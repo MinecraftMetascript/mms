@@ -31,7 +31,8 @@ jobs:
 
       - name: Copy wasm Result
         run: |
-          cp -r ./result/* ${{ github.workspace }}/artifacts
+          cp -r ./result/main.wasm ${{ github.workspace }}/artifacts/mms.wasm
+          cp -r ./result/wasm_exec.js  ${{ github.workspace }}/artifacts/go_wasm_loader.js
 
       - name: Get tag name
         id: get_tag
