@@ -42,22 +42,20 @@ type Visitor struct {
 func (v *Visitor) DumpDeclarations(ns *lib.Namespace) {
 	for name, rule := range v.RuleDeclarations {
 		ns.Set(name, lib.Symbol[json.Marshaler]{
-			File:  rule.File,
-			Line:  rule.Line,
-			Col:   rule.Col,
-			Ref:   rule.Ref,
-			Value: rule.Value,
-			Kind:  rule.Kind,
+			File:     rule.File,
+			Location: rule.Location,
+			Ref:      rule.Ref,
+			Value:    rule.Value,
+			Kind:     rule.Kind,
 		})
 	}
 	for name, condition := range v.ConditionDeclarations {
 		ns.Set(name, lib.Symbol[json.Marshaler]{
-			File:  condition.File,
-			Line:  condition.Line,
-			Col:   condition.Col,
-			Ref:   condition.Ref,
-			Value: condition.Value,
-			Kind:  condition.Kind,
+			File:     condition.File,
+			Location: condition.Location,
+			Ref:      condition.Ref,
+			Value:    condition.Value,
+			Kind:     condition.Kind,
 		})
 	}
 }

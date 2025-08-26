@@ -16,6 +16,10 @@
       in
       {
         devShells.default = pkgs.mkShell {
+env = {
+  GOROOT = "${pkgs.go}/share/go";
+};
+        
           buildInputs = [
             pkgs.antlr4
             pkgs.go
@@ -69,13 +73,6 @@
 
           shellHook = ''
             exec fish
-          '';
-        };
-
-        devShells.jetbrainsPlugin = pkgs.mkShell {
-          buildInputs = [ pkgs.jdk17 pkgs.gradle ];
-          shellHook = ''
-            echo "Use: nix develop .#jetbrainsPlugin -c gradle --no-daemon buildPlugin (run from extensions/jetbrains)"
           '';
         };
 

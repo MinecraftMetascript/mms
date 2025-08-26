@@ -12,12 +12,11 @@ import (
 
 func mkRuleSymbol(ctx *grammars.SurfaceRuleDeclarationContext, rule surface_rules.SurfaceRule, ref lib.Reference, file string) lib.Symbol[surface_rules.SurfaceRule] {
 	return lib.Symbol[surface_rules.SurfaceRule]{
-		Line:  ctx.GetStart().GetLine(),
-		Col:   ctx.GetStart().GetColumn(),
-		Ref:   ref,
-		File:  file,
-		Value: rule,
-		Kind:  lib.SymbolKindSurfaceRule,
+		Location: lib.GetRuleLocation(ctx),
+		Ref:      ref,
+		File:     file,
+		Value:    rule,
+		Kind:     lib.SymbolKindSurfaceRule,
 	}
 }
 

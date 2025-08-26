@@ -14,12 +14,12 @@ const (
 )
 
 type Symbol[K json.Marshaler] struct {
-	File  string     `json:"source"`
-	Line  int        `json:"line"`
-	Col   int        `json:"col"`
-	Ref   Reference  `json:"reference"`
-	Value K          `json:"value"`
-	Kind  SymbolKind `json:"kind"`
+	fmt.Stringer
+	Location TextLocation `json:"location,inline"`
+	File     string       `json:"source"`
+	Ref      Reference    `json:"reference"`
+	Value    K            `json:"value"`
+	Kind     SymbolKind   `json:"kind"`
 }
 
 func NewNamespace() *Namespace {
@@ -56,14 +56,9 @@ func (n *Namespace) Merge(other *Namespace) []MergeIssue {
 	for name, value := range other.symbols {
 		if _, ok := n.symbols[name]; ok {
 			issues = append(issues, MergeIssue{
-				Location: TextLocation{
-					Start: Location{
-						Column: value.Col,
-						Line:   value.Line,
-					},
-				},
-				File:    value.File,
-				Message: "Duplicate symbol",
+				Location: value.Location,
+				File:     value.File,
+				Message:  "Duplicate symbol",
 			},
 			)
 		}
@@ -86,12 +81,11 @@ func AllOf[T json.Marshaler](n *Namespace) map[string]Symbol[T] {
 		}
 		// Create a new symbol with the value cast as T
 		newSymbol := Symbol[T]{
-			File:  sym.File,
-			Line:  sym.Line,
-			Col:   sym.Col,
-			Ref:   sym.Ref,
-			Value: value,
-			Kind:  sym.Kind,
+			File:     sym.File,
+			Location: sym.Location,
+			Ref:      sym.Ref,
+			Value:    value,
+			Kind:     sym.Kind,
 		}
 		out[name] = newSymbol
 	}

@@ -31,12 +31,11 @@ type Visitor struct {
 func (v *Visitor) DumpDeclarations(ns *lib.Namespace) {
 	for name, rule := range v.NoiseDeclarations {
 		ns.Set(name, lib.Symbol[json.Marshaler]{
-			Value: rule.Value,
-			File:  rule.File,
-			Ref:   rule.Ref,
-			Line:  rule.Line,
-			Col:   rule.Col,
-			Kind:  rule.Kind,
+			Value:    rule.Value,
+			File:     rule.File,
+			Ref:      rule.Ref,
+			Location: rule.Location,
+			Kind:     rule.Kind,
 		})
 	}
 }
@@ -64,8 +63,7 @@ func (v *Visitor) ExitNoiseDeclaration(ctx *grammars.NoiseDeclarationContext) {
 			Namespace: v.namespace,
 			Name:      id,
 		},
-		Line: ctx.GetStart().GetLine(),
-		Col:  ctx.GetStart().GetColumn(),
-		Kind: lib.SymbolKindNoise,
+		Location: lib.GetRuleLocation(ctx),
+		Kind:     lib.SymbolKindNoise,
 	}
 }

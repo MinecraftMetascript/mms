@@ -9,8 +9,8 @@ import (
 
 func mkConditionSymbol(ctx *grammars.SurfaceConditionDeclarationContext, rule surface_conditions.SurfaceCondition, ref lib.Reference, file string) lib.Symbol[surface_conditions.SurfaceCondition] {
 	return lib.Symbol[surface_conditions.SurfaceCondition]{
-		Line:  ctx.GetStart().GetLine(),
-		Col:   ctx.GetStart().GetColumn(),
+		Location: lib.GetRuleLocation(ctx),
+
 		Ref:   ref,
 		File:  file,
 		Value: rule,
