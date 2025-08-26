@@ -20,14 +20,14 @@ jobs:
 
       - name: Copy Built Result
         run: |
-          cp -r ./result $GITHUB_WORKSPACE/binary
+          cp -r ./result/bin/mms $GITHUB_WORKSPACE/
 
       - name: Build wasm
         run: nix build ".#wasm"
 
       - name: Copy wasm Result
         run: |
-          cp -r ./result $GITHUB_WORKSPACE/wasm
+          cp -r ./result/* $GITHUB_WORKSPACE/
 
       - name: Get tag name
         id: get_tag
@@ -37,7 +37,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.get_tag.outputs.tag }}
-          files: $GITHUB_WORKSPACE/{wasm,binary}
+          files: $GITHUB_WORKSPACE/*
 
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
