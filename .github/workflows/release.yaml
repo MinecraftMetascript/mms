@@ -1,0 +1,43 @@
+name: Build and Release Artifacts
+
+on:
+  push:
+    tags:
+      - "*"
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v27
+
+      - name: Build flake package
+        run: nix build
+
+      - name: Copy Built Result
+        run: |
+          cp -r ./result $GITHUB_WORKSPACE/binary
+
+      - name: Build wasm
+        run: nix build ".#wasm"
+
+      - name: Copy wasm Result
+        run: |
+          cp -r ./result $GITHUB_WORKSPACE/wasm
+
+      - name: Get tag name
+        id: get_tag
+        run: echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.get_tag.outputs.tag }}
+          files: $GITHUB_WORKSPACE/{wasm,binary}
+
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

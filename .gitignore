@@ -1,0 +1,9 @@
+mms/grammars
+result
+vscode-extension/node_modules
+.antlr
+mms_build
+gen
+extensions/vscode-extension/node_modules
+overworld.json
+surface_rules_wiki.txt
