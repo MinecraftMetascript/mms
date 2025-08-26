@@ -1,5 +1,8 @@
 name: Build and Release Artifacts
 
+permissions:
+  contents: write
+
 on:
   push:
     tags:
