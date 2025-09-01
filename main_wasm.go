@@ -2,51 +2,11 @@
 
 package main
 
-import (
-	"encoding/json"
-	"errors"
-	"log"
-	"syscall/js"
+import "log"
+import "syscall/js"
 
-	"github.com/minecraftmetascript/mms/lang"
-	"github.com/minecraftmetascript/mms/lang/worldgen/noise"
-	"github.com/minecraftmetascript/mms/lang/worldgen/surface/surface_conditions"
-	"github.com/minecraftmetascript/mms/lang/worldgen/surface/surface_rules"
-)
-
-func parseLiteral(this js.Value, args []js.Value) interface{} {
-	if len(args) != 1 {
-		return errors.New("expected 1 argument")
-	}
-	content := args[0].String()
-	project := lang.NewMMSProject()
-
-	err := project.AddFile("wasm_content", content)
-	if err != nil {
-		return err
-	}
-
-	filetree := project.Export()
-
-	tree, err := json.MarshalIndent(filetree, "", "  ")
-	if err != nil {
-		return err
-	}
-
-	symbols := map[string]any{}
-
-	symbols["surface_rules"] = lang.ProjectSymbols[surface_rules.SurfaceRule](project)
-	symbols["surface_conditions"] = lang.ProjectSymbols[surface_conditions.SurfaceCondition](project)
-	symbols["noise"] = lang.ProjectSymbols[noise.Noise](project)
-
-	symbolsStr, err := json.Marshal(symbols)
-	if err != nil {
-		return err
-	}
-
-	js.Global().Call("parseLiteralCallback", string(tree), string(symbolsStr))
-
-	return nil
+func parseLiteral(this js.Value, args []js.Value) any {
+	return "Hello World!"
 }
 
 func main() {

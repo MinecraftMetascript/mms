@@ -13,44 +13,33 @@
       system:
       let
         pkgs = import nixpkgs { inherit system; };
+        antlrBuild = pkgs.writeShellApplication {
+                                   name = "antlr-build";
+                                   runtimeInputs = [
+                                     pkgs.antlr4
+                                     pkgs.go
+                                   ];
+                                   text = ''
+                                     set -e
+                                     src="./grammar"
+                                     dst="./lang"
+                                     ${pkgs.antlr4}/bin/antlr4 -Dlanguage=Go $src/Main_Lexer.g4 -o $dst -package grammar;
+                                     ${pkgs.antlr4}/bin/antlr4 -Dlanguage=Go $src/Main_Parser.g4 -lib $dst/grammar -o $dst -package grammar;
+                                   '';
+                                 };
       in
       {
         devShells.default = pkgs.mkShell {
-env = {
-  GOROOT = "${pkgs.go}/share/go";
-};
+        env = {
+          GOROOT = "${pkgs.go}/share/go";
+        };
         
           buildInputs = [
             pkgs.antlr4
             pkgs.go
             pkgs.fish
-
-            (pkgs.writeShellApplication{
-              name = "debug-file";
-              runtimeInputs = [
-                pkgs.antlr4
-                pkgs.go
-              ];
-              text = ''
-                antlr4-parse grammars/MMSParser.g4 grammars/MMSLexer.g4 mmsFile -gui "$1"
-              '';
-                
-            })
-
-            (pkgs.writeShellApplication {
-              name = "antlr-build";
-              runtimeInputs = [
-                pkgs.antlr4
-                pkgs.go
-              ];
-              text = ''
-                set -e
-                src="./grammars"
-                dst="./lang"
-                ${pkgs.antlr4}/bin/antlr4 -Dlanguage=Go $src/MMSLexer.g4 -o $dst -package grammars;
-                ${pkgs.antlr4}/bin/antlr4 -Dlanguage=Go $src/MMSParser.g4 -lib $dst/grammars -o $dst -package grammars;                
-              '';
-            })
+            antlrBuild
+            pkgs.cobra-cli
             (pkgs.writeShellApplication {
               name = "antlr-build-keyword-rule";
               runtimeInputs = [
@@ -63,7 +52,7 @@ env = {
                   echo "parser grammar MMS_Keyword_Rule;"
                   echo "options { tokenVocab = MMSLexer; }"
                   echo "keyword: "
-                  grep Keyword_ < grammars/MMSLexer.g4 | sed -E 's/:.*/ | /' | tr -d '\n' | sed 's/ | $/\n/'
+                  grep Keyword_ < grammars/Main_Lexer.g4 | sed -E 's/:.*/ | /' | tr -d '\n' | sed 's/ | $/\n/'
                   echo ";"
                 } > grammars/MMS_Keyword_Rule.g4
               '';
@@ -84,12 +73,10 @@ env = {
           # If you use vendoring, run `go mod vendor` and replace null with the hash
           subPackages = [ "." ];
 
+          buildInputs = [antlrBuild];
+
           preBuild = ''
-                dst=./lang
-                mkdir -p $dst
-                # Specifying dst/grammars is required here for some reason -- but not in the shell script?
-                ${pkgs.antlr4}/bin/antlr4 -Dlanguage=Go $src/grammars/MMSLexer.g4 -o $dst/grammars -package grammars;
-                ${pkgs.antlr4}/bin/antlr4 -Dlanguage=Go $src/grammars/MMSParser.g4 -lib $dst/grammars -o $dst/grammars -package grammars;                
+                antlr-build
           '';
         };
 
@@ -105,30 +92,13 @@ env = {
             go build -o main.wasm
           '';
           installPhase = ''
-            mkdir -p $out
-            mv main.wasm $out/
+            mkdir -p $out/js/dist
+            mv main.wasm $out/js/dist
+            cp $src/wasm/* $out/js -r
+
             cp "$(go env GOROOT)/misc/wasm/wasm_exec.js" $out/
           '';
         };
-
-        packages.jetbrainsPlugin = pkgs.stdenvNoCC.mkDerivation {
-          pname = "mms-jetbrains-plugin";
-          version = "0.1.0";
-          src = ./extensions/jetbrains;
-          nativeBuildInputs = [ pkgs.jdk17 pkgs.gradle ];
-          buildPhase = ''
-            set -eu
-            export JAVA_HOME=${pkgs.jdk17}
-            export GRADLE_USER_HOME=$TMPDIR/gradle-home
-            gradle --no-daemon buildPlugin
-          '';
-          installPhase = ''
-            set -eu
-            mkdir -p $out
-            cp -v build/distributions/*.zip $out/
-          '';
-        };
-        
       }
     );
 }
