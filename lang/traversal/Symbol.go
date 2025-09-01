@@ -1,5 +1,7 @@
 package traversal
 
+import "encoding/json"
+
 type Symbol interface {
 	GetNameLocation() TextLocation
 	GetContentLocation() TextLocation
@@ -37,4 +39,18 @@ func (s BaseSymbol) GetValue() Construct {
 
 func (s BaseSymbol) GetReference() *Reference {
 	return s.ref
+}
+
+func (s BaseSymbol) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		NameLocation    TextLocation `json:"nameLocation"`
+		ContentLocation TextLocation `json:"contentLocation"`
+		Value           Construct    `json:"value"`
+		Ref             Reference    `json:"ref"`
+	}{
+		NameLocation:    s.nameLocation,
+		ContentLocation: s.contentLocation,
+		Value:           s.GetValue(),
+		Ref:             *s.ref,
+	})
 }

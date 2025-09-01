@@ -12,9 +12,11 @@ type Location struct {
 }
 
 type TextLocation struct {
-	Start Location
-	Stop  Location
-	Text  string
+	Start    Location
+	StartIdx int
+	Stop     Location
+	StopIdx  int
+	Text     string
 }
 
 func (tl TextLocation) String() string {
@@ -41,10 +43,12 @@ func RuleLocation(ctx antlr.ParserRuleContext, text string) TextLocation {
 			Line: ctx.GetStart().GetLine(),
 			Col:  ctx.GetStart().GetColumn(),
 		},
+		StartIdx: ctx.GetStart().GetStart(),
 		Stop: Location{
 			Line: ctx.GetStop().GetLine(),
 			Col:  ctx.GetStop().GetColumn(),
 		},
-		Text: text[ctx.GetStart().GetStart() : ctx.GetStop().GetStop()+1],
+		StopIdx: ctx.GetStop().GetStop(),
+		Text:    text[ctx.GetStart().GetStart() : ctx.GetStop().GetStop()+1],
 	}
 }

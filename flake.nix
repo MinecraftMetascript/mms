@@ -73,10 +73,8 @@
           # If you use vendoring, run `go mod vendor` and replace null with the hash
           subPackages = [ "." ];
 
-          buildInputs = [antlrBuild];
-
           preBuild = ''
-                antlr-build
+                ${antlrBuild}/bin/antlr-build
           '';
         };
 

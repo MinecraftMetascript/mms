@@ -2,7 +2,7 @@
 
 package main
 
-import "mms2/cmd"
+import "github.com/minecraftmetascript/mms/cmd"
 
 func main() {
 	cmd.Execute()

@@ -2,10 +2,10 @@ package test
 
 import (
 	"fmt"
-	"mms2/lang"
-	"mms2/lang/constructs/worldgen/surface_rules"
-	"mms2/lang/traversal"
-	"mms2/lib"
+	"github.com/minecraftmetascript/mms/lang"
+	"github.com/minecraftmetascript/mms/lang/constructs/worldgen/surface_rules"
+	"github.com/minecraftmetascript/mms/lang/traversal"
+	"github.com/minecraftmetascript/mms/lib"
 	"testing"
 )
 

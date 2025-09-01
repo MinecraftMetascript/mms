@@ -1,9 +1,9 @@
 package surface_rules
 
 import (
-	"mms2/lang/grammar"
-	"mms2/lang/traversal"
-	"mms2/lib"
+	"github.com/minecraftmetascript/mms/lang/grammar"
+	"github.com/minecraftmetascript/mms/lang/traversal"
+	"github.com/minecraftmetascript/mms/lib"
 	"reflect"
 
 	"github.com/antlr4-go/antlr/v4"

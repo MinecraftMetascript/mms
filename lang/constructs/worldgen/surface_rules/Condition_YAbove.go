@@ -2,12 +2,13 @@ package surface_rules
 
 import (
 	"encoding/json"
-	"mms2/lang/constructs/primitives"
-	"mms2/lang/grammar"
-	"mms2/lang/traversal"
-	"mms2/lib"
 	"reflect"
 	"strconv"
+
+	"github.com/minecraftmetascript/mms/lang/constructs/primitives"
+	"github.com/minecraftmetascript/mms/lang/grammar"
+	"github.com/minecraftmetascript/mms/lang/traversal"
+	"github.com/minecraftmetascript/mms/lib"
 
 	"github.com/antlr4-go/antlr/v4"
 )
@@ -18,7 +19,7 @@ func init() {
 		func(ctx antlr.ParserRuleContext, ns string, scope *traversal.Scope) traversal.Construct {
 			yAbove := ctx.(*grammar.SurfaceCondition_YAboveContext)
 
-			x := traversal.ConstructRegistry.Construct(yAbove.VerticalAnchor(), ns, scope)
+			x := traversal.ConstructRegistry.Construct(yAbove.VerticalAnchorDefinition(), ns, scope)
 
 			anchor := x.(*primitives.VerticalAnchor)
 			multiplier, _ := strconv.Atoi(yAbove.Int().GetText())

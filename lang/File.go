@@ -1,7 +1,7 @@
 package lang
 
 import (
-	"mms2/lang/traversal"
+	"github.com/minecraftmetascript/mms/lang/traversal"
 )
 
 type File struct {

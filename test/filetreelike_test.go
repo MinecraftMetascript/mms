@@ -1,7 +1,7 @@
 package test
 
 import (
-	"mms2/lib"
+	"github.com/minecraftmetascript/mms/lib"
 	"testing"
 )
 

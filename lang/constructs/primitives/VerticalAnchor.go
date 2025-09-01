@@ -2,20 +2,21 @@ package primitives
 
 import (
 	"fmt"
-	"mms2/lang/grammar"
-	"mms2/lang/traversal"
-	"mms2/lib"
 	"reflect"
 	"strconv"
+
+	"github.com/minecraftmetascript/mms/lang/grammar"
+	"github.com/minecraftmetascript/mms/lang/traversal"
+	"github.com/minecraftmetascript/mms/lib"
 
 	"github.com/antlr4-go/antlr/v4"
 )
 
 func init() {
 	traversal.ConstructRegistry.Register(
-		reflect.TypeFor[*grammar.VerticalAnchorContext](),
+		reflect.TypeFor[*grammar.VerticalAnchorDefinitionContext](),
 		func(ctx antlr.ParserRuleContext, _ string, _ *traversal.Scope) traversal.Construct {
-			anchor := ctx.(*grammar.VerticalAnchorContext)
+			anchor := ctx.(*grammar.VerticalAnchorDefinitionContext)
 
 			if rule := anchor.VerticalAnchor_Absolute(); rule != nil {
 				value, err := strconv.Atoi(rule.Int().GetText())

@@ -4,10 +4,11 @@ import (
 	"encoding/json"
 	"errors"
 
-	"mms2/lang/grammar"
-	"mms2/lang/traversal"
-	"mms2/lib"
 	"reflect"
+
+	"github.com/minecraftmetascript/mms/lang/grammar"
+	"github.com/minecraftmetascript/mms/lang/traversal"
+	"github.com/minecraftmetascript/mms/lib"
 
 	"github.com/antlr4-go/antlr/v4"
 )
@@ -19,8 +20,12 @@ func init() {
 		reflect.TypeFor[grammar.SurfaceRuleDefinitionContext](),
 		func(ctx antlr.ParserRuleContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
 			def := ctx.(*grammar.SurfaceRuleDefinitionContext)
+			rule := def.SurfaceRule()
+			if rule == nil {
+				return nil
+			}
 
-			if v, ok := def.SurfaceRule().GetChild(0).(antlr.ParserRuleContext); ok {
+			if v, ok := rule.GetChild(0).(antlr.ParserRuleContext); ok {
 				return traversal.ConstructRegistry.Construct(
 					v,
 					currentNamespace,

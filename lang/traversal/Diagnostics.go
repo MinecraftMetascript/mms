@@ -20,10 +20,10 @@ const (
 // via TextLocation
 // Source can be "lexer", "parser", or "semantic"
 type Diagnostic struct {
-	Message  string
-	Where    TextLocation
-	Severity Severity
-	Source   string
+	Message  string       `json:"message"`
+	Where    TextLocation `json:"where"`
+	Severity Severity     `json:"severity"`
+	Source   string       `json:"source"`
 }
 
 func (d Diagnostic) String() string {
@@ -51,16 +51,29 @@ func (l *DiagnosticsErrorListener) SyntaxError(recognizer antlr.Recognizer, offe
 	// Build a minimal TextLocation; try to get token span if available
 	startCol := column
 	stopCol := column + 1
-	if tok, ok := offendingSymbol.(antlr.Token); ok && tok != nil && tok.GetStart() >= 0 && tok.GetStop() >= tok.GetStart() {
-		startCol = tok.GetColumn()
-		// tok.GetStop() is inclusive index over content; convert to column span conservatively
-		stopCol = startCol + len(tok.GetText())
+
+	var startIdx, stopIdx int
+	if tok, ok := offendingSymbol.(antlr.Token); ok {
+		if tok != nil && tok.GetStart() >= 0 && tok.GetStop() >= tok.GetStart() {
+			startCol = tok.GetColumn()
+
+			// tok.GetStop() is inclusive index over content; convert to column span conservatively
+			stopCol = startCol + len(tok.GetText())
+		}
+
+		startIdx = tok.GetStart()
+		stopIdx = tok.GetStop()
+		if stopIdx >= startIdx {
+			stopIdx++
+		}
 	}
 
 	loc := TextLocation{
-		Start: Location{Line: line, Col: startCol},
-		Stop:  Location{Line: line, Col: stopCol},
-		Text:  snippetAt(l.content, line, startCol, stopCol),
+		Start:    Location{Line: line, Col: startCol},
+		StartIdx: startIdx,
+		Stop:     Location{Line: line, Col: stopCol},
+		StopIdx:  stopIdx,
+		Text:     snippetAt(l.content, line, startCol, stopCol),
 	}
 
 	*l.diagnostics = append(*l.diagnostics, Diagnostic{

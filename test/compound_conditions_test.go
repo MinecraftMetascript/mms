@@ -3,8 +3,8 @@ package test
 import (
 	"encoding/json"
 	"fmt"
-	"mms2/lang"
-	"mms2/lang/traversal"
+	"github.com/minecraftmetascript/mms/lang"
+	"github.com/minecraftmetascript/mms/lang/traversal"
 	"testing"
 )
 

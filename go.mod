@@ -1,4 +1,4 @@
-module mms2
+module github.com/minecraftmetascript/mms
 
 go 1.23
 

@@ -202,11 +202,13 @@ func (s *BaseMain_ParserListener) EnterNumber(ctx *NumberContext) {}
 // ExitNumber is called when production number is exited.
 func (s *BaseMain_ParserListener) ExitNumber(ctx *NumberContext) {}
 
-// EnterVerticalAnchor is called when production verticalAnchor is entered.
-func (s *BaseMain_ParserListener) EnterVerticalAnchor(ctx *VerticalAnchorContext) {}
+// EnterVerticalAnchorDefinition is called when production verticalAnchorDefinition is entered.
+func (s *BaseMain_ParserListener) EnterVerticalAnchorDefinition(ctx *VerticalAnchorDefinitionContext) {
+}
 
-// ExitVerticalAnchor is called when production verticalAnchor is exited.
-func (s *BaseMain_ParserListener) ExitVerticalAnchor(ctx *VerticalAnchorContext) {}
+// ExitVerticalAnchorDefinition is called when production verticalAnchorDefinition is exited.
+func (s *BaseMain_ParserListener) ExitVerticalAnchorDefinition(ctx *VerticalAnchorDefinitionContext) {
+}
 
 // EnterVerticalAnchor_Absolute is called when production verticalAnchor_Absolute is entered.
 func (s *BaseMain_ParserListener) EnterVerticalAnchor_Absolute(ctx *VerticalAnchor_AbsoluteContext) {}
@@ -227,3 +229,11 @@ func (s *BaseMain_ParserListener) EnterVerticalAnchor_BelowTop(ctx *VerticalAnch
 
 // ExitVerticalAnchor_BelowTop is called when production verticalAnchor_BelowTop is exited.
 func (s *BaseMain_ParserListener) ExitVerticalAnchor_BelowTop(ctx *VerticalAnchor_BelowTopContext) {}
+
+// EnterVerticalAnchor_Reference is called when production verticalAnchor_Reference is entered.
+func (s *BaseMain_ParserListener) EnterVerticalAnchor_Reference(ctx *VerticalAnchor_ReferenceContext) {
+}
+
+// ExitVerticalAnchor_Reference is called when production verticalAnchor_Reference is exited.
+func (s *BaseMain_ParserListener) ExitVerticalAnchor_Reference(ctx *VerticalAnchor_ReferenceContext) {
+}

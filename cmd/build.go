@@ -3,9 +3,9 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/minecraftmetascript/mms/lang"
 	"io/fs"
 	"log"
-	"mms2/lang"
 	"os"
 
 	"github.com/spf13/cobra"

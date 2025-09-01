@@ -2,7 +2,7 @@ package block_states
 
 import (
 	"encoding/json"
-	"mms2/lang/traversal"
+	"github.com/minecraftmetascript/mms/lang/traversal"
 )
 
 type BlockState struct {

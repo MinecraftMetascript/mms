@@ -91,8 +91,8 @@ type Main_ParserListener interface {
 	// EnterNumber is called when entering the number production.
 	EnterNumber(c *NumberContext)
 
-	// EnterVerticalAnchor is called when entering the verticalAnchor production.
-	EnterVerticalAnchor(c *VerticalAnchorContext)
+	// EnterVerticalAnchorDefinition is called when entering the verticalAnchorDefinition production.
+	EnterVerticalAnchorDefinition(c *VerticalAnchorDefinitionContext)
 
 	// EnterVerticalAnchor_Absolute is called when entering the verticalAnchor_Absolute production.
 	EnterVerticalAnchor_Absolute(c *VerticalAnchor_AbsoluteContext)
@@ -102,6 +102,9 @@ type Main_ParserListener interface {
 
 	// EnterVerticalAnchor_BelowTop is called when entering the verticalAnchor_BelowTop production.
 	EnterVerticalAnchor_BelowTop(c *VerticalAnchor_BelowTopContext)
+
+	// EnterVerticalAnchor_Reference is called when entering the verticalAnchor_Reference production.
+	EnterVerticalAnchor_Reference(c *VerticalAnchor_ReferenceContext)
 
 	// ExitScript is called when exiting the script production.
 	ExitScript(c *ScriptContext)
@@ -187,8 +190,8 @@ type Main_ParserListener interface {
 	// ExitNumber is called when exiting the number production.
 	ExitNumber(c *NumberContext)
 
-	// ExitVerticalAnchor is called when exiting the verticalAnchor production.
-	ExitVerticalAnchor(c *VerticalAnchorContext)
+	// ExitVerticalAnchorDefinition is called when exiting the verticalAnchorDefinition production.
+	ExitVerticalAnchorDefinition(c *VerticalAnchorDefinitionContext)
 
 	// ExitVerticalAnchor_Absolute is called when exiting the verticalAnchor_Absolute production.
 	ExitVerticalAnchor_Absolute(c *VerticalAnchor_AbsoluteContext)
@@ -198,4 +201,7 @@ type Main_ParserListener interface {
 
 	// ExitVerticalAnchor_BelowTop is called when exiting the verticalAnchor_BelowTop production.
 	ExitVerticalAnchor_BelowTop(c *VerticalAnchor_BelowTopContext)
+
+	// ExitVerticalAnchor_Reference is called when exiting the verticalAnchor_Reference production.
+	ExitVerticalAnchor_Reference(c *VerticalAnchor_ReferenceContext)
 }

@@ -2,10 +2,11 @@ package lang
 
 import (
 	"fmt"
-	"mms2/lang/traversal"
-	"mms2/lib"
+
+	"github.com/minecraftmetascript/mms/lang/traversal"
+	"github.com/minecraftmetascript/mms/lib"
 )
-import _ "mms2/lang/constructs/worldgen/surface_rules"
+import _ "github.com/minecraftmetascript/mms/lang/constructs/worldgen/surface_rules"
 
 type Project struct {
 	Files       map[string]*File

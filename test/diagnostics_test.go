@@ -1,9 +1,10 @@
 package test
 
 import (
-	"mms2/lang"
-	"mms2/lang/traversal"
 	"testing"
+
+	"github.com/minecraftmetascript/mms/lang"
+	"github.com/minecraftmetascript/mms/lang/traversal"
 )
 
 func TestSemanticDuplicateSymbolDiagnostic_CrossNamespace(t *testing.T) {

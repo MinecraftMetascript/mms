@@ -2,7 +2,7 @@ package traversal
 
 import (
 	"errors"
-	"mms2/lang/grammar"
+	"github.com/minecraftmetascript/mms/lang/grammar"
 
 	"github.com/antlr4-go/antlr/v4"
 )

@@ -2,10 +2,10 @@ package surface_rules
 
 import (
 	"encoding/json"
-	"mms2/lang/constructs/primitives"
-	"mms2/lang/grammar"
-	"mms2/lang/traversal"
-	"mms2/lib"
+	"github.com/minecraftmetascript/mms/lang/constructs/primitives"
+	"github.com/minecraftmetascript/mms/lang/grammar"
+	"github.com/minecraftmetascript/mms/lang/traversal"
+	"github.com/minecraftmetascript/mms/lib"
 	"reflect"
 
 	"github.com/antlr4-go/antlr/v4"
@@ -16,8 +16,8 @@ func init() {
 		reflect.TypeFor[grammar.SurfaceCondition_VerticalGradientContext](),
 		func(ctx antlr.ParserRuleContext, ns string, scope *traversal.Scope) traversal.Construct {
 			verticalGradient := ctx.(*grammar.SurfaceCondition_VerticalGradientContext)
-			trueAnchor := traversal.ConstructRegistry.Construct(verticalGradient.VerticalAnchor(0), ns, scope).(*primitives.VerticalAnchor)
-			falseAnchor := traversal.ConstructRegistry.Construct(verticalGradient.VerticalAnchor(1), ns, scope).(*primitives.VerticalAnchor)
+			trueAnchor := traversal.ConstructRegistry.Construct(verticalGradient.VerticalAnchorDefinition(0), ns, scope).(*primitives.VerticalAnchor)
+			falseAnchor := traversal.ConstructRegistry.Construct(verticalGradient.VerticalAnchorDefinition(1), ns, scope).(*primitives.VerticalAnchor)
 
 			return &VerticalGradientCondition{
 				SeedText:        verticalGradient.String_().GetText(),

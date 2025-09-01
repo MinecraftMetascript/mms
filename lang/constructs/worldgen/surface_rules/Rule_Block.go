@@ -2,11 +2,12 @@ package surface_rules
 
 import (
 	"encoding/json"
-	"mms2/lang/constructs/block_states"
-	"mms2/lang/grammar"
-	"mms2/lang/traversal"
-	"mms2/lib"
 	"reflect"
+
+	"github.com/minecraftmetascript/mms/lang/constructs/block_states"
+	"github.com/minecraftmetascript/mms/lang/grammar"
+	"github.com/minecraftmetascript/mms/lang/traversal"
+	"github.com/minecraftmetascript/mms/lib"
 
 	"github.com/antlr4-go/antlr/v4"
 )

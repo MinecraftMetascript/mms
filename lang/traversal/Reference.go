@@ -2,8 +2,9 @@ package traversal
 
 import (
 	"fmt"
-	"mms2/lang/grammar"
 	"reflect"
+
+	"github.com/minecraftmetascript/mms/lang/grammar"
 
 	"github.com/antlr4-go/antlr/v4"
 )

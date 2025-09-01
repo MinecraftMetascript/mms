@@ -1,6 +1,6 @@
 parser grammar Main_Parser;
 
-import SurfaceRules_Parser;
+import SurfaceRules_Parser, VerticalAnchor_Parser;
 
 options {
     tokenVocab = Main_Lexer;

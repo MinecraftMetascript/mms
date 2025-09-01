@@ -1,6 +1,7 @@
 package traversal
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 )
@@ -52,4 +53,8 @@ func (s *Scope) Parent() *Scope {
 
 func (s *Scope) Symbols() map[string]Symbol {
 	return s.symbols
+}
+
+func (s *Scope) MarshalJSON() ([]byte, error) {
+	return json.Marshal(s.symbols)
 }
