@@ -49,6 +49,6 @@ func RuleLocation(ctx antlr.ParserRuleContext, text string) TextLocation {
 			Col:  ctx.GetStop().GetColumn(),
 		},
 		StopIdx: ctx.GetStop().GetStop(),
-		Text:    text[ctx.GetStart().GetStart() : ctx.GetStop().GetStop()+1],
+		Text:    ctx.GetText(),
 	}
 }
