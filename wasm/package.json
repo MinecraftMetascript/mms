@@ -14,7 +14,8 @@
   "module": "./mms.js",
   "main": "./mms.js",
   "exports": {
-    ".": "./mms.js"
+    ".": "./mms.js",
+    "./dist/main.wasm": "./dist/main.wasm"
   },
   "types": "./mms.d.ts",
   "repository": "https://github.com/MinecraftMetascript/mms"
