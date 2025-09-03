@@ -2,6 +2,7 @@ name: Build and Release Artifacts
 
 permissions:
   contents: write
+  packages: write
 
 on:
   push:
@@ -28,11 +29,19 @@ jobs:
 
       - name: Build wasm
         run: nix build ".#wasm"
-
-      - name: Copy wasm Result
+      
+      - name: Publish built wasm package
         run: |
-          cp -r ./result/main.wasm ${{ github.workspace }}/artifacts/mms.wasm
-          cp -r ./result/wasm_exec.js  ${{ github.workspace }}/artifacts/go_wasm_loader.js
+          cd ./result/js
+          echo "//npm.pkg.github.com/:_authToken=${{ secrets.GITHUB_TOKEN }}" > .npmrc
+          echo "@minecraftmetascript:registry=https://npm.pkg.github.com" >> .npmrc
+          npm publish --access public
+      
+
+#      - name: Copy wasm Result
+#        run: |
+#          cp -r ./result/main.wasm ${{ github.workspace }}/artifacts/mms.wasm
+#          cp -r ./result/wasm_exec.js  ${{ github.workspace }}/artifacts/go_wasm_loader.js
 
       - name: Get tag name
         id: get_tag

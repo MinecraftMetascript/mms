@@ -14,26 +14,26 @@
       let
         pkgs = import nixpkgs { inherit system; };
         antlrBuild = pkgs.writeShellApplication {
-                                   name = "antlr-build";
-                                   runtimeInputs = [
-                                     pkgs.antlr4
-                                     pkgs.go
-                                   ];
-                                   text = ''
-                                     set -e
-                                     src="./grammar"
-                                     dst="./lang"
-                                     ${pkgs.antlr4}/bin/antlr4 -Dlanguage=Go $src/Main_Lexer.g4 -o $dst -package grammar;
-                                     ${pkgs.antlr4}/bin/antlr4 -Dlanguage=Go $src/Main_Parser.g4 -lib $dst/grammar -o $dst -package grammar;
-                                   '';
-                                 };
+          name = "antlr-build";
+          runtimeInputs = [
+            pkgs.antlr4
+            pkgs.go
+          ];
+          text = ''
+            set -e
+            src="./grammar"
+            dst="./lang"
+            ${pkgs.antlr4}/bin/antlr4 -Dlanguage=Go $src/Main_Lexer.g4 -o $dst -package grammar;
+            ${pkgs.antlr4}/bin/antlr4 -Dlanguage=Go $src/Main_Parser.g4 -lib $dst/grammar -o $dst -package grammar;
+          '';
+        };
       in
       {
         devShells.default = pkgs.mkShell {
-        env = {
-          GOROOT = "${pkgs.go}/share/go";
-        };
-        
+          env = {
+            GOROOT = "${pkgs.go}/share/go";
+          };
+
           buildInputs = [
             pkgs.antlr4
             pkgs.go
@@ -74,7 +74,7 @@
           subPackages = [ "." ];
 
           preBuild = ''
-                ${antlrBuild}/bin/antlr-build
+            ${antlrBuild}/bin/antlr-build
           '';
         };
 
