@@ -30,25 +30,41 @@ const (
 
 func init() {
 	traversal.ConstructRegistry.Register(
+		reflect.TypeFor[grammar.SurfaceConditionContext](),
+		func(ctx antlr.ParserRuleContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
+			conditionCtx := ctx.(*grammar.SurfaceConditionContext)
+			var condition traversal.Construct
+			switch conditionCtx.GetChildCount() {
+			case 1:
+				condition = traversal.ConstructRegistry.Construct(
+					conditionCtx.GetChild(0).(antlr.ParserRuleContext),
+					currentNamespace,
+					scope,
+				)
+			case 2:
+				condition = traversal.ConstructRegistry.Construct(
+					conditionCtx.GetChild(1).(antlr.ParserRuleContext),
+					currentNamespace,
+					scope,
+				)
+				condition = InvertCondition(condition)
+			default:
+				return nil
+			}
+
+			return condition
+		})
+	traversal.ConstructRegistry.Register(
 		reflect.TypeFor[grammar.SurfaceConditionDefinitionContext](),
 		func(ctx antlr.ParserRuleContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
 			def := ctx.(*grammar.SurfaceConditionDefinitionContext)
 
 			if sc := def.SurfaceCondition(); sc != nil {
-				if sc.GetChildCount() > 0 {
-					if prc, ok := sc.GetChild(sc.GetChildCount() - 1).(antlr.ParserRuleContext); ok {
-						cond := traversal.ConstructRegistry.Construct(
-							prc,
-							currentNamespace,
-							scope,
-						)
-						if sc.Bang() != nil {
-							return InvertCondition(cond)
-						} else {
-							return cond
-						}
-					}
-				}
+				return traversal.ConstructRegistry.Construct(
+					sc,
+					currentNamespace,
+					scope,
+				)
 			}
 			return nil
 

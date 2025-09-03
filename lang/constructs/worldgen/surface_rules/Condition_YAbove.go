@@ -57,7 +57,7 @@ func (c YAboveCondition) MarshalJSON() ([]byte, error) {
 	return json.MarshalIndent(struct {
 		Type       SurfaceConditionKind      `json:"type"`
 		Anchor     primitives.VerticalAnchor `json:"anchor"`
-		Multiplier int                       `json:"multiplier"`
+		Multiplier int                       `json:"surface_depth_multiplier"`
 		Add        bool                      `json:"add_stone_depth"`
 	}{
 		Type:       YAboveConditionKind,

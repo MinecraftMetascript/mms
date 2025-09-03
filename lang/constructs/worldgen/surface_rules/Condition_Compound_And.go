@@ -19,23 +19,8 @@ func init() {
 			conditions := make([]traversal.Construct, 0)
 
 			for _, child := range compound.AllSurfaceCondition() {
-				var condition antlr.ParserRuleContext
-
-				if child.GetChildCount() == 1 {
-					if c, ok := child.GetChild(0).(antlr.ParserRuleContext); ok {
-						condition = c
-					}
-				} else if child.GetChildCount() > 1 {
-					if c, ok := child.GetChild(1).(antlr.ParserRuleContext); ok {
-						condition = c
-					}
-				}
-
-				if condition != nil {
-					conditions = append(conditions,
-						traversal.ConstructRegistry.Construct(condition, currentNamespace, scope),
-					)
-				}
+				condition := traversal.ConstructRegistry.Construct(child, currentNamespace, scope)
+				conditions = append(conditions, condition)
 			}
 
 			return &CompoundAndCondition{

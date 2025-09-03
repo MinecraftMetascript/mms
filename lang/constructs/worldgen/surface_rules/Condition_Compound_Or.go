@@ -18,9 +18,8 @@ func init() {
 			compound := _ctx.(*grammar.SurfaceCondition_OrContext)
 			conditions := make([]traversal.Construct, 0)
 			for _, child := range compound.AllSurfaceCondition() {
-				next := traversal.ConstructRegistry.Construct(child.GetChild(0).(antlr.ParserRuleContext), currentNamespace, scope)
+				next := traversal.ConstructRegistry.Construct(child, currentNamespace, scope)
 				conditions = append(conditions, next)
-
 			}
 			return &CompoundOrCondition{
 				Conditions: conditions,

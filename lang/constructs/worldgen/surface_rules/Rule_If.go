@@ -25,21 +25,7 @@ func init() {
 			var condition traversal.Construct
 
 			if cond := ctx.SurfaceCondition(); cond != nil {
-				var inner antlr.ParserRuleContext
-				childCount := cond.GetChildCount()
-				if childCount >= 1 {
-					// if just one child, it's not negated; if more, expect '!' then condition
-					idx := 0
-					if childCount > 1 {
-						idx = 1
-					}
-					if c, ok := cond.GetChild(idx).(antlr.ParserRuleContext); ok {
-						inner = c
-					}
-				}
-				if inner != nil {
-					condition = traversal.ConstructRegistry.Construct(inner, ns, scope)
-				}
+				condition = traversal.ConstructRegistry.Construct(cond, ns, scope)
 			} else {
 				fmt.Println("[ERROR] Condition isn't found!", ctx.SurfaceCondition())
 			}
