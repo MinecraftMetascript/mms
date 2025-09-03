@@ -52,7 +52,7 @@ func (c BiomeCondition) ExportSymbol(symbol traversal.Symbol, rootDir *lib.FileT
 func (c BiomeCondition) MarshalJSON() ([]byte, error) {
 	return json.MarshalIndent(struct {
 		Type   SurfaceConditionKind  `json:"type"`
-		Biomes []traversal.Reference `json:"biomes"`
+		Biomes []traversal.Reference `json:"biome_is"`
 	}{
 		Type:   BiomeConditionKind,
 		Biomes: c.biomes,

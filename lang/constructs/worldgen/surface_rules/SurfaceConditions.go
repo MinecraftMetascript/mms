@@ -24,6 +24,7 @@ const (
 	VerticalGradientConditionKind SurfaceConditionKind = "minecraft:vertical_gradient"
 	AboveWaterConditionKind       SurfaceConditionKind = "minecraft:water"
 	YAboveConditionKind           SurfaceConditionKind = "minecraft:y_above"
+	NotConditionKind              SurfaceConditionKind = "minecraft:not"
 	ReferenceConditionKind        SurfaceConditionKind = "mms:__reference"
 )
 
@@ -36,11 +37,16 @@ func init() {
 			if sc := def.SurfaceCondition(); sc != nil {
 				if sc.GetChildCount() > 0 {
 					if prc, ok := sc.GetChild(0).(antlr.ParserRuleContext); ok {
-						return traversal.ConstructRegistry.Construct(
+						cond := traversal.ConstructRegistry.Construct(
 							prc,
 							currentNamespace,
 							scope,
 						)
+						if sc.Bang() != nil {
+							return InvertCondition(cond)
+						} else {
+							return cond
+						}
 					}
 				}
 			}
@@ -62,10 +68,6 @@ func exportSurfaceCondition(symbol traversal.Symbol, rootDir *lib.FileTreeLike, 
 		MkFile(symbol.GetReference().GetName()+".json", string(data), nil)
 
 	return nil
-}
-
-func InvertCondition(condition traversal.Construct) traversal.Construct {
-	return condition
 }
 
 type BaseSurfaceCondition struct {

@@ -55,8 +55,14 @@ func (c YAboveCondition) ExportSymbol(symbol traversal.Symbol, rootDir *lib.File
 
 func (c YAboveCondition) MarshalJSON() ([]byte, error) {
 	return json.MarshalIndent(struct {
-		Type SurfaceConditionKind `json:"type"`
+		Type       SurfaceConditionKind      `json:"type"`
+		Anchor     primitives.VerticalAnchor `json:"anchor"`
+		Multiplier int                       `json:"multiplier"`
+		Add        bool                      `json:"add_stone_depth"`
 	}{
-		Type: YAboveConditionKind,
+		Type:       YAboveConditionKind,
+		Anchor:     c.Anchor,
+		Multiplier: c.Multiplier,
+		Add:        c.Add,
 	}, "", "  ")
 }

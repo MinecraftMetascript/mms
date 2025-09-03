@@ -61,8 +61,12 @@ func (c VerticalGradientCondition) ExportSymbol(symbol traversal.Symbol, rootDir
 
 func (c VerticalGradientCondition) MarshalJSON() ([]byte, error) {
 	return json.MarshalIndent(struct {
-		Type SurfaceConditionKind `json:"type"`
+		Type         SurfaceConditionKind      `json:"type"`
+		TrueAtBelow  primitives.VerticalAnchor `json:"true_at_and_below"`
+		FalseAtAbove primitives.VerticalAnchor `json:"false_at_and_above"`
 	}{
-		Type: VerticalGradientConditionKind,
+		Type:         VerticalGradientConditionKind,
+		TrueAtBelow:  c.TrueAtAndBelow,
+		FalseAtAbove: c.FalseAtAndAbove,
 	}, "", "  ")
 }
