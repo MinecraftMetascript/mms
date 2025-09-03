@@ -29,12 +29,12 @@ jobs:
 
       - name: Build wasm
         run: nix build ".#wasm"
-      
+
       - name: Publish built wasm package
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           cd ./result/js
-          echo "//npm.pkg.github.com/:_authToken=${{ secrets.GITHUB_TOKEN }}" > .npmrc
-          echo "@minecraftmetascript:registry=https://npm.pkg.github.com" >> .npmrc
           npm publish --access public
       
 
