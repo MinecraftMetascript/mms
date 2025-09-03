@@ -17,13 +17,14 @@ type TextLocation struct {
 	Stop     Location
 	StopIdx  int
 	Text     string
+	Filename string
 }
 
 func (tl TextLocation) String() string {
 	return fmt.Sprintf("(%d,%d)->(%d,%d)", tl.Start.Line, tl.Start.Col, tl.Stop.Line, tl.Stop.Col)
 }
 
-func TerminalNodeLocation(ctx antlr.TerminalNode, text string) TextLocation {
+func TerminalNodeLocation(ctx antlr.TerminalNode, filename string) TextLocation {
 	return TextLocation{
 		Start: Location{
 			Line: ctx.GetSymbol().GetLine(),
@@ -33,11 +34,12 @@ func TerminalNodeLocation(ctx antlr.TerminalNode, text string) TextLocation {
 			Line: ctx.GetSymbol().GetLine(),
 			Col:  ctx.GetSymbol().GetColumn() + len(ctx.GetText()),
 		},
-		Text: text[ctx.GetSymbol().GetStart() : ctx.GetSymbol().GetStop()+1],
+		Text:     ctx.GetText(),
+		Filename: filename,
 	}
 }
 
-func RuleLocation(ctx antlr.ParserRuleContext, text string) TextLocation {
+func RuleLocation(ctx antlr.ParserRuleContext, filename string) TextLocation {
 	return TextLocation{
 		Start: Location{
 			Line: ctx.GetStart().GetLine(),
@@ -48,7 +50,8 @@ func RuleLocation(ctx antlr.ParserRuleContext, text string) TextLocation {
 			Line: ctx.GetStop().GetLine(),
 			Col:  ctx.GetStop().GetColumn(),
 		},
-		StopIdx: ctx.GetStop().GetStop(),
-		Text:    ctx.GetText(),
+		StopIdx:  ctx.GetStop().GetStop(),
+		Text:     ctx.GetText(),
+		Filename: filename,
 	}
 }

@@ -2,10 +2,11 @@ package surface_rules
 
 import (
 	"encoding/json"
+	"reflect"
+
 	"github.com/minecraftmetascript/mms/lang/grammar"
 	"github.com/minecraftmetascript/mms/lang/traversal"
 	"github.com/minecraftmetascript/mms/lib"
-	"reflect"
 
 	"github.com/antlr4-go/antlr/v4"
 )
@@ -16,8 +17,16 @@ func init() {
 		func(ctx antlr.ParserRuleContext, ns string, scope *traversal.Scope) traversal.Construct {
 			ref := ctx.(*grammar.SurfaceCondition_ReferenceContext)
 
+			var refVal *traversal.Reference
+			if rr := ref.ResourceReference(); rr != nil {
+				if cons := traversal.ConstructRegistry.Construct(rr, ns, scope); cons != nil {
+					if r, ok := cons.(*traversal.Reference); ok {
+						refVal = r
+					}
+				}
+			}
 			return &ReferenceCondition{
-				Ref: traversal.ConstructRegistry.Construct(ref.ResourceReference(), ns, scope).(*traversal.Reference),
+				Ref: refVal,
 			}
 		},
 	)
@@ -33,7 +42,7 @@ func (c ReferenceCondition) ExportSymbol(symbol traversal.Symbol, rootDir *lib.F
 }
 
 func (c ReferenceCondition) MarshalJSON() ([]byte, error) {
-	return json.Marshal(struct {
+	return json.MarshalIndent(struct {
 		Type    SurfaceConditionKind `json:"type"`
 		Ref     traversal.Reference  `json:"ref"`
 		Comment string               `json:"__comment"`
@@ -41,5 +50,5 @@ func (c ReferenceCondition) MarshalJSON() ([]byte, error) {
 		Type:    ReferenceConditionKind,
 		Ref:     *c.Ref,
 		Comment: "This should not appear in the JSON output of MMS. If you are seeing this, something went wrong.",
-	})
+	}, "", "  ")
 }

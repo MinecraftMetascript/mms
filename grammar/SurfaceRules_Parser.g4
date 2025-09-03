@@ -56,7 +56,7 @@ surfaceCondition_StoneDepth:
 surfaceCondition_Freezing: Keyword_Freezing;
 
 surfaceCondition_VerticalGradient:
-    Keyword_VerticalGradient String verticalAnchorDefinition Comma verticalAnchorDefinition;
+    Keyword_VerticalGradient String verticalAnchor Comma verticalAnchor;
 
 surfaceCondition_AboveWater:
     Keyword_AboveWater //
@@ -65,5 +65,5 @@ surfaceCondition_AboveWater:
     (Keyword_Add | Keyword_Sub);
 
 surfaceCondition_YAbove:
-    Keyword_YAbove verticalAnchorDefinition Int (Keyword_Add | Keyword_Sub);
+    Keyword_YAbove verticalAnchor Int (Keyword_Add | Keyword_Sub);
 

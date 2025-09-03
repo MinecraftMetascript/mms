@@ -1,9 +1,10 @@
 package test
 
 import (
+	"testing"
+
 	"github.com/minecraftmetascript/mms/lang"
 	"github.com/minecraftmetascript/mms/lang/traversal"
-	"testing"
 )
 
 func TestSimpleDeclaration(t *testing.T) {

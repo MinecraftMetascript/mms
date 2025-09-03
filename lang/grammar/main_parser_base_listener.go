@@ -210,6 +210,12 @@ func (s *BaseMain_ParserListener) EnterVerticalAnchorDefinition(ctx *VerticalAnc
 func (s *BaseMain_ParserListener) ExitVerticalAnchorDefinition(ctx *VerticalAnchorDefinitionContext) {
 }
 
+// EnterVerticalAnchor is called when production verticalAnchor is entered.
+func (s *BaseMain_ParserListener) EnterVerticalAnchor(ctx *VerticalAnchorContext) {}
+
+// ExitVerticalAnchor is called when production verticalAnchor is exited.
+func (s *BaseMain_ParserListener) ExitVerticalAnchor(ctx *VerticalAnchorContext) {}
+
 // EnterVerticalAnchor_Absolute is called when production verticalAnchor_Absolute is entered.
 func (s *BaseMain_ParserListener) EnterVerticalAnchor_Absolute(ctx *VerticalAnchor_AbsoluteContext) {}
 

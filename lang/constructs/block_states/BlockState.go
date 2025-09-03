@@ -2,6 +2,7 @@ package block_states
 
 import (
 	"encoding/json"
+
 	"github.com/minecraftmetascript/mms/lang/traversal"
 )
 

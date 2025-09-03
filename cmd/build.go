@@ -3,10 +3,11 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/minecraftmetascript/mms/lang"
 	"io/fs"
 	"log"
 	"os"
+
+	"github.com/minecraftmetascript/mms/lang"
 
 	"github.com/spf13/cobra"
 )
@@ -68,8 +69,8 @@ var buildCmd = &cobra.Command{
 			)
 		}
 
-		if len(project.Diagnostics) > 0 {
-			for _, diag := range project.Diagnostics {
+		if len(project.Diagnostics()) > 0 {
+			for _, diag := range project.Diagnostics() {
 				log.Println(diag)
 			}
 		}

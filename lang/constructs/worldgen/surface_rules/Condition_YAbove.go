@@ -19,12 +19,22 @@ func init() {
 		func(ctx antlr.ParserRuleContext, ns string, scope *traversal.Scope) traversal.Construct {
 			yAbove := ctx.(*grammar.SurfaceCondition_YAboveContext)
 
-			x := traversal.ConstructRegistry.Construct(yAbove.VerticalAnchorDefinition(), ns, scope)
-
-			anchor := x.(*primitives.VerticalAnchor)
-			multiplier, _ := strconv.Atoi(yAbove.Int().GetText())
+			var anchor primitives.VerticalAnchor
+			if vad := yAbove.VerticalAnchor(); vad != nil {
+				if cons := traversal.ConstructRegistry.Construct(vad, ns, scope); cons != nil {
+					if a, ok := cons.(*primitives.VerticalAnchor); ok && a != nil {
+						anchor = *a
+					}
+				}
+			}
+			multiplier := 0
+			if yAbove.Int() != nil {
+				if m, err := strconv.Atoi(yAbove.Int().GetText()); err == nil {
+					multiplier = m
+				}
+			}
 			return &YAboveCondition{
-				Anchor:     *anchor,
+				Anchor:     anchor,
 				Multiplier: multiplier,
 				Add:        yAbove.Keyword_Add() != nil,
 			}
@@ -44,9 +54,9 @@ func (c YAboveCondition) ExportSymbol(symbol traversal.Symbol, rootDir *lib.File
 }
 
 func (c YAboveCondition) MarshalJSON() ([]byte, error) {
-	return json.Marshal(struct {
+	return json.MarshalIndent(struct {
 		Type SurfaceConditionKind `json:"type"`
 	}{
 		Type: YAboveConditionKind,
-	})
+	}, "", "  ")
 }

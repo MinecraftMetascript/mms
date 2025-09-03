@@ -58,3 +58,13 @@ func (s *Scope) Symbols() map[string]Symbol {
 func (s *Scope) MarshalJSON() ([]byte, error) {
 	return json.Marshal(s.symbols)
 }
+
+func (s *Scope) PurgeFile(file string) error {
+	for name, symbol := range s.symbols {
+		if symbol.GetContentLocation().Filename == file {
+			delete(s.symbols, name)
+
+		}
+	}
+	return nil
+}

@@ -1,8 +1,16 @@
 namespace MySpace;
 
-InBadlands := SurfaceCondition { Biome [ minecraft:badlands minecraft:eroded_badlands minecraft:wooded_badlands ] }
+InBadlands := SurfaceCondition {
+    Biome [
+        minecraft:badlands
+        minecraft:eroded_badlands
+        minecraft:wooded_badlands
+    ]
+}
 
-SkyTerracotta := SurfaceRule { If (AboveSurface) Block stone }
+SkyTerracotta := SurfaceRule {
+    If (AboveSurface) Block stone
+}
 
 NonHoleOrangeTerracotta := SurfaceRule { If (!Hole) Block orange_terracotta }
 
@@ -11,7 +19,7 @@ TerracottaBands := SurfaceRule {
         Sequence [
             If (YAbove Absolute(74) 1 add)
                 Sequence [
-                    If ( or (
+                    If (or (
                         Noise minecraft:surface [-0.909, -0.5454]
                         Noise minecraft:surface [-0.1818, 0.1818]
                         Noise minecraft:surface [0.5454, 0.909]

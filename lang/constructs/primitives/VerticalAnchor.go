@@ -14,27 +14,28 @@ import (
 
 func init() {
 	traversal.ConstructRegistry.Register(
-		reflect.TypeFor[*grammar.VerticalAnchorDefinitionContext](),
+		reflect.TypeFor[*grammar.VerticalAnchorContext](),
 		func(ctx antlr.ParserRuleContext, _ string, _ *traversal.Scope) traversal.Construct {
-			anchor := ctx.(*grammar.VerticalAnchorDefinitionContext)
+			anchor := ctx.(*grammar.VerticalAnchorContext)
 
 			if rule := anchor.VerticalAnchor_Absolute(); rule != nil {
-				value, err := strconv.Atoi(rule.Int().GetText())
-
-				if err != nil {
-					return nil
+				var value int
+				if i := rule.Int(); i != nil {
+					if v, err := strconv.Atoi(i.GetText()); err == nil {
+						value = v
+					}
 				}
-
 				return &VerticalAnchor{
 					Type:  VerticalAnchorType_Absolute,
 					Value: value,
 				}
 			}
 			if rule := anchor.VerticalAnchor_AboveBottom(); rule != nil {
-				value, err := strconv.Atoi(rule.Int().GetText())
-				fmt.Println("Found above bottom", value)
-				if err != nil {
-					return nil
+				var value int
+				if i := rule.Int(); i != nil {
+					if v, err := strconv.Atoi(i.GetText()); err == nil {
+						value = v
+					}
 				}
 				return &VerticalAnchor{
 					Type:  VerticalAnchorType_AboveBottom,
@@ -42,10 +43,11 @@ func init() {
 				}
 			}
 			if rule := anchor.VerticalAnchor_BelowTop(); rule != nil {
-				value, err := strconv.Atoi(rule.Int().GetText())
-				fmt.Println("Found below top", value)
-				if err != nil {
-					return nil
+				var value int
+				if i := rule.Int(); i != nil {
+					if v, err := strconv.Atoi(i.GetText()); err == nil {
+						value = v
+					}
 				}
 				return &VerticalAnchor{
 					Type:  VerticalAnchorType_BelowTop,

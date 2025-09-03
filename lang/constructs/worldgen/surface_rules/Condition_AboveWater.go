@@ -2,11 +2,12 @@ package surface_rules
 
 import (
 	"encoding/json"
+	"reflect"
+	"strconv"
+
 	"github.com/minecraftmetascript/mms/lang/grammar"
 	"github.com/minecraftmetascript/mms/lang/traversal"
 	"github.com/minecraftmetascript/mms/lib"
-	"reflect"
-	"strconv"
 
 	"github.com/antlr4-go/antlr/v4"
 )
@@ -16,13 +17,17 @@ func init() {
 		reflect.TypeFor[grammar.SurfaceCondition_AboveWaterContext](),
 		func(ctx antlr.ParserRuleContext, _ string, _ *traversal.Scope) traversal.Construct {
 			aboveWater := ctx.(*grammar.SurfaceCondition_AboveWaterContext)
-			offset, err := strconv.Atoi(aboveWater.Int().GetText())
-			if err != nil {
-				return nil
+			offset := 0
+			if aboveWater.Int() != nil {
+				if v, err := strconv.Atoi(aboveWater.Int().GetText()); err == nil {
+					offset = v
+				}
 			}
-			depthMultiplier, err := strconv.ParseFloat(aboveWater.Number().GetText(), 64)
-			if err != nil {
-				return nil
+			depthMultiplier := 0.0
+			if aboveWater.Number() != nil {
+				if v, err := strconv.ParseFloat(aboveWater.Number().GetText(), 64); err == nil {
+					depthMultiplier = v
+				}
 			}
 			return &AboveWaterCondition{
 				Offset:          offset,
@@ -46,7 +51,7 @@ func (c AboveWaterCondition) ExportSymbol(symbol traversal.Symbol, rootDir *lib.
 }
 
 func (c AboveWaterCondition) MarshalJSON() ([]byte, error) {
-	return json.Marshal(struct {
+	return json.MarshalIndent(struct {
 		Type       SurfaceConditionKind `json:"type"`
 		Offset     int                  `json:"offset"`
 		Multiplier float64              `json:"surface_depth_multiplier"`
@@ -56,5 +61,5 @@ func (c AboveWaterCondition) MarshalJSON() ([]byte, error) {
 		Offset:     c.Offset,
 		Multiplier: c.DepthMultiplier,
 		Add:        c.Add,
-	})
+	}, "", "  ")
 }

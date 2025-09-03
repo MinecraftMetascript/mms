@@ -2,10 +2,11 @@ package surface_rules
 
 import (
 	"encoding/json"
+	"reflect"
+
 	"github.com/minecraftmetascript/mms/lang/grammar"
 	"github.com/minecraftmetascript/mms/lang/traversal"
 	"github.com/minecraftmetascript/mms/lib"
-	"reflect"
 
 	"github.com/antlr4-go/antlr/v4"
 )
@@ -28,9 +29,9 @@ func (c AboveSurfaceCondition) ExportSymbol(symbol traversal.Symbol, rootDir *li
 }
 
 func (c AboveSurfaceCondition) MarshalJSON() ([]byte, error) {
-	return json.Marshal(struct {
+	return json.MarshalIndent(struct {
 		Type SurfaceConditionKind `json:"type"`
 	}{
 		Type: AboveSurfaceConditionKind,
-	})
+	}, "", "  ")
 }

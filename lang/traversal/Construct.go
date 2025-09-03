@@ -3,8 +3,9 @@ package traversal
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/minecraftmetascript/mms/lib"
 	"reflect"
+
+	"github.com/minecraftmetascript/mms/lib"
 
 	"github.com/antlr4-go/antlr/v4"
 )

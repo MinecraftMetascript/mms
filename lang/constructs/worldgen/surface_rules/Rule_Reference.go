@@ -3,10 +3,11 @@ package surface_rules
 import (
 	"errors"
 	"fmt"
+	"reflect"
+
 	"github.com/minecraftmetascript/mms/lang/grammar"
 	"github.com/minecraftmetascript/mms/lang/traversal"
 	"github.com/minecraftmetascript/mms/lib"
-	"reflect"
 
 	"github.com/antlr4-go/antlr/v4"
 )
@@ -17,14 +18,23 @@ func init() {
 		func(ctx antlr.ParserRuleContext, ns string, scope *traversal.Scope) traversal.Construct {
 			refCtx := ctx.(*grammar.SurfaceRule_ReferenceContext)
 			out := &ReferenceRule{}
-			ref := traversal.ConstructRegistry.Construct(refCtx.ResourceReference(), ns, scope).(*traversal.Reference)
-			ref.SetResolver(func() error {
-				if next, ok := scope.Get(*ref); ok {
-					val := next.GetValue().(traversal.Construct)
-					out.Value = &val
+			var ref *traversal.Reference
+			if rr := refCtx.ResourceReference(); rr != nil {
+				if cons := traversal.ConstructRegistry.Construct(rr, ns, scope); cons != nil {
+					if r, ok := cons.(*traversal.Reference); ok {
+						ref = r
+					}
 				}
-				return nil
-			})
+			}
+			if ref != nil {
+				ref.SetResolver(func() error {
+					if next, ok := scope.Get(*ref); ok {
+						val := next.GetValue().(traversal.Construct)
+						out.Value = &val
+					}
+					return nil
+				})
+			}
 			out.Ref = ref
 
 			return out
@@ -43,6 +53,9 @@ func (c *ReferenceRule) ExportSymbol(symbol traversal.Symbol, rootDir *lib.FileT
 }
 
 func (c *ReferenceRule) MarshalJSON() ([]byte, error) {
+	if c.Ref == nil {
+		return nil, errors.New("reference is nil in ReferenceRule")
+	}
 	if err := c.Ref.Resolve(); err != nil {
 		return nil, err
 	}

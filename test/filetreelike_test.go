@@ -1,8 +1,9 @@
 package test
 
 import (
-	"github.com/minecraftmetascript/mms/lib"
 	"testing"
+
+	"github.com/minecraftmetascript/mms/lib"
 )
 
 func TestFileTreeLike_MkDir(t *testing.T) {

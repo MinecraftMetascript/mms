@@ -2,11 +2,12 @@ package test
 
 import (
 	"fmt"
+	"testing"
+
 	"github.com/minecraftmetascript/mms/lang"
 	"github.com/minecraftmetascript/mms/lang/constructs/worldgen/surface_rules"
 	"github.com/minecraftmetascript/mms/lang/traversal"
 	"github.com/minecraftmetascript/mms/lib"
-	"testing"
 )
 
 func TestBlockRule(t *testing.T) {

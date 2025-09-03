@@ -2,10 +2,11 @@ package surface_rules
 
 import (
 	"encoding/json"
+	"reflect"
+
 	"github.com/minecraftmetascript/mms/lang/grammar"
 	"github.com/minecraftmetascript/mms/lang/traversal"
 	"github.com/minecraftmetascript/mms/lib"
-	"reflect"
 
 	"github.com/antlr4-go/antlr/v4"
 )
@@ -21,8 +22,11 @@ func init() {
 			refs := make([]traversal.Reference, 0)
 			for _, ref := range ctx.AllResourceReference() {
 				// Biome references should default to minecraft when unqualified
-				r := traversal.ConstructRegistry.Construct(ref, "minecraft", scope).(*traversal.Reference)
-				refs = append(refs, *r)
+				if cons := traversal.ConstructRegistry.Construct(ref, "minecraft", scope); cons != nil {
+					if r, ok := cons.(*traversal.Reference); ok && r != nil {
+						refs = append(refs, *r)
+					}
+				}
 			}
 			return &BiomeCondition{
 				biomes: refs,
@@ -46,11 +50,11 @@ func (c BiomeCondition) ExportSymbol(symbol traversal.Symbol, rootDir *lib.FileT
 }
 
 func (c BiomeCondition) MarshalJSON() ([]byte, error) {
-	return json.Marshal(struct {
+	return json.MarshalIndent(struct {
 		Type   SurfaceConditionKind  `json:"type"`
 		Biomes []traversal.Reference `json:"biomes"`
 	}{
 		Type:   BiomeConditionKind,
 		Biomes: c.biomes,
-	})
+	}, "", "  ")
 }

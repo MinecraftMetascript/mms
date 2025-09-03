@@ -2,11 +2,12 @@ package surface_rules
 
 import (
 	"encoding/json"
+	"reflect"
+
 	"github.com/minecraftmetascript/mms/lang/constructs/primitives"
 	"github.com/minecraftmetascript/mms/lang/grammar"
 	"github.com/minecraftmetascript/mms/lang/traversal"
 	"github.com/minecraftmetascript/mms/lib"
-	"reflect"
 
 	"github.com/antlr4-go/antlr/v4"
 )
@@ -16,13 +17,32 @@ func init() {
 		reflect.TypeFor[grammar.SurfaceCondition_VerticalGradientContext](),
 		func(ctx antlr.ParserRuleContext, ns string, scope *traversal.Scope) traversal.Construct {
 			verticalGradient := ctx.(*grammar.SurfaceCondition_VerticalGradientContext)
-			trueAnchor := traversal.ConstructRegistry.Construct(verticalGradient.VerticalAnchorDefinition(0), ns, scope).(*primitives.VerticalAnchor)
-			falseAnchor := traversal.ConstructRegistry.Construct(verticalGradient.VerticalAnchorDefinition(1), ns, scope).(*primitives.VerticalAnchor)
+			var trueAnchor primitives.VerticalAnchor
+			if vad := verticalGradient.VerticalAnchor(0); vad != nil {
+				if cons := traversal.ConstructRegistry.Construct(vad, ns, scope); cons != nil {
+					if a, ok := cons.(*primitives.VerticalAnchor); ok && a != nil {
+						trueAnchor = *a
+					}
+				}
+			}
+			var falseAnchor primitives.VerticalAnchor
+			if vad := verticalGradient.VerticalAnchor(1); vad != nil {
+				if cons := traversal.ConstructRegistry.Construct(vad, ns, scope); cons != nil {
+					if a, ok := cons.(*primitives.VerticalAnchor); ok && a != nil {
+						falseAnchor = *a
+					}
+				}
+			}
+
+			seed := ""
+			if s := verticalGradient.String_(); s != nil {
+				seed = s.GetText()
+			}
 
 			return &VerticalGradientCondition{
-				SeedText:        verticalGradient.String_().GetText(),
-				TrueAtAndBelow:  *trueAnchor,
-				FalseAtAndAbove: *falseAnchor,
+				SeedText:        seed,
+				TrueAtAndBelow:  trueAnchor,
+				FalseAtAndAbove: falseAnchor,
 			}
 		},
 	)
@@ -40,9 +60,9 @@ func (c VerticalGradientCondition) ExportSymbol(symbol traversal.Symbol, rootDir
 }
 
 func (c VerticalGradientCondition) MarshalJSON() ([]byte, error) {
-	return json.Marshal(struct {
+	return json.MarshalIndent(struct {
 		Type SurfaceConditionKind `json:"type"`
 	}{
 		Type: VerticalGradientConditionKind,
-	})
+	}, "", "  ")
 }

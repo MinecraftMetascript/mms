@@ -94,6 +94,9 @@ type Main_ParserListener interface {
 	// EnterVerticalAnchorDefinition is called when entering the verticalAnchorDefinition production.
 	EnterVerticalAnchorDefinition(c *VerticalAnchorDefinitionContext)
 
+	// EnterVerticalAnchor is called when entering the verticalAnchor production.
+	EnterVerticalAnchor(c *VerticalAnchorContext)
+
 	// EnterVerticalAnchor_Absolute is called when entering the verticalAnchor_Absolute production.
 	EnterVerticalAnchor_Absolute(c *VerticalAnchor_AbsoluteContext)
 
@@ -192,6 +195,9 @@ type Main_ParserListener interface {
 
 	// ExitVerticalAnchorDefinition is called when exiting the verticalAnchorDefinition production.
 	ExitVerticalAnchorDefinition(c *VerticalAnchorDefinitionContext)
+
+	// ExitVerticalAnchor is called when exiting the verticalAnchor production.
+	ExitVerticalAnchor(c *VerticalAnchorContext)
 
 	// ExitVerticalAnchor_Absolute is called when exiting the verticalAnchor_Absolute production.
 	ExitVerticalAnchor_Absolute(c *VerticalAnchor_AbsoluteContext)

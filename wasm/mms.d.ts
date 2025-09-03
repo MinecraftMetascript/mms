@@ -5,23 +5,38 @@ declare global {
 }
 
 export type ProjectUpdateHook =
-/**
- * @param {string} root JSON Serialized `FileTreeLike`
- * @param {string} symbols JSON Serialized `Record<string, MmsSymbol>`
- */
-    (root: string, symbols: string) => unknown
+    (serial: string) => unknown
 
 export type FileTreeLike = {
     name: string,
     data?: unknown
 } & ({ isDir: true, children?: Record<string, FileTreeLike> } | { isDir: false, content?: string })
 
-export type MmsSymbol = {
-    nameLocation: unknown,
-    contentLocation: unknown,
-    value: unkonwn,
-    ref: unknown
+
+export type MmsTextLocation = {
+    Start: {
+        Line: number,
+        Column: number
+    },
+    StartIdx: number,
+    Stop: {
+        Line: number,
+        Column: number
+    },
+    StopIdx: number,
+    Text: string,
+    Filename: string
 }
+
+export type MmsReference = `${string}:${string}`
+
+export type MmsSymbol = {
+    nameLocation: MmsTextLocation,
+    contentLocation: MmsTextLocation,
+    value: unknown,
+    ref: MmsReference
+}
+
 
 export class Go {
     argv: string[]

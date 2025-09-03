@@ -22,9 +22,12 @@ func init() {
 
 			var blockName string
 			if ref := ctx.ResourceReference(); ref != nil {
-				blockName = traversal.ConstructRegistry.Construct(
+				cons := traversal.ConstructRegistry.Construct(
 					ref, "minecraft", scope,
-				).(*traversal.Reference).String()
+				)
+				if r, ok := cons.(*traversal.Reference); ok && r != nil {
+					blockName = r.String()
+				}
 			}
 
 			return &Block{

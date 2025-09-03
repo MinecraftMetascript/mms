@@ -2,10 +2,11 @@ package test
 
 import (
 	"fmt"
+	"testing"
+
 	"github.com/minecraftmetascript/mms/lang"
 	"github.com/minecraftmetascript/mms/lang/constructs/worldgen/surface_rules"
 	"github.com/minecraftmetascript/mms/lang/traversal"
-	"testing"
 )
 
 func TestAboveSurfaceCondition(t *testing.T) {

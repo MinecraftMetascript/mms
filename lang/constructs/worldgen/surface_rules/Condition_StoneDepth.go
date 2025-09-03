@@ -2,11 +2,12 @@ package surface_rules
 
 import (
 	"encoding/json"
+	"reflect"
+	"strconv"
+
 	"github.com/minecraftmetascript/mms/lang/grammar"
 	"github.com/minecraftmetascript/mms/lang/traversal"
 	"github.com/minecraftmetascript/mms/lib"
-	"reflect"
-	"strconv"
 
 	"github.com/antlr4-go/antlr/v4"
 )
@@ -16,13 +17,17 @@ func init() {
 		reflect.TypeFor[grammar.SurfaceCondition_StoneDepthContext](),
 		func(ctx antlr.ParserRuleContext, _ string, _ *traversal.Scope) traversal.Construct {
 			stoneDepth := ctx.(*grammar.SurfaceCondition_StoneDepthContext)
-			offset, err := strconv.Atoi(stoneDepth.Int(0).GetText())
-			if err != nil {
-				return nil
+			var offset int
+			if stoneDepth.Int(0) != nil {
+				if v, err := strconv.Atoi(stoneDepth.Int(0).GetText()); err == nil {
+					offset = v
+				}
 			}
-			secondaryDepthRange, err := strconv.Atoi(stoneDepth.Int(1).GetText())
-			if err != nil {
-				return nil
+			var secondaryDepthRange int
+			if stoneDepth.Int(1) != nil {
+				if v, err := strconv.Atoi(stoneDepth.Int(1).GetText()); err == nil {
+					secondaryDepthRange = v
+				}
 			}
 			surface := "floor"
 			if stoneDepth.Keyword_Ceiling() != nil {
@@ -51,7 +56,7 @@ func (c StoneDepthCondition) ExportSymbol(symbol traversal.Symbol, rootDir *lib.
 }
 
 func (c StoneDepthCondition) MarshalJSON() ([]byte, error) {
-	return json.Marshal(struct {
+	return json.MarshalIndent(struct {
 		Type    SurfaceConditionKind `json:"type"`
 		Depth   int                  `json:"offset"`
 		Surface string               `json:"surface_type"`
@@ -63,5 +68,5 @@ func (c StoneDepthCondition) MarshalJSON() ([]byte, error) {
 		Surface: c.Surface,
 		Add:     c.Add,
 		Range:   c.Range,
-	})
+	}, "", "  ")
 }

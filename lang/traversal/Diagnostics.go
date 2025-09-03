@@ -24,6 +24,7 @@ type Diagnostic struct {
 	Where    TextLocation `json:"where"`
 	Severity Severity     `json:"severity"`
 	Source   string       `json:"source"`
+	File     string       `json:"file"`
 }
 
 func (d Diagnostic) String() string {

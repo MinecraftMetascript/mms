@@ -3,10 +3,11 @@ package surface_rules
 import (
 	"encoding/json"
 	"fmt"
+	"reflect"
+
 	"github.com/minecraftmetascript/mms/lang/grammar"
 	"github.com/minecraftmetascript/mms/lang/traversal"
 	"github.com/minecraftmetascript/mms/lib"
-	"reflect"
 
 	"github.com/antlr4-go/antlr/v4"
 )
@@ -25,13 +26,20 @@ func init() {
 
 			if cond := ctx.SurfaceCondition(); cond != nil {
 				var inner antlr.ParserRuleContext
-				if len(cond.GetChildren()) == 1 {
-					inner = cond.GetChild(0).(antlr.ParserRuleContext) // not negated
-				} else {
-					inner = cond.GetChild(1).(antlr.ParserRuleContext) // has bang
+				childCount := cond.GetChildCount()
+				if childCount >= 1 {
+					// if just one child, it's not negated; if more, expect '!' then condition
+					idx := 0
+					if childCount > 1 {
+						idx = 1
+					}
+					if c, ok := cond.GetChild(idx).(antlr.ParserRuleContext); ok {
+						inner = c
+					}
 				}
-
-				condition = traversal.ConstructRegistry.Construct(inner, ns, scope)
+				if inner != nil {
+					condition = traversal.ConstructRegistry.Construct(inner, ns, scope)
+				}
 			} else {
 				fmt.Println("[ERROR] Condition isn't found!", ctx.SurfaceCondition())
 			}
@@ -47,8 +55,11 @@ func init() {
 
 			var action traversal.Construct
 			if rule := ctx.SurfaceRule(); rule != nil {
-				inner := rule.GetChild(0).(antlr.ParserRuleContext)
-				action = traversal.ConstructRegistry.Construct(inner, ns, scope)
+				if rule.GetChildCount() > 0 {
+					if inner, ok := rule.GetChild(0).(antlr.ParserRuleContext); ok {
+						action = traversal.ConstructRegistry.Construct(inner, ns, scope)
+					}
+				}
 			} else {
 				fmt.Println("[ERROR] Rule isn't found!", ctx.SurfaceRule())
 			}
@@ -116,7 +127,7 @@ func (c IfRule) MarshalJSON() ([]byte, error) {
 		return sequenceRule.MarshalJSON()
 	}
 
-	return json.Marshal(struct {
+	return json.MarshalIndent(struct {
 		Type    SurfaceRuleKind     `json:"type"`
 		IfTrue  traversal.Construct `json:"if_true"`
 		ThenRun traversal.Construct `json:"then_run"`
@@ -124,5 +135,5 @@ func (c IfRule) MarshalJSON() ([]byte, error) {
 		Type:    SurfaceRule_Condition,
 		IfTrue:  current.Condition,
 		ThenRun: current.Action,
-	})
+	}, "", "  ")
 }

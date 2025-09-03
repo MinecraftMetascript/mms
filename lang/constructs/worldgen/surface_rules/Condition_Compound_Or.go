@@ -1,10 +1,12 @@
 package surface_rules
 
 import (
+	"encoding/json"
+	"reflect"
+
 	"github.com/minecraftmetascript/mms/lang/grammar"
 	"github.com/minecraftmetascript/mms/lang/traversal"
 	"github.com/minecraftmetascript/mms/lib"
-	"reflect"
 
 	"github.com/antlr4-go/antlr/v4"
 )
@@ -34,4 +36,12 @@ type CompoundOrCondition struct {
 
 func (c *CompoundOrCondition) ExportSymbol(symbol traversal.Symbol, rootDir *lib.FileTreeLike) error {
 	return exportSurfaceCondition(symbol, rootDir, c)
+}
+
+func (c *CompoundOrCondition) MarshalJSON() (data []byte, err error) {
+	return json.MarshalIndent(struct {
+		Conditions []traversal.Construct `json:"conditions"`
+	}{
+		Conditions: c.Conditions,
+	}, "", "  ")
 }

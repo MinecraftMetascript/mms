@@ -11,11 +11,17 @@ type File struct {
 	Diagnostics []traversal.Diagnostic
 }
 
-func (f *File) Parse() {
-	parser := traversal.NewParser(f.Content, f.Project.GlobalScope, &f.Diagnostics)
-	_ = parser.Parse()
-	// Aggregate into project-level diagnostics if present
-	if f.Project != nil {
-		f.Project.Diagnostics = append(f.Project.Diagnostics, f.Diagnostics...)
+func (f *File) Parse() error {
+	err := f.Project.GlobalScope.PurgeFile(f.Path)
+	f.Diagnostics = make([]traversal.Diagnostic, 0)
+	if err != nil {
+		return err
 	}
+	parser := traversal.NewParser(f.Content, f.Path, f.Project.GlobalScope, &f.Diagnostics)
+	err = parser.Parse()
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

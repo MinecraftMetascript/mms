@@ -3,9 +3,10 @@ package test
 import (
 	"encoding/json"
 	"fmt"
+	"testing"
+
 	"github.com/minecraftmetascript/mms/lang"
 	"github.com/minecraftmetascript/mms/lang/traversal"
-	"testing"
 )
 
 func TestCompoundAnd(t *testing.T) {

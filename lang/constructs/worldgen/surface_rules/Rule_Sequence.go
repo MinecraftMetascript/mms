@@ -2,10 +2,11 @@ package surface_rules
 
 import (
 	"encoding/json"
+	"reflect"
+
 	"github.com/minecraftmetascript/mms/lang/grammar"
 	"github.com/minecraftmetascript/mms/lang/traversal"
 	"github.com/minecraftmetascript/mms/lib"
-	"reflect"
 
 	"github.com/antlr4-go/antlr/v4"
 )
@@ -18,8 +19,12 @@ func init() {
 
 			children := make([]traversal.Construct, 0)
 			for _, childCtx := range sequence.AllSurfaceRule() {
-				childRule := traversal.ConstructRegistry.Construct(childCtx.GetChild(0).(antlr.ParserRuleContext), ns, scope)
-				children = append(children, childRule)
+				if childCtx.GetChildCount() > 0 {
+					if prc, ok := childCtx.GetChild(0).(antlr.ParserRuleContext); ok {
+						childRule := traversal.ConstructRegistry.Construct(prc, ns, scope)
+						children = append(children, childRule)
+					}
+				}
 			}
 
 			return &Sequence{
@@ -39,11 +44,11 @@ func (s Sequence) ExportSymbol(symbol traversal.Symbol, rootDir *lib.FileTreeLik
 }
 
 func (r Sequence) MarshalJSON() ([]byte, error) {
-	return json.Marshal(struct {
+	return json.MarshalIndent(struct {
 		Type     SurfaceRuleKind       `json:"type"`
 		Sequence []traversal.Construct `json:"sequence"`
 	}{
 		Type:     SurfaceRule_Sequence,
 		Sequence: r.Rules,
-	})
+	}, "", "  ")
 }

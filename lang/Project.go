@@ -11,22 +11,33 @@ import _ "github.com/minecraftmetascript/mms/lang/constructs/worldgen/surface_ru
 type Project struct {
 	Files       map[string]*File
 	GlobalScope *traversal.Scope
-	Diagnostics []traversal.Diagnostic
+}
+
+func (p *Project) Diagnostics() []traversal.Diagnostic {
+	diagnostics := make([]traversal.Diagnostic, 0)
+	for _, file := range p.Files {
+		diagnostics = append(diagnostics, file.Diagnostics...)
+	}
+	return diagnostics
 }
 
 func NewProject() *Project {
 	return &Project{
 		Files:       make(map[string]*File),
 		GlobalScope: traversal.NewScope(),
-		Diagnostics: []traversal.Diagnostic{},
 	}
 }
 
 func (p *Project) AddFile(path, content string) *File {
-	p.Files[path] = &File{
-		Content: content,
-		Path:    path,
-		Project: p,
+	if p.Files[path] != nil {
+		out := p.Files[path]
+		out.Content = content
+	} else {
+		p.Files[path] = &File{
+			Content: content,
+			Path:    path,
+			Project: p,
+		}
 	}
 	return p.Files[path]
 }

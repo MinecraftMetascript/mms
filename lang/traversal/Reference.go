@@ -15,10 +15,12 @@ func init() {
 		func(ctx_ antlr.ParserRuleContext, currentNamespace string, _ *Scope) Construct {
 			ref := ctx_.(*grammar.ResourceReferenceContext)
 			parts := ref.AllIdentifier()
-			if len(parts) == 1 {
+			switch len(parts) {
+			default:
+				return nil
+			case 1:
 				return Ref(currentNamespace, parts[0].GetText())
-			} else {
-				// Qualified reference
+			case 2:
 				return Ref(parts[0].GetText(), parts[1].GetText())
 			}
 		},

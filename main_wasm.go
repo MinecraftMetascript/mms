@@ -16,19 +16,26 @@ import "syscall/js"
 var logger = log.Default()
 
 type packagedProject struct {
+	Source  map[string]string           `json:"source"`
 	Files   *lib.FileTreeLike           `json:"files"`
 	Symbols map[string]traversal.Symbol `json:"symbols"`
 }
 
 func packageProject() (string, error) {
 	out := packagedProject{
+		Source:  make(map[string]string),
 		Files:   project.BuildFsLike("wasm"),
 		Symbols: project.GlobalScope.Symbols(),
 	}
 
+	for _, file := range project.Files {
+		out.Source[file.Path] = file.Content
+	}
+
 	serialized, err := json.Marshal(out)
 	if err != nil {
-		return "", err
+		fmt.Println("error packaging project: ", err)
+		return "\"\"", err
 	}
 	return string(serialized), nil
 }
@@ -46,13 +53,16 @@ func updateFile(this js.Value, args []js.Value) any {
 		return nil
 	}
 
-	project.AddFile(filename, content).Parse()
-
+	err := project.AddFile(filename, content).Parse()
+	if err != nil {
+		log.Println("[Err]: Failed to add file:", err)
+		return nil
+	}
 	projectStruct, err := packageProject()
 	if err != nil {
 		fmt.Println("[Err]:", err)
 	} else {
-		callback.Invoke(string(projectStruct))
+		callback.Invoke(projectStruct)
 	}
 	return nil
 }

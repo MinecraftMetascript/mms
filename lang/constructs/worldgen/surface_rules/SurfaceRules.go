@@ -25,15 +25,16 @@ func init() {
 				return nil
 			}
 
-			if v, ok := rule.GetChild(0).(antlr.ParserRuleContext); ok {
-				return traversal.ConstructRegistry.Construct(
-					v,
-					currentNamespace,
-					scope,
-				)
-			} else {
-				return nil
+			if rule.GetChildCount() > 0 {
+				if v, ok := rule.GetChild(0).(antlr.ParserRuleContext); ok {
+					return traversal.ConstructRegistry.Construct(
+						v,
+						currentNamespace,
+						scope,
+					)
+				}
 			}
+			return nil
 		},
 	)
 }
@@ -43,11 +44,10 @@ const (
 	SurfaceRule_Bandlands SurfaceRuleKind = "minecraft:bandlands"
 	SurfaceRule_Condition SurfaceRuleKind = "minecraft:condition"
 	SurfaceRule_Sequence  SurfaceRuleKind = "minecraft:sequence"
-	SurfaceRule_Reference SurfaceRuleKind = "__mms:reference"
 )
 
 func exportSurfaceRule(symbol traversal.Symbol, rootDir *lib.FileTreeLike, rule json.Marshaler) error {
-	data, err := json.Marshal(rule)
+	data, err := json.MarshalIndent(rule, "", "  ")
 	if err != nil {
 		return err
 	}

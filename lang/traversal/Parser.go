@@ -2,6 +2,7 @@ package traversal
 
 import (
 	"errors"
+
 	"github.com/minecraftmetascript/mms/lang/grammar"
 
 	"github.com/antlr4-go/antlr/v4"
@@ -17,6 +18,7 @@ type Parser struct {
 
 	scope     *Scope
 	namespace string // Current namespace
+	filename  string
 }
 
 func (p *Parser) GetInternalParser(namespace string) *grammar.Main_Parser {
@@ -33,7 +35,17 @@ func (p *Parser) Parse() (err error) {
 
 func (p *Parser) ExitNamespaceDefinition(ctx *grammar.NamespaceDefinitionContext) {
 	ns := ctx.Identifier()
-	p.namespace = ns.GetText()
+	if ns != nil {
+		p.namespace = ns.GetText()
+	} else {
+		*p.diagnostics = append(*p.diagnostics, Diagnostic{
+			Message:  "Missing Namespace Declaration",
+			Where:    RuleLocation(ctx, p.filename),
+			Severity: SeverityError,
+			Source:   "parser",
+		})
+		p.namespace = "_unnamed_"
+	}
 }
 
 func (p *Parser) ExitDeclaration(ctx *grammar.DeclarationContext) {
@@ -44,7 +56,7 @@ func (p *Parser) ExitDeclaration(ctx *grammar.DeclarationContext) {
 		if p.diagnostics != nil {
 			*p.diagnostics = append(*p.diagnostics, Diagnostic{
 				Message:  "invalid declaration",
-				Where:    RuleLocation(ctx, p.content),
+				Where:    RuleLocation(ctx, p.filename),
 				Severity: SeverityError,
 				Source:   "parser",
 			})
@@ -53,13 +65,18 @@ func (p *Parser) ExitDeclaration(ctx *grammar.DeclarationContext) {
 	}
 	name := nameCtx.GetText()
 
-	val := ConstructRegistry.Construct(definitionCtx.GetChild(0).(antlr.ParserRuleContext), p.namespace, p.scope)
+	var val Construct
+	if definitionCtx.GetChildCount() > 0 {
+		if inner, ok := definitionCtx.GetChild(0).(antlr.ParserRuleContext); ok {
+			val = ConstructRegistry.Construct(inner, p.namespace, p.scope)
+		}
+	}
 
 	if val == nil {
 		if p.diagnostics != nil {
 			*p.diagnostics = append(*p.diagnostics, Diagnostic{
 				Message:  "invalid definition for " + name,
-				Where:    RuleLocation(definitionCtx, p.content),
+				Where:    RuleLocation(definitionCtx, p.filename),
 				Severity: SeverityError,
 				Source:   "parser",
 			})
@@ -68,17 +85,16 @@ func (p *Parser) ExitDeclaration(ctx *grammar.DeclarationContext) {
 	}
 
 	symbol := NewSymbol(
-		TerminalNodeLocation(nameCtx, p.content),
-		RuleLocation(definitionCtx, p.content),
+		TerminalNodeLocation(nameCtx, p.filename),
+		RuleLocation(definitionCtx, p.filename),
 		val,
 		NewReference(name, p.namespace),
 	)
-
 	if err := p.scope.Register(symbol); err != nil {
 		if p.diagnostics != nil {
 			*p.diagnostics = append(*p.diagnostics, Diagnostic{
 				Message:  err.Error(),
-				Where:    TerminalNodeLocation(nameCtx, p.content),
+				Where:    TerminalNodeLocation(nameCtx, p.filename),
 				Severity: SeverityError,
 				Source:   "semantic",
 			})
@@ -86,7 +102,7 @@ func (p *Parser) ExitDeclaration(ctx *grammar.DeclarationContext) {
 	}
 }
 
-func NewParser(content string, globalScope *Scope, diagnostics *[]Diagnostic) *Parser {
+func NewParser(content string, filename string, globalScope *Scope, diagnostics *[]Diagnostic) *Parser {
 	input := antlr.NewInputStream(content)
 	lexer := grammar.NewMain_Lexer(input)
 
@@ -96,6 +112,7 @@ func NewParser(content string, globalScope *Scope, diagnostics *[]Diagnostic) *P
 		content:     content,
 		diagnostics: diagnostics,
 		scope:       globalScope,
+		filename:    filename,
 	}
 
 	// Attach diagnostics listener(s) instead of console listeners
