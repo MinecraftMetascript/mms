@@ -2,7 +2,6 @@ package surface_rules
 
 import (
 	"encoding/json"
-	"fmt"
 	"reflect"
 
 	"github.com/minecraftmetascript/mms/lang/grammar"
@@ -17,17 +16,27 @@ func init() {
 		reflect.TypeFor[grammar.SurfaceRule_ConditionContext](),
 		func(ctx_ antlr.ParserRuleContext, ns string, scope *traversal.Scope) traversal.Construct {
 			ctx := ctx_.(*grammar.SurfaceRule_ConditionContext)
-			out := &IfRule{
-				Negate: ctx.SurfaceCondition().Bang() != nil,
+  	out := &IfRule{
+				Negate: false,
 				scope:  scope,
 			}
 
 			var condition traversal.Construct
 
 			if cond := ctx.SurfaceCondition(); cond != nil {
+				out.Negate = cond.Bang() != nil
 				condition = traversal.ConstructRegistry.Construct(cond, ns, scope)
 			} else {
-				fmt.Println("[ERROR] Condition isn't found!", ctx.SurfaceCondition())
+				if scope != nil && scope.Diagnostics != nil {
+					loc := traversal.RuleLocation(ctx, scope.CurrentFile)
+					*scope.Diagnostics = append(*scope.Diagnostics, traversal.Diagnostic{
+						Message:  "missing surface condition in if rule",
+						Where:    loc,
+						Severity: traversal.SeverityError,
+						Source:   "semantic",
+						File:     scope.CurrentFile,
+					})
+				}
 			}
 
 			if ref, ok := condition.(*ReferenceCondition); ok {
@@ -47,7 +56,16 @@ func init() {
 					}
 				}
 			} else {
-				fmt.Println("[ERROR] Rule isn't found!", ctx.SurfaceRule())
+				if scope != nil && scope.Diagnostics != nil {
+					loc := traversal.RuleLocation(ctx, scope.CurrentFile)
+					*scope.Diagnostics = append(*scope.Diagnostics, traversal.Diagnostic{
+						Message:  "missing nested rule in if rule",
+						Where:    loc,
+						Severity: traversal.SeverityError,
+						Source:   "semantic",
+						File:     scope.CurrentFile,
+					})
+				}
 			}
 
 			out.Action = action
@@ -78,8 +96,7 @@ func (c IfRule) MarshalJSON() ([]byte, error) {
 
 	if c.Negate {
 		c.Negate = false
-		condition := c.Condition
-		c.Condition = InvertCondition(condition)
+		c.Condition = InvertCondition(c.Condition)
 	}
 
 	current := c

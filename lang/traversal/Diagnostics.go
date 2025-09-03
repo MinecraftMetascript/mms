@@ -37,12 +37,14 @@ func (d Diagnostic) String() string {
 type DiagnosticsErrorListener struct {
 	antlr.DefaultErrorListener
 	content     string
+	filename    string
 	diagnostics *[]Diagnostic
 }
 
-func NewDiagnosticsErrorListener(content string, diags *[]Diagnostic) *DiagnosticsErrorListener {
+func NewDiagnosticsErrorListener(content string, filename string, diags *[]Diagnostic) *DiagnosticsErrorListener {
 	return &DiagnosticsErrorListener{
 		content:     content,
+		filename:    filename,
 		diagnostics: diags,
 	}
 }
@@ -75,6 +77,7 @@ func (l *DiagnosticsErrorListener) SyntaxError(recognizer antlr.Recognizer, offe
 		Stop:     Location{Line: line, Col: stopCol},
 		StopIdx:  stopIdx,
 		Text:     snippetAt(l.content, line, startCol, stopCol),
+		Filename: l.filename,
 	}
 
 	*l.diagnostics = append(*l.diagnostics, Diagnostic{
@@ -82,6 +85,7 @@ func (l *DiagnosticsErrorListener) SyntaxError(recognizer antlr.Recognizer, offe
 		Where:    loc,
 		Severity: SeverityError,
 		Source:   "parser",
+		File:     l.filename,
 	})
 }
 

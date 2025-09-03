@@ -7,8 +7,10 @@ import (
 )
 
 type Scope struct {
-	symbols map[string]Symbol
-	parent  *Scope
+	symbols     map[string]Symbol
+	parent      *Scope
+	Diagnostics *[]Diagnostic
+	CurrentFile string
 }
 
 func NewScope() *Scope {

@@ -45,7 +45,7 @@ surfaceCondition_Biome:
     Keyword_Biome SquareOpen NL* (resourceReference NL*)* SquareClose;
 surfaceCondition_Hole: Keyword_Hole;
 surfaceCondition_Noise:
-    Keyword_Noise resourceReference SquareOpen number Comma number SquareClose;
+    Keyword_Noise resourceReference SquareOpen number number SquareClose;
 surfaceCondition_Steep: Keyword_Steep;
 surfaceCondition_StoneDepth:
     Keyword_StoneDepth (Keyword_Floor | Keyword_Ceiling) //
@@ -56,7 +56,7 @@ surfaceCondition_StoneDepth:
 surfaceCondition_Freezing: Keyword_Freezing;
 
 surfaceCondition_VerticalGradient:
-    Keyword_VerticalGradient String verticalAnchor Comma verticalAnchor;
+    Keyword_VerticalGradient String verticalAnchor verticalAnchor;
 
 surfaceCondition_AboveWater:
     Keyword_AboveWater //

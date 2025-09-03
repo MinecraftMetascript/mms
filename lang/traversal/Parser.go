@@ -38,12 +38,13 @@ func (p *Parser) ExitNamespaceDefinition(ctx *grammar.NamespaceDefinitionContext
 	if ns != nil {
 		p.namespace = ns.GetText()
 	} else {
-		*p.diagnostics = append(*p.diagnostics, Diagnostic{
-			Message:  "Missing Namespace Declaration",
-			Where:    RuleLocation(ctx, p.filename),
-			Severity: SeverityError,
-			Source:   "parser",
-		})
+ 	*p.diagnostics = append(*p.diagnostics, Diagnostic{
+ 		Message:  "Missing Namespace Declaration",
+ 		Where:    RuleLocation(ctx, p.filename),
+ 		Severity: SeverityError,
+ 		Source:   "parser",
+ 		File:     p.filename,
+ 	})
 		p.namespace = "_unnamed_"
 	}
 }
@@ -59,6 +60,7 @@ func (p *Parser) ExitDeclaration(ctx *grammar.DeclarationContext) {
 				Where:    RuleLocation(ctx, p.filename),
 				Severity: SeverityError,
 				Source:   "parser",
+				File:     p.filename,
 			})
 		}
 		return
@@ -74,12 +76,13 @@ func (p *Parser) ExitDeclaration(ctx *grammar.DeclarationContext) {
 
 	if val == nil {
 		if p.diagnostics != nil {
-			*p.diagnostics = append(*p.diagnostics, Diagnostic{
-				Message:  "invalid definition for " + name,
-				Where:    RuleLocation(definitionCtx, p.filename),
-				Severity: SeverityError,
-				Source:   "parser",
-			})
+  	*p.diagnostics = append(*p.diagnostics, Diagnostic{
+  		Message:  "invalid definition for " + name,
+  		Where:    RuleLocation(definitionCtx, p.filename),
+  		Severity: SeverityError,
+  		Source:   "parser",
+  		File:     p.filename,
+  	})
 		}
 		return
 	}
@@ -97,6 +100,7 @@ func (p *Parser) ExitDeclaration(ctx *grammar.DeclarationContext) {
 				Where:    TerminalNodeLocation(nameCtx, p.filename),
 				Severity: SeverityError,
 				Source:   "semantic",
+				File:     p.filename,
 			})
 		}
 	}
@@ -119,13 +123,19 @@ func NewParser(content string, filename string, globalScope *Scope, diagnostics 
 	if out.diagnostics == nil {
 		out.diagnostics = &[]Diagnostic{}
 	}
-	diagListener := NewDiagnosticsErrorListener(content, out.diagnostics)
+	diagListener := NewDiagnosticsErrorListener(content, out.filename, out.diagnostics)
 	lexer.RemoveErrorListeners()
 	parser := out.parser
 	parser.RemoveErrorListeners()
 	lexer.AddErrorListener(diagListener)
 	parser.AddErrorListener(diagListener)
 	parser.AddParseListener(out)
+
+	// Wire diagnostics sink into scope for construct factories
+	if out.scope != nil {
+		out.scope.Diagnostics = out.diagnostics
+		out.scope.CurrentFile = out.filename
+	}
 
 	return out
 }
