@@ -93,6 +93,7 @@
             mkdir -p $out/js/dist
             mv main.wasm $out/js/dist
             cp $src/wasm/* $out/js -r
+            cp $src/wasm/.* $out/js -r
 
             cp "$(go env GOROOT)/misc/wasm/wasm_exec.js" $out/
           '';
