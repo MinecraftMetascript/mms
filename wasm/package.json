@@ -1,6 +1,6 @@
 {
   "name": "@minecraftmetascript/mms-wasm",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "keywords": [],
   "author": "",
   "license": "MIT",
@@ -12,6 +12,10 @@
     "./mms.js"
   ],
   "module": "./mms.js",
+  "main": "./mms.js",
+  "exports": {
+    ".": "./mms.js"
+  },
   "types": "./mms.d.ts",
   "repository": "https://github.com/MinecraftMetascript/mms"
 }
