@@ -36,7 +36,7 @@ func init() {
 
 			if sc := def.SurfaceCondition(); sc != nil {
 				if sc.GetChildCount() > 0 {
-					if prc, ok := sc.GetChild(0).(antlr.ParserRuleContext); ok {
+					if prc, ok := sc.GetChild(sc.GetChildCount() - 1).(antlr.ParserRuleContext); ok {
 						cond := traversal.ConstructRegistry.Construct(
 							prc,
 							currentNamespace,
