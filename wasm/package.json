@@ -9,5 +9,6 @@
     "./dist"
   ],
   "module": "./mms.js",
-  "types": "./mms.d.ts"
+  "types": "./mms.d.ts",
+  "repository": "https://github.com/MinecraftMetascript/mms"
 }
