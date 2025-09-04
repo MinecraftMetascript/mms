@@ -3,8 +3,6 @@ package surface_rules
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
-
 	"reflect"
 
 	"github.com/minecraftmetascript/mms/lang/grammar"
@@ -37,9 +35,8 @@ func init() {
 	traversal.ConstructRegistry.Register(
 		reflect.TypeFor[grammar.SurfaceRuleDeclarationContext](),
 		func(ctx antlr.ParserRuleContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
-			fmt.Println("Hi!")
 			declarationContext := ctx.(*grammar.SurfaceRuleDeclarationContext)
-			s := traversal.ProcessDeclaration(declarationContext, declarationContext.SurfaceRule(), scope)
+			s := traversal.ProcessDeclaration(declarationContext, declarationContext.SurfaceRule(), scope, currentNamespace)
 			return s.GetValue()
 		})
 }

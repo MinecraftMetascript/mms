@@ -2,7 +2,6 @@ package traversal
 
 import (
 	"encoding/json"
-	"fmt"
 	"reflect"
 
 	"github.com/minecraftmetascript/mms/lib"
@@ -45,8 +44,6 @@ func (r *constructRegistryImpl) Construct(ctx antlr.ParserRuleContext, currentNa
 
 	if factory, ok := r.constructs[t]; ok {
 		return factory(ctx, currentNamespace, scope)
-	} else {
-		fmt.Println("No factory found for", t)
 	}
 
 	return nil

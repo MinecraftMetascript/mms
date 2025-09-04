@@ -2,7 +2,6 @@ package traversal
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/minecraftmetascript/mms/lang/grammar"
 
@@ -42,7 +41,6 @@ func (p *Parser) ExitNamespaceDeclaration(ctx *grammar.NamespaceDeclarationConte
 	ns := ctx.Identifier()
 	if ns != nil {
 		p.namespace = ns.GetText()
-		fmt.Println("BEGIN: ", p.namespace)
 	} else {
 		*p.diagnostics = append(*p.diagnostics, Diagnostic{
 			Message:  "Missing Namespace Declaration",
@@ -51,7 +49,7 @@ func (p *Parser) ExitNamespaceDeclaration(ctx *grammar.NamespaceDeclarationConte
 			Source:   "parser",
 			File:     p.filename,
 		})
-		p.namespace = "_unnamed_"
+		p.namespace = "[[missing]]"
 	}
 }
 

@@ -5,7 +5,7 @@ surface: 'Surface' NL* '{' NL* (surfaceStatement NL*)* NL* '}';
 surfaceStatement: verticalAnchorDeclaration | surfaceConditionDeclaration | surfaceRuleDeclaration;
 
 verticalAnchor: ('~'? Int) | Identifier;
-verticalAnchorDeclaration: Identifier '=' verticalAnchor;
+verticalAnchorDeclaration: Identifier '=' NL* verticalAnchor;
 
 sharedBuilder_Offset: '.Offset(' Int ')';
 sharedBuilder_Add:'.Add()';
@@ -30,7 +30,7 @@ surfaceCondition:
         | surfaceCondition_VerticalGradient
     )
 ;
-surfaceConditionDeclaration: Identifier '=' surfaceCondition;
+surfaceConditionDeclaration: Identifier '=' NL* surfaceCondition;
 
 surfaceCondition_Not: '!' surfaceCondition;
 surfaceCondition_And: 'And' NL* '(' NL* (surfaceCondition NL*)* surfaceCondition NL* ')';
@@ -63,7 +63,7 @@ surfaceCondition_StoneDepthBuilder:
     | surfaceCondition_StoneDepthBuilder_SecondaryDepthRange
     ;
 
-surfaceCondition_StoneDepthBuilder_SecondaryDepthRange:'.secondaryDepthRange(' Int ')';
+surfaceCondition_StoneDepthBuilder_SecondaryDepthRange:'.SecondaryDepthRange(' Int ')';
 
 surfaceCondition_VerticalGradient: 'VerticalGradient' '(' String ')' NL* (surfaceCondition_VerticalGradientBuilder NL*)*;
 surfaceCondition_VerticalGradientBuilder:
@@ -84,7 +84,7 @@ surfaceCondition_AboveWaterBuilder:
 surfaceCondition_YAbove: 'YAbove' '(' verticalAnchor ')' NL* (surfaceCondition_YAboveBuilder NL*)* ;
 surfaceCondition_YAboveBuilder: sharedBuilder_MulInt | sharedBuilder_Add;
 
-surfaceRuleDeclaration: Identifier '=' surfaceRule;
+surfaceRuleDeclaration: Identifier '=' NL*  surfaceRule;
 surfaceRule: surfaceRule_Block
             | surfaceRule_Sequence
             | surfaceRule_Reference

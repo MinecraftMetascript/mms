@@ -34,16 +34,16 @@ type DeclarationContext interface {
 	Identifier() antlr.TerminalNode
 }
 
-func ProcessDeclaration(ctx DeclarationContext, valueCtx antlr.ParserRuleContext, scope *Scope) Symbol {
+func ProcessDeclaration(ctx DeclarationContext, valueCtx antlr.ParserRuleContext, scope *Scope, namespace string) Symbol {
 	out := &BaseSymbol{}
 	if id := ctx.Identifier(); id == nil {
 		scope.DiagnoseSemanticError("Missing Identifier", ctx)
 	} else {
-		out.ref = NewReference(id.GetText(), "todo")
+		out.ref = NewReference(id.GetText(), namespace)
 		out.nameLocation = TerminalNodeLocation(id, scope.CurrentFile)
 	}
 
-	out.value = ConstructRegistry.Construct(valueCtx, "todo", scope)
+	out.value = ConstructRegistry.Construct(valueCtx, namespace, scope)
 	if out.value == nil {
 		scope.DiagnoseSemanticError("Missing value", valueCtx)
 	} else {
