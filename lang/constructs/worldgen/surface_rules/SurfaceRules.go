@@ -3,6 +3,7 @@ package surface_rules
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 
 	"reflect"
 
@@ -17,16 +18,12 @@ type SurfaceRuleKind string
 
 func init() {
 	traversal.ConstructRegistry.Register(
-		reflect.TypeFor[grammar.SurfaceRuleDefinitionContext](),
+		reflect.TypeFor[grammar.SurfaceRuleContext](),
 		func(ctx antlr.ParserRuleContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
-			def := ctx.(*grammar.SurfaceRuleDefinitionContext)
-			rule := def.SurfaceRule()
-			if rule == nil {
-				return nil
-			}
+			def := ctx.(*grammar.SurfaceRuleContext)
 
-			if rule.GetChildCount() > 0 {
-				if v, ok := rule.GetChild(0).(antlr.ParserRuleContext); ok {
+			if def.GetChildCount() > 0 {
+				if v, ok := def.GetChild(0).(antlr.ParserRuleContext); ok {
 					return traversal.ConstructRegistry.Construct(
 						v,
 						currentNamespace,
@@ -37,6 +34,14 @@ func init() {
 			return nil
 		},
 	)
+	traversal.ConstructRegistry.Register(
+		reflect.TypeFor[grammar.SurfaceRuleDeclarationContext](),
+		func(ctx antlr.ParserRuleContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
+			fmt.Println("Hi!")
+			declarationContext := ctx.(*grammar.SurfaceRuleDeclarationContext)
+			s := traversal.ProcessDeclaration(declarationContext, declarationContext.SurfaceRule(), scope)
+			return s.GetValue()
+		})
 }
 
 const (

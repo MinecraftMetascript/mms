@@ -3,8 +3,8 @@ package surface_rules
 import (
 	"encoding/json"
 	"reflect"
-	"strconv"
 
+	"github.com/minecraftmetascript/mms/lang/builder_chain"
 	"github.com/minecraftmetascript/mms/lang/constructs/primitives"
 	"github.com/minecraftmetascript/mms/lang/grammar"
 	"github.com/minecraftmetascript/mms/lang/traversal"
@@ -14,30 +14,38 @@ import (
 )
 
 func init() {
+	yAboveBuilder := builder_chain.NewBuilderChain(
+		builder_chain.Build(
+			func(ctx *grammar.SharedBuilder_MulIntContext, target *YAboveCondition, scope *traversal.Scope, namespace string) {
+				builder_chain.Builder_GetInt(ctx, func(v int) { target.Multiplier = v }, scope, "Top")
+			},
+		),
+		builder_chain.Build(
+			func(ctx *grammar.SharedBuilder_AddContext, target *YAboveCondition, scope *traversal.Scope, namespace string) {
+				builder_chain.SharedBuilder_Add(ctx, func(v bool) { target.Add = v })
+			},
+		),
+	)
+
 	traversal.ConstructRegistry.Register(
 		reflect.TypeFor[grammar.SurfaceCondition_YAboveContext](),
 		func(ctx antlr.ParserRuleContext, ns string, scope *traversal.Scope) traversal.Construct {
 			yAbove := ctx.(*grammar.SurfaceCondition_YAboveContext)
+			out := &YAboveCondition{}
 
-			var anchor primitives.VerticalAnchor
 			if vad := yAbove.VerticalAnchor(); vad != nil {
 				if cons := traversal.ConstructRegistry.Construct(vad, ns, scope); cons != nil {
 					if a, ok := cons.(*primitives.VerticalAnchor); ok && a != nil {
-						anchor = *a
+						out.Anchor = *a
 					}
 				}
 			}
-			multiplier := 0
-			if yAbove.Int() != nil {
-				if m, err := strconv.Atoi(yAbove.Int().GetText()); err == nil {
-					multiplier = m
-				}
+
+			for _, r := range yAbove.AllSurfaceCondition_YAboveBuilder() {
+				builder_chain.Invoke(yAboveBuilder, r, out, scope, ns)
 			}
-			return &YAboveCondition{
-				Anchor:     anchor,
-				Multiplier: multiplier,
-				Add:        yAbove.Keyword_Add() != nil,
-			}
+
+			return out
 		},
 	)
 }

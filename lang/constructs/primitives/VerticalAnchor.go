@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"strings"
 
 	"github.com/minecraftmetascript/mms/lang/grammar"
 	"github.com/minecraftmetascript/mms/lang/traversal"
@@ -18,41 +19,33 @@ func init() {
 		func(ctx antlr.ParserRuleContext, _ string, _ *traversal.Scope) traversal.Construct {
 			anchor := ctx.(*grammar.VerticalAnchorContext)
 
-			if rule := anchor.VerticalAnchor_Absolute(); rule != nil {
-				var value int
-				if i := rule.Int(); i != nil {
+			if anchor.Identifier() != nil {
+				// Construct a reference
+			} else {
+				t := anchor.GetText()
+				isRelative := strings.Contains(t, "~")
+				if i := anchor.Int(); i != nil {
+					var value int
 					if v, err := strconv.Atoi(i.GetText()); err == nil {
 						value = v
 					}
-				}
-				return &VerticalAnchor{
-					Type:  VerticalAnchorType_Absolute,
-					Value: value,
-				}
-			}
-			if rule := anchor.VerticalAnchor_AboveBottom(); rule != nil {
-				var value int
-				if i := rule.Int(); i != nil {
-					if v, err := strconv.Atoi(i.GetText()); err == nil {
-						value = v
+					var anchorType VerticalAnchorType
+					if isRelative {
+						if value < 0 {
+							anchorType = VerticalAnchorType_BelowTop
+						} else {
+							anchorType = VerticalAnchorType_AboveBottom
+						}
+					} else {
+						anchorType = VerticalAnchorType_Absolute
+					}
+
+					return &VerticalAnchor{
+						Type:  anchorType,
+						Value: value,
 					}
 				}
-				return &VerticalAnchor{
-					Type:  VerticalAnchorType_AboveBottom,
-					Value: value,
-				}
-			}
-			if rule := anchor.VerticalAnchor_BelowTop(); rule != nil {
-				var value int
-				if i := rule.Int(); i != nil {
-					if v, err := strconv.Atoi(i.GetText()); err == nil {
-						value = v
-					}
-				}
-				return &VerticalAnchor{
-					Type:  VerticalAnchorType_BelowTop,
-					Value: value,
-				}
+
 			}
 			return nil
 		},

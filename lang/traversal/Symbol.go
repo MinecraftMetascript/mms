@@ -1,6 +1,10 @@
 package traversal
 
-import "encoding/json"
+import (
+	"encoding/json"
+
+	"github.com/antlr4-go/antlr/v4"
+)
 
 type Symbol interface {
 	GetNameLocation() TextLocation
@@ -23,6 +27,36 @@ func NewSymbol(nameLocation TextLocation, contentLocation TextLocation, value Co
 		value:           value,
 		ref:             ref,
 	}
+}
+
+type DeclarationContext interface {
+	antlr.ParserRuleContext
+	Identifier() antlr.TerminalNode
+}
+
+func ProcessDeclaration(ctx DeclarationContext, valueCtx antlr.ParserRuleContext, scope *Scope) Symbol {
+	out := &BaseSymbol{}
+	if id := ctx.Identifier(); id == nil {
+		scope.DiagnoseSemanticError("Missing Identifier", ctx)
+	} else {
+		out.ref = NewReference(id.GetText(), "todo")
+		out.nameLocation = TerminalNodeLocation(id, scope.CurrentFile)
+	}
+
+	out.value = ConstructRegistry.Construct(valueCtx, "todo", scope)
+	if out.value == nil {
+		scope.DiagnoseSemanticError("Missing value", valueCtx)
+	} else {
+		out.contentLocation = RuleLocation(valueCtx, scope.CurrentFile)
+	}
+
+	err := scope.Register(*out)
+	if err != nil {
+		return nil
+	}
+
+	return out
+
 }
 
 func (s BaseSymbol) GetNameLocation() TextLocation {

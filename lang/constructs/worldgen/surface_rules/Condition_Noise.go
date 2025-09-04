@@ -3,8 +3,8 @@ package surface_rules
 import (
 	"encoding/json"
 	"reflect"
-	"strconv"
 
+	"github.com/minecraftmetascript/mms/lang/builder_chain"
 	"github.com/minecraftmetascript/mms/lang/grammar"
 	"github.com/minecraftmetascript/mms/lang/traversal"
 	"github.com/minecraftmetascript/mms/lib"
@@ -13,35 +13,39 @@ import (
 )
 
 func init() {
+	noiseBuildChain := builder_chain.NewBuilderChain[NoiseCondition](
+		builder_chain.Build(
+			func(ctx *grammar.SurfaceCondition_NoiseBuilder_MinContext, out *NoiseCondition, scope *traversal.Scope, _ string) {
+				builder_chain.Builder_GetFloat(ctx, func(v float64) { out.Min = v }, scope, "Min")
+			},
+		),
+		builder_chain.Build(
+			func(ctx *grammar.SurfaceCondition_NoiseBuilder_MaxContext, out *NoiseCondition, scope *traversal.Scope, _ string) {
+				builder_chain.Builder_GetFloat(ctx, func(v float64) { out.Max = v }, scope, "Min")
+			},
+		),
+	)
+
 	traversal.ConstructRegistry.Register(
 		reflect.TypeFor[grammar.SurfaceCondition_NoiseContext](),
-		func(ctx_ antlr.ParserRuleContext, namespace string, scope *traversal.Scope) traversal.Construct {
-			ctx := ctx_.(*grammar.SurfaceCondition_NoiseContext)
-			minThresh := 0.0
-			if ctx.Number(0) != nil {
-				if v, err := strconv.ParseFloat(ctx.Number(0).GetText(), 64); err == nil {
-					minThresh = v
-				}
-			}
-			maxThresh := 0.0
-			if ctx.Number(1) != nil {
-				if v, err := strconv.ParseFloat(ctx.Number(1).GetText(), 64); err == nil {
-					maxThresh = v
-				}
-			}
+		func(ctx antlr.ParserRuleContext, namespace string, scope *traversal.Scope) traversal.Construct {
+			noise := ctx.(*grammar.SurfaceCondition_NoiseContext)
 			var noiseRef traversal.Reference
-			if rr := ctx.ResourceReference(); rr != nil {
+			if rr := noise.ResourceReference(); rr != nil {
 				if cons := traversal.ConstructRegistry.Construct(rr, namespace, scope); cons != nil {
 					if r, ok := cons.(*traversal.Reference); ok && r != nil {
 						noiseRef = *r
 					}
 				}
 			}
-			return &NoiseCondition{
+			out := &NoiseCondition{
 				NoiseRef: noiseRef,
-				Min:      minThresh,
-				Max:      maxThresh,
 			}
+			for _, r := range noise.AllSurfaceCondition_NoiseBuilder() {
+				builder_chain.Invoke(noiseBuildChain, r, out, scope, namespace)
+			}
+
+			return out
 		},
 	)
 }

@@ -2,6 +2,7 @@ package surface_rules
 
 import (
 	"encoding/json"
+	"fmt"
 	"reflect"
 
 	"github.com/minecraftmetascript/mms/lang/grammar"
@@ -33,43 +34,20 @@ func init() {
 		reflect.TypeFor[grammar.SurfaceConditionContext](),
 		func(ctx antlr.ParserRuleContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
 			conditionCtx := ctx.(*grammar.SurfaceConditionContext)
-			var condition traversal.Construct
-			switch conditionCtx.GetChildCount() {
-			case 1:
-				condition = traversal.ConstructRegistry.Construct(
-					conditionCtx.GetChild(0).(antlr.ParserRuleContext),
-					currentNamespace,
-					scope,
-				)
-			case 2:
-				condition = traversal.ConstructRegistry.Construct(
-					conditionCtx.GetChild(1).(antlr.ParserRuleContext),
-					currentNamespace,
-					scope,
-				)
-				condition = InvertCondition(condition)
-			default:
-				return nil
-			}
-
-			return condition
+			return traversal.ConstructRegistry.Construct(
+				conditionCtx.GetChild(0).(antlr.ParserRuleContext),
+				currentNamespace,
+				scope,
+			)
 		})
 	traversal.ConstructRegistry.Register(
-		reflect.TypeFor[grammar.SurfaceConditionDefinitionContext](),
+		reflect.TypeFor[grammar.SurfaceConditionDeclarationContext](),
 		func(ctx antlr.ParserRuleContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
-			def := ctx.(*grammar.SurfaceConditionDefinitionContext)
-
-			if sc := def.SurfaceCondition(); sc != nil {
-				return traversal.ConstructRegistry.Construct(
-					sc,
-					currentNamespace,
-					scope,
-				)
-			}
-			return nil
-
-		},
-	)
+			fmt.Println("Hi!")
+			declarationContext := ctx.(*grammar.SurfaceConditionDeclarationContext)
+			s := traversal.ProcessDeclaration(declarationContext, declarationContext.SurfaceCondition(), scope)
+			return s.GetValue()
+		})
 }
 
 func exportSurfaceCondition(symbol traversal.Symbol, rootDir *lib.FileTreeLike, condition json.Marshaler) error {

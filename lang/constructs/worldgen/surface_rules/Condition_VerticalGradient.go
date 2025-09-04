@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"reflect"
 
+	"github.com/minecraftmetascript/mms/lang/builder_chain"
 	"github.com/minecraftmetascript/mms/lang/constructs/primitives"
 	"github.com/minecraftmetascript/mms/lang/grammar"
 	"github.com/minecraftmetascript/mms/lang/traversal"
@@ -13,37 +14,42 @@ import (
 )
 
 func init() {
+	verticalGradientBuilder := builder_chain.NewBuilderChain(
+		builder_chain.Build(
+			func(ctx grammar.ISurfaceCondition_VerticalGradientBuilder_TopContext, target *VerticalGradientCondition, scope *traversal.Scope, namespace string) {
+				builder_chain.Builder_GetVerticalAnchor(ctx, namespace, func(anchor primitives.VerticalAnchor) { target.TrueAtAndBelow = anchor }, scope, "Top")
+			},
+		),
+		builder_chain.Build(
+			func(ctx grammar.ISurfaceCondition_VerticalGradientBuilder_BottomContext, target *VerticalGradientCondition, scope *traversal.Scope, namespace string) {
+				builder_chain.Builder_GetVerticalAnchor(ctx, namespace, func(anchor primitives.VerticalAnchor) { target.FalseAtAndAbove = anchor }, scope, "Bottom")
+			},
+		),
+	)
+
 	traversal.ConstructRegistry.Register(
 		reflect.TypeFor[grammar.SurfaceCondition_VerticalGradientContext](),
 		func(ctx antlr.ParserRuleContext, ns string, scope *traversal.Scope) traversal.Construct {
 			verticalGradient := ctx.(*grammar.SurfaceCondition_VerticalGradientContext)
-			var trueAnchor primitives.VerticalAnchor
-			if vad := verticalGradient.VerticalAnchor(0); vad != nil {
-				if cons := traversal.ConstructRegistry.Construct(vad, ns, scope); cons != nil {
-					if a, ok := cons.(*primitives.VerticalAnchor); ok && a != nil {
-						trueAnchor = *a
-					}
-				}
-			}
-			var falseAnchor primitives.VerticalAnchor
-			if vad := verticalGradient.VerticalAnchor(1); vad != nil {
-				if cons := traversal.ConstructRegistry.Construct(vad, ns, scope); cons != nil {
-					if a, ok := cons.(*primitives.VerticalAnchor); ok && a != nil {
-						falseAnchor = *a
-					}
-				}
-			}
+			out := &VerticalGradientCondition{}
 
-			seed := ""
 			if s := verticalGradient.String_(); s != nil {
-				seed = s.GetText()
+				out.SeedText = s.GetText()
+			} else {
+				scope.DiagnoseSemanticError(
+					"Missing seed value",
+					ctx,
+				)
 			}
 
-			return &VerticalGradientCondition{
-				SeedText:        seed,
-				TrueAtAndBelow:  trueAnchor,
-				FalseAtAndAbove: falseAnchor,
+			for _, r := range verticalGradient.AllSurfaceCondition_VerticalGradientBuilder() {
+				builder_chain.Invoke(
+					verticalGradientBuilder, r, out, scope, ns,
+				)
 			}
+
+			return out
+
 		},
 	)
 }

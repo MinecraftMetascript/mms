@@ -23,8 +23,7 @@
             set -e
             src="./grammar"
             dst="./lang"
-            ${pkgs.antlr4}/bin/antlr4 -Dlanguage=Go $src/Main_Lexer.g4 -o $dst -package grammar;
-            ${pkgs.antlr4}/bin/antlr4 -Dlanguage=Go $src/Main_Parser.g4 -lib $dst/grammar -o $dst -package grammar;
+            ${pkgs.antlr4}/bin/antlr4 -Dlanguage=Go $src/MinecraftMetascript.g4 -o $dst -package grammar;
           '';
         };
       in

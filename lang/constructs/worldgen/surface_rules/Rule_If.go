@@ -13,9 +13,9 @@ import (
 
 func init() {
 	traversal.ConstructRegistry.Register(
-		reflect.TypeFor[grammar.SurfaceRule_ConditionContext](),
+		reflect.TypeFor[grammar.SurfaceRule_IfContext](),
 		func(ctx_ antlr.ParserRuleContext, ns string, scope *traversal.Scope) traversal.Construct {
-			ctx := ctx_.(*grammar.SurfaceRule_ConditionContext)
+			ctx := ctx_.(*grammar.SurfaceRule_IfContext)
 			out := &IfRule{
 				Negate: false,
 				scope:  scope,

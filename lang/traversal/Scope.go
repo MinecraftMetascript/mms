@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+
+	"github.com/antlr4-go/antlr/v4"
 )
 
 type Scope struct {
@@ -69,4 +71,31 @@ func (s *Scope) PurgeFile(file string) error {
 		}
 	}
 	return nil
+}
+
+func (s *Scope) DiagnoseSemanticError(
+	message string,
+	ctx antlr.ParserRuleContext,
+) {
+	*s.Diagnostics = append(*s.Diagnostics, Diagnostic{
+		Message:  message,
+		Where:    RuleLocation(ctx, s.CurrentFile),
+		Severity: SeverityError,
+		Source:   "semantic",
+		File:     s.CurrentFile,
+	})
+}
+
+func (s *Scope) DiagnoseSemanticWarning(
+	message string,
+	ctx antlr.ParserRuleContext,
+) {
+	*s.Diagnostics = append(*s.Diagnostics, Diagnostic{
+		Message:  message,
+		Where:    RuleLocation(ctx, s.CurrentFile),
+		Severity: SeverityWarning,
+		Source:   "semantic",
+		File:     s.CurrentFile,
+	})
+
 }

@@ -3,8 +3,8 @@ package surface_rules
 import (
 	"encoding/json"
 	"reflect"
-	"strconv"
 
+	"github.com/minecraftmetascript/mms/lang/builder_chain"
 	"github.com/minecraftmetascript/mms/lang/grammar"
 	"github.com/minecraftmetascript/mms/lang/traversal"
 	"github.com/minecraftmetascript/mms/lib"
@@ -13,28 +13,39 @@ import (
 )
 
 func init() {
+	waterBuildChain := builder_chain.NewBuilderChain[AboveWaterCondition](
+		builder_chain.Build(
+			func(ctx *grammar.SharedBuilder_OffsetContext, out *AboveWaterCondition, scope *traversal.Scope, _ string) {
+				builder_chain.Builder_GetInt(ctx, func(v int) { out.Offset = v }, scope, "Offset")
+			},
+		),
+		builder_chain.Build(
+			func(ctx *grammar.SharedBuilder_AddContext, out *AboveWaterCondition, _ *traversal.Scope, _ string) {
+				builder_chain.SharedBuilder_Add(ctx, func(v bool) { out.Add = v })
+			},
+		),
+		builder_chain.Build(
+			func(ctx *grammar.SharedBuilder_MulContext, out *AboveWaterCondition, scope *traversal.Scope, _ string) {
+				builder_chain.Builder_GetFloat(
+					ctx,
+					func(v float64) { out.DepthMultiplier = v },
+					scope,
+					"Multiplier",
+				)
+			},
+		),
+	)
+
 	traversal.ConstructRegistry.Register(
 		reflect.TypeFor[grammar.SurfaceCondition_AboveWaterContext](),
-		func(ctx antlr.ParserRuleContext, _ string, _ *traversal.Scope) traversal.Construct {
+		func(ctx antlr.ParserRuleContext, namespace string, scope *traversal.Scope) traversal.Construct {
 			aboveWater := ctx.(*grammar.SurfaceCondition_AboveWaterContext)
-			offset := 0
-			if aboveWater.Int() != nil {
-				if v, err := strconv.Atoi(aboveWater.Int().GetText()); err == nil {
-					offset = v
-				}
-			}
-			depthMultiplier := 0.0
-			if aboveWater.Number() != nil {
-				if v, err := strconv.ParseFloat(aboveWater.Number().GetText(), 64); err == nil {
-					depthMultiplier = v
-				}
-			}
-			return &AboveWaterCondition{
-				Offset:          offset,
-				DepthMultiplier: depthMultiplier,
-				Add:             aboveWater.Keyword_Add() != nil,
+			out := &AboveWaterCondition{}
+			for _, r := range aboveWater.AllSurfaceCondition_AboveWaterBuilder() {
+				builder_chain.Invoke(waterBuildChain, r, out, scope, namespace)
 			}
 
+			return out
 		},
 	)
 }

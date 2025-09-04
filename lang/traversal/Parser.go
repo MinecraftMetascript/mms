@@ -2,6 +2,7 @@ package traversal
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/minecraftmetascript/mms/lang/grammar"
 
@@ -9,10 +10,10 @@ import (
 )
 
 type Parser struct {
-	grammar.BaseMain_ParserListener
+	grammar.BaseMinecraftMetascriptListener
 
-	lexer       *grammar.Main_Lexer
-	parser      *grammar.Main_Parser
+	lexer       *grammar.MinecraftMetascriptLexer
+	parser      *grammar.MinecraftMetascriptParser
 	content     string
 	diagnostics *[]Diagnostic
 
@@ -21,7 +22,7 @@ type Parser struct {
 	filename  string
 }
 
-func (p *Parser) GetInternalParser(namespace string) *grammar.Main_Parser {
+func (p *Parser) GetInternalParser(namespace string) *grammar.MinecraftMetascriptParser {
 	p.namespace = namespace
 	return p.parser
 }
@@ -33,86 +34,34 @@ func (p *Parser) Parse() (err error) {
 	return nil
 }
 
-func (p *Parser) ExitNamespaceDefinition(ctx *grammar.NamespaceDefinitionContext) {
+func (p *Parser) ExitEveryRule(ctx antlr.ParserRuleContext) {
+	ConstructRegistry.Construct(ctx, p.namespace, p.scope)
+}
+
+func (p *Parser) ExitNamespaceDeclaration(ctx *grammar.NamespaceDeclarationContext) {
 	ns := ctx.Identifier()
 	if ns != nil {
 		p.namespace = ns.GetText()
+		fmt.Println("BEGIN: ", p.namespace)
 	} else {
- 	*p.diagnostics = append(*p.diagnostics, Diagnostic{
- 		Message:  "Missing Namespace Declaration",
- 		Where:    RuleLocation(ctx, p.filename),
- 		Severity: SeverityError,
- 		Source:   "parser",
- 		File:     p.filename,
- 	})
+		*p.diagnostics = append(*p.diagnostics, Diagnostic{
+			Message:  "Missing Namespace Declaration",
+			Where:    RuleLocation(ctx, p.filename),
+			Severity: SeverityError,
+			Source:   "parser",
+			File:     p.filename,
+		})
 		p.namespace = "_unnamed_"
-	}
-}
-
-func (p *Parser) ExitDeclaration(ctx *grammar.DeclarationContext) {
-	nameCtx := ctx.Identifier()
-	definitionCtx := ctx.Definition()
-	// Validate contexts are present
-	if nameCtx == nil || definitionCtx == nil {
-		if p.diagnostics != nil {
-			*p.diagnostics = append(*p.diagnostics, Diagnostic{
-				Message:  "invalid declaration",
-				Where:    RuleLocation(ctx, p.filename),
-				Severity: SeverityError,
-				Source:   "parser",
-				File:     p.filename,
-			})
-		}
-		return
-	}
-	name := nameCtx.GetText()
-
-	var val Construct
-	if definitionCtx.GetChildCount() > 0 {
-		if inner, ok := definitionCtx.GetChild(0).(antlr.ParserRuleContext); ok {
-			val = ConstructRegistry.Construct(inner, p.namespace, p.scope)
-		}
-	}
-
-	if val == nil {
-		if p.diagnostics != nil {
-  	*p.diagnostics = append(*p.diagnostics, Diagnostic{
-  		Message:  "invalid definition for " + name,
-  		Where:    RuleLocation(definitionCtx, p.filename),
-  		Severity: SeverityError,
-  		Source:   "parser",
-  		File:     p.filename,
-  	})
-		}
-		return
-	}
-
-	symbol := NewSymbol(
-		TerminalNodeLocation(nameCtx, p.filename),
-		RuleLocation(definitionCtx, p.filename),
-		val,
-		NewReference(name, p.namespace),
-	)
-	if err := p.scope.Register(symbol); err != nil {
-		if p.diagnostics != nil {
-			*p.diagnostics = append(*p.diagnostics, Diagnostic{
-				Message:  err.Error(),
-				Where:    TerminalNodeLocation(nameCtx, p.filename),
-				Severity: SeverityError,
-				Source:   "semantic",
-				File:     p.filename,
-			})
-		}
 	}
 }
 
 func NewParser(content string, filename string, globalScope *Scope, diagnostics *[]Diagnostic) *Parser {
 	input := antlr.NewInputStream(content)
-	lexer := grammar.NewMain_Lexer(input)
+	lexer := grammar.NewMinecraftMetascriptLexer(input)
 
 	out := &Parser{
 		lexer:       lexer,
-		parser:      grammar.NewMain_Parser(antlr.NewCommonTokenStream(lexer, 0)),
+		parser:      grammar.NewMinecraftMetascriptParser(antlr.NewCommonTokenStream(lexer, 0)),
 		content:     content,
 		diagnostics: diagnostics,
 		scope:       globalScope,

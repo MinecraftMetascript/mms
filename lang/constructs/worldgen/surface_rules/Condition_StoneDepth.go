@@ -3,8 +3,8 @@ package surface_rules
 import (
 	"encoding/json"
 	"reflect"
-	"strconv"
 
+	"github.com/minecraftmetascript/mms/lang/builder_chain"
 	"github.com/minecraftmetascript/mms/lang/grammar"
 	"github.com/minecraftmetascript/mms/lang/traversal"
 	"github.com/minecraftmetascript/mms/lib"
@@ -13,39 +13,47 @@ import (
 )
 
 func init() {
+	stoneDepthBuildChain := builder_chain.NewBuilderChain[StoneDepthCondition](
+		builder_chain.Build(
+			func(ctx *grammar.SurfaceCondition_StoneDepthBuilder_SecondaryDepthRangeContext, target *StoneDepthCondition, scope *traversal.Scope, namespace string) {
+				builder_chain.Builder_GetInt(ctx, func(v int) { target.Range = v }, scope, "Secondary Depth Range")
+			},
+		),
+		builder_chain.Build(
+			func(ctx *grammar.SharedBuilder_OffsetContext, target *StoneDepthCondition, scope *traversal.Scope, namespace string) {
+				builder_chain.Builder_GetInt(ctx, func(v int) { target.Offset = v }, scope, "Offset")
+			},
+		),
+		builder_chain.Build(
+			func(ctx *grammar.SharedBuilder_AddContext, target *StoneDepthCondition, scope *traversal.Scope, namespace string) {
+				builder_chain.SharedBuilder_Add(ctx, func(v bool) { target.Add = v })
+			},
+		),
+	)
+
 	traversal.ConstructRegistry.Register(
 		reflect.TypeFor[grammar.SurfaceCondition_StoneDepthContext](),
-		func(ctx antlr.ParserRuleContext, _ string, _ *traversal.Scope) traversal.Construct {
+		func(ctx antlr.ParserRuleContext, namespace string, scope *traversal.Scope) traversal.Construct {
 			stoneDepth := ctx.(*grammar.SurfaceCondition_StoneDepthContext)
-			var offset int
-			if stoneDepth.Int(0) != nil {
-				if v, err := strconv.Atoi(stoneDepth.Int(0).GetText()); err == nil {
-					offset = v
-				}
+			out := &StoneDepthCondition{}
+			if mode := stoneDepth.StoneDepthMode(); mode != nil {
+				out.Surface = mode.GetText()
+			} else {
+				scope.DiagnoseSemanticError("Missing stone depth mode, expected Floor or Ceiling", ctx)
 			}
-			var secondaryDepthRange int
-			if stoneDepth.Int(1) != nil {
-				if v, err := strconv.Atoi(stoneDepth.Int(1).GetText()); err == nil {
-					secondaryDepthRange = v
-				}
+
+			for _, r := range stoneDepth.AllSurfaceCondition_StoneDepthBuilder() {
+				builder_chain.Invoke(stoneDepthBuildChain, r, out, scope, namespace)
 			}
-			surface := "floor"
-			if stoneDepth.Keyword_Ceiling() != nil {
-				surface = "ceiling"
-			}
-			return &StoneDepthCondition{
-				Depth:   offset,
-				Add:     stoneDepth.Keyword_Add() != nil, // if this is nil, then Keyword_Sub MUST exist per the grammar
-				Range:   secondaryDepthRange,
-				Surface: surface,
-			}
+
+			return out
 		},
 	)
 }
 
 type StoneDepthCondition struct {
 	traversal.Construct
-	Depth   int
+	Offset  int
 	Add     bool
 	Range   int
 	Surface string
@@ -58,13 +66,13 @@ func (c StoneDepthCondition) ExportSymbol(symbol traversal.Symbol, rootDir *lib.
 func (c StoneDepthCondition) MarshalJSON() ([]byte, error) {
 	return json.MarshalIndent(struct {
 		Type    SurfaceConditionKind `json:"type"`
-		Depth   int                  `json:"offset"`
+		Offset  int                  `json:"offset"`
 		Surface string               `json:"surface_type"`
 		Add     bool                 `json:"add_surface_depth"`
 		Range   int                  `json:"secondary_depth_range"`
 	}{
 		Type:    StoneDepthConditionKind,
-		Depth:   c.Depth,
+		Offset:  c.Offset,
 		Surface: c.Surface,
 		Add:     c.Add,
 		Range:   c.Range,
