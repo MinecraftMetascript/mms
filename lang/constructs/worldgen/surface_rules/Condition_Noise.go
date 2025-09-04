@@ -15,21 +15,21 @@ import (
 func init() {
 	noiseBuildChain := builder_chain.NewBuilderChain[NoiseCondition](
 		builder_chain.Build(
-			func(ctx *grammar.SurfaceCondition_NoiseBuilder_MinContext, out *NoiseCondition, scope *traversal.Scope, _ string) {
+			func(ctx *grammar.SurfaceCondition_NoiseThresholdBuilder_MinContext, out *NoiseCondition, scope *traversal.Scope, _ string) {
 				builder_chain.Builder_GetFloat(ctx, func(v float64) { out.Min = v }, scope, "Min")
 			},
 		),
 		builder_chain.Build(
-			func(ctx *grammar.SurfaceCondition_NoiseBuilder_MaxContext, out *NoiseCondition, scope *traversal.Scope, _ string) {
+			func(ctx *grammar.SurfaceCondition_NoiseThresholdBuilder_MaxContext, out *NoiseCondition, scope *traversal.Scope, _ string) {
 				builder_chain.Builder_GetFloat(ctx, func(v float64) { out.Max = v }, scope, "Min")
 			},
 		),
 	)
 
 	traversal.ConstructRegistry.Register(
-		reflect.TypeFor[grammar.SurfaceCondition_NoiseContext](),
+		reflect.TypeFor[grammar.SurfaceCondition_NoiseThresholdContext](),
 		func(ctx antlr.ParserRuleContext, namespace string, scope *traversal.Scope) traversal.Construct {
-			noise := ctx.(*grammar.SurfaceCondition_NoiseContext)
+			noise := ctx.(*grammar.SurfaceCondition_NoiseThresholdContext)
 			var noiseRef traversal.Reference
 			if rr := noise.ResourceReference(); rr != nil {
 				if cons := traversal.ConstructRegistry.Construct(rr, namespace, scope); cons != nil {
@@ -41,7 +41,7 @@ func init() {
 			out := &NoiseCondition{
 				NoiseRef: noiseRef,
 			}
-			for _, r := range noise.AllSurfaceCondition_NoiseBuilder() {
+			for _, r := range noise.AllSurfaceCondition_NoiseThresholdBuilder() {
 				builder_chain.Invoke(noiseBuildChain, r, out, scope, namespace)
 			}
 

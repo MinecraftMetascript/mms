@@ -19,8 +19,8 @@ type MinecraftMetascriptListener interface {
 	// EnterContentBlocks is called when entering the contentBlocks production.
 	EnterContentBlocks(c *ContentBlocksContext)
 
-	// EnterSurface is called when entering the surface production.
-	EnterSurface(c *SurfaceContext)
+	// EnterSurfaceBlock is called when entering the surfaceBlock production.
+	EnterSurfaceBlock(c *SurfaceBlockContext)
 
 	// EnterSurfaceStatement is called when entering the surfaceStatement production.
 	EnterSurfaceStatement(c *SurfaceStatementContext)
@@ -76,17 +76,17 @@ type MinecraftMetascriptListener interface {
 	// EnterSurfaceCondition_Freezing is called when entering the surfaceCondition_Freezing production.
 	EnterSurfaceCondition_Freezing(c *SurfaceCondition_FreezingContext)
 
-	// EnterSurfaceCondition_NoiseBuilder_Min is called when entering the surfaceCondition_NoiseBuilder_Min production.
-	EnterSurfaceCondition_NoiseBuilder_Min(c *SurfaceCondition_NoiseBuilder_MinContext)
+	// EnterSurfaceCondition_NoiseThresholdBuilder_Min is called when entering the surfaceCondition_NoiseThresholdBuilder_Min production.
+	EnterSurfaceCondition_NoiseThresholdBuilder_Min(c *SurfaceCondition_NoiseThresholdBuilder_MinContext)
 
-	// EnterSurfaceCondition_NoiseBuilder_Max is called when entering the surfaceCondition_NoiseBuilder_Max production.
-	EnterSurfaceCondition_NoiseBuilder_Max(c *SurfaceCondition_NoiseBuilder_MaxContext)
+	// EnterSurfaceCondition_NoiseThresholdBuilder_Max is called when entering the surfaceCondition_NoiseThresholdBuilder_Max production.
+	EnterSurfaceCondition_NoiseThresholdBuilder_Max(c *SurfaceCondition_NoiseThresholdBuilder_MaxContext)
 
-	// EnterSurfaceCondition_NoiseBuilder is called when entering the surfaceCondition_NoiseBuilder production.
-	EnterSurfaceCondition_NoiseBuilder(c *SurfaceCondition_NoiseBuilderContext)
+	// EnterSurfaceCondition_NoiseThresholdBuilder is called when entering the surfaceCondition_NoiseThresholdBuilder production.
+	EnterSurfaceCondition_NoiseThresholdBuilder(c *SurfaceCondition_NoiseThresholdBuilderContext)
 
-	// EnterSurfaceCondition_Noise is called when entering the surfaceCondition_Noise production.
-	EnterSurfaceCondition_Noise(c *SurfaceCondition_NoiseContext)
+	// EnterSurfaceCondition_NoiseThreshold is called when entering the surfaceCondition_NoiseThreshold production.
+	EnterSurfaceCondition_NoiseThreshold(c *SurfaceCondition_NoiseThresholdContext)
 
 	// EnterSurfaceCondition_StoneDepth is called when entering the surfaceCondition_StoneDepth production.
 	EnterSurfaceCondition_StoneDepth(c *SurfaceCondition_StoneDepthContext)
@@ -148,6 +148,21 @@ type MinecraftMetascriptListener interface {
 	// EnterNumber is called when entering the number production.
 	EnterNumber(c *NumberContext)
 
+	// EnterNoiseBlock is called when entering the noiseBlock production.
+	EnterNoiseBlock(c *NoiseBlockContext)
+
+	// EnterNoiseDeclaration is called when entering the noiseDeclaration production.
+	EnterNoiseDeclaration(c *NoiseDeclarationContext)
+
+	// EnterNoiseDefinition is called when entering the noiseDefinition production.
+	EnterNoiseDefinition(c *NoiseDefinitionContext)
+
+	// EnterNoiseDefinition_Builder is called when entering the noiseDefinition_Builder production.
+	EnterNoiseDefinition_Builder(c *NoiseDefinition_BuilderContext)
+
+	// EnterNoiseDefinition_Builder_Octaves is called when entering the noiseDefinition_Builder_Octaves production.
+	EnterNoiseDefinition_Builder_Octaves(c *NoiseDefinition_Builder_OctavesContext)
+
 	// ExitScript is called when exiting the script production.
 	ExitScript(c *ScriptContext)
 
@@ -160,8 +175,8 @@ type MinecraftMetascriptListener interface {
 	// ExitContentBlocks is called when exiting the contentBlocks production.
 	ExitContentBlocks(c *ContentBlocksContext)
 
-	// ExitSurface is called when exiting the surface production.
-	ExitSurface(c *SurfaceContext)
+	// ExitSurfaceBlock is called when exiting the surfaceBlock production.
+	ExitSurfaceBlock(c *SurfaceBlockContext)
 
 	// ExitSurfaceStatement is called when exiting the surfaceStatement production.
 	ExitSurfaceStatement(c *SurfaceStatementContext)
@@ -217,17 +232,17 @@ type MinecraftMetascriptListener interface {
 	// ExitSurfaceCondition_Freezing is called when exiting the surfaceCondition_Freezing production.
 	ExitSurfaceCondition_Freezing(c *SurfaceCondition_FreezingContext)
 
-	// ExitSurfaceCondition_NoiseBuilder_Min is called when exiting the surfaceCondition_NoiseBuilder_Min production.
-	ExitSurfaceCondition_NoiseBuilder_Min(c *SurfaceCondition_NoiseBuilder_MinContext)
+	// ExitSurfaceCondition_NoiseThresholdBuilder_Min is called when exiting the surfaceCondition_NoiseThresholdBuilder_Min production.
+	ExitSurfaceCondition_NoiseThresholdBuilder_Min(c *SurfaceCondition_NoiseThresholdBuilder_MinContext)
 
-	// ExitSurfaceCondition_NoiseBuilder_Max is called when exiting the surfaceCondition_NoiseBuilder_Max production.
-	ExitSurfaceCondition_NoiseBuilder_Max(c *SurfaceCondition_NoiseBuilder_MaxContext)
+	// ExitSurfaceCondition_NoiseThresholdBuilder_Max is called when exiting the surfaceCondition_NoiseThresholdBuilder_Max production.
+	ExitSurfaceCondition_NoiseThresholdBuilder_Max(c *SurfaceCondition_NoiseThresholdBuilder_MaxContext)
 
-	// ExitSurfaceCondition_NoiseBuilder is called when exiting the surfaceCondition_NoiseBuilder production.
-	ExitSurfaceCondition_NoiseBuilder(c *SurfaceCondition_NoiseBuilderContext)
+	// ExitSurfaceCondition_NoiseThresholdBuilder is called when exiting the surfaceCondition_NoiseThresholdBuilder production.
+	ExitSurfaceCondition_NoiseThresholdBuilder(c *SurfaceCondition_NoiseThresholdBuilderContext)
 
-	// ExitSurfaceCondition_Noise is called when exiting the surfaceCondition_Noise production.
-	ExitSurfaceCondition_Noise(c *SurfaceCondition_NoiseContext)
+	// ExitSurfaceCondition_NoiseThreshold is called when exiting the surfaceCondition_NoiseThreshold production.
+	ExitSurfaceCondition_NoiseThreshold(c *SurfaceCondition_NoiseThresholdContext)
 
 	// ExitSurfaceCondition_StoneDepth is called when exiting the surfaceCondition_StoneDepth production.
 	ExitSurfaceCondition_StoneDepth(c *SurfaceCondition_StoneDepthContext)
@@ -288,4 +303,19 @@ type MinecraftMetascriptListener interface {
 
 	// ExitNumber is called when exiting the number production.
 	ExitNumber(c *NumberContext)
+
+	// ExitNoiseBlock is called when exiting the noiseBlock production.
+	ExitNoiseBlock(c *NoiseBlockContext)
+
+	// ExitNoiseDeclaration is called when exiting the noiseDeclaration production.
+	ExitNoiseDeclaration(c *NoiseDeclarationContext)
+
+	// ExitNoiseDefinition is called when exiting the noiseDefinition production.
+	ExitNoiseDefinition(c *NoiseDefinitionContext)
+
+	// ExitNoiseDefinition_Builder is called when exiting the noiseDefinition_Builder production.
+	ExitNoiseDefinition_Builder(c *NoiseDefinition_BuilderContext)
+
+	// ExitNoiseDefinition_Builder_Octaves is called when exiting the noiseDefinition_Builder_Octaves production.
+	ExitNoiseDefinition_Builder_Octaves(c *NoiseDefinition_Builder_OctavesContext)
 }

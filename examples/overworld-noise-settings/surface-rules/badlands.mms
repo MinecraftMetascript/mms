@@ -1,4 +1,8 @@
 namespace MySpace {
+    Noise {
+        xyz = Noise(-4).Octaves(1.4, 1.2, 10)
+    }
+
   Surface {
     InBadlands = Biome(
       minecraft:badlands,
@@ -14,9 +18,9 @@ namespace MySpace {
         If (StoneDepth(Floor)) [
           If (
             Or (
-              Noise(minecraft:surface).Min(-0.909).Max(-0.5454)
-              Noise(minecraft:surface).Min(-0.1818).Max(0.1818)
-              Noise(minecraft:surface).Min(0.5454).Max(0.909)
+              NoiseThreshold(minecraft:surface).Min(-0.909).Max(-0.5454)
+              NoiseThreshold(minecraft:surface).Min(-0.1818).Max(0.1818)
+              NoiseThreshold(minecraft:surface).Min(0.5454).Max(0.909)
             )
           ) Block(minecraft:terracotta)
           Bandlands()

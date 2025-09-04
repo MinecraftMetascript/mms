@@ -2,8 +2,11 @@ package traversal
 
 import (
 	"encoding/json"
+	"fmt"
+	"strings"
 
 	"github.com/antlr4-go/antlr/v4"
+	"github.com/minecraftmetascript/mms/lang/grammar"
 )
 
 type Symbol interface {
@@ -11,6 +14,7 @@ type Symbol interface {
 	GetContentLocation() TextLocation
 	GetValue() Construct
 	GetReference() *Reference
+	GetType() string
 }
 
 type BaseSymbol struct {
@@ -18,6 +22,11 @@ type BaseSymbol struct {
 	contentLocation TextLocation
 	value           Construct
 	ref             *Reference
+	_type           string
+}
+
+func (s BaseSymbol) GetType() string {
+	return s._type
 }
 
 func NewSymbol(nameLocation TextLocation, contentLocation TextLocation, value Construct, ref *Reference) BaseSymbol {
@@ -36,6 +45,9 @@ type DeclarationContext interface {
 
 func ProcessDeclaration(ctx DeclarationContext, valueCtx antlr.ParserRuleContext, scope *Scope, namespace string) Symbol {
 	out := &BaseSymbol{}
+	out._type = grammar.MinecraftMetascriptParserStaticData.RuleNames[valueCtx.GetRuleIndex()]
+	out._type = fmt.Sprintf("%s%s", strings.ToUpper(string(out._type[0])), out._type[1:])
+
 	if id := ctx.Identifier(); id == nil {
 		scope.DiagnoseSemanticError("Missing Identifier", ctx)
 	} else {
