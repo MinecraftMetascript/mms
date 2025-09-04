@@ -19,8 +19,7 @@ surfaceRule_Reference: resourceReference;
 surfaceConditionDefinition: Keyword_SurfaceCondition NL* CurlyOpen NL* surfaceCondition NL* CurlyClose;
 
 surfaceCondition:
-    Bang?
-    (surfaceCondition_AboveSurface
+     surfaceCondition_AboveSurface
     | surfaceCondition_Biome
     | surfaceCondition_Hole
     | surfaceCondition_Noise
@@ -32,12 +31,14 @@ surfaceCondition:
     | surfaceCondition_YAbove
     | surfaceCondition_Reference
     | surfaceCondition_And
-    | surfaceCondition_Or);
+    | surfaceCondition_Or
+    | surfaceCondition_Not;
 
 surfaceCondition_Reference: resourceReference;
 
 surfaceCondition_And: Keyword_And NL* RoundOpen NL* (surfaceCondition NL*)* surfaceCondition NL* RoundClose;
 surfaceCondition_Or: Keyword_Or NL* RoundOpen NL* (surfaceCondition NL*)* surfaceCondition NL* RoundClose;
+surfaceCondition_Not: Keyword_Not NL* RoundOpen NL* surfaceCondition NL* RoundClose;
 
 
 surfaceCondition_AboveSurface: Keyword_AboveSurface;

@@ -16,6 +16,8 @@ Colon: ':';
 SemiColon: ';';
 Amp: '&';
 DoubleAmp: '&&';
+Tilde: '~';
+Dash: '-';
 
 Int: '-'? [0-9]+;
 Float: ('-'? [0-9]+ '.' [0-9]+);

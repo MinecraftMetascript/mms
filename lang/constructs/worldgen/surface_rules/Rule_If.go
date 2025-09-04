@@ -16,7 +16,7 @@ func init() {
 		reflect.TypeFor[grammar.SurfaceRule_ConditionContext](),
 		func(ctx_ antlr.ParserRuleContext, ns string, scope *traversal.Scope) traversal.Construct {
 			ctx := ctx_.(*grammar.SurfaceRule_ConditionContext)
-  	out := &IfRule{
+			out := &IfRule{
 				Negate: false,
 				scope:  scope,
 			}
@@ -24,13 +24,12 @@ func init() {
 			var condition traversal.Construct
 
 			if cond := ctx.SurfaceCondition(); cond != nil {
-				out.Negate = cond.Bang() != nil
 				condition = traversal.ConstructRegistry.Construct(cond, ns, scope)
 			} else {
 				if scope != nil && scope.Diagnostics != nil {
 					loc := traversal.RuleLocation(ctx, scope.CurrentFile)
 					*scope.Diagnostics = append(*scope.Diagnostics, traversal.Diagnostic{
-						Message:  "missing surface condition in if rule",
+						Message:  "Expected a surface condition",
 						Where:    loc,
 						Severity: traversal.SeverityError,
 						Source:   "semantic",

@@ -29,8 +29,11 @@ Keyword_AboveWater: 'AboveWater';
 Keyword_YAbove: 'YAbove';
 Keyword_Floor: 'Floor';
 Keyword_Ceiling: 'Ceiling';
+
+Keyword_Not: 'Not';
 Keyword_And: 'And';
 Keyword_Or: 'Or';
+
 Keyword_Add: 'Add';
 Keyword_Sub: 'Sub';
 ///

@@ -54,8 +54,6 @@ Resource references can be _qualified_ or _unqualified_.
 | `minecraft:stone` | `stone` |
 
 
-
-
 ## Surface Rules
 
 ### Bandlands:
@@ -149,6 +147,16 @@ SurfaceCondition {
 ```
 
 ### Compound Conditions
+
+#### Not
+
+Inverts the result of a condition.
+
+```
+SurfaceCondition {
+    Not ( <SurfaceCondition> )
+}
+```
 
 #### And
 Allows for multiple conditions to be combined with `and`. All conditions must be true
@@ -269,9 +277,9 @@ Vertical Anchors appear in a few places where a Y value is required.
 They can be provided in three forms:
 
 ```
-Absolute(<Int>)
-AboveBottom(<Int>)
-BelowTop(<Int>)
+<Int (Absolute Y Value)>
+~<Int (Relative AboveBottom)>
+~-<Int (Relative BelowTop)>
 ```
 
 

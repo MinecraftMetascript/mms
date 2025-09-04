@@ -120,6 +120,12 @@ func (s *BaseMain_ParserListener) EnterSurfaceCondition_Or(ctx *SurfaceCondition
 // ExitSurfaceCondition_Or is called when production surfaceCondition_Or is exited.
 func (s *BaseMain_ParserListener) ExitSurfaceCondition_Or(ctx *SurfaceCondition_OrContext) {}
 
+// EnterSurfaceCondition_Not is called when production surfaceCondition_Not is entered.
+func (s *BaseMain_ParserListener) EnterSurfaceCondition_Not(ctx *SurfaceCondition_NotContext) {}
+
+// ExitSurfaceCondition_Not is called when production surfaceCondition_Not is exited.
+func (s *BaseMain_ParserListener) ExitSurfaceCondition_Not(ctx *SurfaceCondition_NotContext) {}
+
 // EnterSurfaceCondition_AboveSurface is called when production surfaceCondition_AboveSurface is entered.
 func (s *BaseMain_ParserListener) EnterSurfaceCondition_AboveSurface(ctx *SurfaceCondition_AboveSurfaceContext) {
 }

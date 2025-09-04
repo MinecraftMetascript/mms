@@ -55,6 +55,9 @@ type Main_ParserListener interface {
 	// EnterSurfaceCondition_Or is called when entering the surfaceCondition_Or production.
 	EnterSurfaceCondition_Or(c *SurfaceCondition_OrContext)
 
+	// EnterSurfaceCondition_Not is called when entering the surfaceCondition_Not production.
+	EnterSurfaceCondition_Not(c *SurfaceCondition_NotContext)
+
 	// EnterSurfaceCondition_AboveSurface is called when entering the surfaceCondition_AboveSurface production.
 	EnterSurfaceCondition_AboveSurface(c *SurfaceCondition_AboveSurfaceContext)
 
@@ -156,6 +159,9 @@ type Main_ParserListener interface {
 
 	// ExitSurfaceCondition_Or is called when exiting the surfaceCondition_Or production.
 	ExitSurfaceCondition_Or(c *SurfaceCondition_OrContext)
+
+	// ExitSurfaceCondition_Not is called when exiting the surfaceCondition_Not production.
+	ExitSurfaceCondition_Not(c *SurfaceCondition_NotContext)
 
 	// ExitSurfaceCondition_AboveSurface is called when exiting the surfaceCondition_AboveSurface production.
 	ExitSurfaceCondition_AboveSurface(c *SurfaceCondition_AboveSurfaceContext)
