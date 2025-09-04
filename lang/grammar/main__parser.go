@@ -36,8 +36,8 @@ func main_parserParserInit() {
 		"'SurfaceRule'", "'SurfaceCondition'", "'Block'", "'If'", "'Sequence'",
 		"'Bandlands'", "'AboveSurface'", "'Biome'", "'Hole'", "'Noise'", "'Steep'",
 		"'StoneDepth'", "'Freezing'", "'Temperature'", "'VerticalGradient'",
-		"'AboveWater'", "'YAbove'", "'Floor'", "'Ceiling'", "'and'", "'or'",
-		"'add'", "'sub'", "':='", "'{'", "'}'", "'['", "']'", "'('", "')'",
+		"'AboveWater'", "'YAbove'", "'Floor'", "'Ceiling'", "'And'", "'Or'",
+		"'Add'", "'Sub'", "':='", "'{'", "'}'", "'['", "']'", "'('", "')'",
 		"'.'", "'!'", "','", "':'", "';'", "'&'", "'&&'",
 	}
 	staticData.SymbolicNames = []string{

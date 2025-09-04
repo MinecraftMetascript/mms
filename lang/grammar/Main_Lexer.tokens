@@ -72,10 +72,10 @@ LineComment=50
 'YAbove'=22
 'Floor'=23
 'Ceiling'=24
-'and'=25
-'or'=26
-'add'=27
-'sub'=28
+'And'=25
+'Or'=26
+'Add'=27
+'Sub'=28
 ':='=29
 '{'=30
 '}'=31
