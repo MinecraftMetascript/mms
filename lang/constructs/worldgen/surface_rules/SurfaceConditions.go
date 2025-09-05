@@ -33,17 +33,20 @@ func init() {
 		reflect.TypeFor[grammar.SurfaceConditionContext](),
 		func(ctx antlr.ParserRuleContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
 			conditionCtx := ctx.(*grammar.SurfaceConditionContext)
-			return traversal.ConstructRegistry.Construct(
-				conditionCtx.GetChild(0).(antlr.ParserRuleContext),
-				currentNamespace,
-				scope,
-			)
+			if conditionCtx.GetChildCount() > 0 {
+				return traversal.ConstructRegistry.Construct(
+					conditionCtx.GetChild(0).(antlr.ParserRuleContext),
+					currentNamespace,
+					scope,
+				)
+			}
+			return nil
 		})
 	traversal.ConstructRegistry.Register(
 		reflect.TypeFor[grammar.SurfaceConditionDeclarationContext](),
 		func(ctx antlr.ParserRuleContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
 			declarationContext := ctx.(*grammar.SurfaceConditionDeclarationContext)
-			s := traversal.ProcessDeclaration(declarationContext, declarationContext.SurfaceCondition(), scope, currentNamespace)
+			s := traversal.ProcessDeclaration(declarationContext, declarationContext.SurfaceCondition(), scope, currentNamespace, "SurfaceCondition")
 			return s.GetValue()
 		})
 }

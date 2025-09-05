@@ -46,11 +46,11 @@ func (s *BaseMinecraftMetascriptListener) EnterContentBlocks(ctx *ContentBlocksC
 // ExitContentBlocks is called when production contentBlocks is exited.
 func (s *BaseMinecraftMetascriptListener) ExitContentBlocks(ctx *ContentBlocksContext) {}
 
-// EnterSurface is called when production surface is entered.
-func (s *BaseMinecraftMetascriptListener) EnterSurface(ctx *SurfaceContext) {}
+// EnterSurfaceBlock is called when production surfaceBlock is entered.
+func (s *BaseMinecraftMetascriptListener) EnterSurfaceBlock(ctx *SurfaceBlockContext) {}
 
-// ExitSurface is called when production surface is exited.
-func (s *BaseMinecraftMetascriptListener) ExitSurface(ctx *SurfaceContext) {}
+// ExitSurfaceBlock is called when production surfaceBlock is exited.
+func (s *BaseMinecraftMetascriptListener) ExitSurfaceBlock(ctx *SurfaceBlockContext) {}
 
 // EnterSurfaceStatement is called when production surfaceStatement is entered.
 func (s *BaseMinecraftMetascriptListener) EnterSurfaceStatement(ctx *SurfaceStatementContext) {}
@@ -184,36 +184,36 @@ func (s *BaseMinecraftMetascriptListener) EnterSurfaceCondition_Freezing(ctx *Su
 func (s *BaseMinecraftMetascriptListener) ExitSurfaceCondition_Freezing(ctx *SurfaceCondition_FreezingContext) {
 }
 
-// EnterSurfaceCondition_NoiseBuilder_Min is called when production surfaceCondition_NoiseBuilder_Min is entered.
-func (s *BaseMinecraftMetascriptListener) EnterSurfaceCondition_NoiseBuilder_Min(ctx *SurfaceCondition_NoiseBuilder_MinContext) {
+// EnterSurfaceCondition_NoiseThresholdBuilder_Min is called when production surfaceCondition_NoiseThresholdBuilder_Min is entered.
+func (s *BaseMinecraftMetascriptListener) EnterSurfaceCondition_NoiseThresholdBuilder_Min(ctx *SurfaceCondition_NoiseThresholdBuilder_MinContext) {
 }
 
-// ExitSurfaceCondition_NoiseBuilder_Min is called when production surfaceCondition_NoiseBuilder_Min is exited.
-func (s *BaseMinecraftMetascriptListener) ExitSurfaceCondition_NoiseBuilder_Min(ctx *SurfaceCondition_NoiseBuilder_MinContext) {
+// ExitSurfaceCondition_NoiseThresholdBuilder_Min is called when production surfaceCondition_NoiseThresholdBuilder_Min is exited.
+func (s *BaseMinecraftMetascriptListener) ExitSurfaceCondition_NoiseThresholdBuilder_Min(ctx *SurfaceCondition_NoiseThresholdBuilder_MinContext) {
 }
 
-// EnterSurfaceCondition_NoiseBuilder_Max is called when production surfaceCondition_NoiseBuilder_Max is entered.
-func (s *BaseMinecraftMetascriptListener) EnterSurfaceCondition_NoiseBuilder_Max(ctx *SurfaceCondition_NoiseBuilder_MaxContext) {
+// EnterSurfaceCondition_NoiseThresholdBuilder_Max is called when production surfaceCondition_NoiseThresholdBuilder_Max is entered.
+func (s *BaseMinecraftMetascriptListener) EnterSurfaceCondition_NoiseThresholdBuilder_Max(ctx *SurfaceCondition_NoiseThresholdBuilder_MaxContext) {
 }
 
-// ExitSurfaceCondition_NoiseBuilder_Max is called when production surfaceCondition_NoiseBuilder_Max is exited.
-func (s *BaseMinecraftMetascriptListener) ExitSurfaceCondition_NoiseBuilder_Max(ctx *SurfaceCondition_NoiseBuilder_MaxContext) {
+// ExitSurfaceCondition_NoiseThresholdBuilder_Max is called when production surfaceCondition_NoiseThresholdBuilder_Max is exited.
+func (s *BaseMinecraftMetascriptListener) ExitSurfaceCondition_NoiseThresholdBuilder_Max(ctx *SurfaceCondition_NoiseThresholdBuilder_MaxContext) {
 }
 
-// EnterSurfaceCondition_NoiseBuilder is called when production surfaceCondition_NoiseBuilder is entered.
-func (s *BaseMinecraftMetascriptListener) EnterSurfaceCondition_NoiseBuilder(ctx *SurfaceCondition_NoiseBuilderContext) {
+// EnterSurfaceCondition_NoiseThresholdBuilder is called when production surfaceCondition_NoiseThresholdBuilder is entered.
+func (s *BaseMinecraftMetascriptListener) EnterSurfaceCondition_NoiseThresholdBuilder(ctx *SurfaceCondition_NoiseThresholdBuilderContext) {
 }
 
-// ExitSurfaceCondition_NoiseBuilder is called when production surfaceCondition_NoiseBuilder is exited.
-func (s *BaseMinecraftMetascriptListener) ExitSurfaceCondition_NoiseBuilder(ctx *SurfaceCondition_NoiseBuilderContext) {
+// ExitSurfaceCondition_NoiseThresholdBuilder is called when production surfaceCondition_NoiseThresholdBuilder is exited.
+func (s *BaseMinecraftMetascriptListener) ExitSurfaceCondition_NoiseThresholdBuilder(ctx *SurfaceCondition_NoiseThresholdBuilderContext) {
 }
 
-// EnterSurfaceCondition_Noise is called when production surfaceCondition_Noise is entered.
-func (s *BaseMinecraftMetascriptListener) EnterSurfaceCondition_Noise(ctx *SurfaceCondition_NoiseContext) {
+// EnterSurfaceCondition_NoiseThreshold is called when production surfaceCondition_NoiseThreshold is entered.
+func (s *BaseMinecraftMetascriptListener) EnterSurfaceCondition_NoiseThreshold(ctx *SurfaceCondition_NoiseThresholdContext) {
 }
 
-// ExitSurfaceCondition_Noise is called when production surfaceCondition_Noise is exited.
-func (s *BaseMinecraftMetascriptListener) ExitSurfaceCondition_Noise(ctx *SurfaceCondition_NoiseContext) {
+// ExitSurfaceCondition_NoiseThreshold is called when production surfaceCondition_NoiseThreshold is exited.
+func (s *BaseMinecraftMetascriptListener) ExitSurfaceCondition_NoiseThreshold(ctx *SurfaceCondition_NoiseThresholdContext) {
 }
 
 // EnterSurfaceCondition_StoneDepth is called when production surfaceCondition_StoneDepth is entered.
@@ -365,3 +365,35 @@ func (s *BaseMinecraftMetascriptListener) EnterNumber(ctx *NumberContext) {}
 
 // ExitNumber is called when production number is exited.
 func (s *BaseMinecraftMetascriptListener) ExitNumber(ctx *NumberContext) {}
+
+// EnterNoiseBlock is called when production noiseBlock is entered.
+func (s *BaseMinecraftMetascriptListener) EnterNoiseBlock(ctx *NoiseBlockContext) {}
+
+// ExitNoiseBlock is called when production noiseBlock is exited.
+func (s *BaseMinecraftMetascriptListener) ExitNoiseBlock(ctx *NoiseBlockContext) {}
+
+// EnterNoiseDeclaration is called when production noiseDeclaration is entered.
+func (s *BaseMinecraftMetascriptListener) EnterNoiseDeclaration(ctx *NoiseDeclarationContext) {}
+
+// ExitNoiseDeclaration is called when production noiseDeclaration is exited.
+func (s *BaseMinecraftMetascriptListener) ExitNoiseDeclaration(ctx *NoiseDeclarationContext) {}
+
+// EnterNoise is called when production noise is entered.
+func (s *BaseMinecraftMetascriptListener) EnterNoise(ctx *NoiseContext) {}
+
+// ExitNoise is called when production noise is exited.
+func (s *BaseMinecraftMetascriptListener) ExitNoise(ctx *NoiseContext) {}
+
+// EnterNoise_Builder is called when production noise_Builder is entered.
+func (s *BaseMinecraftMetascriptListener) EnterNoise_Builder(ctx *Noise_BuilderContext) {}
+
+// ExitNoise_Builder is called when production noise_Builder is exited.
+func (s *BaseMinecraftMetascriptListener) ExitNoise_Builder(ctx *Noise_BuilderContext) {}
+
+// EnterNoise_Builder_Amplitudes is called when production noise_Builder_Amplitudes is entered.
+func (s *BaseMinecraftMetascriptListener) EnterNoise_Builder_Amplitudes(ctx *Noise_Builder_AmplitudesContext) {
+}
+
+// ExitNoise_Builder_Amplitudes is called when production noise_Builder_Amplitudes is exited.
+func (s *BaseMinecraftMetascriptListener) ExitNoise_Builder_Amplitudes(ctx *Noise_Builder_AmplitudesContext) {
+}

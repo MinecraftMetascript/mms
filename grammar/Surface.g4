@@ -1,7 +1,7 @@
 grammar Surface;
 import Core_Lang;
 
-surface: 'Surface' NL* '{' NL* (surfaceStatement NL*)* NL* '}';
+surfaceBlock: 'Surface' NL* '{' NL* (surfaceStatement NL*)* NL* '}';
 surfaceStatement: verticalAnchorDeclaration | surfaceConditionDeclaration | surfaceRuleDeclaration;
 
 verticalAnchor: ('~'? Int) | Identifier;
@@ -20,7 +20,7 @@ surfaceCondition:
         | surfaceCondition_Hole
         | surfaceCondition_Steep
         | surfaceCondition_Freezing
-        | surfaceCondition_Noise
+        | surfaceCondition_NoiseThreshold
         | surfaceCondition_StoneDepth
         | surfaceCondition_AboveWater
         | surfaceCondition_YAbove
@@ -47,10 +47,10 @@ surfaceCondition_Freezing: 'Freezing' '(' ')';
 
 
 // These are split out to make them easier to differentiate in the go code
-surfaceCondition_NoiseBuilder_Min: '.Min(' number ')';
-surfaceCondition_NoiseBuilder_Max: '.Max(' number ')';
-surfaceCondition_NoiseBuilder: surfaceCondition_NoiseBuilder_Max | surfaceCondition_NoiseBuilder_Min;
-surfaceCondition_Noise: 'Noise' '(' resourceReference ')' NL* (surfaceCondition_NoiseBuilder NL*)*;
+surfaceCondition_NoiseThresholdBuilder_Min: '.Min(' number ')';
+surfaceCondition_NoiseThresholdBuilder_Max: '.Max(' number ')';
+surfaceCondition_NoiseThresholdBuilder: surfaceCondition_NoiseThresholdBuilder_Max | surfaceCondition_NoiseThresholdBuilder_Min;
+surfaceCondition_NoiseThreshold: 'NoiseThreshold' '(' resourceReference ')' NL* (surfaceCondition_NoiseThresholdBuilder NL*)*;
 
 StoneDepthMode: 'Floor' | 'Ceiling';
 surfaceCondition_StoneDepth:

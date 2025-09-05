@@ -11,6 +11,7 @@ type Symbol interface {
 	GetContentLocation() TextLocation
 	GetValue() Construct
 	GetReference() *Reference
+	GetType() string
 }
 
 type BaseSymbol struct {
@@ -18,6 +19,11 @@ type BaseSymbol struct {
 	contentLocation TextLocation
 	value           Construct
 	ref             *Reference
+	_type           string
+}
+
+func (s BaseSymbol) GetType() string {
+	return s._type
 }
 
 func NewSymbol(nameLocation TextLocation, contentLocation TextLocation, value Construct, ref *Reference) BaseSymbol {
@@ -34,8 +40,10 @@ type DeclarationContext interface {
 	Identifier() antlr.TerminalNode
 }
 
-func ProcessDeclaration(ctx DeclarationContext, valueCtx antlr.ParserRuleContext, scope *Scope, namespace string) Symbol {
+func ProcessDeclaration(ctx DeclarationContext, valueCtx antlr.ParserRuleContext, scope *Scope, namespace string, typeName string) Symbol {
 	out := &BaseSymbol{}
+	out._type = typeName
+
 	if id := ctx.Identifier(); id == nil {
 		scope.DiagnoseSemanticError("Missing Identifier", ctx)
 	} else {
@@ -45,7 +53,7 @@ func ProcessDeclaration(ctx DeclarationContext, valueCtx antlr.ParserRuleContext
 
 	out.value = ConstructRegistry.Construct(valueCtx, namespace, scope)
 	if out.value == nil {
-		scope.DiagnoseSemanticError("Missing value", valueCtx)
+		scope.DiagnoseSemanticError("Missing value", ctx)
 	} else {
 		out.contentLocation = RuleLocation(valueCtx, scope.CurrentFile)
 	}
@@ -80,11 +88,13 @@ func (s BaseSymbol) MarshalJSON() ([]byte, error) {
 		NameLocation    TextLocation `json:"nameLocation"`
 		ContentLocation TextLocation `json:"contentLocation"`
 		Value           Construct    `json:"value"`
-		Ref             Reference    `json:"ref"`
+		Ref             *Reference   `json:"ref"`
+		Type            string       `json:"type"`
 	}{
 		NameLocation:    s.nameLocation,
 		ContentLocation: s.contentLocation,
 		Value:           s.GetValue(),
-		Ref:             *s.ref,
+		Ref:             s.ref,
+		Type:            s.GetType(),
 	})
 }
