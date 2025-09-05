@@ -84,4 +84,4 @@ LineComment=48
 ':'=36
 'Noise'=37
 'Noise('=38
-'.Octaves('=39
+'.Amplitudes('=39

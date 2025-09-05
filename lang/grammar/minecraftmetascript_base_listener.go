@@ -378,24 +378,22 @@ func (s *BaseMinecraftMetascriptListener) EnterNoiseDeclaration(ctx *NoiseDeclar
 // ExitNoiseDeclaration is called when production noiseDeclaration is exited.
 func (s *BaseMinecraftMetascriptListener) ExitNoiseDeclaration(ctx *NoiseDeclarationContext) {}
 
-// EnterNoiseDefinition is called when production noiseDefinition is entered.
-func (s *BaseMinecraftMetascriptListener) EnterNoiseDefinition(ctx *NoiseDefinitionContext) {}
+// EnterNoise is called when production noise is entered.
+func (s *BaseMinecraftMetascriptListener) EnterNoise(ctx *NoiseContext) {}
 
-// ExitNoiseDefinition is called when production noiseDefinition is exited.
-func (s *BaseMinecraftMetascriptListener) ExitNoiseDefinition(ctx *NoiseDefinitionContext) {}
+// ExitNoise is called when production noise is exited.
+func (s *BaseMinecraftMetascriptListener) ExitNoise(ctx *NoiseContext) {}
 
-// EnterNoiseDefinition_Builder is called when production noiseDefinition_Builder is entered.
-func (s *BaseMinecraftMetascriptListener) EnterNoiseDefinition_Builder(ctx *NoiseDefinition_BuilderContext) {
+// EnterNoise_Builder is called when production noise_Builder is entered.
+func (s *BaseMinecraftMetascriptListener) EnterNoise_Builder(ctx *Noise_BuilderContext) {}
+
+// ExitNoise_Builder is called when production noise_Builder is exited.
+func (s *BaseMinecraftMetascriptListener) ExitNoise_Builder(ctx *Noise_BuilderContext) {}
+
+// EnterNoise_Builder_Amplitudes is called when production noise_Builder_Amplitudes is entered.
+func (s *BaseMinecraftMetascriptListener) EnterNoise_Builder_Amplitudes(ctx *Noise_Builder_AmplitudesContext) {
 }
 
-// ExitNoiseDefinition_Builder is called when production noiseDefinition_Builder is exited.
-func (s *BaseMinecraftMetascriptListener) ExitNoiseDefinition_Builder(ctx *NoiseDefinition_BuilderContext) {
-}
-
-// EnterNoiseDefinition_Builder_Octaves is called when production noiseDefinition_Builder_Octaves is entered.
-func (s *BaseMinecraftMetascriptListener) EnterNoiseDefinition_Builder_Octaves(ctx *NoiseDefinition_Builder_OctavesContext) {
-}
-
-// ExitNoiseDefinition_Builder_Octaves is called when production noiseDefinition_Builder_Octaves is exited.
-func (s *BaseMinecraftMetascriptListener) ExitNoiseDefinition_Builder_Octaves(ctx *NoiseDefinition_Builder_OctavesContext) {
+// ExitNoise_Builder_Amplitudes is called when production noise_Builder_Amplitudes is exited.
+func (s *BaseMinecraftMetascriptListener) ExitNoise_Builder_Amplitudes(ctx *Noise_Builder_AmplitudesContext) {
 }

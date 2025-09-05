@@ -79,7 +79,7 @@ func getFileDiag(this js.Value, args []js.Value) any {
 		return nil
 	}
 	if file, ok := project.Files[filename]; ok {
-		raw, err := json.Marshal(file.Diagnostics)
+		raw, err := json.Marshal(lib.Unique(file.Diagnostics))
 		if err != nil {
 			fmt.Println("[Err]:", err)
 			return nil

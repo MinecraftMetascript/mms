@@ -154,14 +154,14 @@ type MinecraftMetascriptListener interface {
 	// EnterNoiseDeclaration is called when entering the noiseDeclaration production.
 	EnterNoiseDeclaration(c *NoiseDeclarationContext)
 
-	// EnterNoiseDefinition is called when entering the noiseDefinition production.
-	EnterNoiseDefinition(c *NoiseDefinitionContext)
+	// EnterNoise is called when entering the noise production.
+	EnterNoise(c *NoiseContext)
 
-	// EnterNoiseDefinition_Builder is called when entering the noiseDefinition_Builder production.
-	EnterNoiseDefinition_Builder(c *NoiseDefinition_BuilderContext)
+	// EnterNoise_Builder is called when entering the noise_Builder production.
+	EnterNoise_Builder(c *Noise_BuilderContext)
 
-	// EnterNoiseDefinition_Builder_Octaves is called when entering the noiseDefinition_Builder_Octaves production.
-	EnterNoiseDefinition_Builder_Octaves(c *NoiseDefinition_Builder_OctavesContext)
+	// EnterNoise_Builder_Amplitudes is called when entering the noise_Builder_Amplitudes production.
+	EnterNoise_Builder_Amplitudes(c *Noise_Builder_AmplitudesContext)
 
 	// ExitScript is called when exiting the script production.
 	ExitScript(c *ScriptContext)
@@ -310,12 +310,12 @@ type MinecraftMetascriptListener interface {
 	// ExitNoiseDeclaration is called when exiting the noiseDeclaration production.
 	ExitNoiseDeclaration(c *NoiseDeclarationContext)
 
-	// ExitNoiseDefinition is called when exiting the noiseDefinition production.
-	ExitNoiseDefinition(c *NoiseDefinitionContext)
+	// ExitNoise is called when exiting the noise production.
+	ExitNoise(c *NoiseContext)
 
-	// ExitNoiseDefinition_Builder is called when exiting the noiseDefinition_Builder production.
-	ExitNoiseDefinition_Builder(c *NoiseDefinition_BuilderContext)
+	// ExitNoise_Builder is called when exiting the noise_Builder production.
+	ExitNoise_Builder(c *Noise_BuilderContext)
 
-	// ExitNoiseDefinition_Builder_Octaves is called when exiting the noiseDefinition_Builder_Octaves production.
-	ExitNoiseDefinition_Builder_Octaves(c *NoiseDefinition_Builder_OctavesContext)
+	// ExitNoise_Builder_Amplitudes is called when exiting the noise_Builder_Amplitudes production.
+	ExitNoise_Builder_Amplitudes(c *Noise_Builder_AmplitudesContext)
 }

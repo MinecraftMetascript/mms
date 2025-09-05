@@ -17,8 +17,7 @@ func init() {
 		func(ctx_ antlr.ParserRuleContext, ns string, scope *traversal.Scope) traversal.Construct {
 			ctx := ctx_.(*grammar.SurfaceRule_IfContext)
 			out := &IfRule{
-				Negate: false,
-				scope:  scope,
+				scope: scope,
 			}
 
 			var condition traversal.Construct
@@ -76,7 +75,6 @@ func init() {
 
 type IfRule struct {
 	traversal.Construct
-	Negate    bool
 	Condition traversal.Construct
 	Action    traversal.Construct
 	scope     *traversal.Scope
@@ -93,11 +91,6 @@ func (c IfRule) MarshalJSON() ([]byte, error) {
 		}
 	}
 
-	if c.Negate {
-		c.Negate = false
-		c.Condition = InvertCondition(c.Condition)
-	}
-
 	current := c
 	if and, ok := c.Condition.(*CompoundAndCondition); ok {
 		for i, cond := range and.Conditions {
@@ -106,7 +99,6 @@ func (c IfRule) MarshalJSON() ([]byte, error) {
 				next = current
 			}
 			current = IfRule{
-				Negate:    false,
 				Condition: cond,
 				Action:    next,
 			}
@@ -120,9 +112,9 @@ func (c IfRule) MarshalJSON() ([]byte, error) {
 		for _, cond := range or.Conditions {
 			sequenceRule.Rules = append(sequenceRule.Rules,
 				&IfRule{
-					Negate:    false,
 					Action:    c.Action,
 					Condition: cond,
+					scope:     c.scope,
 				},
 			)
 		}

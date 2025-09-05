@@ -38,6 +38,9 @@ func (r *constructRegistryImpl) Register(ctxType reflect.Type, factory Construct
 
 func (r *constructRegistryImpl) Construct(ctx antlr.ParserRuleContext, currentNamespace string, scope *Scope) Construct {
 	t := reflect.TypeOf(ctx)
+	if t == nil {
+		return nil
+	}
 	if t.Kind() == reflect.Ptr {
 		t = t.Elem()
 	}

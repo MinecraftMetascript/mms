@@ -2,7 +2,7 @@ grammar MinecraftMetascript;
 
 import Surface, Noise, Core_Lang;
 
-script: (namespace NL*)*;
+script: NL* (namespace NL*)*;
 
 namespaceDeclaration: 'namespace' Identifier;
 namespace: namespaceDeclaration NL* '{' NL* (contentBlocks NL*)* NL* '}';

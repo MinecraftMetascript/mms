@@ -2,11 +2,8 @@ package traversal
 
 import (
 	"encoding/json"
-	"fmt"
-	"strings"
 
 	"github.com/antlr4-go/antlr/v4"
-	"github.com/minecraftmetascript/mms/lang/grammar"
 )
 
 type Symbol interface {
@@ -43,10 +40,9 @@ type DeclarationContext interface {
 	Identifier() antlr.TerminalNode
 }
 
-func ProcessDeclaration(ctx DeclarationContext, valueCtx antlr.ParserRuleContext, scope *Scope, namespace string) Symbol {
+func ProcessDeclaration(ctx DeclarationContext, valueCtx antlr.ParserRuleContext, scope *Scope, namespace string, typeName string) Symbol {
 	out := &BaseSymbol{}
-	out._type = grammar.MinecraftMetascriptParserStaticData.RuleNames[valueCtx.GetRuleIndex()]
-	out._type = fmt.Sprintf("%s%s", strings.ToUpper(string(out._type[0])), out._type[1:])
+	out._type = typeName
 
 	if id := ctx.Identifier(); id == nil {
 		scope.DiagnoseSemanticError("Missing Identifier", ctx)
@@ -57,7 +53,7 @@ func ProcessDeclaration(ctx DeclarationContext, valueCtx antlr.ParserRuleContext
 
 	out.value = ConstructRegistry.Construct(valueCtx, namespace, scope)
 	if out.value == nil {
-		scope.DiagnoseSemanticError("Missing value", valueCtx)
+		scope.DiagnoseSemanticError("Missing value", ctx)
 	} else {
 		out.contentLocation = RuleLocation(valueCtx, scope.CurrentFile)
 	}
@@ -93,10 +89,12 @@ func (s BaseSymbol) MarshalJSON() ([]byte, error) {
 		ContentLocation TextLocation `json:"contentLocation"`
 		Value           Construct    `json:"value"`
 		Ref             Reference    `json:"ref"`
+		Type            string       `json:"type"`
 	}{
 		NameLocation:    s.nameLocation,
 		ContentLocation: s.contentLocation,
 		Value:           s.GetValue(),
 		Ref:             *s.ref,
+		Type:            s.GetType(),
 	})
 }

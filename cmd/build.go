@@ -47,17 +47,21 @@ var buildCmd = &cobra.Command{
 		stat, err := fs.Stat(os.DirFS("."), inFile)
 
 		if err != nil {
-			log.Println("Error building project.", err)
+			log.Println("Error building project", err)
 			return
 		}
+
 		if stat.IsDir() {
 			log.Println("Project is a directory")
 		} else {
 			if content, err := os.ReadFile(inFile); err != nil {
-				log.Println("Error building project:")
+				log.Println("Error reading project:")
 			} else {
 				f := project.AddFile(inFile, string(content))
-				f.Parse()
+				err = f.Parse()
+				if err != nil {
+					log.Println("Error parsing project:", err)
+				}
 			}
 		}
 		r, err := json.MarshalIndent(project.BuildFsLike(outFile), "", "  ")

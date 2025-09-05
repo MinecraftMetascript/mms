@@ -35,6 +35,7 @@ export type MmsSymbol = {
     contentLocation: MmsTextLocation,
     value: unknown,
     ref: MmsReference
+    type: string
 }
 
 

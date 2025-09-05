@@ -7,6 +7,7 @@ import (
 	"github.com/minecraftmetascript/mms/lib"
 )
 import _ "github.com/minecraftmetascript/mms/lang/constructs/worldgen/surface_rules"
+import _ "github.com/minecraftmetascript/mms/lang/constructs/worldgen/noise"
 
 type Project struct {
 	Files       map[string]*File
@@ -18,7 +19,9 @@ func (p *Project) Diagnostics() []traversal.Diagnostic {
 	for _, file := range p.Files {
 		diagnostics = append(diagnostics, file.Diagnostics...)
 	}
-	return diagnostics
+
+	// Some things can create duplicate diagnostics, so we can deduplicate
+	return lib.Unique(diagnostics)
 }
 
 func NewProject() *Project {
