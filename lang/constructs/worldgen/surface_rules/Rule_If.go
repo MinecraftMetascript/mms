@@ -13,7 +13,7 @@ import (
 
 func init() {
 	traversal.ConstructRegistry.Register(
-		reflect.TypeFor[grammar.SurfaceRule_IfContext](),
+		reflect.TypeFor[*grammar.SurfaceRule_IfContext](),
 		func(ctx_ antlr.ParserRuleContext, ns string, scope *traversal.Scope) traversal.Construct {
 			ctx := ctx_.(*grammar.SurfaceRule_IfContext)
 			out := &IfRule{
@@ -101,6 +101,7 @@ func (c IfRule) MarshalJSON() ([]byte, error) {
 			current = IfRule{
 				Condition: cond,
 				Action:    next,
+				scope:     c.scope,
 			}
 		}
 	}

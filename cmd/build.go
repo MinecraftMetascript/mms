@@ -55,7 +55,7 @@ var buildCmd = &cobra.Command{
 			log.Println("Project is a directory")
 		} else {
 			if content, err := os.ReadFile(inFile); err != nil {
-				log.Println("Error reading project:")
+				log.Println("Error reading project:", err)
 			} else {
 				f := project.AddFile(inFile, string(content))
 				err = f.Parse()

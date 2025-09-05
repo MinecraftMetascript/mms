@@ -13,22 +13,22 @@ import (
 )
 
 func init() {
-	noiseBuildChain := builder_chain.NewBuilderChain[NoiseCondition](
-		builder_chain.Build(
-			func(ctx *grammar.SurfaceCondition_NoiseThresholdBuilder_MinContext, out *NoiseCondition, scope *traversal.Scope, _ string) {
-				builder_chain.Builder_GetFloat(ctx, func(v float64) { out.Min = v }, scope, "Min")
-			},
-		),
-		builder_chain.Build(
-			func(ctx *grammar.SurfaceCondition_NoiseThresholdBuilder_MaxContext, out *NoiseCondition, scope *traversal.Scope, _ string) {
-				builder_chain.Builder_GetFloat(ctx, func(v float64) { out.Max = v }, scope, "Min")
-			},
-		),
-	)
-
 	traversal.ConstructRegistry.Register(
 		reflect.TypeFor[grammar.SurfaceCondition_NoiseThresholdContext](),
 		func(ctx antlr.ParserRuleContext, namespace string, scope *traversal.Scope) traversal.Construct {
+			noiseBuildChain := builder_chain.NewBuilderChain[NoiseCondition](
+				builder_chain.Build(
+					func(ctx *grammar.SurfaceCondition_NoiseThresholdBuilder_MinContext, out *NoiseCondition, scope *traversal.Scope, _ string) {
+						builder_chain.Builder_GetFloat(ctx, func(v float64) { out.Min = v }, scope, "Min")
+					},
+				),
+				builder_chain.Build(
+					func(ctx *grammar.SurfaceCondition_NoiseThresholdBuilder_MaxContext, out *NoiseCondition, scope *traversal.Scope, _ string) {
+						builder_chain.Builder_GetFloat(ctx, func(v float64) { out.Max = v }, scope, "Min")
+					},
+				),
+			)
+
 			noise := ctx.(*grammar.SurfaceCondition_NoiseThresholdContext)
 			var noiseRef traversal.Reference
 			if rr := noise.ResourceReference(); rr != nil {
@@ -42,8 +42,27 @@ func init() {
 				NoiseRef: noiseRef,
 			}
 			for _, r := range noise.AllSurfaceCondition_NoiseThresholdBuilder() {
-				builder_chain.Invoke(noiseBuildChain, r, out, scope, namespace)
+				child := r.GetChild(0)
+				if child == nil {
+					continue
+				}
+				builder_chain.Invoke(noiseBuildChain, child.(antlr.ParserRuleContext), out, scope, namespace)
 			}
+
+			builder_chain.Require(
+				noiseBuildChain,
+				noise,
+				scope,
+				reflect.TypeFor[*grammar.SurfaceCondition_NoiseThresholdBuilder_MinContext](),
+				".Min",
+			)
+			builder_chain.Require(
+				noiseBuildChain,
+				noise,
+				scope,
+				reflect.TypeFor[*grammar.SurfaceCondition_NoiseThresholdBuilder_MaxContext](),
+				".Max",
+			)
 
 			return out
 		},

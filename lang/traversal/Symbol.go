@@ -88,13 +88,13 @@ func (s BaseSymbol) MarshalJSON() ([]byte, error) {
 		NameLocation    TextLocation `json:"nameLocation"`
 		ContentLocation TextLocation `json:"contentLocation"`
 		Value           Construct    `json:"value"`
-		Ref             Reference    `json:"ref"`
+		Ref             *Reference   `json:"ref"`
 		Type            string       `json:"type"`
 	}{
 		NameLocation:    s.nameLocation,
 		ContentLocation: s.contentLocation,
 		Value:           s.GetValue(),
-		Ref:             *s.ref,
+		Ref:             s.ref,
 		Type:            s.GetType(),
 	})
 }

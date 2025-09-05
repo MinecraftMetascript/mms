@@ -13,27 +13,27 @@ import (
 )
 
 func init() {
-	stoneDepthBuildChain := builder_chain.NewBuilderChain[StoneDepthCondition](
-		builder_chain.Build(
-			func(ctx *grammar.SurfaceCondition_StoneDepthBuilder_SecondaryDepthRangeContext, target *StoneDepthCondition, scope *traversal.Scope, namespace string) {
-				builder_chain.Builder_GetInt(ctx, func(v int) { target.Range = v }, scope, "Secondary Depth Range")
-			},
-		),
-		builder_chain.Build(
-			func(ctx *grammar.SharedBuilder_OffsetContext, target *StoneDepthCondition, scope *traversal.Scope, namespace string) {
-				builder_chain.Builder_GetInt(ctx, func(v int) { target.Offset = v }, scope, "Offset")
-			},
-		),
-		builder_chain.Build(
-			func(ctx *grammar.SharedBuilder_AddContext, target *StoneDepthCondition, scope *traversal.Scope, namespace string) {
-				builder_chain.SharedBuilder_Add(ctx, func(v bool) { target.Add = v })
-			},
-		),
-	)
-
 	traversal.ConstructRegistry.Register(
 		reflect.TypeFor[grammar.SurfaceCondition_StoneDepthContext](),
 		func(ctx antlr.ParserRuleContext, namespace string, scope *traversal.Scope) traversal.Construct {
+			stoneDepthBuildChain := builder_chain.NewBuilderChain[StoneDepthCondition](
+				builder_chain.Build(
+					func(ctx *grammar.SurfaceCondition_StoneDepthBuilder_SecondaryDepthRangeContext, target *StoneDepthCondition, scope *traversal.Scope, namespace string) {
+						builder_chain.Builder_GetInt(ctx, func(v int) { target.Range = v }, scope, "Secondary Depth Range")
+					},
+				),
+				builder_chain.Build(
+					func(ctx *grammar.SharedBuilder_OffsetContext, target *StoneDepthCondition, scope *traversal.Scope, namespace string) {
+						builder_chain.Builder_GetInt(ctx, func(v int) { target.Offset = v }, scope, "Offset")
+					},
+				),
+				builder_chain.Build(
+					func(ctx *grammar.SharedBuilder_AddContext, target *StoneDepthCondition, scope *traversal.Scope, namespace string) {
+						builder_chain.SharedBuilder_Add(ctx, func(v bool) { target.Add = v })
+					},
+				),
+			)
+
 			stoneDepth := ctx.(*grammar.SurfaceCondition_StoneDepthContext)
 			out := &StoneDepthCondition{}
 			if mode := stoneDepth.StoneDepthMode(); mode != nil {
@@ -43,7 +43,11 @@ func init() {
 			}
 
 			for _, r := range stoneDepth.AllSurfaceCondition_StoneDepthBuilder() {
-				builder_chain.Invoke(stoneDepthBuildChain, r, out, scope, namespace)
+				child := r.GetChild(0)
+				if child == nil {
+					continue
+				}
+				builder_chain.Invoke(stoneDepthBuildChain, child.(antlr.ParserRuleContext), out, scope, namespace)
 			}
 
 			return out

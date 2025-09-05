@@ -14,22 +14,22 @@ import (
 )
 
 func init() {
-	verticalGradientBuilder := builder_chain.NewBuilderChain(
-		builder_chain.Build(
-			func(ctx grammar.ISurfaceCondition_VerticalGradientBuilder_TopContext, target *VerticalGradientCondition, scope *traversal.Scope, namespace string) {
-				builder_chain.Builder_GetVerticalAnchor(ctx, namespace, func(anchor primitives.VerticalAnchor) { target.TrueAtAndBelow = anchor }, scope, "Top")
-			},
-		),
-		builder_chain.Build(
-			func(ctx grammar.ISurfaceCondition_VerticalGradientBuilder_BottomContext, target *VerticalGradientCondition, scope *traversal.Scope, namespace string) {
-				builder_chain.Builder_GetVerticalAnchor(ctx, namespace, func(anchor primitives.VerticalAnchor) { target.FalseAtAndAbove = anchor }, scope, "Bottom")
-			},
-		),
-	)
-
 	traversal.ConstructRegistry.Register(
 		reflect.TypeFor[grammar.SurfaceCondition_VerticalGradientContext](),
 		func(ctx antlr.ParserRuleContext, ns string, scope *traversal.Scope) traversal.Construct {
+			verticalGradientBuilder := builder_chain.NewBuilderChain(
+				builder_chain.Build(
+					func(ctx grammar.ISurfaceCondition_VerticalGradientBuilder_TopContext, target *VerticalGradientCondition, scope *traversal.Scope, namespace string) {
+						builder_chain.Builder_GetVerticalAnchor(ctx, namespace, func(anchor primitives.VerticalAnchor) { target.TrueAtAndBelow = anchor }, scope, "Top")
+					},
+				),
+				builder_chain.Build(
+					func(ctx grammar.ISurfaceCondition_VerticalGradientBuilder_BottomContext, target *VerticalGradientCondition, scope *traversal.Scope, namespace string) {
+						builder_chain.Builder_GetVerticalAnchor(ctx, namespace, func(anchor primitives.VerticalAnchor) { target.FalseAtAndAbove = anchor }, scope, "Bottom")
+					},
+				),
+			)
+
 			verticalGradient := ctx.(*grammar.SurfaceCondition_VerticalGradientContext)
 			out := &VerticalGradientCondition{}
 
@@ -43,8 +43,12 @@ func init() {
 			}
 
 			for _, r := range verticalGradient.AllSurfaceCondition_VerticalGradientBuilder() {
+				child := r.GetChild(0)
+				if child == nil {
+					continue
+				}
 				builder_chain.Invoke(
-					verticalGradientBuilder, r, out, scope, ns,
+					verticalGradientBuilder, child.(antlr.ParserRuleContext), out, scope, ns,
 				)
 			}
 

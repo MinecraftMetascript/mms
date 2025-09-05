@@ -1,8 +1,4 @@
-namespace MySpace {
-    Noise {
-        xyz = Noise(-4).Octaves(1.4, 1.2, 10)
-    }
-
+namespace minecraft {
   Surface {
     InBadlands = Biome(
       minecraft:badlands,

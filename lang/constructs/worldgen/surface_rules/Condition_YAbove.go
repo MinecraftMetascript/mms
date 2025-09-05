@@ -14,22 +14,22 @@ import (
 )
 
 func init() {
-	yAboveBuilder := builder_chain.NewBuilderChain(
-		builder_chain.Build(
-			func(ctx *grammar.SharedBuilder_MulIntContext, target *YAboveCondition, scope *traversal.Scope, namespace string) {
-				builder_chain.Builder_GetInt(ctx, func(v int) { target.Multiplier = v }, scope, "Top")
-			},
-		),
-		builder_chain.Build(
-			func(ctx *grammar.SharedBuilder_AddContext, target *YAboveCondition, scope *traversal.Scope, namespace string) {
-				builder_chain.SharedBuilder_Add(ctx, func(v bool) { target.Add = v })
-			},
-		),
-	)
-
 	traversal.ConstructRegistry.Register(
 		reflect.TypeFor[grammar.SurfaceCondition_YAboveContext](),
 		func(ctx antlr.ParserRuleContext, ns string, scope *traversal.Scope) traversal.Construct {
+			yAboveBuilder := builder_chain.NewBuilderChain(
+				builder_chain.Build(
+					func(ctx *grammar.SharedBuilder_MulIntContext, target *YAboveCondition, scope *traversal.Scope, namespace string) {
+						builder_chain.Builder_GetInt(ctx, func(v int) { target.Multiplier = v }, scope, "Top")
+					},
+				),
+				builder_chain.Build(
+					func(ctx *grammar.SharedBuilder_AddContext, target *YAboveCondition, scope *traversal.Scope, namespace string) {
+						builder_chain.SharedBuilder_Add(ctx, func(v bool) { target.Add = v })
+					},
+				),
+			)
+			
 			yAbove := ctx.(*grammar.SurfaceCondition_YAboveContext)
 			out := &YAboveCondition{}
 
@@ -42,7 +42,11 @@ func init() {
 			}
 
 			for _, r := range yAbove.AllSurfaceCondition_YAboveBuilder() {
-				builder_chain.Invoke(yAboveBuilder, r, out, scope, ns)
+				child := r.GetChild(0)
+				if child == nil {
+					continue
+				}
+				builder_chain.Invoke(yAboveBuilder, child.(antlr.ParserRuleContext), out, scope, ns)
 			}
 
 			return out
