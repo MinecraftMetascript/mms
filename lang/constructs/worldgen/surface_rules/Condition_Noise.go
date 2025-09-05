@@ -24,7 +24,7 @@ func init() {
 				),
 				builder_chain.Build(
 					func(ctx *grammar.SurfaceCondition_NoiseThresholdBuilder_MaxContext, out *NoiseCondition, scope *traversal.Scope, _ string) {
-						builder_chain.Builder_GetFloat(ctx, func(v float64) { out.Max = v }, scope, "Min")
+						builder_chain.Builder_GetFloat(ctx, func(v float64) { out.Max = v }, scope, "Max")
 					},
 				),
 			)

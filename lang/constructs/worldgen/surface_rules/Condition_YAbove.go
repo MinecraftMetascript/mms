@@ -20,7 +20,7 @@ func init() {
 			yAboveBuilder := builder_chain.NewBuilderChain(
 				builder_chain.Build(
 					func(ctx *grammar.SharedBuilder_MulIntContext, target *YAboveCondition, scope *traversal.Scope, namespace string) {
-						builder_chain.Builder_GetInt(ctx, func(v int) { target.Multiplier = v }, scope, "Top")
+						builder_chain.Builder_GetInt(ctx, func(v int) { target.Multiplier = v }, scope, "Mul")
 					},
 				),
 				builder_chain.Build(
@@ -29,7 +29,7 @@ func init() {
 					},
 				),
 			)
-			
+
 			yAbove := ctx.(*grammar.SurfaceCondition_YAboveContext)
 			out := &YAboveCondition{}
 
