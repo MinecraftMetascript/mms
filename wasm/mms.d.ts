@@ -33,7 +33,7 @@ export type MmsReference = `${string}:${string}`
 export type MmsSymbol = {
     nameLocation: MmsTextLocation,
     contentLocation: MmsTextLocation,
-    value: unknown,
+    value: object,
     ref: MmsReference
     type: string
 }

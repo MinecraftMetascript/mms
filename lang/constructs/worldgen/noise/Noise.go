@@ -14,6 +14,18 @@ import (
 
 func init() {
 	traversal.ConstructRegistry.Register(
+		reflect.TypeFor[*grammar.NoiseBlockContext](),
+		func(ctx antlr.ParserRuleContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
+			blockCtx := ctx.(*grammar.NoiseBlockContext)
+			for _, child := range blockCtx.GetChildren() {
+				if rule, ok := child.(antlr.ParserRuleContext); ok {
+					traversal.ConstructRegistry.Construct(rule, currentNamespace, scope)
+				}
+			}
+			return nil
+		},
+	)
+	traversal.ConstructRegistry.Register(
 		reflect.TypeFor[*grammar.NoiseDeclarationContext](),
 		func(ctx antlr.ParserRuleContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
 			declaration := ctx.(*grammar.NoiseDeclarationContext)

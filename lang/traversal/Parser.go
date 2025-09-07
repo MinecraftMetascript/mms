@@ -2,6 +2,7 @@ package traversal
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/minecraftmetascript/mms/lang/grammar"
 
@@ -27,14 +28,22 @@ func (p *Parser) GetInternalParser(namespace string) *grammar.MinecraftMetascrip
 }
 
 func (p *Parser) Parse() (err error) {
+	fmt.Println("Parsing...")
 	if p.parser.Script() == nil {
 		return errors.New("failed to parse")
 	}
+	fmt.Println("Done parsing")
 	return nil
 }
 
-func (p *Parser) ExitEveryRule(ctx antlr.ParserRuleContext) {
-	ConstructRegistry.Construct(ctx, p.namespace, p.scope)
+func (p *Parser) ExitNamespace(ctx *grammar.NamespaceContext) {
+	for _, contentBlockCtx := range ctx.AllContentBlocks() {
+		if contentBlock, ok := contentBlockCtx.(*grammar.ContentBlocksContext); ok {
+			inner := contentBlock.GetChild(0)
+			ConstructRegistry.Construct(inner.(antlr.ParserRuleContext), p.namespace, p.scope)
+
+		}
+	}
 }
 
 func (p *Parser) ExitNamespaceDeclaration(ctx *grammar.NamespaceDeclarationContext) {

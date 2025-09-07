@@ -366,6 +366,140 @@ func (s *BaseMinecraftMetascriptListener) EnterNumber(ctx *NumberContext) {}
 // ExitNumber is called when production number is exited.
 func (s *BaseMinecraftMetascriptListener) ExitNumber(ctx *NumberContext) {}
 
+// EnterSharedBuilder_XzScale is called when production sharedBuilder_XzScale is entered.
+func (s *BaseMinecraftMetascriptListener) EnterSharedBuilder_XzScale(ctx *SharedBuilder_XzScaleContext) {
+}
+
+// ExitSharedBuilder_XzScale is called when production sharedBuilder_XzScale is exited.
+func (s *BaseMinecraftMetascriptListener) ExitSharedBuilder_XzScale(ctx *SharedBuilder_XzScaleContext) {
+}
+
+// EnterSharedBuilder_YScale is called when production sharedBuilder_YScale is entered.
+func (s *BaseMinecraftMetascriptListener) EnterSharedBuilder_YScale(ctx *SharedBuilder_YScaleContext) {
+}
+
+// ExitSharedBuilder_YScale is called when production sharedBuilder_YScale is exited.
+func (s *BaseMinecraftMetascriptListener) ExitSharedBuilder_YScale(ctx *SharedBuilder_YScaleContext) {
+}
+
+// EnterSharedBuilder_XzFactor is called when production sharedBuilder_XzFactor is entered.
+func (s *BaseMinecraftMetascriptListener) EnterSharedBuilder_XzFactor(ctx *SharedBuilder_XzFactorContext) {
+}
+
+// ExitSharedBuilder_XzFactor is called when production sharedBuilder_XzFactor is exited.
+func (s *BaseMinecraftMetascriptListener) ExitSharedBuilder_XzFactor(ctx *SharedBuilder_XzFactorContext) {
+}
+
+// EnterSharedBuilder_YFactor is called when production sharedBuilder_YFactor is entered.
+func (s *BaseMinecraftMetascriptListener) EnterSharedBuilder_YFactor(ctx *SharedBuilder_YFactorContext) {
+}
+
+// ExitSharedBuilder_YFactor is called when production sharedBuilder_YFactor is exited.
+func (s *BaseMinecraftMetascriptListener) ExitSharedBuilder_YFactor(ctx *SharedBuilder_YFactorContext) {
+}
+
+// EnterDensityFnBlock is called when production densityFnBlock is entered.
+func (s *BaseMinecraftMetascriptListener) EnterDensityFnBlock(ctx *DensityFnBlockContext) {}
+
+// ExitDensityFnBlock is called when production densityFnBlock is exited.
+func (s *BaseMinecraftMetascriptListener) ExitDensityFnBlock(ctx *DensityFnBlockContext) {}
+
+// EnterDensityFnDeclaration is called when production densityFnDeclaration is entered.
+func (s *BaseMinecraftMetascriptListener) EnterDensityFnDeclaration(ctx *DensityFnDeclarationContext) {
+}
+
+// ExitDensityFnDeclaration is called when production densityFnDeclaration is exited.
+func (s *BaseMinecraftMetascriptListener) ExitDensityFnDeclaration(ctx *DensityFnDeclarationContext) {
+}
+
+// EnterDensityFn is called when production densityFn is entered.
+func (s *BaseMinecraftMetascriptListener) EnterDensityFn(ctx *DensityFnContext) {}
+
+// ExitDensityFn is called when production densityFn is exited.
+func (s *BaseMinecraftMetascriptListener) ExitDensityFn(ctx *DensityFnContext) {}
+
+// EnterDensityFn_NoInput is called when production densityFn_NoInput is entered.
+func (s *BaseMinecraftMetascriptListener) EnterDensityFn_NoInput(ctx *DensityFn_NoInputContext) {}
+
+// ExitDensityFn_NoInput is called when production densityFn_NoInput is exited.
+func (s *BaseMinecraftMetascriptListener) ExitDensityFn_NoInput(ctx *DensityFn_NoInputContext) {}
+
+// EnterDensityFn_SingleInput is called when production densityFn_SingleInput is entered.
+func (s *BaseMinecraftMetascriptListener) EnterDensityFn_SingleInput(ctx *DensityFn_SingleInputContext) {
+}
+
+// ExitDensityFn_SingleInput is called when production densityFn_SingleInput is exited.
+func (s *BaseMinecraftMetascriptListener) ExitDensityFn_SingleInput(ctx *DensityFn_SingleInputContext) {
+}
+
+// EnterDensityFn_Noise is called when production densityFn_Noise is entered.
+func (s *BaseMinecraftMetascriptListener) EnterDensityFn_Noise(ctx *DensityFn_NoiseContext) {}
+
+// ExitDensityFn_Noise is called when production densityFn_Noise is exited.
+func (s *BaseMinecraftMetascriptListener) ExitDensityFn_Noise(ctx *DensityFn_NoiseContext) {}
+
+// EnterDensityFn_NoiseBuilder is called when production densityFn_NoiseBuilder is entered.
+func (s *BaseMinecraftMetascriptListener) EnterDensityFn_NoiseBuilder(ctx *DensityFn_NoiseBuilderContext) {
+}
+
+// ExitDensityFn_NoiseBuilder is called when production densityFn_NoiseBuilder is exited.
+func (s *BaseMinecraftMetascriptListener) ExitDensityFn_NoiseBuilder(ctx *DensityFn_NoiseBuilderContext) {
+}
+
+// EnterDensityFn_Cache is called when production densityFn_Cache is entered.
+func (s *BaseMinecraftMetascriptListener) EnterDensityFn_Cache(ctx *DensityFn_CacheContext) {}
+
+// ExitDensityFn_Cache is called when production densityFn_Cache is exited.
+func (s *BaseMinecraftMetascriptListener) ExitDensityFn_Cache(ctx *DensityFn_CacheContext) {}
+
+// EnterDensityFn_DualInput is called when production densityFn_DualInput is entered.
+func (s *BaseMinecraftMetascriptListener) EnterDensityFn_DualInput(ctx *DensityFn_DualInputContext) {}
+
+// ExitDensityFn_DualInput is called when production densityFn_DualInput is exited.
+func (s *BaseMinecraftMetascriptListener) ExitDensityFn_DualInput(ctx *DensityFn_DualInputContext) {}
+
+// EnterDensityFn_OldBlendedNoise is called when production densityFn_OldBlendedNoise is entered.
+func (s *BaseMinecraftMetascriptListener) EnterDensityFn_OldBlendedNoise(ctx *DensityFn_OldBlendedNoiseContext) {
+}
+
+// ExitDensityFn_OldBlendedNoise is called when production densityFn_OldBlendedNoise is exited.
+func (s *BaseMinecraftMetascriptListener) ExitDensityFn_OldBlendedNoise(ctx *DensityFn_OldBlendedNoiseContext) {
+}
+
+// EnterDensityFn_OldBlendedNoiseBuilder is called when production densityFn_OldBlendedNoiseBuilder is entered.
+func (s *BaseMinecraftMetascriptListener) EnterDensityFn_OldBlendedNoiseBuilder(ctx *DensityFn_OldBlendedNoiseBuilderContext) {
+}
+
+// ExitDensityFn_OldBlendedNoiseBuilder is called when production densityFn_OldBlendedNoiseBuilder is exited.
+func (s *BaseMinecraftMetascriptListener) ExitDensityFn_OldBlendedNoiseBuilder(ctx *DensityFn_OldBlendedNoiseBuilderContext) {
+}
+
+// EnterDensityFn_OldBlendedNoiseBuilder_Smear is called when production densityFn_OldBlendedNoiseBuilder_Smear is entered.
+func (s *BaseMinecraftMetascriptListener) EnterDensityFn_OldBlendedNoiseBuilder_Smear(ctx *DensityFn_OldBlendedNoiseBuilder_SmearContext) {
+}
+
+// ExitDensityFn_OldBlendedNoiseBuilder_Smear is called when production densityFn_OldBlendedNoiseBuilder_Smear is exited.
+func (s *BaseMinecraftMetascriptListener) ExitDensityFn_OldBlendedNoiseBuilder_Smear(ctx *DensityFn_OldBlendedNoiseBuilder_SmearContext) {
+}
+
+// EnterDensityFn_Constant is called when production densityFn_Constant is entered.
+func (s *BaseMinecraftMetascriptListener) EnterDensityFn_Constant(ctx *DensityFn_ConstantContext) {}
+
+// ExitDensityFn_Constant is called when production densityFn_Constant is exited.
+func (s *BaseMinecraftMetascriptListener) ExitDensityFn_Constant(ctx *DensityFn_ConstantContext) {}
+
+// EnterDensityFn_Reference is called when production densityFn_Reference is entered.
+func (s *BaseMinecraftMetascriptListener) EnterDensityFn_Reference(ctx *DensityFn_ReferenceContext) {}
+
+// ExitDensityFn_Reference is called when production densityFn_Reference is exited.
+func (s *BaseMinecraftMetascriptListener) ExitDensityFn_Reference(ctx *DensityFn_ReferenceContext) {}
+
+// EnterDensityFn_Math is called when production densityFn_Math is entered.
+func (s *BaseMinecraftMetascriptListener) EnterDensityFn_Math(ctx *DensityFn_MathContext) {}
+
+// ExitDensityFn_Math is called when production densityFn_Math is exited.
+func (s *BaseMinecraftMetascriptListener) ExitDensityFn_Math(ctx *DensityFn_MathContext) {}
+
 // EnterNoiseBlock is called when production noiseBlock is entered.
 func (s *BaseMinecraftMetascriptListener) EnterNoiseBlock(ctx *NoiseBlockContext) {}
 

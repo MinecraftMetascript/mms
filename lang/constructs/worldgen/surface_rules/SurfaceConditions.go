@@ -2,6 +2,7 @@ package surface_rules
 
 import (
 	"encoding/json"
+	"fmt"
 	"reflect"
 
 	"github.com/minecraftmetascript/mms/lang/grammar"
@@ -29,6 +30,29 @@ const (
 )
 
 func init() {
+	traversal.ConstructRegistry.Register(
+		reflect.TypeFor[*grammar.SurfaceBlockContext](),
+		func(ctx antlr.ParserRuleContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
+			blockCtx := ctx.(*grammar.SurfaceBlockContext)
+			for _, statementCtx := range blockCtx.GetChildren() {
+				statement, ok := statementCtx.(antlr.ParserRuleContext)
+				if !ok {
+					// TODO: Diagnose?
+					continue
+				}
+				targetCtx, ok := statement.GetChild(0).(antlr.ParserRuleContext)
+				if !ok {
+					// TODO: Diagnose?
+					continue
+				}
+
+				if traversal.ConstructRegistry.Construct(targetCtx, currentNamespace, scope) == nil {
+					fmt.Println("Failed to construct ", ctx.GetText(), reflect.TypeOf(targetCtx).Elem().Name())
+				}
+			}
+			return nil
+		},
+	)
 	traversal.ConstructRegistry.Register(
 		reflect.TypeFor[grammar.SurfaceConditionContext](),
 		func(ctx antlr.ParserRuleContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {

@@ -4,7 +4,7 @@ resourceReference: (Identifier ':')? Identifier;
 
 
 Int: '-'? [0-9]+;
-Float: ('-'? [0-9]+ '.' [0-9]+);
+Float: ('-'? [0-9]* '.' [0-9]+);
 String: '"' ~[\r\n]* '"';
 number: Int | Float;
 

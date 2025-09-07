@@ -26,12 +26,13 @@ func (s BaseSymbol) GetType() string {
 	return s._type
 }
 
-func NewSymbol(nameLocation TextLocation, contentLocation TextLocation, value Construct, ref *Reference) BaseSymbol {
+func NewSymbol(nameLocation TextLocation, contentLocation TextLocation, value Construct, ref *Reference, _type string) BaseSymbol {
 	return BaseSymbol{
 		nameLocation:    nameLocation,
 		contentLocation: contentLocation,
 		value:           value,
 		ref:             ref,
+		_type:           _type,
 	}
 }
 

@@ -148,6 +148,63 @@ type MinecraftMetascriptListener interface {
 	// EnterNumber is called when entering the number production.
 	EnterNumber(c *NumberContext)
 
+	// EnterSharedBuilder_XzScale is called when entering the sharedBuilder_XzScale production.
+	EnterSharedBuilder_XzScale(c *SharedBuilder_XzScaleContext)
+
+	// EnterSharedBuilder_YScale is called when entering the sharedBuilder_YScale production.
+	EnterSharedBuilder_YScale(c *SharedBuilder_YScaleContext)
+
+	// EnterSharedBuilder_XzFactor is called when entering the sharedBuilder_XzFactor production.
+	EnterSharedBuilder_XzFactor(c *SharedBuilder_XzFactorContext)
+
+	// EnterSharedBuilder_YFactor is called when entering the sharedBuilder_YFactor production.
+	EnterSharedBuilder_YFactor(c *SharedBuilder_YFactorContext)
+
+	// EnterDensityFnBlock is called when entering the densityFnBlock production.
+	EnterDensityFnBlock(c *DensityFnBlockContext)
+
+	// EnterDensityFnDeclaration is called when entering the densityFnDeclaration production.
+	EnterDensityFnDeclaration(c *DensityFnDeclarationContext)
+
+	// EnterDensityFn is called when entering the densityFn production.
+	EnterDensityFn(c *DensityFnContext)
+
+	// EnterDensityFn_NoInput is called when entering the densityFn_NoInput production.
+	EnterDensityFn_NoInput(c *DensityFn_NoInputContext)
+
+	// EnterDensityFn_SingleInput is called when entering the densityFn_SingleInput production.
+	EnterDensityFn_SingleInput(c *DensityFn_SingleInputContext)
+
+	// EnterDensityFn_Noise is called when entering the densityFn_Noise production.
+	EnterDensityFn_Noise(c *DensityFn_NoiseContext)
+
+	// EnterDensityFn_NoiseBuilder is called when entering the densityFn_NoiseBuilder production.
+	EnterDensityFn_NoiseBuilder(c *DensityFn_NoiseBuilderContext)
+
+	// EnterDensityFn_Cache is called when entering the densityFn_Cache production.
+	EnterDensityFn_Cache(c *DensityFn_CacheContext)
+
+	// EnterDensityFn_DualInput is called when entering the densityFn_DualInput production.
+	EnterDensityFn_DualInput(c *DensityFn_DualInputContext)
+
+	// EnterDensityFn_OldBlendedNoise is called when entering the densityFn_OldBlendedNoise production.
+	EnterDensityFn_OldBlendedNoise(c *DensityFn_OldBlendedNoiseContext)
+
+	// EnterDensityFn_OldBlendedNoiseBuilder is called when entering the densityFn_OldBlendedNoiseBuilder production.
+	EnterDensityFn_OldBlendedNoiseBuilder(c *DensityFn_OldBlendedNoiseBuilderContext)
+
+	// EnterDensityFn_OldBlendedNoiseBuilder_Smear is called when entering the densityFn_OldBlendedNoiseBuilder_Smear production.
+	EnterDensityFn_OldBlendedNoiseBuilder_Smear(c *DensityFn_OldBlendedNoiseBuilder_SmearContext)
+
+	// EnterDensityFn_Constant is called when entering the densityFn_Constant production.
+	EnterDensityFn_Constant(c *DensityFn_ConstantContext)
+
+	// EnterDensityFn_Reference is called when entering the densityFn_Reference production.
+	EnterDensityFn_Reference(c *DensityFn_ReferenceContext)
+
+	// EnterDensityFn_Math is called when entering the densityFn_Math production.
+	EnterDensityFn_Math(c *DensityFn_MathContext)
+
 	// EnterNoiseBlock is called when entering the noiseBlock production.
 	EnterNoiseBlock(c *NoiseBlockContext)
 
@@ -303,6 +360,63 @@ type MinecraftMetascriptListener interface {
 
 	// ExitNumber is called when exiting the number production.
 	ExitNumber(c *NumberContext)
+
+	// ExitSharedBuilder_XzScale is called when exiting the sharedBuilder_XzScale production.
+	ExitSharedBuilder_XzScale(c *SharedBuilder_XzScaleContext)
+
+	// ExitSharedBuilder_YScale is called when exiting the sharedBuilder_YScale production.
+	ExitSharedBuilder_YScale(c *SharedBuilder_YScaleContext)
+
+	// ExitSharedBuilder_XzFactor is called when exiting the sharedBuilder_XzFactor production.
+	ExitSharedBuilder_XzFactor(c *SharedBuilder_XzFactorContext)
+
+	// ExitSharedBuilder_YFactor is called when exiting the sharedBuilder_YFactor production.
+	ExitSharedBuilder_YFactor(c *SharedBuilder_YFactorContext)
+
+	// ExitDensityFnBlock is called when exiting the densityFnBlock production.
+	ExitDensityFnBlock(c *DensityFnBlockContext)
+
+	// ExitDensityFnDeclaration is called when exiting the densityFnDeclaration production.
+	ExitDensityFnDeclaration(c *DensityFnDeclarationContext)
+
+	// ExitDensityFn is called when exiting the densityFn production.
+	ExitDensityFn(c *DensityFnContext)
+
+	// ExitDensityFn_NoInput is called when exiting the densityFn_NoInput production.
+	ExitDensityFn_NoInput(c *DensityFn_NoInputContext)
+
+	// ExitDensityFn_SingleInput is called when exiting the densityFn_SingleInput production.
+	ExitDensityFn_SingleInput(c *DensityFn_SingleInputContext)
+
+	// ExitDensityFn_Noise is called when exiting the densityFn_Noise production.
+	ExitDensityFn_Noise(c *DensityFn_NoiseContext)
+
+	// ExitDensityFn_NoiseBuilder is called when exiting the densityFn_NoiseBuilder production.
+	ExitDensityFn_NoiseBuilder(c *DensityFn_NoiseBuilderContext)
+
+	// ExitDensityFn_Cache is called when exiting the densityFn_Cache production.
+	ExitDensityFn_Cache(c *DensityFn_CacheContext)
+
+	// ExitDensityFn_DualInput is called when exiting the densityFn_DualInput production.
+	ExitDensityFn_DualInput(c *DensityFn_DualInputContext)
+
+	// ExitDensityFn_OldBlendedNoise is called when exiting the densityFn_OldBlendedNoise production.
+	ExitDensityFn_OldBlendedNoise(c *DensityFn_OldBlendedNoiseContext)
+
+	// ExitDensityFn_OldBlendedNoiseBuilder is called when exiting the densityFn_OldBlendedNoiseBuilder production.
+	ExitDensityFn_OldBlendedNoiseBuilder(c *DensityFn_OldBlendedNoiseBuilderContext)
+
+	// ExitDensityFn_OldBlendedNoiseBuilder_Smear is called when exiting the densityFn_OldBlendedNoiseBuilder_Smear production.
+	ExitDensityFn_OldBlendedNoiseBuilder_Smear(c *DensityFn_OldBlendedNoiseBuilder_SmearContext)
+
+	// ExitDensityFn_Constant is called when exiting the densityFn_Constant production.
+	ExitDensityFn_Constant(c *DensityFn_ConstantContext)
+
+	// ExitDensityFn_Reference is called when exiting the densityFn_Reference production.
+	ExitDensityFn_Reference(c *DensityFn_ReferenceContext)
+
+	// ExitDensityFn_Math is called when exiting the densityFn_Math production.
+	ExitDensityFn_Math(c *DensityFn_MathContext)
 
 	// ExitNoiseBlock is called when exiting the noiseBlock production.
 	ExitNoiseBlock(c *NoiseBlockContext)

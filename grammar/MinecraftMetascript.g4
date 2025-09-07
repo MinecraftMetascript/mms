@@ -1,10 +1,10 @@
 grammar MinecraftMetascript;
 
-import Surface, Noise, Core_Lang;
+import Surface,DensityFunctions, Noise, Core_Lang;
 
 script: NL* (namespace NL*)*;
 
 namespaceDeclaration: 'namespace' Identifier;
 namespace: namespaceDeclaration NL* '{' NL* (contentBlocks NL*)* NL* '}';
 
-contentBlocks: surfaceBlock | noiseBlock;
+contentBlocks: surfaceBlock | noiseBlock | densityFnBlock;

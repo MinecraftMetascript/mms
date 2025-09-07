@@ -46,9 +46,9 @@ func (r *constructRegistryImpl) Construct(ctx antlr.ParserRuleContext, currentNa
 	}
 
 	if factory, ok := r.constructs[t]; ok {
-		return factory(ctx, currentNamespace, scope)
+		val := factory(ctx, currentNamespace, scope)
+		return val
 	}
-
 	return nil
 }
 
