@@ -29,7 +29,17 @@ func init() {
 		reflect.TypeFor[*grammar.NoiseDeclarationContext](),
 		func(ctx antlr.ParserRuleContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
 			declaration := ctx.(*grammar.NoiseDeclarationContext)
-			s := traversal.ProcessDeclaration(declaration, declaration.Noise(), scope, currentNamespace, "Noise")
+			noise := declaration.Noise()
+			if noise == nil {
+				// TODO: Diagnose?
+				return nil
+			}
+			noiseDef := noise.NoiseDefinition()
+			if noiseDef == nil {
+				// TODO: Diagnose?
+				return nil
+			}
+			s := traversal.ProcessDeclaration(declaration, noiseDef, scope, currentNamespace, "Noise")
 			if s == nil {
 				return nil
 			}
@@ -37,12 +47,13 @@ func init() {
 		},
 	)
 	traversal.ConstructRegistry.Register(
-		reflect.TypeFor[*grammar.NoiseContext](),
+		reflect.TypeFor[*grammar.NoiseDefinitionContext](),
 		func(ctx antlr.ParserRuleContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
-			noise := ctx.(*grammar.NoiseContext)
+			noise := ctx.(*grammar.NoiseDefinitionContext)
 			out := &Noise{
 				Amplitudes: make([]float64, 0),
 			}
+
 			builder_chain.Builder_GetInt(
 				noise, func(i int) { out.FirstOctave = i }, scope, "FirstOctave",
 			)

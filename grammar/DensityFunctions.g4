@@ -2,13 +2,14 @@ grammar DensityFunctions;
 
 import Core_Lang, Noise;
 
+densityFnBlock: 'DensityFn' NL* '{' NL* (densityFnDeclaration NL*)* NL* '}';
+
 sharedBuilder_XzScale: '.XZScale(' number ')';
 sharedBuilder_YScale: '.YScale(' number ')';
 sharedBuilder_XzFactor: '.XZFactor(' number ')';
 sharedBuilder_YFactor: '.YFactor(' number ')';
 
 
-densityFnBlock: 'DensityFn' NL* '{' NL* (densityFnDeclaration NL*)* NL* '}';
 
 densityFnDeclaration: Identifier NL* '=' NL* densityFn;
 densityFn: (
@@ -19,6 +20,7 @@ densityFn: (
     | densityFn_Noise
     | densityFn_NoInput
     | densityFn_OldBlendedNoise
+    | densityFn_WierdScaledSampler
     | densityFn_Reference // should be last
 ) densityFn_Math?;
 
@@ -43,9 +45,11 @@ densityFn_SingleInput: (
     | 'ShiftB'
 ) NL* '(' NL* densityFn NL* ')';
 
+densityFn_InlineNoise: noise;
+
 densityFn_Noise: (
-    ('Noise' NL* '(' NL* (resourceReference) NL* ')') | noise
-) (densityFn_NoiseBuilder NL*)*;
+    ('Noise' NL* '(' NL* (resourceReference) NL* ')') | densityFn_InlineNoise
+) NL* (densityFn_NoiseBuilder NL*)*;
 
 densityFn_NoiseBuilder: sharedBuilder_XzScale | sharedBuilder_YScale;
 
@@ -57,9 +61,7 @@ densityFn_DualInput: (
     | 'Max'
 ) NL* '(' NL* densityFn ',' NL* densityFn NL* ')';
 
-
-
-densityFn_OldBlendedNoise: 'OldBlendedNoise' '(' ')' (densityFn_OldBlendedNoiseBuilder NL*)*;
+densityFn_OldBlendedNoise: 'OldBlendedNoise' '(' ')' NL* (densityFn_OldBlendedNoiseBuilder NL*)*;
 densityFn_OldBlendedNoiseBuilder:
       sharedBuilder_XzScale
     | sharedBuilder_YScale
@@ -68,6 +70,18 @@ densityFn_OldBlendedNoiseBuilder:
     | densityFn_OldBlendedNoiseBuilder_Smear;
 
 densityFn_OldBlendedNoiseBuilder_Smear: 'SmearMul' '(' number ')';
+
+densityFn_WierdScaledSampler: 'WeirdScaledSampler' '(' densityFn ')' NL* (densityFn_WierdScaledSamplerBuilder NL*)*;
+
+densityFn_WierdScaledSamplerBuilder:   densityFn_WierdScaledSamplerBuilder_Type1
+                                     | densityFn_WierdScaledSamplerBuilder_Type2
+                                     | densityFn_WierdScaledSamplerBuilder_Noise
+                                    ;
+densityFn_WierdScaledSamplerBuilder_Type1: '.Type1' '(' ')';
+densityFn_WierdScaledSamplerBuilder_Type2: '.Type2' '(' ')';
+densityFn_WierdScaledSamplerBuilder_Noise: '.Noise' (noiseDefinition | ('(' resourceReference ')'));
+
+
 
 densityFn_Constant: number;
 densityFn_Reference: resourceReference;

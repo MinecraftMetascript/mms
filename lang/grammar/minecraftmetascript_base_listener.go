@@ -366,6 +366,12 @@ func (s *BaseMinecraftMetascriptListener) EnterNumber(ctx *NumberContext) {}
 // ExitNumber is called when production number is exited.
 func (s *BaseMinecraftMetascriptListener) ExitNumber(ctx *NumberContext) {}
 
+// EnterDensityFnBlock is called when production densityFnBlock is entered.
+func (s *BaseMinecraftMetascriptListener) EnterDensityFnBlock(ctx *DensityFnBlockContext) {}
+
+// ExitDensityFnBlock is called when production densityFnBlock is exited.
+func (s *BaseMinecraftMetascriptListener) ExitDensityFnBlock(ctx *DensityFnBlockContext) {}
+
 // EnterSharedBuilder_XzScale is called when production sharedBuilder_XzScale is entered.
 func (s *BaseMinecraftMetascriptListener) EnterSharedBuilder_XzScale(ctx *SharedBuilder_XzScaleContext) {
 }
@@ -398,12 +404,6 @@ func (s *BaseMinecraftMetascriptListener) EnterSharedBuilder_YFactor(ctx *Shared
 func (s *BaseMinecraftMetascriptListener) ExitSharedBuilder_YFactor(ctx *SharedBuilder_YFactorContext) {
 }
 
-// EnterDensityFnBlock is called when production densityFnBlock is entered.
-func (s *BaseMinecraftMetascriptListener) EnterDensityFnBlock(ctx *DensityFnBlockContext) {}
-
-// ExitDensityFnBlock is called when production densityFnBlock is exited.
-func (s *BaseMinecraftMetascriptListener) ExitDensityFnBlock(ctx *DensityFnBlockContext) {}
-
 // EnterDensityFnDeclaration is called when production densityFnDeclaration is entered.
 func (s *BaseMinecraftMetascriptListener) EnterDensityFnDeclaration(ctx *DensityFnDeclarationContext) {
 }
@@ -430,6 +430,14 @@ func (s *BaseMinecraftMetascriptListener) EnterDensityFn_SingleInput(ctx *Densit
 
 // ExitDensityFn_SingleInput is called when production densityFn_SingleInput is exited.
 func (s *BaseMinecraftMetascriptListener) ExitDensityFn_SingleInput(ctx *DensityFn_SingleInputContext) {
+}
+
+// EnterDensityFn_InlineNoise is called when production densityFn_InlineNoise is entered.
+func (s *BaseMinecraftMetascriptListener) EnterDensityFn_InlineNoise(ctx *DensityFn_InlineNoiseContext) {
+}
+
+// ExitDensityFn_InlineNoise is called when production densityFn_InlineNoise is exited.
+func (s *BaseMinecraftMetascriptListener) ExitDensityFn_InlineNoise(ctx *DensityFn_InlineNoiseContext) {
 }
 
 // EnterDensityFn_Noise is called when production densityFn_Noise is entered.
@@ -482,6 +490,46 @@ func (s *BaseMinecraftMetascriptListener) EnterDensityFn_OldBlendedNoiseBuilder_
 func (s *BaseMinecraftMetascriptListener) ExitDensityFn_OldBlendedNoiseBuilder_Smear(ctx *DensityFn_OldBlendedNoiseBuilder_SmearContext) {
 }
 
+// EnterDensityFn_WierdScaledSampler is called when production densityFn_WierdScaledSampler is entered.
+func (s *BaseMinecraftMetascriptListener) EnterDensityFn_WierdScaledSampler(ctx *DensityFn_WierdScaledSamplerContext) {
+}
+
+// ExitDensityFn_WierdScaledSampler is called when production densityFn_WierdScaledSampler is exited.
+func (s *BaseMinecraftMetascriptListener) ExitDensityFn_WierdScaledSampler(ctx *DensityFn_WierdScaledSamplerContext) {
+}
+
+// EnterDensityFn_WierdScaledSamplerBuilder is called when production densityFn_WierdScaledSamplerBuilder is entered.
+func (s *BaseMinecraftMetascriptListener) EnterDensityFn_WierdScaledSamplerBuilder(ctx *DensityFn_WierdScaledSamplerBuilderContext) {
+}
+
+// ExitDensityFn_WierdScaledSamplerBuilder is called when production densityFn_WierdScaledSamplerBuilder is exited.
+func (s *BaseMinecraftMetascriptListener) ExitDensityFn_WierdScaledSamplerBuilder(ctx *DensityFn_WierdScaledSamplerBuilderContext) {
+}
+
+// EnterDensityFn_WierdScaledSamplerBuilder_Type1 is called when production densityFn_WierdScaledSamplerBuilder_Type1 is entered.
+func (s *BaseMinecraftMetascriptListener) EnterDensityFn_WierdScaledSamplerBuilder_Type1(ctx *DensityFn_WierdScaledSamplerBuilder_Type1Context) {
+}
+
+// ExitDensityFn_WierdScaledSamplerBuilder_Type1 is called when production densityFn_WierdScaledSamplerBuilder_Type1 is exited.
+func (s *BaseMinecraftMetascriptListener) ExitDensityFn_WierdScaledSamplerBuilder_Type1(ctx *DensityFn_WierdScaledSamplerBuilder_Type1Context) {
+}
+
+// EnterDensityFn_WierdScaledSamplerBuilder_Type2 is called when production densityFn_WierdScaledSamplerBuilder_Type2 is entered.
+func (s *BaseMinecraftMetascriptListener) EnterDensityFn_WierdScaledSamplerBuilder_Type2(ctx *DensityFn_WierdScaledSamplerBuilder_Type2Context) {
+}
+
+// ExitDensityFn_WierdScaledSamplerBuilder_Type2 is called when production densityFn_WierdScaledSamplerBuilder_Type2 is exited.
+func (s *BaseMinecraftMetascriptListener) ExitDensityFn_WierdScaledSamplerBuilder_Type2(ctx *DensityFn_WierdScaledSamplerBuilder_Type2Context) {
+}
+
+// EnterDensityFn_WierdScaledSamplerBuilder_Noise is called when production densityFn_WierdScaledSamplerBuilder_Noise is entered.
+func (s *BaseMinecraftMetascriptListener) EnterDensityFn_WierdScaledSamplerBuilder_Noise(ctx *DensityFn_WierdScaledSamplerBuilder_NoiseContext) {
+}
+
+// ExitDensityFn_WierdScaledSamplerBuilder_Noise is called when production densityFn_WierdScaledSamplerBuilder_Noise is exited.
+func (s *BaseMinecraftMetascriptListener) ExitDensityFn_WierdScaledSamplerBuilder_Noise(ctx *DensityFn_WierdScaledSamplerBuilder_NoiseContext) {
+}
+
 // EnterDensityFn_Constant is called when production densityFn_Constant is entered.
 func (s *BaseMinecraftMetascriptListener) EnterDensityFn_Constant(ctx *DensityFn_ConstantContext) {}
 
@@ -517,6 +565,12 @@ func (s *BaseMinecraftMetascriptListener) EnterNoise(ctx *NoiseContext) {}
 
 // ExitNoise is called when production noise is exited.
 func (s *BaseMinecraftMetascriptListener) ExitNoise(ctx *NoiseContext) {}
+
+// EnterNoiseDefinition is called when production noiseDefinition is entered.
+func (s *BaseMinecraftMetascriptListener) EnterNoiseDefinition(ctx *NoiseDefinitionContext) {}
+
+// ExitNoiseDefinition is called when production noiseDefinition is exited.
+func (s *BaseMinecraftMetascriptListener) ExitNoiseDefinition(ctx *NoiseDefinitionContext) {}
 
 // EnterNoise_Builder is called when production noise_Builder is entered.
 func (s *BaseMinecraftMetascriptListener) EnterNoise_Builder(ctx *Noise_BuilderContext) {}

@@ -39,7 +39,46 @@ func (m MathDensityFn) ExportSymbol(symbol traversal.Symbol, rootDir *lib.FileTr
 	return exportDensityFunction(symbol, rootDir, m)
 }
 
+func ExtractInlinedNoise(noiseCtx *grammar.NoiseDefinitionContext, currentNamespace string, scope *traversal.Scope) *traversal.Reference {
+	noiseDef := traversal.ConstructRegistry.Construct(noiseCtx, currentNamespace, scope)
+	noiseRef := traversal.NewReference(
+		fmt.Sprintf("densityfn_noise_%d_%d", noiseCtx.GetStart().GetLine(), noiseCtx.GetStart().GetColumn()),
+		"mms_inline",
+	)
+	noiseSymbol := traversal.NewSymbol(
+		traversal.RuleLocation(noiseCtx, scope.CurrentFile),
+		traversal.RuleLocation(noiseCtx, scope.CurrentFile),
+		noiseDef,
+		noiseRef,
+		"Noise",
+	)
+	if _, ok := scope.Get(*noiseRef); !ok {
+		if err := scope.Register(noiseSymbol); err != nil {
+			// TODO: Improve behavior
+			panic(err)
+		}
+	}
+	return noiseRef
+}
+
 func init() {
+	traversal.ConstructRegistry.Register(
+		reflect.TypeFor[*grammar.DensityFn_InlineNoiseContext](),
+		func(ctx antlr.ParserRuleContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
+			inlineCtx, ok := ctx.(*grammar.DensityFn_InlineNoiseContext)
+
+			if !ok {
+				// TODO: Diagnose?
+				return nil
+			}
+
+			if noiseInlineCtx := inlineCtx.Noise(); noiseInlineCtx != nil {
+				return ExtractInlinedNoise(noiseInlineCtx.NoiseDefinition().(*grammar.NoiseDefinitionContext), currentNamespace, scope)
+			}
+			return nil
+		},
+	)
+
 	traversal.ConstructRegistry.Register(
 		reflect.TypeFor[*grammar.DensityFnBlockContext](),
 		func(ctx antlr.ParserRuleContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {

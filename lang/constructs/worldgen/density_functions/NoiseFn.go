@@ -2,7 +2,6 @@ package density_functions
 
 import (
 	"encoding/json"
-	"fmt"
 	"reflect"
 
 	"github.com/antlr4-go/antlr/v4"
@@ -35,26 +34,13 @@ func init() {
 				YScale:  1,
 			}
 
-			if noiseInlineCtx := densityFn.Noise(); noiseInlineCtx != nil {
-				noiseDef := traversal.ConstructRegistry.Construct(noiseInlineCtx, currentNamespace, scope)
-				noiseRef := traversal.NewReference(
-					fmt.Sprintf("densityfn_noise_%d_%d", noiseInlineCtx.GetStart().GetLine(), noiseInlineCtx.GetStart().GetColumn()),
-					"mms_inline",
-				)
-				noiseSymbol := traversal.NewSymbol(
-					traversal.RuleLocation(noiseInlineCtx, scope.CurrentFile),
-					traversal.RuleLocation(noiseInlineCtx, scope.CurrentFile),
-					noiseDef,
-					noiseRef,
-					"Noise",
-				)
-				if _, ok := scope.Get(*noiseRef); !ok {
-					if err := scope.Register(noiseSymbol); err != nil {
-						// TODO: Improve behavior
-						panic(err)
-					}
+			if noiseInlineCtx := densityFn.DensityFn_InlineNoise(); noiseInlineCtx != nil {
+				noiseRef := traversal.ConstructRegistry.Construct(noiseInlineCtx, currentNamespace, scope)
+				if noiseRef == nil {
+					// TODO: Diagnose
+				} else if ref, ok := noiseRef.(*traversal.Reference); ok {
+					out.Noise = *ref
 				}
-				out.Noise = *noiseRef
 			}
 
 			if refCtx := densityFn.ResourceReference(); refCtx != nil {

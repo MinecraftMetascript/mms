@@ -148,6 +148,9 @@ type MinecraftMetascriptListener interface {
 	// EnterNumber is called when entering the number production.
 	EnterNumber(c *NumberContext)
 
+	// EnterDensityFnBlock is called when entering the densityFnBlock production.
+	EnterDensityFnBlock(c *DensityFnBlockContext)
+
 	// EnterSharedBuilder_XzScale is called when entering the sharedBuilder_XzScale production.
 	EnterSharedBuilder_XzScale(c *SharedBuilder_XzScaleContext)
 
@@ -160,9 +163,6 @@ type MinecraftMetascriptListener interface {
 	// EnterSharedBuilder_YFactor is called when entering the sharedBuilder_YFactor production.
 	EnterSharedBuilder_YFactor(c *SharedBuilder_YFactorContext)
 
-	// EnterDensityFnBlock is called when entering the densityFnBlock production.
-	EnterDensityFnBlock(c *DensityFnBlockContext)
-
 	// EnterDensityFnDeclaration is called when entering the densityFnDeclaration production.
 	EnterDensityFnDeclaration(c *DensityFnDeclarationContext)
 
@@ -174,6 +174,9 @@ type MinecraftMetascriptListener interface {
 
 	// EnterDensityFn_SingleInput is called when entering the densityFn_SingleInput production.
 	EnterDensityFn_SingleInput(c *DensityFn_SingleInputContext)
+
+	// EnterDensityFn_InlineNoise is called when entering the densityFn_InlineNoise production.
+	EnterDensityFn_InlineNoise(c *DensityFn_InlineNoiseContext)
 
 	// EnterDensityFn_Noise is called when entering the densityFn_Noise production.
 	EnterDensityFn_Noise(c *DensityFn_NoiseContext)
@@ -196,6 +199,21 @@ type MinecraftMetascriptListener interface {
 	// EnterDensityFn_OldBlendedNoiseBuilder_Smear is called when entering the densityFn_OldBlendedNoiseBuilder_Smear production.
 	EnterDensityFn_OldBlendedNoiseBuilder_Smear(c *DensityFn_OldBlendedNoiseBuilder_SmearContext)
 
+	// EnterDensityFn_WierdScaledSampler is called when entering the densityFn_WierdScaledSampler production.
+	EnterDensityFn_WierdScaledSampler(c *DensityFn_WierdScaledSamplerContext)
+
+	// EnterDensityFn_WierdScaledSamplerBuilder is called when entering the densityFn_WierdScaledSamplerBuilder production.
+	EnterDensityFn_WierdScaledSamplerBuilder(c *DensityFn_WierdScaledSamplerBuilderContext)
+
+	// EnterDensityFn_WierdScaledSamplerBuilder_Type1 is called when entering the densityFn_WierdScaledSamplerBuilder_Type1 production.
+	EnterDensityFn_WierdScaledSamplerBuilder_Type1(c *DensityFn_WierdScaledSamplerBuilder_Type1Context)
+
+	// EnterDensityFn_WierdScaledSamplerBuilder_Type2 is called when entering the densityFn_WierdScaledSamplerBuilder_Type2 production.
+	EnterDensityFn_WierdScaledSamplerBuilder_Type2(c *DensityFn_WierdScaledSamplerBuilder_Type2Context)
+
+	// EnterDensityFn_WierdScaledSamplerBuilder_Noise is called when entering the densityFn_WierdScaledSamplerBuilder_Noise production.
+	EnterDensityFn_WierdScaledSamplerBuilder_Noise(c *DensityFn_WierdScaledSamplerBuilder_NoiseContext)
+
 	// EnterDensityFn_Constant is called when entering the densityFn_Constant production.
 	EnterDensityFn_Constant(c *DensityFn_ConstantContext)
 
@@ -213,6 +231,9 @@ type MinecraftMetascriptListener interface {
 
 	// EnterNoise is called when entering the noise production.
 	EnterNoise(c *NoiseContext)
+
+	// EnterNoiseDefinition is called when entering the noiseDefinition production.
+	EnterNoiseDefinition(c *NoiseDefinitionContext)
 
 	// EnterNoise_Builder is called when entering the noise_Builder production.
 	EnterNoise_Builder(c *Noise_BuilderContext)
@@ -361,6 +382,9 @@ type MinecraftMetascriptListener interface {
 	// ExitNumber is called when exiting the number production.
 	ExitNumber(c *NumberContext)
 
+	// ExitDensityFnBlock is called when exiting the densityFnBlock production.
+	ExitDensityFnBlock(c *DensityFnBlockContext)
+
 	// ExitSharedBuilder_XzScale is called when exiting the sharedBuilder_XzScale production.
 	ExitSharedBuilder_XzScale(c *SharedBuilder_XzScaleContext)
 
@@ -373,9 +397,6 @@ type MinecraftMetascriptListener interface {
 	// ExitSharedBuilder_YFactor is called when exiting the sharedBuilder_YFactor production.
 	ExitSharedBuilder_YFactor(c *SharedBuilder_YFactorContext)
 
-	// ExitDensityFnBlock is called when exiting the densityFnBlock production.
-	ExitDensityFnBlock(c *DensityFnBlockContext)
-
 	// ExitDensityFnDeclaration is called when exiting the densityFnDeclaration production.
 	ExitDensityFnDeclaration(c *DensityFnDeclarationContext)
 
@@ -387,6 +408,9 @@ type MinecraftMetascriptListener interface {
 
 	// ExitDensityFn_SingleInput is called when exiting the densityFn_SingleInput production.
 	ExitDensityFn_SingleInput(c *DensityFn_SingleInputContext)
+
+	// ExitDensityFn_InlineNoise is called when exiting the densityFn_InlineNoise production.
+	ExitDensityFn_InlineNoise(c *DensityFn_InlineNoiseContext)
 
 	// ExitDensityFn_Noise is called when exiting the densityFn_Noise production.
 	ExitDensityFn_Noise(c *DensityFn_NoiseContext)
@@ -409,6 +433,21 @@ type MinecraftMetascriptListener interface {
 	// ExitDensityFn_OldBlendedNoiseBuilder_Smear is called when exiting the densityFn_OldBlendedNoiseBuilder_Smear production.
 	ExitDensityFn_OldBlendedNoiseBuilder_Smear(c *DensityFn_OldBlendedNoiseBuilder_SmearContext)
 
+	// ExitDensityFn_WierdScaledSampler is called when exiting the densityFn_WierdScaledSampler production.
+	ExitDensityFn_WierdScaledSampler(c *DensityFn_WierdScaledSamplerContext)
+
+	// ExitDensityFn_WierdScaledSamplerBuilder is called when exiting the densityFn_WierdScaledSamplerBuilder production.
+	ExitDensityFn_WierdScaledSamplerBuilder(c *DensityFn_WierdScaledSamplerBuilderContext)
+
+	// ExitDensityFn_WierdScaledSamplerBuilder_Type1 is called when exiting the densityFn_WierdScaledSamplerBuilder_Type1 production.
+	ExitDensityFn_WierdScaledSamplerBuilder_Type1(c *DensityFn_WierdScaledSamplerBuilder_Type1Context)
+
+	// ExitDensityFn_WierdScaledSamplerBuilder_Type2 is called when exiting the densityFn_WierdScaledSamplerBuilder_Type2 production.
+	ExitDensityFn_WierdScaledSamplerBuilder_Type2(c *DensityFn_WierdScaledSamplerBuilder_Type2Context)
+
+	// ExitDensityFn_WierdScaledSamplerBuilder_Noise is called when exiting the densityFn_WierdScaledSamplerBuilder_Noise production.
+	ExitDensityFn_WierdScaledSamplerBuilder_Noise(c *DensityFn_WierdScaledSamplerBuilder_NoiseContext)
+
 	// ExitDensityFn_Constant is called when exiting the densityFn_Constant production.
 	ExitDensityFn_Constant(c *DensityFn_ConstantContext)
 
@@ -426,6 +465,9 @@ type MinecraftMetascriptListener interface {
 
 	// ExitNoise is called when exiting the noise production.
 	ExitNoise(c *NoiseContext)
+
+	// ExitNoiseDefinition is called when exiting the noiseDefinition production.
+	ExitNoiseDefinition(c *NoiseDefinitionContext)
 
 	// ExitNoise_Builder is called when exiting the noise_Builder production.
 	ExitNoise_Builder(c *Noise_BuilderContext)
