@@ -19,12 +19,12 @@ func init() {
 		func(ctx antlr.ParserRuleContext, ns string, scope *traversal.Scope) traversal.Construct {
 			yAboveBuilder := builder_chain.NewBuilderChain(
 				builder_chain.Build(
-					func(ctx *grammar.SharedBuilder_MulIntContext, target *YAboveCondition, scope *traversal.Scope, namespace string) {
+					func(ctx *grammar.Builder_MulIntContext, target *YAboveCondition, scope *traversal.Scope, namespace string) {
 						builder_chain.Builder_GetInt(ctx, func(v int) { target.Multiplier = v }, scope, "Mul")
 					},
 				),
 				builder_chain.Build(
-					func(ctx *grammar.SharedBuilder_AddContext, target *YAboveCondition, scope *traversal.Scope, namespace string) {
+					func(ctx *grammar.Builder_AddContext, target *YAboveCondition, scope *traversal.Scope, namespace string) {
 						builder_chain.SharedBuilder_Add(ctx, func(v bool) { target.Add = v })
 					},
 				),

@@ -7,11 +7,6 @@ surfaceStatement: verticalAnchorDeclaration | surfaceConditionDeclaration | surf
 verticalAnchor: ('~'? Int) | Identifier;
 verticalAnchorDeclaration: Identifier '=' NL* verticalAnchor;
 
-sharedBuilder_Offset: '.Offset(' Int ')';
-sharedBuilder_Add:'.Add()';
-sharedBuilder_Mul: '.Mul(' number ')';
-sharedBuilder_MulInt: '.Mul(' Int ')';
-
 surfaceCondition:
     (
     surfaceCondition_Not
@@ -47,9 +42,7 @@ surfaceCondition_Freezing: 'Freezing' '(' ')';
 
 
 // These are split out to make them easier to differentiate in the go code
-surfaceCondition_NoiseThresholdBuilder_Min: '.Min(' number ')';
-surfaceCondition_NoiseThresholdBuilder_Max: '.Max(' number ')';
-surfaceCondition_NoiseThresholdBuilder: surfaceCondition_NoiseThresholdBuilder_Max | surfaceCondition_NoiseThresholdBuilder_Min;
+surfaceCondition_NoiseThresholdBuilder: builder_Max | builder_Min;
 surfaceCondition_NoiseThreshold: 'NoiseThreshold' '(' resourceReference ')' NL* (surfaceCondition_NoiseThresholdBuilder NL*)*;
 
 StoneDepthMode: 'Floor' | 'Ceiling';
@@ -58,8 +51,8 @@ surfaceCondition_StoneDepth:
     (surfaceCondition_StoneDepthBuilder NL*)*;
 
 surfaceCondition_StoneDepthBuilder:
-    sharedBuilder_Offset
-    | sharedBuilder_Add
+    builder_Offset
+    | builder_Add
     | surfaceCondition_StoneDepthBuilder_SecondaryDepthRange
     ;
 
@@ -67,22 +60,20 @@ surfaceCondition_StoneDepthBuilder_SecondaryDepthRange:'.SecondaryDepthRange(' I
 
 surfaceCondition_VerticalGradient: 'VerticalGradient' '(' String ')' NL* (surfaceCondition_VerticalGradientBuilder NL*)*;
 surfaceCondition_VerticalGradientBuilder:
-    surfaceCondition_VerticalGradientBuilder_Top
-    | surfaceCondition_VerticalGradientBuilder_Bottom
+    builder_Top
+    | builder_Bottom
     ;
 
-surfaceCondition_VerticalGradientBuilder_Top: '.Top' '(' verticalAnchor ')';
-surfaceCondition_VerticalGradientBuilder_Bottom: '.Bottom' '(' verticalAnchor ')';
 
 
 surfaceCondition_AboveWater: 'AboveWater' '(' ')' NL* (surfaceCondition_AboveWaterBuilder NL*)*;
 surfaceCondition_AboveWaterBuilder:
-    sharedBuilder_Offset
-    | sharedBuilder_Add
-    | sharedBuilder_Mul;
+    builder_Offset
+    | builder_Add
+    | builder_Mul;
 
 surfaceCondition_YAbove: 'YAbove' '(' verticalAnchor ')' NL* (surfaceCondition_YAboveBuilder NL*)* ;
-surfaceCondition_YAboveBuilder: sharedBuilder_MulInt | sharedBuilder_Add;
+surfaceCondition_YAboveBuilder: builder_MulInt | builder_Add;
 
 surfaceRuleDeclaration: Identifier '=' NL*  surfaceRule;
 surfaceRule: surfaceRule_Block

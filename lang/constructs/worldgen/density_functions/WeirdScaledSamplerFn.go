@@ -2,7 +2,6 @@ package density_functions
 
 import (
 	"encoding/json"
-	"fmt"
 	"reflect"
 
 	"github.com/antlr4-go/antlr/v4"
@@ -36,13 +35,13 @@ func init() {
 					// TODO: Diagnose
 					continue
 				}
-				if _, ok := builder.(*grammar.DensityFn_WierdScaledSamplerBuilder_Type1Context); ok {
+				if _, ok := builder.(*grammar.Builder_Type1Context); ok {
 					out.ValueMapper = "type_1"
 				}
-				if _, ok := builder.(*grammar.DensityFn_WierdScaledSamplerBuilder_Type2Context); ok {
+				if _, ok := builder.(*grammar.Builder_Type2Context); ok {
 					out.ValueMapper = "type_2"
 				}
-				if noise, ok := builder.(*grammar.DensityFn_WierdScaledSamplerBuilder_NoiseContext); ok {
+				if noise, ok := builder.(*grammar.Builder_NoiseContext); ok {
 					if noise.ResourceReference() != nil {
 						ref := traversal.ConstructRegistry.Construct(noise.ResourceReference(), currentNamespace, scope)
 						if r, ok := ref.(*traversal.Reference); ok {
@@ -57,7 +56,6 @@ func init() {
 						if ref != nil {
 							out.Noise = *ref
 						} else {
-							fmt.Println(ref)
 							// TODO: Diagnose
 							scope.DiagnoseSemanticError("Invalid inline noise definition.", noise)
 							continue

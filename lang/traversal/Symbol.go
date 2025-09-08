@@ -54,7 +54,7 @@ func ProcessDeclaration(ctx DeclarationContext, valueCtx antlr.ParserRuleContext
 
 	out.value = ConstructRegistry.Construct(valueCtx, namespace, scope)
 	if out.value == nil {
-		scope.DiagnoseSemanticError("Missing value", ctx)
+		scope.DiagnoseSemanticError("No Value found for Declaration", ctx)
 	} else {
 		out.contentLocation = RuleLocation(valueCtx, scope.CurrentFile)
 	}

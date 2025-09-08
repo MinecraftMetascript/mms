@@ -28,7 +28,7 @@ type (
 )
 
 func SharedBuilder_Add(
-	ctx *grammar.SharedBuilder_AddContext,
+	ctx *grammar.Builder_AddContext,
 	mod func(bool),
 ) {
 	if !ctx.IsEmpty() {

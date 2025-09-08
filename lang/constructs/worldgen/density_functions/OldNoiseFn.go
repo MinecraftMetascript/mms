@@ -17,27 +17,27 @@ func init() {
 		func(ctx antlr.ParserRuleContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
 			noiseFnBuilder := builder_chain.NewBuilderChain(
 				builder_chain.Build(
-					func(ctx *grammar.SharedBuilder_XzScaleContext, target *OldBlendedNoiseFn, scope *traversal.Scope, namespace string) {
+					func(ctx *grammar.Builder_XZScaleContext, target *OldBlendedNoiseFn, scope *traversal.Scope, namespace string) {
 						builder_chain.Builder_GetFloat(ctx, func(v float64) { target.XzScale = v }, scope, "XzScale")
 					},
 				),
 				builder_chain.Build(
-					func(ctx *grammar.SharedBuilder_YScaleContext, target *OldBlendedNoiseFn, scope *traversal.Scope, namespace string) {
+					func(ctx *grammar.Builder_YScaleContext, target *OldBlendedNoiseFn, scope *traversal.Scope, namespace string) {
 						builder_chain.Builder_GetFloat(ctx, func(v float64) { target.YScale = v }, scope, "XzScale")
 					},
 				),
 				builder_chain.Build(
-					func(ctx *grammar.SharedBuilder_XzFactorContext, target *OldBlendedNoiseFn, scope *traversal.Scope, namespace string) {
+					func(ctx *grammar.Builder_XZFactorContext, target *OldBlendedNoiseFn, scope *traversal.Scope, namespace string) {
 						builder_chain.Builder_GetFloat(ctx, func(v float64) { target.XzFactor = v }, scope, "XzScale")
 					},
 				),
 				builder_chain.Build(
-					func(ctx *grammar.SharedBuilder_YFactorContext, target *OldBlendedNoiseFn, scope *traversal.Scope, namespace string) {
+					func(ctx *grammar.Builder_YFactorContext, target *OldBlendedNoiseFn, scope *traversal.Scope, namespace string) {
 						builder_chain.Builder_GetFloat(ctx, func(v float64) { target.YFactor = v }, scope, "XzScale")
 					},
 				),
 				builder_chain.Build(
-					func(ctx *grammar.DensityFn_OldBlendedNoiseBuilder_SmearContext, target *OldBlendedNoiseFn, scope *traversal.Scope, namespace string) {
+					func(ctx *grammar.Builder_SmearContext, target *OldBlendedNoiseFn, scope *traversal.Scope, namespace string) {
 						builder_chain.Builder_GetFloat(ctx, func(v float64) { target.SmearMultiplier = v }, scope, "XzScale")
 					},
 				),

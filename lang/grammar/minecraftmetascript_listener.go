@@ -31,18 +31,6 @@ type MinecraftMetascriptListener interface {
 	// EnterVerticalAnchorDeclaration is called when entering the verticalAnchorDeclaration production.
 	EnterVerticalAnchorDeclaration(c *VerticalAnchorDeclarationContext)
 
-	// EnterSharedBuilder_Offset is called when entering the sharedBuilder_Offset production.
-	EnterSharedBuilder_Offset(c *SharedBuilder_OffsetContext)
-
-	// EnterSharedBuilder_Add is called when entering the sharedBuilder_Add production.
-	EnterSharedBuilder_Add(c *SharedBuilder_AddContext)
-
-	// EnterSharedBuilder_Mul is called when entering the sharedBuilder_Mul production.
-	EnterSharedBuilder_Mul(c *SharedBuilder_MulContext)
-
-	// EnterSharedBuilder_MulInt is called when entering the sharedBuilder_MulInt production.
-	EnterSharedBuilder_MulInt(c *SharedBuilder_MulIntContext)
-
 	// EnterSurfaceCondition is called when entering the surfaceCondition production.
 	EnterSurfaceCondition(c *SurfaceConditionContext)
 
@@ -76,12 +64,6 @@ type MinecraftMetascriptListener interface {
 	// EnterSurfaceCondition_Freezing is called when entering the surfaceCondition_Freezing production.
 	EnterSurfaceCondition_Freezing(c *SurfaceCondition_FreezingContext)
 
-	// EnterSurfaceCondition_NoiseThresholdBuilder_Min is called when entering the surfaceCondition_NoiseThresholdBuilder_Min production.
-	EnterSurfaceCondition_NoiseThresholdBuilder_Min(c *SurfaceCondition_NoiseThresholdBuilder_MinContext)
-
-	// EnterSurfaceCondition_NoiseThresholdBuilder_Max is called when entering the surfaceCondition_NoiseThresholdBuilder_Max production.
-	EnterSurfaceCondition_NoiseThresholdBuilder_Max(c *SurfaceCondition_NoiseThresholdBuilder_MaxContext)
-
 	// EnterSurfaceCondition_NoiseThresholdBuilder is called when entering the surfaceCondition_NoiseThresholdBuilder production.
 	EnterSurfaceCondition_NoiseThresholdBuilder(c *SurfaceCondition_NoiseThresholdBuilderContext)
 
@@ -102,12 +84,6 @@ type MinecraftMetascriptListener interface {
 
 	// EnterSurfaceCondition_VerticalGradientBuilder is called when entering the surfaceCondition_VerticalGradientBuilder production.
 	EnterSurfaceCondition_VerticalGradientBuilder(c *SurfaceCondition_VerticalGradientBuilderContext)
-
-	// EnterSurfaceCondition_VerticalGradientBuilder_Top is called when entering the surfaceCondition_VerticalGradientBuilder_Top production.
-	EnterSurfaceCondition_VerticalGradientBuilder_Top(c *SurfaceCondition_VerticalGradientBuilder_TopContext)
-
-	// EnterSurfaceCondition_VerticalGradientBuilder_Bottom is called when entering the surfaceCondition_VerticalGradientBuilder_Bottom production.
-	EnterSurfaceCondition_VerticalGradientBuilder_Bottom(c *SurfaceCondition_VerticalGradientBuilder_BottomContext)
 
 	// EnterSurfaceCondition_AboveWater is called when entering the surfaceCondition_AboveWater production.
 	EnterSurfaceCondition_AboveWater(c *SurfaceCondition_AboveWaterContext)
@@ -142,26 +118,95 @@ type MinecraftMetascriptListener interface {
 	// EnterSurfaceRule_If is called when entering the surfaceRule_If production.
 	EnterSurfaceRule_If(c *SurfaceRule_IfContext)
 
+	// EnterBuilder_XZScale is called when entering the builder_XZScale production.
+	EnterBuilder_XZScale(c *Builder_XZScaleContext)
+
+	// EnterBuilder_YScale is called when entering the builder_YScale production.
+	EnterBuilder_YScale(c *Builder_YScaleContext)
+
+	// EnterBuilder_XZFactor is called when entering the builder_XZFactor production.
+	EnterBuilder_XZFactor(c *Builder_XZFactorContext)
+
+	// EnterBuilder_YFactor is called when entering the builder_YFactor production.
+	EnterBuilder_YFactor(c *Builder_YFactorContext)
+
+	// EnterBuilder_Noise is called when entering the builder_Noise production.
+	EnterBuilder_Noise(c *Builder_NoiseContext)
+
+	// EnterBuilder_Smear is called when entering the builder_Smear production.
+	EnterBuilder_Smear(c *Builder_SmearContext)
+
+	// EnterBuilder_Type1 is called when entering the builder_Type1 production.
+	EnterBuilder_Type1(c *Builder_Type1Context)
+
+	// EnterBuilder_Type2 is called when entering the builder_Type2 production.
+	EnterBuilder_Type2(c *Builder_Type2Context)
+
+	// EnterBuilder_Shift is called when entering the builder_Shift production.
+	EnterBuilder_Shift(c *Builder_ShiftContext)
+
+	// EnterBuilder_Amplitudes is called when entering the builder_Amplitudes production.
+	EnterBuilder_Amplitudes(c *Builder_AmplitudesContext)
+
+	// EnterBuilder_Offset is called when entering the builder_Offset production.
+	EnterBuilder_Offset(c *Builder_OffsetContext)
+
+	// EnterBuilder_Add is called when entering the builder_Add production.
+	EnterBuilder_Add(c *Builder_AddContext)
+
+	// EnterBuilder_Mul is called when entering the builder_Mul production.
+	EnterBuilder_Mul(c *Builder_MulContext)
+
+	// EnterBuilder_MulInt is called when entering the builder_MulInt production.
+	EnterBuilder_MulInt(c *Builder_MulIntContext)
+
+	// EnterBuilder_Min is called when entering the builder_Min production.
+	EnterBuilder_Min(c *Builder_MinContext)
+
+	// EnterBuilder_Max is called when entering the builder_Max production.
+	EnterBuilder_Max(c *Builder_MaxContext)
+
+	// EnterBuilder_Top is called when entering the builder_Top production.
+	EnterBuilder_Top(c *Builder_TopContext)
+
+	// EnterBuilder_TopLiteral is called when entering the builder_TopLiteral production.
+	EnterBuilder_TopLiteral(c *Builder_TopLiteralContext)
+
+	// EnterBuilder_Bottom is called when entering the builder_Bottom production.
+	EnterBuilder_Bottom(c *Builder_BottomContext)
+
+	// EnterBuilder_BottomLiteral is called when entering the builder_BottomLiteral production.
+	EnterBuilder_BottomLiteral(c *Builder_BottomLiteralContext)
+
+	// EnterBuilder_InRange is called when entering the builder_InRange production.
+	EnterBuilder_InRange(c *Builder_InRangeContext)
+
+	// EnterBuilder_OutRange is called when entering the builder_OutRange production.
+	EnterBuilder_OutRange(c *Builder_OutRangeContext)
+
 	// EnterResourceReference is called when entering the resourceReference production.
 	EnterResourceReference(c *ResourceReferenceContext)
 
 	// EnterNumber is called when entering the number production.
 	EnterNumber(c *NumberContext)
 
+	// EnterNoiseBlock is called when entering the noiseBlock production.
+	EnterNoiseBlock(c *NoiseBlockContext)
+
+	// EnterNoiseDeclaration is called when entering the noiseDeclaration production.
+	EnterNoiseDeclaration(c *NoiseDeclarationContext)
+
+	// EnterNoise is called when entering the noise production.
+	EnterNoise(c *NoiseContext)
+
+	// EnterNoiseDefinition is called when entering the noiseDefinition production.
+	EnterNoiseDefinition(c *NoiseDefinitionContext)
+
+	// EnterNoise_Builder is called when entering the noise_Builder production.
+	EnterNoise_Builder(c *Noise_BuilderContext)
+
 	// EnterDensityFnBlock is called when entering the densityFnBlock production.
 	EnterDensityFnBlock(c *DensityFnBlockContext)
-
-	// EnterSharedBuilder_XzScale is called when entering the sharedBuilder_XzScale production.
-	EnterSharedBuilder_XzScale(c *SharedBuilder_XzScaleContext)
-
-	// EnterSharedBuilder_YScale is called when entering the sharedBuilder_YScale production.
-	EnterSharedBuilder_YScale(c *SharedBuilder_YScaleContext)
-
-	// EnterSharedBuilder_XzFactor is called when entering the sharedBuilder_XzFactor production.
-	EnterSharedBuilder_XzFactor(c *SharedBuilder_XzFactorContext)
-
-	// EnterSharedBuilder_YFactor is called when entering the sharedBuilder_YFactor production.
-	EnterSharedBuilder_YFactor(c *SharedBuilder_YFactorContext)
 
 	// EnterDensityFnDeclaration is called when entering the densityFnDeclaration production.
 	EnterDensityFnDeclaration(c *DensityFnDeclarationContext)
@@ -196,23 +241,44 @@ type MinecraftMetascriptListener interface {
 	// EnterDensityFn_OldBlendedNoiseBuilder is called when entering the densityFn_OldBlendedNoiseBuilder production.
 	EnterDensityFn_OldBlendedNoiseBuilder(c *DensityFn_OldBlendedNoiseBuilderContext)
 
-	// EnterDensityFn_OldBlendedNoiseBuilder_Smear is called when entering the densityFn_OldBlendedNoiseBuilder_Smear production.
-	EnterDensityFn_OldBlendedNoiseBuilder_Smear(c *DensityFn_OldBlendedNoiseBuilder_SmearContext)
-
 	// EnterDensityFn_WierdScaledSampler is called when entering the densityFn_WierdScaledSampler production.
 	EnterDensityFn_WierdScaledSampler(c *DensityFn_WierdScaledSamplerContext)
 
 	// EnterDensityFn_WierdScaledSamplerBuilder is called when entering the densityFn_WierdScaledSamplerBuilder production.
 	EnterDensityFn_WierdScaledSamplerBuilder(c *DensityFn_WierdScaledSamplerBuilderContext)
 
-	// EnterDensityFn_WierdScaledSamplerBuilder_Type1 is called when entering the densityFn_WierdScaledSamplerBuilder_Type1 production.
-	EnterDensityFn_WierdScaledSamplerBuilder_Type1(c *DensityFn_WierdScaledSamplerBuilder_Type1Context)
+	// EnterDensityFn_ShiftedNoise is called when entering the densityFn_ShiftedNoise production.
+	EnterDensityFn_ShiftedNoise(c *DensityFn_ShiftedNoiseContext)
 
-	// EnterDensityFn_WierdScaledSamplerBuilder_Type2 is called when entering the densityFn_WierdScaledSamplerBuilder_Type2 production.
-	EnterDensityFn_WierdScaledSamplerBuilder_Type2(c *DensityFn_WierdScaledSamplerBuilder_Type2Context)
+	// EnterDensityFn_ShiftedNoiseBuilder is called when entering the densityFn_ShiftedNoiseBuilder production.
+	EnterDensityFn_ShiftedNoiseBuilder(c *DensityFn_ShiftedNoiseBuilderContext)
 
-	// EnterDensityFn_WierdScaledSamplerBuilder_Noise is called when entering the densityFn_WierdScaledSamplerBuilder_Noise production.
-	EnterDensityFn_WierdScaledSamplerBuilder_Noise(c *DensityFn_WierdScaledSamplerBuilder_NoiseContext)
+	// EnterDensityFn_RangeChoice is called when entering the densityFn_RangeChoice production.
+	EnterDensityFn_RangeChoice(c *DensityFn_RangeChoiceContext)
+
+	// EnterDensityFn_RangeChoiceBuilder is called when entering the densityFn_RangeChoiceBuilder production.
+	EnterDensityFn_RangeChoiceBuilder(c *DensityFn_RangeChoiceBuilderContext)
+
+	// EnterDensityFn_Clamp is called when entering the densityFn_Clamp production.
+	EnterDensityFn_Clamp(c *DensityFn_ClampContext)
+
+	// EnterDensityFn_ClampBuilder is called when entering the densityFn_ClampBuilder production.
+	EnterDensityFn_ClampBuilder(c *DensityFn_ClampBuilderContext)
+
+	// EnterDensityFn_YClampedGradient is called when entering the densityFn_YClampedGradient production.
+	EnterDensityFn_YClampedGradient(c *DensityFn_YClampedGradientContext)
+
+	// EnterDensityFn_YClampedGradientBuilder is called when entering the densityFn_YClampedGradientBuilder production.
+	EnterDensityFn_YClampedGradientBuilder(c *DensityFn_YClampedGradientBuilderContext)
+
+	// EnterDensityFn_SplineFn is called when entering the densityFn_SplineFn production.
+	EnterDensityFn_SplineFn(c *DensityFn_SplineFnContext)
+
+	// EnterDensityFn_Spline is called when entering the densityFn_Spline production.
+	EnterDensityFn_Spline(c *DensityFn_SplineContext)
+
+	// EnterDensityFn_SplinePoint is called when entering the densityFn_SplinePoint production.
+	EnterDensityFn_SplinePoint(c *DensityFn_SplinePointContext)
 
 	// EnterDensityFn_Constant is called when entering the densityFn_Constant production.
 	EnterDensityFn_Constant(c *DensityFn_ConstantContext)
@@ -222,24 +288,6 @@ type MinecraftMetascriptListener interface {
 
 	// EnterDensityFn_Math is called when entering the densityFn_Math production.
 	EnterDensityFn_Math(c *DensityFn_MathContext)
-
-	// EnterNoiseBlock is called when entering the noiseBlock production.
-	EnterNoiseBlock(c *NoiseBlockContext)
-
-	// EnterNoiseDeclaration is called when entering the noiseDeclaration production.
-	EnterNoiseDeclaration(c *NoiseDeclarationContext)
-
-	// EnterNoise is called when entering the noise production.
-	EnterNoise(c *NoiseContext)
-
-	// EnterNoiseDefinition is called when entering the noiseDefinition production.
-	EnterNoiseDefinition(c *NoiseDefinitionContext)
-
-	// EnterNoise_Builder is called when entering the noise_Builder production.
-	EnterNoise_Builder(c *Noise_BuilderContext)
-
-	// EnterNoise_Builder_Amplitudes is called when entering the noise_Builder_Amplitudes production.
-	EnterNoise_Builder_Amplitudes(c *Noise_Builder_AmplitudesContext)
 
 	// ExitScript is called when exiting the script production.
 	ExitScript(c *ScriptContext)
@@ -264,18 +312,6 @@ type MinecraftMetascriptListener interface {
 
 	// ExitVerticalAnchorDeclaration is called when exiting the verticalAnchorDeclaration production.
 	ExitVerticalAnchorDeclaration(c *VerticalAnchorDeclarationContext)
-
-	// ExitSharedBuilder_Offset is called when exiting the sharedBuilder_Offset production.
-	ExitSharedBuilder_Offset(c *SharedBuilder_OffsetContext)
-
-	// ExitSharedBuilder_Add is called when exiting the sharedBuilder_Add production.
-	ExitSharedBuilder_Add(c *SharedBuilder_AddContext)
-
-	// ExitSharedBuilder_Mul is called when exiting the sharedBuilder_Mul production.
-	ExitSharedBuilder_Mul(c *SharedBuilder_MulContext)
-
-	// ExitSharedBuilder_MulInt is called when exiting the sharedBuilder_MulInt production.
-	ExitSharedBuilder_MulInt(c *SharedBuilder_MulIntContext)
 
 	// ExitSurfaceCondition is called when exiting the surfaceCondition production.
 	ExitSurfaceCondition(c *SurfaceConditionContext)
@@ -310,12 +346,6 @@ type MinecraftMetascriptListener interface {
 	// ExitSurfaceCondition_Freezing is called when exiting the surfaceCondition_Freezing production.
 	ExitSurfaceCondition_Freezing(c *SurfaceCondition_FreezingContext)
 
-	// ExitSurfaceCondition_NoiseThresholdBuilder_Min is called when exiting the surfaceCondition_NoiseThresholdBuilder_Min production.
-	ExitSurfaceCondition_NoiseThresholdBuilder_Min(c *SurfaceCondition_NoiseThresholdBuilder_MinContext)
-
-	// ExitSurfaceCondition_NoiseThresholdBuilder_Max is called when exiting the surfaceCondition_NoiseThresholdBuilder_Max production.
-	ExitSurfaceCondition_NoiseThresholdBuilder_Max(c *SurfaceCondition_NoiseThresholdBuilder_MaxContext)
-
 	// ExitSurfaceCondition_NoiseThresholdBuilder is called when exiting the surfaceCondition_NoiseThresholdBuilder production.
 	ExitSurfaceCondition_NoiseThresholdBuilder(c *SurfaceCondition_NoiseThresholdBuilderContext)
 
@@ -336,12 +366,6 @@ type MinecraftMetascriptListener interface {
 
 	// ExitSurfaceCondition_VerticalGradientBuilder is called when exiting the surfaceCondition_VerticalGradientBuilder production.
 	ExitSurfaceCondition_VerticalGradientBuilder(c *SurfaceCondition_VerticalGradientBuilderContext)
-
-	// ExitSurfaceCondition_VerticalGradientBuilder_Top is called when exiting the surfaceCondition_VerticalGradientBuilder_Top production.
-	ExitSurfaceCondition_VerticalGradientBuilder_Top(c *SurfaceCondition_VerticalGradientBuilder_TopContext)
-
-	// ExitSurfaceCondition_VerticalGradientBuilder_Bottom is called when exiting the surfaceCondition_VerticalGradientBuilder_Bottom production.
-	ExitSurfaceCondition_VerticalGradientBuilder_Bottom(c *SurfaceCondition_VerticalGradientBuilder_BottomContext)
 
 	// ExitSurfaceCondition_AboveWater is called when exiting the surfaceCondition_AboveWater production.
 	ExitSurfaceCondition_AboveWater(c *SurfaceCondition_AboveWaterContext)
@@ -376,26 +400,95 @@ type MinecraftMetascriptListener interface {
 	// ExitSurfaceRule_If is called when exiting the surfaceRule_If production.
 	ExitSurfaceRule_If(c *SurfaceRule_IfContext)
 
+	// ExitBuilder_XZScale is called when exiting the builder_XZScale production.
+	ExitBuilder_XZScale(c *Builder_XZScaleContext)
+
+	// ExitBuilder_YScale is called when exiting the builder_YScale production.
+	ExitBuilder_YScale(c *Builder_YScaleContext)
+
+	// ExitBuilder_XZFactor is called when exiting the builder_XZFactor production.
+	ExitBuilder_XZFactor(c *Builder_XZFactorContext)
+
+	// ExitBuilder_YFactor is called when exiting the builder_YFactor production.
+	ExitBuilder_YFactor(c *Builder_YFactorContext)
+
+	// ExitBuilder_Noise is called when exiting the builder_Noise production.
+	ExitBuilder_Noise(c *Builder_NoiseContext)
+
+	// ExitBuilder_Smear is called when exiting the builder_Smear production.
+	ExitBuilder_Smear(c *Builder_SmearContext)
+
+	// ExitBuilder_Type1 is called when exiting the builder_Type1 production.
+	ExitBuilder_Type1(c *Builder_Type1Context)
+
+	// ExitBuilder_Type2 is called when exiting the builder_Type2 production.
+	ExitBuilder_Type2(c *Builder_Type2Context)
+
+	// ExitBuilder_Shift is called when exiting the builder_Shift production.
+	ExitBuilder_Shift(c *Builder_ShiftContext)
+
+	// ExitBuilder_Amplitudes is called when exiting the builder_Amplitudes production.
+	ExitBuilder_Amplitudes(c *Builder_AmplitudesContext)
+
+	// ExitBuilder_Offset is called when exiting the builder_Offset production.
+	ExitBuilder_Offset(c *Builder_OffsetContext)
+
+	// ExitBuilder_Add is called when exiting the builder_Add production.
+	ExitBuilder_Add(c *Builder_AddContext)
+
+	// ExitBuilder_Mul is called when exiting the builder_Mul production.
+	ExitBuilder_Mul(c *Builder_MulContext)
+
+	// ExitBuilder_MulInt is called when exiting the builder_MulInt production.
+	ExitBuilder_MulInt(c *Builder_MulIntContext)
+
+	// ExitBuilder_Min is called when exiting the builder_Min production.
+	ExitBuilder_Min(c *Builder_MinContext)
+
+	// ExitBuilder_Max is called when exiting the builder_Max production.
+	ExitBuilder_Max(c *Builder_MaxContext)
+
+	// ExitBuilder_Top is called when exiting the builder_Top production.
+	ExitBuilder_Top(c *Builder_TopContext)
+
+	// ExitBuilder_TopLiteral is called when exiting the builder_TopLiteral production.
+	ExitBuilder_TopLiteral(c *Builder_TopLiteralContext)
+
+	// ExitBuilder_Bottom is called when exiting the builder_Bottom production.
+	ExitBuilder_Bottom(c *Builder_BottomContext)
+
+	// ExitBuilder_BottomLiteral is called when exiting the builder_BottomLiteral production.
+	ExitBuilder_BottomLiteral(c *Builder_BottomLiteralContext)
+
+	// ExitBuilder_InRange is called when exiting the builder_InRange production.
+	ExitBuilder_InRange(c *Builder_InRangeContext)
+
+	// ExitBuilder_OutRange is called when exiting the builder_OutRange production.
+	ExitBuilder_OutRange(c *Builder_OutRangeContext)
+
 	// ExitResourceReference is called when exiting the resourceReference production.
 	ExitResourceReference(c *ResourceReferenceContext)
 
 	// ExitNumber is called when exiting the number production.
 	ExitNumber(c *NumberContext)
 
+	// ExitNoiseBlock is called when exiting the noiseBlock production.
+	ExitNoiseBlock(c *NoiseBlockContext)
+
+	// ExitNoiseDeclaration is called when exiting the noiseDeclaration production.
+	ExitNoiseDeclaration(c *NoiseDeclarationContext)
+
+	// ExitNoise is called when exiting the noise production.
+	ExitNoise(c *NoiseContext)
+
+	// ExitNoiseDefinition is called when exiting the noiseDefinition production.
+	ExitNoiseDefinition(c *NoiseDefinitionContext)
+
+	// ExitNoise_Builder is called when exiting the noise_Builder production.
+	ExitNoise_Builder(c *Noise_BuilderContext)
+
 	// ExitDensityFnBlock is called when exiting the densityFnBlock production.
 	ExitDensityFnBlock(c *DensityFnBlockContext)
-
-	// ExitSharedBuilder_XzScale is called when exiting the sharedBuilder_XzScale production.
-	ExitSharedBuilder_XzScale(c *SharedBuilder_XzScaleContext)
-
-	// ExitSharedBuilder_YScale is called when exiting the sharedBuilder_YScale production.
-	ExitSharedBuilder_YScale(c *SharedBuilder_YScaleContext)
-
-	// ExitSharedBuilder_XzFactor is called when exiting the sharedBuilder_XzFactor production.
-	ExitSharedBuilder_XzFactor(c *SharedBuilder_XzFactorContext)
-
-	// ExitSharedBuilder_YFactor is called when exiting the sharedBuilder_YFactor production.
-	ExitSharedBuilder_YFactor(c *SharedBuilder_YFactorContext)
 
 	// ExitDensityFnDeclaration is called when exiting the densityFnDeclaration production.
 	ExitDensityFnDeclaration(c *DensityFnDeclarationContext)
@@ -430,23 +523,44 @@ type MinecraftMetascriptListener interface {
 	// ExitDensityFn_OldBlendedNoiseBuilder is called when exiting the densityFn_OldBlendedNoiseBuilder production.
 	ExitDensityFn_OldBlendedNoiseBuilder(c *DensityFn_OldBlendedNoiseBuilderContext)
 
-	// ExitDensityFn_OldBlendedNoiseBuilder_Smear is called when exiting the densityFn_OldBlendedNoiseBuilder_Smear production.
-	ExitDensityFn_OldBlendedNoiseBuilder_Smear(c *DensityFn_OldBlendedNoiseBuilder_SmearContext)
-
 	// ExitDensityFn_WierdScaledSampler is called when exiting the densityFn_WierdScaledSampler production.
 	ExitDensityFn_WierdScaledSampler(c *DensityFn_WierdScaledSamplerContext)
 
 	// ExitDensityFn_WierdScaledSamplerBuilder is called when exiting the densityFn_WierdScaledSamplerBuilder production.
 	ExitDensityFn_WierdScaledSamplerBuilder(c *DensityFn_WierdScaledSamplerBuilderContext)
 
-	// ExitDensityFn_WierdScaledSamplerBuilder_Type1 is called when exiting the densityFn_WierdScaledSamplerBuilder_Type1 production.
-	ExitDensityFn_WierdScaledSamplerBuilder_Type1(c *DensityFn_WierdScaledSamplerBuilder_Type1Context)
+	// ExitDensityFn_ShiftedNoise is called when exiting the densityFn_ShiftedNoise production.
+	ExitDensityFn_ShiftedNoise(c *DensityFn_ShiftedNoiseContext)
 
-	// ExitDensityFn_WierdScaledSamplerBuilder_Type2 is called when exiting the densityFn_WierdScaledSamplerBuilder_Type2 production.
-	ExitDensityFn_WierdScaledSamplerBuilder_Type2(c *DensityFn_WierdScaledSamplerBuilder_Type2Context)
+	// ExitDensityFn_ShiftedNoiseBuilder is called when exiting the densityFn_ShiftedNoiseBuilder production.
+	ExitDensityFn_ShiftedNoiseBuilder(c *DensityFn_ShiftedNoiseBuilderContext)
 
-	// ExitDensityFn_WierdScaledSamplerBuilder_Noise is called when exiting the densityFn_WierdScaledSamplerBuilder_Noise production.
-	ExitDensityFn_WierdScaledSamplerBuilder_Noise(c *DensityFn_WierdScaledSamplerBuilder_NoiseContext)
+	// ExitDensityFn_RangeChoice is called when exiting the densityFn_RangeChoice production.
+	ExitDensityFn_RangeChoice(c *DensityFn_RangeChoiceContext)
+
+	// ExitDensityFn_RangeChoiceBuilder is called when exiting the densityFn_RangeChoiceBuilder production.
+	ExitDensityFn_RangeChoiceBuilder(c *DensityFn_RangeChoiceBuilderContext)
+
+	// ExitDensityFn_Clamp is called when exiting the densityFn_Clamp production.
+	ExitDensityFn_Clamp(c *DensityFn_ClampContext)
+
+	// ExitDensityFn_ClampBuilder is called when exiting the densityFn_ClampBuilder production.
+	ExitDensityFn_ClampBuilder(c *DensityFn_ClampBuilderContext)
+
+	// ExitDensityFn_YClampedGradient is called when exiting the densityFn_YClampedGradient production.
+	ExitDensityFn_YClampedGradient(c *DensityFn_YClampedGradientContext)
+
+	// ExitDensityFn_YClampedGradientBuilder is called when exiting the densityFn_YClampedGradientBuilder production.
+	ExitDensityFn_YClampedGradientBuilder(c *DensityFn_YClampedGradientBuilderContext)
+
+	// ExitDensityFn_SplineFn is called when exiting the densityFn_SplineFn production.
+	ExitDensityFn_SplineFn(c *DensityFn_SplineFnContext)
+
+	// ExitDensityFn_Spline is called when exiting the densityFn_Spline production.
+	ExitDensityFn_Spline(c *DensityFn_SplineContext)
+
+	// ExitDensityFn_SplinePoint is called when exiting the densityFn_SplinePoint production.
+	ExitDensityFn_SplinePoint(c *DensityFn_SplinePointContext)
 
 	// ExitDensityFn_Constant is called when exiting the densityFn_Constant production.
 	ExitDensityFn_Constant(c *DensityFn_ConstantContext)
@@ -456,22 +570,4 @@ type MinecraftMetascriptListener interface {
 
 	// ExitDensityFn_Math is called when exiting the densityFn_Math production.
 	ExitDensityFn_Math(c *DensityFn_MathContext)
-
-	// ExitNoiseBlock is called when exiting the noiseBlock production.
-	ExitNoiseBlock(c *NoiseBlockContext)
-
-	// ExitNoiseDeclaration is called when exiting the noiseDeclaration production.
-	ExitNoiseDeclaration(c *NoiseDeclarationContext)
-
-	// ExitNoise is called when exiting the noise production.
-	ExitNoise(c *NoiseContext)
-
-	// ExitNoiseDefinition is called when exiting the noiseDefinition production.
-	ExitNoiseDefinition(c *NoiseDefinitionContext)
-
-	// ExitNoise_Builder is called when exiting the noise_Builder production.
-	ExitNoise_Builder(c *Noise_BuilderContext)
-
-	// ExitNoise_Builder_Amplitudes is called when exiting the noise_Builder_Amplitudes production.
-	ExitNoise_Builder_Amplitudes(c *Noise_Builder_AmplitudesContext)
 }

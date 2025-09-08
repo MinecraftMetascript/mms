@@ -18,12 +18,12 @@ func init() {
 		func(ctx antlr.ParserRuleContext, namespace string, scope *traversal.Scope) traversal.Construct {
 			noiseBuildChain := builder_chain.NewBuilderChain[NoiseCondition](
 				builder_chain.Build(
-					func(ctx *grammar.SurfaceCondition_NoiseThresholdBuilder_MinContext, out *NoiseCondition, scope *traversal.Scope, _ string) {
+					func(ctx *grammar.Builder_MinContext, out *NoiseCondition, scope *traversal.Scope, _ string) {
 						builder_chain.Builder_GetFloat(ctx, func(v float64) { out.Min = v }, scope, "Min")
 					},
 				),
 				builder_chain.Build(
-					func(ctx *grammar.SurfaceCondition_NoiseThresholdBuilder_MaxContext, out *NoiseCondition, scope *traversal.Scope, _ string) {
+					func(ctx *grammar.Builder_MaxContext, out *NoiseCondition, scope *traversal.Scope, _ string) {
 						builder_chain.Builder_GetFloat(ctx, func(v float64) { out.Max = v }, scope, "Max")
 					},
 				),
@@ -53,14 +53,14 @@ func init() {
 				noiseBuildChain,
 				noise,
 				scope,
-				reflect.TypeFor[*grammar.SurfaceCondition_NoiseThresholdBuilder_MinContext](),
+				reflect.TypeFor[*grammar.Builder_MinContext](),
 				".Min",
 			)
 			builder_chain.Require(
 				noiseBuildChain,
 				noise,
 				scope,
-				reflect.TypeFor[*grammar.SurfaceCondition_NoiseThresholdBuilder_MaxContext](),
+				reflect.TypeFor[*grammar.Builder_MaxContext](),
 				".Max",
 			)
 

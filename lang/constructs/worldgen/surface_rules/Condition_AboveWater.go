@@ -18,17 +18,17 @@ func init() {
 		func(ctx antlr.ParserRuleContext, namespace string, scope *traversal.Scope) traversal.Construct {
 			waterBuildChain := builder_chain.NewBuilderChain[AboveWaterCondition](
 				builder_chain.Build(
-					func(ctx *grammar.SharedBuilder_OffsetContext, out *AboveWaterCondition, scope *traversal.Scope, _ string) {
+					func(ctx *grammar.Builder_OffsetContext, out *AboveWaterCondition, scope *traversal.Scope, _ string) {
 						builder_chain.Builder_GetInt(ctx, func(v int) { out.Offset = v }, scope, "Offset")
 					},
 				),
 				builder_chain.Build(
-					func(ctx *grammar.SharedBuilder_AddContext, out *AboveWaterCondition, _ *traversal.Scope, _ string) {
+					func(ctx *grammar.Builder_AddContext, out *AboveWaterCondition, _ *traversal.Scope, _ string) {
 						builder_chain.SharedBuilder_Add(ctx, func(v bool) { out.Add = v })
 					},
 				),
 				builder_chain.Build(
-					func(ctx *grammar.SharedBuilder_MulContext, out *AboveWaterCondition, scope *traversal.Scope, _ string) {
+					func(ctx *grammar.Builder_MulContext, out *AboveWaterCondition, scope *traversal.Scope, _ string) {
 						builder_chain.Builder_GetFloat(
 							ctx,
 							func(v float64) { out.DepthMultiplier = v },

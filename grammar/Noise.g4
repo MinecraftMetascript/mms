@@ -9,5 +9,4 @@ noise: 'Noise' noiseDefinition;
 
 noiseDefinition: '(' NL* Int NL* ')' NL* (noise_Builder NL*)*;
 
-noise_Builder: noise_Builder_Amplitudes;
-noise_Builder_Amplitudes: '.Amplitudes' '(' (number ',')* number  ')';
+noise_Builder: builder_Amplitudes;

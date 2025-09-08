@@ -2,7 +2,7 @@ package density_functions
 
 import (
 	"encoding/json"
-	"fmt"
+
 	"reflect"
 
 	"github.com/antlr4-go/antlr/v4"
@@ -73,7 +73,6 @@ func init() {
 
 			if target := densityFn.DensityFn(); target != nil {
 				val := traversal.ConstructRegistry.Construct(target.(antlr.ParserRuleContext), currentNamespace, scope)
-				fmt.Println(">>>", reflect.TypeOf(val).Elem().Name(), val)
 				if val == nil {
 					scope.DiagnoseSemanticError("Missing density function target", ctx)
 				} else {

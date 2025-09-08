@@ -23,12 +23,12 @@ func init() {
 					},
 				),
 				builder_chain.Build(
-					func(ctx *grammar.SharedBuilder_OffsetContext, target *StoneDepthCondition, scope *traversal.Scope, namespace string) {
+					func(ctx *grammar.Builder_OffsetContext, target *StoneDepthCondition, scope *traversal.Scope, namespace string) {
 						builder_chain.Builder_GetInt(ctx, func(v int) { target.Offset = v }, scope, "Offset")
 					},
 				),
 				builder_chain.Build(
-					func(ctx *grammar.SharedBuilder_AddContext, target *StoneDepthCondition, scope *traversal.Scope, namespace string) {
+					func(ctx *grammar.Builder_AddContext, target *StoneDepthCondition, scope *traversal.Scope, namespace string) {
 						builder_chain.SharedBuilder_Add(ctx, func(v bool) { target.Add = v })
 					},
 				),

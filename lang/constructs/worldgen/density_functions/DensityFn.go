@@ -123,7 +123,6 @@ func init() {
 				return nil
 			} else {
 				value := traversal.ConstructRegistry.Construct(target, currentNamespace, scope)
-				fmt.Println(ctx.GetText(), value, reflect.TypeOf(value).Elem().Name(), fnCtx.DensityFn_Math() != nil)
 				if math := fnCtx.DensityFn_Math(); math != nil {
 					// This has attached maths
 					arg2 := traversal.ConstructRegistry.Construct(math.DensityFn(), currentNamespace, scope)

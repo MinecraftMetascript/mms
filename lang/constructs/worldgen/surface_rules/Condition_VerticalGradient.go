@@ -19,12 +19,12 @@ func init() {
 		func(ctx antlr.ParserRuleContext, ns string, scope *traversal.Scope) traversal.Construct {
 			verticalGradientBuilder := builder_chain.NewBuilderChain(
 				builder_chain.Build(
-					func(ctx grammar.ISurfaceCondition_VerticalGradientBuilder_TopContext, target *VerticalGradientCondition, scope *traversal.Scope, namespace string) {
+					func(ctx *grammar.Builder_TopContext, target *VerticalGradientCondition, scope *traversal.Scope, namespace string) {
 						builder_chain.Builder_GetVerticalAnchor(ctx, namespace, func(anchor primitives.VerticalAnchor) { target.TrueAtAndBelow = anchor }, scope, "Top")
 					},
 				),
 				builder_chain.Build(
-					func(ctx grammar.ISurfaceCondition_VerticalGradientBuilder_BottomContext, target *VerticalGradientCondition, scope *traversal.Scope, namespace string) {
+					func(ctx *grammar.Builder_BottomContext, target *VerticalGradientCondition, scope *traversal.Scope, namespace string) {
 						builder_chain.Builder_GetVerticalAnchor(ctx, namespace, func(anchor primitives.VerticalAnchor) { target.FalseAtAndAbove = anchor }, scope, "Bottom")
 					},
 				),

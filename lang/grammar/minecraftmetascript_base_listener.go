@@ -72,34 +72,6 @@ func (s *BaseMinecraftMetascriptListener) EnterVerticalAnchorDeclaration(ctx *Ve
 func (s *BaseMinecraftMetascriptListener) ExitVerticalAnchorDeclaration(ctx *VerticalAnchorDeclarationContext) {
 }
 
-// EnterSharedBuilder_Offset is called when production sharedBuilder_Offset is entered.
-func (s *BaseMinecraftMetascriptListener) EnterSharedBuilder_Offset(ctx *SharedBuilder_OffsetContext) {
-}
-
-// ExitSharedBuilder_Offset is called when production sharedBuilder_Offset is exited.
-func (s *BaseMinecraftMetascriptListener) ExitSharedBuilder_Offset(ctx *SharedBuilder_OffsetContext) {
-}
-
-// EnterSharedBuilder_Add is called when production sharedBuilder_Add is entered.
-func (s *BaseMinecraftMetascriptListener) EnterSharedBuilder_Add(ctx *SharedBuilder_AddContext) {}
-
-// ExitSharedBuilder_Add is called when production sharedBuilder_Add is exited.
-func (s *BaseMinecraftMetascriptListener) ExitSharedBuilder_Add(ctx *SharedBuilder_AddContext) {}
-
-// EnterSharedBuilder_Mul is called when production sharedBuilder_Mul is entered.
-func (s *BaseMinecraftMetascriptListener) EnterSharedBuilder_Mul(ctx *SharedBuilder_MulContext) {}
-
-// ExitSharedBuilder_Mul is called when production sharedBuilder_Mul is exited.
-func (s *BaseMinecraftMetascriptListener) ExitSharedBuilder_Mul(ctx *SharedBuilder_MulContext) {}
-
-// EnterSharedBuilder_MulInt is called when production sharedBuilder_MulInt is entered.
-func (s *BaseMinecraftMetascriptListener) EnterSharedBuilder_MulInt(ctx *SharedBuilder_MulIntContext) {
-}
-
-// ExitSharedBuilder_MulInt is called when production sharedBuilder_MulInt is exited.
-func (s *BaseMinecraftMetascriptListener) ExitSharedBuilder_MulInt(ctx *SharedBuilder_MulIntContext) {
-}
-
 // EnterSurfaceCondition is called when production surfaceCondition is entered.
 func (s *BaseMinecraftMetascriptListener) EnterSurfaceCondition(ctx *SurfaceConditionContext) {}
 
@@ -184,22 +156,6 @@ func (s *BaseMinecraftMetascriptListener) EnterSurfaceCondition_Freezing(ctx *Su
 func (s *BaseMinecraftMetascriptListener) ExitSurfaceCondition_Freezing(ctx *SurfaceCondition_FreezingContext) {
 }
 
-// EnterSurfaceCondition_NoiseThresholdBuilder_Min is called when production surfaceCondition_NoiseThresholdBuilder_Min is entered.
-func (s *BaseMinecraftMetascriptListener) EnterSurfaceCondition_NoiseThresholdBuilder_Min(ctx *SurfaceCondition_NoiseThresholdBuilder_MinContext) {
-}
-
-// ExitSurfaceCondition_NoiseThresholdBuilder_Min is called when production surfaceCondition_NoiseThresholdBuilder_Min is exited.
-func (s *BaseMinecraftMetascriptListener) ExitSurfaceCondition_NoiseThresholdBuilder_Min(ctx *SurfaceCondition_NoiseThresholdBuilder_MinContext) {
-}
-
-// EnterSurfaceCondition_NoiseThresholdBuilder_Max is called when production surfaceCondition_NoiseThresholdBuilder_Max is entered.
-func (s *BaseMinecraftMetascriptListener) EnterSurfaceCondition_NoiseThresholdBuilder_Max(ctx *SurfaceCondition_NoiseThresholdBuilder_MaxContext) {
-}
-
-// ExitSurfaceCondition_NoiseThresholdBuilder_Max is called when production surfaceCondition_NoiseThresholdBuilder_Max is exited.
-func (s *BaseMinecraftMetascriptListener) ExitSurfaceCondition_NoiseThresholdBuilder_Max(ctx *SurfaceCondition_NoiseThresholdBuilder_MaxContext) {
-}
-
 // EnterSurfaceCondition_NoiseThresholdBuilder is called when production surfaceCondition_NoiseThresholdBuilder is entered.
 func (s *BaseMinecraftMetascriptListener) EnterSurfaceCondition_NoiseThresholdBuilder(ctx *SurfaceCondition_NoiseThresholdBuilderContext) {
 }
@@ -254,22 +210,6 @@ func (s *BaseMinecraftMetascriptListener) EnterSurfaceCondition_VerticalGradient
 
 // ExitSurfaceCondition_VerticalGradientBuilder is called when production surfaceCondition_VerticalGradientBuilder is exited.
 func (s *BaseMinecraftMetascriptListener) ExitSurfaceCondition_VerticalGradientBuilder(ctx *SurfaceCondition_VerticalGradientBuilderContext) {
-}
-
-// EnterSurfaceCondition_VerticalGradientBuilder_Top is called when production surfaceCondition_VerticalGradientBuilder_Top is entered.
-func (s *BaseMinecraftMetascriptListener) EnterSurfaceCondition_VerticalGradientBuilder_Top(ctx *SurfaceCondition_VerticalGradientBuilder_TopContext) {
-}
-
-// ExitSurfaceCondition_VerticalGradientBuilder_Top is called when production surfaceCondition_VerticalGradientBuilder_Top is exited.
-func (s *BaseMinecraftMetascriptListener) ExitSurfaceCondition_VerticalGradientBuilder_Top(ctx *SurfaceCondition_VerticalGradientBuilder_TopContext) {
-}
-
-// EnterSurfaceCondition_VerticalGradientBuilder_Bottom is called when production surfaceCondition_VerticalGradientBuilder_Bottom is entered.
-func (s *BaseMinecraftMetascriptListener) EnterSurfaceCondition_VerticalGradientBuilder_Bottom(ctx *SurfaceCondition_VerticalGradientBuilder_BottomContext) {
-}
-
-// ExitSurfaceCondition_VerticalGradientBuilder_Bottom is called when production surfaceCondition_VerticalGradientBuilder_Bottom is exited.
-func (s *BaseMinecraftMetascriptListener) ExitSurfaceCondition_VerticalGradientBuilder_Bottom(ctx *SurfaceCondition_VerticalGradientBuilder_BottomContext) {
 }
 
 // EnterSurfaceCondition_AboveWater is called when production surfaceCondition_AboveWater is entered.
@@ -354,6 +294,140 @@ func (s *BaseMinecraftMetascriptListener) EnterSurfaceRule_If(ctx *SurfaceRule_I
 // ExitSurfaceRule_If is called when production surfaceRule_If is exited.
 func (s *BaseMinecraftMetascriptListener) ExitSurfaceRule_If(ctx *SurfaceRule_IfContext) {}
 
+// EnterBuilder_XZScale is called when production builder_XZScale is entered.
+func (s *BaseMinecraftMetascriptListener) EnterBuilder_XZScale(ctx *Builder_XZScaleContext) {}
+
+// ExitBuilder_XZScale is called when production builder_XZScale is exited.
+func (s *BaseMinecraftMetascriptListener) ExitBuilder_XZScale(ctx *Builder_XZScaleContext) {}
+
+// EnterBuilder_YScale is called when production builder_YScale is entered.
+func (s *BaseMinecraftMetascriptListener) EnterBuilder_YScale(ctx *Builder_YScaleContext) {}
+
+// ExitBuilder_YScale is called when production builder_YScale is exited.
+func (s *BaseMinecraftMetascriptListener) ExitBuilder_YScale(ctx *Builder_YScaleContext) {}
+
+// EnterBuilder_XZFactor is called when production builder_XZFactor is entered.
+func (s *BaseMinecraftMetascriptListener) EnterBuilder_XZFactor(ctx *Builder_XZFactorContext) {}
+
+// ExitBuilder_XZFactor is called when production builder_XZFactor is exited.
+func (s *BaseMinecraftMetascriptListener) ExitBuilder_XZFactor(ctx *Builder_XZFactorContext) {}
+
+// EnterBuilder_YFactor is called when production builder_YFactor is entered.
+func (s *BaseMinecraftMetascriptListener) EnterBuilder_YFactor(ctx *Builder_YFactorContext) {}
+
+// ExitBuilder_YFactor is called when production builder_YFactor is exited.
+func (s *BaseMinecraftMetascriptListener) ExitBuilder_YFactor(ctx *Builder_YFactorContext) {}
+
+// EnterBuilder_Noise is called when production builder_Noise is entered.
+func (s *BaseMinecraftMetascriptListener) EnterBuilder_Noise(ctx *Builder_NoiseContext) {}
+
+// ExitBuilder_Noise is called when production builder_Noise is exited.
+func (s *BaseMinecraftMetascriptListener) ExitBuilder_Noise(ctx *Builder_NoiseContext) {}
+
+// EnterBuilder_Smear is called when production builder_Smear is entered.
+func (s *BaseMinecraftMetascriptListener) EnterBuilder_Smear(ctx *Builder_SmearContext) {}
+
+// ExitBuilder_Smear is called when production builder_Smear is exited.
+func (s *BaseMinecraftMetascriptListener) ExitBuilder_Smear(ctx *Builder_SmearContext) {}
+
+// EnterBuilder_Type1 is called when production builder_Type1 is entered.
+func (s *BaseMinecraftMetascriptListener) EnterBuilder_Type1(ctx *Builder_Type1Context) {}
+
+// ExitBuilder_Type1 is called when production builder_Type1 is exited.
+func (s *BaseMinecraftMetascriptListener) ExitBuilder_Type1(ctx *Builder_Type1Context) {}
+
+// EnterBuilder_Type2 is called when production builder_Type2 is entered.
+func (s *BaseMinecraftMetascriptListener) EnterBuilder_Type2(ctx *Builder_Type2Context) {}
+
+// ExitBuilder_Type2 is called when production builder_Type2 is exited.
+func (s *BaseMinecraftMetascriptListener) ExitBuilder_Type2(ctx *Builder_Type2Context) {}
+
+// EnterBuilder_Shift is called when production builder_Shift is entered.
+func (s *BaseMinecraftMetascriptListener) EnterBuilder_Shift(ctx *Builder_ShiftContext) {}
+
+// ExitBuilder_Shift is called when production builder_Shift is exited.
+func (s *BaseMinecraftMetascriptListener) ExitBuilder_Shift(ctx *Builder_ShiftContext) {}
+
+// EnterBuilder_Amplitudes is called when production builder_Amplitudes is entered.
+func (s *BaseMinecraftMetascriptListener) EnterBuilder_Amplitudes(ctx *Builder_AmplitudesContext) {}
+
+// ExitBuilder_Amplitudes is called when production builder_Amplitudes is exited.
+func (s *BaseMinecraftMetascriptListener) ExitBuilder_Amplitudes(ctx *Builder_AmplitudesContext) {}
+
+// EnterBuilder_Offset is called when production builder_Offset is entered.
+func (s *BaseMinecraftMetascriptListener) EnterBuilder_Offset(ctx *Builder_OffsetContext) {}
+
+// ExitBuilder_Offset is called when production builder_Offset is exited.
+func (s *BaseMinecraftMetascriptListener) ExitBuilder_Offset(ctx *Builder_OffsetContext) {}
+
+// EnterBuilder_Add is called when production builder_Add is entered.
+func (s *BaseMinecraftMetascriptListener) EnterBuilder_Add(ctx *Builder_AddContext) {}
+
+// ExitBuilder_Add is called when production builder_Add is exited.
+func (s *BaseMinecraftMetascriptListener) ExitBuilder_Add(ctx *Builder_AddContext) {}
+
+// EnterBuilder_Mul is called when production builder_Mul is entered.
+func (s *BaseMinecraftMetascriptListener) EnterBuilder_Mul(ctx *Builder_MulContext) {}
+
+// ExitBuilder_Mul is called when production builder_Mul is exited.
+func (s *BaseMinecraftMetascriptListener) ExitBuilder_Mul(ctx *Builder_MulContext) {}
+
+// EnterBuilder_MulInt is called when production builder_MulInt is entered.
+func (s *BaseMinecraftMetascriptListener) EnterBuilder_MulInt(ctx *Builder_MulIntContext) {}
+
+// ExitBuilder_MulInt is called when production builder_MulInt is exited.
+func (s *BaseMinecraftMetascriptListener) ExitBuilder_MulInt(ctx *Builder_MulIntContext) {}
+
+// EnterBuilder_Min is called when production builder_Min is entered.
+func (s *BaseMinecraftMetascriptListener) EnterBuilder_Min(ctx *Builder_MinContext) {}
+
+// ExitBuilder_Min is called when production builder_Min is exited.
+func (s *BaseMinecraftMetascriptListener) ExitBuilder_Min(ctx *Builder_MinContext) {}
+
+// EnterBuilder_Max is called when production builder_Max is entered.
+func (s *BaseMinecraftMetascriptListener) EnterBuilder_Max(ctx *Builder_MaxContext) {}
+
+// ExitBuilder_Max is called when production builder_Max is exited.
+func (s *BaseMinecraftMetascriptListener) ExitBuilder_Max(ctx *Builder_MaxContext) {}
+
+// EnterBuilder_Top is called when production builder_Top is entered.
+func (s *BaseMinecraftMetascriptListener) EnterBuilder_Top(ctx *Builder_TopContext) {}
+
+// ExitBuilder_Top is called when production builder_Top is exited.
+func (s *BaseMinecraftMetascriptListener) ExitBuilder_Top(ctx *Builder_TopContext) {}
+
+// EnterBuilder_TopLiteral is called when production builder_TopLiteral is entered.
+func (s *BaseMinecraftMetascriptListener) EnterBuilder_TopLiteral(ctx *Builder_TopLiteralContext) {}
+
+// ExitBuilder_TopLiteral is called when production builder_TopLiteral is exited.
+func (s *BaseMinecraftMetascriptListener) ExitBuilder_TopLiteral(ctx *Builder_TopLiteralContext) {}
+
+// EnterBuilder_Bottom is called when production builder_Bottom is entered.
+func (s *BaseMinecraftMetascriptListener) EnterBuilder_Bottom(ctx *Builder_BottomContext) {}
+
+// ExitBuilder_Bottom is called when production builder_Bottom is exited.
+func (s *BaseMinecraftMetascriptListener) ExitBuilder_Bottom(ctx *Builder_BottomContext) {}
+
+// EnterBuilder_BottomLiteral is called when production builder_BottomLiteral is entered.
+func (s *BaseMinecraftMetascriptListener) EnterBuilder_BottomLiteral(ctx *Builder_BottomLiteralContext) {
+}
+
+// ExitBuilder_BottomLiteral is called when production builder_BottomLiteral is exited.
+func (s *BaseMinecraftMetascriptListener) ExitBuilder_BottomLiteral(ctx *Builder_BottomLiteralContext) {
+}
+
+// EnterBuilder_InRange is called when production builder_InRange is entered.
+func (s *BaseMinecraftMetascriptListener) EnterBuilder_InRange(ctx *Builder_InRangeContext) {}
+
+// ExitBuilder_InRange is called when production builder_InRange is exited.
+func (s *BaseMinecraftMetascriptListener) ExitBuilder_InRange(ctx *Builder_InRangeContext) {}
+
+// EnterBuilder_OutRange is called when production builder_OutRange is entered.
+func (s *BaseMinecraftMetascriptListener) EnterBuilder_OutRange(ctx *Builder_OutRangeContext) {}
+
+// ExitBuilder_OutRange is called when production builder_OutRange is exited.
+func (s *BaseMinecraftMetascriptListener) ExitBuilder_OutRange(ctx *Builder_OutRangeContext) {}
+
 // EnterResourceReference is called when production resourceReference is entered.
 func (s *BaseMinecraftMetascriptListener) EnterResourceReference(ctx *ResourceReferenceContext) {}
 
@@ -366,43 +440,41 @@ func (s *BaseMinecraftMetascriptListener) EnterNumber(ctx *NumberContext) {}
 // ExitNumber is called when production number is exited.
 func (s *BaseMinecraftMetascriptListener) ExitNumber(ctx *NumberContext) {}
 
+// EnterNoiseBlock is called when production noiseBlock is entered.
+func (s *BaseMinecraftMetascriptListener) EnterNoiseBlock(ctx *NoiseBlockContext) {}
+
+// ExitNoiseBlock is called when production noiseBlock is exited.
+func (s *BaseMinecraftMetascriptListener) ExitNoiseBlock(ctx *NoiseBlockContext) {}
+
+// EnterNoiseDeclaration is called when production noiseDeclaration is entered.
+func (s *BaseMinecraftMetascriptListener) EnterNoiseDeclaration(ctx *NoiseDeclarationContext) {}
+
+// ExitNoiseDeclaration is called when production noiseDeclaration is exited.
+func (s *BaseMinecraftMetascriptListener) ExitNoiseDeclaration(ctx *NoiseDeclarationContext) {}
+
+// EnterNoise is called when production noise is entered.
+func (s *BaseMinecraftMetascriptListener) EnterNoise(ctx *NoiseContext) {}
+
+// ExitNoise is called when production noise is exited.
+func (s *BaseMinecraftMetascriptListener) ExitNoise(ctx *NoiseContext) {}
+
+// EnterNoiseDefinition is called when production noiseDefinition is entered.
+func (s *BaseMinecraftMetascriptListener) EnterNoiseDefinition(ctx *NoiseDefinitionContext) {}
+
+// ExitNoiseDefinition is called when production noiseDefinition is exited.
+func (s *BaseMinecraftMetascriptListener) ExitNoiseDefinition(ctx *NoiseDefinitionContext) {}
+
+// EnterNoise_Builder is called when production noise_Builder is entered.
+func (s *BaseMinecraftMetascriptListener) EnterNoise_Builder(ctx *Noise_BuilderContext) {}
+
+// ExitNoise_Builder is called when production noise_Builder is exited.
+func (s *BaseMinecraftMetascriptListener) ExitNoise_Builder(ctx *Noise_BuilderContext) {}
+
 // EnterDensityFnBlock is called when production densityFnBlock is entered.
 func (s *BaseMinecraftMetascriptListener) EnterDensityFnBlock(ctx *DensityFnBlockContext) {}
 
 // ExitDensityFnBlock is called when production densityFnBlock is exited.
 func (s *BaseMinecraftMetascriptListener) ExitDensityFnBlock(ctx *DensityFnBlockContext) {}
-
-// EnterSharedBuilder_XzScale is called when production sharedBuilder_XzScale is entered.
-func (s *BaseMinecraftMetascriptListener) EnterSharedBuilder_XzScale(ctx *SharedBuilder_XzScaleContext) {
-}
-
-// ExitSharedBuilder_XzScale is called when production sharedBuilder_XzScale is exited.
-func (s *BaseMinecraftMetascriptListener) ExitSharedBuilder_XzScale(ctx *SharedBuilder_XzScaleContext) {
-}
-
-// EnterSharedBuilder_YScale is called when production sharedBuilder_YScale is entered.
-func (s *BaseMinecraftMetascriptListener) EnterSharedBuilder_YScale(ctx *SharedBuilder_YScaleContext) {
-}
-
-// ExitSharedBuilder_YScale is called when production sharedBuilder_YScale is exited.
-func (s *BaseMinecraftMetascriptListener) ExitSharedBuilder_YScale(ctx *SharedBuilder_YScaleContext) {
-}
-
-// EnterSharedBuilder_XzFactor is called when production sharedBuilder_XzFactor is entered.
-func (s *BaseMinecraftMetascriptListener) EnterSharedBuilder_XzFactor(ctx *SharedBuilder_XzFactorContext) {
-}
-
-// ExitSharedBuilder_XzFactor is called when production sharedBuilder_XzFactor is exited.
-func (s *BaseMinecraftMetascriptListener) ExitSharedBuilder_XzFactor(ctx *SharedBuilder_XzFactorContext) {
-}
-
-// EnterSharedBuilder_YFactor is called when production sharedBuilder_YFactor is entered.
-func (s *BaseMinecraftMetascriptListener) EnterSharedBuilder_YFactor(ctx *SharedBuilder_YFactorContext) {
-}
-
-// ExitSharedBuilder_YFactor is called when production sharedBuilder_YFactor is exited.
-func (s *BaseMinecraftMetascriptListener) ExitSharedBuilder_YFactor(ctx *SharedBuilder_YFactorContext) {
-}
 
 // EnterDensityFnDeclaration is called when production densityFnDeclaration is entered.
 func (s *BaseMinecraftMetascriptListener) EnterDensityFnDeclaration(ctx *DensityFnDeclarationContext) {
@@ -482,14 +554,6 @@ func (s *BaseMinecraftMetascriptListener) EnterDensityFn_OldBlendedNoiseBuilder(
 func (s *BaseMinecraftMetascriptListener) ExitDensityFn_OldBlendedNoiseBuilder(ctx *DensityFn_OldBlendedNoiseBuilderContext) {
 }
 
-// EnterDensityFn_OldBlendedNoiseBuilder_Smear is called when production densityFn_OldBlendedNoiseBuilder_Smear is entered.
-func (s *BaseMinecraftMetascriptListener) EnterDensityFn_OldBlendedNoiseBuilder_Smear(ctx *DensityFn_OldBlendedNoiseBuilder_SmearContext) {
-}
-
-// ExitDensityFn_OldBlendedNoiseBuilder_Smear is called when production densityFn_OldBlendedNoiseBuilder_Smear is exited.
-func (s *BaseMinecraftMetascriptListener) ExitDensityFn_OldBlendedNoiseBuilder_Smear(ctx *DensityFn_OldBlendedNoiseBuilder_SmearContext) {
-}
-
 // EnterDensityFn_WierdScaledSampler is called when production densityFn_WierdScaledSampler is entered.
 func (s *BaseMinecraftMetascriptListener) EnterDensityFn_WierdScaledSampler(ctx *DensityFn_WierdScaledSamplerContext) {
 }
@@ -506,28 +570,86 @@ func (s *BaseMinecraftMetascriptListener) EnterDensityFn_WierdScaledSamplerBuild
 func (s *BaseMinecraftMetascriptListener) ExitDensityFn_WierdScaledSamplerBuilder(ctx *DensityFn_WierdScaledSamplerBuilderContext) {
 }
 
-// EnterDensityFn_WierdScaledSamplerBuilder_Type1 is called when production densityFn_WierdScaledSamplerBuilder_Type1 is entered.
-func (s *BaseMinecraftMetascriptListener) EnterDensityFn_WierdScaledSamplerBuilder_Type1(ctx *DensityFn_WierdScaledSamplerBuilder_Type1Context) {
+// EnterDensityFn_ShiftedNoise is called when production densityFn_ShiftedNoise is entered.
+func (s *BaseMinecraftMetascriptListener) EnterDensityFn_ShiftedNoise(ctx *DensityFn_ShiftedNoiseContext) {
 }
 
-// ExitDensityFn_WierdScaledSamplerBuilder_Type1 is called when production densityFn_WierdScaledSamplerBuilder_Type1 is exited.
-func (s *BaseMinecraftMetascriptListener) ExitDensityFn_WierdScaledSamplerBuilder_Type1(ctx *DensityFn_WierdScaledSamplerBuilder_Type1Context) {
+// ExitDensityFn_ShiftedNoise is called when production densityFn_ShiftedNoise is exited.
+func (s *BaseMinecraftMetascriptListener) ExitDensityFn_ShiftedNoise(ctx *DensityFn_ShiftedNoiseContext) {
 }
 
-// EnterDensityFn_WierdScaledSamplerBuilder_Type2 is called when production densityFn_WierdScaledSamplerBuilder_Type2 is entered.
-func (s *BaseMinecraftMetascriptListener) EnterDensityFn_WierdScaledSamplerBuilder_Type2(ctx *DensityFn_WierdScaledSamplerBuilder_Type2Context) {
+// EnterDensityFn_ShiftedNoiseBuilder is called when production densityFn_ShiftedNoiseBuilder is entered.
+func (s *BaseMinecraftMetascriptListener) EnterDensityFn_ShiftedNoiseBuilder(ctx *DensityFn_ShiftedNoiseBuilderContext) {
 }
 
-// ExitDensityFn_WierdScaledSamplerBuilder_Type2 is called when production densityFn_WierdScaledSamplerBuilder_Type2 is exited.
-func (s *BaseMinecraftMetascriptListener) ExitDensityFn_WierdScaledSamplerBuilder_Type2(ctx *DensityFn_WierdScaledSamplerBuilder_Type2Context) {
+// ExitDensityFn_ShiftedNoiseBuilder is called when production densityFn_ShiftedNoiseBuilder is exited.
+func (s *BaseMinecraftMetascriptListener) ExitDensityFn_ShiftedNoiseBuilder(ctx *DensityFn_ShiftedNoiseBuilderContext) {
 }
 
-// EnterDensityFn_WierdScaledSamplerBuilder_Noise is called when production densityFn_WierdScaledSamplerBuilder_Noise is entered.
-func (s *BaseMinecraftMetascriptListener) EnterDensityFn_WierdScaledSamplerBuilder_Noise(ctx *DensityFn_WierdScaledSamplerBuilder_NoiseContext) {
+// EnterDensityFn_RangeChoice is called when production densityFn_RangeChoice is entered.
+func (s *BaseMinecraftMetascriptListener) EnterDensityFn_RangeChoice(ctx *DensityFn_RangeChoiceContext) {
 }
 
-// ExitDensityFn_WierdScaledSamplerBuilder_Noise is called when production densityFn_WierdScaledSamplerBuilder_Noise is exited.
-func (s *BaseMinecraftMetascriptListener) ExitDensityFn_WierdScaledSamplerBuilder_Noise(ctx *DensityFn_WierdScaledSamplerBuilder_NoiseContext) {
+// ExitDensityFn_RangeChoice is called when production densityFn_RangeChoice is exited.
+func (s *BaseMinecraftMetascriptListener) ExitDensityFn_RangeChoice(ctx *DensityFn_RangeChoiceContext) {
+}
+
+// EnterDensityFn_RangeChoiceBuilder is called when production densityFn_RangeChoiceBuilder is entered.
+func (s *BaseMinecraftMetascriptListener) EnterDensityFn_RangeChoiceBuilder(ctx *DensityFn_RangeChoiceBuilderContext) {
+}
+
+// ExitDensityFn_RangeChoiceBuilder is called when production densityFn_RangeChoiceBuilder is exited.
+func (s *BaseMinecraftMetascriptListener) ExitDensityFn_RangeChoiceBuilder(ctx *DensityFn_RangeChoiceBuilderContext) {
+}
+
+// EnterDensityFn_Clamp is called when production densityFn_Clamp is entered.
+func (s *BaseMinecraftMetascriptListener) EnterDensityFn_Clamp(ctx *DensityFn_ClampContext) {}
+
+// ExitDensityFn_Clamp is called when production densityFn_Clamp is exited.
+func (s *BaseMinecraftMetascriptListener) ExitDensityFn_Clamp(ctx *DensityFn_ClampContext) {}
+
+// EnterDensityFn_ClampBuilder is called when production densityFn_ClampBuilder is entered.
+func (s *BaseMinecraftMetascriptListener) EnterDensityFn_ClampBuilder(ctx *DensityFn_ClampBuilderContext) {
+}
+
+// ExitDensityFn_ClampBuilder is called when production densityFn_ClampBuilder is exited.
+func (s *BaseMinecraftMetascriptListener) ExitDensityFn_ClampBuilder(ctx *DensityFn_ClampBuilderContext) {
+}
+
+// EnterDensityFn_YClampedGradient is called when production densityFn_YClampedGradient is entered.
+func (s *BaseMinecraftMetascriptListener) EnterDensityFn_YClampedGradient(ctx *DensityFn_YClampedGradientContext) {
+}
+
+// ExitDensityFn_YClampedGradient is called when production densityFn_YClampedGradient is exited.
+func (s *BaseMinecraftMetascriptListener) ExitDensityFn_YClampedGradient(ctx *DensityFn_YClampedGradientContext) {
+}
+
+// EnterDensityFn_YClampedGradientBuilder is called when production densityFn_YClampedGradientBuilder is entered.
+func (s *BaseMinecraftMetascriptListener) EnterDensityFn_YClampedGradientBuilder(ctx *DensityFn_YClampedGradientBuilderContext) {
+}
+
+// ExitDensityFn_YClampedGradientBuilder is called when production densityFn_YClampedGradientBuilder is exited.
+func (s *BaseMinecraftMetascriptListener) ExitDensityFn_YClampedGradientBuilder(ctx *DensityFn_YClampedGradientBuilderContext) {
+}
+
+// EnterDensityFn_SplineFn is called when production densityFn_SplineFn is entered.
+func (s *BaseMinecraftMetascriptListener) EnterDensityFn_SplineFn(ctx *DensityFn_SplineFnContext) {}
+
+// ExitDensityFn_SplineFn is called when production densityFn_SplineFn is exited.
+func (s *BaseMinecraftMetascriptListener) ExitDensityFn_SplineFn(ctx *DensityFn_SplineFnContext) {}
+
+// EnterDensityFn_Spline is called when production densityFn_Spline is entered.
+func (s *BaseMinecraftMetascriptListener) EnterDensityFn_Spline(ctx *DensityFn_SplineContext) {}
+
+// ExitDensityFn_Spline is called when production densityFn_Spline is exited.
+func (s *BaseMinecraftMetascriptListener) ExitDensityFn_Spline(ctx *DensityFn_SplineContext) {}
+
+// EnterDensityFn_SplinePoint is called when production densityFn_SplinePoint is entered.
+func (s *BaseMinecraftMetascriptListener) EnterDensityFn_SplinePoint(ctx *DensityFn_SplinePointContext) {
+}
+
+// ExitDensityFn_SplinePoint is called when production densityFn_SplinePoint is exited.
+func (s *BaseMinecraftMetascriptListener) ExitDensityFn_SplinePoint(ctx *DensityFn_SplinePointContext) {
 }
 
 // EnterDensityFn_Constant is called when production densityFn_Constant is entered.
@@ -547,41 +669,3 @@ func (s *BaseMinecraftMetascriptListener) EnterDensityFn_Math(ctx *DensityFn_Mat
 
 // ExitDensityFn_Math is called when production densityFn_Math is exited.
 func (s *BaseMinecraftMetascriptListener) ExitDensityFn_Math(ctx *DensityFn_MathContext) {}
-
-// EnterNoiseBlock is called when production noiseBlock is entered.
-func (s *BaseMinecraftMetascriptListener) EnterNoiseBlock(ctx *NoiseBlockContext) {}
-
-// ExitNoiseBlock is called when production noiseBlock is exited.
-func (s *BaseMinecraftMetascriptListener) ExitNoiseBlock(ctx *NoiseBlockContext) {}
-
-// EnterNoiseDeclaration is called when production noiseDeclaration is entered.
-func (s *BaseMinecraftMetascriptListener) EnterNoiseDeclaration(ctx *NoiseDeclarationContext) {}
-
-// ExitNoiseDeclaration is called when production noiseDeclaration is exited.
-func (s *BaseMinecraftMetascriptListener) ExitNoiseDeclaration(ctx *NoiseDeclarationContext) {}
-
-// EnterNoise is called when production noise is entered.
-func (s *BaseMinecraftMetascriptListener) EnterNoise(ctx *NoiseContext) {}
-
-// ExitNoise is called when production noise is exited.
-func (s *BaseMinecraftMetascriptListener) ExitNoise(ctx *NoiseContext) {}
-
-// EnterNoiseDefinition is called when production noiseDefinition is entered.
-func (s *BaseMinecraftMetascriptListener) EnterNoiseDefinition(ctx *NoiseDefinitionContext) {}
-
-// ExitNoiseDefinition is called when production noiseDefinition is exited.
-func (s *BaseMinecraftMetascriptListener) ExitNoiseDefinition(ctx *NoiseDefinitionContext) {}
-
-// EnterNoise_Builder is called when production noise_Builder is entered.
-func (s *BaseMinecraftMetascriptListener) EnterNoise_Builder(ctx *Noise_BuilderContext) {}
-
-// ExitNoise_Builder is called when production noise_Builder is exited.
-func (s *BaseMinecraftMetascriptListener) ExitNoise_Builder(ctx *Noise_BuilderContext) {}
-
-// EnterNoise_Builder_Amplitudes is called when production noise_Builder_Amplitudes is entered.
-func (s *BaseMinecraftMetascriptListener) EnterNoise_Builder_Amplitudes(ctx *Noise_Builder_AmplitudesContext) {
-}
-
-// ExitNoise_Builder_Amplitudes is called when production noise_Builder_Amplitudes is exited.
-func (s *BaseMinecraftMetascriptListener) ExitNoise_Builder_Amplitudes(ctx *Noise_Builder_AmplitudesContext) {
-}

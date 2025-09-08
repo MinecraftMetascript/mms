@@ -59,7 +59,7 @@ func init() {
 			)
 
 			for _, r := range noise.AllNoise_Builder() {
-				if amplitudes := r.Noise_Builder_Amplitudes(); amplitudes != nil {
+				if amplitudes := r.Builder_Amplitudes(); amplitudes != nil {
 					for _, amplitude := range amplitudes.AllNumber() {
 						if amplitude != nil {
 							val, err := strconv.ParseFloat(amplitude.GetText(), 64)
