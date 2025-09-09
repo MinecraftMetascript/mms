@@ -66,7 +66,7 @@
 
         packages.default = pkgs.buildGoModule {
           pname = "mms";
-          version = "0.3.1";
+          version = "0.3.2";
           src = ./.;
           vendorHash = null;
           # If you use vendoring, run `go mod vendor` and replace null with the hash
@@ -79,7 +79,7 @@
 
         packages.wasm = pkgs.stdenvNoCC.mkDerivation {
           pname = "mms-wasm";
-          version = "0.3.1";
+          version = "0.3.2";
           src = ./.;
           buildInputs = [ pkgs.go ];
           buildPhase = ''
