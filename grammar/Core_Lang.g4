@@ -2,6 +2,8 @@ grammar Core_Lang;
 
 import Noise, DensityFunctions, Surface;
 
+declare: Identifier NL* '=' NL*;
+
 builder_XZScale: '.XZScale(' NL* number NL* ')';
 builder_YScale: '.YScale(' NL* number NL* ')';
 builder_XZFactor: '.XZFactor(' NL* number NL* ')';
@@ -36,9 +38,10 @@ Float: ('-'? [0-9]* '.' [0-9]+);
 String: '"' ~[\r\n]* '"';
 number: Int | Float;
 
-NL: [\n];
+NL: [\n] -> channel(HIDDEN);
 WS: [ \t]+ -> skip;
 Identifier: [a-zA-Z] [a-zA-Z0-9_/]*;
 
 BlockComment: '/*' .*? '*/' -> channel(HIDDEN);
 LineComment: '//' ~[\r\n]* -> channel(HIDDEN);
+

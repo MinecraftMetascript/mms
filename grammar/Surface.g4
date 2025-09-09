@@ -5,7 +5,7 @@ surfaceBlock: 'Surface' NL* '{' NL* (surfaceStatement NL*)* NL* '}';
 surfaceStatement: verticalAnchorDeclaration | surfaceConditionDeclaration | surfaceRuleDeclaration;
 
 verticalAnchor: ('~'? Int) | Identifier;
-verticalAnchorDeclaration: Identifier '=' NL* verticalAnchor;
+verticalAnchorDeclaration: declare verticalAnchor;
 
 surfaceCondition:
     (
@@ -25,7 +25,7 @@ surfaceCondition:
         | surfaceCondition_VerticalGradient
     )
 ;
-surfaceConditionDeclaration: Identifier '=' NL* surfaceCondition;
+surfaceConditionDeclaration: declare surfaceCondition;
 
 surfaceCondition_Not: '!' surfaceCondition;
 surfaceCondition_And: 'And' NL* '(' NL* (surfaceCondition NL*)* surfaceCondition NL* ')';
@@ -75,7 +75,7 @@ surfaceCondition_AboveWaterBuilder:
 surfaceCondition_YAbove: 'YAbove' '(' verticalAnchor ')' NL* (surfaceCondition_YAboveBuilder NL*)* ;
 surfaceCondition_YAboveBuilder: builder_MulInt | builder_Add;
 
-surfaceRuleDeclaration: Identifier '=' NL*  surfaceRule;
+surfaceRuleDeclaration: declare  surfaceRule;
 surfaceRule: surfaceRule_Block
             | surfaceRule_Sequence
             | surfaceRule_Reference

@@ -2,7 +2,6 @@ package density_functions
 
 import (
 	"encoding/json"
-	"fmt"
 	"reflect"
 	"strconv"
 
@@ -30,7 +29,6 @@ func buildSplinePoint(point *grammar.DensityFn_SplinePointContext, currentNamesp
 			}
 		} else {
 			scope.DiagnoseSemanticError("Missing spline location", point)
-			fmt.Println(locationCtx)
 			return nil
 		}
 	}

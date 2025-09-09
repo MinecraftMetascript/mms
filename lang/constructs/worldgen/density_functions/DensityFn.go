@@ -99,9 +99,9 @@ func init() {
 			if child := declaration.DensityFn(); child == nil {
 				scope.DiagnoseSemanticError("Missing density function definition", ctx)
 			} else if targetCtx := child; targetCtx != nil {
-				s := traversal.ProcessDeclaration(declaration, targetCtx.(antlr.ParserRuleContext), scope, currentNamespace, "DensityFunction")
+				s := traversal.ProcessDeclaration(declaration.Declare(), targetCtx.(antlr.ParserRuleContext), scope, currentNamespace, "DensityFunction")
 				if s == nil {
-					fmt.Println("Failed to process declaration")
+					scope.DiagnoseSemanticError("Failed to process density function declaration", ctx)
 					return nil
 				}
 				return s.GetValue()

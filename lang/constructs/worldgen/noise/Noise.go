@@ -39,7 +39,7 @@ func init() {
 				// TODO: Diagnose?
 				return nil
 			}
-			s := traversal.ProcessDeclaration(declaration, noiseDef, scope, currentNamespace, "Noise")
+			s := traversal.ProcessDeclaration(declaration.Declare(), noiseDef, scope, currentNamespace, "Noise")
 			if s == nil {
 				return nil
 			}

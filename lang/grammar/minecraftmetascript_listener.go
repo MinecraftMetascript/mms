@@ -118,6 +118,9 @@ type MinecraftMetascriptListener interface {
 	// EnterSurfaceRule_If is called when entering the surfaceRule_If production.
 	EnterSurfaceRule_If(c *SurfaceRule_IfContext)
 
+	// EnterDeclare is called when entering the declare production.
+	EnterDeclare(c *DeclareContext)
+
 	// EnterBuilder_XZScale is called when entering the builder_XZScale production.
 	EnterBuilder_XZScale(c *Builder_XZScaleContext)
 
@@ -295,6 +298,18 @@ type MinecraftMetascriptListener interface {
 	// EnterDensityFn_Math is called when entering the densityFn_Math production.
 	EnterDensityFn_Math(c *DensityFn_MathContext)
 
+	// EnterNoiseRouterBlock is called when entering the noiseRouterBlock production.
+	EnterNoiseRouterBlock(c *NoiseRouterBlockContext)
+
+	// EnterNoiseRouterDeclaration is called when entering the noiseRouterDeclaration production.
+	EnterNoiseRouterDeclaration(c *NoiseRouterDeclarationContext)
+
+	// EnterNoiseRouter is called when entering the noiseRouter production.
+	EnterNoiseRouter(c *NoiseRouterContext)
+
+	// EnterNoiseRouter_Builder is called when entering the noiseRouter_Builder production.
+	EnterNoiseRouter_Builder(c *NoiseRouter_BuilderContext)
+
 	// ExitScript is called when exiting the script production.
 	ExitScript(c *ScriptContext)
 
@@ -405,6 +420,9 @@ type MinecraftMetascriptListener interface {
 
 	// ExitSurfaceRule_If is called when exiting the surfaceRule_If production.
 	ExitSurfaceRule_If(c *SurfaceRule_IfContext)
+
+	// ExitDeclare is called when exiting the declare production.
+	ExitDeclare(c *DeclareContext)
 
 	// ExitBuilder_XZScale is called when exiting the builder_XZScale production.
 	ExitBuilder_XZScale(c *Builder_XZScaleContext)
@@ -582,4 +600,16 @@ type MinecraftMetascriptListener interface {
 
 	// ExitDensityFn_Math is called when exiting the densityFn_Math production.
 	ExitDensityFn_Math(c *DensityFn_MathContext)
+
+	// ExitNoiseRouterBlock is called when exiting the noiseRouterBlock production.
+	ExitNoiseRouterBlock(c *NoiseRouterBlockContext)
+
+	// ExitNoiseRouterDeclaration is called when exiting the noiseRouterDeclaration production.
+	ExitNoiseRouterDeclaration(c *NoiseRouterDeclarationContext)
+
+	// ExitNoiseRouter is called when exiting the noiseRouter production.
+	ExitNoiseRouter(c *NoiseRouterContext)
+
+	// ExitNoiseRouter_Builder is called when exiting the noiseRouter_Builder production.
+	ExitNoiseRouter_Builder(c *NoiseRouter_BuilderContext)
 }

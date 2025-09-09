@@ -294,6 +294,12 @@ func (s *BaseMinecraftMetascriptListener) EnterSurfaceRule_If(ctx *SurfaceRule_I
 // ExitSurfaceRule_If is called when production surfaceRule_If is exited.
 func (s *BaseMinecraftMetascriptListener) ExitSurfaceRule_If(ctx *SurfaceRule_IfContext) {}
 
+// EnterDeclare is called when production declare is entered.
+func (s *BaseMinecraftMetascriptListener) EnterDeclare(ctx *DeclareContext) {}
+
+// ExitDeclare is called when production declare is exited.
+func (s *BaseMinecraftMetascriptListener) ExitDeclare(ctx *DeclareContext) {}
+
 // EnterBuilder_XZScale is called when production builder_XZScale is entered.
 func (s *BaseMinecraftMetascriptListener) EnterBuilder_XZScale(ctx *Builder_XZScaleContext) {}
 
@@ -681,3 +687,29 @@ func (s *BaseMinecraftMetascriptListener) EnterDensityFn_Math(ctx *DensityFn_Mat
 
 // ExitDensityFn_Math is called when production densityFn_Math is exited.
 func (s *BaseMinecraftMetascriptListener) ExitDensityFn_Math(ctx *DensityFn_MathContext) {}
+
+// EnterNoiseRouterBlock is called when production noiseRouterBlock is entered.
+func (s *BaseMinecraftMetascriptListener) EnterNoiseRouterBlock(ctx *NoiseRouterBlockContext) {}
+
+// ExitNoiseRouterBlock is called when production noiseRouterBlock is exited.
+func (s *BaseMinecraftMetascriptListener) ExitNoiseRouterBlock(ctx *NoiseRouterBlockContext) {}
+
+// EnterNoiseRouterDeclaration is called when production noiseRouterDeclaration is entered.
+func (s *BaseMinecraftMetascriptListener) EnterNoiseRouterDeclaration(ctx *NoiseRouterDeclarationContext) {
+}
+
+// ExitNoiseRouterDeclaration is called when production noiseRouterDeclaration is exited.
+func (s *BaseMinecraftMetascriptListener) ExitNoiseRouterDeclaration(ctx *NoiseRouterDeclarationContext) {
+}
+
+// EnterNoiseRouter is called when production noiseRouter is entered.
+func (s *BaseMinecraftMetascriptListener) EnterNoiseRouter(ctx *NoiseRouterContext) {}
+
+// ExitNoiseRouter is called when production noiseRouter is exited.
+func (s *BaseMinecraftMetascriptListener) ExitNoiseRouter(ctx *NoiseRouterContext) {}
+
+// EnterNoiseRouter_Builder is called when production noiseRouter_Builder is entered.
+func (s *BaseMinecraftMetascriptListener) EnterNoiseRouter_Builder(ctx *NoiseRouter_BuilderContext) {}
+
+// ExitNoiseRouter_Builder is called when production noiseRouter_Builder is exited.
+func (s *BaseMinecraftMetascriptListener) ExitNoiseRouter_Builder(ctx *NoiseRouter_BuilderContext) {}

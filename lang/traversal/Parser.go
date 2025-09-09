@@ -2,7 +2,6 @@ package traversal
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/minecraftmetascript/mms/lang/grammar"
 
@@ -28,11 +27,9 @@ func (p *Parser) GetInternalParser(namespace string) *grammar.MinecraftMetascrip
 }
 
 func (p *Parser) Parse() (*grammar.ScriptContext, error) {
-	fmt.Println("Parsing...")
 	if res := p.parser.Script(); res == nil {
 		return nil, errors.New("failed to parse")
 	} else {
-		fmt.Println("Done parsing")
 		return res.(*grammar.ScriptContext), nil
 	}
 }

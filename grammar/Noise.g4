@@ -3,7 +3,7 @@ import Core_Lang;
 
 noiseBlock: 'Noise' NL* '{' NL* (noiseDeclaration NL*)* NL* '}';
 
-noiseDeclaration: Identifier '=' noise;
+noiseDeclaration: declare noise;
 
 noise: 'Noise' noiseDefinition;
 

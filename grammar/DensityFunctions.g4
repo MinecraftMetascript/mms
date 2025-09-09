@@ -4,7 +4,7 @@ import Core_Lang, Noise;
 
 densityFnBlock: 'DensityFn' NL* '{' NL* (densityFnDeclaration NL*)* NL* '}';
 
-densityFnDeclaration: Identifier NL* '=' NL* densityFn;
+densityFnDeclaration: declare densityFn;
 densityFn: (
       densityFn_SingleInput
     | densityFn_Cache

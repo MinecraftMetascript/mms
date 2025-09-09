@@ -2,7 +2,6 @@ package surface_rules
 
 import (
 	"encoding/json"
-	"fmt"
 	"reflect"
 
 	"github.com/minecraftmetascript/mms/lang/grammar"
@@ -46,9 +45,7 @@ func init() {
 					continue
 				}
 
-				if traversal.ConstructRegistry.Construct(targetCtx, currentNamespace, scope) == nil {
-					fmt.Println("Failed to construct ", ctx.GetText(), reflect.TypeOf(targetCtx).Elem().Name())
-				}
+				traversal.ConstructRegistry.Construct(targetCtx, currentNamespace, scope)
 			}
 			return nil
 		},
@@ -70,7 +67,7 @@ func init() {
 		reflect.TypeFor[grammar.SurfaceConditionDeclarationContext](),
 		func(ctx antlr.ParserRuleContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
 			declarationContext := ctx.(*grammar.SurfaceConditionDeclarationContext)
-			s := traversal.ProcessDeclaration(declarationContext, declarationContext.SurfaceCondition(), scope, currentNamespace, "SurfaceCondition")
+			s := traversal.ProcessDeclaration(declarationContext.Declare(), declarationContext.SurfaceCondition(), scope, currentNamespace, "SurfaceCondition")
 			return s.GetValue()
 		})
 }

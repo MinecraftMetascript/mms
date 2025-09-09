@@ -23,7 +23,6 @@ func Invoke[Target any](bc *BuilderChain[Target], ctx antlr.ParserRuleContext, t
 		ctxType = ctxType.Elem()
 	}
 
-	fmt.Println(ctxType.Name())
 	fn, ok := bc.fns[ctxType]
 	if !ok {
 		return false

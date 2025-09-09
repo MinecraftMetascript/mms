@@ -36,7 +36,7 @@ func init() {
 		reflect.TypeFor[grammar.SurfaceRuleDeclarationContext](),
 		func(ctx antlr.ParserRuleContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
 			declarationContext := ctx.(*grammar.SurfaceRuleDeclarationContext)
-			s := traversal.ProcessDeclaration(declarationContext, declarationContext.SurfaceRule(), scope, currentNamespace, "SurfaceRule")
+			s := traversal.ProcessDeclaration(declarationContext.Declare(), declarationContext.SurfaceRule(), scope, currentNamespace, "SurfaceRule")
 			return s.GetValue()
 		})
 }
