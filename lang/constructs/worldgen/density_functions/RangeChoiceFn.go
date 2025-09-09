@@ -53,8 +53,9 @@ func init() {
 			input := densityFn.DensityFn()
 			if input == nil {
 				scope.DiagnoseSemanticError("Missing input to range choice", ctx)
+			} else {
+				out.Input = traversal.ConstructRegistry.Construct(input.(antlr.ParserRuleContext), currentNamespace, scope)
 			}
-			out.Input = traversal.ConstructRegistry.Construct(input.(antlr.ParserRuleContext), currentNamespace, scope)
 
 			for _, builderWrap := range densityFn.AllDensityFn_RangeChoiceBuilder() {
 				builder_chain.Invoke(rangeChoiceBuilder, builderWrap.GetChild(0).(antlr.ParserRuleContext), out, scope, currentNamespace)

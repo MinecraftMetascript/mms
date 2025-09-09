@@ -25,12 +25,7 @@ func init() {
 						builder_chain.Builder_GetFloat(ctx, func(v float64) { target.YScale = v }, scope, "YScale")
 					},
 				), builder_chain.Build(
-					func(ctx *grammar.Builder_ShiftContext, target *ShiftedNoiseDensityFn, scope *traversal.Scope, namespace string) {
-						axis := ctx.Axis()
-						if axis == nil {
-							scope.DiagnoseSemanticError("Missing or invalid Axis", ctx)
-							return
-						}
+					func(ctx *grammar.Builder_ShiftXContext, target *ShiftedNoiseDensityFn, scope *traversal.Scope, namespace string) {
 						childFnCtx := ctx.DensityFn()
 						if childFnCtx == nil {
 							scope.DiagnoseSemanticError("Missing or invalid Density Function", ctx)
@@ -40,22 +35,33 @@ func init() {
 						if fn == nil {
 							scope.DiagnoseSemanticError("Missing or invalid Density Function", ctx)
 						}
-
-						switch axis.GetText() {
-						case "x":
-							target.ShiftX = fn
-							break
-						case "y":
-							target.ShiftY = fn
-							break
-						case "z":
-							target.ShiftZ = fn
-							break
-						default:
-							scope.DiagnoseSemanticError("Invalid Axis", ctx)
-							break
+						target.ShiftX = fn
+					}),
+				builder_chain.Build(
+					func(ctx *grammar.Builder_ShiftYContext, target *ShiftedNoiseDensityFn, scope *traversal.Scope, namespace string) {
+						childFnCtx := ctx.DensityFn()
+						if childFnCtx == nil {
+							scope.DiagnoseSemanticError("Missing or invalid Density Function", ctx)
 						}
 
+						fn := traversal.ConstructRegistry.Construct(childFnCtx, namespace, scope)
+						if fn == nil {
+							scope.DiagnoseSemanticError("Missing or invalid Density Function", ctx)
+						}
+						target.ShiftY = fn
+					}),
+				builder_chain.Build(
+					func(ctx *grammar.Builder_ShiftZContext, target *ShiftedNoiseDensityFn, scope *traversal.Scope, namespace string) {
+						childFnCtx := ctx.DensityFn()
+						if childFnCtx == nil {
+							scope.DiagnoseSemanticError("Missing or invalid Density Function", ctx)
+						}
+
+						fn := traversal.ConstructRegistry.Construct(childFnCtx, namespace, scope)
+						if fn == nil {
+							scope.DiagnoseSemanticError("Missing or invalid Density Function", ctx)
+						}
+						target.ShiftZ = fn
 					}),
 			)
 			densityFn := ctx.(*grammar.DensityFn_ShiftedNoiseContext)

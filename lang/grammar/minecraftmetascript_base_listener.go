@@ -342,11 +342,23 @@ func (s *BaseMinecraftMetascriptListener) EnterBuilder_Type2(ctx *Builder_Type2C
 // ExitBuilder_Type2 is called when production builder_Type2 is exited.
 func (s *BaseMinecraftMetascriptListener) ExitBuilder_Type2(ctx *Builder_Type2Context) {}
 
-// EnterBuilder_Shift is called when production builder_Shift is entered.
-func (s *BaseMinecraftMetascriptListener) EnterBuilder_Shift(ctx *Builder_ShiftContext) {}
+// EnterBuilder_ShiftX is called when production builder_ShiftX is entered.
+func (s *BaseMinecraftMetascriptListener) EnterBuilder_ShiftX(ctx *Builder_ShiftXContext) {}
 
-// ExitBuilder_Shift is called when production builder_Shift is exited.
-func (s *BaseMinecraftMetascriptListener) ExitBuilder_Shift(ctx *Builder_ShiftContext) {}
+// ExitBuilder_ShiftX is called when production builder_ShiftX is exited.
+func (s *BaseMinecraftMetascriptListener) ExitBuilder_ShiftX(ctx *Builder_ShiftXContext) {}
+
+// EnterBuilder_ShiftY is called when production builder_ShiftY is entered.
+func (s *BaseMinecraftMetascriptListener) EnterBuilder_ShiftY(ctx *Builder_ShiftYContext) {}
+
+// ExitBuilder_ShiftY is called when production builder_ShiftY is exited.
+func (s *BaseMinecraftMetascriptListener) ExitBuilder_ShiftY(ctx *Builder_ShiftYContext) {}
+
+// EnterBuilder_ShiftZ is called when production builder_ShiftZ is entered.
+func (s *BaseMinecraftMetascriptListener) EnterBuilder_ShiftZ(ctx *Builder_ShiftZContext) {}
+
+// ExitBuilder_ShiftZ is called when production builder_ShiftZ is exited.
+func (s *BaseMinecraftMetascriptListener) ExitBuilder_ShiftZ(ctx *Builder_ShiftZContext) {}
 
 // EnterBuilder_Amplitudes is called when production builder_Amplitudes is entered.
 func (s *BaseMinecraftMetascriptListener) EnterBuilder_Amplitudes(ctx *Builder_AmplitudesContext) {}

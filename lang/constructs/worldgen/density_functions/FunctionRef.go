@@ -2,7 +2,6 @@ package density_functions
 
 import (
 	"errors"
-	"fmt"
 	"reflect"
 
 	"github.com/antlr4-go/antlr/v4"
@@ -57,9 +56,7 @@ func (c *ReferenceFunction) MarshalJSON() ([]byte, error) {
 		return nil, err
 	}
 	if c.Value == nil {
-		return nil, errors.New(
-			fmt.Sprintf("unable to resolve reference %s", c.Ref.String()),
-		)
+		return c.Ref.MarshalJSON()
 	}
 	return (*c.Value).MarshalJSON()
 }

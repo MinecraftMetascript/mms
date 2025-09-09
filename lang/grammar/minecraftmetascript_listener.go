@@ -142,8 +142,14 @@ type MinecraftMetascriptListener interface {
 	// EnterBuilder_Type2 is called when entering the builder_Type2 production.
 	EnterBuilder_Type2(c *Builder_Type2Context)
 
-	// EnterBuilder_Shift is called when entering the builder_Shift production.
-	EnterBuilder_Shift(c *Builder_ShiftContext)
+	// EnterBuilder_ShiftX is called when entering the builder_ShiftX production.
+	EnterBuilder_ShiftX(c *Builder_ShiftXContext)
+
+	// EnterBuilder_ShiftY is called when entering the builder_ShiftY production.
+	EnterBuilder_ShiftY(c *Builder_ShiftYContext)
+
+	// EnterBuilder_ShiftZ is called when entering the builder_ShiftZ production.
+	EnterBuilder_ShiftZ(c *Builder_ShiftZContext)
 
 	// EnterBuilder_Amplitudes is called when entering the builder_Amplitudes production.
 	EnterBuilder_Amplitudes(c *Builder_AmplitudesContext)
@@ -424,8 +430,14 @@ type MinecraftMetascriptListener interface {
 	// ExitBuilder_Type2 is called when exiting the builder_Type2 production.
 	ExitBuilder_Type2(c *Builder_Type2Context)
 
-	// ExitBuilder_Shift is called when exiting the builder_Shift production.
-	ExitBuilder_Shift(c *Builder_ShiftContext)
+	// ExitBuilder_ShiftX is called when exiting the builder_ShiftX production.
+	ExitBuilder_ShiftX(c *Builder_ShiftXContext)
+
+	// ExitBuilder_ShiftY is called when exiting the builder_ShiftY production.
+	ExitBuilder_ShiftY(c *Builder_ShiftYContext)
+
+	// ExitBuilder_ShiftZ is called when exiting the builder_ShiftZ production.
+	ExitBuilder_ShiftZ(c *Builder_ShiftZContext)
 
 	// ExitBuilder_Amplitudes is called when exiting the builder_Amplitudes production.
 	ExitBuilder_Amplitudes(c *Builder_AmplitudesContext)

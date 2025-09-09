@@ -27,13 +27,14 @@ func (p *Parser) GetInternalParser(namespace string) *grammar.MinecraftMetascrip
 	return p.parser
 }
 
-func (p *Parser) Parse() (err error) {
+func (p *Parser) Parse() (*grammar.ScriptContext, error) {
 	fmt.Println("Parsing...")
-	if p.parser.Script() == nil {
-		return errors.New("failed to parse")
+	if res := p.parser.Script(); res == nil {
+		return nil, errors.New("failed to parse")
+	} else {
+		fmt.Println("Done parsing")
+		return res.(*grammar.ScriptContext), nil
 	}
-	fmt.Println("Done parsing")
-	return nil
 }
 
 func (p *Parser) ExitNamespace(ctx *grammar.NamespaceContext) {

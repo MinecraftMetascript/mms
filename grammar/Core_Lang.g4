@@ -10,7 +10,9 @@ builder_Noise: '.Noise' (noiseDefinition | ('(' resourceReference ')'));
 builder_Smear: 'Smear' '(' number ')';
 builder_Type1: '.Type1' '(' ')';
 builder_Type2: '.Type2' '(' ')';
-builder_Shift: '.Shift' '(' Axis ',' densityFn ')';
+builder_ShiftX: '.ShiftX' '(' densityFn ')';
+builder_ShiftY: '.ShiftY' '(' densityFn ')';
+builder_ShiftZ: '.ShiftZ' '(' densityFn ')';
 builder_Amplitudes: '.Amplitudes' '(' (number ',')* number  ')';
 builder_Offset: '.Offset(' Int ')';
 builder_Add:'.Add()';
@@ -26,10 +28,8 @@ builder_InRange: '.InRange' '(' densityFn ')';
 builder_OutRange: '.OutRange' '(' densityFn ')';
 
 
-
 resourceReference: (Identifier ':')? Identifier;
 
-Axis: 'x' | 'y' | 'z';
 
 Int: '-'? [0-9]+;
 Float: ('-'? [0-9]* '.' [0-9]+);
@@ -38,7 +38,7 @@ number: Int | Float;
 
 NL: [\n];
 WS: [ \t]+ -> skip;
-Identifier: [a-zA-Z][a-zA-Z0-9_]*;
+Identifier: [a-zA-Z] [a-zA-Z0-9_]*;
 
 BlockComment: '/*' .*? '*/' -> channel(HIDDEN);
 LineComment: '//' ~[\r\n]* -> channel(HIDDEN);

@@ -1,0 +1,11 @@
+[language-server.mms-lsp]
+command = "go"
+args = ["run", "main.go", "lsp"]
+
+[[language]]
+name = "mms"
+scope = "source.mms"
+injection-regex = "mms"
+file-types = ["mms"]
+comment-tokens = "#"
+language-servers = [ "mms-lsp" ]

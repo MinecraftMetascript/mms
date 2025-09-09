@@ -2,7 +2,6 @@ package surface_rules
 
 import (
 	"errors"
-	"fmt"
 	"reflect"
 
 	"github.com/minecraftmetascript/mms/lang/grammar"
@@ -60,9 +59,7 @@ func (c *ReferenceRule) MarshalJSON() ([]byte, error) {
 		return nil, err
 	}
 	if c.Value == nil {
-		return nil, errors.New(
-			fmt.Sprintf("unable to resolve reference %s", c.Ref.String()),
-		)
+		return c.Ref.MarshalJSON()
 	}
 	return (*c.Value).MarshalJSON()
 }
