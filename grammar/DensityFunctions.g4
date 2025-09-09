@@ -75,7 +75,7 @@ densityFn_WierdScaledSamplerBuilder: builder_Type1 | builder_Type2 | builder_Noi
 densityFn_ShiftedNoise: 'ShiftedNoise' NL* '(' NL* ')' NL* (densityFn_ShiftedNoiseBuilder NL*)*;
 densityFn_ShiftedNoiseBuilder: builder_Noise | builder_XZScale | builder_YScale | builder_ShiftX | builder_ShiftY | builder_ShiftZ;
 
-densityFn_RangeChoice: 'RangeChoice' NL* '(' densityFn ')' NL* (densityFn_RangeChoiceBuilder NL*)*;
+densityFn_RangeChoice: 'RangeChoice' NL* '(' NL* densityFn NL* ')' NL* (densityFn_RangeChoiceBuilder NL*)*;
 densityFn_RangeChoiceBuilder: builder_Min | builder_Max | builder_InRange | builder_OutRange;
 
 densityFn_Clamp: 'Clamp' NL* '(' densityFn ')' NL* (densityFn_ClampBuilder NL*)*;
@@ -90,7 +90,7 @@ densityFn_SplinePoint: '.Point' '(' number ',' (number | densityFn_Spline | reso
 
 densityFn_Constant: number;
 densityFn_Reference: resourceReference;
-densityFn_Math: ('+' | '*') densityFn;
+densityFn_Math: ('+' | '*') NL* densityFn;
 
 
 /*

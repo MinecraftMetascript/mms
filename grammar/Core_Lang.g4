@@ -2,30 +2,30 @@ grammar Core_Lang;
 
 import Noise, DensityFunctions, Surface;
 
-builder_XZScale: '.XZScale(' number ')';
-builder_YScale: '.YScale(' number ')';
-builder_XZFactor: '.XZFactor(' number ')';
-builder_YFactor: '.YFactor(' number ')';
-builder_Noise: '.Noise' (noiseDefinition | ('(' resourceReference ')'));
-builder_Smear: 'Smear' '(' number ')';
+builder_XZScale: '.XZScale(' NL* number NL* ')';
+builder_YScale: '.YScale(' NL* number NL* ')';
+builder_XZFactor: '.XZFactor(' NL* number NL* ')';
+builder_YFactor: '.YFactor(' NL* number NL* ')';
+builder_Noise: '.Noise' (noiseDefinition | ('(' NL* resourceReference NL* ')'));
+builder_Smear: 'Smear' '(' NL* number NL* ')';
 builder_Type1: '.Type1' '(' ')';
 builder_Type2: '.Type2' '(' ')';
-builder_ShiftX: '.ShiftX' '(' densityFn ')';
-builder_ShiftY: '.ShiftY' '(' densityFn ')';
-builder_ShiftZ: '.ShiftZ' '(' densityFn ')';
+builder_ShiftX: '.ShiftX' '(' NL* densityFn NL* ')';
+builder_ShiftY: '.ShiftY' '(' NL* densityFn NL* ')';
+builder_ShiftZ: '.ShiftZ' '(' NL* densityFn NL* ')';
 builder_Amplitudes: '.Amplitudes' '(' (number ',')* number  ')';
-builder_Offset: '.Offset(' Int ')';
-builder_Add:'.Add()';
-builder_Mul: '.Mul(' number ')';
-builder_MulInt: '.Mul(' Int ')';
-builder_Min: '.Min(' number ')';
-builder_Max: '.Max(' number ')';
-builder_Top: '.Top' '(' verticalAnchor ')';
+builder_Offset: '.Offset' '(' NL* Int NL* ')';
+builder_Add:'.Add' '(' ')' ;
+builder_Mul: '.Mul(' NL* number NL* ')';
+builder_MulInt: '.Mul(' NL* Int NL* ')';
+builder_Min: '.Min(' NL* number NL* ')';
+builder_Max: '.Max(' NL* number NL* ')';
+builder_Top: '.Top' '(' NL* verticalAnchor NL* ')';
 builder_TopLiteral: '.Top' '(' Int ')';
-builder_Bottom: '.Bottom' '(' verticalAnchor ')';
-builder_BottomLiteral: '.Bottom' '(' Int ')';
-builder_InRange: '.InRange' '(' densityFn ')';
-builder_OutRange: '.OutRange' '(' densityFn ')';
+builder_Bottom: '.Bottom' '(' NL* verticalAnchor NL* ')';
+builder_BottomLiteral: '.Bottom' '('NL* Int NL* ')';
+builder_InRange: '.InRange' '(' NL* densityFn NL* ')';
+builder_OutRange: '.OutRange' '(' NL* densityFn NL* ')';
 
 
 resourceReference: (Identifier ':')? Identifier;
@@ -38,7 +38,7 @@ number: Int | Float;
 
 NL: [\n];
 WS: [ \t]+ -> skip;
-Identifier: [a-zA-Z] [a-zA-Z0-9_]*;
+Identifier: [a-zA-Z] [a-zA-Z0-9_/]*;
 
 BlockComment: '/*' .*? '*/' -> channel(HIDDEN);
 LineComment: '//' ~[\r\n]* -> channel(HIDDEN);
