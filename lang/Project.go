@@ -10,6 +10,8 @@ import _ "github.com/minecraftmetascript/mms/lang/constructs/worldgen/surface_ru
 import _ "github.com/minecraftmetascript/mms/lang/constructs/worldgen/noise"
 import _ "github.com/minecraftmetascript/mms/lang/constructs/worldgen/density_functions"
 import _ "github.com/minecraftmetascript/mms/lang/constructs/worldgen/noise_router"
+import _ "github.com/minecraftmetascript/mms/lang/constructs/worldgen/noise_settings"
+import _ "github.com/minecraftmetascript/mms/lang/constructs/block_states"
 
 type Project struct {
 	Files       map[string]*File

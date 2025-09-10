@@ -713,3 +713,133 @@ func (s *BaseMinecraftMetascriptListener) EnterNoiseRouter_Builder(ctx *NoiseRou
 
 // ExitNoiseRouter_Builder is called when production noiseRouter_Builder is exited.
 func (s *BaseMinecraftMetascriptListener) ExitNoiseRouter_Builder(ctx *NoiseRouter_BuilderContext) {}
+
+// EnterNoiseSettingsBlock is called when production noiseSettingsBlock is entered.
+func (s *BaseMinecraftMetascriptListener) EnterNoiseSettingsBlock(ctx *NoiseSettingsBlockContext) {}
+
+// ExitNoiseSettingsBlock is called when production noiseSettingsBlock is exited.
+func (s *BaseMinecraftMetascriptListener) ExitNoiseSettingsBlock(ctx *NoiseSettingsBlockContext) {}
+
+// EnterNoiseSettingsDeclaration is called when production noiseSettingsDeclaration is entered.
+func (s *BaseMinecraftMetascriptListener) EnterNoiseSettingsDeclaration(ctx *NoiseSettingsDeclarationContext) {
+}
+
+// ExitNoiseSettingsDeclaration is called when production noiseSettingsDeclaration is exited.
+func (s *BaseMinecraftMetascriptListener) ExitNoiseSettingsDeclaration(ctx *NoiseSettingsDeclarationContext) {
+}
+
+// EnterNoiseSettings is called when production noiseSettings is entered.
+func (s *BaseMinecraftMetascriptListener) EnterNoiseSettings(ctx *NoiseSettingsContext) {}
+
+// ExitNoiseSettings is called when production noiseSettings is exited.
+func (s *BaseMinecraftMetascriptListener) ExitNoiseSettings(ctx *NoiseSettingsContext) {}
+
+// EnterNoiseSettings_Builder is called when production noiseSettings_Builder is entered.
+func (s *BaseMinecraftMetascriptListener) EnterNoiseSettings_Builder(ctx *NoiseSettings_BuilderContext) {
+}
+
+// ExitNoiseSettings_Builder is called when production noiseSettings_Builder is exited.
+func (s *BaseMinecraftMetascriptListener) ExitNoiseSettings_Builder(ctx *NoiseSettings_BuilderContext) {
+}
+
+// EnterBuilder_NoiseSize is called when production builder_NoiseSize is entered.
+func (s *BaseMinecraftMetascriptListener) EnterBuilder_NoiseSize(ctx *Builder_NoiseSizeContext) {}
+
+// ExitBuilder_NoiseSize is called when production builder_NoiseSize is exited.
+func (s *BaseMinecraftMetascriptListener) ExitBuilder_NoiseSize(ctx *Builder_NoiseSizeContext) {}
+
+// EnterBuilder_NoiseRouter is called when production builder_NoiseRouter is entered.
+func (s *BaseMinecraftMetascriptListener) EnterBuilder_NoiseRouter(ctx *Builder_NoiseRouterContext) {}
+
+// ExitBuilder_NoiseRouter is called when production builder_NoiseRouter is exited.
+func (s *BaseMinecraftMetascriptListener) ExitBuilder_NoiseRouter(ctx *Builder_NoiseRouterContext) {}
+
+// EnterBuilder_SeaLevel is called when production builder_SeaLevel is entered.
+func (s *BaseMinecraftMetascriptListener) EnterBuilder_SeaLevel(ctx *Builder_SeaLevelContext) {}
+
+// ExitBuilder_SeaLevel is called when production builder_SeaLevel is exited.
+func (s *BaseMinecraftMetascriptListener) ExitBuilder_SeaLevel(ctx *Builder_SeaLevelContext) {}
+
+// EnterBuilder_DisableCreatures is called when production builder_DisableCreatures is entered.
+func (s *BaseMinecraftMetascriptListener) EnterBuilder_DisableCreatures(ctx *Builder_DisableCreaturesContext) {
+}
+
+// ExitBuilder_DisableCreatures is called when production builder_DisableCreatures is exited.
+func (s *BaseMinecraftMetascriptListener) ExitBuilder_DisableCreatures(ctx *Builder_DisableCreaturesContext) {
+}
+
+// EnterBuilder_DisableVeins is called when production builder_DisableVeins is entered.
+func (s *BaseMinecraftMetascriptListener) EnterBuilder_DisableVeins(ctx *Builder_DisableVeinsContext) {
+}
+
+// ExitBuilder_DisableVeins is called when production builder_DisableVeins is exited.
+func (s *BaseMinecraftMetascriptListener) ExitBuilder_DisableVeins(ctx *Builder_DisableVeinsContext) {
+}
+
+// EnterBuilder_DisableAquifers is called when production builder_DisableAquifers is entered.
+func (s *BaseMinecraftMetascriptListener) EnterBuilder_DisableAquifers(ctx *Builder_DisableAquifersContext) {
+}
+
+// ExitBuilder_DisableAquifers is called when production builder_DisableAquifers is exited.
+func (s *BaseMinecraftMetascriptListener) ExitBuilder_DisableAquifers(ctx *Builder_DisableAquifersContext) {
+}
+
+// EnterBuilder_LegacyRandomSource is called when production builder_LegacyRandomSource is entered.
+func (s *BaseMinecraftMetascriptListener) EnterBuilder_LegacyRandomSource(ctx *Builder_LegacyRandomSourceContext) {
+}
+
+// ExitBuilder_LegacyRandomSource is called when production builder_LegacyRandomSource is exited.
+func (s *BaseMinecraftMetascriptListener) ExitBuilder_LegacyRandomSource(ctx *Builder_LegacyRandomSourceContext) {
+}
+
+// EnterBuilder_DefaultBlock is called when production builder_DefaultBlock is entered.
+func (s *BaseMinecraftMetascriptListener) EnterBuilder_DefaultBlock(ctx *Builder_DefaultBlockContext) {
+}
+
+// ExitBuilder_DefaultBlock is called when production builder_DefaultBlock is exited.
+func (s *BaseMinecraftMetascriptListener) ExitBuilder_DefaultBlock(ctx *Builder_DefaultBlockContext) {
+}
+
+// EnterBuilder_DefaultFluid is called when production builder_DefaultFluid is entered.
+func (s *BaseMinecraftMetascriptListener) EnterBuilder_DefaultFluid(ctx *Builder_DefaultFluidContext) {
+}
+
+// ExitBuilder_DefaultFluid is called when production builder_DefaultFluid is exited.
+func (s *BaseMinecraftMetascriptListener) ExitBuilder_DefaultFluid(ctx *Builder_DefaultFluidContext) {
+}
+
+// EnterBuilder_SpawnTarget is called when production builder_SpawnTarget is entered.
+func (s *BaseMinecraftMetascriptListener) EnterBuilder_SpawnTarget(ctx *Builder_SpawnTargetContext) {}
+
+// ExitBuilder_SpawnTarget is called when production builder_SpawnTarget is exited.
+func (s *BaseMinecraftMetascriptListener) ExitBuilder_SpawnTarget(ctx *Builder_SpawnTargetContext) {}
+
+// EnterBuilder_MinY is called when production builder_MinY is entered.
+func (s *BaseMinecraftMetascriptListener) EnterBuilder_MinY(ctx *Builder_MinYContext) {}
+
+// ExitBuilder_MinY is called when production builder_MinY is exited.
+func (s *BaseMinecraftMetascriptListener) ExitBuilder_MinY(ctx *Builder_MinYContext) {}
+
+// EnterBuilder_Height is called when production builder_Height is entered.
+func (s *BaseMinecraftMetascriptListener) EnterBuilder_Height(ctx *Builder_HeightContext) {}
+
+// ExitBuilder_Height is called when production builder_Height is exited.
+func (s *BaseMinecraftMetascriptListener) ExitBuilder_Height(ctx *Builder_HeightContext) {}
+
+// EnterBuilder_SurfaceRule is called when production builder_SurfaceRule is entered.
+func (s *BaseMinecraftMetascriptListener) EnterBuilder_SurfaceRule(ctx *Builder_SurfaceRuleContext) {}
+
+// ExitBuilder_SurfaceRule is called when production builder_SurfaceRule is exited.
+func (s *BaseMinecraftMetascriptListener) ExitBuilder_SurfaceRule(ctx *Builder_SurfaceRuleContext) {}
+
+// EnterBlockState is called when production blockState is entered.
+func (s *BaseMinecraftMetascriptListener) EnterBlockState(ctx *BlockStateContext) {}
+
+// ExitBlockState is called when production blockState is exited.
+func (s *BaseMinecraftMetascriptListener) ExitBlockState(ctx *BlockStateContext) {}
+
+// EnterBlockState_Builder is called when production blockState_Builder is entered.
+func (s *BaseMinecraftMetascriptListener) EnterBlockState_Builder(ctx *BlockState_BuilderContext) {}
+
+// ExitBlockState_Builder is called when production blockState_Builder is exited.
+func (s *BaseMinecraftMetascriptListener) ExitBlockState_Builder(ctx *BlockState_BuilderContext) {}

@@ -310,6 +310,63 @@ type MinecraftMetascriptListener interface {
 	// EnterNoiseRouter_Builder is called when entering the noiseRouter_Builder production.
 	EnterNoiseRouter_Builder(c *NoiseRouter_BuilderContext)
 
+	// EnterNoiseSettingsBlock is called when entering the noiseSettingsBlock production.
+	EnterNoiseSettingsBlock(c *NoiseSettingsBlockContext)
+
+	// EnterNoiseSettingsDeclaration is called when entering the noiseSettingsDeclaration production.
+	EnterNoiseSettingsDeclaration(c *NoiseSettingsDeclarationContext)
+
+	// EnterNoiseSettings is called when entering the noiseSettings production.
+	EnterNoiseSettings(c *NoiseSettingsContext)
+
+	// EnterNoiseSettings_Builder is called when entering the noiseSettings_Builder production.
+	EnterNoiseSettings_Builder(c *NoiseSettings_BuilderContext)
+
+	// EnterBuilder_NoiseSize is called when entering the builder_NoiseSize production.
+	EnterBuilder_NoiseSize(c *Builder_NoiseSizeContext)
+
+	// EnterBuilder_NoiseRouter is called when entering the builder_NoiseRouter production.
+	EnterBuilder_NoiseRouter(c *Builder_NoiseRouterContext)
+
+	// EnterBuilder_SeaLevel is called when entering the builder_SeaLevel production.
+	EnterBuilder_SeaLevel(c *Builder_SeaLevelContext)
+
+	// EnterBuilder_DisableCreatures is called when entering the builder_DisableCreatures production.
+	EnterBuilder_DisableCreatures(c *Builder_DisableCreaturesContext)
+
+	// EnterBuilder_DisableVeins is called when entering the builder_DisableVeins production.
+	EnterBuilder_DisableVeins(c *Builder_DisableVeinsContext)
+
+	// EnterBuilder_DisableAquifers is called when entering the builder_DisableAquifers production.
+	EnterBuilder_DisableAquifers(c *Builder_DisableAquifersContext)
+
+	// EnterBuilder_LegacyRandomSource is called when entering the builder_LegacyRandomSource production.
+	EnterBuilder_LegacyRandomSource(c *Builder_LegacyRandomSourceContext)
+
+	// EnterBuilder_DefaultBlock is called when entering the builder_DefaultBlock production.
+	EnterBuilder_DefaultBlock(c *Builder_DefaultBlockContext)
+
+	// EnterBuilder_DefaultFluid is called when entering the builder_DefaultFluid production.
+	EnterBuilder_DefaultFluid(c *Builder_DefaultFluidContext)
+
+	// EnterBuilder_SpawnTarget is called when entering the builder_SpawnTarget production.
+	EnterBuilder_SpawnTarget(c *Builder_SpawnTargetContext)
+
+	// EnterBuilder_MinY is called when entering the builder_MinY production.
+	EnterBuilder_MinY(c *Builder_MinYContext)
+
+	// EnterBuilder_Height is called when entering the builder_Height production.
+	EnterBuilder_Height(c *Builder_HeightContext)
+
+	// EnterBuilder_SurfaceRule is called when entering the builder_SurfaceRule production.
+	EnterBuilder_SurfaceRule(c *Builder_SurfaceRuleContext)
+
+	// EnterBlockState is called when entering the blockState production.
+	EnterBlockState(c *BlockStateContext)
+
+	// EnterBlockState_Builder is called when entering the blockState_Builder production.
+	EnterBlockState_Builder(c *BlockState_BuilderContext)
+
 	// ExitScript is called when exiting the script production.
 	ExitScript(c *ScriptContext)
 
@@ -612,4 +669,61 @@ type MinecraftMetascriptListener interface {
 
 	// ExitNoiseRouter_Builder is called when exiting the noiseRouter_Builder production.
 	ExitNoiseRouter_Builder(c *NoiseRouter_BuilderContext)
+
+	// ExitNoiseSettingsBlock is called when exiting the noiseSettingsBlock production.
+	ExitNoiseSettingsBlock(c *NoiseSettingsBlockContext)
+
+	// ExitNoiseSettingsDeclaration is called when exiting the noiseSettingsDeclaration production.
+	ExitNoiseSettingsDeclaration(c *NoiseSettingsDeclarationContext)
+
+	// ExitNoiseSettings is called when exiting the noiseSettings production.
+	ExitNoiseSettings(c *NoiseSettingsContext)
+
+	// ExitNoiseSettings_Builder is called when exiting the noiseSettings_Builder production.
+	ExitNoiseSettings_Builder(c *NoiseSettings_BuilderContext)
+
+	// ExitBuilder_NoiseSize is called when exiting the builder_NoiseSize production.
+	ExitBuilder_NoiseSize(c *Builder_NoiseSizeContext)
+
+	// ExitBuilder_NoiseRouter is called when exiting the builder_NoiseRouter production.
+	ExitBuilder_NoiseRouter(c *Builder_NoiseRouterContext)
+
+	// ExitBuilder_SeaLevel is called when exiting the builder_SeaLevel production.
+	ExitBuilder_SeaLevel(c *Builder_SeaLevelContext)
+
+	// ExitBuilder_DisableCreatures is called when exiting the builder_DisableCreatures production.
+	ExitBuilder_DisableCreatures(c *Builder_DisableCreaturesContext)
+
+	// ExitBuilder_DisableVeins is called when exiting the builder_DisableVeins production.
+	ExitBuilder_DisableVeins(c *Builder_DisableVeinsContext)
+
+	// ExitBuilder_DisableAquifers is called when exiting the builder_DisableAquifers production.
+	ExitBuilder_DisableAquifers(c *Builder_DisableAquifersContext)
+
+	// ExitBuilder_LegacyRandomSource is called when exiting the builder_LegacyRandomSource production.
+	ExitBuilder_LegacyRandomSource(c *Builder_LegacyRandomSourceContext)
+
+	// ExitBuilder_DefaultBlock is called when exiting the builder_DefaultBlock production.
+	ExitBuilder_DefaultBlock(c *Builder_DefaultBlockContext)
+
+	// ExitBuilder_DefaultFluid is called when exiting the builder_DefaultFluid production.
+	ExitBuilder_DefaultFluid(c *Builder_DefaultFluidContext)
+
+	// ExitBuilder_SpawnTarget is called when exiting the builder_SpawnTarget production.
+	ExitBuilder_SpawnTarget(c *Builder_SpawnTargetContext)
+
+	// ExitBuilder_MinY is called when exiting the builder_MinY production.
+	ExitBuilder_MinY(c *Builder_MinYContext)
+
+	// ExitBuilder_Height is called when exiting the builder_Height production.
+	ExitBuilder_Height(c *Builder_HeightContext)
+
+	// ExitBuilder_SurfaceRule is called when exiting the builder_SurfaceRule production.
+	ExitBuilder_SurfaceRule(c *Builder_SurfaceRuleContext)
+
+	// ExitBlockState is called when exiting the blockState production.
+	ExitBlockState(c *BlockStateContext)
+
+	// ExitBlockState_Builder is called when exiting the blockState_Builder production.
+	ExitBlockState_Builder(c *BlockState_BuilderContext)
 }

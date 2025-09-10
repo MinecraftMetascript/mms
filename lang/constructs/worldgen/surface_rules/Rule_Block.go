@@ -20,19 +20,19 @@ func init() {
 				return nil
 			}
 
-			var blockName string
+			out := &Block{}
 			if ref := ctx.ResourceReference(); ref != nil {
 				cons := traversal.ConstructRegistry.Construct(
 					ref, "minecraft", scope,
 				)
 				if r, ok := cons.(*traversal.Reference); ok && r != nil {
-					blockName = r.String()
+
+					out.BlockName = *block_states.BlockStateRef(*r)
+					return out
 				}
 			}
 
-			return &Block{
-				BlockName: blockName,
-			}
+			return nil
 		},
 	)
 }
@@ -40,7 +40,7 @@ func init() {
 type Block struct {
 	traversal.BaseConstruct
 
-	BlockName string
+	BlockName block_states.BlockState
 }
 
 func (b Block) ExportSymbol(symbol traversal.Symbol, rootDir *lib.FileTreeLike) error {
@@ -65,6 +65,6 @@ func (b Block) MarshalJSON() ([]byte, error) {
 		State block_states.BlockState `json:"result_state"`
 	}{
 		Type:  SurfaceRule_Block,
-		State: block_states.BlockState{Name: b.BlockName},
+		State: b.BlockName,
 	}, "", "  ")
 }
