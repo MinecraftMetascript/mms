@@ -2,7 +2,6 @@ package surface_rules
 
 import (
 	"encoding/json"
-	"reflect"
 
 	"github.com/minecraftmetascript/mms/lang/builder_chain"
 	"github.com/minecraftmetascript/mms/lang/grammar"
@@ -13,9 +12,8 @@ import (
 )
 
 func init() {
-	traversal.ConstructRegistry.Register(
-		reflect.TypeFor[grammar.SurfaceCondition_AboveWaterContext](),
-		func(ctx antlr.ParserRuleContext, namespace string, scope *traversal.Scope) traversal.Construct {
+	traversal.Register(
+		func(aboveWater *grammar.SurfaceCondition_AboveWaterContext, namespace string, scope *traversal.Scope) traversal.Construct {
 			waterBuildChain := builder_chain.NewBuilderChain[AboveWaterCondition](
 				builder_chain.Build(
 					func(ctx *grammar.Builder_OffsetContext, out *AboveWaterCondition, scope *traversal.Scope, _ string) {
@@ -38,8 +36,6 @@ func init() {
 					},
 				),
 			)
-
-			aboveWater := ctx.(*grammar.SurfaceCondition_AboveWaterContext)
 			out := &AboveWaterCondition{}
 			for _, r := range aboveWater.AllSurfaceCondition_AboveWaterBuilder() {
 				child := r.GetChild(0)

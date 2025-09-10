@@ -3,7 +3,6 @@ package density_functions
 import (
 	"encoding/json"
 	"fmt"
-	"reflect"
 
 	"github.com/antlr4-go/antlr/v4"
 	"github.com/minecraftmetascript/mms/lang/grammar"
@@ -62,16 +61,8 @@ func ExtractInlinedNoise(noiseCtx *grammar.NoiseDefinitionContext, currentNamesp
 }
 
 func init() {
-	traversal.ConstructRegistry.Register(
-		reflect.TypeFor[*grammar.DensityFn_InlineNoiseContext](),
-		func(ctx antlr.ParserRuleContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
-			inlineCtx, ok := ctx.(*grammar.DensityFn_InlineNoiseContext)
-
-			if !ok {
-				// TODO: Diagnose?
-				return nil
-			}
-
+	traversal.Register(
+		func(inlineCtx *grammar.DensityFn_InlineNoiseContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
 			if noiseInlineCtx := inlineCtx.Noise(); noiseInlineCtx != nil {
 				return ExtractInlinedNoise(noiseInlineCtx.NoiseDefinition().(*grammar.NoiseDefinitionContext), currentNamespace, scope)
 			}
@@ -79,10 +70,8 @@ func init() {
 		},
 	)
 
-	traversal.ConstructRegistry.Register(
-		reflect.TypeFor[*grammar.DensityFnBlockContext](),
-		func(ctx antlr.ParserRuleContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
-			blockCtx := ctx.(*grammar.DensityFnBlockContext)
+	traversal.Register(
+		func(blockCtx *grammar.DensityFnBlockContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
 			for _, child := range blockCtx.GetChildren() {
 				if rule, ok := child.(antlr.ParserRuleContext); ok {
 					traversal.ConstructRegistry.Construct(rule, currentNamespace, scope)
@@ -91,17 +80,14 @@ func init() {
 			return nil
 		},
 	)
-	traversal.ConstructRegistry.Register(
-		reflect.TypeFor[*grammar.DensityFnDeclarationContext](),
-		func(ctx antlr.ParserRuleContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
-			declaration := ctx.(*grammar.DensityFnDeclarationContext)
-
+	traversal.Register(
+		func(declaration *grammar.DensityFnDeclarationContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
 			if child := declaration.DensityFn(); child == nil {
-				scope.DiagnoseSemanticError("Missing density function definition", ctx)
+				scope.DiagnoseSemanticError("Missing density function definition", declaration)
 			} else if targetCtx := child; targetCtx != nil {
 				s := traversal.ProcessDeclaration(declaration.Declare(), targetCtx.(antlr.ParserRuleContext), scope, currentNamespace, "DensityFunction")
 				if s == nil {
-					scope.DiagnoseSemanticError("Failed to process density function declaration", ctx)
+					scope.DiagnoseSemanticError("Failed to process density function declaration", declaration)
 					return nil
 				}
 				return s.GetValue()
@@ -110,10 +96,8 @@ func init() {
 		},
 	)
 
-	traversal.ConstructRegistry.Register(
-		reflect.TypeFor[*grammar.DensityFnContext](),
-		func(ctx antlr.ParserRuleContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
-			fnCtx := ctx.(*grammar.DensityFnContext)
+	traversal.Register(
+		func(fnCtx *grammar.DensityFnContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
 			targetCtx := fnCtx.GetChild(0)
 			if targetCtx == nil {
 				return nil
@@ -135,7 +119,7 @@ func init() {
 						case "+":
 							kind = MathDensityFn_Add
 						default:
-							scope.DiagnoseSemanticError("Unknown operator", ctx)
+							scope.DiagnoseSemanticError("Unknown operator", fnCtx)
 						}
 					}
 					return &MathDensityFn{

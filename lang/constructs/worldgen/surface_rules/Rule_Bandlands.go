@@ -2,18 +2,14 @@ package surface_rules
 
 import (
 	"encoding/json"
-	"reflect"
 
 	"github.com/minecraftmetascript/mms/lang/grammar"
 	"github.com/minecraftmetascript/mms/lang/traversal"
-
-	"github.com/antlr4-go/antlr/v4"
 )
 
 func init() {
-	traversal.ConstructRegistry.Register(
-		reflect.TypeFor[grammar.SurfaceRule_BandlandsContext](),
-		func(_ antlr.ParserRuleContext, _ string, _ *traversal.Scope) traversal.Construct {
+	traversal.Register(
+		func(_ *grammar.SurfaceRule_BandlandsContext, _ string, _ *traversal.Scope) traversal.Construct {
 			return &Bandlands{}
 		},
 	)

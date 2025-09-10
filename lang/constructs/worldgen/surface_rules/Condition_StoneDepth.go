@@ -2,7 +2,6 @@ package surface_rules
 
 import (
 	"encoding/json"
-	"reflect"
 
 	"github.com/minecraftmetascript/mms/lang/builder_chain"
 	"github.com/minecraftmetascript/mms/lang/grammar"
@@ -13,9 +12,8 @@ import (
 )
 
 func init() {
-	traversal.ConstructRegistry.Register(
-		reflect.TypeFor[grammar.SurfaceCondition_StoneDepthContext](),
-		func(ctx antlr.ParserRuleContext, namespace string, scope *traversal.Scope) traversal.Construct {
+	traversal.Register(
+		func(stoneDepth *grammar.SurfaceCondition_StoneDepthContext, namespace string, scope *traversal.Scope) traversal.Construct {
 			stoneDepthBuildChain := builder_chain.NewBuilderChain[StoneDepthCondition](
 				builder_chain.Build(
 					func(ctx *grammar.SurfaceCondition_StoneDepthBuilder_SecondaryDepthRangeContext, target *StoneDepthCondition, scope *traversal.Scope, namespace string) {
@@ -34,12 +32,11 @@ func init() {
 				),
 			)
 
-			stoneDepth := ctx.(*grammar.SurfaceCondition_StoneDepthContext)
 			out := &StoneDepthCondition{}
 			if mode := stoneDepth.StoneDepthMode(); mode != nil {
 				out.Surface = mode.GetText()
 			} else {
-				scope.DiagnoseSemanticError("Missing stone depth mode, expected Floor or Ceiling", ctx)
+				scope.DiagnoseSemanticError("Missing stone depth mode, expected Floor or Ceiling", stoneDepth)
 			}
 
 			for _, r := range stoneDepth.AllSurfaceCondition_StoneDepthBuilder() {

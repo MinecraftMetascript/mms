@@ -2,23 +2,15 @@ package surface_rules
 
 import (
 	"encoding/json"
-	"reflect"
 
 	"github.com/minecraftmetascript/mms/lang/grammar"
 	"github.com/minecraftmetascript/mms/lang/traversal"
 	"github.com/minecraftmetascript/mms/lib"
-
-	"github.com/antlr4-go/antlr/v4"
 )
 
 func init() {
-	traversal.ConstructRegistry.Register(
-		reflect.TypeFor[grammar.SurfaceCondition_BiomeContext](),
-		func(ctx_ antlr.ParserRuleContext, namespace string, scope *traversal.Scope) traversal.Construct {
-			ctx, ok := ctx_.(*grammar.SurfaceCondition_BiomeContext)
-			if !ok {
-				return nil
-			}
+	traversal.Register(
+		func(ctx *grammar.SurfaceCondition_BiomeContext, namespace string, scope *traversal.Scope) traversal.Construct {
 			refs := make([]traversal.Reference, 0)
 			for _, ref := range ctx.AllResourceReference() {
 				// Biome references should default to minecraft when unqualified

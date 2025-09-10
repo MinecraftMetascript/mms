@@ -2,9 +2,7 @@ package density_functions
 
 import (
 	"encoding/json"
-	"reflect"
 
-	"github.com/antlr4-go/antlr/v4"
 	"github.com/minecraftmetascript/mms/lang/builder_chain"
 	"github.com/minecraftmetascript/mms/lang/grammar"
 	"github.com/minecraftmetascript/mms/lang/traversal"
@@ -12,10 +10,8 @@ import (
 )
 
 func init() {
-	traversal.ConstructRegistry.Register(
-		reflect.TypeFor[*grammar.DensityFn_ConstantContext](),
-		func(ctx antlr.ParserRuleContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
-			densityFn := ctx.(*grammar.DensityFn_ConstantContext)
+	traversal.Register(
+		func(densityFn *grammar.DensityFn_ConstantContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
 			out := &ConstantDensityFn{}
 			builder_chain.Builder_GetFloat(
 				densityFn, func(f float64) { out.Value = f }, scope, "Value",

@@ -2,18 +2,12 @@ package traversal
 
 import (
 	"fmt"
-	"reflect"
 
 	"github.com/minecraftmetascript/mms/lang/grammar"
-
-	"github.com/antlr4-go/antlr/v4"
 )
 
 func init() {
-	ConstructRegistry.Register(
-		reflect.TypeFor[*grammar.ResourceReferenceContext](),
-		func(ctx_ antlr.ParserRuleContext, currentNamespace string, _ *Scope) Construct {
-			ref := ctx_.(*grammar.ResourceReferenceContext)
+	Register(func(ref *grammar.ResourceReferenceContext, currentNamespace string, _ *Scope) Construct {
 			parts := ref.AllIdentifier()
 			switch len(parts) {
 			default:

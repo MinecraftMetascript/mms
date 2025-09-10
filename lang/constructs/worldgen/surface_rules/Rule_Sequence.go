@@ -2,7 +2,6 @@ package surface_rules
 
 import (
 	"encoding/json"
-	"reflect"
 
 	"github.com/minecraftmetascript/mms/lang/grammar"
 	"github.com/minecraftmetascript/mms/lang/traversal"
@@ -12,11 +11,8 @@ import (
 )
 
 func init() {
-	traversal.ConstructRegistry.Register(
-		reflect.TypeFor[grammar.SurfaceRule_SequenceContext](),
-		func(ctx_ antlr.ParserRuleContext, ns string, scope *traversal.Scope) traversal.Construct {
-			sequence := ctx_.(*grammar.SurfaceRule_SequenceContext)
-
+	traversal.Register(
+		func(sequence *grammar.SurfaceRule_SequenceContext, ns string, scope *traversal.Scope) traversal.Construct {
 			children := make([]traversal.Construct, 0)
 			for _, childCtx := range sequence.AllSurfaceRule() {
 				if childCtx.GetChildCount() > 0 {

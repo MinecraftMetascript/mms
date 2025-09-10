@@ -2,43 +2,35 @@ package surface_rules
 
 import (
 	"errors"
-	"reflect"
 
 	"github.com/minecraftmetascript/mms/lang/grammar"
 	"github.com/minecraftmetascript/mms/lang/traversal"
 	"github.com/minecraftmetascript/mms/lib"
-
-	"github.com/antlr4-go/antlr/v4"
 )
 
 func init() {
-	traversal.ConstructRegistry.Register(
-		reflect.TypeFor[grammar.SurfaceRule_ReferenceContext](),
-		func(ctx antlr.ParserRuleContext, ns string, scope *traversal.Scope) traversal.Construct {
-			refCtx := ctx.(*grammar.SurfaceRule_ReferenceContext)
-			out := &ReferenceRule{}
-			var ref *traversal.Reference
-			if rr := refCtx.ResourceReference(); rr != nil {
-				if cons := traversal.ConstructRegistry.Construct(rr, ns, scope); cons != nil {
-					if r, ok := cons.(*traversal.Reference); ok {
-						ref = r
-					}
+	traversal.Register(func(refCtx *grammar.SurfaceRule_ReferenceContext, ns string, scope *traversal.Scope) traversal.Construct {
+		out := &ReferenceRule{}
+		var ref *traversal.Reference
+		if rr := refCtx.ResourceReference(); rr != nil {
+			if cons := traversal.ConstructRegistry.Construct(rr, ns, scope); cons != nil {
+				if r, ok := cons.(*traversal.Reference); ok {
+					ref = r
 				}
 			}
-			if ref != nil {
-				ref.SetResolver(func() error {
-					if next, ok := scope.Get(*ref); ok {
-						val := next.GetValue().(traversal.Construct)
-						out.Value = &val
-					}
-					return nil
-				})
-			}
-			out.Ref = ref
-
-			return out
-		},
-	)
+		}
+		if ref != nil {
+			ref.SetResolver(func() error {
+				if next, ok := scope.Get(*ref); ok {
+					val := next.GetValue().(traversal.Construct)
+					out.Value = &val
+				}
+				return nil
+			})
+		}
+		out.Ref = ref
+		return out
+	})
 }
 
 type ReferenceRule struct {

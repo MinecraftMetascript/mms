@@ -2,22 +2,16 @@ package surface_rules
 
 import (
 	"encoding/json"
-	"reflect"
 
 	"github.com/minecraftmetascript/mms/lang/grammar"
 	"github.com/minecraftmetascript/mms/lang/traversal"
 	"github.com/minecraftmetascript/mms/lib"
-
-	"github.com/antlr4-go/antlr/v4"
 )
 
 func init() {
-	traversal.ConstructRegistry.Register(
-		reflect.TypeFor[grammar.SurfaceCondition_AboveSurfaceContext](),
-		func(ctx antlr.ParserRuleContext, _ string, _ *traversal.Scope) traversal.Construct {
-			return &AboveSurfaceCondition{}
-		},
-	)
+	traversal.Register(func(ctx *grammar.SurfaceCondition_AboveSurfaceContext, _ string, _ *traversal.Scope) traversal.Construct {
+		return &AboveSurfaceCondition{}
+	})
 }
 
 type AboveSurfaceCondition struct {

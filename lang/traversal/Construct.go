@@ -29,11 +29,16 @@ type constructRegistryImpl struct {
 	constructs map[reflect.Type]ConstructFactory
 }
 
-func (r *constructRegistryImpl) Register(ctxType reflect.Type, factory ConstructFactory) {
+type Factory[C antlr.ParserRuleContext] func(ctx C, ns string, scope *Scope) Construct
+
+func Register[C antlr.ParserRuleContext](f Factory[C]) {
+	ctxType := reflect.TypeFor[C]()
 	if ctxType.Kind() == reflect.Ptr {
-		ctxType = ctxType.Elem() // Dereference pointers for simplicity
+		ctxType = ctxType.Elem()
 	}
-	r.constructs[ctxType] = factory
+	ConstructRegistry.constructs[ctxType] = func(base antlr.ParserRuleContext, ns string, scope *Scope) Construct {
+		return f(base.(C), ns, scope)
+	}
 }
 
 func (r *constructRegistryImpl) Construct(ctx antlr.ParserRuleContext, currentNamespace string, scope *Scope) Construct {

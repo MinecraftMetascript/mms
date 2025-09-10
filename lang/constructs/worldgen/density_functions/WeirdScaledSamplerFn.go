@@ -2,7 +2,6 @@ package density_functions
 
 import (
 	"encoding/json"
-	"reflect"
 
 	"github.com/antlr4-go/antlr/v4"
 	"github.com/minecraftmetascript/mms/lang/grammar"
@@ -11,19 +10,18 @@ import (
 )
 
 func init() {
-	traversal.ConstructRegistry.Register(
-		reflect.TypeFor[*grammar.DensityFn_WierdScaledSamplerContext](),
-		func(ctx antlr.ParserRuleContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
-			densityFn := ctx.(*grammar.DensityFn_WierdScaledSamplerContext)
+	traversal.Register(
+
+		func(densityFn *grammar.DensityFn_WierdScaledSamplerContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
 			out := &WeirdScaledSamplerFn{}
 
 			input := densityFn.DensityFn()
 			if input == nil {
-				scope.DiagnoseSemanticError("Missing input density function", ctx)
+				scope.DiagnoseSemanticError("Missing input density function", densityFn)
 			} else {
 				inputFn := traversal.ConstructRegistry.Construct(input.(antlr.ParserRuleContext), currentNamespace, scope)
 				if inputFn == nil {
-					scope.DiagnoseSemanticError("Invalid input density function", ctx)
+					scope.DiagnoseSemanticError("Invalid input density function", densityFn)
 				} else {
 					out.Input = inputFn
 				}

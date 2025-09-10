@@ -12,9 +12,8 @@ import (
 )
 
 func init() {
-	traversal.ConstructRegistry.Register(
-		reflect.TypeFor[*grammar.DensityFn_YClampedGradientContext](),
-		func(ctx antlr.ParserRuleContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
+	traversal.Register(
+		func(densityFn *grammar.DensityFn_YClampedGradientContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
 			rangeChoiceBuilder := builder_chain.NewBuilderChain[YClampedGradientDensityFn](
 				builder_chain.Build(
 					func(ctx *grammar.Builder_BottomLiteralContext, target *YClampedGradientDensityFn, scope *traversal.Scope, namespace string) {
@@ -38,7 +37,6 @@ func init() {
 				),
 			)
 
-			densityFn := ctx.(*grammar.DensityFn_YClampedGradientContext)
 			out := &YClampedGradientDensityFn{}
 
 			for _, builderWrap := range densityFn.AllDensityFn_YClampedGradientBuilder() {

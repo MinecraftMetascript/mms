@@ -2,39 +2,25 @@ package surface_rules
 
 import (
 	"encoding/json"
-	"reflect"
 
 	"github.com/minecraftmetascript/mms/lang/constructs/block_states"
 	"github.com/minecraftmetascript/mms/lang/grammar"
 	"github.com/minecraftmetascript/mms/lang/traversal"
 	"github.com/minecraftmetascript/mms/lib"
-
-	"github.com/antlr4-go/antlr/v4"
 )
 
 func init() {
-	traversal.ConstructRegistry.Register(reflect.TypeFor[grammar.SurfaceRule_BlockContext](),
-		func(baseCtx antlr.ParserRuleContext, _ string, scope *traversal.Scope) traversal.Construct {
-			ctx, ok := baseCtx.(*grammar.SurfaceRule_BlockContext)
-			if !ok {
-				return nil
+	traversal.Register(func(ctx *grammar.SurfaceRule_BlockContext, _ string, scope *traversal.Scope) traversal.Construct {
+		out := &Block{}
+		if ref := ctx.ResourceReference(); ref != nil {
+			cons := traversal.ConstructRegistry.Construct(ref, "minecraft", scope)
+			if r, ok := cons.(*traversal.Reference); ok && r != nil {
+				out.BlockName = *block_states.BlockStateRef(*r)
+				return out
 			}
-
-			out := &Block{}
-			if ref := ctx.ResourceReference(); ref != nil {
-				cons := traversal.ConstructRegistry.Construct(
-					ref, "minecraft", scope,
-				)
-				if r, ok := cons.(*traversal.Reference); ok && r != nil {
-
-					out.BlockName = *block_states.BlockStateRef(*r)
-					return out
-				}
-			}
-
-			return nil
-		},
-	)
+		}
+		return nil
+	})
 }
 
 type Block struct {

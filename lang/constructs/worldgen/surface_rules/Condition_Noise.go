@@ -13,9 +13,8 @@ import (
 )
 
 func init() {
-	traversal.ConstructRegistry.Register(
-		reflect.TypeFor[grammar.SurfaceCondition_NoiseThresholdContext](),
-		func(ctx antlr.ParserRuleContext, namespace string, scope *traversal.Scope) traversal.Construct {
+	traversal.Register(
+		func(noise *grammar.SurfaceCondition_NoiseThresholdContext, namespace string, scope *traversal.Scope) traversal.Construct {
 			noiseBuildChain := builder_chain.NewBuilderChain[NoiseCondition](
 				builder_chain.Build(
 					func(ctx *grammar.Builder_MinContext, out *NoiseCondition, scope *traversal.Scope, _ string) {
@@ -29,7 +28,6 @@ func init() {
 				),
 			)
 
-			noise := ctx.(*grammar.SurfaceCondition_NoiseThresholdContext)
 			var noiseRef traversal.Reference
 			if rr := noise.ResourceReference(); rr != nil {
 				if cons := traversal.ConstructRegistry.Construct(rr, namespace, scope); cons != nil {

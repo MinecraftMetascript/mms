@@ -2,23 +2,17 @@ package primitives
 
 import (
 	"fmt"
-	"reflect"
 	"strconv"
 	"strings"
 
 	"github.com/minecraftmetascript/mms/lang/grammar"
 	"github.com/minecraftmetascript/mms/lang/traversal"
 	"github.com/minecraftmetascript/mms/lib"
-
-	"github.com/antlr4-go/antlr/v4"
 )
 
 func init() {
-	traversal.ConstructRegistry.Register(
-		reflect.TypeFor[*grammar.VerticalAnchorContext](),
-		func(ctx antlr.ParserRuleContext, _ string, _ *traversal.Scope) traversal.Construct {
-			anchor := ctx.(*grammar.VerticalAnchorContext)
-
+	traversal.Register(
+		func(anchor *grammar.VerticalAnchorContext, _ string, _ *traversal.Scope) traversal.Construct {
 			if anchor.Identifier() != nil {
 				// Construct a reference
 			} else {

@@ -105,10 +105,8 @@ func getBuilder() *builder_chain.BuilderChain[NoiseSettings] {
 }
 
 func init() {
-	traversal.ConstructRegistry.Register(
-		reflect.TypeFor[*grammar.NoiseSettingsBlockContext](),
-		func(ctx antlr.ParserRuleContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
-			block := ctx.(*grammar.NoiseSettingsBlockContext)
+	traversal.Register(
+		func(block *grammar.NoiseSettingsBlockContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
 			for _, child := range block.GetChildren() {
 				if rule, ok := child.(antlr.ParserRuleContext); ok {
 					traversal.ConstructRegistry.Construct(rule, currentNamespace, scope)
@@ -117,21 +115,16 @@ func init() {
 			return nil
 		},
 	)
-	traversal.ConstructRegistry.Register(
-		reflect.TypeFor[*grammar.NoiseSettingsDeclarationContext](),
-		func(ctx antlr.ParserRuleContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
-			declaration := ctx.(*grammar.NoiseSettingsDeclarationContext)
+	traversal.Register(
+		func(declaration *grammar.NoiseSettingsDeclarationContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
 			if v := traversal.ProcessDeclaration(declaration.Declare(), declaration.NoiseSettings(), scope, currentNamespace, "NoiseSettings"); v != nil {
 				return v.GetValue()
 			}
 			return nil
 		},
 	)
-	traversal.ConstructRegistry.Register(
-		reflect.TypeFor[*grammar.NoiseSettingsContext](),
-		func(ctx antlr.ParserRuleContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
-
-			settings := ctx.(*grammar.NoiseSettingsContext)
+	traversal.Register(
+		func(settings *grammar.NoiseSettingsContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
 			chain := getBuilder()
 
 			out := &NoiseSettings{

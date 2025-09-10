@@ -2,7 +2,6 @@ package surface_rules
 
 import (
 	"encoding/json"
-	"reflect"
 
 	"github.com/minecraftmetascript/mms/lang/grammar"
 	"github.com/minecraftmetascript/mms/lang/traversal"
@@ -12,10 +11,9 @@ import (
 )
 
 func init() {
-	traversal.ConstructRegistry.Register(
-		reflect.TypeFor[*grammar.SurfaceRule_IfContext](),
-		func(ctx_ antlr.ParserRuleContext, ns string, scope *traversal.Scope) traversal.Construct {
-			ctx := ctx_.(*grammar.SurfaceRule_IfContext)
+	traversal.Register(
+
+		func(ctx *grammar.SurfaceRule_IfContext, ns string, scope *traversal.Scope) traversal.Construct {
 			out := &IfRule{
 				scope: scope,
 			}

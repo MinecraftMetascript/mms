@@ -3,7 +3,6 @@ package noise_router
 import (
 	"encoding/json"
 	"errors"
-	"reflect"
 
 	"github.com/antlr4-go/antlr/v4"
 	"github.com/minecraftmetascript/mms/lang/grammar"
@@ -12,26 +11,19 @@ import (
 )
 
 func init() {
-	traversal.ConstructRegistry.Register(
-		reflect.TypeFor[*grammar.NoiseRouterBlockContext](),
-		func(ctx antlr.ParserRuleContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
-			blockCtx := ctx.(*grammar.NoiseRouterBlockContext)
-			for _, child := range blockCtx.GetChildren() {
-				if rule, ok := child.(antlr.ParserRuleContext); ok {
-					traversal.ConstructRegistry.Construct(rule, currentNamespace, scope)
-				}
-			}
-			return nil
-		},
-	)
-	traversal.ConstructRegistry.Register(
-		reflect.TypeFor[*grammar.NoiseRouterDeclarationContext](),
-		func(ctx antlr.ParserRuleContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
-			declaration := ctx.(*grammar.NoiseRouterDeclarationContext)
+ traversal.Register(func(blockCtx *grammar.NoiseRouterBlockContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
+	for _, child := range blockCtx.GetChildren() {
+		if rule, ok := child.(antlr.ParserRuleContext); ok {
+			traversal.ConstructRegistry.Construct(rule, currentNamespace, scope)
+		}
+	}
+	return nil
+})
+	traversal.Register(func(declaration *grammar.NoiseRouterDeclarationContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
 
 			routerDef := declaration.NoiseRouter()
 			if routerDef == nil {
-				scope.DiagnoseSemanticError("Missing noise router definition", ctx)
+				scope.DiagnoseSemanticError("Missing noise router definition", declaration)
 				return nil
 			}
 
@@ -40,20 +32,16 @@ func init() {
 				return nil
 			}
 			return s.GetValue()
-		},
-	)
+		})
 
-	traversal.ConstructRegistry.Register(
-		reflect.TypeFor[*grammar.NoiseRouterContext](),
-		func(ctx antlr.ParserRuleContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
-			router := ctx.(*grammar.NoiseRouterContext)
-			out := &NoiseRouter{}
+	traversal.Register(func(router *grammar.NoiseRouterContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
+		out := &NoiseRouter{}
 
 			finalDensityPresent := false
 			for _, builderCtx := range router.AllNoiseRouter_Builder() {
 				builderKindCtx := builderCtx.GetChild(1)
 				if builderKindCtx == nil {
-					scope.DiagnoseSemanticError("Missing builder", ctx)
+					scope.DiagnoseSemanticError("Missing builder", router)
 					continue
 				}
 				builderKind := builderKindCtx.(antlr.TerminalNode).GetText()
@@ -93,11 +81,10 @@ func init() {
 			}
 
 			if !finalDensityPresent {
-				scope.DiagnoseSemanticError("Missing required FinalDensity()", ctx)
+				scope.DiagnoseSemanticError("Missing required FinalDensity()", router)
 			}
 			return out
-		},
-	)
+		})
 }
 
 type NoiseRouter struct {

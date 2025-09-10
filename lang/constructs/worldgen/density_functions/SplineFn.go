@@ -2,10 +2,8 @@ package density_functions
 
 import (
 	"encoding/json"
-	"reflect"
 	"strconv"
 
-	"github.com/antlr4-go/antlr/v4"
 	"github.com/minecraftmetascript/mms/lang/builder_chain"
 	"github.com/minecraftmetascript/mms/lang/grammar"
 	"github.com/minecraftmetascript/mms/lang/traversal"
@@ -63,19 +61,15 @@ func buildSplinePoint(point *grammar.DensityFn_SplinePointContext, currentNamesp
 }
 
 func init() {
-	traversal.ConstructRegistry.Register(
-		reflect.TypeFor[*grammar.DensityFn_SplineFnContext](),
-		func(ctx antlr.ParserRuleContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
-			densityFn := ctx.(*grammar.DensityFn_SplineFnContext)
+	traversal.Register(
+		func(densityFn *grammar.DensityFn_SplineFnContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
 			splineDef := densityFn.DensityFn_Spline()
 			return traversal.ConstructRegistry.Construct(splineDef, currentNamespace, scope)
 		},
 	)
 
-	traversal.ConstructRegistry.Register(
-		reflect.TypeFor[*grammar.DensityFn_SplineContext](),
-		func(ctx antlr.ParserRuleContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
-			splineDef := ctx.(*grammar.DensityFn_SplineContext)
+	traversal.Register(
+		func(splineDef *grammar.DensityFn_SplineContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
 			if constant := splineDef.Number(); constant != nil {
 				var spline float64
 				builder_chain.Builder_GetFloat(splineDef, func(f float64) { spline = f }, scope, "Spline")
@@ -89,7 +83,7 @@ func init() {
 			}
 			inputCtx := splineDef.DensityFn()
 			if inputCtx == nil {
-				scope.DiagnoseSemanticError("Missing input to spline", ctx)
+				scope.DiagnoseSemanticError("Missing input to spline", splineDef)
 			} else {
 				input := traversal.ConstructRegistry.Construct(inputCtx, currentNamespace, scope)
 				out.Coordinate = input

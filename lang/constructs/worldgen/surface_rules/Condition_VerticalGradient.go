@@ -2,7 +2,6 @@ package surface_rules
 
 import (
 	"encoding/json"
-	"reflect"
 
 	"github.com/minecraftmetascript/mms/lang/builder_chain"
 	"github.com/minecraftmetascript/mms/lang/constructs/primitives"
@@ -14,9 +13,8 @@ import (
 )
 
 func init() {
-	traversal.ConstructRegistry.Register(
-		reflect.TypeFor[grammar.SurfaceCondition_VerticalGradientContext](),
-		func(ctx antlr.ParserRuleContext, ns string, scope *traversal.Scope) traversal.Construct {
+	traversal.Register(
+		func(verticalGradient *grammar.SurfaceCondition_VerticalGradientContext, ns string, scope *traversal.Scope) traversal.Construct {
 			verticalGradientBuilder := builder_chain.NewBuilderChain(
 				builder_chain.Build(
 					func(ctx *grammar.Builder_TopContext, target *VerticalGradientCondition, scope *traversal.Scope, namespace string) {
@@ -30,7 +28,6 @@ func init() {
 				),
 			)
 
-			verticalGradient := ctx.(*grammar.SurfaceCondition_VerticalGradientContext)
 			out := &VerticalGradientCondition{}
 
 			if s := verticalGradient.String_(); s != nil {
@@ -38,7 +35,7 @@ func init() {
 			} else {
 				scope.DiagnoseSemanticError(
 					"Missing seed value",
-					ctx,
+					verticalGradient,
 				)
 			}
 

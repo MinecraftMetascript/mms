@@ -2,7 +2,6 @@ package surface_rules
 
 import (
 	"encoding/json"
-	"reflect"
 
 	"github.com/minecraftmetascript/mms/lang/builder_chain"
 	"github.com/minecraftmetascript/mms/lang/constructs/primitives"
@@ -14,9 +13,8 @@ import (
 )
 
 func init() {
-	traversal.ConstructRegistry.Register(
-		reflect.TypeFor[grammar.SurfaceCondition_YAboveContext](),
-		func(ctx antlr.ParserRuleContext, ns string, scope *traversal.Scope) traversal.Construct {
+	traversal.Register(
+		func(yAbove *grammar.SurfaceCondition_YAboveContext, ns string, scope *traversal.Scope) traversal.Construct {
 			yAboveBuilder := builder_chain.NewBuilderChain(
 				builder_chain.Build(
 					func(ctx *grammar.Builder_MulIntContext, target *YAboveCondition, scope *traversal.Scope, namespace string) {
@@ -30,7 +28,6 @@ func init() {
 				),
 			)
 
-			yAbove := ctx.(*grammar.SurfaceCondition_YAboveContext)
 			out := &YAboveCondition{}
 
 			if vad := yAbove.VerticalAnchor(); vad != nil {

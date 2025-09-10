@@ -2,7 +2,6 @@ package density_functions
 
 import (
 	"encoding/json"
-	"reflect"
 
 	"github.com/antlr4-go/antlr/v4"
 	"github.com/minecraftmetascript/mms/lang/grammar"
@@ -18,10 +17,8 @@ const (
 )
 
 func init() {
-	traversal.ConstructRegistry.Register(
-		reflect.TypeFor[*grammar.DensityFn_DualInputContext](),
-		func(ctx antlr.ParserRuleContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
-			densityFn := ctx.(*grammar.DensityFn_DualInputContext)
+	traversal.Register(
+		func(densityFn *grammar.DensityFn_DualInputContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
 			out := &DualInputDensityFn{}
 			kind := densityFn.GetChild(0)
 			switch k := kind.(type) {
@@ -33,37 +30,37 @@ func init() {
 					case "Max":
 						out.Kind = DensityFn_Max
 					default:
-						scope.DiagnoseSemanticError("Invalid density function kind", ctx)
+						scope.DiagnoseSemanticError("Invalid density function kind", densityFn)
 					}
 				} else {
-					scope.DiagnoseSemanticError("Missing density function kind", ctx)
+					scope.DiagnoseSemanticError("Missing density function kind", densityFn)
 				}
 			default:
-				scope.DiagnoseSemanticError("Invalid density function kind", ctx)
+				scope.DiagnoseSemanticError("Invalid density function kind", densityFn)
 			}
 
 			firstArg := densityFn.DensityFn(0)
 			if firstArg != nil {
 				val := traversal.ConstructRegistry.Construct(firstArg, currentNamespace, scope)
 				if val == nil {
-					scope.DiagnoseSemanticError("Missing density function target", ctx)
+					scope.DiagnoseSemanticError("Missing density function target", densityFn)
 				} else {
 					out.FirstArg = val
 				}
 			} else {
-				scope.DiagnoseSemanticError("Missing density function target", ctx)
+				scope.DiagnoseSemanticError("Missing density function target", densityFn)
 			}
 
 			secondArg := densityFn.DensityFn(1)
 			if secondArg != nil {
 				val := traversal.ConstructRegistry.Construct(secondArg, currentNamespace, scope)
 				if val == nil {
-					scope.DiagnoseSemanticError("Missing density function target", ctx)
+					scope.DiagnoseSemanticError("Missing density function target", densityFn)
 				} else {
 					out.SecondArg = val
 				}
 			} else {
-				scope.DiagnoseSemanticError("Missing density function target", ctx)
+				scope.DiagnoseSemanticError("Missing density function target", densityFn)
 			}
 
 			return out

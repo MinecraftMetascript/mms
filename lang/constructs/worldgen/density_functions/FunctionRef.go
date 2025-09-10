@@ -2,9 +2,7 @@ package density_functions
 
 import (
 	"errors"
-	"reflect"
 
-	"github.com/antlr4-go/antlr/v4"
 	"github.com/minecraftmetascript/mms/lang/grammar"
 	"github.com/minecraftmetascript/mms/lang/traversal"
 	"github.com/minecraftmetascript/mms/lib"
@@ -17,10 +15,8 @@ type ReferenceFunction struct {
 }
 
 func init() {
-	traversal.ConstructRegistry.Register(
-		reflect.TypeFor[grammar.DensityFn_ReferenceContext](),
-		func(ctx antlr.ParserRuleContext, ns string, scope *traversal.Scope) traversal.Construct {
-			refCtx := ctx.(*grammar.DensityFn_ReferenceContext)
+	traversal.Register(
+		func(refCtx *grammar.DensityFn_ReferenceContext, ns string, scope *traversal.Scope) traversal.Construct {
 			out := &ReferenceFunction{}
 			if rr := refCtx.ResourceReference(); rr != nil {
 				if cons := traversal.ConstructRegistry.Construct(rr, ns, scope); cons != nil {

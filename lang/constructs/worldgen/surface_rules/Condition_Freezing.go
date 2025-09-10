@@ -2,19 +2,15 @@ package surface_rules
 
 import (
 	"encoding/json"
-	"reflect"
 
 	"github.com/minecraftmetascript/mms/lang/grammar"
 	"github.com/minecraftmetascript/mms/lang/traversal"
 	"github.com/minecraftmetascript/mms/lib"
-
-	"github.com/antlr4-go/antlr/v4"
 )
 
 func init() {
-	traversal.ConstructRegistry.Register(
-		reflect.TypeFor[grammar.SurfaceCondition_FreezingContext](),
-		func(ctx antlr.ParserRuleContext, _ string, _ *traversal.Scope) traversal.Construct {
+	traversal.Register(
+		func(_ *grammar.SurfaceCondition_FreezingContext, _ string, _ *traversal.Scope) traversal.Construct {
 			return &FreezingCondition{}
 		},
 	)

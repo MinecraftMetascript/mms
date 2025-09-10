@@ -2,7 +2,6 @@ package noise
 
 import (
 	"encoding/json"
-	"reflect"
 	"strconv"
 
 	"github.com/antlr4-go/antlr/v4"
@@ -13,22 +12,15 @@ import (
 )
 
 func init() {
-	traversal.ConstructRegistry.Register(
-		reflect.TypeFor[*grammar.NoiseBlockContext](),
-		func(ctx antlr.ParserRuleContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
-			blockCtx := ctx.(*grammar.NoiseBlockContext)
-			for _, child := range blockCtx.GetChildren() {
-				if rule, ok := child.(antlr.ParserRuleContext); ok {
-					traversal.ConstructRegistry.Construct(rule, currentNamespace, scope)
-				}
+	traversal.Register(func(blockCtx *grammar.NoiseBlockContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
+		for _, child := range blockCtx.GetChildren() {
+			if rule, ok := child.(antlr.ParserRuleContext); ok {
+				traversal.ConstructRegistry.Construct(rule, currentNamespace, scope)
 			}
-			return nil
-		},
-	)
-	traversal.ConstructRegistry.Register(
-		reflect.TypeFor[*grammar.NoiseDeclarationContext](),
-		func(ctx antlr.ParserRuleContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
-			declaration := ctx.(*grammar.NoiseDeclarationContext)
+		}
+		return nil
+	})
+	traversal.Register(func(declaration *grammar.NoiseDeclarationContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
 			noise := declaration.Noise()
 			if noise == nil {
 				// TODO: Diagnose?
@@ -43,13 +35,9 @@ func init() {
 			if s == nil {
 				return nil
 			}
-			return s.GetValue()
-		},
-	)
-	traversal.ConstructRegistry.Register(
-		reflect.TypeFor[*grammar.NoiseDefinitionContext](),
-		func(ctx antlr.ParserRuleContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
-			noise := ctx.(*grammar.NoiseDefinitionContext)
+ 		return s.GetValue()
+		})
+	traversal.Register(func(noise *grammar.NoiseDefinitionContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
 			out := &Noise{
 				Amplitudes: make([]float64, 0),
 			}

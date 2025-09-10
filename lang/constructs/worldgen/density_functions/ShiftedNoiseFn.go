@@ -2,7 +2,6 @@ package density_functions
 
 import (
 	"encoding/json"
-	"reflect"
 
 	"github.com/antlr4-go/antlr/v4"
 	"github.com/minecraftmetascript/mms/lang/builder_chain"
@@ -12,9 +11,8 @@ import (
 )
 
 func init() {
-	traversal.ConstructRegistry.Register(
-		reflect.TypeFor[*grammar.DensityFn_ShiftedNoiseContext](),
-		func(ctx antlr.ParserRuleContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
+	traversal.Register(
+		func(densityFn *grammar.DensityFn_ShiftedNoiseContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
 			shiftedNoiseBuilder := builder_chain.NewBuilderChain[ShiftedNoiseDensityFn](
 				builder_chain.Build(
 					func(ctx *grammar.Builder_XZScaleContext, target *ShiftedNoiseDensityFn, scope *traversal.Scope, namespace string) {
@@ -64,7 +62,7 @@ func init() {
 						target.ShiftZ = fn
 					}),
 			)
-			densityFn := ctx.(*grammar.DensityFn_ShiftedNoiseContext)
+
 			out := &ShiftedNoiseDensityFn{
 				XZScale: 1,
 				YScale:  1,

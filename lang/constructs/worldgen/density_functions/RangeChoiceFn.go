@@ -12,9 +12,8 @@ import (
 )
 
 func init() {
-	traversal.ConstructRegistry.Register(
-		reflect.TypeFor[*grammar.DensityFn_RangeChoiceContext](),
-		func(ctx antlr.ParserRuleContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
+	traversal.Register(
+		func(densityFn *grammar.DensityFn_RangeChoiceContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
 			rangeChoiceBuilder := builder_chain.NewBuilderChain[RangeChoiceDensityFn](
 				builder_chain.Build(
 					func(ctx *grammar.Builder_MinContext, target *RangeChoiceDensityFn, scope *traversal.Scope, namespace string) {
@@ -48,11 +47,10 @@ func init() {
 				),
 			)
 
-			densityFn := ctx.(*grammar.DensityFn_RangeChoiceContext)
 			out := &RangeChoiceDensityFn{}
 			input := densityFn.DensityFn()
 			if input == nil {
-				scope.DiagnoseSemanticError("Missing input to range choice", ctx)
+				scope.DiagnoseSemanticError("Missing input to range choice", densityFn)
 			} else {
 				out.Input = traversal.ConstructRegistry.Construct(input.(antlr.ParserRuleContext), currentNamespace, scope)
 			}

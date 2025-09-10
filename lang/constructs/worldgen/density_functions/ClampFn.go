@@ -12,9 +12,8 @@ import (
 )
 
 func init() {
-	traversal.ConstructRegistry.Register(
-		reflect.TypeFor[*grammar.DensityFn_ClampContext](),
-		func(ctx antlr.ParserRuleContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
+	traversal.Register(
+		func(densityFn *grammar.DensityFn_ClampContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
 			rangeChoiceBuilder := builder_chain.NewBuilderChain[ClampDensityFn](
 				builder_chain.Build(
 					func(ctx *grammar.Builder_MinContext, target *ClampDensityFn, scope *traversal.Scope, namespace string) {
@@ -27,16 +26,14 @@ func init() {
 					},
 				),
 			)
-
-			densityFn := ctx.(*grammar.DensityFn_ClampContext)
 			out := &ClampDensityFn{}
 			input := densityFn.DensityFn()
 			if input == nil {
-				scope.DiagnoseSemanticError("Missing input to range choice", ctx)
+				scope.DiagnoseSemanticError("Missing input to range choice", densityFn)
 			}
 			out.Input = traversal.ConstructRegistry.Construct(input.(antlr.ParserRuleContext), currentNamespace, scope)
 			if out.Input == nil {
-				scope.DiagnoseSemanticError("Invalid input to range choice", ctx)
+				scope.DiagnoseSemanticError("Invalid input to range choice", densityFn)
 			}
 
 			for _, builderWrap := range densityFn.AllDensityFn_ClampBuilder() {

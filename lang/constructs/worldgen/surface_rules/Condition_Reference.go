@@ -2,21 +2,15 @@ package surface_rules
 
 import (
 	"encoding/json"
-	"reflect"
 
 	"github.com/minecraftmetascript/mms/lang/grammar"
 	"github.com/minecraftmetascript/mms/lang/traversal"
 	"github.com/minecraftmetascript/mms/lib"
-
-	"github.com/antlr4-go/antlr/v4"
 )
 
 func init() {
-	traversal.ConstructRegistry.Register(
-		reflect.TypeFor[grammar.SurfaceCondition_ReferenceContext](),
-		func(ctx antlr.ParserRuleContext, ns string, scope *traversal.Scope) traversal.Construct {
-			ref := ctx.(*grammar.SurfaceCondition_ReferenceContext)
-
+	traversal.Register(
+		func(ref *grammar.SurfaceCondition_ReferenceContext, ns string, scope *traversal.Scope) traversal.Construct {
 			var refVal *traversal.Reference
 			if rr := ref.ResourceReference(); rr != nil {
 				if cons := traversal.ConstructRegistry.Construct(rr, ns, scope); cons != nil {

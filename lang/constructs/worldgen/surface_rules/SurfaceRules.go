@@ -3,7 +3,6 @@ package surface_rules
 import (
 	"encoding/json"
 	"errors"
-	"reflect"
 
 	"github.com/minecraftmetascript/mms/lang/grammar"
 	"github.com/minecraftmetascript/mms/lang/traversal"
@@ -15,10 +14,7 @@ import (
 type SurfaceRuleKind string
 
 func init() {
-	traversal.ConstructRegistry.Register(
-		reflect.TypeFor[grammar.SurfaceRuleContext](),
-		func(ctx antlr.ParserRuleContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
-			def := ctx.(*grammar.SurfaceRuleContext)
+	traversal.Register(func(def *grammar.SurfaceRuleContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
 
 			if def.GetChildCount() > 0 {
 				if v, ok := def.GetChild(0).(antlr.ParserRuleContext); ok {
@@ -30,15 +26,11 @@ func init() {
 				}
 			}
 			return nil
-		},
-	)
-	traversal.ConstructRegistry.Register(
-		reflect.TypeFor[grammar.SurfaceRuleDeclarationContext](),
-		func(ctx antlr.ParserRuleContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
-			declarationContext := ctx.(*grammar.SurfaceRuleDeclarationContext)
-			s := traversal.ProcessDeclaration(declarationContext.Declare(), declarationContext.SurfaceRule(), scope, currentNamespace, "SurfaceRule")
-			return s.GetValue()
-		})
+	})
+	traversal.Register(func(declarationContext *grammar.SurfaceRuleDeclarationContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
+		s := traversal.ProcessDeclaration(declarationContext.Declare(), declarationContext.SurfaceRule(), scope, currentNamespace, "SurfaceRule")
+		return s.GetValue()
+	})
 }
 
 const (

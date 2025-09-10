@@ -2,20 +2,15 @@ package surface_rules
 
 import (
 	"encoding/json"
-	"reflect"
 
 	"github.com/minecraftmetascript/mms/lang/grammar"
 	"github.com/minecraftmetascript/mms/lang/traversal"
 	"github.com/minecraftmetascript/mms/lib"
-
-	"github.com/antlr4-go/antlr/v4"
 )
 
 func init() {
-	traversal.ConstructRegistry.Register(
-		reflect.TypeFor[grammar.SurfaceCondition_AndContext](),
-		func(_ctx antlr.ParserRuleContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
-			compound := _ctx.(*grammar.SurfaceCondition_AndContext)
+	traversal.Register(
+		func(compound *grammar.SurfaceCondition_AndContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
 			conditions := make([]traversal.Construct, 0)
 
 			for _, child := range compound.AllSurfaceCondition() {

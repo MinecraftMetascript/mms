@@ -2,20 +2,14 @@ package block_states
 
 import (
 	"encoding/json"
-	"fmt"
-	"reflect"
 
-	"github.com/antlr4-go/antlr/v4"
 	"github.com/minecraftmetascript/mms/lang/grammar"
 	"github.com/minecraftmetascript/mms/lang/traversal"
 )
 
 func init() {
-	traversal.ConstructRegistry.Register(
-		reflect.TypeFor[*grammar.BlockStateContext](),
-		func(ctx antlr.ParserRuleContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
-			fmt.Println("eeee")
-			state := ctx.(*grammar.BlockStateContext)
+	traversal.Register(
+		func(state *grammar.BlockStateContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
 			nameCtx := state.ResourceReference()
 			if nameCtx == nil {
 				return nil
