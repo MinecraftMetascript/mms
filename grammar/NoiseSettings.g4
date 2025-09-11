@@ -5,7 +5,7 @@ import Core_Lang, BlockState, NoiseRouter, Surface;
 noiseSettingsBlock: 'NoiseSettings' NL* '{' NL* (noiseSettingsDeclaration NL*)* NL* '}';
 
 noiseSettingsDeclaration: declare noiseSettings;
-noiseSettings: 'NoiseSettings' NL* '(' NL* ')' NL* (noiseSettings_Builder NL*)*;
+noiseSettings: 'NoiseSettings' NL* '(' NL* NL* ')' NL* (noiseSettings_Builder NL*)*;
 
 
 noiseSettings_Builder:
@@ -23,17 +23,17 @@ noiseSettings_Builder:
     | builder_NoiseRouter
     | builder_SurfaceRule
     ;
-builder_NoiseSize: '.NoiseSize' '(' Int ',' Int ')';
-builder_NoiseRouter: '.NoiseRouter' '(' noiseRouter ')';
-builder_SeaLevel: '.SeaLevel' '(' Int ')';
-builder_DisableCreatures: '.DisableCreatures' '(' ')';
-builder_DisableVeins: '.DisableVeins' '(' ')';
-builder_DisableAquifers: '.DisableAquifers' '(' ')';
-builder_LegacyRandomSource: '.LegacyRandomSource' '(' ')';
-builder_DefaultBlock: '.DefaultBlock' '(' (blockState | resourceReference) ')';
-builder_DefaultFluid: '.DefaultFluid' '(' (blockState | resourceReference) ')';
-builder_SpawnTarget: '.SpawnTarget' '(' /* TODO: Implement */ ')';
-builder_MinY: '.MinY' '(' Int ')';
-builder_Height: '.Height' '(' Int ')';
+builder_NoiseSize: '.NoiseSize' '(' NL* Int NL* ',' NL* Int NL* ')';
+builder_NoiseRouter: '.NoiseRouter' '(' NL* noiseRouter NL* ')';
+builder_SeaLevel: '.SeaLevel' '(' NL* Int NL* ')';
+builder_DisableCreatures: '.DisableCreatures' '(' NL* NL* ')';
+builder_DisableVeins: '.DisableVeins' '(' NL* NL* ')';
+builder_DisableAquifers: '.DisableAquifers' '(' NL* NL* ')';
+builder_LegacyRandomSource: '.LegacyRandomSource' '(' NL* NL* ')';
+builder_DefaultBlock: '.DefaultBlock' '(' NL* (blockState | resourceReference) NL* ')';
+builder_DefaultFluid: '.DefaultFluid' '(' NL* (blockState | resourceReference) NL* ')';
+builder_SpawnTarget: '.SpawnTarget' '(' NL* /* TODO: Implement */ NL* ')';
+builder_MinY: '.MinY' '(' NL* Int NL* ')';
+builder_Height: '.Height' '(' NL* Int NL* ')';
 
-builder_SurfaceRule: '.SurfaceRule' '(' surfaceRule ')';
+builder_SurfaceRule: '.SurfaceRule' '(' NL* surfaceRule NL* ')';

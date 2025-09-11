@@ -19,20 +19,20 @@ type BaseSymbol struct {
 	contentLocation TextLocation
 	value           Construct
 	ref             *Reference
-	_type           string
+	kind            string
 }
 
 func (s BaseSymbol) GetType() string {
-	return s._type
+	return s.kind
 }
 
-func NewSymbol(nameLocation TextLocation, contentLocation TextLocation, value Construct, ref *Reference, _type string) BaseSymbol {
+func NewSymbol(nameLocation TextLocation, contentLocation TextLocation, value Construct, ref *Reference, kind string) BaseSymbol {
 	return BaseSymbol{
 		nameLocation:    nameLocation,
 		contentLocation: contentLocation,
 		value:           value,
 		ref:             ref,
-		_type:           _type,
+		kind:            kind,
 	}
 }
 
@@ -41,9 +41,9 @@ type DeclarationContext interface {
 	Identifier() antlr.TerminalNode
 }
 
-func ProcessDeclaration(ctx DeclarationContext, valueCtx antlr.ParserRuleContext, scope *Scope, namespace string, typeName string) Symbol {
+func ProcessDeclaration(ctx DeclarationContext, valueCtx antlr.ParserRuleContext, scope *Scope, namespace string, kind string) Symbol {
 	out := &BaseSymbol{}
-	out._type = typeName
+	out.kind = kind
 
 	if id := ctx.Identifier(); id == nil {
 		scope.DiagnoseSemanticError("Missing Identifier", ctx)

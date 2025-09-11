@@ -2,7 +2,6 @@ package density_functions
 
 import (
 	"encoding/json"
-	"fmt"
 
 	"github.com/antlr4-go/antlr/v4"
 	"github.com/minecraftmetascript/mms/lang/grammar"
@@ -38,33 +37,14 @@ func (m MathDensityFn) ExportSymbol(symbol traversal.Symbol, rootDir *lib.FileTr
 	return exportDensityFunction(symbol, rootDir, m)
 }
 
-func ExtractInlinedNoise(noiseCtx *grammar.NoiseDefinitionContext, currentNamespace string, scope *traversal.Scope) *traversal.Reference {
-	noiseDef := traversal.ConstructRegistry.Construct(noiseCtx, currentNamespace, scope)
-	noiseRef := traversal.NewReference(
-		fmt.Sprintf("densityfn_noise_%d_%d", noiseCtx.GetStart().GetLine(), noiseCtx.GetStart().GetColumn()),
-		"mms_inline",
-	)
-	noiseSymbol := traversal.NewSymbol(
-		traversal.RuleLocation(noiseCtx, scope.CurrentFile),
-		traversal.RuleLocation(noiseCtx, scope.CurrentFile),
-		noiseDef,
-		noiseRef,
-		"Noise",
-	)
-	if _, ok := scope.Get(*noiseRef); !ok {
-		if err := scope.Register(noiseSymbol); err != nil {
-			// TODO: Improve behavior
-			panic(err)
-		}
-	}
-	return noiseRef
-}
-
 func init() {
 	traversal.Register(
-		func(inlineCtx *grammar.DensityFn_InlineNoiseContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
-			if noiseInlineCtx := inlineCtx.Noise(); noiseInlineCtx != nil {
-				return ExtractInlinedNoise(noiseInlineCtx.NoiseDefinition().(*grammar.NoiseDefinitionContext), currentNamespace, scope)
+		func(ctx *grammar.DensityFn_InlineNoiseContext, namespace string, scope *traversal.Scope) traversal.Construct {
+			if noiseCtx := ctx.Noise(); noiseCtx != nil {
+				if _, ref := traversal.ExtractInlineConstruct(noiseCtx.NoiseDefinition(), namespace, scope, "Noise"); ref != nil {
+					return ref
+				}
+
 			}
 			return nil
 		},
@@ -140,6 +120,7 @@ func exportDensityFunction(symbol traversal.Symbol, rootDir *lib.FileTreeLike, c
 		return err
 	}
 	rootDir.
+		MkDir("data", nil).
 		MkDir(symbol.GetReference().GetNamespace(), nil).
 		MkDir("worldgen", nil).
 		MkDir("density_function", nil).

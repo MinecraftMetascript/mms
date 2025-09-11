@@ -30,10 +30,12 @@ func TerminalNodeLocation(ctx antlr.TerminalNode, filename string) TextLocation 
 			Line: ctx.GetSymbol().GetLine(),
 			Col:  ctx.GetSymbol().GetColumn(),
 		},
+		StartIdx: ctx.GetSymbol().GetStart(),
 		Stop: Location{
 			Line: ctx.GetSymbol().GetLine(),
 			Col:  ctx.GetSymbol().GetColumn() + len(ctx.GetText()),
 		},
+		StopIdx:  ctx.GetSymbol().GetStop(),
 		Text:     ctx.GetText(),
 		Filename: filename,
 	}

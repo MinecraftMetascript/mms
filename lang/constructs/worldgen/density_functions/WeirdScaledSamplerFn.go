@@ -50,11 +50,11 @@ func init() {
 							continue
 						}
 					} else if inline := noise.NoiseDefinition(); inline != nil {
-						ref := ExtractInlinedNoise(inline.(*grammar.NoiseDefinitionContext), currentNamespace, scope)
+						_, ref := traversal.ExtractInlineConstruct(inline, currentNamespace, scope, "Noise")
+
 						if ref != nil {
 							out.Noise = *ref
 						} else {
-							// TODO: Diagnose
 							scope.DiagnoseSemanticError("Invalid inline noise definition.", noise)
 							continue
 						}

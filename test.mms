@@ -1,31 +1,16 @@
 Namespace xyz {
-    NoiseSettings {
-        someDimension = NoiseSettings()
-            .SeaLevel(5)
-            .DefaultBlock(stone)
-            .DefaultFluid(Block(water))
-            .NoiseSize(3,3)
-    }
+  DensityFn {
+    TestNoise = Noise(-5).Amplitudes(5)
+  }
 
-    Noise {
-        n = Noise(-10).Amplitudes(5,6,7)
-    }
-    DensityFn {
-        r = Noise(myNoise)
-    }
-    NoiseRouter {
-        o = Router()
-            .FinalDensity(
-                YClampedGradient()
-                    .Min(0)
-                    .Max(100)
-                    .Bottom(-10)
-                    .Top(10)
-            )
-            .Temperature(
-                Noise(-5).Amplitudes(1,2,3)
-            )
-            .Erosion(n)
-    }
+  NoiseSettings {
+    MyNoise = NoiseSettings()
+      .NoiseRouter(
+        Router()
+          .FinalDensity(1)
+      )
+      .SurfaceRule(Block(stone))
+      .DefaultBlock(stone)
+      .DefaultFluid(water)
+  }
 }
-

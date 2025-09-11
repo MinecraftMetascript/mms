@@ -75,6 +75,21 @@ func getBuilder() *builder_chain.BuilderChain[NoiseSettings] {
 			},
 		),
 		builder_chain.Build(
+			func(ctx *grammar.Builder_NoiseRouterContext, target *NoiseSettings, scope *traversal.Scope, namespace string) {
+				if sym, _ := traversal.ExtractInlineConstruct(ctx.NoiseRouter(), namespace, scope, "NoiseRouter"); sym != nil {
+					target.NoiseRouter = sym.GetValue()
+				}
+			},
+		),
+		builder_chain.Build(
+			func(ctx *grammar.Builder_SurfaceRuleContext, target *NoiseSettings, scope *traversal.Scope, namespace string) {
+				if sym, _ :=
+					traversal.ExtractInlineConstruct(ctx.SurfaceRule(), namespace, scope, "SurfaceRule"); sym != nil {
+					target.NoiseRouter = sym.GetValue()
+				}
+			},
+		),
+		builder_chain.Build(
 			func(ctx *grammar.Builder_NoiseSizeContext, target *NoiseSettings, scope *traversal.Scope, namespace string) {
 				horizontalCtx := ctx.Int(0)
 				if horizontalCtx == nil {
@@ -169,8 +184,8 @@ func init() {
 				chain,
 				settings,
 				scope,
-				reflect.TypeFor[*grammar.Builder_NoiseRouterContext](),
-				".NoiseRouter",
+				reflect.TypeFor[*grammar.Builder_SurfaceRuleContext](),
+				".SurfaceRule",
 			)
 			return out
 		},

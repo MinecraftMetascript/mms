@@ -24,7 +24,7 @@ type packagedProject struct {
 func packageProject() (string, error) {
 	out := packagedProject{
 		Source:  make(map[string]string),
-		Files:   project.BuildFsLike("wasm"),
+		Files:   project.BuildFsLike("my_mms_project"),
 		Symbols: project.GlobalScope.Symbols(),
 	}
 
