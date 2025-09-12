@@ -6,9 +6,8 @@ import (
 	"log"
 	"reflect"
 
-	"github.com/minecraftmetascript/mms/lib"
-
 	"github.com/antlr4-go/antlr/v4"
+	"github.com/minecraftmetascript/mms/lib"
 )
 
 type Construct interface {
@@ -28,17 +27,96 @@ type BaseConstruct struct {
 }
 
 type constructRegistryImpl struct {
-	constructs map[reflect.Type]ConstructFactory
+	factories map[reflect.Type]ConstructFactory
+	help      map[reflect.Type]func(construct Construct, symbol Symbol, location TextLocation) *string
+
+	constructs map[TextLocation]Construct
+	symbols    map[TextLocation]Symbol
+}
+
+func getByLocation[T any](location TextLocation, m map[TextLocation]T) map[TextLocation]T {
+	out := make(map[TextLocation]T, 0)
+	for l, val := range m {
+		if location.Contains(l) {
+			out[l] = val
+		}
+	}
+	return out
 }
 
 type Factory[C antlr.ParserRuleContext] func(ctx C, ns string, scope *Scope) Construct
+
+func RegisterHelp[C antlr.ParserRuleContext](f func(construct Construct, symbol Symbol, location TextLocation) *string) {
+	ctxType := reflect.TypeFor[C]()
+	if ctxType.Kind() == reflect.Ptr {
+		ctxType = ctxType.Elem()
+	}
+	ConstructRegistry.help[ctxType] = f
+}
+
+type Help struct {
+	Content  string
+	Position TextLocation
+}
+
+func GetHelp(ctx antlr.ParserRuleContext, filename string) *Help {
+	t := reflect.TypeOf(ctx)
+	if t == nil {
+		return nil
+	}
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+
+	helper, ok := ConstructRegistry.help[t]
+	if !ok {
+		return nil
+	}
+
+	ctxLocation := RuleLocation(ctx, filename)
+	constructs := getByLocation(ctxLocation, ConstructRegistry.constructs)
+	symbols := getByLocation(ctxLocation, ConstructRegistry.symbols)
+
+	for location, symbol := range symbols {
+		construct := symbol.GetValue()
+		if construct == nil {
+			continue
+		}
+		val := helper(construct, symbol, location)
+		if val == nil {
+			continue
+		}
+
+		return &Help{
+			Content:  *val,
+			Position: location,
+		}
+	}
+
+	for location, construct := range constructs {
+		if construct == nil {
+			continue
+		}
+		val := helper(construct, nil, location)
+		if val == nil {
+			continue
+		}
+
+		return &Help{
+			Content:  *val,
+			Position: location,
+		}
+	}
+
+	return nil
+}
 
 func Register[C antlr.ParserRuleContext](f Factory[C]) {
 	ctxType := reflect.TypeFor[C]()
 	if ctxType.Kind() == reflect.Ptr {
 		ctxType = ctxType.Elem()
 	}
-	ConstructRegistry.constructs[ctxType] = func(base antlr.ParserRuleContext, ns string, scope *Scope) Construct {
+	ConstructRegistry.factories[ctxType] = func(base antlr.ParserRuleContext, ns string, scope *Scope) Construct {
 		return f(base.(C), ns, scope)
 	}
 }
@@ -52,15 +130,19 @@ func (r *constructRegistryImpl) Construct(ctx antlr.ParserRuleContext, currentNa
 		t = t.Elem()
 	}
 
-	if factory, ok := r.constructs[t]; ok {
+	if factory, ok := r.factories[t]; ok {
 		val := factory(ctx, currentNamespace, scope)
+		r.constructs[RuleLocation(ctx, scope.CurrentFile)] = val
 		return val
 	}
 	return nil
 }
 
 var ConstructRegistry = &constructRegistryImpl{
-	constructs: make(map[reflect.Type]ConstructFactory),
+	factories:  make(map[reflect.Type]ConstructFactory),
+	help:       make(map[reflect.Type]func(construct Construct, symbol Symbol, location TextLocation) *string),
+	constructs: make(map[TextLocation]Construct),
+	symbols:    make(map[TextLocation]Symbol),
 }
 
 func ExtractInlineConstruct(
@@ -102,5 +184,6 @@ func ExtractInlineConstruct(
 		scope.DiagnoseSemanticError(fmt.Sprintf("Found duplicate inline values. This should not be possible %s", label), ctx)
 		return nil, nil
 	}
+	ConstructRegistry.symbols[RuleLocation(ctx, scope.CurrentFile)] = s
 	return s, ref
 }

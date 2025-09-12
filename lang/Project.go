@@ -51,9 +51,10 @@ func (p *Project) AddFile(path, content string) *File {
 
 func (p *Project) BuildFsLike(rootName string) *lib.FileTreeLike {
 	root := lib.NewDirLike(rootName, nil)
+	dataDir := root.MkDir("data", nil)
 	for name, symbol := range p.GlobalScope.Symbols() {
 		ref := symbol.GetValue()
-		err := ref.ExportSymbol(symbol, root)
+		err := ref.ExportSymbol(symbol, dataDir)
 		if err != nil {
 			fmt.Println(fmt.Sprintf("Error while exporting %s: %s", name, err.Error()))
 		}

@@ -2,6 +2,18 @@ declare global {
     function updateFile(filename: string, content: string, callback: ProjectUpdateHook): void
 
     function getFileDiag(filename: string, callback: (serial: string) => void)
+
+    /**
+     * Exported by mms.wasm
+     * @param input
+     */
+    function mmsLspWrite(input: string): void
+
+    /**
+     * Must be defined for mms.wasm to load properly.
+     * @param output
+     */
+    function mmsLspRead(output: string): void
 }
 
 export type ProjectUpdateHook =

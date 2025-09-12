@@ -20,6 +20,10 @@ type TextLocation struct {
 	Filename string
 }
 
+func (tl TextLocation) Contains(other TextLocation) bool {
+	return tl.StartIdx <= other.StartIdx && tl.StopIdx >= other.StopIdx
+}
+
 func (tl TextLocation) String() string {
 	return fmt.Sprintf("(%d,%d)->(%d,%d)", tl.Start.Line, tl.Start.Col, tl.Stop.Line, tl.Stop.Col)
 }

@@ -1,0 +1,121 @@
+package density_functions
+
+import (
+	"fmt"
+	"strconv"
+
+	"github.com/antlr4-go/antlr/v4"
+	"github.com/minecraftmetascript/mms/lang/constructs/mmsFunc"
+	"github.com/minecraftmetascript/mms/lang/grammar"
+	"github.com/minecraftmetascript/mms/lang/traversal"
+	"github.com/minecraftmetascript/mms/lib"
+)
+
+type DensityFnFunc struct {
+	signature mmsFunc.Signature
+	target    *grammar.DensityFnContext
+}
+
+func (d DensityFnFunc) GetSignature() mmsFunc.Signature {
+	return d.signature
+}
+
+func (d DensityFnFunc) GetContent() antlr.ParserRuleContext {
+	return d.target
+}
+
+func (d DensityFnFunc) MarshalJSON() ([]byte, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (d DensityFnFunc) ExportSymbol(symbol traversal.Symbol, rootDir *lib.FileTreeLike) error {
+	//TODO implement me
+	panic("implement me")
+}
+
+func init() {
+	traversal.Register(func(ctx *grammar.DensityFnBodyContext, ns string, scope *traversal.Scope) traversal.Construct {
+		funcCtx := ctx.FuncOf()
+		funcVal := traversal.ConstructRegistry.Construct(funcCtx, ns, scope)
+		out := &DensityFnFunc{}
+		if val, ok := funcVal.(*mmsFunc.Signature); !ok {
+			return nil
+		} else {
+			out.signature = *val
+		}
+		out.target = ctx.DensityFn().(*grammar.DensityFnContext)
+		return out
+	})
+	traversal.Register(func(ctx *grammar.DensityFnFuncDeclarationContext, ns string, scope *traversal.Scope) traversal.Construct {
+		symbol := traversal.ProcessDeclaration(ctx.Declare(), ctx.DensityFnBody(), scope, ns, "DensityFnFunc")
+
+		mmsFunc.Register(
+			symbol.GetReference().GetName(),
+			symbol.GetValue().(*DensityFnFunc),
+		)
+
+		return nil
+	})
+	traversal.Register(func(ctx *grammar.FuncCallContext, ns string, scope *traversal.Scope) traversal.Construct {
+		funcName := ctx.Identifier()
+		fn := mmsFunc.Get(funcName.GetText())
+		if fn == nil {
+			return nil
+		}
+		signatureParameters := fn.GetSignature().Params()
+		callParameters := ctx.AllParam()
+
+		if len(signatureParameters) != len(callParameters) {
+			scope.DiagnoseSemanticError(
+				fmt.Sprintf("Expected %d parameters, found %d", len(signatureParameters), len(callParameters)),
+				ctx,
+			)
+			return nil
+		}
+
+		paramValues := make(map[string]any, len(callParameters))
+
+		for i, callParam := range ctx.AllParam() {
+			sigParam := signatureParameters[i]
+			switch sigParam.Kind {
+			case "int":
+				v, err := strconv.Atoi(callParam.GetText())
+				if err != nil {
+					scope.DiagnoseSemanticError(
+						fmt.Sprintf("Expected int, found %s", callParam.GetText()),
+						callParam,
+					)
+					return nil
+				}
+				paramValues[sigParam.Name] = v
+				fmt.Printf("Var %s has value %d\n", sigParam.Name, v)
+			}
+		}
+
+		result := replace(fn.GetContent(), paramValues)
+		fmt.Println(result.GetText())
+
+		if funcName == nil {
+			// TODO: Diagnose me
+			return nil
+		}
+		return nil
+	})
+}
+
+func replace(rule antlr.ParserRuleContext, variableMap map[string]any) antlr.ParserRuleContext {
+	for _, child := range rule.GetChildren() {
+		if childRule, ok := child.(antlr.ParserRuleContext); ok {
+			replace(childRule, variableMap)
+		} else if childNode, ok := child.(antlr.TerminalNode); ok {
+			tokenTypeInt := childNode.GetSymbol().GetTokenType()
+			if grammar.MinecraftMetascriptLexerVariable == tokenTypeInt {
+				fmt.Println("Replacing variable", childNode.GetText())
+				//antlr.TokenStreamRewriter{}
+			}
+		}
+	}
+	return rule
+
+}

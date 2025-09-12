@@ -11400,10 +11400,12 @@ func (p *MinecraftMetascriptParser) Builder_Min() (localctx IBuilder_MinContext)
 		}
 		_la = p.GetTokenStream().LA(1)
 	}
+
 	{
 		p.SetState(948)
 		p.Number()
 	}
+
 	p.SetState(952)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
@@ -11580,10 +11582,12 @@ func (p *MinecraftMetascriptParser) Builder_Max() (localctx IBuilder_MaxContext)
 		}
 		_la = p.GetTokenStream().LA(1)
 	}
+
 	{
 		p.SetState(964)
 		p.Number()
 	}
+
 	p.SetState(968)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
@@ -11908,6 +11912,7 @@ func (p *MinecraftMetascriptParser) Builder_TopLiteral() (localctx IBuilder_TopL
 			goto errorExit
 		}
 	}
+
 	{
 		p.SetState(992)
 		p.Match(MinecraftMetascriptParserInt)
@@ -11916,6 +11921,7 @@ func (p *MinecraftMetascriptParser) Builder_TopLiteral() (localctx IBuilder_TopL
 			goto errorExit
 		}
 	}
+
 	{
 		p.SetState(993)
 		p.Match(MinecraftMetascriptParserT__8)
@@ -12252,6 +12258,7 @@ func (p *MinecraftMetascriptParser) Builder_BottomLiteral() (localctx IBuilder_B
 		}
 		_la = p.GetTokenStream().LA(1)
 	}
+
 	{
 		p.SetState(1020)
 		p.Match(MinecraftMetascriptParserInt)
@@ -12260,6 +12267,7 @@ func (p *MinecraftMetascriptParser) Builder_BottomLiteral() (localctx IBuilder_B
 			goto errorExit
 		}
 	}
+
 	p.SetState(1024)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
@@ -14074,6 +14082,7 @@ func (p *MinecraftMetascriptParser) DensityFnBlock() (localctx IDensityFnBlockCo
 			p.SetState(1160)
 			p.DensityFnDeclaration()
 		}
+
 		p.SetState(1164)
 		p.GetErrorHandler().Sync(p)
 		if p.HasError() {

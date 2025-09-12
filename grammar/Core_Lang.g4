@@ -4,6 +4,7 @@ import Noise, DensityFunctions, Surface;
 
 declare: Identifier NL* '=' NL*;
 
+
 builder_XZScale: '.XZScale(' NL* number NL* ')';
 builder_YScale: '.YScale(' NL* number NL* ')';
 builder_XZFactor: '.XZFactor(' NL* number NL* ')';
@@ -20,12 +21,12 @@ builder_Offset: '.Offset' '(' NL* Int NL* ')';
 builder_Add:'.Add' '(' ')' ;
 builder_Mul: '.Mul(' NL* number NL* ')';
 builder_MulInt: '.Mul(' NL* Int NL* ')';
-builder_Min: '.Min(' NL* number NL* ')';
-builder_Max: '.Max(' NL* number NL* ')';
+builder_Min: '.Min(' NL* (number) NL* ')';
+builder_Max: '.Max(' NL* (number) NL* ')';
 builder_Top: '.Top' '(' NL* verticalAnchor NL* ')';
-builder_TopLiteral: '.Top' '(' Int ')';
+builder_TopLiteral: '.Top' '(' (Int) ')';
 builder_Bottom: '.Bottom' '(' NL* verticalAnchor NL* ')';
-builder_BottomLiteral: '.Bottom' '('NL* Int NL* ')';
+builder_BottomLiteral: '.Bottom' '('NL* (Int) NL* ')';
 builder_InRange: '.InRange' '(' NL* densityFn NL* ')';
 builder_OutRange: '.OutRange' '(' NL* densityFn NL* ')';
 

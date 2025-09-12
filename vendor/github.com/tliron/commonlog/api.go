@@ -10,8 +10,6 @@ import (
 
 var backend Backend
 
-var Trace bool
-
 // Sets the current backend.
 //
 // A nil backend will disable all logging
@@ -41,9 +39,9 @@ func Configure(verbosity int, path *string) {
 	}
 }
 
-// Convenience method to call [Configure] but automatically override
-// the verbosity with -4 ([None]) if logging to stdout and [terminal.Quiet]
-// is set to false.
+// Convenience method to call [Configure] while automatically overriding
+// the verbosity with -4 ([None]) if [terminal.Quiet] is set to false
+// and the path is empty (meaning we want to log to stdout).
 func Initialize(verbosity int, path string) {
 	if path == "" {
 		if terminal.Quiet {
@@ -58,8 +56,8 @@ func Initialize(verbosity int, path string) {
 // Gets the current backend's [io.Writer]. Guaranteed to always return
 // a valid non-nil value.
 //
-// Can be [io.Discard] if unsupported by the backend or if no backend was
-// set.
+// Will be [io.Discard] if writing is unsupported by the backend or if
+// no backend was set.
 func GetWriter() io.Writer {
 	if backend != nil {
 		if writer := backend.GetWriter(); writer != nil {
@@ -150,13 +148,13 @@ func NewDebugMessage(depth int, name ...string) Message {
 	return NewMessage(Debug, depth+1, name...)
 }
 
-// Creates a [BackendLogger] for the given path. The path is converted to
-// a name using [string.Split] on ".".
+// Provides a [BackendLogger] instance for the given path. The path
+// is converted to a name using [PathToName].
+//
+// Note that this function will always return a new instance and that
+// instances for the same path are functionally equivalent.
 func GetLogger(path string) Logger {
-	name := strings.Split(path, ".")
-	if len(name) == 0 {
-		name = nil
-	}
+	name := PathToName(path)
 	return NewBackendLogger(name...)
 }
 

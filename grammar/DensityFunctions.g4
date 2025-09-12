@@ -2,7 +2,8 @@ grammar DensityFunctions;
 
 import Core_Lang, Noise;
 
-densityFnBlock: 'DensityFn' NL* '{' NL* (densityFnDeclaration NL*)* NL* '}';
+densityFnBlock: 'DensityFn' NL* '{' NL* ((densityFnDeclaration) NL*)* NL* '}';
+
 
 densityFnDeclaration: declare densityFn;
 densityFn: (

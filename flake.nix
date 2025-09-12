@@ -2,7 +2,7 @@
   description = "DevShell with Antlr4 and Go";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/d98abf5cf5914e5e4e9d57205e3af55ca90ffc1d";
+    nixpkgs.url = "github:NixOS/nixpkgs/648f70160c03151bc2121d179291337ad6bc564b";
     flake-utils.url = "github:numtide/flake-utils";
 
   };
@@ -85,8 +85,13 @@
           buildPhase = ''
             export GOOS=js
             export GOARCH=wasm
+            export HOME="$TMPDIR"
+            export GOPATH="$TMPDIR/go"
+            export GOMODCACHE="$GOPATH/pkg/mod"
             export GOCACHE="$TMPDIR/go-cache"
-            go build -o main.wasm
+            export GOPROXY=off
+
+            go build -o main.wasm -mod=vendor
           '';
           installPhase = ''
             mkdir -p $out/js/dist
@@ -94,7 +99,7 @@
             cp $src/wasm/* $out/js -r
             cp $src/wasm/.* $out/js -r
 
-            cp "$(go env GOROOT)/misc/wasm/wasm_exec.js" $out/
+            cp "$(go env GOROOT)/lib/wasm/wasm_exec.js" $out/
           '';
         };
       }

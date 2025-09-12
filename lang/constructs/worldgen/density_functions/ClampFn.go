@@ -12,6 +12,13 @@ import (
 )
 
 func init() {
+	traversal.RegisterHelp[*grammar.DensityFn_ClampContext](
+		func(construct traversal.Construct, s traversal.Symbol, location traversal.TextLocation) *string {
+			help := `Clamps the input density function to the specified range`
+			return &help
+		},
+	)
+
 	traversal.Register(
 		func(densityFn *grammar.DensityFn_ClampContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
 			rangeChoiceBuilder := builder_chain.NewBuilderChain[ClampDensityFn](

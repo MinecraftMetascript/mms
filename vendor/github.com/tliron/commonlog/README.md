@@ -8,19 +8,24 @@ CommonLog
 A common Go API for structured *and* unstructured logging with support for pluggable backends
 and sinks.
 
-Supported backends (you can log *to* these APIs):
+Currently supported backends (you can log *to* these APIs):
 
-* simple (built-in textual, colorized backend; see below)
-* [klog](https://github.com/kubernetes/klog) (used by the [Kubernetes client library](https://github.com/kubernetes/client-go/))
+* simple (included textual, colorized backend; see below)
+* [Go built-in structured logging (import log/slog)](https://pkg.go.dev/log/slog)
+* [klog](https://github.com/kubernetes/klog)
 * [systemd journal](https://www.freedesktop.org/software/systemd/man/systemd-journald.service.html)
 * [zerolog](https://github.com/rs/zerolog)
-* [slog](https://pkg.go.dev/log/slog) (introduced in Go 1.21)
 
-Supported sinks (you can capture logs *from* these APIs):
+Currently supported sinks (you can capture logs *from* these APIs):
 
-* [Go built-in logging](https://pkg.go.dev/log)
-* [Go built-in structured logging](https://pkg.go.dev/log/slog)
+* [Go built-in logging (import log)](https://pkg.go.dev/log)
+* [Go built-in structured logging (import log/slog)](https://pkg.go.dev/log/slog)
 * [hclog](https://github.com/hashicorp/go-hclog) (used by many HashiCorp libraries)
+* [klog](https://github.com/kubernetes/klog) (used by the [Kubernetes client library](https://github.com/kubernetes/client-go/))
+* [memberlist](https://github.com/hashicorp/memberlist)
+* [Quartz](https://github.com/reugn/go-quartz)
+
+Please contribute more backends and sinks!
 
 Rationale
 ---------
@@ -47,10 +52,10 @@ or transmitting your log messages is likely the biggest factor in your optimizat
 
 A FAQ is: Why not standardize on the built-in [slog](https://pkg.go.dev/log/slog) API? Slog indeed is a big
 step forward for Go, not only because it supports structured messages, but also because it decouples the
-handler, an interface, from the logger. This enables alternative backends, a feature tragically missing from
-Go's [log library](https://pkg.go.dev/log). Unfortunately, slog was introduced only in Go 1.21 and is thus
-not used by much go Go's pre-1.21 ecosystem of 3rd-party libraries. CommonLog supports slog both as a backend
-and as a sink, so you can easily mix the CommonLog API with slog API *and* handling.
+handler (an interface) from the logger. This enables alternative backends, a feature tragically missing from
+Go's [older log library](https://pkg.go.dev/log). Unfortunately, slog was introduced only in Go 1.21 and is thus
+not used by much go Go's pre-1.21 ecosystem of 3rd-party libraries. CommonLog supports slog *both* as a backend
+*and* as a sink, so you can easily mix the CommonLog API with slog API *and* loggers.
 
 Features
 --------
@@ -59,15 +64,27 @@ Features
   inherits from "engine.parser", which in turn inherits from "engine". The empty name is the root of the
   hierarchy. Each name's default verbosity is that of its parent, which you can then override with
   `commonlog.SetMaxLevel()`.
-* Support for call stack depth. This can be used by a backend (for example, by klog) to find out where in
-  the code the logging happened.
+* Support for call stack depth. This can be used by a backend to find out where in the code the logging
+  happened.
 * No need to create logger objects. The "true" API entrypoint is the global function `commonlog.NewMessage`,
-  which you provide with a name and a level. The default logger type is just a convenient wrapper around it
-  that provides the familiar unstructured functions.
-* The unstructured `commonlog.Logger` type is an interface, allowing you to more easily switch implementations
-  per use without having to introduce a whole backend. For example, you can assign the `commonlog.MOCK_LOGGER`
+  which you provide with a name and a level. The logger type is just a convenient wrapper around that provides
+  a more familiar logger object API.
+* The `commonlog.Logger` type is an interface, allowing you to more easily switch implementations per use
+  without having to introduce a whole backend. For example, you can assign the `commonlog.MOCK_LOGGER`
   to disable a logger without changing the rest of your implementation. Compare with Go's built-in
   [`Logger`](https://pkg.go.dev/log#Logger) type, which frustratingly is a struct rather than an interface.
+
+Annoying Sinks
+--------------
+
+Some logging libraries simply do not provide a way to hook API calls. For example, Go's built-in logging
+(pre-slog) defines the logger object as a struct rather than an interface. Thus, the only way to implement a
+sink is to capture the final output and parse it line by line.
+
+This is inefficent but it *does* work and does satisfy our goals here. Again, CommonLog does not and cannot
+provide the most performant logging solution. If that's a priority, and you want unified logging, then *you*
+have to make sure all your code, including imported libraries, uses *one only one* performant library, such as
+[zerolog](https://github.com/rs/zerolog).
 
 Basic Usage
 -----------
@@ -95,21 +112,28 @@ import (
 
 func main() {
     if m := commonlog.NewErrorMessage(0, "engine", "parser"); m != nil {
-        m.Set("_message", "Hello world!").Set("myfloat", 10.2).Send()
+        m.Set("_message", "Hello world!").Set("myFloat", 10.2).Send()
     }
     util.Exit(0)
 }
 ```
 
-Note that `commonlog.NewMessage` will return nil if the message cannot be created, for example if
-the message level is higher than the max level for that name, so you always need to check against nil.
+Note that `commonlog.NewMessage` will return nil if the message is not created, for example if the
+message level is higher than the max level for that name, so you always need to check against nil.
 
-`Set` can accept any key and value, but two special keys are recognized by the API:
+That first integer argument is "depth", referring to callstack depth. This is only used when tracing is
+enabled to add the file name and line number of the logging location in the source code. For example, a
+value of 0 would use this location, while a value of 1 would use the caller of the current function,
+and so on.
+
+`Set` can accept any key and value, but special keys are recognized by the API:
 
 * `_message`: The main description of the message. This is the key used by unstructured logging.
 * `_scope`: An optional identifier that can be used to group messages, making them easier to filter
   (e.g. by grep on text). Backends may handle this specially. Unstructured backends may, for example,
   add it as a bracketed prefix for messages.
+* `_file`: Source code file name
+* `_line`: Source code line number within file (expected to be an integer)
 
 Also note that calling `util.Exit(0)` to exit your program is not absolutely necessary, however
 it's good practice because it makes sure to flush buffered log messages for some backends.
@@ -127,18 +151,23 @@ import (
 var log = commonlog.GetLogger("engine.parser")
 
 func main() {
-    log.Errorf("Hello %s!", "world")
+    log.Noticef("Hello %s!", "world")
     util.Exit(0)
 }
 ```
 
-The API also supports adding structured key-value pairs as optional arguments:
+The API also supports adding structured key-value pairs as optional additional arguments to
+the methods without the "f" suffix:
 
 ```go
-log.Error("Hello world!", "myfloat", 10.2, "myname", "Linus Torvalds")
+log.Error("my message",
+    "myFloat", 10.2,
+    "myName", "Linus Torvalds",
+)
 ```
 
-Use conditional logging to optimize for costly unstructured message creation, e.g.:
+Use conditional logging to optimize to avoid costly unstructured message creation when
+the log message would not be sent:
 
 ```go
 if log.AllowLevel(commonlog.Debug) {
@@ -146,9 +175,22 @@ if log.AllowLevel(commonlog.Debug) {
 }
 ```
 
-The scope logger can be used to automatically set the `_scope` key for another logger. It
-automatically detects nesting, in which case it appends the new scope separated by a ".",
-e.g.:
+The key-value logger can be used to automatically add key-values to all log messages. It
+automatically detects nesting to add new values or override existing ones:
+
+```go
+var log = commonlog.GetLogger("engine.parser")
+var yamlLog = commonlog.NewKeyValueLogger(log,
+    "format", "yaml",
+    "formatVersion", 2,
+)
+var newYamllog = commonlog.NewKeyValueLogger(yamlLog,
+    "formatVersion", 3,
+)
+```
+
+The scope logger constructor can be used to automatically set the `_scope` key for a logger.
+It automatically detects nesting, in which case it appends the new scope separated by a ".":
 
 ```go
 var log = commonlog.GetLogger("engine.parser")
@@ -165,8 +207,8 @@ func main() {
 Configuration
 -------------
 
-All backends can be configured via a common API to support writing to files or stderr. For example, to increase
-verbosity and write to a file:
+All backends can be configured via a common API to support writing to files or stderr. For example, to
+increase verbosity and write to a file:
 
 ```go
 func main() {
@@ -207,12 +249,21 @@ It's important to note that the configuration APIs are not thread safe. This inc
 `Configure()` and `SetMaxLevel()`. Thus, make sure to get all your configuration done before
 you start sending log messages. A good place for this is `init()` or `main()` functions.
 
+Also supported is the ability to add the source code file name and line number automatically
+to all messages, taking into account the "depth" argument for `commonlog.NewMessage`. Note
+that for the logger API the "depth" is always 0:
+
+```go
+commonlog.Trace = true
+```
+
 Colorization
 ------------
 
 For the simple backend you must explicitly attempt to enable ANSI color if desired. Note that
 if it's unsupported by the terminal then no ANSI codes will be sent (unless you force it via
-`util.InitializeColorization("force")`):
+`util.InitializeColorization("force")`). This even works on Windows, which has complicated
+colorization support in its cmd terminal:
 
 ```go
 import (

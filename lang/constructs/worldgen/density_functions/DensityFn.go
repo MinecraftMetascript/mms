@@ -12,8 +12,8 @@ import (
 type MathDensityFnKind string
 
 const (
-	MathDensityFn_Add MathDensityFnKind = "add"
-	MathDensityFn_Mul MathDensityFnKind = "mul"
+	MathDensityFn_Add MathDensityFnKind = "minecraft:add"
+	MathDensityFn_Mul MathDensityFnKind = "minecraft:mul"
 )
 
 type MathDensityFn struct {
@@ -22,15 +22,23 @@ type MathDensityFn struct {
 }
 
 func (m MathDensityFn) MarshalJSON() ([]byte, error) {
-	return json.MarshalIndent(struct {
-		Type MathDensityFnKind   `json:"type"`
-		Arg1 traversal.Construct `json:"argument1"`
-		Arg2 traversal.Construct `json:"argument2"`
+	out := struct {
+		Type MathDensityFnKind `json:"type"`
+		Arg1 any               `json:"argument1"`
+		Arg2 any               `json:"argument2"`
 	}{
 		Type: m.Type,
 		Arg1: m.Arg1,
 		Arg2: m.Arg2,
-	}, "", "  ")
+	}
+	if v, ok := m.Arg1.(*ConstantDensityFn); ok {
+		out.Arg1 = v.Value
+	}
+	if v, ok := m.Arg2.(*ConstantDensityFn); ok {
+		out.Arg2 = v.Value
+	}
+
+	return json.MarshalIndent(out, "", "  ")
 }
 
 func (m MathDensityFn) ExportSymbol(symbol traversal.Symbol, rootDir *lib.FileTreeLike) error {
@@ -120,7 +128,6 @@ func exportDensityFunction(symbol traversal.Symbol, rootDir *lib.FileTreeLike, c
 		return err
 	}
 	rootDir.
-		MkDir("data", nil).
 		MkDir(symbol.GetReference().GetNamespace(), nil).
 		MkDir("worldgen", nil).
 		MkDir("density_function", nil).

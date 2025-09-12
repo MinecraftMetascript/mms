@@ -11,6 +11,14 @@ import (
 )
 
 func init() {
+	traversal.RegisterHelp[*grammar.DensityFn_NoiseContext](func(construct traversal.Construct, symbol traversal.Symbol, location traversal.TextLocation) *string {
+		out := "References a defined noise function.\nUses .XzScale( densityFn ) and .YScale( densityFn ) to scale the noise function."
+		return &out
+	})
+	traversal.RegisterHelp[*grammar.DensityFn_InlineNoiseContext](func(construct traversal.Construct, symbol traversal.Symbol, location traversal.TextLocation) *string {
+		out := "Defines a noise inline. This will automatically be extracted the mms_inline namespace.<br/>  Uses `.XzScale(_densityFn_)` and `.YScale(_densityFn_)` to scale the noise function."
+		return &out
+	})
 	traversal.Register(
 		func(densityFn *grammar.DensityFn_NoiseContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
 			noiseFnBuilder := builder_chain.NewBuilderChain(
@@ -24,7 +32,7 @@ func init() {
 					},
 				),
 			)
-			
+
 			out := &NoiseDensityFn{
 				XzScale: 1,
 				YScale:  1,

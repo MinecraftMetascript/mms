@@ -27,6 +27,15 @@ func (p *Parser) GetInternalParser(namespace string) *grammar.MinecraftMetascrip
 }
 
 func (p *Parser) Parse() (*grammar.ScriptContext, error) {
+	// This was part of an attempt to implement functions
+	//p.parser.AddParseListener(fnReplacer)
+	//if res := p.parser.Script(); res == nil {
+	//	return nil, errors.New("failed to parse")
+	//}
+	//p.parser.RemoveParseListener(fnReplacer)
+	//// Reset the token stream to the beginning
+	//p.parser.GetTokenStream().Seek(0)
+	p.parser.AddParseListener(p)
 	if res := p.parser.Script(); res == nil {
 		return nil, errors.New("failed to parse")
 	} else {
@@ -39,7 +48,6 @@ func (p *Parser) ExitNamespace(ctx *grammar.NamespaceContext) {
 		if contentBlock, ok := contentBlockCtx.(*grammar.ContentBlocksContext); ok {
 			inner := contentBlock.GetChild(0)
 			ConstructRegistry.Construct(inner.(antlr.ParserRuleContext), p.namespace, p.scope)
-
 		}
 	}
 }
@@ -83,7 +91,6 @@ func NewParser(content string, filename string, globalScope *Scope, diagnostics 
 	parser.RemoveErrorListeners()
 	lexer.AddErrorListener(diagListener)
 	parser.AddErrorListener(diagListener)
-	parser.AddParseListener(out)
 
 	// Wire diagnostics sink into scope for construct factories
 	if out.scope != nil {

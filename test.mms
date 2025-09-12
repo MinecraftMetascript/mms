@@ -1,6 +1,10 @@
 Namespace xyz {
   DensityFn {
     TestNoise = Noise(-5).Amplitudes(5)
+
+
+    TestFn = YClampedGradient().Min(0).Max(1).Bottom(1).Top(4)
+
   }
 
   NoiseSettings {

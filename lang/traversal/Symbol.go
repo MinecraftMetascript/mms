@@ -64,8 +64,9 @@ func ProcessDeclaration(ctx DeclarationContext, valueCtx antlr.ParserRuleContext
 		return nil
 	}
 
-	return out
+	ConstructRegistry.symbols[RuleLocation(ctx, scope.CurrentFile)] = out
 
+	return out
 }
 
 func (s BaseSymbol) GetNameLocation() TextLocation {
