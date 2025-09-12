@@ -12,6 +12,13 @@ import (
 )
 
 func init() {
+	traversal.RegisterHelp[*grammar.DensityFn_RangeChoiceContext](
+		func(construct traversal.Construct, symbol traversal.Symbol, location traversal.TextLocation) *string {
+			help := "Defines a range choice density function that returns different values based on whether the input is within a specified range.<br/>Required: `.Min(float)`, `.Max(float)`, `.InRange(densityFn)`, `.OutRange(densityFn)`.<br/>Example: `RangeChoice(densityFn).Min(-1).Max(1).InRange(densityFn).OutRange(densityFn)`"
+			return &help
+		},
+	)
+
 	traversal.Register(
 		func(densityFn *grammar.DensityFn_RangeChoiceContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
 			rangeChoiceBuilder := builder_chain.NewBuilderChain[RangeChoiceDensityFn](

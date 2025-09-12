@@ -12,6 +12,12 @@ import (
 )
 
 func init() {
+	traversal.RegisterHelp[*grammar.SurfaceCondition_AboveWaterContext](
+		func(construct traversal.Construct, symbol traversal.Symbol, location traversal.TextLocation) *string {
+			out := "Checks if the current position is above water, based on terrain depth."
+			return &out
+		},
+	)
 	traversal.Register(
 		func(aboveWater *grammar.SurfaceCondition_AboveWaterContext, namespace string, scope *traversal.Scope) traversal.Construct {
 			waterBuildChain := builder_chain.NewBuilderChain[AboveWaterCondition](

@@ -13,6 +13,12 @@ import (
 )
 
 func init() {
+	traversal.RegisterHelp[*grammar.SurfaceCondition_VerticalGradientContext](
+		func(construct traversal.Construct, symbol traversal.Symbol, location traversal.TextLocation) *string {
+			out := "Compares the current Y position, with a messy transition, just like the deepslate and bedrock transitions."
+			return &out
+		},
+	)
 	traversal.Register(
 		func(verticalGradient *grammar.SurfaceCondition_VerticalGradientContext, ns string, scope *traversal.Scope) traversal.Construct {
 			verticalGradientBuilder := builder_chain.NewBuilderChain(

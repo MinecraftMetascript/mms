@@ -12,6 +12,12 @@ import (
 )
 
 func init() {
+	traversal.RegisterHelp[*grammar.DensityFn_YClampedGradientContext](
+		func(construct traversal.Construct, symbol traversal.Symbol, location traversal.TextLocation) *string {
+			out := "Creates a gradient that runs from a specified y-coordinate to another.<br/>.`Top(int)` and `.Max(float)` define the upper elevation and value, while `.Bottom(int)` and `.Min(float)` define the lower elevation and value.<br/>Example: `YClampedGradient(densityFn).Top(100).Max(0).Bottom(-100).Max(1)"
+			return &out
+		},
+	)
 	traversal.Register(
 		func(densityFn *grammar.DensityFn_YClampedGradientContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
 			rangeChoiceBuilder := builder_chain.NewBuilderChain[YClampedGradientDensityFn](

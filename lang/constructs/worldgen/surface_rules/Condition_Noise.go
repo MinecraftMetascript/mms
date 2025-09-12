@@ -13,6 +13,13 @@ import (
 )
 
 func init() {
+	traversal.RegisterHelp[*grammar.SurfaceCondition_NoiseThresholdContext](
+		func(construct traversal.Construct, symbol traversal.Symbol, location traversal.TextLocation) *string {
+			out := "Passes based on the noise value of the current position. Value must be between .Min() and .Max(). <br/> .Min() and .Max() are required."
+			return &out
+		},
+	)
+
 	traversal.Register(
 		func(noise *grammar.SurfaceCondition_NoiseThresholdContext, namespace string, scope *traversal.Scope) traversal.Construct {
 			noiseBuildChain := builder_chain.NewBuilderChain[NoiseCondition](

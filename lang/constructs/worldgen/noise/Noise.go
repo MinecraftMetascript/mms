@@ -12,6 +12,12 @@ import (
 )
 
 func init() {
+	traversal.RegisterHelp[*grammar.NoiseDefinitionContext](
+		func(construct traversal.Construct, symbol traversal.Symbol, location traversal.TextLocation) *string {
+			out := "Defines a noise function.<br/>`FirstOctave(int)` is required.<br/>`Amplitudes(float)` is required.<br/>Example: `Noise(FirstOctave(100), Amplitudes(0.5, 0.5))`"
+			return &out
+		},
+	)
 	traversal.Register(func(blockCtx *grammar.NoiseBlockContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
 		for _, child := range blockCtx.GetChildren() {
 			if rule, ok := child.(antlr.ParserRuleContext); ok {
@@ -21,53 +27,53 @@ func init() {
 		return nil
 	})
 	traversal.Register(func(declaration *grammar.NoiseDeclarationContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
-			noise := declaration.Noise()
-			if noise == nil {
-				// TODO: Diagnose?
-				return nil
-			}
-			noiseDef := noise.NoiseDefinition()
-			if noiseDef == nil {
-				// TODO: Diagnose?
-				return nil
-			}
-			s := traversal.ProcessDeclaration(declaration.Declare(), noiseDef, scope, currentNamespace, "Noise")
-			if s == nil {
-				return nil
-			}
- 		return s.GetValue()
-		})
+		noise := declaration.Noise()
+		if noise == nil {
+			// TODO: Diagnose?
+			return nil
+		}
+		noiseDef := noise.NoiseDefinition()
+		if noiseDef == nil {
+			// TODO: Diagnose?
+			return nil
+		}
+		s := traversal.ProcessDeclaration(declaration.Declare(), noiseDef, scope, currentNamespace, "Noise")
+		if s == nil {
+			return nil
+		}
+		return s.GetValue()
+	})
 	traversal.Register(func(noise *grammar.NoiseDefinitionContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
-			out := &Noise{
-				Amplitudes: make([]float64, 0),
-			}
+		out := &Noise{
+			Amplitudes: make([]float64, 0),
+		}
 
-			builder_chain.Builder_GetInt(
-				noise, func(i int) { out.FirstOctave = i }, scope, "FirstOctave",
-			)
+		builder_chain.Builder_GetInt(
+			noise, func(i int) { out.FirstOctave = i }, scope, "FirstOctave",
+		)
 
-			for _, r := range noise.AllNoise_Builder() {
-				if amplitudes := r.Builder_Amplitudes(); amplitudes != nil {
-					for _, amplitude := range amplitudes.AllNumber() {
-						if amplitude != nil {
-							val, err := strconv.ParseFloat(amplitude.GetText(), 64)
-							if err != nil {
-								scope.DiagnoseSemanticError(
-									"Invalid amplitude value",
-									amplitude,
-								)
-							} else {
-								out.Amplitudes = append(out.Amplitudes, val)
-							}
+		for _, r := range noise.AllNoise_Builder() {
+			if amplitudes := r.Builder_Amplitudes(); amplitudes != nil {
+				for _, amplitude := range amplitudes.AllNumber() {
+					if amplitude != nil {
+						val, err := strconv.ParseFloat(amplitude.GetText(), 64)
+						if err != nil {
+							scope.DiagnoseSemanticError(
+								"Invalid amplitude value",
+								amplitude,
+							)
+						} else {
+							out.Amplitudes = append(out.Amplitudes, val)
 						}
 					}
-				} else {
-					scope.DiagnoseSemanticError("Missing amplitudes value", r)
 				}
+			} else {
+				scope.DiagnoseSemanticError("Missing amplitudes value", r)
 			}
+		}
 
-			return out
-		},
+		return out
+	},
 	)
 }
 

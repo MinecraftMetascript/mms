@@ -11,6 +11,12 @@ import (
 )
 
 func init() {
+	traversal.RegisterHelp[*grammar.SurfaceRule_IfContext](
+		func(construct traversal.Construct, symbol traversal.Symbol, location traversal.TextLocation) *string {
+			out := "Applies the given surface rules only when the given condition is met."
+			return &out
+		},
+	)
 	traversal.Register(
 
 		func(ctx *grammar.SurfaceRule_IfContext, ns string, scope *traversal.Scope) traversal.Construct {

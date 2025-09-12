@@ -10,8 +10,13 @@ import (
 )
 
 func init() {
+	traversal.RegisterHelp[*grammar.DensityFn_WierdScaledSamplerContext](
+		func(construct traversal.Construct, symbol traversal.Symbol, location traversal.TextLocation) *string {
+			out := "According to the input value, scales and enhances (or weakens) some regions of the specified noise, and then returns the absolute value.\n\n"
+			return &out
+		},
+	)
 	traversal.Register(
-
 		func(densityFn *grammar.DensityFn_WierdScaledSamplerContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
 			out := &WeirdScaledSamplerFn{}
 

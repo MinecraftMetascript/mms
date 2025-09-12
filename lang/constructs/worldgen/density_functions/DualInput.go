@@ -17,6 +17,18 @@ const (
 )
 
 func init() {
+	traversal.RegisterHelp[*grammar.DensityFn_DualInputContext](
+		func(construct traversal.Construct, symbol traversal.Symbol, location traversal.TextLocation) *string {
+			var out string
+			switch construct.(DualInputDensityFn).Kind {
+			case DensityFn_Min:
+				out = "Takes the minimum of 2 density functions.<br/>Functions must be separated by `,`.<br/>Example: `Min(1, 2)`"
+			case DensityFn_Max:
+				out = "Takes the maximum of 2 density functions.<br/>Functions must be separated by `,`.<br/>Example: `Max(1, 2)`"
+			}
+			return &out
+		},
+	)
 	traversal.Register(
 		func(densityFn *grammar.DensityFn_DualInputContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
 			out := &DualInputDensityFn{}

@@ -9,6 +9,12 @@ import (
 )
 
 func init() {
+	traversal.RegisterHelp[*grammar.SurfaceCondition_BiomeContext](
+		func(construct traversal.Construct, symbol traversal.Symbol, location traversal.TextLocation) *string {
+			out := "Checks the biome at the current position."
+			return &out
+		},
+	)
 	traversal.Register(
 		func(ctx *grammar.SurfaceCondition_BiomeContext, namespace string, scope *traversal.Scope) traversal.Construct {
 			refs := make([]traversal.Reference, 0)

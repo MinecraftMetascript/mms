@@ -11,6 +11,13 @@ import (
 )
 
 func init() {
+	traversal.RegisterHelp[*grammar.DensityFn_ShiftedNoiseContext](
+		func(construct traversal.Construct, symbol traversal.Symbol, location traversal.TextLocation) *string {
+			help := "Shifts noise using .ShiftX( densityFn ), .ShiftY( densityFn ) and .ShiftZ( densityFn ).<br/>Uses .XZScale( float ) and .YScale( float ) to scale the noise function."
+			return &help
+		},
+	)
+
 	traversal.Register(
 		func(densityFn *grammar.DensityFn_ShiftedNoiseContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
 			shiftedNoiseBuilder := builder_chain.NewBuilderChain[ShiftedNoiseDensityFn](

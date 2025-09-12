@@ -9,6 +9,13 @@ import (
 )
 
 func init() {
+	traversal.RegisterHelp[*grammar.SurfaceCondition_HoleContext](
+		func(construct traversal.Construct, symbol traversal.Symbol, location traversal.TextLocation) *string {
+			out := "Passes if the current position is in a hole"
+			return &out
+		},
+	)
+
 	traversal.Register(
 		func(_ *grammar.SurfaceCondition_HoleContext, _ string, _ *traversal.Scope) traversal.Construct {
 			return &HoleCondition{}

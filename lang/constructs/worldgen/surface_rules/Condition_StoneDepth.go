@@ -12,6 +12,13 @@ import (
 )
 
 func init() {
+	traversal.RegisterHelp[*grammar.SurfaceCondition_StoneDepthContext](
+		func(construct traversal.Construct, symbol traversal.Symbol, location traversal.TextLocation) *string {
+			out := "Checks if the current position is within a specified distance from the surface, either upward or downward, using terrain depth."
+			return &out
+		},
+	)
+
 	traversal.Register(
 		func(stoneDepth *grammar.SurfaceCondition_StoneDepthContext, namespace string, scope *traversal.Scope) traversal.Construct {
 			stoneDepthBuildChain := builder_chain.NewBuilderChain[StoneDepthCondition](

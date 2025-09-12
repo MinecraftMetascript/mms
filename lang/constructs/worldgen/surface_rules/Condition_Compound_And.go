@@ -9,6 +9,12 @@ import (
 )
 
 func init() {
+	traversal.RegisterHelp[*grammar.SurfaceCondition_AndContext](
+		func(construct traversal.Construct, symbol traversal.Symbol, location traversal.TextLocation) *string {
+			out := "Combines multiple conditions with AND. <br/> Under the hood, each condition is handled as a minecraft:condition rule, this is just a convenience."
+			return &out
+		},
+	)
 	traversal.Register(
 		func(compound *grammar.SurfaceCondition_AndContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
 			conditions := make([]traversal.Construct, 0)

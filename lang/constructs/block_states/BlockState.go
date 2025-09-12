@@ -8,6 +8,13 @@ import (
 )
 
 func init() {
+	traversal.RegisterHelp[*grammar.BlockStateContext](
+		func(state traversal.Construct, symbol traversal.Symbol, location traversal.TextLocation) *string {
+			out := "Defines a Minecraft [block state](https://minecraft.wiki/w/Block_states).<br/>Currently *only has support for block name*.<br/>Example: `Block(minecraft:stone)`"
+			return &out
+		},
+	)
+
 	traversal.Register(
 		func(state *grammar.BlockStateContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
 			nameCtx := state.ResourceReference()

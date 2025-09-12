@@ -11,6 +11,12 @@ import (
 )
 
 func init() {
+	traversal.RegisterHelp[*grammar.DensityFn_OldBlendedNoiseContext](
+		func(construct traversal.Construct, symbol traversal.Symbol, location traversal.TextLocation) *string {
+			out := "References a defined noise function.<br/>Uses .XzScale( float ), .YScale( float ), .XzFactor( float ), .YFactor( float ) and .Smear( float ) to scale the noise function."
+			return &out
+		},
+	)
 	traversal.Register(
 		func(densityFn *grammar.DensityFn_OldBlendedNoiseContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
 			noiseFnBuilder := builder_chain.NewBuilderChain(

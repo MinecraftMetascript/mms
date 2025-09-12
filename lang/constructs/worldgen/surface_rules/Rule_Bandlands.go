@@ -8,6 +8,12 @@ import (
 )
 
 func init() {
+	traversal.RegisterHelp[*grammar.SurfaceRule_BandlandsContext](
+		func(construct traversal.Construct, symbol traversal.Symbol, location traversal.TextLocation) *string {
+			out := "Used in badlands to place terracotta."
+			return &out
+		},
+	)
 	traversal.Register(
 		func(_ *grammar.SurfaceRule_BandlandsContext, _ string, _ *traversal.Scope) traversal.Construct {
 			return &Bandlands{}

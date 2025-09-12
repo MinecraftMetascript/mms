@@ -11,6 +11,11 @@ import (
 )
 
 func init() {
+	traversal.RegisterHelp[*grammar.VerticalAnchorContext](
+		func(construct traversal.Construct, symbol traversal.Symbol, location traversal.TextLocation) *string {
+			out := "Defines a vertical anchor, which can be absolute, above the bottom, or below the top.<br/>Absolute: `100`<br/>Above bottom: `~-100`<br/>Below top: `~100`"
+			return &out
+		})
 	traversal.Register(
 		func(anchor *grammar.VerticalAnchorContext, _ string, _ *traversal.Scope) traversal.Construct {
 			if anchor.Identifier() != nil {

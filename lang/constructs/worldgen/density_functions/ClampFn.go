@@ -14,7 +14,7 @@ import (
 func init() {
 	traversal.RegisterHelp[*grammar.DensityFn_ClampContext](
 		func(construct traversal.Construct, s traversal.Symbol, location traversal.TextLocation) *string {
-			help := `Clamps the input density function to the specified range`
+			help := "Clamps the input density function to the specified range.<br/> `.Min(float)` and `.Max(float)` are required.<br/>Example: `Clamp(_densityFn_).Min(0).Max(1))`"
 			return &help
 		},
 	)

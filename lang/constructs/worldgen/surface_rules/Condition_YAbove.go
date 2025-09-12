@@ -13,6 +13,12 @@ import (
 )
 
 func init() {
+	traversal.RegisterHelp[*grammar.SurfaceCondition_YAboveContext](
+		func(construct traversal.Construct, symbol traversal.Symbol, location traversal.TextLocation) *string {
+			out := "Checks if the current position is above a specified height (exclusive)."
+			return &out
+		},
+	)
 	traversal.Register(
 		func(yAbove *grammar.SurfaceCondition_YAboveContext, ns string, scope *traversal.Scope) traversal.Construct {
 			yAboveBuilder := builder_chain.NewBuilderChain(

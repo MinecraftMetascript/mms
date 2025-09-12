@@ -61,6 +61,12 @@ func buildSplinePoint(point *grammar.DensityFn_SplinePointContext, currentNamesp
 }
 
 func init() {
+	traversal.RegisterHelp[*grammar.DensityFn_SplineFnContext](
+		func(construct traversal.Construct, symbol traversal.Symbol, location traversal.TextLocation) *string {
+			out := "Defines a cubic spline"
+			return &out
+		},
+	)
 	traversal.Register(
 		func(densityFn *grammar.DensityFn_SplineFnContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
 			splineDef := densityFn.DensityFn_Spline()

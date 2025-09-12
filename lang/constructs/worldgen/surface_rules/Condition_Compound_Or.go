@@ -9,6 +9,13 @@ import (
 )
 
 func init() {
+	traversal.RegisterHelp[*grammar.SurfaceCondition_OrContext](
+		func(construct traversal.Construct, symbol traversal.Symbol, location traversal.TextLocation) *string {
+			out := "Combines multiple conditions with OR. <br/> Under the hood, this creates a minecraft:sequence, with each condition as a direct child, and the result of this OR is the pass rule for all conditions in the sequence"
+			return &out
+		},
+	)
+
 	traversal.Register(
 		func(compound *grammar.SurfaceCondition_OrContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
 			conditions := make([]traversal.Construct, 0)

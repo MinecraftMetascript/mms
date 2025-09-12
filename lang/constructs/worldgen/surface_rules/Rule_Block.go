@@ -10,6 +10,12 @@ import (
 )
 
 func init() {
+	traversal.RegisterHelp[*grammar.SurfaceRule_BlockContext](
+		func(construct traversal.Construct, symbol traversal.Symbol, location traversal.TextLocation) *string {
+			out := "Places the specified block"
+			return &out
+		},
+	)
 	traversal.Register(func(ctx *grammar.SurfaceRule_BlockContext, _ string, scope *traversal.Scope) traversal.Construct {
 		out := &Block{}
 		if ref := ctx.ResourceReference(); ref != nil {

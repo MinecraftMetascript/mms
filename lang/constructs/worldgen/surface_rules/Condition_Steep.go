@@ -9,6 +9,13 @@ import (
 )
 
 func init() {
+	traversal.RegisterHelp[*grammar.SurfaceCondition_SteepContext](
+		func(construct traversal.Construct, symbol traversal.Symbol, location traversal.TextLocation) *string {
+			out := "Checks if the current position is a steep face on the north or east sides of a mountain."
+			return &out
+		},
+	)
+
 	traversal.Register(
 		func(_ *grammar.SurfaceCondition_SteepContext, _ string, _ *traversal.Scope) traversal.Construct {
 			return &SteepCondition{}

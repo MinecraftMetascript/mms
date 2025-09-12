@@ -9,6 +9,13 @@ import (
 )
 
 func init() {
+	traversal.RegisterHelp[*grammar.SurfaceCondition_FreezingContext](
+		func(construct traversal.Construct, symbol traversal.Symbol, location traversal.TextLocation) *string {
+			out := "Passes if the current position is in a biome where water can freeze"
+			return &out
+		},
+	)
+
 	traversal.Register(
 		func(_ *grammar.SurfaceCondition_FreezingContext, _ string, _ *traversal.Scope) traversal.Construct {
 			return &FreezingCondition{}
