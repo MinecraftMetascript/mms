@@ -47,6 +47,7 @@ func getBuilder() *builder_chain.BuilderChain[NoiseSettings] {
 				if state == nil {
 					state = traversal.ConstructRegistry.Construct(ctx.ResourceReference(), namespace, scope)
 					if state == nil {
+						scope.DiagnoseSemanticWarning("Could not identify block state", ctx)
 						return
 					}
 					target.DefaultBlock = block_states.BlockStateRef(*state.(*traversal.Reference))
@@ -59,6 +60,12 @@ func getBuilder() *builder_chain.BuilderChain[NoiseSettings] {
 			func(ctx *grammar.Builder_DefaultFluidContext, target *NoiseSettings, scope *traversal.Scope, namespace string) {
 				state := traversal.ConstructRegistry.Construct(ctx.BlockState(), namespace, scope)
 				if state == nil {
+					state = traversal.ConstructRegistry.Construct(ctx.ResourceReference(), namespace, scope)
+					if state == nil {
+						scope.DiagnoseSemanticWarning("Could not identify block state", ctx)
+						return
+					}
+					target.DefaultFluid = block_states.BlockStateRef(*state.(*traversal.Reference))
 					return
 				}
 				target.DefaultFluid = state
@@ -71,21 +78,29 @@ func getBuilder() *builder_chain.BuilderChain[NoiseSettings] {
 		),
 		builder_chain.Build(
 			func(ctx *grammar.Builder_HeightContext, target *NoiseSettings, scope *traversal.Scope, namespace string) {
-				builder_chain.Builder_GetInt(ctx, func(v int) { target.Height = v }, scope, "MinY")
+				builder_chain.Builder_GetInt(ctx, func(v int) { target.Height = v }, scope, "Height")
 			},
 		),
 		builder_chain.Build(
 			func(ctx *grammar.Builder_NoiseRouterContext, target *NoiseSettings, scope *traversal.Scope, namespace string) {
-				if sym, _ := traversal.ExtractInlineConstruct(ctx.NoiseRouter(), namespace, scope, "NoiseRouter"); sym != nil {
+				router := ctx.NoiseRouter()
+				if router == nil {
+					return
+				}
+				if sym, _ := traversal.ExtractInlineConstruct(router, namespace, scope, "NoiseRouter"); sym != nil {
 					target.NoiseRouter = sym.GetValue()
 				}
 			},
 		),
 		builder_chain.Build(
 			func(ctx *grammar.Builder_SurfaceRuleContext, target *NoiseSettings, scope *traversal.Scope, namespace string) {
+				rule := ctx.SurfaceRule()
+				if rule == nil {
+					return
+				}
 				if sym, _ :=
-					traversal.ExtractInlineConstruct(ctx.SurfaceRule(), namespace, scope, "SurfaceRule"); sym != nil {
-					target.NoiseRouter = sym.GetValue()
+					traversal.ExtractInlineConstruct(rule, namespace, scope, "SurfaceRule"); sym != nil {
+					target.SurfaceRule = sym.GetValue()
 				}
 			},
 		),
@@ -233,6 +248,8 @@ func (n *NoiseSettings) MarshalJSON() ([]byte, error) {
 		DefaultBlock       traversal.Construct `json:"default_block"`
 		DefaultFluid       traversal.Construct `json:"default_fluid"`
 		Noise              interface{}         `json:"noise"`
+		NoiseRouter        traversal.Construct `json:"noise_router"`
+		SurfaceRule        traversal.Construct `json:"surface_rule"`
 	}{
 		SeaLevel:           n.SeaLevel,
 		CreaturesEnabled:   n.DisableCreatures,
@@ -242,6 +259,8 @@ func (n *NoiseSettings) MarshalJSON() ([]byte, error) {
 		DefaultBlock:       n.DefaultBlock,
 		DefaultFluid:       n.DefaultFluid,
 		Noise:              noise,
+		NoiseRouter:        n.NoiseRouter,
+		SurfaceRule:        n.SurfaceRule,
 	}, "", "  ")
 }
 

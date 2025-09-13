@@ -46,6 +46,7 @@ func init() {
 		TextDocumentDocumentSymbol: ls.DocumentSymbols,
 		TextDocumentFoldingRange:   ls.TextDocumentFoldingRange,
 		TextDocumentHover:          ls.TextDocumentHover,
+		TextDocumentCompletion:     ls.TextDocumentCompletion,
 	}
 }
 
@@ -162,4 +163,34 @@ func (ls *LanguageServer) TextDocumentHover(context *glsp.Context, params *proto
 	}
 
 	return nil, nil
+}
+
+// Returns: []CompletionItem | CompletionList | nil
+func (ls *LanguageServer) TextDocumentCompletion(context *glsp.Context, params *protocol.CompletionParams) (any, error) {
+	out := protocol.CompletionList{
+		IsIncomplete: false,
+		Items:        make([]protocol.CompletionItem, 0),
+	}
+
+	out.Items = append(out.Items, protocol.CompletionItem{
+		Label:               "This is a completion item.",
+		Kind:                nil,
+		Tags:                nil,
+		Detail:              nil,
+		Documentation:       nil,
+		Deprecated:          nil,
+		Preselect:           nil,
+		SortText:            nil,
+		FilterText:          nil,
+		InsertText:          nil,
+		InsertTextFormat:    nil,
+		InsertTextMode:      nil,
+		TextEdit:            nil,
+		AdditionalTextEdits: nil,
+		CommitCharacters:    nil,
+		Command:             nil,
+		Data:                nil,
+	})
+
+	return out, nil
 }

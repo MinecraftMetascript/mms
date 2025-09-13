@@ -11,80 +11,84 @@ import (
 )
 
 func init() {
- traversal.Register(func(blockCtx *grammar.NoiseRouterBlockContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
-	for _, child := range blockCtx.GetChildren() {
-		if rule, ok := child.(antlr.ParserRuleContext); ok {
-			traversal.ConstructRegistry.Construct(rule, currentNamespace, scope)
+	traversal.Register(func(blockCtx *grammar.NoiseRouterBlockContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
+		for _, child := range blockCtx.GetChildren() {
+			if rule, ok := child.(antlr.ParserRuleContext); ok {
+				traversal.ConstructRegistry.Construct(rule, currentNamespace, scope)
+			}
 		}
-	}
-	return nil
-})
+		return nil
+	})
 	traversal.Register(func(declaration *grammar.NoiseRouterDeclarationContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
 
-			routerDef := declaration.NoiseRouter()
-			if routerDef == nil {
-				scope.DiagnoseSemanticError("Missing noise router definition", declaration)
-				return nil
-			}
+		routerDef := declaration.NoiseRouter()
+		if routerDef == nil {
+			scope.DiagnoseSemanticError("Missing noise router definition", declaration)
+			return nil
+		}
 
-			s := traversal.ProcessDeclaration(declaration.Declare(), routerDef, scope, currentNamespace, "NoiseRouter")
-			if s == nil {
-				return nil
-			}
-			return s.GetValue()
-		})
+		s := traversal.ProcessDeclaration(declaration.Declare(), routerDef, scope, currentNamespace, "NoiseRouter")
+		if s == nil {
+			return nil
+		}
+		return s.GetValue()
+	})
 
 	traversal.Register(func(router *grammar.NoiseRouterContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
 		out := &NoiseRouter{}
 
-			finalDensityPresent := false
-			for _, builderCtx := range router.AllNoiseRouter_Builder() {
-				builderKindCtx := builderCtx.GetChild(1)
-				if builderKindCtx == nil {
-					scope.DiagnoseSemanticError("Missing builder", router)
-					continue
-				}
-				builderKind := builderKindCtx.(antlr.TerminalNode).GetText()
-
-				value := traversal.ConstructRegistry.Construct(builderCtx.DensityFn(), currentNamespace, scope)
-				switch NoiseRouterBuilderKind(builderKind) {
-				case FinalDensity:
-					finalDensityPresent = true
-					out.FinalDensity = value
-				case Barrier:
-					out.Barrier = value
-				case FluidLevelFloodedness:
-					out.FluidLevelFloodedness = value
-				case FluidLevelSpread:
-					out.FluidLevelSpread = value
-				case Lava:
-					out.Lava = value
-				case VeinToggle:
-					out.VeinToggle = value
-				case VeinRidged:
-					out.VeinRidged = value
-				case VeinGap:
-					out.VeinGap = value
-				case Temperature:
-					out.Temperature = value
-				case Vegetation:
-					out.Vegetation = value
-				case Continents:
-					out.Continents = value
-				case Erosion:
-					out.Erosion = value
-				case Depth:
-					out.Depth = value
-				case Ridges:
-					out.Ridges = value
-				}
+		finalDensityPresent := false
+		for _, builderCtx := range router.AllNoiseRouter_Builder() {
+			if builderCtx.GetChildCount() < 2 {
+				// TODO: Better diagnosis
+				continue
 			}
-
-			if !finalDensityPresent {
-				scope.DiagnoseSemanticError("Missing required FinalDensity()", router)
+			builderKindCtx := builderCtx.GetChild(1)
+			if builderKindCtx == nil {
+				// TODO: Better diagnosis
+				continue
 			}
-			return out
-		})
+			builderKind := builderKindCtx.(antlr.TerminalNode).GetText()
+
+			value := traversal.ConstructRegistry.Construct(builderCtx.DensityFn(), currentNamespace, scope)
+			switch NoiseRouterBuilderKind(builderKind) {
+			case FinalDensity:
+				finalDensityPresent = true
+				out.FinalDensity = value
+			case Barrier:
+				out.Barrier = value
+			case FluidLevelFloodedness:
+				out.FluidLevelFloodedness = value
+			case FluidLevelSpread:
+				out.FluidLevelSpread = value
+			case Lava:
+				out.Lava = value
+			case VeinToggle:
+				out.VeinToggle = value
+			case VeinRidged:
+				out.VeinRidged = value
+			case VeinGap:
+				out.VeinGap = value
+			case Temperature:
+				out.Temperature = value
+			case Vegetation:
+				out.Vegetation = value
+			case Continents:
+				out.Continents = value
+			case Erosion:
+				out.Erosion = value
+			case Depth:
+				out.Depth = value
+			case Ridges:
+				out.Ridges = value
+			}
+		}
+
+		if !finalDensityPresent {
+			scope.DiagnoseSemanticError("Missing required FinalDensity()", router)
+		}
+		return out
+	})
 }
 
 type NoiseRouter struct {
