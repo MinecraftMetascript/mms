@@ -1,7 +1,6 @@
 package traversal
 
 import (
-	"fmt"
 	"reflect"
 	"slices"
 
@@ -105,14 +104,14 @@ func DeclareNode(ctx DeclarableContext, namespace string, scope *Scope) (Symbol,
 	if factory, ok := factoriesByDeclarationCtx[t]; ok {
 		res, ok := factory.(innerNodeFactory).CreateDeclaration(ctx, namespace, scope)
 		if ok {
-			if err := scope.Register(res); err != nil {
+			if err := scope.Register(res); err == nil {
 				location := RuleLocation(ctx, scope.CurrentFile)
 				symbolsByLocation[location] = res
 				nodesByLocation[res.GetContentLocation()] = res.GetValue()
 
 				return res, true
 			} else {
-				scope.DiagnoseSemanticError("Duplicate declaration", ctx)
+				scope.DiagnoseSemanticError(err.Error(), ctx)
 			}
 		}
 	}
@@ -189,7 +188,6 @@ func GetCompletions(location protocol.Position) []protocol.CompletionItem {
 	line := location.Line
 	character := location.Character
 	candidates := getNodesAtPosition(int(line+1), int(character))
-	fmt.Printf("L %d // C %d // Candidates %-v\n", line, character, candidates)
 
 	if candidates == nil || len(candidates) == 0 {
 		return GetCompletions(protocol.Position{
