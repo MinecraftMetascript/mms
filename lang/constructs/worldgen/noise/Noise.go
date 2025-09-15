@@ -112,6 +112,7 @@ func (n Noise) GetLocation() traversal.TextLocation {
 }
 
 func (n Noise) GetCompletions(_ protocol.Position) []protocol.CompletionItem {
+
 	out := make([]protocol.CompletionItem, 0)
 	if n.Amplitudes == nil || len(n.Amplitudes) == 0 {
 		out = append(out, protocol.CompletionItem{
@@ -123,17 +124,9 @@ func (n Noise) GetCompletions(_ protocol.Position) []protocol.CompletionItem {
 					Start: n.location.Stop.OffsetColumn(1).ToLspPosition(),
 					End:   n.location.Stop.OffsetColumn(1).ToLspPosition(),
 				},
-				NewText: ".Amplitudes(",
+				NewText: ".Amplitudes(${0})",
 			},
-			AdditionalTextEdits: []protocol.TextEdit{
-				{
-					Range: protocol.Range{
-						Start: n.location.Stop.OffsetColumn(len(".Amplitudes(") + 2).ToLspPosition(),
-						End:   n.location.Stop.OffsetColumn(len(".Amplitudes(") + 2).ToLspPosition(),
-					},
-					NewText: ")",
-				},
-			},
+			InsertTextFormat: lib.Ptr(protocol.InsertTextFormatSnippet),
 		})
 	}
 

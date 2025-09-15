@@ -18,10 +18,9 @@ func (n NoiseBlock) GetCompletions(cursorPosition protocol.Position) []protocol.
 
 	// TODO: Make sure we aren't conflicting with any other declarations?
 	out = append(out, protocol.CompletionItem{
-		Label:            "New Noise",
+		Label:            "Create Noise",
 		Kind:             lib.Ptr(protocol.CompletionItemKindSnippet),
-		Detail:           lib.Ptr("Declare a new Noise type"),
-		InsertText:       lib.Ptr("$0 = Noise($1).Amplitudes($2)"),
+		InsertText:       lib.Ptr("${0} = Noise(${1}).Amplitudes(${2})"),
 		InsertTextFormat: lib.Ptr(protocol.InsertTextFormatSnippet),
 	})
 

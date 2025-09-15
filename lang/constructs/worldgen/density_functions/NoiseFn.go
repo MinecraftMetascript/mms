@@ -7,7 +7,16 @@ import (
 	"github.com/minecraftmetascript/mms/lang/builder_chain"
 	"github.com/minecraftmetascript/mms/lang/grammar"
 	"github.com/minecraftmetascript/mms/lang/traversal"
+	"github.com/minecraftmetascript/mms/lib"
+	protocol "github.com/tliron/glsp/protocol_3_16"
 )
+
+var noiseDensitySnippet = protocol.CompletionItem{
+	Label:            "Noise DensityFn",
+	Kind:             lib.Ptr(protocol.CompletionItemKindSnippet),
+	InsertText:       lib.Ptr("${0} = Noise(${1}).XZScale(${2:1}).YScale(${3:1})"),
+	InsertTextFormat: lib.Ptr(protocol.InsertTextFormatSnippet),
+}
 
 type NoiseFnFactory struct {
 	BaseDensityFnFactory
@@ -76,6 +85,34 @@ type NoiseDensityFn struct {
 	XzScale  float64
 	YScale   float64
 	location traversal.TextLocation
+}
+
+func (c NoiseDensityFn) GetCompletions(cursorPosition protocol.Position) []protocol.CompletionItem {
+	return []protocol.CompletionItem{
+		{
+			Label: "XZ Scale",
+			Kind:  lib.Ptr(protocol.CompletionItemKindMethod),
+			TextEdit: protocol.TextEdit{
+				Range: protocol.Range{
+					Start: c.location.Stop.OffsetColumn(1).ToLspPosition(),
+					End:   c.location.Stop.OffsetColumn(1).ToLspPosition(),
+				},
+				NewText: ".XZScale({0})",
+			},
+			InsertTextFormat: lib.Ptr(protocol.InsertTextFormatSnippet),
+		}, {
+			Label: "Y Scale",
+			Kind:  lib.Ptr(protocol.CompletionItemKindMethod),
+			TextEdit: protocol.TextEdit{
+				Range: protocol.Range{
+					Start: c.location.Stop.OffsetColumn(1).ToLspPosition(),
+					End:   c.location.Stop.OffsetColumn(1).ToLspPosition(),
+				},
+				NewText: ".YScale({0})",
+			},
+			InsertTextFormat: lib.Ptr(protocol.InsertTextFormatSnippet),
+		},
+	}
 }
 
 func (c NoiseDensityFn) GetLocation() traversal.TextLocation {

@@ -111,7 +111,8 @@ func DeclareNode(ctx DeclarableContext, namespace string, scope *Scope) (Symbol,
 				nodesByLocation[res.GetContentLocation()] = res.GetValue()
 
 				return res, true
-
+			} else {
+				scope.DiagnoseSemanticError("Duplicate declaration", ctx)
 			}
 		}
 	}

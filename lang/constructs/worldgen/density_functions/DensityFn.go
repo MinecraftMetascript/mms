@@ -2,20 +2,19 @@ package density_functions
 
 import (
 	"encoding/json"
-	"log"
 
 	"github.com/antlr4-go/antlr/v4"
 	"github.com/minecraftmetascript/mms/lang/constructs/primitives"
 	"github.com/minecraftmetascript/mms/lang/grammar"
 	"github.com/minecraftmetascript/mms/lang/traversal"
 	"github.com/minecraftmetascript/mms/lib"
+	protocol "github.com/tliron/glsp/protocol_3_16"
 )
 
 type DensityFnFactory struct {
 }
 
 func (d DensityFnFactory) CreateDeclaration(ctx *grammar.DensityFnDeclarationContext, namespace string, scope *traversal.Scope) (traversal.Symbol, bool) {
-	log.Println("[Debug] Creating density function declaration")
 	if ctx.Declare() != nil {
 		declaration := primitives.DeclarationFactory{}.Create(ctx.Declare().(*grammar.DeclareContext), namespace, scope)
 		if declaration == nil {
@@ -133,6 +132,12 @@ func (n DensityFnBlockFactory) Export(symbol traversal.Symbol, rootDir *lib.File
 type DensityFnBlock struct {
 	location     traversal.TextLocation
 	declarations []traversal.Symbol
+}
+
+func (d DensityFnBlock) GetCompletions(cursorPosition protocol.Position) []protocol.CompletionItem {
+	return []protocol.CompletionItem{
+		noiseDensitySnippet,
+	}
 }
 
 func (d DensityFnBlock) GetLocation() traversal.TextLocation {
