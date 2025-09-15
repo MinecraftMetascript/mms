@@ -43,11 +43,23 @@ func (p *Parser) Parse() (*grammar.ScriptContext, error) {
 	}
 }
 
+//
+//func (p *Parser) ExitEveryRule(ctx antlr.ParserRuleContext) {
+//	if d, ok := ctx.(DeclarableContext); ok {
+//		ref, ok := DeclareNode(d, p.namespace, p.scope)
+//		if ok {
+//			p.scope.Register(ref)
+//		}
+//	} else {
+//		fmt.Println(ConstructNode(ctx, p.namespace, p.scope))
+//	}
+//}
+
 func (p *Parser) ExitNamespace(ctx *grammar.NamespaceContext) {
 	for _, contentBlockCtx := range ctx.AllContentBlocks() {
 		if contentBlock, ok := contentBlockCtx.(*grammar.ContentBlocksContext); ok {
 			inner := contentBlock.GetChild(0)
-			ConstructRegistry.Construct(inner.(antlr.ParserRuleContext), p.namespace, p.scope)
+			ConstructNode(inner.(antlr.ParserRuleContext), p.namespace, p.scope)
 		}
 	}
 }

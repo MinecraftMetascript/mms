@@ -6,8 +6,66 @@ import (
 	"github.com/antlr4-go/antlr/v4"
 	"github.com/minecraftmetascript/mms/lang/grammar"
 	"github.com/minecraftmetascript/mms/lang/traversal"
-	"github.com/minecraftmetascript/mms/lib"
+	"github.com/minecraftmetascript/mms/lang/traversal/getters"
 )
+
+type DualInputDensityFnFactory struct {
+	BaseDensityFnFactory
+}
+
+func (d DualInputDensityFnFactory) Create(ctx *grammar.DensityFn_DualInputContext, namespace string, scope *traversal.Scope) *DualInputDensityFn {
+	out := &DualInputDensityFn{
+		location: traversal.RuleLocation(ctx, scope.CurrentFile),
+	}
+	kind := ctx.GetChild(0)
+	switch k := kind.(type) {
+	case antlr.TerminalNode:
+		if k != nil {
+			switch k.GetText() {
+			case "Min":
+				out.Kind = DensityFn_Min
+			case "Max":
+				out.Kind = DensityFn_Max
+			default:
+				scope.DiagnoseSemanticError("Invalid density function kind", ctx)
+			}
+		} else {
+			scope.DiagnoseSemanticError("Missing density function kind", ctx)
+		}
+	default:
+		scope.DiagnoseSemanticError("Invalid density function kind", ctx)
+	}
+
+	out.FirstArg = getters.GetChildNode(
+		ctx.DensityFn(0),
+		namespace,
+		scope,
+		"Missing density function target",
+	)
+
+	out.SecondArg = getters.GetChildNode(
+		ctx.DensityFn(1),
+		namespace,
+		scope,
+		"Missing density function target",
+	)
+
+	return out
+}
+
+func (d DualInputDensityFnFactory) GetHelp(node *DualInputDensityFn, _ traversal.Symbol, _ traversal.TextLocation) *traversal.Help {
+	var out string
+	switch node.Kind {
+	case DensityFn_Min:
+		out = "Takes the minimum of 2 density functions.<br/>Functions must be separated by `,`.<br/>Example: `Min(1, 2)`"
+	case DensityFn_Max:
+		out = "Takes the maximum of 2 density functions.<br/>Functions must be separated by `,`.<br/>Example: `Max(1, 2)`"
+	}
+	return &traversal.Help{
+		Content:  out,
+		Position: node.GetLocation(),
+	}
+}
 
 type DualInputDensityFnKind string
 
@@ -17,81 +75,26 @@ const (
 )
 
 func init() {
-	traversal.RegisterHelp[*grammar.DensityFn_DualInputContext](
-		func(construct traversal.Construct, symbol traversal.Symbol, location traversal.TextLocation) *string {
-			var out string
-			switch construct.(DualInputDensityFn).Kind {
-			case DensityFn_Min:
-				out = "Takes the minimum of 2 density functions.<br/>Functions must be separated by `,`.<br/>Example: `Min(1, 2)`"
-			case DensityFn_Max:
-				out = "Takes the maximum of 2 density functions.<br/>Functions must be separated by `,`.<br/>Example: `Max(1, 2)`"
-			}
-			return &out
-		},
-	)
-	traversal.Register(
-		func(densityFn *grammar.DensityFn_DualInputContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
-			out := &DualInputDensityFn{}
-			kind := densityFn.GetChild(0)
-			switch k := kind.(type) {
-			case antlr.TerminalNode:
-				if k != nil {
-					switch k.GetText() {
-					case "Min":
-						out.Kind = DensityFn_Min
-					case "Max":
-						out.Kind = DensityFn_Max
-					default:
-						scope.DiagnoseSemanticError("Invalid density function kind", densityFn)
-					}
-				} else {
-					scope.DiagnoseSemanticError("Missing density function kind", densityFn)
-				}
-			default:
-				scope.DiagnoseSemanticError("Invalid density function kind", densityFn)
-			}
-
-			firstArg := densityFn.DensityFn(0)
-			if firstArg != nil {
-				val := traversal.ConstructRegistry.Construct(firstArg, currentNamespace, scope)
-				if val == nil {
-					scope.DiagnoseSemanticError("Missing density function target", densityFn)
-				} else {
-					out.FirstArg = val
-				}
-			} else {
-				scope.DiagnoseSemanticError("Missing density function target", densityFn)
-			}
-
-			secondArg := densityFn.DensityFn(1)
-			if secondArg != nil {
-				val := traversal.ConstructRegistry.Construct(secondArg, currentNamespace, scope)
-				if val == nil {
-					scope.DiagnoseSemanticError("Missing density function target", densityFn)
-				} else {
-					out.SecondArg = val
-				}
-			} else {
-				scope.DiagnoseSemanticError("Missing density function target", densityFn)
-			}
-
-			return out
-		},
-	)
+	traversal.RegisterNodeFactory(DualInputDensityFnFactory{}, false)
 }
 
 type DualInputDensityFn struct {
 	Kind      DualInputDensityFnKind
-	FirstArg  traversal.Construct
-	SecondArg traversal.Construct
+	FirstArg  traversal.Node
+	SecondArg traversal.Node
+	location  traversal.TextLocation
+}
+
+func (s DualInputDensityFn) GetLocation() traversal.TextLocation {
+	return s.location
 }
 
 func (s DualInputDensityFn) MarshalJSON() ([]byte, error) {
 	return json.MarshalIndent(
 		struct {
 			Type      DualInputDensityFnKind `json:"type"`
-			FirstArg  traversal.Construct    `json:"argument1"`
-			SecondArg traversal.Construct    `json:"argument2"`
+			FirstArg  traversal.Node         `json:"argument1"`
+			SecondArg traversal.Node         `json:"argument2"`
 		}{
 			Type:      s.Kind,
 			FirstArg:  s.FirstArg,
@@ -100,8 +103,4 @@ func (s DualInputDensityFn) MarshalJSON() ([]byte, error) {
 		"",
 		"  ",
 	)
-}
-
-func (s DualInputDensityFn) ExportSymbol(symbol traversal.Symbol, rootDir *lib.FileTreeLike) error {
-	return exportDensityFunction(symbol, rootDir, s)
 }

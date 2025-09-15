@@ -5,46 +5,56 @@ import (
 
 	"github.com/minecraftmetascript/mms/lang/grammar"
 	"github.com/minecraftmetascript/mms/lang/traversal"
-	"github.com/minecraftmetascript/mms/lib"
 )
 
-type ReferenceFunction struct {
-	traversal.Construct
-	Ref   *traversal.Reference
-	Value *traversal.Construct
-}
-
 func init() {
-	traversal.Register(
-		func(refCtx *grammar.DensityFn_ReferenceContext, ns string, scope *traversal.Scope) traversal.Construct {
-			out := &ReferenceFunction{}
-			if rr := refCtx.ResourceReference(); rr != nil {
-				if cons := traversal.ConstructRegistry.Construct(rr, ns, scope); cons != nil {
-					if r, ok := cons.(*traversal.Reference); ok {
-						out.Ref = r
+	traversal.RegisterNodeFactory(ReferenceFunctionFactory{}, false)
+}
 
-						out.Ref.SetResolver(func() error {
-							if next, ok := scope.Get(*r); ok {
-								val := next.GetValue().(traversal.Construct)
+type ReferenceFunctionFactory struct {
+	BaseDensityFnFactory
+}
 
-								out.Value = &val
-							}
-							return nil
-						})
+func (r ReferenceFunctionFactory) Create(ctx *grammar.DensityFn_ReferenceContext, namespace string, scope *traversal.Scope) *ReferenceFunction {
+	out := &ReferenceFunction{
+		location: traversal.RuleLocation(ctx, scope.CurrentFile),
+	}
+	if rr := ctx.ResourceReference(); rr != nil {
+		// TODO: Kill the construct registry
+		if cons := traversal.ConstructRegistry.Construct(rr, namespace, scope); cons != nil {
+			if r, ok := cons.(*traversal.Reference); ok {
+				out.Ref = r
+
+				out.Ref.SetResolver(func() error {
+					if next, ok := scope.Get(*r); ok {
+						val := next.GetValue().(traversal.Construct)
+
+						out.Value = &val
 					}
-				}
+					return nil
+				})
 			}
+		}
+	}
 
-			return out
-		},
-	)
+	return out
 }
 
-func (c *ReferenceFunction) ExportSymbol(symbol traversal.Symbol, rootDir *lib.FileTreeLike) error {
-	return exportDensityFunction(symbol, rootDir, c)
+func (r ReferenceFunctionFactory) GetHelp(_ *ReferenceFunction, _ traversal.Symbol, _ traversal.TextLocation) *traversal.Help {
+	return nil
 }
 
-func (c *ReferenceFunction) MarshalJSON() ([]byte, error) {
+type ReferenceFunction struct {
+	Ref      *traversal.Reference
+	Value    *traversal.Construct
+	location traversal.TextLocation
+}
+
+func (c ReferenceFunction) GetLocation() traversal.TextLocation {
+	return c.location
+}
+
+func (c ReferenceFunction) MarshalJSON() ([]byte, error) {
 	if c.Ref == nil {
 		return nil, errors.New("reference is nil in ReferenceRule")
 	}

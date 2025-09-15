@@ -16,6 +16,7 @@ type File struct {
 
 func (f *File) Parse() error {
 	err := f.Project.GlobalScope.PurgeFile(f.Path)
+	traversal.RemoveFile(f.Path)
 	f.Diagnostics = make([]traversal.Diagnostic, 0)
 	if err != nil {
 		return err

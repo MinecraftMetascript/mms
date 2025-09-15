@@ -6,27 +6,41 @@ import (
 	"github.com/antlr4-go/antlr/v4"
 )
 
+type SymbolKind string
+
+const (
+	VerticalAnchor = "VerticalAnchor"
+	Noise          = "Noise"
+)
+
 type Symbol interface {
 	GetNameLocation() TextLocation
 	GetContentLocation() TextLocation
-	GetValue() Construct
+	GetValue() Node
 	GetReference() *Reference
-	GetType() string
+	GetKind() SymbolKind
 }
 
 type BaseSymbol struct {
 	nameLocation    TextLocation
 	contentLocation TextLocation
-	value           Construct
+	value           Node
 	ref             *Reference
-	kind            string
+	kind            SymbolKind
 }
 
-func (s BaseSymbol) GetType() string {
+func (s BaseSymbol) GetKind() SymbolKind {
 	return s.kind
 }
 
-func NewSymbol(nameLocation TextLocation, contentLocation TextLocation, value Construct, ref *Reference, kind string) BaseSymbol {
+func NewEmptySymbol(nameLocation TextLocation, ref *Reference) BaseSymbol {
+	return BaseSymbol{
+		nameLocation: nameLocation,
+		ref:          ref,
+	}
+}
+
+func NewSymbol(nameLocation TextLocation, contentLocation TextLocation, value Node, ref *Reference, kind SymbolKind) BaseSymbol {
 	return BaseSymbol{
 		nameLocation:    nameLocation,
 		contentLocation: contentLocation,
@@ -41,34 +55,6 @@ type DeclarationContext interface {
 	Identifier() antlr.TerminalNode
 }
 
-func ProcessDeclaration(ctx DeclarationContext, valueCtx antlr.ParserRuleContext, scope *Scope, namespace string, kind string) Symbol {
-	out := &BaseSymbol{}
-	out.kind = kind
-
-	if id := ctx.Identifier(); id == nil {
-		scope.DiagnoseSemanticError("Missing Identifier", ctx)
-	} else {
-		out.ref = NewReference(id.GetText(), namespace)
-		out.nameLocation = TerminalNodeLocation(id, scope.CurrentFile)
-	}
-
-	out.value = ConstructRegistry.Construct(valueCtx, namespace, scope)
-	if out.value == nil {
-		scope.DiagnoseSemanticError("No Value found for Declaration", ctx)
-	} else {
-		out.contentLocation = RuleLocation(valueCtx, scope.CurrentFile)
-	}
-
-	err := scope.Register(*out)
-	if err != nil {
-		return nil
-	}
-
-	ConstructRegistry.symbols[RuleLocation(ctx, scope.CurrentFile)] = out
-
-	return out
-}
-
 func (s BaseSymbol) GetNameLocation() TextLocation {
 	return s.nameLocation
 }
@@ -77,7 +63,7 @@ func (s BaseSymbol) GetContentLocation() TextLocation {
 	return s.contentLocation
 }
 
-func (s BaseSymbol) GetValue() Construct {
+func (s BaseSymbol) GetValue() Node {
 	return s.value
 }
 
@@ -89,14 +75,14 @@ func (s BaseSymbol) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
 		NameLocation    TextLocation `json:"nameLocation"`
 		ContentLocation TextLocation `json:"contentLocation"`
-		Value           Construct    `json:"value"`
+		Value           Node         `json:"value"`
 		Ref             *Reference   `json:"ref"`
-		Type            string       `json:"type"`
+		Type            SymbolKind   `json:"type"`
 	}{
 		NameLocation:    s.nameLocation,
 		ContentLocation: s.contentLocation,
 		Value:           s.GetValue(),
 		Ref:             s.ref,
-		Type:            s.GetType(),
+		Type:            s.GetKind(),
 	})
 }

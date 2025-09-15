@@ -2,16 +2,20 @@ package lang
 
 import (
 	"fmt"
+	"log"
 
 	"github.com/minecraftmetascript/mms/lang/traversal"
 	"github.com/minecraftmetascript/mms/lib"
 )
-import _ "github.com/minecraftmetascript/mms/lang/constructs/worldgen/surface_rules"
+
+//import _ "github.com/minecraftmetascript/mms/lang/constructs/worldgen/surface_rules"
 import _ "github.com/minecraftmetascript/mms/lang/constructs/worldgen/noise"
+
 import _ "github.com/minecraftmetascript/mms/lang/constructs/worldgen/density_functions"
-import _ "github.com/minecraftmetascript/mms/lang/constructs/worldgen/noise_router"
-import _ "github.com/minecraftmetascript/mms/lang/constructs/worldgen/noise_settings"
-import _ "github.com/minecraftmetascript/mms/lang/constructs/block_states"
+
+//import _ "github.com/minecraftmetascript/mms/lang/constructs/worldgen/noise_router"
+//import _ "github.com/minecraftmetascript/mms/lang/constructs/worldgen/noise_settings"
+//import _ "github.com/minecraftmetascript/mms/lang/constructs/block_states"
 
 type Project struct {
 	Files       map[string]*File
@@ -53,10 +57,9 @@ func (p *Project) BuildFsLike(rootName string) *lib.FileTreeLike {
 	root := lib.NewDirLike(rootName, nil)
 	dataDir := root.MkDir("data", nil)
 	for name, symbol := range p.GlobalScope.Symbols() {
-		ref := symbol.GetValue()
-		err := ref.ExportSymbol(symbol, dataDir)
+		err := traversal.ExportNode(symbol, dataDir)
 		if err != nil {
-			fmt.Println(fmt.Sprintf("Error while exporting %s: %s", name, err.Error()))
+			log.Println(fmt.Sprintf("Error while exporting %s: %s", name, err.Error()))
 		}
 	}
 

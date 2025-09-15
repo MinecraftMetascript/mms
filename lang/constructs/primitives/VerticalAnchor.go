@@ -10,45 +10,79 @@ import (
 	"github.com/minecraftmetascript/mms/lib"
 )
 
-func init() {
-	traversal.RegisterHelp[*grammar.VerticalAnchorContext](
-		func(construct traversal.Construct, symbol traversal.Symbol, location traversal.TextLocation) *string {
-			out := "Defines a vertical anchor, which can be absolute, above the bottom, or below the top.<br/>Absolute: `100`<br/>Above bottom: `~-100`<br/>Below top: `~100`"
-			return &out
-		})
-	traversal.Register(
-		func(anchor *grammar.VerticalAnchorContext, _ string, _ *traversal.Scope) traversal.Construct {
-			if anchor.Identifier() != nil {
-				// Construct a reference
+type VerticalAnchorFactory struct{}
+
+func (v VerticalAnchorFactory) CreateDeclaration(ctx *grammar.VerticalAnchorDeclarationContext, namespace string, scope *traversal.Scope) (traversal.Symbol, bool) {
+	if ctx.Declare() != nil {
+		declaration := DeclarationFactory{}.Create(ctx.Declare().(*grammar.DeclareContext), namespace, scope)
+		if declaration == nil {
+			scope.DiagnoseSemanticError("Missing identifier", ctx.Declare())
+		}
+		anchor := v.Create(ctx.VerticalAnchor().(*grammar.VerticalAnchorContext), namespace, scope)
+		if anchor == nil {
+			scope.DiagnoseSemanticError("Missing or invalid vertical anchor", ctx.VerticalAnchor())
+		}
+		return traversal.NewSymbol(
+			declaration.GetNameLocation(),
+			traversal.RuleLocation(ctx.VerticalAnchor(), scope.CurrentFile),
+			anchor,
+			declaration.GetReference(),
+			traversal.VerticalAnchor,
+		), true
+
+	} else {
+		return nil, false
+	}
+}
+
+func (v VerticalAnchorFactory) Create(ctx *grammar.VerticalAnchorContext, namespace string, scope *traversal.Scope) *VerticalAnchor {
+	t := ctx.GetText()
+	isRelative := strings.Contains(t, "~")
+	if i := ctx.Int(); i != nil {
+		var value int
+		if v, err := strconv.Atoi(i.GetText()); err == nil {
+			value = v
+		}
+		var anchorType VerticalAnchorType
+		if isRelative {
+			if value < 0 {
+				anchorType = VerticalAnchorType_BelowTop
 			} else {
-				t := anchor.GetText()
-				isRelative := strings.Contains(t, "~")
-				if i := anchor.Int(); i != nil {
-					var value int
-					if v, err := strconv.Atoi(i.GetText()); err == nil {
-						value = v
-					}
-					var anchorType VerticalAnchorType
-					if isRelative {
-						if value < 0 {
-							anchorType = VerticalAnchorType_BelowTop
-						} else {
-							anchorType = VerticalAnchorType_AboveBottom
-						}
-					} else {
-						anchorType = VerticalAnchorType_Absolute
-					}
-
-					return &VerticalAnchor{
-						Type:  anchorType,
-						Value: value,
-					}
-				}
-
+				anchorType = VerticalAnchorType_AboveBottom
 			}
-			return nil
-		},
-	)
+		} else {
+			anchorType = VerticalAnchorType_Absolute
+		}
+
+		return &VerticalAnchor{
+			Type:     anchorType,
+			Value:    value,
+			location: traversal.RuleLocation(ctx, scope.CurrentFile),
+		}
+	}
+	return nil
+}
+
+func (v VerticalAnchorFactory) GetHelp(node *VerticalAnchor, symbol traversal.Symbol, location traversal.TextLocation) *traversal.Help {
+	return &traversal.Help{
+		Content:  "Defines a vertical anchor, which can be absolute, above the bottom, or below the top.<br/>Absolute: `100`<br/>Above bottom: `~-100`<br/>Below top: `~100`",
+		Position: node.GetLocation(),
+	}
+}
+
+func (v VerticalAnchorFactory) Export(symbol traversal.Symbol, rootDir *lib.FileTreeLike) error {
+	if rootDir == nil {
+		return nil
+	}
+	rootDir.
+		MkDir("_debug", nil).
+		MkDir("vertical_anchor", nil).
+		MkFile(symbol.GetReference().GetName()+".json", "", nil)
+	return nil
+}
+
+func init() {
+	traversal.RegisterNodeFactory(VerticalAnchorFactory{}, true)
 }
 
 type VerticalAnchorType string
@@ -60,13 +94,13 @@ const (
 )
 
 type VerticalAnchor struct {
-	traversal.BaseConstruct
-	Type  VerticalAnchorType
-	Value int
+	location traversal.TextLocation
+	Type     VerticalAnchorType
+	Value    int
 }
 
-func (v VerticalAnchor) ExportSymbol(symbol traversal.Symbol, rootDir *lib.FileTreeLike) error {
-	return nil
+func (v VerticalAnchor) GetLocation() traversal.TextLocation {
+	return v.location
 }
 
 func (v VerticalAnchor) MarshalJSON() ([]byte, error) {

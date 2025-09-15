@@ -34,16 +34,6 @@ type constructRegistryImpl struct {
 	symbols    map[TextLocation]Symbol
 }
 
-func getByLocation[T any](location TextLocation, m map[TextLocation]T) map[TextLocation]T {
-	out := make(map[TextLocation]T, 0)
-	for l, val := range m {
-		if location.Contains(l) {
-			out[l] = val
-		}
-	}
-	return out
-}
-
 type Factory[C antlr.ParserRuleContext] func(ctx C, ns string, scope *Scope) Construct
 
 func RegisterHelp[C antlr.ParserRuleContext](f func(construct Construct, symbol Symbol, location TextLocation) *string) {
@@ -74,24 +64,24 @@ func GetHelp(ctx antlr.ParserRuleContext, filename string) *Help {
 	}
 
 	ctxLocation := RuleLocation(ctx, filename)
-	constructs := getByLocation(ctxLocation, ConstructRegistry.constructs)
-	symbols := getByLocation(ctxLocation, ConstructRegistry.symbols)
+	constructs := FilterByLocation(ctxLocation, ConstructRegistry.constructs)
+	//symbols := getByLocation(ctxLocation, ConstructRegistry.symbols)
 
-	for location, symbol := range symbols {
-		construct := symbol.GetValue()
-		if construct == nil {
-			continue
-		}
-		val := helper(construct, symbol, location)
-		if val == nil {
-			continue
-		}
-
-		return &Help{
-			Content:  *val,
-			Position: location,
-		}
-	}
+	//for location, symbol := range symbols {
+	//	construct := symbol.GetValue()
+	//	if construct == nil {
+	//		continue
+	//	}
+	//	val := helper(construct, symbol, location)
+	//	if val == nil {
+	//		continue
+	//	}
+	//
+	//	return &Help{
+	//		Content:  *val,
+	//		Position: location,
+	//	}
+	//}
 
 	for location, construct := range constructs {
 		if construct == nil {
@@ -149,19 +139,19 @@ func ExtractInlineConstruct(
 	ctx antlr.ParserRuleContext,
 	namespace string,
 	scope *Scope,
-	label string,
+	kind SymbolKind,
 ) (Symbol, *Reference) {
-	def := ConstructRegistry.Construct(ctx, namespace, scope)
+	def := ConstructNode(ctx, namespace, scope)
 	if def == nil {
 		log.Printf("[Error] Failed to extract inline construct -- ConstructRegistry returned nil for %s\n", reflect.TypeOf(ctx).Elem().Name())
-		scope.DiagnoseSemanticError(fmt.Sprintf("Failed to extract inline %s", label), ctx)
+		scope.DiagnoseSemanticError(fmt.Sprintf("Failed to extract inline %s", kind), ctx)
 		return nil, nil
 	}
 	ref :=
 		NewReference(
 			fmt.Sprintf(
 				"%s_%d_%d",
-				label,
+				kind,
 				ctx.GetStart().GetLine(),
 				ctx.GetStart().GetColumn(),
 			),
@@ -172,16 +162,16 @@ func ExtractInlineConstruct(
 		RuleLocation(ctx, scope.CurrentFile),
 		def,
 		ref,
-		label,
+		kind,
 	)
 	if _, ok := scope.Get(*ref); !ok {
 		if err := scope.Register(s); err != nil {
 			log.Println("Failed to extract inline construct -- ", err)
-			scope.DiagnoseSemanticError(fmt.Sprintf("Failed to extract inline %s", label), ctx)
+			scope.DiagnoseSemanticError(fmt.Sprintf("Failed to extract inline %s", kind), ctx)
 			return nil, nil
 		}
 	} else {
-		scope.DiagnoseSemanticError(fmt.Sprintf("Found duplicate inline values. This should not be possible %s", label), ctx)
+		scope.DiagnoseSemanticError(fmt.Sprintf("Found duplicate inline values. This should not be possible %s", kind), ctx)
 		return nil, nil
 	}
 	ConstructRegistry.symbols[RuleLocation(ctx, scope.CurrentFile)] = s

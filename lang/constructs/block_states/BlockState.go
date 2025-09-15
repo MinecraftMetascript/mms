@@ -1,32 +1,49 @@
 package block_states
 
 import (
-	"encoding/json"
-
 	"github.com/minecraftmetascript/mms/lang/grammar"
 	"github.com/minecraftmetascript/mms/lang/traversal"
+	"github.com/minecraftmetascript/mms/lib"
 )
 
-func init() {
-	traversal.RegisterHelp[*grammar.BlockStateContext](
-		func(state traversal.Construct, symbol traversal.Symbol, location traversal.TextLocation) *string {
-			out := "Defines a Minecraft [block state](https://minecraft.wiki/w/Block_states).<br/>Currently *only has support for block name*.<br/>Example: `Block(minecraft:stone)`"
-			return &out
-		},
-	)
+type BlockStateFactory struct{}
 
-	traversal.Register(
-		func(state *grammar.BlockStateContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
-			nameCtx := state.ResourceReference()
-			if nameCtx == nil {
-				return nil
-			}
-			name := traversal.ConstructRegistry.Construct(nameCtx, currentNamespace, scope).(*traversal.Reference)
-			return &BlockState{
-				Name: *name,
-			}
-		},
-	)
+func (b BlockStateFactory) CreateDeclaration(ctx traversal.DeclarableContext, namespace string, scope *traversal.Scope) (traversal.Symbol, bool) {
+	return nil, false
+}
+
+func (b BlockStateFactory) Create(ctx *grammar.BlockStateContext, namespace string, scope *traversal.Scope) *BlockState {
+	nameCtx := ctx.ResourceReference()
+	if nameCtx == nil {
+		return nil
+	}
+	name := traversal.ConstructRegistry.Construct(nameCtx, namespace, scope).(*traversal.Reference)
+	return &BlockState{
+		Name:     *name,
+		location: traversal.RuleLocation(ctx, scope.CurrentFile),
+	}
+}
+
+func (b BlockStateFactory) GetHelp(node *BlockState, symbol traversal.Symbol, location traversal.TextLocation) *traversal.Help {
+	return &traversal.Help{
+		Content:  "Defines a Block State",
+		Position: node.GetLocation(),
+	}
+}
+
+func (b BlockStateFactory) Export(symbol traversal.Symbol, rootDir *lib.FileTreeLike) error {
+	if rootDir == nil {
+		return nil
+	}
+	rootDir.
+		MkDir("_debug", nil).
+		MkDir("block_states", nil).
+		MkFile(symbol.GetReference().GetName()+".json", "", nil)
+	return nil
+}
+
+func init() {
+	traversal.RegisterNodeFactory(BlockStateFactory{}, false)
 }
 
 func BlockStateRef(r traversal.Reference) *BlockState {
@@ -34,14 +51,10 @@ func BlockStateRef(r traversal.Reference) *BlockState {
 }
 
 type BlockState struct {
-	traversal.BaseConstruct
-	Name traversal.Reference
+	Name     traversal.Reference `json:"Name"`
+	location traversal.TextLocation
 }
 
-func (bs BlockState) MarshalJSON() ([]byte, error) {
-	return json.MarshalIndent(struct {
-		Name traversal.Reference `json:"Name"`
-	}{
-		Name: bs.Name,
-	}, "", "  ")
+func (bs BlockState) GetLocation() traversal.TextLocation {
+	return bs.location
 }

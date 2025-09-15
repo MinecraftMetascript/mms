@@ -8,96 +8,101 @@ import (
 	"github.com/minecraftmetascript/mms/lang/builder_chain"
 	"github.com/minecraftmetascript/mms/lang/grammar"
 	"github.com/minecraftmetascript/mms/lang/traversal"
-	"github.com/minecraftmetascript/mms/lib"
 )
 
+type RangeChoiceDensityFnFactory struct {
+	BaseDensityFnFactory
+}
+
+func (r RangeChoiceDensityFnFactory) Create(ctx *grammar.DensityFn_RangeChoiceContext, namespace string, scope *traversal.Scope) *RangeChoiceDensityFn {
+	rangeChoiceBuilder := builder_chain.NewBuilderChain[RangeChoiceDensityFn](
+		builder_chain.Build(
+			func(ctx *grammar.Builder_MinContext, target *RangeChoiceDensityFn, scope *traversal.Scope, namespace string) {
+				builder_chain.Builder_GetFloat(ctx, func(v float64) { target.Min = v }, scope, "Min")
+			},
+		),
+		builder_chain.Build(
+			func(ctx *grammar.Builder_MaxContext, target *RangeChoiceDensityFn, scope *traversal.Scope, namespace string) {
+				builder_chain.Builder_GetFloat(ctx, func(v float64) { target.Max = v }, scope, "Max")
+			},
+		),
+		builder_chain.Build(
+			func(ctx *grammar.Builder_InRangeContext, target *RangeChoiceDensityFn, scope *traversal.Scope, namespace string) {
+				fn := traversal.ConstructRegistry.Construct(ctx.DensityFn(), namespace, scope)
+				if fn != nil {
+					target.InRange = fn
+				} else {
+					scope.DiagnoseSemanticError("Missing or invalid InRange Function", ctx)
+				}
+			},
+		),
+		builder_chain.Build(
+			func(ctx *grammar.Builder_OutRangeContext, target *RangeChoiceDensityFn, scope *traversal.Scope, namespace string) {
+				fn := traversal.ConstructRegistry.Construct(ctx.DensityFn(), namespace, scope)
+				if fn != nil {
+					target.OutRange = fn
+				} else {
+					scope.DiagnoseSemanticError("Missing or invalid InRange Function", ctx)
+				}
+			},
+		),
+	)
+
+	out := &RangeChoiceDensityFn{
+		location: traversal.RuleLocation(ctx, scope.CurrentFile),
+	}
+	input := ctx.DensityFn()
+	if input == nil {
+		scope.DiagnoseSemanticError("Missing input to range choice", ctx)
+	} else {
+		out.Input = traversal.ConstructRegistry.Construct(input.(antlr.ParserRuleContext), namespace, scope)
+	}
+
+	for _, builderWrap := range ctx.AllDensityFn_RangeChoiceBuilder() {
+		builder_chain.Invoke(rangeChoiceBuilder, builderWrap.GetChild(0).(antlr.ParserRuleContext), out, scope, namespace)
+	}
+
+	builder_chain.Require(
+		rangeChoiceBuilder,
+		ctx,
+		scope,
+		reflect.TypeFor[*grammar.Builder_MinContext](),
+		".Min",
+	)
+	builder_chain.Require(
+		rangeChoiceBuilder,
+		ctx,
+		scope,
+		reflect.TypeFor[*grammar.Builder_MaxContext](),
+		".Max",
+	)
+	builder_chain.Require(
+		rangeChoiceBuilder,
+		ctx,
+		scope,
+		reflect.TypeFor[*grammar.Builder_InRangeContext](),
+		".InRange",
+	)
+	builder_chain.Require(
+		rangeChoiceBuilder,
+		ctx,
+		scope,
+		reflect.TypeFor[*grammar.Builder_OutRangeContext](),
+		".OutRange",
+	)
+
+	return out
+}
+
+func (r RangeChoiceDensityFnFactory) GetHelp(node *RangeChoiceDensityFn, symbol traversal.Symbol, location traversal.TextLocation) *traversal.Help {
+	return &traversal.Help{
+		Content:  "Selects from 2 density functions based on an input function and a range.",
+		Position: node.GetLocation(),
+	}
+}
+
 func init() {
-	traversal.RegisterHelp[*grammar.DensityFn_RangeChoiceContext](
-		func(construct traversal.Construct, symbol traversal.Symbol, location traversal.TextLocation) *string {
-			help := "Defines a range choice density function that returns different values based on whether the input is within a specified range.<br/>Required: `.Min(float)`, `.Max(float)`, `.InRange(densityFn)`, `.OutRange(densityFn)`.<br/>Example: `RangeChoice(densityFn).Min(-1).Max(1).InRange(densityFn).OutRange(densityFn)`"
-			return &help
-		},
-	)
-
-	traversal.Register(
-		func(densityFn *grammar.DensityFn_RangeChoiceContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
-			rangeChoiceBuilder := builder_chain.NewBuilderChain[RangeChoiceDensityFn](
-				builder_chain.Build(
-					func(ctx *grammar.Builder_MinContext, target *RangeChoiceDensityFn, scope *traversal.Scope, namespace string) {
-						builder_chain.Builder_GetFloat(ctx, func(v float64) { target.Min = v }, scope, "Min")
-					},
-				),
-				builder_chain.Build(
-					func(ctx *grammar.Builder_MaxContext, target *RangeChoiceDensityFn, scope *traversal.Scope, namespace string) {
-						builder_chain.Builder_GetFloat(ctx, func(v float64) { target.Max = v }, scope, "Max")
-					},
-				),
-				builder_chain.Build(
-					func(ctx *grammar.Builder_InRangeContext, target *RangeChoiceDensityFn, scope *traversal.Scope, namespace string) {
-						fn := traversal.ConstructRegistry.Construct(ctx.DensityFn(), currentNamespace, scope)
-						if fn != nil {
-							target.InRange = fn
-						} else {
-							scope.DiagnoseSemanticError("Missing or invalid InRange Function", ctx)
-						}
-					},
-				),
-				builder_chain.Build(
-					func(ctx *grammar.Builder_OutRangeContext, target *RangeChoiceDensityFn, scope *traversal.Scope, namespace string) {
-						fn := traversal.ConstructRegistry.Construct(ctx.DensityFn(), currentNamespace, scope)
-						if fn != nil {
-							target.OutRange = fn
-						} else {
-							scope.DiagnoseSemanticError("Missing or invalid InRange Function", ctx)
-						}
-					},
-				),
-			)
-
-			out := &RangeChoiceDensityFn{}
-			input := densityFn.DensityFn()
-			if input == nil {
-				scope.DiagnoseSemanticError("Missing input to range choice", densityFn)
-			} else {
-				out.Input = traversal.ConstructRegistry.Construct(input.(antlr.ParserRuleContext), currentNamespace, scope)
-			}
-
-			for _, builderWrap := range densityFn.AllDensityFn_RangeChoiceBuilder() {
-				builder_chain.Invoke(rangeChoiceBuilder, builderWrap.GetChild(0).(antlr.ParserRuleContext), out, scope, currentNamespace)
-			}
-
-			builder_chain.Require(
-				rangeChoiceBuilder,
-				densityFn,
-				scope,
-				reflect.TypeFor[*grammar.Builder_MinContext](),
-				".Min",
-			)
-			builder_chain.Require(
-				rangeChoiceBuilder,
-				densityFn,
-				scope,
-				reflect.TypeFor[*grammar.Builder_MaxContext](),
-				".Max",
-			)
-			builder_chain.Require(
-				rangeChoiceBuilder,
-				densityFn,
-				scope,
-				reflect.TypeFor[*grammar.Builder_InRangeContext](),
-				".InRange",
-			)
-			builder_chain.Require(
-				rangeChoiceBuilder,
-				densityFn,
-				scope,
-				reflect.TypeFor[*grammar.Builder_OutRangeContext](),
-				".OutRange",
-			)
-
-			return out
-		},
-	)
+	traversal.RegisterNodeFactory(RangeChoiceDensityFnFactory{}, false)
 }
 
 type RangeChoiceDensityFn struct {
@@ -106,6 +111,11 @@ type RangeChoiceDensityFn struct {
 	Max      float64
 	InRange  traversal.Construct
 	OutRange traversal.Construct
+	location traversal.TextLocation
+}
+
+func (c RangeChoiceDensityFn) GetLocation() traversal.TextLocation {
+	return c.location
 }
 
 func (c RangeChoiceDensityFn) MarshalJSON() ([]byte, error) {
@@ -124,8 +134,4 @@ func (c RangeChoiceDensityFn) MarshalJSON() ([]byte, error) {
 		InRange:  c.InRange,
 		OutRange: c.OutRange,
 	}, "", "  ")
-}
-
-func (c RangeChoiceDensityFn) ExportSymbol(symbol traversal.Symbol, rootDir *lib.FileTreeLike) error {
-	return exportDensityFunction(symbol, rootDir, c)
 }

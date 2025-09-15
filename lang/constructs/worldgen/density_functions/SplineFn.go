@@ -7,8 +7,56 @@ import (
 	"github.com/minecraftmetascript/mms/lang/builder_chain"
 	"github.com/minecraftmetascript/mms/lang/grammar"
 	"github.com/minecraftmetascript/mms/lang/traversal"
-	"github.com/minecraftmetascript/mms/lib"
 )
+
+type SplineFactory struct {
+	BaseDensityFnFactory
+}
+
+func (s SplineFactory) Create(ctx *grammar.DensityFn_SplineFnContext, namespace string, scope *traversal.Scope) traversal.Node {
+	splineDef := ctx.DensityFn_Spline()
+	return buildSpline(splineDef.(*grammar.DensityFn_SplineContext), namespace, scope)
+}
+
+func (s SplineFactory) GetHelp(node *SplineDensityFn, symbol traversal.Symbol, location traversal.TextLocation) *traversal.Help {
+	return &traversal.Help{
+		Content:  "Defines a cubic spline",
+		Position: node.GetLocation(),
+	}
+}
+func buildSpline(ctx *grammar.DensityFn_SplineContext, currentNamespace string, scope *traversal.Scope) traversal.Node {
+	if constant := ctx.Number(); constant != nil {
+		var spline float64
+		builder_chain.Builder_GetFloat(ctx, func(f float64) { spline = f }, scope, "Spline")
+		return &SplineConst{
+			Spline:   spline,
+			location: traversal.RuleLocation(ctx, scope.CurrentFile),
+		}
+	}
+
+	out := Spline{
+		Points: make([]SplinePoint, 0),
+	}
+	inputCtx := ctx.DensityFn()
+	if inputCtx == nil {
+		scope.DiagnoseSemanticError("Missing input to spline", ctx)
+	} else {
+		input := traversal.ConstructRegistry.Construct(inputCtx, currentNamespace, scope)
+		out.Coordinate = input
+	}
+
+	for _, p := range ctx.AllDensityFn_SplinePoint() {
+		point := buildSplinePoint(p.(*grammar.DensityFn_SplinePointContext), currentNamespace, scope)
+		if point != nil {
+			out.Points = append(out.Points, *point)
+		}
+	}
+
+	return &SplineDensityFn{
+		Spline:   out,
+		location: traversal.RuleLocation(ctx, scope.CurrentFile),
+	}
+}
 
 func buildSplinePoint(point *grammar.DensityFn_SplinePointContext, currentNamespace string, scope *traversal.Scope) *SplinePoint {
 	out := &SplinePoint{}
@@ -61,56 +109,16 @@ func buildSplinePoint(point *grammar.DensityFn_SplinePointContext, currentNamesp
 }
 
 func init() {
-	traversal.RegisterHelp[*grammar.DensityFn_SplineFnContext](
-		func(construct traversal.Construct, symbol traversal.Symbol, location traversal.TextLocation) *string {
-			out := "Defines a cubic spline"
-			return &out
-		},
-	)
-	traversal.Register(
-		func(densityFn *grammar.DensityFn_SplineFnContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
-			splineDef := densityFn.DensityFn_Spline()
-			return traversal.ConstructRegistry.Construct(splineDef, currentNamespace, scope)
-		},
-	)
 
-	traversal.Register(
-		func(splineDef *grammar.DensityFn_SplineContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
-			if constant := splineDef.Number(); constant != nil {
-				var spline float64
-				builder_chain.Builder_GetFloat(splineDef, func(f float64) { spline = f }, scope, "Spline")
-				return &SplineConst{
-					Spline: spline,
-				}
-			}
-
-			out := Spline{
-				Points: make([]SplinePoint, 0),
-			}
-			inputCtx := splineDef.DensityFn()
-			if inputCtx == nil {
-				scope.DiagnoseSemanticError("Missing input to spline", splineDef)
-			} else {
-				input := traversal.ConstructRegistry.Construct(inputCtx, currentNamespace, scope)
-				out.Coordinate = input
-			}
-
-			for _, p := range splineDef.AllDensityFn_SplinePoint() {
-				point := buildSplinePoint(p.(*grammar.DensityFn_SplinePointContext), currentNamespace, scope)
-				if point != nil {
-					out.Points = append(out.Points, *point)
-				}
-			}
-
-			return &SplineDensityFn{
-				Spline: out,
-			}
-
-		})
 }
 
 type SplineDensityFn struct {
-	Spline Spline
+	Spline   Spline
+	location traversal.TextLocation
+}
+
+func (c SplineDensityFn) GetLocation() traversal.TextLocation {
+	return c.location
 }
 
 type Spline struct {
@@ -158,14 +166,15 @@ func (c SplineDensityFn) MarshalJSON() ([]byte, error) {
 	}, "", "  ")
 }
 
-func (c SplineDensityFn) ExportSymbol(symbol traversal.Symbol, rootDir *lib.FileTreeLike) error {
-	return exportDensityFunction(symbol, rootDir, c)
-}
-
 // Spline Constant Form
 
 type SplineConst struct {
-	Spline float64
+	Spline   float64
+	location traversal.TextLocation
+}
+
+func (s SplineConst) GetLocation() traversal.TextLocation {
+	return s.location
 }
 
 func (s SplineConst) MarshalJSON() ([]byte, error) {
@@ -176,8 +185,4 @@ func (s SplineConst) MarshalJSON() ([]byte, error) {
 		Type:   "minecraft:spline",
 		Spline: s.Spline,
 	}, "", "  ")
-}
-
-func (s SplineConst) ExportSymbol(symbol traversal.Symbol, rootDir *lib.FileTreeLike) error {
-	return exportDensityFunction(symbol, rootDir, s)
 }

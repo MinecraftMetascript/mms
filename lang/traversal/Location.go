@@ -4,11 +4,42 @@ import (
 	"fmt"
 
 	"github.com/antlr4-go/antlr/v4"
+	protocol "github.com/tliron/glsp/protocol_3_16"
 )
+
+func FilterByLocation[T any](location TextLocation, m map[TextLocation]T) map[TextLocation]T {
+	out := make(map[TextLocation]T, 0)
+	for l, val := range m {
+		if location.Contains(l) {
+			out[l] = val
+		}
+	}
+	return out
+}
 
 type Location struct {
 	Line int
 	Col  int
+}
+
+func (l Location) ToLspPosition() protocol.Position {
+	return protocol.Position{
+		Line:      protocol.UInteger(l.Line - 1), // Protocol positions are 0 indexed
+		Character: protocol.UInteger(l.Col),
+	}
+}
+func (l Location) OffsetLine(offset int) Location {
+	return Location{
+		Line: l.Line + offset,
+		Col:  l.Col,
+	}
+}
+
+func (l Location) OffsetColumn(offset int) Location {
+	return Location{
+		Line: l.Line,
+		Col:  l.Col + offset,
+	}
 }
 
 type TextLocation struct {

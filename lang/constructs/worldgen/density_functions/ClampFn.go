@@ -8,68 +8,78 @@ import (
 	"github.com/minecraftmetascript/mms/lang/builder_chain"
 	"github.com/minecraftmetascript/mms/lang/grammar"
 	"github.com/minecraftmetascript/mms/lang/traversal"
-	"github.com/minecraftmetascript/mms/lib"
 )
 
+type ClampFnFactory struct {
+	BaseDensityFnFactory
+}
+
+func (c ClampFnFactory) Create(ctx *grammar.DensityFn_ClampContext, namespace string, scope *traversal.Scope) *ClampDensityFn {
+	rangeChoiceBuilder := builder_chain.NewBuilderChain[ClampDensityFn](
+		builder_chain.Build(
+			func(ctx *grammar.Builder_MinContext, target *ClampDensityFn, scope *traversal.Scope, namespace string) {
+				builder_chain.Builder_GetFloat(ctx, func(v float64) { target.Min = v }, scope, "Min")
+			},
+		),
+		builder_chain.Build(
+			func(ctx *grammar.Builder_MaxContext, target *ClampDensityFn, scope *traversal.Scope, namespace string) {
+				builder_chain.Builder_GetFloat(ctx, func(v float64) { target.Max = v }, scope, "Max")
+			},
+		),
+	)
+	out := &ClampDensityFn{
+		location: traversal.RuleLocation(ctx, scope.CurrentFile),
+	}
+	input := ctx.DensityFn()
+	if input == nil {
+		scope.DiagnoseSemanticError("Missing input to range choice", ctx)
+	}
+	out.Input = traversal.ConstructRegistry.Construct(input.(antlr.ParserRuleContext), namespace, scope)
+	if out.Input == nil {
+		scope.DiagnoseSemanticError("Invalid input to range choice", ctx)
+	}
+
+	for _, builderWrap := range ctx.AllDensityFn_ClampBuilder() {
+		builder_chain.Invoke(rangeChoiceBuilder, builderWrap.GetChild(0).(antlr.ParserRuleContext), out, scope, namespace)
+	}
+
+	builder_chain.Require(
+		rangeChoiceBuilder,
+		ctx,
+		scope,
+		reflect.TypeFor[*grammar.Builder_MinContext](),
+		".Min",
+	)
+	builder_chain.Require(
+		rangeChoiceBuilder,
+		ctx,
+		scope,
+		reflect.TypeFor[*grammar.Builder_MaxContext](),
+		".Max",
+	)
+	return out
+}
+
+func (c ClampFnFactory) GetHelp(node *ClampDensityFn, symbol traversal.Symbol, location traversal.TextLocation) *traversal.Help {
+	return &traversal.Help{
+		Content:  "Clamps the input density function to the specified range.<br/> `.Min(float)` and `.Max(float)` are required.<br/>Example: `Clamp(_densityFn_).Min(0).Max(1))`",
+		Position: node.GetLocation(),
+	}
+}
+
 func init() {
-	traversal.RegisterHelp[*grammar.DensityFn_ClampContext](
-		func(construct traversal.Construct, s traversal.Symbol, location traversal.TextLocation) *string {
-			help := "Clamps the input density function to the specified range.<br/> `.Min(float)` and `.Max(float)` are required.<br/>Example: `Clamp(_densityFn_).Min(0).Max(1))`"
-			return &help
-		},
-	)
-
-	traversal.Register(
-		func(densityFn *grammar.DensityFn_ClampContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
-			rangeChoiceBuilder := builder_chain.NewBuilderChain[ClampDensityFn](
-				builder_chain.Build(
-					func(ctx *grammar.Builder_MinContext, target *ClampDensityFn, scope *traversal.Scope, namespace string) {
-						builder_chain.Builder_GetFloat(ctx, func(v float64) { target.Min = v }, scope, "Min")
-					},
-				),
-				builder_chain.Build(
-					func(ctx *grammar.Builder_MaxContext, target *ClampDensityFn, scope *traversal.Scope, namespace string) {
-						builder_chain.Builder_GetFloat(ctx, func(v float64) { target.Max = v }, scope, "Max")
-					},
-				),
-			)
-			out := &ClampDensityFn{}
-			input := densityFn.DensityFn()
-			if input == nil {
-				scope.DiagnoseSemanticError("Missing input to range choice", densityFn)
-			}
-			out.Input = traversal.ConstructRegistry.Construct(input.(antlr.ParserRuleContext), currentNamespace, scope)
-			if out.Input == nil {
-				scope.DiagnoseSemanticError("Invalid input to range choice", densityFn)
-			}
-
-			for _, builderWrap := range densityFn.AllDensityFn_ClampBuilder() {
-				builder_chain.Invoke(rangeChoiceBuilder, builderWrap.GetChild(0).(antlr.ParserRuleContext), out, scope, currentNamespace)
-			}
-
-			builder_chain.Require(
-				rangeChoiceBuilder,
-				densityFn,
-				scope,
-				reflect.TypeFor[*grammar.Builder_MinContext](),
-				".Min",
-			)
-			builder_chain.Require(
-				rangeChoiceBuilder,
-				densityFn,
-				scope,
-				reflect.TypeFor[*grammar.Builder_MaxContext](),
-				".Max",
-			)
-			return out
-		},
-	)
+	traversal.RegisterNodeFactory(ClampFnFactory{}, false)
 }
 
 type ClampDensityFn struct {
-	Input traversal.Construct
-	Min   float64
-	Max   float64
+	Input    traversal.Construct
+	Min      float64
+	Max      float64
+	location traversal.TextLocation
+}
+
+func (c ClampDensityFn) GetLocation() traversal.TextLocation {
+	return c.location
 }
 
 func (c ClampDensityFn) MarshalJSON() ([]byte, error) {
@@ -84,8 +94,4 @@ func (c ClampDensityFn) MarshalJSON() ([]byte, error) {
 		Min:   c.Min,
 		Max:   c.Max,
 	}, "", "  ")
-}
-
-func (c ClampDensityFn) ExportSymbol(symbol traversal.Symbol, rootDir *lib.FileTreeLike) error {
-	return exportDensityFunction(symbol, rootDir, c)
 }

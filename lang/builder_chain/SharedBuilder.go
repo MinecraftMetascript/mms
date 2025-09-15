@@ -89,7 +89,7 @@ func Builder_GetVerticalAnchor(
 	label string,
 ) {
 	if raw := ctx.VerticalAnchor(); raw != nil {
-		anchor := traversal.ConstructRegistry.Construct(raw, currentNamespace, scope)
+		anchor := traversal.ConstructNode(raw, currentNamespace, scope)
 		if a, ok := anchor.(*primitives.VerticalAnchor); ok && a != nil {
 			mod(*a)
 		} else {

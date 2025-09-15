@@ -71,7 +71,6 @@ func Start() error {
 
 func (ls *LanguageServer) Initialize(context *glsp.Context, params *protocol.InitializeParams) (any, error) {
 	capabilities := ls.handler.CreateServerCapabilities()
-
 	return protocol.InitializeResult{
 		Capabilities: capabilities,
 		ServerInfo: &protocol.InitializeResultServerInfo{
@@ -172,25 +171,11 @@ func (ls *LanguageServer) TextDocumentCompletion(context *glsp.Context, params *
 		Items:        make([]protocol.CompletionItem, 0),
 	}
 
-	out.Items = append(out.Items, protocol.CompletionItem{
-		Label:               "This is a completion item.",
-		Kind:                nil,
-		Tags:                nil,
-		Detail:              nil,
-		Documentation:       nil,
-		Deprecated:          nil,
-		Preselect:           nil,
-		SortText:            nil,
-		FilterText:          nil,
-		InsertText:          nil,
-		InsertTextFormat:    nil,
-		InsertTextMode:      nil,
-		TextEdit:            nil,
-		AdditionalTextEdits: nil,
-		CommitCharacters:    nil,
-		Command:             nil,
-		Data:                nil,
-	})
+	foundCompletions := ls.activeDocument.CompletionsAtPosition(params.TextDocumentPositionParams.Position, params.TextDocument.URI)
+	if foundCompletions != nil {
+		out.Items = foundCompletions
+		return out, nil
+	}
 
 	return out, nil
 }

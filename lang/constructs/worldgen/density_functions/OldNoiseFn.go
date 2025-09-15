@@ -7,64 +7,67 @@ import (
 	"github.com/minecraftmetascript/mms/lang/builder_chain"
 	"github.com/minecraftmetascript/mms/lang/grammar"
 	"github.com/minecraftmetascript/mms/lang/traversal"
-	"github.com/minecraftmetascript/mms/lib"
 )
 
+type OldNoiseFnFactory struct {
+	BaseDensityFnFactory
+}
+
+func (o OldNoiseFnFactory) Create(ctx *grammar.DensityFn_OldBlendedNoiseContext, namespace string, scope *traversal.Scope) *OldBlendedNoiseFn {
+	noiseFnBuilder := builder_chain.NewBuilderChain(
+		builder_chain.Build(
+			func(ctx *grammar.Builder_XZScaleContext, target *OldBlendedNoiseFn, scope *traversal.Scope, namespace string) {
+				builder_chain.Builder_GetFloat(ctx, func(v float64) { target.XzScale = v }, scope, "XzScale")
+			},
+		),
+		builder_chain.Build(
+			func(ctx *grammar.Builder_YScaleContext, target *OldBlendedNoiseFn, scope *traversal.Scope, namespace string) {
+				builder_chain.Builder_GetFloat(ctx, func(v float64) { target.YScale = v }, scope, "XzScale")
+			},
+		),
+		builder_chain.Build(
+			func(ctx *grammar.Builder_XZFactorContext, target *OldBlendedNoiseFn, scope *traversal.Scope, namespace string) {
+				builder_chain.Builder_GetFloat(ctx, func(v float64) { target.XzFactor = v }, scope, "XzScale")
+			},
+		),
+		builder_chain.Build(
+			func(ctx *grammar.Builder_YFactorContext, target *OldBlendedNoiseFn, scope *traversal.Scope, namespace string) {
+				builder_chain.Builder_GetFloat(ctx, func(v float64) { target.YFactor = v }, scope, "XzScale")
+			},
+		),
+		builder_chain.Build(
+			func(ctx *grammar.Builder_SmearContext, target *OldBlendedNoiseFn, scope *traversal.Scope, namespace string) {
+				builder_chain.Builder_GetFloat(ctx, func(v float64) { target.SmearMultiplier = v }, scope, "XzScale")
+			},
+		),
+	)
+
+	out := &OldBlendedNoiseFn{
+		XzScale:         1,
+		YScale:          1,
+		XzFactor:        1,
+		YFactor:         1,
+		SmearMultiplier: 1,
+		location:        traversal.RuleLocation(ctx, scope.CurrentFile),
+	}
+
+	for _, r := range ctx.AllDensityFn_OldBlendedNoiseBuilder() {
+		child := r.GetChild(0)
+		if child == nil {
+			continue
+		}
+		builder_chain.Invoke(noiseFnBuilder, child.(antlr.ParserRuleContext), out, scope, namespace)
+	}
+	return out
+}
+
+func (o OldNoiseFnFactory) GetHelp(node *OldBlendedNoiseFn, symbol traversal.Symbol, location traversal.TextLocation) *traversal.Help {
+	return nil
+}
+
 func init() {
-	traversal.RegisterHelp[*grammar.DensityFn_OldBlendedNoiseContext](
-		func(construct traversal.Construct, symbol traversal.Symbol, location traversal.TextLocation) *string {
-			out := "References a defined noise function.<br/>Uses .XzScale( float ), .YScale( float ), .XzFactor( float ), .YFactor( float ) and .Smear( float ) to scale the noise function."
-			return &out
-		},
-	)
-	traversal.Register(
-		func(densityFn *grammar.DensityFn_OldBlendedNoiseContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
-			noiseFnBuilder := builder_chain.NewBuilderChain(
-				builder_chain.Build(
-					func(ctx *grammar.Builder_XZScaleContext, target *OldBlendedNoiseFn, scope *traversal.Scope, namespace string) {
-						builder_chain.Builder_GetFloat(ctx, func(v float64) { target.XzScale = v }, scope, "XzScale")
-					},
-				),
-				builder_chain.Build(
-					func(ctx *grammar.Builder_YScaleContext, target *OldBlendedNoiseFn, scope *traversal.Scope, namespace string) {
-						builder_chain.Builder_GetFloat(ctx, func(v float64) { target.YScale = v }, scope, "XzScale")
-					},
-				),
-				builder_chain.Build(
-					func(ctx *grammar.Builder_XZFactorContext, target *OldBlendedNoiseFn, scope *traversal.Scope, namespace string) {
-						builder_chain.Builder_GetFloat(ctx, func(v float64) { target.XzFactor = v }, scope, "XzScale")
-					},
-				),
-				builder_chain.Build(
-					func(ctx *grammar.Builder_YFactorContext, target *OldBlendedNoiseFn, scope *traversal.Scope, namespace string) {
-						builder_chain.Builder_GetFloat(ctx, func(v float64) { target.YFactor = v }, scope, "XzScale")
-					},
-				),
-				builder_chain.Build(
-					func(ctx *grammar.Builder_SmearContext, target *OldBlendedNoiseFn, scope *traversal.Scope, namespace string) {
-						builder_chain.Builder_GetFloat(ctx, func(v float64) { target.SmearMultiplier = v }, scope, "XzScale")
-					},
-				),
-			)
+	traversal.RegisterNodeFactory(OldNoiseFnFactory{}, false)
 
-			out := &OldBlendedNoiseFn{
-				XzScale:         1,
-				YScale:          1,
-				XzFactor:        1,
-				YFactor:         1,
-				SmearMultiplier: 1,
-			}
-
-			for _, r := range densityFn.AllDensityFn_OldBlendedNoiseBuilder() {
-				child := r.GetChild(0)
-				if child == nil {
-					continue
-				}
-				builder_chain.Invoke(noiseFnBuilder, child.(antlr.ParserRuleContext), out, scope, currentNamespace)
-			}
-			return out
-		},
-	)
 }
 
 type OldBlendedNoiseFn struct {
@@ -73,6 +76,12 @@ type OldBlendedNoiseFn struct {
 	XzFactor        float64
 	YFactor         float64
 	SmearMultiplier float64
+
+	location traversal.TextLocation
+}
+
+func (c OldBlendedNoiseFn) GetLocation() traversal.TextLocation {
+	return c.location
 }
 
 func (c OldBlendedNoiseFn) MarshalJSON() ([]byte, error) {
@@ -91,8 +100,4 @@ func (c OldBlendedNoiseFn) MarshalJSON() ([]byte, error) {
 		YFactor:  c.YFactor,
 		Smear:    c.SmearMultiplier,
 	}, "", "  ")
-}
-
-func (c OldBlendedNoiseFn) ExportSymbol(symbol traversal.Symbol, rootDir *lib.FileTreeLike) error {
-	return exportDensityFunction(symbol, rootDir, c)
 }

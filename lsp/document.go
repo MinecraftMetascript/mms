@@ -81,10 +81,16 @@ func (d *document) ApplyChanges(changes []interface{}) error {
 }
 
 func (d *document) HelpAtPosition(position protocol.Position, filename string) *traversal.Help {
-	for _, rule := range slices.Backward(d.file.GetRulesAtPosition(position.IndexIn(d.file.Content))) {
-		if helpContent := traversal.GetHelp(rule, filename); helpContent != nil {
+	possibleRules := d.file.GetRulesAtPosition(position.IndexIn(d.file.Content))
+	for _, rule := range slices.Backward(possibleRules) {
+		ruleLocation := traversal.RuleLocation(rule, filename)
+		if helpContent := traversal.GetNodeHelp(ruleLocation, filename); helpContent != nil {
 			return helpContent
 		}
 	}
 	return nil
+}
+
+func (d *document) CompletionsAtPosition(cursorPosition protocol.Position, filename string) []protocol.CompletionItem {
+	return traversal.GetCompletions(cursorPosition)
 }

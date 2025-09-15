@@ -9,74 +9,87 @@ import (
 	"github.com/minecraftmetascript/mms/lib"
 )
 
-func init() {
-	traversal.RegisterHelp[*grammar.DensityFn_WierdScaledSamplerContext](
-		func(construct traversal.Construct, symbol traversal.Symbol, location traversal.TextLocation) *string {
-			out := "According to the input value, scales and enhances (or weakens) some regions of the specified noise, and then returns the absolute value.\n\n"
-			return &out
-		},
-	)
-	traversal.Register(
-		func(densityFn *grammar.DensityFn_WierdScaledSamplerContext, currentNamespace string, scope *traversal.Scope) traversal.Construct {
-			out := &WeirdScaledSamplerFn{}
+type WeirdScaledSamplerFnFactory struct {
+	BaseDensityFnFactory
+}
 
-			input := densityFn.DensityFn()
-			if input == nil {
-				scope.DiagnoseSemanticError("Missing input density function", densityFn)
-			} else {
-				inputFn := traversal.ConstructRegistry.Construct(input.(antlr.ParserRuleContext), currentNamespace, scope)
-				if inputFn == nil {
-					scope.DiagnoseSemanticError("Invalid input density function", densityFn)
+func (w WeirdScaledSamplerFnFactory) Create(ctx *grammar.DensityFn_WierdScaledSamplerContext, namespace string, scope *traversal.Scope) *WeirdScaledSamplerFn {
+	out := &WeirdScaledSamplerFn{
+		location: traversal.RuleLocation(ctx, scope.CurrentFile),
+	}
+
+	input := ctx.DensityFn()
+	if input == nil {
+		scope.DiagnoseSemanticError("Missing input density function", ctx)
+	} else {
+		inputFn := traversal.ConstructRegistry.Construct(input.(antlr.ParserRuleContext), namespace, scope)
+		if inputFn == nil {
+			scope.DiagnoseSemanticError("Invalid input density function", ctx)
+		} else {
+			out.Input = inputFn
+		}
+	}
+
+	for _, builderWrap := range ctx.AllDensityFn_WierdScaledSamplerBuilder() {
+		builder := builderWrap.GetChild(0)
+		if builder == nil {
+			// TODO: Diagnose
+			continue
+		}
+		if _, ok := builder.(*grammar.Builder_Type1Context); ok {
+			out.ValueMapper = "type_1"
+		}
+		if _, ok := builder.(*grammar.Builder_Type2Context); ok {
+			out.ValueMapper = "type_2"
+		}
+		if noise, ok := builder.(*grammar.Builder_NoiseContext); ok {
+			if noise.ResourceReference() != nil {
+				ref := traversal.ConstructRegistry.Construct(noise.ResourceReference(), namespace, scope)
+				if r, ok := ref.(*traversal.Reference); ok {
+					out.Noise = *r
 				} else {
-					out.Input = inputFn
-				}
-			}
-
-			for _, builderWrap := range densityFn.AllDensityFn_WierdScaledSamplerBuilder() {
-				builder := builderWrap.GetChild(0)
-				if builder == nil {
+					scope.DiagnoseSemanticError("Invalid noise reference", noise)
 					// TODO: Diagnose
 					continue
 				}
-				if _, ok := builder.(*grammar.Builder_Type1Context); ok {
-					out.ValueMapper = "type_1"
-				}
-				if _, ok := builder.(*grammar.Builder_Type2Context); ok {
-					out.ValueMapper = "type_2"
-				}
-				if noise, ok := builder.(*grammar.Builder_NoiseContext); ok {
-					if noise.ResourceReference() != nil {
-						ref := traversal.ConstructRegistry.Construct(noise.ResourceReference(), currentNamespace, scope)
-						if r, ok := ref.(*traversal.Reference); ok {
-							out.Noise = *r
-						} else {
-							scope.DiagnoseSemanticError("Invalid noise reference", noise)
-							// TODO: Diagnose
-							continue
-						}
-					} else if inline := noise.NoiseDefinition(); inline != nil {
-						_, ref := traversal.ExtractInlineConstruct(inline, currentNamespace, scope, "Noise")
+			} else if inline := noise.NoiseDefinition(); inline != nil {
+				_, ref := traversal.ExtractInlineConstruct(inline, namespace, scope, "Noise")
 
-						if ref != nil {
-							out.Noise = *ref
-						} else {
-							scope.DiagnoseSemanticError("Invalid inline noise definition.", noise)
-							continue
-						}
-
-					}
+				if ref != nil {
+					out.Noise = *ref
+				} else {
+					scope.DiagnoseSemanticError("Invalid inline noise definition.", noise)
+					continue
 				}
+
 			}
+		}
+	}
 
-			return out
-		},
-	)
+	return out
+}
+
+func (w WeirdScaledSamplerFnFactory) GetHelp(node *WeirdScaledSamplerFn, symbol traversal.Symbol, location traversal.TextLocation) *traversal.Help {
+	return &traversal.Help{
+		Content:  "According to the input value, scales and enhances (or weakens) some regions of the specified noise, and then returns the absolute value.",
+		Position: node.GetLocation(),
+	}
+}
+
+func init() {
+	traversal.RegisterNodeFactory(WeirdScaledSamplerFnFactory{}, false)
 }
 
 type WeirdScaledSamplerFn struct {
 	Noise       traversal.Reference
 	ValueMapper string
 	Input       traversal.Construct
+
+	location traversal.TextLocation
+}
+
+func (c WeirdScaledSamplerFn) GetLocation() traversal.TextLocation {
+	return c.location
 }
 
 func (c WeirdScaledSamplerFn) MarshalJSON() ([]byte, error) {
