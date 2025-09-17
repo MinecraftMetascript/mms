@@ -21,9 +21,20 @@ type HelpfulNodeFactory[Target Node] interface {
 	GetHelp(Target, Symbol, TextLocation) *Help
 }
 
-type NodeFactory[Result Node, Ctx antlr.ParserRuleContext, DeclareCtx DeclarableContext] interface {
-	CreateDeclaration(ctx DeclareCtx, namespace string, scope *Scope) (Symbol, bool)
+type NodeFactory[Result Node, Ctx antlr.ParserRuleContext] interface {
 	Create(ctx Ctx, namespace string, scope *Scope) Result
+}
+
+type DeclarableFactory[DeclareCtx antlr.ParserRuleContext] interface {
+	CreateDeclaration(ctx DeclareCtx, namespace string, scope *Scope) (Symbol, bool)
+}
+
+type RegisterDeclarableFactory[Result Node, Ctx antlr.ParserRuleContext, DeclareCtx antlr.ParserRuleContext] interface {
+	NodeFactory[Result, Ctx]
+	DeclarableFactory[DeclareCtx]
+}
+
+type ExportableNodeFactory interface {
 	Export(symbol Symbol, rootDir *lib.FileTreeLike) error
 }
 
@@ -32,9 +43,9 @@ type DeclarableContext interface {
 	Declare() grammar.IDeclareContext
 }
 
-var factoriesByValueCtx = make(map[reflect.Type]NodeFactory[Node, antlr.ParserRuleContext, DeclarableContext])
-var factoriesByDeclarationCtx = make(map[reflect.Type]NodeFactory[Node, antlr.ParserRuleContext, DeclarableContext])
-var factoriesByResultType = make(map[reflect.Type]NodeFactory[Node, antlr.ParserRuleContext, DeclarableContext])
+var factoriesByValueCtx = make(map[reflect.Type]NodeFactory[Node, antlr.ParserRuleContext])
+var factoriesByDeclarationCtx = make(map[reflect.Type]NodeFactory[Node, antlr.ParserRuleContext])
+var factoriesByResultType = make(map[reflect.Type]NodeFactory[Node, antlr.ParserRuleContext])
 
 var nodesByLocation = make(map[TextLocation]Node)
 var symbolsByLocation = make(map[TextLocation]Symbol)
@@ -52,20 +63,20 @@ func RemoveFile(filename string) {
 	}
 }
 
-func RegisterNodeFactory[Result Node, Ctx antlr.ParserRuleContext, DeclareCtx DeclarableContext](f NodeFactory[Result, Ctx, DeclareCtx], registerDeclaration bool) {
-	ctxType := reflect.TypeFor[Ctx]()
-	if ctxType.Kind() == reflect.Ptr {
-		ctxType = ctxType.Elem()
-	}
+func RegisterNodeFactory[Result Node, Ctx antlr.ParserRuleContext](f NodeFactory[Result, Ctx]) {
+	ctxType := lib.DerefType(reflect.TypeFor[Ctx]())
 	val := innerNodeFactory{
 		create: func(ctx antlr.ParserRuleContext, namespace string, scope *Scope) Node {
 			return f.Create(ctx.(Ctx), namespace, scope)
 		},
 		export: func(s Symbol, root *lib.FileTreeLike) error {
-			return f.Export(s, root)
+			if c, ok := f.(ExportableNodeFactory); ok {
+				return c.Export(s, root)
+			}
+			return nil
 		},
 		declare: func(ctx DeclarableContext, namespace string, scope *Scope) (Symbol, bool) {
-			return f.CreateDeclaration(ctx.(DeclareCtx), namespace, scope)
+			return nil, false
 		},
 		getCompletions: func(node Node, location protocol.Position) []protocol.CompletionItem {
 			if c, ok := node.(CompletableNode); ok {
@@ -81,13 +92,6 @@ func RegisterNodeFactory[Result Node, Ctx antlr.ParserRuleContext, DeclareCtx De
 		}
 	}
 
-	if registerDeclaration {
-		declareCtxType := reflect.TypeFor[DeclareCtx]()
-		if declareCtxType.Kind() == reflect.Ptr {
-			declareCtxType = declareCtxType.Elem()
-		}
-		factoriesByDeclarationCtx[declareCtxType] = val
-	}
 	resultType := reflect.TypeFor[Result]()
 	if resultType.Kind() == reflect.Ptr {
 		resultType = resultType.Elem()
@@ -95,7 +99,58 @@ func RegisterNodeFactory[Result Node, Ctx antlr.ParserRuleContext, DeclareCtx De
 
 	factoriesByResultType[resultType] = val
 	factoriesByValueCtx[ctxType] = val
+}
 
+func RegisterDeclarableNodeFactory[
+	Result Node,
+	Ctx antlr.ParserRuleContext,
+	DeclareCtx DeclarableContext,
+	F interface {
+		NodeFactory[Result, Ctx]
+		DeclarableFactory[DeclareCtx]
+	},
+](f F) {
+	ctxType := lib.DerefType(reflect.TypeFor[Ctx]())
+	val := innerNodeFactory{
+		create: func(ctx antlr.ParserRuleContext, namespace string, scope *Scope) Node {
+			return f.Create(ctx.(Ctx), namespace, scope)
+		},
+		export: func(s Symbol, root *lib.FileTreeLike) error {
+			if c, ok := any(f).(ExportableNodeFactory); ok {
+				return c.Export(s, root)
+			}
+			return nil
+		},
+		declare: func(ctx DeclarableContext, namespace string, scope *Scope) (Symbol, bool) {
+			return f.CreateDeclaration(ctx.(DeclareCtx), namespace, scope)
+		},
+		getCompletions: func(node Node, location protocol.Position) []protocol.CompletionItem {
+			if c, ok := node.(CompletableNode); ok {
+				return c.GetCompletions(location)
+			}
+			return nil
+		},
+	}
+
+	if helpful, ok := any(f).(HelpfulNodeFactory[Result]); ok {
+		val.getHelp = func(node Node, symbol Symbol, location TextLocation) *Help {
+			return helpful.GetHelp(node.(Result), symbol, location)
+		}
+	}
+
+	declareCtxType := reflect.TypeFor[DeclareCtx]()
+	if declareCtxType.Kind() == reflect.Ptr {
+		declareCtxType = declareCtxType.Elem()
+	}
+	factoriesByDeclarationCtx[declareCtxType] = val
+
+	resultType := reflect.TypeFor[Result]()
+	if resultType.Kind() == reflect.Ptr {
+		resultType = resultType.Elem()
+	}
+
+	factoriesByResultType[resultType] = val
+	factoriesByValueCtx[ctxType] = val
 }
 
 func DeclareNode(ctx DeclarableContext, namespace string, scope *Scope) (Symbol, bool) {
@@ -182,28 +237,8 @@ func getNodesAtPosition(line int, character int) []Node {
 }
 
 func GetCompletions(location protocol.Position) []protocol.CompletionItem {
-	if location.Character <= 0 {
-		return nil
-	}
-	line := location.Line
-	character := location.Character
-	candidates := getNodesAtPosition(int(line+1), int(character))
-
-	if candidates == nil || len(candidates) == 0 {
-		return GetCompletions(protocol.Position{
-			Line:      line,
-			Character: character - 1,
-		})
-	}
-	for _, candidate := range candidates {
-		if n, ok := candidate.(CompletableNode); ok {
-			return n.GetCompletions(location)
-		}
-	}
-	return GetCompletions(protocol.Position{
-		Line:      line,
-		Character: character - 1,
-	})
+	// TODO: Implement Me
+	return nil
 }
 
 func ExportNode(symbol Symbol, rootDir *lib.FileTreeLike) error {
@@ -214,7 +249,11 @@ func ExportNode(symbol Symbol, rootDir *lib.FileTreeLike) error {
 	if !ok {
 		return nil
 	}
-	return factory.Export(symbol, rootDir)
+	exportable, ok := factory.(ExportableNodeFactory)
+	if !ok {
+		return nil
+	}
+	return exportable.Export(symbol, rootDir)
 }
 
 type innerNodeFactory struct {

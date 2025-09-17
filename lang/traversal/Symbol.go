@@ -16,6 +16,7 @@ const (
 type Symbol interface {
 	GetNameLocation() TextLocation
 	GetContentLocation() TextLocation
+	GetLocation() TextLocation
 	GetValue() Node
 	GetReference() *Reference
 	GetKind() SymbolKind
@@ -31,6 +32,17 @@ type BaseSymbol struct {
 
 func (s BaseSymbol) GetKind() SymbolKind {
 	return s.kind
+}
+
+func (s BaseSymbol) GetLocation() TextLocation {
+	return TextLocation{
+		Start:    s.nameLocation.Start,
+		StartIdx: s.nameLocation.StartIdx,
+		Stop:     s.contentLocation.Stop,
+		StopIdx:  s.contentLocation.StopIdx,
+		Text:     s.nameLocation.Text + s.contentLocation.Text,
+		Filename: s.nameLocation.Filename,
+	}
 }
 
 func NewEmptySymbol(nameLocation TextLocation, ref *Reference) BaseSymbol {

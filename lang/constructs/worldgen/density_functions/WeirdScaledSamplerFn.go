@@ -10,7 +10,6 @@ import (
 )
 
 type WeirdScaledSamplerFnFactory struct {
-	BaseDensityFnFactory
 }
 
 func (w WeirdScaledSamplerFnFactory) Create(ctx *grammar.DensityFn_WierdScaledSamplerContext, namespace string, scope *traversal.Scope) *WeirdScaledSamplerFn {
@@ -77,7 +76,7 @@ func (w WeirdScaledSamplerFnFactory) GetHelp(node *WeirdScaledSamplerFn, symbol 
 }
 
 func init() {
-	traversal.RegisterNodeFactory(WeirdScaledSamplerFnFactory{}, false)
+	traversal.RegisterNodeFactory(WeirdScaledSamplerFnFactory{})
 }
 
 type WeirdScaledSamplerFn struct {

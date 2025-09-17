@@ -9,6 +9,7 @@ import (
 	"github.com/minecraftmetascript/mms/lang/traversal"
 	"github.com/minecraftmetascript/mms/lang/traversal/getters"
 	"github.com/minecraftmetascript/mms/lib"
+	"github.com/minecraftmetascript/mms/lsp/completions"
 	protocol "github.com/tliron/glsp/protocol_3_16"
 )
 
@@ -77,10 +78,14 @@ func (n NoiseFactory) Create(ctx *grammar.NoiseContext, namespace string, scope 
 }
 
 func (n NoiseFactory) GetHelp(node *Noise, _ traversal.Symbol, _ traversal.TextLocation) *traversal.Help {
-	return &traversal.Help{
-		Content:  "Defines a noise function.<br/>`FirstOctave(int)` is required.<br/>`Amplitudes(float)` is required.<br/>Example: `Noise(FirstOctave(100), Amplitudes(0.5, 0.5))`",
-		Position: node.GetLocation(),
-	}
+	return traversal.MkHelp(
+		[]string{
+			"Defines some noise.",
+			"`Amplitudes(float)` is required.",
+			"Example: `Noise(FirstOctave(100), Amplitudes(0.5, 0.5))`",
+		},
+		node,
+	)
 }
 
 func (n NoiseFactory) Export(symbol traversal.Symbol, rootDir *lib.FileTreeLike) error {
@@ -97,7 +102,7 @@ func (n NoiseFactory) Export(symbol traversal.Symbol, rootDir *lib.FileTreeLike)
 }
 
 func init() {
-	traversal.RegisterNodeFactory(NoiseFactory{}, true)
+	traversal.RegisterDeclarableNodeFactory(NoiseFactory{})
 }
 
 type Noise struct {
@@ -109,27 +114,4 @@ type Noise struct {
 
 func (n Noise) GetLocation() traversal.TextLocation {
 	return n.location
-}
-
-func (n Noise) GetCompletions(_ protocol.Position) []protocol.CompletionItem {
-
-	out := make([]protocol.CompletionItem, 0)
-	if n.Amplitudes == nil || len(n.Amplitudes) == 0 {
-		out = append(out, protocol.CompletionItem{
-			Label:  "Amplitude",
-			Kind:   lib.Ptr(protocol.CompletionItemKindMethod),
-			Detail: lib.Ptr("Define the amplitudes of this noise function"),
-			TextEdit: protocol.TextEdit{
-				Range: protocol.Range{
-					Start: n.location.Stop.OffsetColumn(1).ToLspPosition(),
-					End:   n.location.Stop.OffsetColumn(1).ToLspPosition(),
-				},
-				NewText: ".Amplitudes(${0})",
-			},
-			InsertTextFormat: lib.Ptr(protocol.InsertTextFormatSnippet),
-		})
-	}
-
-	return out
-
 }

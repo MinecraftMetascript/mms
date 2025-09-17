@@ -12,7 +12,6 @@ import (
 )
 
 type YClampedGradientFnFactory struct {
-	BaseDensityFnFactory
 }
 
 func (y YClampedGradientFnFactory) Create(ctx *grammar.DensityFn_YClampedGradientContext, namespace string, scope *traversal.Scope) *YClampedGradientDensityFn {
@@ -86,7 +85,7 @@ func (y YClampedGradientFnFactory) GetHelp(node *YClampedGradientDensityFn, symb
 }
 
 func init() {
-	traversal.RegisterNodeFactory(YClampedGradientFnFactory{}, false)
+	traversal.RegisterNodeFactory(YClampedGradientFnFactory{})
 }
 
 type YClampedGradientDensityFn struct {

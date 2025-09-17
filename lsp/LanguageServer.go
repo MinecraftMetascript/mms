@@ -71,6 +71,7 @@ func Start() error {
 
 func (ls *LanguageServer) Initialize(context *glsp.Context, params *protocol.InitializeParams) (any, error) {
 	capabilities := ls.handler.CreateServerCapabilities()
+	capabilities.CompletionProvider.TriggerCharacters = []string{"."}
 	return protocol.InitializeResult{
 		Capabilities: capabilities,
 		ServerInfo: &protocol.InitializeResultServerInfo{

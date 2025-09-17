@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"reflect"
+	"strings"
 
 	"github.com/antlr4-go/antlr/v4"
 	"github.com/minecraftmetascript/mms/lib"
@@ -47,6 +48,13 @@ func RegisterHelp[C antlr.ParserRuleContext](f func(construct Construct, symbol 
 type Help struct {
 	Content  string
 	Position TextLocation
+}
+
+func MkHelp(content []string, node Node) *Help {
+	return &Help{
+		Content:  strings.Join(content, "<br/>"),
+		Position: node.GetLocation(),
+	}
 }
 
 func GetHelp(ctx antlr.ParserRuleContext, filename string) *Help {

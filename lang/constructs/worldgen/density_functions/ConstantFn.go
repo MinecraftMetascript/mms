@@ -9,7 +9,6 @@ import (
 )
 
 type ConstantFnFactory struct {
-	BaseDensityFnFactory
 }
 
 func (c ConstantFnFactory) Create(ctx *grammar.DensityFn_ConstantContext, _ string, scope *traversal.Scope) *ConstantDensityFn {
@@ -27,7 +26,7 @@ func (c ConstantFnFactory) GetHelp(_ *ConstantDensityFn, _ traversal.Symbol, _ t
 }
 
 func init() {
-	traversal.RegisterNodeFactory(ConstantFnFactory{}, false)
+	traversal.RegisterNodeFactory(ConstantFnFactory{})
 }
 
 type ConstantDensityFn struct {

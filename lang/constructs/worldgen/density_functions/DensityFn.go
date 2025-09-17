@@ -76,16 +76,11 @@ func (d DensityFnFactory) Create(ctx *grammar.DensityFnContext, namespace string
 	}
 }
 
-func (d DensityFnFactory) GetHelp(node traversal.Node, symbol traversal.Symbol, location traversal.TextLocation) *traversal.Help {
-	return nil
-}
-
 func (d DensityFnFactory) Export(symbol traversal.Symbol, rootDir *lib.FileTreeLike) error {
 	return exportDensityFunction(symbol, rootDir, symbol.GetValue())
 }
 
 type InlineNoiseDensityFnFactory struct {
-	BaseDensityFnFactory
 }
 
 func (i InlineNoiseDensityFnFactory) Create(ctx *grammar.DensityFn_InlineNoiseContext, namespace string, scope *traversal.Scope) traversal.Node {
@@ -94,10 +89,6 @@ func (i InlineNoiseDensityFnFactory) Create(ctx *grammar.DensityFn_InlineNoiseCo
 			return node.GetValue()
 		}
 	}
-	return nil
-}
-
-func (i InlineNoiseDensityFnFactory) GetHelp(node traversal.Node, symbol traversal.Symbol, location traversal.TextLocation) *traversal.Help {
 	return nil
 }
 
@@ -121,23 +112,9 @@ func (n DensityFnBlockFactory) Create(ctx *grammar.DensityFnBlockContext, namesp
 	return out
 }
 
-func (n DensityFnBlockFactory) GetHelp(node *DensityFnBlock, symbol traversal.Symbol, location traversal.TextLocation) *traversal.Help {
-	return nil
-}
-
-func (n DensityFnBlockFactory) Export(symbol traversal.Symbol, rootDir *lib.FileTreeLike) error {
-	return nil
-}
-
 type DensityFnBlock struct {
 	location     traversal.TextLocation
 	declarations []traversal.Symbol
-}
-
-func (d DensityFnBlock) GetCompletions(cursorPosition protocol.Position) []protocol.CompletionItem {
-	return []protocol.CompletionItem{
-		noiseDensitySnippet,
-	}
 }
 
 func (d DensityFnBlock) GetLocation() traversal.TextLocation {
@@ -145,9 +122,9 @@ func (d DensityFnBlock) GetLocation() traversal.TextLocation {
 }
 
 func init() {
-	traversal.RegisterNodeFactory(DensityFnFactory{}, true)
-	traversal.RegisterNodeFactory(InlineNoiseDensityFnFactory{}, true)
-	traversal.RegisterNodeFactory(DensityFnBlockFactory{}, true)
+	traversal.RegisterDeclarableNodeFactory(DensityFnFactory{})
+	traversal.RegisterNodeFactory(InlineNoiseDensityFnFactory{})
+	traversal.RegisterNodeFactory(DensityFnBlockFactory{})
 }
 
 func exportDensityFunction(symbol traversal.Symbol, rootDir *lib.FileTreeLike, condition traversal.Node) error {

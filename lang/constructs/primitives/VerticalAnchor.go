@@ -82,7 +82,7 @@ func (v VerticalAnchorFactory) Export(symbol traversal.Symbol, rootDir *lib.File
 }
 
 func init() {
-	traversal.RegisterNodeFactory(VerticalAnchorFactory{}, true)
+	traversal.RegisterDeclarableNodeFactory(VerticalAnchorFactory{})
 }
 
 type VerticalAnchorType string

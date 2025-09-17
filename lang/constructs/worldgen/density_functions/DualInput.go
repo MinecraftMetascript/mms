@@ -10,7 +10,6 @@ import (
 )
 
 type DualInputDensityFnFactory struct {
-	BaseDensityFnFactory
 }
 
 func (d DualInputDensityFnFactory) Create(ctx *grammar.DensityFn_DualInputContext, namespace string, scope *traversal.Scope) *DualInputDensityFn {
@@ -75,7 +74,7 @@ const (
 )
 
 func init() {
-	traversal.RegisterNodeFactory(DualInputDensityFnFactory{}, false)
+	traversal.RegisterNodeFactory(DualInputDensityFnFactory{})
 }
 
 type DualInputDensityFn struct {

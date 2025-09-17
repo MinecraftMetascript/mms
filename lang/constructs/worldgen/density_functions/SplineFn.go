@@ -10,7 +10,6 @@ import (
 )
 
 type SplineFactory struct {
-	BaseDensityFnFactory
 }
 
 func (s SplineFactory) Create(ctx *grammar.DensityFn_SplineFnContext, namespace string, scope *traversal.Scope) traversal.Node {

@@ -10,7 +10,6 @@ import (
 )
 
 type OldNoiseFnFactory struct {
-	BaseDensityFnFactory
 }
 
 func (o OldNoiseFnFactory) Create(ctx *grammar.DensityFn_OldBlendedNoiseContext, namespace string, scope *traversal.Scope) *OldBlendedNoiseFn {
@@ -66,7 +65,7 @@ func (o OldNoiseFnFactory) GetHelp(node *OldBlendedNoiseFn, symbol traversal.Sym
 }
 
 func init() {
-	traversal.RegisterNodeFactory(OldNoiseFnFactory{}, false)
+	traversal.RegisterNodeFactory(OldNoiseFnFactory{})
 
 }
 

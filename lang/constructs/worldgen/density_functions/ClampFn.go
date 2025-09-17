@@ -8,10 +8,12 @@ import (
 	"github.com/minecraftmetascript/mms/lang/builder_chain"
 	"github.com/minecraftmetascript/mms/lang/grammar"
 	"github.com/minecraftmetascript/mms/lang/traversal"
+	"github.com/minecraftmetascript/mms/lang/traversal/getters"
+	"github.com/minecraftmetascript/mms/lsp/completions"
+	protocol "github.com/tliron/glsp/protocol_3_16"
 )
 
 type ClampFnFactory struct {
-	BaseDensityFnFactory
 }
 
 func (c ClampFnFactory) Create(ctx *grammar.DensityFn_ClampContext, namespace string, scope *traversal.Scope) *ClampDensityFn {
@@ -29,12 +31,13 @@ func (c ClampFnFactory) Create(ctx *grammar.DensityFn_ClampContext, namespace st
 	)
 	out := &ClampDensityFn{
 		location: traversal.RuleLocation(ctx, scope.CurrentFile),
+		ctx:      ctx,
 	}
 	input := ctx.DensityFn()
 	if input == nil {
 		scope.DiagnoseSemanticError("Missing input to range choice", ctx)
 	}
-	out.Input = traversal.ConstructRegistry.Construct(input.(antlr.ParserRuleContext), namespace, scope)
+	out.Input = traversal.ConstructNode(input, namespace, scope)
 	if out.Input == nil {
 		scope.DiagnoseSemanticError("Invalid input to range choice", ctx)
 	}
@@ -68,14 +71,15 @@ func (c ClampFnFactory) GetHelp(node *ClampDensityFn, symbol traversal.Symbol, l
 }
 
 func init() {
-	traversal.RegisterNodeFactory(ClampFnFactory{}, false)
+	traversal.RegisterNodeFactory(ClampFnFactory{})
 }
 
 type ClampDensityFn struct {
-	Input    traversal.Construct
+	Input    traversal.Node
 	Min      float64
 	Max      float64
 	location traversal.TextLocation
+	ctx      *grammar.DensityFn_ClampContext
 }
 
 func (c ClampDensityFn) GetLocation() traversal.TextLocation {
@@ -84,10 +88,10 @@ func (c ClampDensityFn) GetLocation() traversal.TextLocation {
 
 func (c ClampDensityFn) MarshalJSON() ([]byte, error) {
 	return json.MarshalIndent(struct {
-		Type  string              `json:"type"`
-		Input traversal.Construct `json:"input"`
-		Min   float64             `json:"min"`
-		Max   float64             `json:"max"`
+		Type  string         `json:"type"`
+		Input traversal.Node `json:"input"`
+		Min   float64        `json:"min"`
+		Max   float64        `json:"max"`
 	}{
 		Type:  "minecraft:clamp",
 		Input: c.Input,

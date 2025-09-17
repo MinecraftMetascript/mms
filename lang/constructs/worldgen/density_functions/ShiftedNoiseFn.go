@@ -10,7 +10,6 @@ import (
 )
 
 type ShiftedNoiseFnFactory struct {
-	BaseDensityFnFactory
 }
 
 func (s ShiftedNoiseFnFactory) Create(ctx *grammar.DensityFn_ShiftedNoiseContext, namespace string, scope *traversal.Scope) *ShiftedNoiseDensityFn {
@@ -85,7 +84,7 @@ func (s ShiftedNoiseFnFactory) GetHelp(node *ShiftedNoiseDensityFn, symbol trave
 }
 
 func init() {
-	traversal.RegisterNodeFactory(ShiftedNoiseFnFactory{}, false)
+	traversal.RegisterNodeFactory(ShiftedNoiseFnFactory{})
 }
 
 type ShiftedNoiseDensityFn struct {

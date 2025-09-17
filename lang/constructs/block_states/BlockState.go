@@ -43,7 +43,7 @@ func (b BlockStateFactory) Export(symbol traversal.Symbol, rootDir *lib.FileTree
 }
 
 func init() {
-	traversal.RegisterNodeFactory(BlockStateFactory{}, false)
+	traversal.RegisterDeclarableNodeFactory(BlockStateFactory{}, false)
 }
 
 func BlockStateRef(r traversal.Reference) *BlockState {

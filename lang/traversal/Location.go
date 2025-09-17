@@ -55,6 +55,10 @@ func (tl TextLocation) Contains(other TextLocation) bool {
 	return tl.StartIdx <= other.StartIdx && tl.StopIdx >= other.StopIdx
 }
 
+func (tl TextLocation) ContainsLocation(location Location) bool {
+	return tl.Start.Line <= location.Line && tl.Stop.Line >= location.Line
+}
+
 func (tl TextLocation) String() string {
 	return fmt.Sprintf("(%d,%d)->(%d,%d)", tl.Start.Line, tl.Start.Col, tl.Stop.Line, tl.Stop.Col)
 }

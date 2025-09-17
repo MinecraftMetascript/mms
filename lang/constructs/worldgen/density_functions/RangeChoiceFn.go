@@ -11,7 +11,6 @@ import (
 )
 
 type RangeChoiceDensityFnFactory struct {
-	BaseDensityFnFactory
 }
 
 func (r RangeChoiceDensityFnFactory) Create(ctx *grammar.DensityFn_RangeChoiceContext, namespace string, scope *traversal.Scope) *RangeChoiceDensityFn {
@@ -102,7 +101,7 @@ func (r RangeChoiceDensityFnFactory) GetHelp(node *RangeChoiceDensityFn, symbol 
 }
 
 func init() {
-	traversal.RegisterNodeFactory(RangeChoiceDensityFnFactory{}, false)
+	traversal.RegisterNodeFactory(RangeChoiceDensityFnFactory{})
 }
 
 type RangeChoiceDensityFn struct {

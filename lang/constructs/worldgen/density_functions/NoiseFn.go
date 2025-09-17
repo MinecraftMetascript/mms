@@ -7,20 +7,12 @@ import (
 	"github.com/minecraftmetascript/mms/lang/builder_chain"
 	"github.com/minecraftmetascript/mms/lang/grammar"
 	"github.com/minecraftmetascript/mms/lang/traversal"
-	"github.com/minecraftmetascript/mms/lib"
+	"github.com/minecraftmetascript/mms/lang/traversal/getters"
+	"github.com/minecraftmetascript/mms/lsp/completions"
 	protocol "github.com/tliron/glsp/protocol_3_16"
 )
 
-var noiseDensitySnippet = protocol.CompletionItem{
-	Label:            "Noise DensityFn",
-	Kind:             lib.Ptr(protocol.CompletionItemKindSnippet),
-	InsertText:       lib.Ptr("${0} = Noise(${1}).XZScale(${2:1}).YScale(${3:1})"),
-	InsertTextFormat: lib.Ptr(protocol.InsertTextFormatSnippet),
-}
-
-type NoiseFnFactory struct {
-	BaseDensityFnFactory
-}
+type NoiseFnFactory struct{}
 
 func (n NoiseFnFactory) Create(ctx *grammar.DensityFn_NoiseContext, namespace string, scope *traversal.Scope) *NoiseDensityFn {
 	noiseFnBuilder := builder_chain.NewBuilderChain(
@@ -39,6 +31,7 @@ func (n NoiseFnFactory) Create(ctx *grammar.DensityFn_NoiseContext, namespace st
 		XzScale:  1,
 		YScale:   1,
 		location: traversal.RuleLocation(ctx, scope.CurrentFile),
+		ctx:      ctx,
 	}
 
 	if noiseInlineCtx := ctx.DensityFn_InlineNoise(); noiseInlineCtx != nil {
@@ -77,7 +70,7 @@ func (n NoiseFnFactory) GetHelp(node *NoiseDensityFn, symbol traversal.Symbol, l
 }
 
 func init() {
-	traversal.RegisterNodeFactory(NoiseFnFactory{}, false)
+	traversal.RegisterNodeFactory(NoiseFnFactory{})
 }
 
 type NoiseDensityFn struct {
@@ -85,34 +78,7 @@ type NoiseDensityFn struct {
 	XzScale  float64
 	YScale   float64
 	location traversal.TextLocation
-}
-
-func (c NoiseDensityFn) GetCompletions(cursorPosition protocol.Position) []protocol.CompletionItem {
-	return []protocol.CompletionItem{
-		{
-			Label: "XZ Scale",
-			Kind:  lib.Ptr(protocol.CompletionItemKindMethod),
-			TextEdit: protocol.TextEdit{
-				Range: protocol.Range{
-					Start: c.location.Stop.OffsetColumn(1).ToLspPosition(),
-					End:   c.location.Stop.OffsetColumn(1).ToLspPosition(),
-				},
-				NewText: ".XZScale({0})",
-			},
-			InsertTextFormat: lib.Ptr(protocol.InsertTextFormatSnippet),
-		}, {
-			Label: "Y Scale",
-			Kind:  lib.Ptr(protocol.CompletionItemKindMethod),
-			TextEdit: protocol.TextEdit{
-				Range: protocol.Range{
-					Start: c.location.Stop.OffsetColumn(1).ToLspPosition(),
-					End:   c.location.Stop.OffsetColumn(1).ToLspPosition(),
-				},
-				NewText: ".YScale({0})",
-			},
-			InsertTextFormat: lib.Ptr(protocol.InsertTextFormatSnippet),
-		},
-	}
+	ctx      *grammar.DensityFn_NoiseContext
 }
 
 func (c NoiseDensityFn) GetLocation() traversal.TextLocation {

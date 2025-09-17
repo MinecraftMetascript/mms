@@ -8,11 +8,10 @@ import (
 )
 
 func init() {
-	traversal.RegisterNodeFactory(ReferenceFunctionFactory{}, false)
+	traversal.RegisterNodeFactory(ReferenceFunctionFactory{})
 }
 
 type ReferenceFunctionFactory struct {
-	BaseDensityFnFactory
 }
 
 func (r ReferenceFunctionFactory) Create(ctx *grammar.DensityFn_ReferenceContext, namespace string, scope *traversal.Scope) *ReferenceFunction {

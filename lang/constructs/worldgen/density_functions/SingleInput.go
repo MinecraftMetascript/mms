@@ -10,7 +10,6 @@ import (
 )
 
 type SingleInputDensityFnFactory struct {
-	BaseDensityFnFactory
 }
 
 func (s SingleInputDensityFnFactory) Create(ctx *grammar.DensityFn_SingleInputContext, namespace string, scope *traversal.Scope) *SingleInputDensityFn {
