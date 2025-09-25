@@ -4,10 +4,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 
 	"github.com/minecraftmetascript/mms/lang"
 	"github.com/tliron/commonlog"
+	_ "github.com/tliron/commonlog/simple"
+
 	"github.com/tliron/glsp"
 	protocol "github.com/tliron/glsp/protocol_3_16"
 	"github.com/tliron/glsp/server"
@@ -29,7 +30,7 @@ var ls *LanguageServer
 
 func init() {
 	ls = &LanguageServer{
-		log:       commonlog.NewBackendLogger(),
+		log:       commonlog.NewBackendLogger("MMS Language Server"),
 		name:      "Minecraft Metascript",
 		version:   "0.3.1",
 		project:   lang.NewProject(),
@@ -51,22 +52,21 @@ func init() {
 }
 
 func StartStreaming(stream io.ReadWriteCloser) error {
-	serve := server.NewServer(ls.handler, ls.name, true)
+	serve := server.NewServer(ls.handler, ls.name, false)
 	serve.ServeStream(stream, serve.Log)
 	return nil //?
 }
 
 func Start() error {
-	serve := server.NewServer(ls.handler, ls.name, true)
-	ls.log = serve.Log
+	commonlog.Configure(1, nil)
 
-	err := serve.RunStdio()
-	if err != nil {
-		serve.Log.Error(fmt.Sprintf("Failed to start language server: %s", err.Error()))
-	} else {
-		serve.Log.Info("Language server started")
-	}
-	return err
+	serve := server.NewServer(ls.handler, ls.name, false)
+	ls.log = serve.Log
+	ls.log.SetMaxLevel(commonlog.Level(6))
+	ls.log.Info("Language Server Starting...")
+
+	return serve.RunStdio()
+
 }
 
 func (ls *LanguageServer) Initialize(context *glsp.Context, params *protocol.InitializeParams) (any, error) {
@@ -82,7 +82,7 @@ func (ls *LanguageServer) Initialize(context *glsp.Context, params *protocol.Ini
 }
 
 func (ls *LanguageServer) Initialized(context *glsp.Context, params *protocol.InitializedParams) error {
-	ls.log.Info("Initialized")
+	ls.log.Info("MMS Language server ready")
 	return nil
 }
 
@@ -94,11 +94,11 @@ func (ls *LanguageServer) Shutdown(context *glsp.Context) error {
 
 func (ls *LanguageServer) setTrace(context *glsp.Context, params *protocol.SetTraceParams) error {
 	protocol.SetTraceValue(params.Value)
+	ls.log.Infof("Trace set to %s", params.Value)
 	return nil
 }
 
 func (ls *LanguageServer) TextDocumentDidChange(context *glsp.Context, params *protocol.DidChangeTextDocumentParams) error {
-	ls.log.Info("TextDocumentDidChange", params.TextDocument.URI)
 	doc, ok := ls.documents[params.TextDocument.URI]
 	if !ok {
 		ls.log.Error("no document for URI")
@@ -112,13 +112,14 @@ func (ls *LanguageServer) TextDocumentDidChange(context *glsp.Context, params *p
 }
 
 func (ls *LanguageServer) TextDocumentDidOpen(context *glsp.Context, params *protocol.DidOpenTextDocumentParams) error {
-	ls.log.Info("TextDocumentDidOpen", params.TextDocument.Text)
+	ls.log.Debugf("TextDocumentDidOpen %s", params.TextDocument.URI)
 	doc, err := newDocument(
 		params.TextDocument.Text,
 		params.TextDocument.URI,
 		ls.project,
 	)
 	if err != nil {
+		ls.log.Errorf("failed to create document: %s", err)
 		return err
 	}
 	ls.documents[params.TextDocument.URI] = doc
@@ -140,7 +141,6 @@ func (ls *LanguageServer) TextDocumentFoldingRange(context *glsp.Context, params
 }
 
 func (ls *LanguageServer) LogTrace(context *glsp.Context, params *protocol.LogTraceParams) error {
-	log.Println(params.Message)
 	return nil
 }
 

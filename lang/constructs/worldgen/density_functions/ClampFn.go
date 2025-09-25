@@ -8,9 +8,6 @@ import (
 	"github.com/minecraftmetascript/mms/lang/builder_chain"
 	"github.com/minecraftmetascript/mms/lang/grammar"
 	"github.com/minecraftmetascript/mms/lang/traversal"
-	"github.com/minecraftmetascript/mms/lang/traversal/getters"
-	"github.com/minecraftmetascript/mms/lsp/completions"
-	protocol "github.com/tliron/glsp/protocol_3_16"
 )
 
 type ClampFnFactory struct {

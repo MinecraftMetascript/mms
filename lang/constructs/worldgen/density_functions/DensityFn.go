@@ -8,7 +8,6 @@ import (
 	"github.com/minecraftmetascript/mms/lang/grammar"
 	"github.com/minecraftmetascript/mms/lang/traversal"
 	"github.com/minecraftmetascript/mms/lib"
-	protocol "github.com/tliron/glsp/protocol_3_16"
 )
 
 type DensityFnFactory struct {
@@ -93,10 +92,6 @@ func (i InlineNoiseDensityFnFactory) Create(ctx *grammar.DensityFn_InlineNoiseCo
 }
 
 type DensityFnBlockFactory struct{}
-
-func (n DensityFnBlockFactory) CreateDeclaration(ctx traversal.DeclarableContext, namespace string, scope *traversal.Scope) (traversal.Symbol, bool) {
-	return nil, false
-}
 
 func (n DensityFnBlockFactory) Create(ctx *grammar.DensityFnBlockContext, namespace string, scope *traversal.Scope) *DensityFnBlock {
 	out := &DensityFnBlock{

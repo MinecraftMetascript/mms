@@ -82,7 +82,7 @@ func (n NoiseFactory) GetHelp(node *Noise, _ traversal.Symbol, _ traversal.TextL
 		[]string{
 			"Defines some noise.",
 			"`Amplitudes(float)` is required.",
-			"Example: `Noise(FirstOctave(100), Amplitudes(0.5, 0.5))`",
+			"Example: `Noise(100).Amplitudes(0.5, 0.5)`",
 		},
 		node,
 	)
@@ -110,6 +110,12 @@ type Noise struct {
 	Amplitudes  []float64 `json:"amplitudes"`
 	location    traversal.TextLocation
 	ctx         *grammar.NoiseContext
+}
+
+func (n Noise) GetCompletions(cursorPosition protocol.Position) []protocol.CompletionItem {
+	return []protocol.CompletionItem{
+		completions.BuilderFnCompletion("Amplitudes", "Amplitudes(${1})", n.location.Stop.ToLspPosition()),
+	}
 }
 
 func (n Noise) GetLocation() traversal.TextLocation {

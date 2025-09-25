@@ -92,5 +92,5 @@ func (d *document) HelpAtPosition(position protocol.Position, filename string) *
 }
 
 func (d *document) CompletionsAtPosition(cursorPosition protocol.Position, filename string) []protocol.CompletionItem {
-	return traversal.GetCompletions(cursorPosition)
+	return traversal.GetCompletions(cursorPosition, filename)
 }

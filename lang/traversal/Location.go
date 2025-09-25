@@ -82,17 +82,25 @@ func TerminalNodeLocation(ctx antlr.TerminalNode, filename string) TextLocation 
 
 func RuleLocation(ctx antlr.ParserRuleContext, filename string) TextLocation {
 	return TextLocation{
-		Start: Location{
-			Line: ctx.GetStart().GetLine(),
-			Col:  ctx.GetStart().GetColumn(),
-		},
+		Start:    RuleStart(ctx),
 		StartIdx: ctx.GetStart().GetStart(),
-		Stop: Location{
-			Line: ctx.GetStop().GetLine(),
-			Col:  ctx.GetStop().GetColumn(),
-		},
+		Stop:     RuleStop(ctx),
 		StopIdx:  ctx.GetStop().GetStop(),
 		Text:     ctx.GetText(),
 		Filename: filename,
+	}
+}
+
+func RuleStop(ctx antlr.ParserRuleContext) Location {
+	return Location{
+		Line: ctx.GetStop().GetLine(),
+		Col:  ctx.GetStop().GetColumn(),
+	}
+}
+
+func RuleStart(ctx antlr.ParserRuleContext) Location {
+	return Location{
+		Line: ctx.GetStart().GetLine(),
+		Col:  ctx.GetStart().GetColumn(),
 	}
 }

@@ -11,8 +11,8 @@ func BuilderFnCompletion(label, snippet string, insertPosition protocol.Position
 		Kind:  lib.Ptr(protocol.CompletionItemKindMethod),
 		TextEdit: protocol.TextEdit{
 			Range: protocol.Range{
-				Start: insertPosition,
-				End:   insertPosition,
+				Start: lib.AddCols(insertPosition, 2),
+				End:   lib.AddCols(insertPosition, 2),
 			},
 			NewText: snippet,
 		},

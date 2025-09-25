@@ -3,8 +3,6 @@ package noise
 import (
 	"github.com/minecraftmetascript/mms/lang/grammar"
 	"github.com/minecraftmetascript/mms/lang/traversal"
-	"github.com/minecraftmetascript/mms/lib"
-	protocol "github.com/tliron/glsp/protocol_3_16"
 )
 
 type NoiseBlock struct {

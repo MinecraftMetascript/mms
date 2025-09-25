@@ -52,7 +52,7 @@ type Help struct {
 
 func MkHelp(content []string, node Node) *Help {
 	return &Help{
-		Content:  strings.Join(content, "<br/>"),
+		Content:  strings.Join(content, "<br/>\n"),
 		Position: node.GetLocation(),
 	}
 }
