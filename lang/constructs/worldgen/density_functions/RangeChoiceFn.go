@@ -8,6 +8,8 @@ import (
 	"github.com/minecraftmetascript/mms/lang/builder_chain"
 	"github.com/minecraftmetascript/mms/lang/grammar"
 	"github.com/minecraftmetascript/mms/lang/traversal"
+	"github.com/minecraftmetascript/mms/lsp/completions"
+	protocol "github.com/tliron/glsp/protocol_3_16"
 )
 
 type RangeChoiceDensityFnFactory struct {
@@ -99,22 +101,29 @@ func (r RangeChoiceDensityFnFactory) GetHelp(node *RangeChoiceDensityFn, symbol 
 		Position: node.GetLocation(),
 	}
 }
-
 func init() {
 	traversal.RegisterNodeFactory(RangeChoiceDensityFnFactory{})
 }
 
 type RangeChoiceDensityFn struct {
-	Input    traversal.Construct
-	Min      float64
-	Max      float64
-	InRange  traversal.Construct
-	OutRange traversal.Construct
-	location traversal.TextLocation
+    Input    traversal.Construct
+    Min      float64
+    Max      float64
+    InRange  traversal.Construct
+    OutRange traversal.Construct
+    location traversal.TextLocation
 }
 
 func (c RangeChoiceDensityFn) GetLocation() traversal.TextLocation {
 	return c.location
+}
+func (c RangeChoiceDensityFn) GetCompletions(cursorPosition protocol.Position) []protocol.CompletionItem {
+	return []protocol.CompletionItem{
+		completions.BuilderFnCompletion("Min", "Min(${1})", c.location.Stop.ToLspPosition()),
+		completions.BuilderFnCompletion("Max", "Max(${1})", c.location.Stop.ToLspPosition()),
+		completions.BuilderFnCompletion("InRange", "InRange(${1})", c.location.Stop.ToLspPosition()),
+		completions.BuilderFnCompletion("OutRange", "OutRange(${1})", c.location.Stop.ToLspPosition()),
+	}
 }
 
 func (c RangeChoiceDensityFn) MarshalJSON() ([]byte, error) {

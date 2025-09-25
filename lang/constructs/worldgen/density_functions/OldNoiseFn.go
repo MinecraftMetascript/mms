@@ -7,6 +7,8 @@ import (
 	"github.com/minecraftmetascript/mms/lang/builder_chain"
 	"github.com/minecraftmetascript/mms/lang/grammar"
 	"github.com/minecraftmetascript/mms/lang/traversal"
+	"github.com/minecraftmetascript/mms/lsp/completions"
+	protocol "github.com/tliron/glsp/protocol_3_16"
 )
 
 type OldNoiseFnFactory struct {
@@ -80,15 +82,25 @@ type OldBlendedNoiseFn struct {
 }
 
 func (c OldBlendedNoiseFn) GetLocation() traversal.TextLocation {
-	return c.location
+    return c.location
+}
+
+func (c OldBlendedNoiseFn) GetCompletions(cursorPosition protocol.Position) []protocol.CompletionItem {
+    return []protocol.CompletionItem{
+        completions.BuilderFnCompletion("XZScale", "XZScale(${1})", c.location.Stop.ToLspPosition()),
+        completions.BuilderFnCompletion("YScale", "YScale(${1})", c.location.Stop.ToLspPosition()),
+        completions.BuilderFnCompletion("XZFactor", "XZFactor(${1})", c.location.Stop.ToLspPosition()),
+        completions.BuilderFnCompletion("YFactor", "YFactor(${1})", c.location.Stop.ToLspPosition()),
+        completions.BuilderFnCompletion("Smear", "Smear(${1})", c.location.Stop.ToLspPosition()),
+    }
 }
 
 func (c OldBlendedNoiseFn) MarshalJSON() ([]byte, error) {
-	return json.MarshalIndent(struct {
-		Type     string  `json:"type"`
-		XzScale  float64 `json:"xz_scale"`
-		YScale   float64 `json:"y_scale"`
-		XzFactor float64 `json:"xz_factor"`
+    return json.MarshalIndent(struct {
+        Type     string  `json:"type"`
+        XzScale  float64 `json:"xz_scale"`
+        YScale   float64 `json:"y_scale"`
+        XzFactor float64 `json:"xz_factor"`
 		YFactor  float64 `json:"y_factor"`
 		Smear    float64 `json:"smear_scale_multiplier"`
 	}{

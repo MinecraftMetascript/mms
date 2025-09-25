@@ -7,6 +7,8 @@ import (
 	"github.com/minecraftmetascript/mms/lang/grammar"
 	"github.com/minecraftmetascript/mms/lang/traversal"
 	"github.com/minecraftmetascript/mms/lib"
+	"github.com/minecraftmetascript/mms/lsp/completions"
+	protocol "github.com/tliron/glsp/protocol_3_16"
 )
 
 type WeirdScaledSamplerFnFactory struct {
@@ -74,21 +76,28 @@ func (w WeirdScaledSamplerFnFactory) GetHelp(node *WeirdScaledSamplerFn, symbol 
 		Position: node.GetLocation(),
 	}
 }
-
 func init() {
 	traversal.RegisterNodeFactory(WeirdScaledSamplerFnFactory{})
 }
 
 type WeirdScaledSamplerFn struct {
-	Noise       traversal.Reference
-	ValueMapper string
-	Input       traversal.Construct
+    Noise       traversal.Reference
+    ValueMapper string
+    Input       traversal.Construct
 
-	location traversal.TextLocation
+    location traversal.TextLocation
 }
 
 func (c WeirdScaledSamplerFn) GetLocation() traversal.TextLocation {
-	return c.location
+    return c.location
+}
+
+func (c WeirdScaledSamplerFn) GetCompletions(cursorPosition protocol.Position) []protocol.CompletionItem {
+    return []protocol.CompletionItem{
+        completions.BuilderFnCompletion("Type1", "Type1()", c.location.Stop.ToLspPosition()),
+        completions.BuilderFnCompletion("Type2", "Type2()", c.location.Stop.ToLspPosition()),
+        completions.BuilderFnCompletion("Noise", "Noise(${1})", c.location.Stop.ToLspPosition()),
+    }
 }
 
 func (c WeirdScaledSamplerFn) MarshalJSON() ([]byte, error) {

@@ -8,6 +8,8 @@ import (
 	"github.com/minecraftmetascript/mms/lang/builder_chain"
 	"github.com/minecraftmetascript/mms/lang/grammar"
 	"github.com/minecraftmetascript/mms/lang/traversal"
+	"github.com/minecraftmetascript/mms/lsp/completions"
+	protocol "github.com/tliron/glsp/protocol_3_16"
 )
 
 type ClampFnFactory struct {
@@ -66,33 +68,39 @@ func (c ClampFnFactory) GetHelp(node *ClampDensityFn, symbol traversal.Symbol, l
 		Position: node.GetLocation(),
 	}
 }
-
 func init() {
 	traversal.RegisterNodeFactory(ClampFnFactory{})
 }
 
 type ClampDensityFn struct {
-	Input    traversal.Node
-	Min      float64
-	Max      float64
-	location traversal.TextLocation
-	ctx      *grammar.DensityFn_ClampContext
+    Input    traversal.Node
+    Min      float64
+    Max      float64
+    location traversal.TextLocation
+    ctx      *grammar.DensityFn_ClampContext
 }
 
 func (c ClampDensityFn) GetLocation() traversal.TextLocation {
-	return c.location
+    return c.location
+}
+
+func (c ClampDensityFn) GetCompletions(cursorPosition protocol.Position) []protocol.CompletionItem {
+    return []protocol.CompletionItem{
+        completions.BuilderFnCompletion("Min", "Min(${1})", c.location.Stop.ToLspPosition()),
+        completions.BuilderFnCompletion("Max", "Max(${1})", c.location.Stop.ToLspPosition()),
+    }
 }
 
 func (c ClampDensityFn) MarshalJSON() ([]byte, error) {
-	return json.MarshalIndent(struct {
-		Type  string         `json:"type"`
-		Input traversal.Node `json:"input"`
-		Min   float64        `json:"min"`
-		Max   float64        `json:"max"`
-	}{
-		Type:  "minecraft:clamp",
-		Input: c.Input,
-		Min:   c.Min,
-		Max:   c.Max,
-	}, "", "  ")
+    return json.MarshalIndent(struct {
+        Type  string         `json:"type"`
+        Input traversal.Node `json:"input"`
+        Min   float64        `json:"min"`
+        Max   float64        `json:"max"`
+    }{
+        Type:  "minecraft:clamp",
+        Input: c.Input,
+        Min:   c.Min,
+        Max:   c.Max,
+    }, "", "  ")
 }

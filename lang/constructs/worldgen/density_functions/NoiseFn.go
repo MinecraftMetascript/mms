@@ -7,6 +7,9 @@ import (
 	"github.com/minecraftmetascript/mms/lang/builder_chain"
 	"github.com/minecraftmetascript/mms/lang/grammar"
 	"github.com/minecraftmetascript/mms/lang/traversal"
+	"github.com/minecraftmetascript/mms/lib"
+	"github.com/minecraftmetascript/mms/lsp/completions"
+	protocol "github.com/tliron/glsp/protocol_3_16"
 )
 
 type NoiseFnFactory struct{}
@@ -19,7 +22,7 @@ func (n NoiseFnFactory) Create(ctx *grammar.DensityFn_NoiseContext, namespace st
 			},
 		), builder_chain.Build(
 			func(ctx *grammar.Builder_YScaleContext, target *NoiseDensityFn, scope *traversal.Scope, namespace string) {
-				builder_chain.Builder_GetFloat(ctx, func(v float64) { target.YScale = v }, scope, "XzScale")
+				builder_chain.Builder_GetFloat(ctx, func(v float64) { target.YScale = v }, scope, "YScale")
 			},
 		),
 	)
@@ -29,6 +32,7 @@ func (n NoiseFnFactory) Create(ctx *grammar.DensityFn_NoiseContext, namespace st
 		YScale:   1,
 		location: traversal.RuleLocation(ctx, scope.CurrentFile),
 		ctx:      ctx,
+		scope:    scope,
 	}
 
 	if noiseInlineCtx := ctx.DensityFn_InlineNoise(); noiseInlineCtx != nil {
@@ -76,10 +80,56 @@ type NoiseDensityFn struct {
 	YScale   float64
 	location traversal.TextLocation
 	ctx      *grammar.DensityFn_NoiseContext
+	scope    *traversal.Scope
 }
 
 func (c NoiseDensityFn) GetLocation() traversal.TextLocation {
 	return c.location
+}
+
+func (c NoiseDensityFn) GetCompletions(cursorPosition protocol.Position) []protocol.CompletionItem {
+	items := []protocol.CompletionItem{}
+
+	// Provide reference completions only when cursor is between the parentheses of Noise(...)
+	if c.ctx != nil && c.scope != nil {
+		cursorPos := completions.CursorWithin(c.ctx, cursorPosition, "(", ")")
+		allPossible := completions.ReferenceCompletions(c.scope, traversal.Noise, cursorPosition)
+		switch cursorPos {
+		case completions.CursorWithinEmpty:
+			items = append(items, allPossible...)
+		case completions.CursorAtEnd:
+			ref := c.ctx.ResourceReference()
+			filteredCompletions := completions.FilterByReference(c.scope, traversal.Noise, cursorPosition, allPossible, ref)
+			items = append(items, filteredCompletions...)
+		case completions.CursorNotWithin:
+			// Cursor is not within the parens of the root, so we want to provide builder functions
+
+			// We do want to check for children though, as we don't want to suggest builders if the user is currently trying to edit one
+			if cursorPos := completions.CursorWithinRecursive(c.ctx, cursorPosition, "(", ")"); cursorPos != completions.CursorNotWithin {
+				break
+			}
+			if len(lib.GetAntlrChildren[*grammar.Builder_XZScaleContext](c.ctx)) == 0 {
+				items = append(items,
+					completions.BuilderFnCompletion(
+						"XZScale",
+						"XZScale(${1})",
+						c.location.Stop.ToLspPosition(),
+					),
+				)
+			}
+			if len(lib.GetAntlrChildren[*grammar.Builder_YScaleContext](c.ctx)) == 0 {
+				items = append(items,
+					completions.BuilderFnCompletion(
+						"YScale",
+						"YScale(${1})",
+						c.location.Stop.ToLspPosition(),
+					),
+				)
+			}
+		}
+	}
+
+	return items
 }
 
 func (c NoiseDensityFn) MarshalJSON() ([]byte, error) {

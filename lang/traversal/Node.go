@@ -1,7 +1,6 @@
 package traversal
 
 import (
-	"log"
 	"reflect"
 	"slices"
 
@@ -164,7 +163,6 @@ func DeclareNode(ctx DeclarableContext, namespace string, scope *Scope) (Symbol,
 				location := RuleLocation(ctx, scope.CurrentFile)
 				symbolsByLocation[location] = res
 				nodesByLocation[res.GetContentLocation()] = res.GetValue()
-				log.Println("Added to nodesByLocation", res.GetKind(), res.GetContentLocation(), res.GetValue())
 
 				return res, true
 			} else {
@@ -183,7 +181,6 @@ func ConstructNode(ctx antlr.ParserRuleContext, namespace string, scope *Scope) 
 		if val != nil {
 			location := RuleLocation(ctx, scope.CurrentFile)
 			nodesByLocation[location] = val
-			log.Println("Added to nodesByLocation", val)
 
 			return val
 		}

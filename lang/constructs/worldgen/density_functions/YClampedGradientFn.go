@@ -9,6 +9,8 @@ import (
 	"github.com/minecraftmetascript/mms/lang/grammar"
 	"github.com/minecraftmetascript/mms/lang/traversal"
 	"github.com/minecraftmetascript/mms/lib"
+	"github.com/minecraftmetascript/mms/lsp/completions"
+	protocol "github.com/tliron/glsp/protocol_3_16"
 )
 
 type YClampedGradientFnFactory struct {
@@ -98,7 +100,16 @@ type YClampedGradientDensityFn struct {
 }
 
 func (c YClampedGradientDensityFn) GetLocation() traversal.TextLocation {
-	return c.location
+    return c.location
+}
+
+func (c YClampedGradientDensityFn) GetCompletions(cursorPosition protocol.Position) []protocol.CompletionItem {
+    return []protocol.CompletionItem{
+        completions.BuilderFnCompletion("Top", "Top(${1})", c.location.Stop.ToLspPosition()),
+        completions.BuilderFnCompletion("Bottom", "Bottom(${1})", c.location.Stop.ToLspPosition()),
+        completions.BuilderFnCompletion("Min", "Min(${1})", c.location.Stop.ToLspPosition()),
+        completions.BuilderFnCompletion("Max", "Max(${1})", c.location.Stop.ToLspPosition()),
+    }
 }
 
 func (c YClampedGradientDensityFn) MarshalJSON() ([]byte, error) {

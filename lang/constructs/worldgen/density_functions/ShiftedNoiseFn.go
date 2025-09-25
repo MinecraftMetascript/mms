@@ -7,6 +7,8 @@ import (
 	"github.com/minecraftmetascript/mms/lang/builder_chain"
 	"github.com/minecraftmetascript/mms/lang/grammar"
 	"github.com/minecraftmetascript/mms/lang/traversal"
+	"github.com/minecraftmetascript/mms/lsp/completions"
+	protocol "github.com/tliron/glsp/protocol_3_16"
 )
 
 type ShiftedNoiseFnFactory struct {
@@ -99,6 +101,17 @@ type ShiftedNoiseDensityFn struct {
 
 func (c ShiftedNoiseDensityFn) GetLocation() traversal.TextLocation {
 	return c.location
+}
+
+func (c ShiftedNoiseDensityFn) GetCompletions(cursorPosition protocol.Position) []protocol.CompletionItem {
+    return []protocol.CompletionItem{
+        completions.BuilderFnCompletion("XZScale", "XZScale(${1})", c.location.Stop.ToLspPosition()),
+        completions.BuilderFnCompletion("YScale", "YScale(${1})", c.location.Stop.ToLspPosition()),
+        completions.BuilderFnCompletion("ShiftX", "ShiftX(${1})", c.location.Stop.ToLspPosition()),
+        completions.BuilderFnCompletion("ShiftY", "ShiftY(${1})", c.location.Stop.ToLspPosition()),
+        completions.BuilderFnCompletion("ShiftZ", "ShiftZ(${1})", c.location.Stop.ToLspPosition()),
+        completions.BuilderFnCompletion("Noise", "Noise(${1})", c.location.Stop.ToLspPosition()),
+    }
 }
 
 func (c ShiftedNoiseDensityFn) MarshalJSON() ([]byte, error) {

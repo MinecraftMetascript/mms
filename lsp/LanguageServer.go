@@ -6,6 +6,8 @@ import (
 	"io"
 
 	"github.com/minecraftmetascript/mms/lang"
+	"github.com/minecraftmetascript/mms/lang/grammar"
+	"github.com/minecraftmetascript/mms/lib"
 	"github.com/tliron/commonlog"
 	_ "github.com/tliron/commonlog/simple"
 
@@ -71,7 +73,8 @@ func Start() error {
 
 func (ls *LanguageServer) Initialize(context *glsp.Context, params *protocol.InitializeParams) (any, error) {
 	capabilities := ls.handler.CreateServerCapabilities()
-	capabilities.CompletionProvider.TriggerCharacters = []string{"."}
+	capabilities.CompletionProvider.TriggerCharacters = []string{".", "(", ":"}
+
 	return protocol.InitializeResult{
 		Capabilities: capabilities,
 		ServerInfo: &protocol.InitializeResultServerInfo{
@@ -112,7 +115,6 @@ func (ls *LanguageServer) TextDocumentDidChange(context *glsp.Context, params *p
 }
 
 func (ls *LanguageServer) TextDocumentDidOpen(context *glsp.Context, params *protocol.DidOpenTextDocumentParams) error {
-	ls.log.Debugf("TextDocumentDidOpen %s", params.TextDocument.URI)
 	doc, err := newDocument(
 		params.TextDocument.Text,
 		params.TextDocument.URI,
@@ -124,6 +126,20 @@ func (ls *LanguageServer) TextDocumentDidOpen(context *glsp.Context, params *pro
 	}
 	ls.documents[params.TextDocument.URI] = doc
 	doc.PublishDiagnostics(context)
+	children := lib.GetAntlrChildren[*grammar.DensityFn_NoiseContext](doc.file.Script)
+	if len(children) == 0 {
+		ls.log.Info("No density functions found")
+	}
+	for _, child := range children {
+		ls.log.Infof("Noise function found @ %d/%d:%d/%d: %s",
+			child.GetStart().GetLine(),
+			child.GetStart().GetColumn(),
+			child.GetStop().GetLine(),
+			child.GetStop().GetColumn(),
+			child.GetText(),
+		)
+	}
+
 	ls.activeDocument = doc
 	return nil
 }
@@ -167,6 +183,7 @@ func (ls *LanguageServer) TextDocumentHover(context *glsp.Context, params *proto
 
 // Returns: []CompletionItem | CompletionList | nil
 func (ls *LanguageServer) TextDocumentCompletion(context *glsp.Context, params *protocol.CompletionParams) (any, error) {
+	ls.log.Info("TextDocumentCompletion")
 	out := protocol.CompletionList{
 		IsIncomplete: false,
 		Items:        make([]protocol.CompletionItem, 0),

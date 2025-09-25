@@ -47,8 +47,10 @@ densityFn_SingleInput: (
 densityFn_InlineNoise: noise;
 
 densityFn_Noise: (
-    ('Noise' NL* '(' NL* (resourceReference) NL* ')') | densityFn_InlineNoise
-) NL* (densityFn_NoiseBuilder NL*)*;
+      ('Noise' NL* '(' NL* (resourceReference)? NL* ')') 
+      | densityFn_InlineNoise
+  ) NL* 
+  (densityFn_NoiseBuilder NL*)*;
 
 densityFn_NoiseBuilder: builder_XZScale | builder_YScale;
 
@@ -56,7 +58,7 @@ DensityFn_CacheKind: '2d' | 'Once' | 'All';
 densityFn_Cache: 'Cache' NL* '(' NL* DensityFn_CacheKind NL* ',' NL* densityFn NL* ')';
 
 densityFn_DualInput: (
-    | 'Min'
+      'Min'
     | 'Max'
 ) NL* '(' NL* densityFn ',' NL* densityFn NL* ')';
 

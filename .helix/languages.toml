@@ -7,5 +7,5 @@ name = "mms"
 scope = "source.mms"
 injection-regex = "mms"
 file-types = ["mms"]
-comment-tokens = "#"
+comment-tokens = "//"
 language-servers = [ "mms-lsp" ]
