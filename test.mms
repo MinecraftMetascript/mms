@@ -1,6 +1,6 @@
 Namespace numberTwo {
   Noise {
-    blah = Noise(10).Amplitudes(1,2,3,minecraft:stone)
+    blah = Noise(10).Amplitudes(1,2,3)
   }
 }
 

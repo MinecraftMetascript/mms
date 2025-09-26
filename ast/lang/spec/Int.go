@@ -30,7 +30,6 @@ func (i Int) Validate(ctx grammar.IValueContext) (bool, error) {
 			if val < i.Min || val > i.Max {
 				return false, fmt.Errorf("int must be between %d and %d", i.Min, i.Max)
 			}
-			fmt.Println("Arg is::", val)
 			return e == nil, e
 		}
 	case antlr.TerminalNode:

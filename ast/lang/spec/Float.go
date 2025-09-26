@@ -4,6 +4,7 @@ import (
 	"strconv"
 
 	"github.com/antlr4-go/antlr/v4"
+	"github.com/minecraftmetascript/mms/ast"
 	"github.com/minecraftmetascript/mms/lang/grammar"
 )
 
@@ -28,4 +29,27 @@ func (f Float) Validate(ctx grammar.IValueContext) (bool, error) {
 	}
 	_, e := strconv.ParseFloat(rawVal, 64)
 	return e == nil, e
+}
+
+func getFloatValue() {
+
+}
+
+func getNumberValue(ctx grammar.INumberContext, possibilities []Float) *FloatNode {
+	out := &FloatNode{}
+
+
+
+}
+
+type FloatNode struct {
+	location ast.SourceLocation
+	value    float64
+}
+
+func (fn FloatNode) GetLocation() ast.SourceLocation {
+	return fn.location
+}
+func (fn FloatNode) GetValue() float64 {
+	return fn.value
 }

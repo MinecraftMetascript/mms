@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/minecraftmetascript/mms/ast"
 	"github.com/minecraftmetascript/mms/lang/grammar"
 )
 
@@ -39,36 +40,69 @@ func (fc Function) argSpec(i int) []Value {
 	return fc.Args[i]
 }
 
-func (fc Function) Process(ctx grammar.IFnContext) {
-	args := ctx.AllValue()
-	for i, arg := range args {
-		spec := fc.argSpec(i)
-		valid := false
-		for _, opt := range spec {
-			ok, _ := opt.Validate(arg)
-			if ok {
-				valid = true
-				break
-			}
+func getFnValue(ctx grammar.IFnContext, possibilities []Function) *FunctionNode {
+	funcName := ctx.Identifier()
+	if funcName == nil {
+		// TODO: ✏ Diagnose -- missing function kind
+		return nil
+	}
+
+	for _, possible := range possibilities {
+		if possible.Name != funcName.GetText() {
+			continue // not a match
 		}
-		if !valid {
-			validTypes := make([]string, 0)
+		// found a match
+		out := &FunctionNode{
+			Args:     make([]ValueNode, 0),
+			Builders: make([]FunctionNode, 0),
+		}
+
+		args := ctx.AllValue()
+		for i, arg := range args {
+			spec := possible.argSpec(i)
+			valid := false
+			// TODO: We need to modify this to allow for error messages, but also
+			// 			fallthrough when something doesn't match?
 			for _, opt := range spec {
-				validTypes = append(validTypes, opt.GetLabel())
+				ok, e := opt.Validate(arg)
+				if ok {
+					valid = true
+					value := GetValue(arg, spec)
+					fmt.Println("VALUE:::", value)
+					break
+				} else if e != nil {
+					fmt.Println("Invalid Argument:", e)
+					break
+				}
 			}
-			fmt.Println("Invalid Argument, expected one of:", strings.Join(validTypes, ", "))
+			if !valid {
+				validTypes := make([]string, 0)
+				for _, opt := range spec {
+					validTypes = append(validTypes, opt.GetLabel())
+				}
+				fmt.Println("Invalid Argument, expected one of:", strings.Join(validTypes, ", "))
+			}
 		}
-	}
 
-	builders := ctx.AllFn()
+		builders := ctx.AllFn()
 
-	builderSpecsAsValue := make([]Value, len(fc.Builders))
-	for i, builder := range fc.Builders {
-		builderSpecsAsValue[i] = builder
+		for _, builder := range builders {
+			node := getFnValue(builder, possible.Builders)
+			if node != nil {
+				out.Builders = append(out.Builders, *node)
+			}
+		}
+		return out
 	}
+	return nil
+}
 
-	for _, builder := range builders {
-		fmt.Println("Attempting to process a builder!")
-		getFnValue(builder, builderSpecsAsValue)
-	}
+type FunctionNode struct {
+	location ast.SourceLocation
+	Args     []ValueNode
+	Builders []FunctionNode
+}
+
+func (f FunctionNode) GetLocation() ast.SourceLocation {
+	return f.location
 }
