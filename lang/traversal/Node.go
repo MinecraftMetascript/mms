@@ -244,9 +244,7 @@ func GetCompletions(location protocol.Position, filename string) []protocol.Comp
 				return c.GetCompletions(location)
 			}
 		}
-
 	}
-	// TODO: Implement Me
 	return nil
 }
 

@@ -31,14 +31,16 @@ func (c ClampFnFactory) Create(ctx *grammar.DensityFn_ClampContext, namespace st
 	out := &ClampDensityFn{
 		location: traversal.RuleLocation(ctx, scope.CurrentFile),
 		ctx:      ctx,
+		scope:    scope,
 	}
 	input := ctx.DensityFn()
 	if input == nil {
 		scope.DiagnoseSemanticError("Missing input to range choice", ctx)
-	}
-	out.Input = traversal.ConstructNode(input, namespace, scope)
-	if out.Input == nil {
-		scope.DiagnoseSemanticError("Invalid input to range choice", ctx)
+	} else {
+		out.Input = traversal.ConstructNode(input, namespace, scope)
+		if out.Input == nil {
+			scope.DiagnoseSemanticError("Invalid input to range choice", ctx)
+		}
 	}
 
 	for _, builderWrap := range ctx.AllDensityFn_ClampBuilder() {
@@ -73,34 +75,58 @@ func init() {
 }
 
 type ClampDensityFn struct {
-    Input    traversal.Node
-    Min      float64
-    Max      float64
-    location traversal.TextLocation
-    ctx      *grammar.DensityFn_ClampContext
+	Input    traversal.Node
+	Min      float64
+	Max      float64
+	location traversal.TextLocation
+	ctx      *grammar.DensityFn_ClampContext
+	scope    *traversal.Scope
 }
 
 func (c ClampDensityFn) GetLocation() traversal.TextLocation {
-    return c.location
+	return c.location
 }
 
 func (c ClampDensityFn) GetCompletions(cursorPosition protocol.Position) []protocol.CompletionItem {
-    return []protocol.CompletionItem{
-        completions.BuilderFnCompletion("Min", "Min(${1})", c.location.Stop.ToLspPosition()),
-        completions.BuilderFnCompletion("Max", "Max(${1})", c.location.Stop.ToLspPosition()),
-    }
+	items := make([]protocol.CompletionItem, 0)
+	zone := completions.CursorWithin(c.ctx, cursorPosition, "(", ")")
+	allPossible := completions.ReferenceCompletions(c.scope, traversal.Noise, cursorPosition)
+	switch zone {
+	case completions.CursorWithinEmpty:
+		items = append(items, allPossible...)
+	case completions.CursorAtEnd:
+		// Get the input context
+		fnCtx := c.ctx.DensityFn()
+		if fnCtx == nil {
+			// Input context is missing, but we aren't within an empty context. This shouldn't really happen
+			break
+		}
+		if refFn := fnCtx.DensityFn_Reference(); refFn != nil {
+			// The child is actually a reference
+			if ref := refFn.ResourceReference(); ref != nil {
+				// The reference exists - filter down to prefixes
+				filteredCompletions := completions.FilterByReference(c.scope, traversal.Noise, cursorPosition, allPossible, ref)
+				items = append(items, filteredCompletions...)
+			}
+		}
+	case completions.CursorNotWithin:
+		items = completions.AppendIfOccurances[*grammar.Builder_MinContext](c.ctx, items, completions.BuilderFnCompletion("Min", "Min(${1})", c.location.Stop.ToLspPosition()), 1)
+		items = completions.AppendIfOccurances[*grammar.Builder_MaxContext](c.ctx, items, completions.BuilderFnCompletion("Max", "Max(${1})", c.location.Stop.ToLspPosition()), 1)
+	}
+
+	return items
 }
 
 func (c ClampDensityFn) MarshalJSON() ([]byte, error) {
-    return json.MarshalIndent(struct {
-        Type  string         `json:"type"`
-        Input traversal.Node `json:"input"`
-        Min   float64        `json:"min"`
-        Max   float64        `json:"max"`
-    }{
-        Type:  "minecraft:clamp",
-        Input: c.Input,
-        Min:   c.Min,
-        Max:   c.Max,
-    }, "", "  ")
+	return json.MarshalIndent(struct {
+		Type  string         `json:"type"`
+		Input traversal.Node `json:"input"`
+		Min   float64        `json:"min"`
+		Max   float64        `json:"max"`
+	}{
+		Type:  "minecraft:clamp",
+		Input: c.Input,
+		Min:   c.Min,
+		Max:   c.Max,
+	}, "", "  ")
 }

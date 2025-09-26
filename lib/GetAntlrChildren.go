@@ -16,3 +16,7 @@ func GetAntlrChildren[T antlr.ParserRuleContext](root antlr.ParserRuleContext) [
 	}
 	return children
 }
+
+func HasAntlrChild[T antlr.ParserRuleContext](root antlr.ParserRuleContext) bool {
+	return len(GetAntlrChildren[T](root)) > 0
+}

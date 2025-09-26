@@ -7,7 +7,6 @@ import (
 	"github.com/minecraftmetascript/mms/lang/builder_chain"
 	"github.com/minecraftmetascript/mms/lang/grammar"
 	"github.com/minecraftmetascript/mms/lang/traversal"
-	"github.com/minecraftmetascript/mms/lib"
 	"github.com/minecraftmetascript/mms/lsp/completions"
 	protocol "github.com/tliron/glsp/protocol_3_16"
 )
@@ -92,40 +91,46 @@ func (c NoiseDensityFn) GetCompletions(cursorPosition protocol.Position) []proto
 
 	// Provide reference completions only when cursor is between the parentheses of Noise(...)
 	if c.ctx != nil && c.scope != nil {
+		// We need to identify if we are in the "reference" zone, or the "builder" zone
 		cursorPos := completions.CursorWithin(c.ctx, cursorPosition, "(", ")")
 		allPossible := completions.ReferenceCompletions(c.scope, traversal.Noise, cursorPosition)
+
 		switch cursorPos {
 		case completions.CursorWithinEmpty:
+			// Cursor is between the parentheses with no content, so we want to provide all reference completions
 			items = append(items, allPossible...)
 		case completions.CursorAtEnd:
+			// The cursor is at the end of the parentheses, so we want to provide filtered reference completions
 			ref := c.ctx.ResourceReference()
 			filteredCompletions := completions.FilterByReference(c.scope, traversal.Noise, cursorPosition, allPossible, ref)
 			items = append(items, filteredCompletions...)
 		case completions.CursorNotWithin:
 			// Cursor is not within the parens of the root, so we want to provide builder functions
-
 			// We do want to check for children though, as we don't want to suggest builders if the user is currently trying to edit one
 			if cursorPos := completions.CursorWithinRecursive(c.ctx, cursorPosition, "(", ")"); cursorPos != completions.CursorNotWithin {
 				break
 			}
-			if len(lib.GetAntlrChildren[*grammar.Builder_XZScaleContext](c.ctx)) == 0 {
-				items = append(items,
-					completions.BuilderFnCompletion(
-						"XZScale",
-						"XZScale(${1})",
-						c.location.Stop.ToLspPosition(),
-					),
-				)
-			}
-			if len(lib.GetAntlrChildren[*grammar.Builder_YScaleContext](c.ctx)) == 0 {
-				items = append(items,
-					completions.BuilderFnCompletion(
-						"YScale",
-						"YScale(${1})",
-						c.location.Stop.ToLspPosition(),
-					),
-				)
-			}
+			items = completions.AppendIfOccurances[*grammar.Builder_XZScaleContext](
+				c.ctx,
+				items,
+				completions.BuilderFnCompletion(
+					"XZScale",
+					"XZScale(${1})",
+					c.location.Stop.ToLspPosition(), // end of the context to place this outside any parentheses
+				),
+				1,
+			)
+
+			items = completions.AppendIfOccurances[*grammar.Builder_YScaleContext](
+				c.ctx,
+				items,
+				completions.BuilderFnCompletion(
+					"YScale",
+					"YScale(${1})",
+					c.location.Stop.ToLspPosition(), // end of the context to place this outside any parentheses
+				),
+				1,
+			)
 		}
 	}
 
