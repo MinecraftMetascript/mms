@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"github.com/minecraftmetascript/mms/lsp"
+	//"github.com/minecraftmetascript/mms/lsp"
 	"github.com/spf13/cobra"
 )
 
@@ -10,7 +10,7 @@ var lspCmd = &cobra.Command{
 	Use: "lsp",
 
 	Run: func(cmd *cobra.Command, args []string) {
-		lsp.Start()
+		//lsp.Start()
 
 	},
 }

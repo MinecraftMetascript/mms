@@ -7,8 +7,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/minecraftmetascript/mms/lang"
-
+	"github.com/minecraftmetascript/mms/project"
 	"github.com/spf13/cobra"
 )
 
@@ -42,7 +41,7 @@ var buildCmd = &cobra.Command{
 
 		}
 
-		project := lang.NewProject()
+		project := project.NewProject()
 
 		stat, err := fs.Stat(os.DirFS("."), inFile)
 
@@ -71,12 +70,6 @@ var buildCmd = &cobra.Command{
 				string(r),
 				err,
 			)
-		}
-
-		if len(project.Diagnostics()) > 0 {
-			for _, diag := range project.Diagnostics() {
-				log.Println(diag)
-			}
 		}
 
 	},

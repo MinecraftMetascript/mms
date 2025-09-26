@@ -10,12 +10,13 @@ import (
 	"log"
 	"sync"
 
+	"syscall/js"
+
 	"github.com/minecraftmetascript/mms/lang"
 	"github.com/minecraftmetascript/mms/lang/traversal"
 	"github.com/minecraftmetascript/mms/lib"
 	"github.com/minecraftmetascript/mms/lsp"
 )
-import "syscall/js"
 
 var logger = log.Default()
 

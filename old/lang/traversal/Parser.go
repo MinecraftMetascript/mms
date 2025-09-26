@@ -97,6 +97,7 @@ func NewParser(content string, filename string, globalScope *Scope, diagnostics 
 	if out.diagnostics == nil {
 		out.diagnostics = &[]Diagnostic{}
 	}
+
 	diagListener := NewDiagnosticsErrorListener(content, out.filename, out.diagnostics)
 	lexer.RemoveErrorListeners()
 	parser := out.parser

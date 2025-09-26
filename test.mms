@@ -1,9 +1,10 @@
 Namespace numberTwo {
   Noise {
-    blah = Noise(10)
+    blah = Noise(10).Amplitudes(1,2,3,minecraft:stone)
   }
 }
 
+/*
 Namespace xyz {
     Noise {
         x = Noise(4).Amplitudes(5)
@@ -16,7 +17,7 @@ Namespace xyz {
     TestNoise = Noise(-5).Amplitudes(5)
     TestFn = YClampedGradient().Min(0).Max(1).Bottom(1).Top(4)
   }
-/*
+
   NoiseSettings {
     MyNoise = NoiseSettings()
       .NoiseRouter(
@@ -26,5 +27,6 @@ Namespace xyz {
       .SurfaceRule(Block(stone))
       .DefaultBlock(stone)
       .DefaultFluid(water)
-  } */
+  }
 }
+*/
