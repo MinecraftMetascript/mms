@@ -1,11 +1,11 @@
 package project
 
 import (
-	"log"
+	"fmt"
 
 	"github.com/antlr4-go/antlr/v4"
-	"github.com/minecraftmetascript/mms/ast/lang"
-	"github.com/minecraftmetascript/mms/ast/lang/spec"
+	"github.com/minecraftmetascript/mms/lang"
+	"github.com/minecraftmetascript/mms/lang/ast"
 	"github.com/minecraftmetascript/mms/lang/grammar"
 )
 
@@ -32,19 +32,25 @@ func (p Parser) ExitNamedBlock(ctx *grammar.NamedBlockContext) {
 			// TODO: ✏ Diagnose -- No Kind
 			continue
 		}
-		blockSpec := lang.GetBlockSpec(blockKind.GetText())
+
+		blockSpec := lang.Blocks.Get(blockKind.GetText())
 		if blockSpec == nil {
 			// TODO: ✏ Diagnose -- Invalid Kind
 			continue
 		}
-		for _, v := range b.AllVarDecl() {
-			varName := v.Identifier()
-			if varName == nil {
-				// TODO: ✏ Diagnose -- Missing Name
-				continue
+		block, diags := blockSpec.Match(b)
+
+		if diags != nil {
+			fmt.Println("Diagnostics:")
+			for i, diag := range diags {
+				fmt.Println("\t", i, ":", diag)
 			}
-			log.Println("Identified variable: ", varName)
-			spec.GetValue(v.Value(), blockSpec.Values)
+		}
+		for name, decl := range block.Declarations {
+			if exportable, ok := decl.(ast.Symbol); ok {
+				res := exportable.Export(name)
+				res.PrintDebug()
+			}
 		}
 	}
 }

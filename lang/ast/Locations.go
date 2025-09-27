@@ -1,5 +1,7 @@
 package ast
 
+import "github.com/antlr4-go/antlr/v4"
+
 type Location struct {
 	// Line 0-indexed
 	Line int `json:"line"`
@@ -10,8 +12,8 @@ type Location struct {
 }
 
 type SourceLocation struct {
-	Start Location
-	Stop  Location
+	Start Location `json:"start"`
+	Stop  Location `json:"stop"`
 }
 
 func (sl SourceLocation) Intersects(other SourceLocation) bool {
@@ -28,10 +30,24 @@ func (sl SourceLocation) ContainsLocation(l Location) bool {
 	return lineContained && columnContained
 }
 
-type Diagnostic struct {
-	Message  string `json:"message"`
-	Severity string `json:"severity"`
-	Source   string `json:"source"`
-	Filename string `json:"filename"`
-	Location SourceLocation
+func TokenStart(ctx antlr.Token) Location {
+	return Location{
+		Line:   ctx.GetLine(),
+		Column: ctx.GetColumn(),
+		Index:  ctx.GetStart(),
+	}
+}
+func TokenStop(ctx antlr.Token) Location {
+	return Location{
+		Line:   ctx.GetLine(),
+		Column: ctx.GetColumn(),
+		Index:  ctx.GetStop(),
+	}
+}
+
+func RuleLocation(ctx antlr.ParserRuleContext) SourceLocation {
+	return SourceLocation{
+		Start: TokenStart(ctx.GetStart()),
+		Stop:  TokenStop(ctx.GetStop()),
+	}
 }

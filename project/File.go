@@ -1,7 +1,5 @@
 package project
 
-import _ "github.com/minecraftmetascript/mms/ast/factories"
-
 type File struct {
 	path    string
 	content string

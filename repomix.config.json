@@ -30,7 +30,15 @@
   "ignore": {
     "useGitignore": true,
     "useDefaultPatterns": true,
-    "customPatterns": []
+    "customPatterns": [
+      "old",
+      "result",
+      "vendor",
+      ".windsurfrules",
+      "lang_ref.md",
+      "flake.nix",
+      "flake.lock"
+    ]
   },
   "security": {
     "enableSecurityCheck": true
