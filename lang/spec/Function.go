@@ -13,8 +13,21 @@ type OverloadSpec struct {
 }
 
 type Overload struct {
+	ast.BaseNode
 	Args     []ast.Node
 	Builders []FunctionNode
+}
+
+func (o Overload) Children() []ast.Node {
+	children := make([]ast.Node, 0)
+	for _, a := range o.Args {
+		children = append(children, a)
+	}
+	for _, b := range o.Builders {
+		children = append(children, &b)
+	}
+
+	return children
 }
 
 func NewOverloadSpec(args []ValueSpec, restArg ValueSpec, builders []FunctionSpec) OverloadSpec {
@@ -27,9 +40,13 @@ func NewOverloadSpec(args []ValueSpec, restArg ValueSpec, builders []FunctionSpe
 
 func (spec *OverloadSpec) Match(ctx grammar.IFnContext) (ast.Node, []ast.Diagnostic) {
 	diags := make([]ast.Diagnostic, 0)
+	l := ast.RuleLocation(ctx)
 	out := &Overload{
 		Args:     make([]ast.Node, len(spec.Args)),
 		Builders: make([]FunctionNode, 0),
+		BaseNode: ast.BaseNode{
+			Location: &l,
+		},
 	}
 
 	for i, argCtx := range ctx.AllValue() {
@@ -84,11 +101,13 @@ func (spec *OverloadSpec) Match(ctx grammar.IFnContext) (ast.Node, []ast.Diagnos
 
 type FunctionSpec struct {
 	Name string
-	Kind string
+	Kind ast.SymbolKind
 	// Arguments Slice of overloads
 	Overloads []OverloadSpec
+	Help      string
 
 	export func(fn FunctionNode, name string) *lib.FileTreeLike
+	output func(fn FunctionNode) any
 }
 
 func (f FunctionSpec) matchFn(fnCtx grammar.IFnContext) (*FunctionNode, []ast.Diagnostic) {
@@ -108,12 +127,17 @@ func (f FunctionSpec) matchFn(fnCtx grammar.IFnContext) (*FunctionNode, []ast.Di
 		if res == nil {
 			return nil, diags
 		}
+
+		l := ast.RuleLocation(fnCtx)
 		return &FunctionNode{
 			Name:      f.Name,
 			Arguments: res.(*Overload).Args,
 			Builders:  res.(*Overload).Builders,
 			spec:      f,
-			kind:      f.Kind,
+			BaseSymbol: ast.BaseSymbol{
+				Kind:     f.Kind,
+				Location: &l,
+			},
 		}, diags
 	}
 
@@ -124,10 +148,12 @@ func (f FunctionSpec) matchFn(fnCtx grammar.IFnContext) (*FunctionNode, []ast.Di
 			Severity: ast.Warning,
 		},
 	}
-
 }
 
 func (f FunctionSpec) Match(valueCtx grammar.IValueContext) (ast.Node, []ast.Diagnostic) {
+	if valueCtx == nil {
+		return nil, nil
+	}
 	fnCtx := valueCtx.Fn()
 	if fnCtx == nil {
 		return nil, nil
@@ -135,36 +161,62 @@ func (f FunctionSpec) Match(valueCtx grammar.IValueContext) (ast.Node, []ast.Dia
 	return f.matchFn(fnCtx)
 }
 
-func (f FunctionSpec) SetExporter(exporter func(n FunctionNode, name string) *lib.FileTreeLike) FunctionSpec {
+func (f FunctionSpec) SetFileExporter(exporter func(n FunctionNode, name string) *lib.FileTreeLike) FunctionSpec {
 	out := &f
 	out.export = exporter
 	return *out
 }
-func (f FunctionSpec) SetKind(kind string) FunctionSpec {
+func (f FunctionSpec) SetOutputFn(outputFn func(n FunctionNode) any) FunctionSpec {
+	out := &f
+	out.output = outputFn
+	return *out
+}
+
+func (f FunctionSpec) SetKind(kind ast.SymbolKind) FunctionSpec {
 	out := &f
 	out.Kind = kind
 	return *out
 }
+func (f FunctionSpec) SetHelp(help string) FunctionSpec {
+	out := &f
+	out.Help = help
+	return *out
+}
 
-func NewFunctionSpec(kind string, overloads ...OverloadSpec) *FunctionSpec {
+func NewFunctionSpec(name string, overloads ...OverloadSpec) *FunctionSpec {
 	return &FunctionSpec{
-		Name:      kind,
+		Name:      name,
 		Overloads: overloads,
 	}
 }
 
 type FunctionNode struct {
+	ast.BaseSymbol
 	Name      string
 	Arguments []ast.Node
 	Builders  []FunctionNode
 
-	kind string
 	spec FunctionSpec
 }
 
-func (n FunctionNode) Kind() string {
-	return n.kind
+func (n FunctionNode) Children() []ast.Node {
+	children := make([]ast.Node, 0)
+	for _, a := range n.Arguments {
+		children = append(children, a)
+	}
+	for _, b := range n.Builders {
+		children = append(children, &b)
+	}
+
+	return children
 }
-func (n FunctionNode) Export(name string) *lib.FileTreeLike {
+
+func (n FunctionNode) ToFileTreeLike(name string) *lib.FileTreeLike {
 	return n.spec.export(n, name)
 }
+
+func (n FunctionNode) ToSerializable() any {
+	return n.spec.output(n)
+}
+
+func (n FunctionNode) GetHelp() string { return n.spec.Help }

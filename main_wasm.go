@@ -12,29 +12,30 @@ import (
 
 	"syscall/js"
 
-	"github.com/minecraftmetascript/mms/lang"
-	"github.com/minecraftmetascript/mms/lang/traversal"
+	"github.com/minecraftmetascript/mms/lang/ast"
 	"github.com/minecraftmetascript/mms/lib"
 	"github.com/minecraftmetascript/mms/lsp"
+	"github.com/minecraftmetascript/mms/project"
 )
 
 var logger = log.Default()
 
 type packagedProject struct {
-	Source  map[string]string           `json:"source"`
-	Files   *lib.FileTreeLike           `json:"files"`
-	Symbols map[string]traversal.Symbol `json:"symbols"`
+	Source  map[string]string         `json:"source"`
+	Files   *lib.FileTreeLike         `json:"files"`
+	Symbols map[string]*ast.Namespace `json:"symbols"`
 }
 
 func packageProject() (string, error) {
+
 	out := packagedProject{
 		Source:  make(map[string]string),
-		Files:   project.BuildFsLike("my_mms_project"),
-		Symbols: project.GlobalScope.Symbols(),
+		Files:   instanceProject.BuildFsLike("my_mms_project"),
+		Symbols: instanceProject.Symbols(),
 	}
 
-	for _, file := range project.Files {
-		out.Source[file.Path] = file.Content
+	for _, file := range instanceProject.Files() {
+		out.Source[file.Path()] = file.Content()
 	}
 
 	serialized, err := json.Marshal(out)
@@ -58,7 +59,7 @@ func updateFile(this js.Value, args []js.Value) any {
 		return nil
 	}
 
-	err := project.AddFile(filename, content).Parse()
+	_, err := instanceProject.AddFile(filename, content)
 	if err != nil {
 		log.Println("[Err]: Failed to add file:", err)
 		return nil
@@ -83,8 +84,8 @@ func getFileDiag(this js.Value, args []js.Value) any {
 		log.Println("[Err]: Invalid callback type, expected function, got", callback.Type())
 		return nil
 	}
-	if file, ok := project.Files[filename]; ok {
-		raw, err := json.Marshal(lib.Unique(file.Diagnostics))
+	if file := instanceProject.File(filename); file != nil {
+		raw, err := json.Marshal(file.Diagnostics())
 		if err != nil {
 			log.Println("[Err]:", err)
 			return nil
@@ -94,14 +95,14 @@ func getFileDiag(this js.Value, args []js.Value) any {
 	return nil
 }
 
-var project *lang.Project
+var instanceProject *project.Project
 
 func main() {
 	logger.SetPrefix("[MMS:WASM]: ")
 	logger.SetFlags(0)
 	logger.Println("MMS WASM loading")
 
-	project = lang.NewProject()
+	instanceProject = project.NewProject()
 
 	js.Global().Set("updateFile", js.FuncOf(updateFile))
 	logger.Println("updateFile function registered")

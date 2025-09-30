@@ -26,17 +26,17 @@ func (s *BaseMinecraftMetascriptListener) EnterFile(ctx *FileContext) {}
 // ExitFile is called when production file is exited.
 func (s *BaseMinecraftMetascriptListener) ExitFile(ctx *FileContext) {}
 
-// EnterBlock is called when production block is entered.
-func (s *BaseMinecraftMetascriptListener) EnterBlock(ctx *BlockContext) {}
-
-// ExitBlock is called when production block is exited.
-func (s *BaseMinecraftMetascriptListener) ExitBlock(ctx *BlockContext) {}
-
 // EnterNamedBlock is called when production namedBlock is entered.
 func (s *BaseMinecraftMetascriptListener) EnterNamedBlock(ctx *NamedBlockContext) {}
 
 // ExitNamedBlock is called when production namedBlock is exited.
 func (s *BaseMinecraftMetascriptListener) ExitNamedBlock(ctx *NamedBlockContext) {}
+
+// EnterBlock is called when production block is entered.
+func (s *BaseMinecraftMetascriptListener) EnterBlock(ctx *BlockContext) {}
+
+// ExitBlock is called when production block is exited.
+func (s *BaseMinecraftMetascriptListener) ExitBlock(ctx *BlockContext) {}
 
 // EnterVarDecl is called when production varDecl is entered.
 func (s *BaseMinecraftMetascriptListener) EnterVarDecl(ctx *VarDeclContext) {}
@@ -73,6 +73,12 @@ func (s *BaseMinecraftMetascriptListener) EnterCondGroupedAnd(ctx *CondGroupedAn
 
 // ExitCondGroupedAnd is called when production condGroupedAnd is exited.
 func (s *BaseMinecraftMetascriptListener) ExitCondGroupedAnd(ctx *CondGroupedAndContext) {}
+
+// EnterCondNegate is called when production condNegate is entered.
+func (s *BaseMinecraftMetascriptListener) EnterCondNegate(ctx *CondNegateContext) {}
+
+// ExitCondNegate is called when production condNegate is exited.
+func (s *BaseMinecraftMetascriptListener) ExitCondNegate(ctx *CondNegateContext) {}
 
 // EnterCondAnd is called when production condAnd is entered.
 func (s *BaseMinecraftMetascriptListener) EnterCondAnd(ctx *CondAndContext) {}

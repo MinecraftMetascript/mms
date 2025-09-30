@@ -25,29 +25,28 @@ export type FileTreeLike = {
 } & ({ isDir: true, children?: Record<string, FileTreeLike> } | { isDir: false, content?: string })
 
 
-export type MmsTextLocation = {
-    Start: {
-        Line: number,
-        Column: number
+export type MmsSourceLocation = {
+    start: {
+        line: number,
+        column: number,
+        index: number
     },
-    StartIdx: number,
-    Stop: {
-        Line: number,
-        Column: number
+    stop: {
+        line: number,
+        column: number,
+        index: number
     },
-    StopIdx: number,
-    Text: string,
-    Filename: string
+    file: string
 }
 
 export type MmsReference = `${string}:${string}`
 
 export type MmsSymbol = {
-    nameLocation: MmsTextLocation,
-    contentLocation: MmsTextLocation,
+    nameLocation: MmsSourceLocation,
+    location: MmsSourceLocation,
     value: object,
     ref: MmsReference
-    type: string
+    kind: string
 }
 
 

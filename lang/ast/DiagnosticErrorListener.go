@@ -1,35 +1,10 @@
-package traversal
+package ast
 
 import (
 	"fmt"
 
 	"github.com/antlr4-go/antlr/v4"
 )
-
-// Severity indicates the diagnostic level
-type Severity string
-
-const (
-	SeverityError   Severity = "error"
-	SeverityWarning Severity = "warning"
-	SeverityInfo    Severity = "info"
-)
-
-// Diagnostic describes an issue found during lexing/parsing/analysis
-// Start/Stop positions are inclusive of the underlying text segment
-// via TextLocation
-// Source can be "lexer", "parser", or "semantic"
-type Diagnostic struct {
-	Message  string       `json:"message"`
-	Where    TextLocation `json:"where"`
-	Severity Severity     `json:"severity"`
-	Source   string       `json:"source"`
-	File     string       `json:"file"`
-}
-
-func (d Diagnostic) String() string {
-	return fmt.Sprintf("%s (%s): %s", d.Severity, d.Where.String(), d.Message)
-}
 
 // DiagnosticsErrorListener collects syntax errors from ANTLR and stores them
 // into the provided slice. It uses the file content to populate the
@@ -38,10 +13,10 @@ type DiagnosticsErrorListener struct {
 	antlr.DefaultErrorListener
 	content     string
 	filename    string
-	diagnostics *[]Diagnostic
+	diagnostics *Diagnostics
 }
 
-func NewDiagnosticsErrorListener(content string, filename string, diags *[]Diagnostic) *DiagnosticsErrorListener {
+func NewDiagnosticsErrorListener(content string, filename string, diags *Diagnostics) *DiagnosticsErrorListener {
 	return &DiagnosticsErrorListener{
 		content:     content,
 		filename:    filename,
@@ -71,22 +46,17 @@ func (l *DiagnosticsErrorListener) SyntaxError(recognizer antlr.Recognizer, offe
 		}
 	}
 
-	loc := TextLocation{
-		Start:    Location{Line: line, Col: startCol},
-		StartIdx: startIdx,
-		Stop:     Location{Line: line, Col: stopCol},
-		StopIdx:  stopIdx,
-		Text:     snippetAt(l.content, line, startCol, stopCol),
+	loc := SourceLocation{
+		Start:    Location{Line: line, Column: startCol},
+		Stop:     Location{Line: line, Column: stopCol},
 		Filename: l.filename,
 	}
-
-	*l.diagnostics = append(*l.diagnostics, Diagnostic{
+	l.diagnostics.Add(Diagnostic{
 		Message:  fmt.Sprintf("syntax error: %s", msg),
-		Where:    loc,
-		Severity: SeverityError,
-		Source:   "parser",
-		File:     l.filename,
+		Location: loc,
+		Severity: Error,
 	})
+
 }
 
 // helper: get text snippet between columns on a given 1-based line

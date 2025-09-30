@@ -42,8 +42,12 @@ func (n NumberSpec) Match(valueCtx grammar.IValueContext) (ast.Node, []ast.Diagn
 					Severity: ast.Warning,
 				}}
 			}
+			l := ast.RuleLocation(numCtx)
 			return &NumberNode{
 				Value: float64(val),
+				BaseNode: ast.BaseNode{
+					Location: &l,
+				},
 			}, nil
 		}
 	}
@@ -51,5 +55,14 @@ func (n NumberSpec) Match(valueCtx grammar.IValueContext) (ast.Node, []ast.Diagn
 }
 
 type NumberNode struct {
+	ast.BaseNode
 	Value float64
+}
+
+func (n NumberNode) GetLocation() *ast.SourceLocation {
+	return n.Location
+}
+
+func (n NumberNode) Children() []ast.Node {
+	return []ast.Node{}
 }

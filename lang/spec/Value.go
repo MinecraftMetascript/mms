@@ -18,6 +18,9 @@ func (bsl *ValueSpecList) Add(bs ValueSpec) {
 }
 
 func (bsl *ValueSpecList) Match(ctx grammar.IValueContext) (ast.Node, []ast.Diagnostic) {
+	if ctx == nil {
+		return nil, nil
+	}
 	for _, bs := range bsl.specs {
 		val, diags := bs.Match(ctx)
 

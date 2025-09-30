@@ -12,17 +12,18 @@ fn: Identifier '(' (value ',')* value? ')' ('.' fn)*;
 value: number | String | fn | resourceReference | conditional | list;
 
 condition
-  : rootCondition                                  #condPrimary
-  | '(' condition '&&' condition ')'               #condGroupedAnd
-  | '(' condition '||' condition ')'               #condGroupedOr
-  | condition '&&' condition                       #condAnd
-  | condition '||' condition                       #condOr
+  : rootCondition                                       #condPrimary
+  | '(' NL* condition NL* '&&' NL* condition NL* ')'    #condGroupedAnd
+  | '(' NL* condition NL* '||' NL* condition NL* ')'    #condGroupedOr
+  | condition NL* '&&' NL*  condition                   #condAnd
+  | condition NL* '||' NL*  condition                   #condOr
+  | '!' condition                                       #condNegate
   ;
 
 rootCondition: '!'? value;
 
 conditional: 'If'  NL* '(' NL* condition  NL* ')' NL* value;
-list: '['  NL* (value  NL*)* value?  NL* ']';
+list: '['  NL* (value NL* ','? NL*)* value?  NL* ']';
 
 Int: '-'? [0-9]+;
 Float: '-'? [0-9]* '.' [0-9]+;
@@ -34,7 +35,7 @@ WS: [ \t]+ -> skip;
 NL: [\n] -> channel(HIDDEN);
 
 // Laziest
-Identifier: [a-zA-Z] [a-zA-Z0-9_/]*;
+Identifier: [a-zA-Z_] [a-zA-Z0-9_/]*;
 
 BlockComment: '/*' .*? '*/' -> channel(HIDDEN);
 LineComment: '//' ~[\r\n]* -> channel(HIDDEN);

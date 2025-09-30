@@ -10,11 +10,11 @@ type MinecraftMetascriptListener interface {
 	// EnterFile is called when entering the file production.
 	EnterFile(c *FileContext)
 
-	// EnterBlock is called when entering the block production.
-	EnterBlock(c *BlockContext)
-
 	// EnterNamedBlock is called when entering the namedBlock production.
 	EnterNamedBlock(c *NamedBlockContext)
+
+	// EnterBlock is called when entering the block production.
+	EnterBlock(c *BlockContext)
 
 	// EnterVarDecl is called when entering the varDecl production.
 	EnterVarDecl(c *VarDeclContext)
@@ -33,6 +33,9 @@ type MinecraftMetascriptListener interface {
 
 	// EnterCondGroupedAnd is called when entering the condGroupedAnd production.
 	EnterCondGroupedAnd(c *CondGroupedAndContext)
+
+	// EnterCondNegate is called when entering the condNegate production.
+	EnterCondNegate(c *CondNegateContext)
 
 	// EnterCondAnd is called when entering the condAnd production.
 	EnterCondAnd(c *CondAndContext)
@@ -58,11 +61,11 @@ type MinecraftMetascriptListener interface {
 	// ExitFile is called when exiting the file production.
 	ExitFile(c *FileContext)
 
-	// ExitBlock is called when exiting the block production.
-	ExitBlock(c *BlockContext)
-
 	// ExitNamedBlock is called when exiting the namedBlock production.
 	ExitNamedBlock(c *NamedBlockContext)
+
+	// ExitBlock is called when exiting the block production.
+	ExitBlock(c *BlockContext)
 
 	// ExitVarDecl is called when exiting the varDecl production.
 	ExitVarDecl(c *VarDeclContext)
@@ -81,6 +84,9 @@ type MinecraftMetascriptListener interface {
 
 	// ExitCondGroupedAnd is called when exiting the condGroupedAnd production.
 	ExitCondGroupedAnd(c *CondGroupedAndContext)
+
+	// ExitCondNegate is called when exiting the condNegate production.
+	ExitCondNegate(c *CondNegateContext)
 
 	// ExitCondAnd is called when exiting the condAnd production.
 	ExitCondAnd(c *CondAndContext)

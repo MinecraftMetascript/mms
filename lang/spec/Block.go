@@ -91,7 +91,14 @@ func (b BlockSpec) Match(ctx grammar.IBlockContext) (*BlockNode, []ast.Diagnosti
 				continue
 			}
 		} else {
+			if s, ok := val.(ast.Symbol); ok {
+				idL := ast.TerminalLocation(idCtx)
+				s.SetNameLocation(
+					&idL,
+				)
+			}
 			out.Declarations[id] = val
+
 		}
 
 	}

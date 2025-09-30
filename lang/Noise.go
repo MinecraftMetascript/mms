@@ -3,7 +3,9 @@ package lang
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 
+	"github.com/minecraftmetascript/mms/lang/ast"
 	"github.com/minecraftmetascript/mms/lang/spec"
 	"github.com/minecraftmetascript/mms/lib"
 )
@@ -18,46 +20,58 @@ var NoiseBlock = spec.NewBlockSpec(
 				nil,
 				[]spec.FunctionSpec{amplitudesBuilder},
 			),
-		).SetExporter(NoiseExporter).SetKind("Noise"),
+		).
+			SetFileExporter(NoiseExporter).
+			SetOutputFn(NoiseSerializer).
+			SetHelp("Defines a noise function.").
+			SetKind(ast.SymbolNoise),
 	},
 )
 
-var NoiseExporter = func(fn spec.FunctionNode, name string) *lib.FileTreeLike {
+var NoiseSerializer = func(fn spec.FunctionNode) any {
 	if fn.Name != "Noise" {
-		return nil
+		return "{ \"__\": \"MMS: Unable to serialize\"}"
 	}
 
 	out := struct {
-		FirstOctave int       `json:"first_octave"`
+		FirstOctave int       `json:"firstOctave"`
 		Amplitudes  []float64 `json:"amplitudes"`
-	}{}
+	}{
+		Amplitudes: make([]float64, 0),
+	}
 
 	if len(fn.Arguments) < 1 {
 		// TODO: ERROR
-		return nil
+		return "{ \"__\": \"MMS: Unable to serialize\"}"
 	}
 	if firstOctave, ok := fn.Arguments[0].(*spec.NumberNode); ok {
 		out.FirstOctave = int(firstOctave.Value)
 	}
-	out.Amplitudes = make([]float64, len(fn.Arguments))
-	if len(fn.Builders) < 1 {
-		return nil
-	}
-	amplitudes := fn.Builders[0]
-	for _, ampArg := range amplitudes.Arguments {
-		amp := ampArg.(*spec.NumberNode)
-		out.Amplitudes = append(out.Amplitudes, amp.Value)
+	if len(fn.Builders) > 0 {
+		amplitudes := fn.Builders[0]
+		for _, ampArg := range amplitudes.Arguments {
+			amp := ampArg.(*spec.NumberNode)
+			out.Amplitudes = append(out.Amplitudes, amp.Value)
+		}
 	}
 
-	x, _ := json.Marshal(out)
-	fmt.Println(string(x))
+	return out
+}
+
+var NoiseExporter = func(fn spec.FunctionNode, name string) *lib.FileTreeLike {
+	content := NoiseSerializer(fn)
+	contentBytes, err := json.MarshalIndent(content, "", "  ")
+	if err != nil {
+		log.Println("Error marshalling noise: ", err)
+	}
+
 	root := lib.
 		NewDirLike("worldgen", nil)
 	root.
 		MkDir("noise", nil).
 		MkFile(
 			fmt.Sprintf("%s.json", name),
-			string(x),
+			string(contentBytes),
 			nil,
 		)
 	return root

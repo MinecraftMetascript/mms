@@ -56,14 +56,19 @@ var buildCmd = &cobra.Command{
 			if content, err := os.ReadFile(inFile); err != nil {
 				log.Println("Error reading project:", err)
 			} else {
-				f := project.AddFile(inFile, string(content))
-				err = f.Parse()
+				_, err := project.AddFile(inFile, string(content))
+
 				if err != nil {
 					log.Println("Error parsing project:", err)
 				}
 			}
 		}
-		r, err := json.MarshalIndent(project.BuildFsLike(outFile), "", "  ")
+		//fsLike := project.BuildFsLike(outFile)
+		if err != nil {
+			log.Println("Error exporting project:", err)
+			return
+		}
+		r, err := json.MarshalIndent(project.Symbols(), "", "  ")
 
 		if debugMode {
 			log.Println(
@@ -71,7 +76,6 @@ var buildCmd = &cobra.Command{
 				err,
 			)
 		}
-
 	},
 }
 
