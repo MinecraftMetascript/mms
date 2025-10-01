@@ -1,6 +1,7 @@
 package project
 
 import (
+	"log"
 	"slices"
 
 	"github.com/minecraftmetascript/mms/lang/ast"
@@ -31,13 +32,12 @@ func (f *File) Parse() (map[string]*ast.Namespace, error) {
 	parser := NewParser(f.content, f.path)
 
 	parser.parser.File()
+
 	// Freeze diagnostics
 	f.diagnostics = *parser.diagnostics
 
-	for _, ns := range parser.namespaces {
-		for _, decl := range ns.AllDecls() {
-			f.ingestNodes(decl)
-		}
+	for _, block := range parser.blocks {
+		f.ingestNodes(block)
 	}
 
 	return parser.namespaces, nil
@@ -62,8 +62,7 @@ func (f *File) NodesAtPosition(pos ast.Location) []ast.Node {
 	candidates := make([]ast.Node, 0)
 	for loc, v := range f.astNodes {
 		if loc.ContainsLocation(pos) {
-			candidates = append(candidates, h)
-
+			candidates = append(candidates, v)
 		}
 	}
 
@@ -75,5 +74,25 @@ func (f *File) NodesAtPosition(pos ast.Location) []ast.Node {
 	})
 
 	return candidates
+}
 
+func (f *File) NodesInRange(start, stop ast.Location) []ast.Node {
+	candidates := make([]ast.Node, 0)
+
+	for loc, v := range f.astNodes {
+		log.Printf("Node at %s", loc)
+		if loc.ContainsLocation(start) || loc.ContainsLocation(stop) {
+			log.Printf("  Matched")
+			candidates = append(candidates, v)
+		}
+		log.Printf("  Done")
+	}
+	slices.SortStableFunc(candidates, func(a, b ast.Node) int {
+		aLen := a.GetLocation().Stop.Index - a.GetLocation().Start.Index
+		bLen := b.GetLocation().Stop.Index - b.GetLocation().Start.Index
+
+		return aLen - bLen
+	})
+
+	return candidates
 }

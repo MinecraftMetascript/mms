@@ -7,7 +7,8 @@ varDecl: Identifier '=' /* A value? */ value;
 
 resourceReference: (Identifier ':')? Identifier;
 
-fn: Identifier '(' (value ',')* value? ')' ('.' fn)*;
+// Allow trailing commas to ensure this parses properly when editing
+fn: Identifier '(' (value ',')* (value ','?)? ')' ('.' fn)*?;
 
 value: number | String | fn | resourceReference | conditional | list;
 

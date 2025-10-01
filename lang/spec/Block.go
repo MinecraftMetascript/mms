@@ -1,8 +1,13 @@
 package spec
 
 import (
+	"fmt"
+	"log"
+
 	"github.com/minecraftmetascript/mms/lang/ast"
 	"github.com/minecraftmetascript/mms/lang/grammar"
+	"github.com/minecraftmetascript/mms/lib"
+	protocol "github.com/tliron/glsp/protocol_3_16"
 )
 
 // Block Spec List
@@ -64,6 +69,7 @@ func (b BlockSpec) Match(ctx grammar.IBlockContext) (*BlockNode, []ast.Diagnosti
 		Kind:         b.Kind,
 		Declarations: make(map[string]ast.Node),
 		location:     ast.RuleLocation(ctx),
+		spec:         b,
 	}
 	diags := make([]ast.Diagnostic, 0)
 	for _, decl := range ctx.AllVarDecl() {
@@ -79,23 +85,33 @@ func (b BlockSpec) Match(ctx grammar.IBlockContext) (*BlockNode, []ast.Diagnosti
 		id := idCtx.GetText()
 		valueCtx := decl.Value()
 
-		if val, d := b.AllowedValues.Match(valueCtx); val == nil {
+		if val, d := b.AllowedValues.Match(valueCtx); lib.IsNilInterface(val) {
 			if d != nil && len(d) > 0 {
 				diags = append(diags, d...)
 			} else {
 				diags = append(diags, ast.Diagnostic{
 					Location: ast.RuleLocation(decl),
-					Message:  "Invalid value",
+					Message:  "Invalid value", // TODO: Better message
 					Severity: ast.Error,
 				})
-				continue
+			}
+			declL := ast.RuleLocation(decl)
+			idL := ast.TerminalLocation(idCtx)
+			out.Declarations[id] = &ast.EmptySymbol{
+				BaseSymbol: ast.BaseSymbol{
+					BaseNode: ast.BaseNode{
+						Location: &declL,
+					},
+					Location:     &declL,
+					NameLocation: &idL,
+					Kind:         "",
+				},
 			}
 		} else {
+			// At this point, val should not equal nil
 			if s, ok := val.(ast.Symbol); ok {
 				idL := ast.TerminalLocation(idCtx)
-				s.SetNameLocation(
-					&idL,
-				)
+				s.SetNameLocation(&idL)
 			}
 			out.Declarations[id] = val
 
@@ -113,4 +129,54 @@ type BlockNode struct {
 	Kind         string
 	Declarations map[string]ast.Node
 	location     ast.SourceLocation
+	spec         BlockSpec
+}
+
+func (b BlockNode) Complete(fileSource string, position protocol.Position, triggerChar *string, symbols map[string]*ast.Namespace) []protocol.CompletionItem {
+	if triggerChar == nil {
+		// TODO: We have to infer?
+	}
+
+	for _, d := range b.Declarations {
+		if d.GetLocation().ContainsPosition(position) {
+			if _, ok := d.(*ast.EmptySymbol); ok {
+				break
+			}
+			return nil
+		}
+	}
+	out := make([]protocol.CompletionItem, 0)
+	for _, v := range b.spec.AllowedValues.specs {
+		switch s := v.(type) {
+		case FunctionSpec:
+			log.Printf("%s", s.Name)
+			out = append(out, protocol.CompletionItem{
+				Label:            fmt.Sprintf("[%s] %s", s.Kind, s.Name),
+				Kind:             &MethodKind,
+				Detail:           &s.Help,
+				InsertTextFormat: &SnippetFormat,
+				TextEdit: protocol.TextEdit{
+					Range: protocol.Range{
+						Start: position,
+						End:   position,
+					},
+					NewText: fmt.Sprintf("%s(${1})", s.Name),
+				},
+			})
+		}
+	}
+	log.Printf("%s", out)
+	return out
+}
+
+func (b BlockNode) Children() []ast.Node {
+	out := make([]ast.Node, 0)
+	for _, node := range b.Declarations {
+		out = append(out, node)
+	}
+	return out
+}
+
+func (b BlockNode) GetLocation() *ast.SourceLocation {
+	return &b.location
 }

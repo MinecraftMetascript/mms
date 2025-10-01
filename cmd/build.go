@@ -18,6 +18,7 @@ var buildCmd = &cobra.Command{
 	Long:      ``,
 	ValidArgs: []cobra.Completion{"Input", "Output"},
 	Run: func(cmd *cobra.Command, args []string) {
+		log.SetFlags(0)
 		if len(args) < 1 {
 			log.Println("Please provide an input file or directory")
 			return

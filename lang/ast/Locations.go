@@ -1,6 +1,9 @@
 package ast
 
 import (
+	"fmt"
+	"math"
+
 	"github.com/antlr4-go/antlr/v4"
 	protocol "github.com/tliron/glsp/protocol_3_16"
 )
@@ -21,10 +24,48 @@ func (l Location) ToLspPosition() protocol.Position {
 	}
 }
 
+func (l Location) ColOffset(off int) Location {
+	out := &l
+	out.Column += off
+	return *out
+}
+
+func (l Location) String() string {
+	return fmt.Sprintf("(%d,%d)", l.Line, l.Column)
+}
+
+func (l Location) IndexIn(content string) int {
+	lines := 1
+	index := 0
+	for i := 0; i < len(content); i++ {
+		if lines == l.Line && index == l.Column {
+			return i
+		}
+		if content[i] == '\n' {
+			lines++
+			index = 0
+		} else {
+			index++
+		}
+	}
+	return len(content)
+}
+
 type SourceLocation struct {
 	Start    Location `json:"start"`
 	Stop     Location `json:"stop"`
 	Filename string   `json:"file"`
+}
+
+func (sl SourceLocation) String() string {
+	return fmt.Sprintf("[(%s) - (%s)]", sl.Start, sl.Stop)
+}
+
+func (sl SourceLocation) Distance(idx int) int {
+	startDist := math.Abs(float64(sl.Start.Index - idx))
+	stopDist := math.Abs(float64(sl.Stop.Index - idx))
+
+	return int(math.Min(startDist, stopDist))
 }
 
 func (sl SourceLocation) ToLspRange() protocol.Range {
@@ -44,8 +85,16 @@ func (sl SourceLocation) Contains(other SourceLocation) bool {
 
 func (sl SourceLocation) ContainsLocation(l Location) bool {
 	lineContained := sl.Start.Line <= l.Line && sl.Stop.Line >= l.Line
-	columnContained := sl.Start.Column <= l.Column && l.Column >= l.Column
-	return lineContained && columnContained
+	if !lineContained {
+		return false
+	}
+	if sl.Start.Line == l.Line && sl.Start.Column > l.Column {
+		return false
+	}
+	if sl.Stop.Line == l.Line && sl.Stop.Column < l.Column {
+		return false
+	}
+	return true
 }
 
 func (sl SourceLocation) ContainsPosition(p protocol.Position) bool {

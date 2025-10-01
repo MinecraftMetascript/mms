@@ -8,10 +8,22 @@ const (
 	Info    DiagnosticSeverity = "info"
 )
 
+/*
+
 type Diagnostic struct {
-	Location SourceLocation
-	Message  string
-	Severity DiagnosticSeverity
+	Message  string       `json:"message"`
+	Where    TextLocation `json:"where"`
+	Severity Severity     `json:"severity"`
+	Source   string       `json:"source"`
+	File     string       `json:"file"`
+}
+
+*/
+
+type Diagnostic struct {
+	Location SourceLocation     `json:"location"`
+	Message  string             `json:"message"`
+	Severity DiagnosticSeverity `json:"severity"`
 }
 
 type Diagnostics struct {

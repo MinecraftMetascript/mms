@@ -10,21 +10,28 @@ import (
 	"github.com/minecraftmetascript/mms/lib"
 )
 
-var amplitudesBuilder = *spec.NewFunctionSpec("Amplitudes", spec.NewOverloadSpec(nil, spec.NewNumberSpec(true), nil))
+var amplitudesBuilder = spec.NewFunctionSpec(
+	"Amplitudes",
+	spec.NewOverloadSpec([]spec.ValueSpec{
+		spec.NewNumberSpec(true), // require at least 1
+	}, spec.NewNumberSpec(true), nil),
+).SetHelp("Defines the amplitudes for each noise")
+
+var noiseFn = spec.NewFunctionSpec("Noise",
+	spec.NewOverloadSpec(
+		[]spec.ValueSpec{spec.NewNumberSpec(false)},
+		nil,
+		[]spec.FunctionSpec{amplitudesBuilder},
+	),
+).
+	SetFileExporter(NoiseExporter).
+	SetOutputFn(NoiseSerializer).
+	SetHelp("Defines a noise function.").
+	SetKind(ast.SymbolNoise)
 
 var NoiseBlock = spec.NewBlockSpec(
 	"Noise", []spec.ValueSpec{
-		spec.NewFunctionSpec("Noise",
-			spec.NewOverloadSpec(
-				[]spec.ValueSpec{spec.NewNumberSpec(false)},
-				nil,
-				[]spec.FunctionSpec{amplitudesBuilder},
-			),
-		).
-			SetFileExporter(NoiseExporter).
-			SetOutputFn(NoiseSerializer).
-			SetHelp("Defines a noise function.").
-			SetKind(ast.SymbolNoise),
+		noiseFn,
 	},
 )
 

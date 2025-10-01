@@ -1,8 +1,6 @@
 package project
 
 import (
-	"log"
-
 	"github.com/minecraftmetascript/mms/lang/ast"
 	"github.com/minecraftmetascript/mms/lib"
 )
@@ -33,10 +31,7 @@ func (p *Project) AddFile(path, content string) (*File, error) {
 			for name, decl := range decls.AllDecls() {
 				if decl.GetLocation().Filename == path {
 					decls.Delete(name)
-				} else {
-					log.Printf("Not deleting %s from %s (it is located in %s)", name, path, decl.GetNameLocation().Filename)
 				}
-
 			}
 		}
 
@@ -53,6 +48,8 @@ func (p *Project) AddFile(path, content string) (*File, error) {
 		}
 	}
 
+	
+
 	return f, err
 }
 
@@ -64,7 +61,9 @@ func (p *Project) BuildFsLike(root string) *lib.FileTreeLike {
 
 		for name, decl := range decls.AllDecls() {
 			declFs := decl.ToFileTreeLike(name)
-			nsDir.Merge(declFs)
+			if declFs != nil {
+				nsDir.Merge(declFs)
+			}
 		}
 	}
 	return rootDir

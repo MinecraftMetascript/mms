@@ -1,8 +1,6 @@
 package project
 
 import (
-	"fmt"
-
 	"github.com/antlr4-go/antlr/v4"
 	"github.com/minecraftmetascript/mms/lang"
 	"github.com/minecraftmetascript/mms/lang/ast"
@@ -15,6 +13,7 @@ type Parser struct {
 	parser *grammar.MinecraftMetascriptParser
 
 	namespaces  map[string]*ast.Namespace
+	blocks      []ast.Node
 	diagnostics *ast.Diagnostics
 	filename    string
 }
@@ -58,15 +57,10 @@ func (p *Parser) ExitNamedBlock(ctx *grammar.NamedBlockContext) {
 			// TODO: ✏ Diagnose -- Invalid GetKind
 			continue
 		}
+		p.blocks = append(p.blocks, block)
 
 		p.diagnostics.Add(diags...)
 
-		if diags != nil {
-			fmt.Println("Diagnostics:")
-			for i, diag := range diags {
-				fmt.Println("\t", i, ":", diag)
-			}
-		}
 		for name, decl := range block.Declarations {
 			if symbol, ok := decl.(ast.Symbol); ok {
 				symbol.SetFilename(p.filename)
@@ -87,6 +81,7 @@ func NewParser(content, filename string) *Parser {
 		parser:      grammar.NewMinecraftMetascriptParser(antlr.NewCommonTokenStream(lexer, 0)),
 		namespaces:  make(map[string]*ast.Namespace),
 		diagnostics: ast.NewDiagnostics(),
+		blocks:      make([]ast.Node, 0),
 		filename:    filename,
 	}
 

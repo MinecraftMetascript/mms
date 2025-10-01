@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/minecraftmetascript/mms/lib"
+	protocol "github.com/tliron/glsp/protocol_3_16"
 )
 
 type Node interface {
@@ -27,12 +28,17 @@ type HelpfulNode interface {
 	Node
 	GetHelp() string
 }
-type CompletableNode interface{}
+type CompletableNode interface {
+	Complete(fileSource string, position protocol.Position, triggerChar *string, symbols map[string]*Namespace) []protocol.CompletionItem
+}
 
 type SymbolKind string
 
 const (
-	SymbolNoise SymbolKind = "Noise"
+	SymbolNever            SymbolKind = "Never" // Used for things like block references that MMS doesn't resolve
+	SymbolNoise            SymbolKind = "Noise"
+	SymbolSurfaceRule      SymbolKind = "SurfaceRule"
+	SymbolSurfaceCondition SymbolKind = "SurfaceCondition"
 )
 
 type Symbol interface {
@@ -51,6 +57,10 @@ type BaseSymbol struct {
 	Location     *SourceLocation `json:"location"`
 	NameLocation *SourceLocation `json:"nameLocation"`
 	Kind         SymbolKind      `json:"kind"`
+}
+
+type EmptySymbol struct {
+	BaseSymbol
 }
 
 func (n *BaseSymbol) GetLocation() *SourceLocation {

@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"slices"
+	"strings"
 
 	"github.com/minecraftmetascript/mms/lang/ast"
 	"github.com/minecraftmetascript/mms/project"
@@ -22,6 +24,23 @@ type LanguageServer struct {
 	version string
 	handler *protocol.Handler
 	project *project.Project
+}
+
+func abs(x int) int {
+	if x < 0 {
+		return -x
+	}
+	return x
+}
+
+type logTranslator struct {
+	l commonlog.Logger
+}
+
+func (l logTranslator) Write(p []byte) (n int, err error) {
+	out := strings.Trim(string(p), "\n")
+	l.l.Info(out)
+	return len(out), nil
 }
 
 var ls *LanguageServer
@@ -42,6 +61,7 @@ func init() {
 		TextDocumentDidChange:      ls.TextDocumentDidChange,
 		TextDocumentDocumentSymbol: ls.TextDocumentDocumentSymbol,
 		TextDocumentHover:          ls.TextDocumentHover,
+		TextDocumentCompletion:     ls.TextDocumentCompletion,
 	}
 
 }
@@ -59,8 +79,8 @@ func Start() error {
 	ls.log = serve.Log
 	ls.log.SetMaxLevel(commonlog.Level(6))
 	ls.log.Info("Language Server Starting...")
-	log.SetOutput(commonlog.GetWriter())
-	log.Println("Output from log package!")
+	log.SetOutput(logTranslator{ls.log})
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
 	return serve.RunStdio()
 }
@@ -74,7 +94,6 @@ func (ls *LanguageServer) TextDocumentDocumentSymbol(context *glsp.Context, para
 	}
 
 	out := make([]protocol.DocumentSymbol, 0)
-	ls.log.Infof("%s", ls.project.Symbols())
 	for ns, decls := range ls.project.Symbols() {
 		for name, decl := range decls.AllDecls() {
 			if decl.GetLocation().Filename == path {
@@ -90,21 +109,21 @@ func (ls *LanguageServer) TextDocumentDocumentSymbol(context *glsp.Context, para
 		}
 	}
 
-	ls.PublishDiagnostics(context, f)
 	return out, nil
 }
 
 func (ls *LanguageServer) TextDocumentDidOpen(ctx *glsp.Context, params *protocol.DidOpenTextDocumentParams) error {
 	initialContent := params.TextDocument.Text
-	path := string(params.TextDocument.URI)
+	path := params.TextDocument.URI
 
-	_, err := ls.project.AddFile(path, initialContent)
+	f, err := ls.project.AddFile(path, initialContent)
+	ls.PublishDiagnostics(ctx, f)
 	return err
 }
 
 func (ls *LanguageServer) Initialize(context *glsp.Context, params *protocol.InitializeParams) (any, error) {
 	capabilities := ls.handler.CreateServerCapabilities()
-	//capabilities.CompletionProvider.TriggerCharacters = []string{".", "(", ":"}
+	capabilities.CompletionProvider.TriggerCharacters = []string{".", "(", ")", ":", "=", " ", ","}
 
 	return protocol.InitializeResult{
 		Capabilities: capabilities,
@@ -141,12 +160,12 @@ func (ls *LanguageServer) TextDocumentDidChange(context *glsp.Context, params *p
 		}
 	}
 
-	_, err := ls.project.AddFile(params.TextDocument.URI, content)
+	f, err := ls.project.AddFile(params.TextDocument.URI, content)
+	ls.PublishDiagnostics(context, f)
 	return err
 }
 
 func (ls *LanguageServer) TextDocumentHover(context *glsp.Context, params *protocol.HoverParams) (*protocol.Hover, error) {
-	// TODO: Use AST() (map of location -> node) to discover nodes at the cursor. iterate from least to most specific and return the first one that matches.
 	file := ls.project.File(params.TextDocument.URI)
 	candidates := file.NodesAtPosition(
 		ast.Location{
@@ -165,6 +184,58 @@ func (ls *LanguageServer) TextDocumentHover(context *glsp.Context, params *proto
 						Value: helpful.GetHelp(),
 					},
 				}, nil
+			}
+		}
+	}
+
+	return nil, nil
+}
+
+func (ls *LanguageServer) TextDocumentCompletion(_ *glsp.Context, params *protocol.CompletionParams) (any, error) {
+	file := ls.project.File(params.TextDocument.URI)
+
+	log.Println("completing", params.Position)
+
+	rangeStart := ast.Location{
+		Line:   int(params.Position.Line + 1),
+		Column: int(params.Position.Character - 2),
+	}
+	rangeStart.Index = rangeStart.IndexIn(file.Content())
+
+	rangeEnd := ast.Location{
+		Line:   int(params.Position.Line + 1),
+		Column: int(params.Position.Character + 2),
+	}
+	rangeEnd.Index = rangeEnd.IndexIn(file.Content())
+
+	candidates := file.NodesInRange(rangeStart, rangeEnd)
+
+	slices.SortStableFunc(candidates, func(a, b ast.Node) int {
+		// TODO: this appears to be prioritizing block completions
+		cursorIdx := params.Position.IndexIn(file.Content())
+		aLoc := a.GetLocation()
+		bLoc := b.GetLocation()
+
+		if aLoc == nil || bLoc == nil {
+			return 0
+		}
+
+		aDist := aLoc.Distance(cursorIdx)
+		bDist := bLoc.Distance(cursorIdx)
+		return aDist - bDist
+	})
+	log.Println("candidates", candidates)
+
+	if len(candidates) > 0 {
+		for _, candidate := range candidates {
+			if completable, ok := candidate.(ast.CompletableNode); ok {
+				log.Println("completable", candidate.GetLocation())
+				res := completable.Complete(file.Content(), params.Position, params.Context.TriggerCharacter, ls.project.Symbols())
+				if res != nil {
+					return res, nil
+				}
+			} else {
+				log.Println("not completable", candidate.GetLocation())
 			}
 		}
 	}

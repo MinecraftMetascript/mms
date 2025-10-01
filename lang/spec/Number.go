@@ -20,6 +20,7 @@ func NewNumberSpec(floating bool) *NumberSpec {
 func (n NumberSpec) Match(valueCtx grammar.IValueContext) (ast.Node, []ast.Diagnostic) {
 	if numCtx := valueCtx.Number(); numCtx != nil {
 		numTxt := numCtx.GetText()
+		numLocation := ast.RuleLocation(numCtx)
 		if n.floating {
 			val, err := strconv.ParseFloat(numTxt, 64)
 			if err != nil {
@@ -31,8 +32,10 @@ func (n NumberSpec) Match(valueCtx grammar.IValueContext) (ast.Node, []ast.Diagn
 			}
 			return &NumberNode{
 				Value: val,
+				BaseNode: ast.BaseNode{
+					Location: &numLocation,
+				},
 			}, nil
-
 		} else {
 			val, err := strconv.Atoi(numTxt)
 			if err != nil {
@@ -42,11 +45,10 @@ func (n NumberSpec) Match(valueCtx grammar.IValueContext) (ast.Node, []ast.Diagn
 					Severity: ast.Warning,
 				}}
 			}
-			l := ast.RuleLocation(numCtx)
 			return &NumberNode{
 				Value: float64(val),
 				BaseNode: ast.BaseNode{
-					Location: &l,
+					Location: &numLocation,
 				},
 			}, nil
 		}
@@ -57,12 +59,4 @@ func (n NumberSpec) Match(valueCtx grammar.IValueContext) (ast.Node, []ast.Diagn
 type NumberNode struct {
 	ast.BaseNode
 	Value float64
-}
-
-func (n NumberNode) GetLocation() *ast.SourceLocation {
-	return n.Location
-}
-
-func (n NumberNode) Children() []ast.Node {
-	return []ast.Node{}
 }

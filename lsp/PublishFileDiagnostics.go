@@ -7,7 +7,6 @@ import (
 )
 
 func (ls *LanguageServer) PublishDiagnostics(context *glsp.Context, file *project.File) {
-
 	errSeverity := protocol.DiagnosticSeverityError
 	diags := make([]protocol.Diagnostic, 0)
 
@@ -20,8 +19,6 @@ func (ls *LanguageServer) PublishDiagnostics(context *glsp.Context, file *projec
 			Message:  diag.Message,
 		})
 	}
-
-	ls.log.Debugf("Publishing %d diagnostics for %s", len(diags), file.Path())
 
 	go context.Notify(protocol.ServerTextDocumentPublishDiagnostics, protocol.PublishDiagnosticsParams{
 		URI:         file.Path(),

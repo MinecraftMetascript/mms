@@ -3,7 +3,14 @@ package spec
 import (
 	"github.com/minecraftmetascript/mms/lang/ast"
 	"github.com/minecraftmetascript/mms/lang/grammar"
+	"github.com/minecraftmetascript/mms/lib"
+	protocol "github.com/tliron/glsp/protocol_3_16"
 )
+
+var SnippetFormat = protocol.InsertTextFormatSnippet
+var SnippetKind = protocol.CompletionItemKindSnippet
+var MethodKind = protocol.CompletionItemKindMethod
+var ReferenceKind = protocol.CompletionItemKindReference
 
 type ValueSpec interface {
 	Match(valueCtx grammar.IValueContext) (ast.Node, []ast.Diagnostic)
@@ -24,7 +31,7 @@ func (bsl *ValueSpecList) Match(ctx grammar.IValueContext) (ast.Node, []ast.Diag
 	for _, bs := range bsl.specs {
 		val, diags := bs.Match(ctx)
 
-		if val != nil || (diags != nil && len(diags) > 0) {
+		if !lib.IsNilInterface(val) || (diags != nil && len(diags) > 0) {
 			return val, diags
 		}
 	}
