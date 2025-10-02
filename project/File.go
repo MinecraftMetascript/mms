@@ -1,7 +1,6 @@
 package project
 
 import (
-	"log"
 	"slices"
 
 	"github.com/minecraftmetascript/mms/lang/ast"
@@ -80,12 +79,9 @@ func (f *File) NodesInRange(start, stop ast.Location) []ast.Node {
 	candidates := make([]ast.Node, 0)
 
 	for loc, v := range f.astNodes {
-		log.Printf("Node at %s", loc)
 		if loc.ContainsLocation(start) || loc.ContainsLocation(stop) {
-			log.Printf("  Matched")
 			candidates = append(candidates, v)
 		}
-		log.Printf("  Done")
 	}
 	slices.SortStableFunc(candidates, func(a, b ast.Node) int {
 		aLen := a.GetLocation().Stop.Index - a.GetLocation().Start.Index

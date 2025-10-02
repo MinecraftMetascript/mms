@@ -151,11 +151,12 @@ var Hole = spec.NewFunctionSpec(
 
 var NoiseThreshold = spec.NewFunctionSpec(
 	"NoiseThreshold",
-	spec.NewOverloadSpec(
-		[]spec.ValueSpec{noiseFn}, nil, []spec.FunctionSpec{MinBuilder, MaxBuilder},
-	),
+	// Completion will try to use the first overload, so we want to prioritize that one
 	spec.NewOverloadSpec(
 		[]spec.ValueSpec{spec.NewReferenceSpec(ast.SymbolNoise)}, nil, []spec.FunctionSpec{MinBuilder, MaxBuilder},
+	),
+	spec.NewOverloadSpec(
+		[]spec.ValueSpec{noiseFn}, nil, []spec.FunctionSpec{MinBuilder, MaxBuilder},
 	),
 ).
 	SetHelp("Passes for columns where the input noise is between the minimum and maximum values.").

@@ -194,17 +194,15 @@ func (ls *LanguageServer) TextDocumentHover(context *glsp.Context, params *proto
 func (ls *LanguageServer) TextDocumentCompletion(_ *glsp.Context, params *protocol.CompletionParams) (any, error) {
 	file := ls.project.File(params.TextDocument.URI)
 
-	log.Println("completing", params.Position)
-
 	rangeStart := ast.Location{
 		Line:   int(params.Position.Line + 1),
-		Column: int(params.Position.Character - 2),
+		Column: int(params.Position.Character - 1),
 	}
 	rangeStart.Index = rangeStart.IndexIn(file.Content())
 
 	rangeEnd := ast.Location{
 		Line:   int(params.Position.Line + 1),
-		Column: int(params.Position.Character + 2),
+		Column: int(params.Position.Character),
 	}
 	rangeEnd.Index = rangeEnd.IndexIn(file.Content())
 
@@ -212,30 +210,29 @@ func (ls *LanguageServer) TextDocumentCompletion(_ *glsp.Context, params *protoc
 
 	slices.SortStableFunc(candidates, func(a, b ast.Node) int {
 		// TODO: this appears to be prioritizing block completions
-		cursorIdx := params.Position.IndexIn(file.Content())
+		//cursorIdx := params.Position.IndexIn(file.Content())
 		aLoc := a.GetLocation()
 		bLoc := b.GetLocation()
 
 		if aLoc == nil || bLoc == nil {
 			return 0
 		}
-
-		aDist := aLoc.Distance(cursorIdx)
-		bDist := bLoc.Distance(cursorIdx)
-		return aDist - bDist
+		if aLoc.Contains(*bLoc) {
+			return 1
+		} else if bLoc.Contains(*aLoc) {
+			return -1
+		} else {
+			return 0
+		}
 	})
-	log.Println("candidates", candidates)
 
 	if len(candidates) > 0 {
 		for _, candidate := range candidates {
 			if completable, ok := candidate.(ast.CompletableNode); ok {
-				log.Println("completable", candidate.GetLocation())
 				res := completable.Complete(file.Content(), params.Position, params.Context.TriggerCharacter, ls.project.Symbols())
 				if res != nil {
 					return res, nil
 				}
-			} else {
-				log.Println("not completable", candidate.GetLocation())
 			}
 		}
 	}

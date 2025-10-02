@@ -8,6 +8,7 @@ import (
 	"github.com/minecraftmetascript/mms/lang/ast"
 	"github.com/minecraftmetascript/mms/lang/grammar"
 	"github.com/minecraftmetascript/mms/lib"
+	"github.com/samber/lo"
 	protocol "github.com/tliron/glsp/protocol_3_16"
 )
 
@@ -278,7 +279,7 @@ func locate(source string, idx int) ast.Location {
 	return *out
 }
 
-func (n FunctionNode) builderCompletions() []protocol.CompletionItem {
+func (n FunctionNode) builderCompletions(includeLeadingDot bool) []protocol.CompletionItem {
 	items := make([]protocol.CompletionItem, 0)
 	builderSnapPosition := getBuilderInsertPosition(n)
 	for _, overload := range n.spec.Overloads {
@@ -287,6 +288,12 @@ func (n FunctionNode) builderCompletions() []protocol.CompletionItem {
 				return node.Name == b.Name
 			})
 			if !builderExists {
+				snip := "%s(${1})"
+				offset := 2
+				if includeLeadingDot {
+					snip = "." + snip
+					offset = 1
+				}
 				items = append(items, protocol.CompletionItem{
 					Label:            b.Name,
 					Detail:           &b.Help,
@@ -294,43 +301,84 @@ func (n FunctionNode) builderCompletions() []protocol.CompletionItem {
 					InsertTextFormat: &SnippetFormat,
 					TextEdit: protocol.TextEdit{
 						Range: protocol.Range{
-							Start: builderSnapPosition.ColOffset(1).ToLspPosition(),
-							End:   builderSnapPosition.ColOffset(2).ToLspPosition(),
+							Start: builderSnapPosition.ColOffset(offset).ToLspPosition(),
+							End:   builderSnapPosition.ColOffset(offset).ToLspPosition(),
 						},
-						NewText: fmt.Sprintf(".%s(${1})", b.Name),
+						NewText: fmt.Sprintf(snip, b.Name),
 					},
 				})
 			}
 		}
 	}
-	return items
+	return lo.UniqBy(items, func(item protocol.CompletionItem) string {
+		// TODO: How do we want to handle overloads here?
+		return item.Label
+	})
+
 }
 
 func (n FunctionNode) argCompletions(fileSource string, p protocol.Position, triggerChar *string, symbols map[string]*ast.Namespace) []protocol.CompletionItem {
 	argIdx := -1
-	//TODO: Fix this
+	cursorIdx := p.IndexIn(fileSource)
+
+	// Find which argument the cursor is in or after
 	for i, a := range n.Arguments {
 		if a == nil {
-			// I have no idea
+			// Nil argument means this position hasn't been filled yet
+			// This is likely where we want to complete
 			argIdx = i
 			break
 		}
+
 		al := a.GetLocation()
 		if al == nil {
-			// I have no idea
+			continue
+		}
+
+		// Check if cursor is within this argument
+		if al.ContainsPosition(p) {
 			argIdx = i
 			break
 		}
-		if a.GetLocation().ContainsPosition(p) {
-			argIdx = i
-			break
+
+		// Check if cursor is after this argument
+		// This handles the case where cursor is between args (e.g., after comma)
+		argEndIdx := al.Stop.IndexIn(fileSource)
+		if cursorIdx > argEndIdx {
+			// Cursor is after this argument, so we might be completing the next one
+			argIdx = i + 1
 		}
 	}
 
+	// If we still haven't found an index, check if we're completing the first argument
 	if argIdx == -1 {
-		argIdx = len(n.Arguments)
+		// Check if cursor is before the first argument (if any exist)
+		if len(n.Arguments) > 0 && n.Arguments[0] != nil {
+			firstArgLoc := n.Arguments[0].GetLocation()
+			if firstArgLoc != nil {
+				firstArgIdx := firstArgLoc.Start.IndexIn(fileSource)
+				if cursorIdx < firstArgIdx {
+					argIdx = 0
+				}
+			}
+		} else {
+			// No arguments yet, we're completing the first one
+			argIdx = 0
+		}
 	}
 
+	// Clamp to valid range - if we're past all defined args, check for rest args
+	if argIdx >= len(n.overload.Args) {
+		if n.overload.RestArg != nil {
+			// Use rest arg spec for completions
+			if c, ok := n.overload.RestArg.(ast.CompletableNode); ok {
+				return c.Complete(fileSource, p, triggerChar, symbols)
+			}
+		}
+		return make([]protocol.CompletionItem, 0)
+	}
+
+	// Get completions for the identified argument
 	if c, ok := n.overload.Args[argIdx].(ast.CompletableNode); ok {
 		return c.Complete(fileSource, p, triggerChar, symbols)
 	}
@@ -349,9 +397,22 @@ func (n FunctionNode) Complete(fileSource string, position protocol.Position, tr
 	log.Printf("Completing function %s", n.Name)
 	items := make([]protocol.CompletionItem, 0)
 	var mode functionCompletionMode
-	if triggerChar == nil {
-		// Infer mode ?
-		mode = functionCompletionModeArgs
+	if triggerChar == nil || *triggerChar == "" {
+		// Infer mode based on cursor position
+		// If position is after the args closing paren, suggest builders
+		// Otherwise, suggest args
+		if n.Location != nil {
+			endOfArgs := getBuilderInsertPosition(n)
+			l := int(position.Line)
+			if l > endOfArgs.Line ||
+				(l == endOfArgs.Line && position.Character > uint32(endOfArgs.Column)) {
+				mode = functionCompletionModeBuilders
+			} else {
+				mode = functionCompletionModeArgs
+			}
+		} else {
+			mode = functionCompletionModeArgs
+		}
 	} else {
 		switch *triggerChar {
 		case ".", ")":
@@ -359,20 +420,28 @@ func (n FunctionNode) Complete(fileSource string, position protocol.Position, tr
 		case "(", ",":
 			mode = functionCompletionModeArgs
 		default:
+			mode = functionCompletionModeArgs
 		}
+	}
+	log.Println("mode: ", mode)
+	if triggerChar != nil {
+		log.Printf("triggerChar: '%s'", *triggerChar)
+	} else {
+		log.Println("triggerChar: nil")
 	}
 
 	switch mode {
 	case functionCompletionModeBuilders:
-		items = n.builderCompletions()
+		idx := position.IndexIn(fileSource)
+		items = n.builderCompletions(fileSource[idx-1] == ')')
 		if len(items) == 0 && n.parent != nil {
-			log.Println("No completions found, falling back to parent: ", n.Kind)
 			return n.parent.Complete(fileSource, position, triggerChar, symbols)
 		}
 	case functionCompletionModeArgs:
 		items = n.argCompletions(fileSource, position, triggerChar, symbols)
 	}
 
+	log.Println("Completions: ", items)
 	return items
 }
 

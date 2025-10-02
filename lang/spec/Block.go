@@ -2,7 +2,6 @@ package spec
 
 import (
 	"fmt"
-	"log"
 
 	"github.com/minecraftmetascript/mms/lang/ast"
 	"github.com/minecraftmetascript/mms/lang/grammar"
@@ -149,7 +148,6 @@ func (b BlockNode) Complete(fileSource string, position protocol.Position, trigg
 	for _, v := range b.spec.AllowedValues.specs {
 		switch s := v.(type) {
 		case FunctionSpec:
-			log.Printf("%s", s.Name)
 			out = append(out, protocol.CompletionItem{
 				Label:            fmt.Sprintf("[%s] %s", s.Kind, s.Name),
 				Kind:             &MethodKind,
@@ -165,7 +163,6 @@ func (b BlockNode) Complete(fileSource string, position protocol.Position, trigg
 			})
 		}
 	}
-	log.Printf("%s", out)
 	return out
 }
 

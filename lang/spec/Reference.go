@@ -2,7 +2,6 @@ package spec
 
 import (
 	"fmt"
-	"log"
 
 	"github.com/minecraftmetascript/mms/lang/ast"
 	"github.com/minecraftmetascript/mms/lang/grammar"
@@ -18,14 +17,9 @@ func NewReferenceSpec(kind ast.SymbolKind) *ReferenceSpec {
 }
 func (r ReferenceSpec) Complete(fileSource string, position protocol.Position, triggerChar *string, symbols map[string]*ast.Namespace) []protocol.CompletionItem {
 	out := make([]protocol.CompletionItem, 0)
-	log.Printf("Scope: %-s", symbols)
-	log.Printf("Attempting to complete a reference! %s", r.Kind)
 	for ns, nsSymbols := range symbols {
-		log.Printf("Scanning %s", ns)
 		for n, s := range nsSymbols.AllDecls() {
-			log.Printf("  Checking %s", n)
 			if s.GetKind() == r.Kind {
-				log.Println("    Hit")
 				out = append(out, protocol.CompletionItem{
 					Label: fmt.Sprintf("%s:%s", ns, n),
 					TextEdit: protocol.TextEdit{
@@ -37,8 +31,6 @@ func (r ReferenceSpec) Complete(fileSource string, position protocol.Position, t
 					},
 					Kind: &ReferenceKind,
 				})
-			} else {
-				log.Printf("    Miss")
 			}
 		}
 	}
@@ -55,7 +47,7 @@ func (r ReferenceSpec) Match(valueCtx grammar.IValueContext) (ast.Node, []ast.Di
 	parts := refCtx.AllIdentifier()
 	refL := ast.RuleLocation(refCtx)
 	if len(parts) == 1 {
-		return ReferenceNode{
+		return &ReferenceNode{
 			location:  refL,
 			Namespace: "",
 			Name:      parts[0].GetText(),
@@ -63,7 +55,7 @@ func (r ReferenceSpec) Match(valueCtx grammar.IValueContext) (ast.Node, []ast.Di
 		}, nil
 
 	} else if len(parts) == 2 {
-		return ReferenceNode{
+		return &ReferenceNode{
 			location:  refL,
 			Namespace: parts[0].GetText(),
 			Name:      parts[1].GetText(),
@@ -90,15 +82,15 @@ type ReferenceNode struct {
 	Kind      ast.SymbolKind
 }
 
-func (r ReferenceNode) Children() []ast.Node {
+func (r *ReferenceNode) Children() []ast.Node {
 	return []ast.Node{}
 }
 
-func (r ReferenceNode) GetLocation() *ast.SourceLocation {
+func (r *ReferenceNode) GetLocation() *ast.SourceLocation {
 	return &r.location
 }
 
-func (r ReferenceNode) String() string { return fmt.Sprintf("%s:%s", r.Namespace, r.Name) }
+func (r *ReferenceNode) String() string { return fmt.Sprintf("%s:%s", r.Namespace, r.Name) }
 
 func GetReferenceNodeValue(n ast.Node) *string {
 	if n == nil {
