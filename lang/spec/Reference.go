@@ -2,9 +2,11 @@ package spec
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/minecraftmetascript/mms/lang/ast"
 	"github.com/minecraftmetascript/mms/lang/grammar"
+	"github.com/samber/lo"
 	protocol "github.com/tliron/glsp/protocol_3_16"
 )
 
@@ -16,18 +18,27 @@ func NewReferenceSpec(kind ast.SymbolKind) *ReferenceSpec {
 	return &ReferenceSpec{Kind: kind}
 }
 func (r ReferenceSpec) Complete(fileSource string, position protocol.Position, triggerChar *string, symbols map[string]*ast.Namespace) []protocol.CompletionItem {
+	// Extract any prefix the user has already typed
+	prefix := ExtractPrefixAtPosition(fileSource, position)
+
+	start := protocol.Position{
+		Line:      position.Line,
+		Character: protocol.UInteger(int(position.Character) - len(prefix)),
+	}
+
 	out := make([]protocol.CompletionItem, 0)
 	for ns, nsSymbols := range symbols {
 		for n, s := range nsSymbols.AllDecls() {
 			if s.GetKind() == r.Kind {
+				label := fmt.Sprintf("%s:%s", ns, n)
 				out = append(out, protocol.CompletionItem{
-					Label: fmt.Sprintf("%s:%s", ns, n),
+					Label: label,
 					TextEdit: protocol.TextEdit{
 						Range: protocol.Range{
-							Start: position,
+							Start: start,
 							End:   position,
 						},
-						NewText: fmt.Sprintf("%s:%s", ns, n),
+						NewText: label,
 					},
 					Kind: &ReferenceKind,
 				})
@@ -35,7 +46,11 @@ func (r ReferenceSpec) Complete(fileSource string, position protocol.Position, t
 		}
 	}
 
-	return out
+	// Filter by prefix if user has typed something
+	return lo.Filter(out, func(item protocol.CompletionItem, index int) bool {
+		parts := strings.Split(strings.ToLower(item.Label), ":")
+		return strings.HasPrefix(parts[0], strings.ToLower(prefix)) || strings.HasPrefix(parts[1], strings.ToLower(prefix))
+	})
 }
 
 func (r ReferenceSpec) Match(valueCtx grammar.IValueContext) (ast.Node, []ast.Diagnostic) {
@@ -48,7 +63,9 @@ func (r ReferenceSpec) Match(valueCtx grammar.IValueContext) (ast.Node, []ast.Di
 	refL := ast.RuleLocation(refCtx)
 	if len(parts) == 1 {
 		return &ReferenceNode{
-			location:  refL,
+			BaseNode: ast.BaseNode{
+				Location: &refL,
+			},
 			Namespace: "",
 			Name:      parts[0].GetText(),
 			Kind:      r.Kind,
@@ -56,7 +73,9 @@ func (r ReferenceSpec) Match(valueCtx grammar.IValueContext) (ast.Node, []ast.Di
 
 	} else if len(parts) == 2 {
 		return &ReferenceNode{
-			location:  refL,
+			BaseNode: ast.BaseNode{
+				Location: &refL,
+			},
 			Namespace: parts[0].GetText(),
 			Name:      parts[1].GetText(),
 			Kind:      r.Kind,
@@ -76,7 +95,7 @@ func (r ReferenceSpec) Match(valueCtx grammar.IValueContext) (ast.Node, []ast.Di
 }
 
 type ReferenceNode struct {
-	location  ast.SourceLocation
+	ast.BaseNode
 	Namespace string
 	Name      string
 	Kind      ast.SymbolKind
@@ -84,10 +103,6 @@ type ReferenceNode struct {
 
 func (r *ReferenceNode) Children() []ast.Node {
 	return []ast.Node{}
-}
-
-func (r *ReferenceNode) GetLocation() *ast.SourceLocation {
-	return &r.location
 }
 
 func (r *ReferenceNode) String() string { return fmt.Sprintf("%s:%s", r.Namespace, r.Name) }

@@ -55,13 +55,24 @@ func (spec *OverloadSpec) Match(ctx grammar.IFnContext) (ast.Node, []ast.Diagnos
 		},
 	}
 
-	for i, argCtx := range ctx.AllValue() {
+	argCtxs := ctx.AllValue()
+
+	// Check for missing required arguments
+	if len(argCtxs) < len(spec.Args) {
+		diags = append(diags, ast.Diagnostic{
+			Location: ast.RuleLocation(ctx),
+			Message:  fmt.Sprintf("Not enough arguments: expected %d, got %d", len(spec.Args), len(argCtxs)),
+			Severity: ast.Error,
+		})
+	}
+
+	for i, argCtx := range argCtxs {
 		var argSpec ValueSpec
 		if i >= len(spec.Args) {
 			if spec.RestArg == nil {
 				diags = append(diags, ast.Diagnostic{
 					Location: ast.RuleLocation(argCtx),
-					Message:  "Unexpected argument",
+					Message:  fmt.Sprintf("Unexpected argument at position %d", i+1),
 					Severity: ast.Warning,
 				})
 			}
@@ -70,12 +81,10 @@ func (spec *OverloadSpec) Match(ctx grammar.IFnContext) (ast.Node, []ast.Diagnos
 			argSpec = spec.Args[i]
 		}
 
-		// TODO: We need to modify this to allow for error messages, but also
-		// 			fallthrough when something doesn't match?
 		if argSpec == nil {
 			diags = append(diags, ast.Diagnostic{
 				Location: ast.RuleLocation(argCtx),
-				Message:  "Unexpected argument",
+				Message:  fmt.Sprintf("Unexpected argument at position %d", i+1),
 				Severity: ast.Warning,
 			})
 			continue
@@ -90,6 +99,13 @@ func (spec *OverloadSpec) Match(ctx grammar.IFnContext) (ast.Node, []ast.Diagnos
 			} else {
 				out.Args[i] = value
 			}
+		} else {
+			// Value is nil and no diagnostics - type mismatch
+			diags = append(diags, ast.Diagnostic{
+				Location: ast.RuleLocation(argCtx),
+				Message:  fmt.Sprintf("Argument at position %d does not match expected type", i+1),
+				Severity: ast.Error,
+			})
 		}
 	}
 
@@ -142,17 +158,96 @@ func (f FunctionSpec) matchFn(fnCtx grammar.IFnContext) (*FunctionNode, []ast.Di
 		return nil, nil
 	}
 
+	// Track all overload attempts for better diagnostics
+	allOverloadDiags := make([][]ast.Diagnostic, 0)
+	allOverloadResults := make([]*Overload, 0)
+	argCount := len(fnCtx.AllValue())
+
+	// First pass: try to find an overload without errors
 	for _, overload := range f.Overloads {
 		res, diags := overload.Match(fnCtx)
 		if res == nil {
-			return nil, diags
+			allOverloadDiags = append(allOverloadDiags, diags)
+			allOverloadResults = append(allOverloadResults, nil)
+			continue
 		}
 
+		allOverloadResults = append(allOverloadResults, res.(*Overload))
+		allOverloadDiags = append(allOverloadDiags, diags)
+
+		// Check if this match has only minor issues (warnings) or no issues
+		hasErrors := false
+		if diags != nil {
+			for _, d := range diags {
+				if d.Severity == ast.Error {
+					hasErrors = true
+					break
+				}
+			}
+		}
+
+		// If we have a result and no errors, use this overload
+		if !hasErrors {
+			out := &FunctionNode{
+				Name:      f.Name,
+				overload:  overload,
+				Arguments: res.(*Overload).Args,
+				Builders:  res.(*Overload).Builders,
+				spec:      f,
+				source:    fnCtx.GetStart().GetInputStream().GetText(fnCtx.GetStart().GetStart(), fnCtx.GetStop().GetStop()+1),
+				BaseSymbol: ast.BaseSymbol{
+					Kind:     f.Kind,
+					Location: &l,
+				},
+			}
+
+			builders := make([]FunctionNode, 0)
+			for _, b := range res.(*Overload).Builders {
+				b.parent = out
+				builders = append(builders, b)
+			}
+			out.Builders = builders
+
+			return out, diags
+		}
+	}
+
+	// No perfect match found - pick the best overload and return it WITH diagnostics
+	// This allows autocomplete to work even when there are errors
+	bestOverloadIdx := -1
+	if len(allOverloadResults) > 0 {
+		// Strategy: prefer overloads with results, and among those, prefer ones with matching arg counts
+		for i, res := range allOverloadResults {
+			if res != nil {
+				if bestOverloadIdx == -1 {
+					bestOverloadIdx = i
+				} else {
+					// Prefer overload with closer arg count match
+					currentDiff := argCount - len(f.Overloads[i].Args)
+					if currentDiff < 0 {
+						currentDiff = -currentDiff
+					}
+					bestDiff := argCount - len(f.Overloads[bestOverloadIdx].Args)
+					if bestDiff < 0 {
+						bestDiff = -bestDiff
+					}
+					if currentDiff < bestDiff {
+						bestOverloadIdx = i
+					}
+				}
+			}
+		}
+	}
+
+	// If we found a best match, return it with diagnostics
+	if bestOverloadIdx >= 0 && allOverloadResults[bestOverloadIdx] != nil {
+		res := allOverloadResults[bestOverloadIdx]
+		overload := f.Overloads[bestOverloadIdx]
 		out := &FunctionNode{
 			Name:      f.Name,
 			overload:  overload,
-			Arguments: res.(*Overload).Args,
-			Builders:  res.(*Overload).Builders,
+			Arguments: res.Args,
+			Builders:  res.Builders,
 			spec:      f,
 			source:    fnCtx.GetStart().GetInputStream().GetText(fnCtx.GetStart().GetStart(), fnCtx.GetStop().GetStop()+1),
 			BaseSymbol: ast.BaseSymbol{
@@ -162,22 +257,77 @@ func (f FunctionSpec) matchFn(fnCtx grammar.IFnContext) (*FunctionNode, []ast.Di
 		}
 
 		builders := make([]FunctionNode, 0)
-		for _, b := range res.(*Overload).Builders {
+		for _, b := range res.Builders {
 			b.parent = out
 			builders = append(builders, b)
 		}
 		out.Builders = builders
 
-		return out, diags
+		// Return the node with diagnostics
+		return out, allOverloadDiags[bestOverloadIdx]
 	}
 
-	return nil, []ast.Diagnostic{
-		{
+	// No overload matched - provide detailed diagnostics
+	diagnostics := make([]ast.Diagnostic, 0)
+
+	if len(f.Overloads) == 1 {
+		// Single overload - report its specific issues
+		if len(allOverloadDiags) > 0 && len(allOverloadDiags[0]) > 0 {
+			diagnostics = allOverloadDiags[0]
+		} else {
+			diagnostics = append(diagnostics, ast.Diagnostic{
+				Location: ast.RuleLocation(fnCtx),
+				Message:  fmt.Sprintf("%s: argument type mismatch", f.Name),
+				Severity: ast.Error,
+			})
+		}
+	} else {
+		// Multiple overloads - provide summary
+		msg := fmt.Sprintf("%s: no matching overload for %d argument(s)", f.Name, argCount)
+		expectedCounts := make([]int, 0)
+		for _, overload := range f.Overloads {
+			count := len(overload.Args)
+			if overload.RestArg != nil {
+				// RestArg means variable arguments
+				msg = fmt.Sprintf("%s: no matching overload found (tried %d overload(s))", f.Name, len(f.Overloads))
+				break
+			}
+			expectedCounts = append(expectedCounts, count)
+		}
+
+		diagnostics = append(diagnostics, ast.Diagnostic{
 			Location: ast.RuleLocation(fnCtx),
-			Message:  "No matching overload found",
-			Severity: ast.Warning,
-		},
+			Message:  msg,
+			Severity: ast.Error,
+		})
+
+		// Include specific errors from the closest matching overload
+		if len(allOverloadDiags) > 0 {
+			// Find the overload with matching arg count or closest to it
+			bestMatch := 0
+			bestDiff := 999999
+			for i, overload := range f.Overloads {
+				diff := argCount - len(overload.Args)
+				if diff < 0 {
+					diff = -diff
+				}
+				if diff < bestDiff {
+					bestDiff = diff
+					bestMatch = i
+				}
+			}
+			if bestMatch < len(allOverloadDiags) && len(allOverloadDiags[bestMatch]) > 0 {
+				// Add a subset of diagnostics from best match
+				for _, d := range allOverloadDiags[bestMatch] {
+					if d.Severity == ast.Error {
+						diagnostics = append(diagnostics, d)
+					}
+				}
+			}
+		}
 	}
+
+	return nil, diagnostics
 }
 
 func (f FunctionSpec) Match(valueCtx grammar.IValueContext) (ast.Node, []ast.Diagnostic) {
@@ -279,7 +429,7 @@ func locate(source string, idx int) ast.Location {
 	return *out
 }
 
-func (n FunctionNode) builderCompletions(includeLeadingDot bool) []protocol.CompletionItem {
+func (n FunctionNode) builderCompletions(includeLeadingDot bool, fileSource string, position protocol.Position) []protocol.CompletionItem {
 	items := make([]protocol.CompletionItem, 0)
 	builderSnapPosition := getBuilderInsertPosition(n)
 	for _, overload := range n.spec.Overloads {
@@ -310,11 +460,14 @@ func (n FunctionNode) builderCompletions(includeLeadingDot bool) []protocol.Comp
 			}
 		}
 	}
-	return lo.UniqBy(items, func(item protocol.CompletionItem) string {
+	items = lo.UniqBy(items, func(item protocol.CompletionItem) string {
 		// TODO: How do we want to handle overloads here?
 		return item.Label
 	})
 
+	// Extract any prefix the user has already typed and filter
+	prefix := ExtractPrefixAtPosition(fileSource, position)
+	return FilterCompletionsByPrefix(items, prefix)
 }
 
 func (n FunctionNode) argCompletions(fileSource string, p protocol.Position, triggerChar *string, symbols map[string]*ast.Namespace) []protocol.CompletionItem {
@@ -344,14 +497,16 @@ func (n FunctionNode) argCompletions(fileSource string, p protocol.Position, tri
 		// Check if cursor is after this argument
 		// This handles the case where cursor is between args (e.g., after comma)
 		argEndIdx := al.Stop.IndexIn(fileSource)
-		if cursorIdx > argEndIdx {
-			// Cursor is after this argument, so we might be completing the next one
+		if cursorIdx > argEndIdx+1 {
+			log.Println("Using offset argIdx because we might be overflowing?", al, al.Start, al.Start.IndexIn(fileSource), al.Stop, al.Stop.IndexIn(fileSource), cursorIdx, argEndIdx+1)
+			// Cursor is after this argument (and not immediately trailing), so we might be completing the next one
 			argIdx = i + 1
 		}
 	}
 
 	// If we still haven't found an index, check if we're completing the first argument
 	if argIdx == -1 {
+		log.Println("No index found so far")
 		// Check if cursor is before the first argument (if any exist)
 		if len(n.Arguments) > 0 && n.Arguments[0] != nil {
 			firstArgLoc := n.Arguments[0].GetLocation()
@@ -361,14 +516,17 @@ func (n FunctionNode) argCompletions(fileSource string, p protocol.Position, tri
 					argIdx = 0
 				}
 			}
-		} else {
-			// No arguments yet, we're completing the first one
-			argIdx = 0
 		}
+	}
+
+	if argIdx == -1 {
+		// No arguments yet, we're completing the first one
+		argIdx = 0
 	}
 
 	// Clamp to valid range - if we're past all defined args, check for rest args
 	if argIdx >= len(n.overload.Args) {
+		log.Println("RestArg", argIdx, n.overload.Args, n.overload.RestArg)
 		if n.overload.RestArg != nil {
 			// Use rest arg spec for completions
 			if c, ok := n.overload.RestArg.(ast.CompletableNode); ok {
@@ -379,8 +537,15 @@ func (n FunctionNode) argCompletions(fileSource string, p protocol.Position, tri
 	}
 
 	// Get completions for the identified argument
-	if c, ok := n.overload.Args[argIdx].(ast.CompletableNode); ok {
-		return c.Complete(fileSource, p, triggerChar, symbols)
+	if completableNode, ok := n.Arguments[argIdx].(ast.CompletableNode); ok {
+		log.Println("Node")
+		return completableNode.Complete(fileSource, p, triggerChar, symbols)
+	} else if completableSpec, ok := n.overload.Args[argIdx].(ast.CompletableNode); ok {
+		log.Println("Spec")
+		return completableSpec.Complete(fileSource, p, triggerChar, symbols)
+	} else {
+		log.Println("None", n.Arguments[argIdx], n.overload.Args[argIdx])
+
 	}
 
 	return make([]protocol.CompletionItem, 0)
@@ -433,7 +598,7 @@ func (n FunctionNode) Complete(fileSource string, position protocol.Position, tr
 	switch mode {
 	case functionCompletionModeBuilders:
 		idx := position.IndexIn(fileSource)
-		items = n.builderCompletions(fileSource[idx-1] == ')')
+		items = n.builderCompletions(fileSource[idx-1] == ')', fileSource, position)
 		if len(items) == 0 && n.parent != nil {
 			return n.parent.Complete(fileSource, position, triggerChar, symbols)
 		}

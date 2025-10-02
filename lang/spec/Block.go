@@ -86,11 +86,14 @@ func (b BlockSpec) Match(ctx grammar.IBlockContext) (*BlockNode, []ast.Diagnosti
 
 		if val, d := b.AllowedValues.Match(valueCtx); lib.IsNilInterface(val) {
 			if d != nil && len(d) > 0 {
+				// Use diagnostics from the value spec matching
 				diags = append(diags, d...)
 			} else {
+				// No specific diagnostics - provide helpful generic message
+				msg := fmt.Sprintf("Invalid value for '%s' in %s block. Value does not match any allowed type.", id, b.Kind)
 				diags = append(diags, ast.Diagnostic{
 					Location: ast.RuleLocation(decl),
-					Message:  "Invalid value", // TODO: Better message
+					Message:  msg,
 					Severity: ast.Error,
 				})
 			}
@@ -114,6 +117,10 @@ func (b BlockSpec) Match(ctx grammar.IBlockContext) (*BlockNode, []ast.Diagnosti
 			}
 			out.Declarations[id] = val
 
+			// Include any warnings/info diagnostics from successful match
+			if d != nil && len(d) > 0 {
+				diags = append(diags, d...)
+			}
 		}
 
 	}
@@ -144,6 +151,10 @@ func (b BlockNode) Complete(fileSource string, position protocol.Position, trigg
 			return nil
 		}
 	}
+
+	// Extract any prefix the user has already typed
+	prefix := ExtractPrefixAtPosition(fileSource, position)
+
 	out := make([]protocol.CompletionItem, 0)
 	for _, v := range b.spec.AllowedValues.specs {
 		switch s := v.(type) {
@@ -163,7 +174,9 @@ func (b BlockNode) Complete(fileSource string, position protocol.Position, trigg
 			})
 		}
 	}
-	return out
+
+	// Filter by prefix if user has typed something
+	return FilterCompletionsByPrefix(out, prefix)
 }
 
 func (b BlockNode) Children() []ast.Node {

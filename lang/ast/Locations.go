@@ -114,7 +114,7 @@ func TokenStart(ctx antlr.Token) Location {
 func TokenStop(ctx antlr.Token) Location {
 	return Location{
 		Line:   ctx.GetLine(),
-		Column: ctx.GetColumn(),
+		Column: ctx.GetColumn() + (ctx.GetStop() - ctx.GetStart()),
 		Index:  ctx.GetStop(),
 	}
 }
