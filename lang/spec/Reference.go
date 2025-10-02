@@ -59,6 +59,7 @@ func (r ReferenceSpec) Match(valueCtx grammar.IValueContext) (ast.Node, []ast.Di
 			location:  refL,
 			Namespace: "",
 			Name:      parts[0].GetText(),
+			Kind:      r.Kind,
 		}, nil
 
 	} else if len(parts) == 2 {
@@ -66,6 +67,7 @@ func (r ReferenceSpec) Match(valueCtx grammar.IValueContext) (ast.Node, []ast.Di
 			location:  refL,
 			Namespace: parts[0].GetText(),
 			Name:      parts[1].GetText(),
+			Kind:      r.Kind,
 		}, nil
 
 	} else {
@@ -85,6 +87,7 @@ type ReferenceNode struct {
 	location  ast.SourceLocation
 	Namespace string
 	Name      string
+	Kind      ast.SymbolKind
 }
 
 func (r ReferenceNode) Children() []ast.Node {
@@ -93,4 +96,17 @@ func (r ReferenceNode) Children() []ast.Node {
 
 func (r ReferenceNode) GetLocation() *ast.SourceLocation {
 	return &r.location
+}
+
+func (r ReferenceNode) String() string { return fmt.Sprintf("%s:%s", r.Namespace, r.Name) }
+
+func GetReferenceNodeValue(n ast.Node) *string {
+	if n == nil {
+		return nil
+	}
+	if n, ok := n.(*ReferenceNode); ok {
+		r := n.String()
+		return &r
+	}
+	return nil
 }

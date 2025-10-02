@@ -60,3 +60,13 @@ type NumberNode struct {
 	ast.BaseNode
 	Value float64
 }
+
+func GetNumberNodeValue(n ast.Node) *float64 {
+	if n == nil {
+		return nil
+	}
+	if n, ok := n.(*NumberNode); ok {
+		return &n.Value
+	}
+	return nil
+}

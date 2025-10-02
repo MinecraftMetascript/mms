@@ -76,6 +76,7 @@ func (n *BaseSymbol) SetNameLocation(loc *SourceLocation) {
 func (n *BaseSymbol) GetKind() SymbolKind {
 	return n.Kind
 }
+
 func (n *BaseSymbol) SetFilename(file string) {
 	if n.NameLocation != nil {
 		n.NameLocation.Filename = file

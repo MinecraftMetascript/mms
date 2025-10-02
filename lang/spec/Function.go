@@ -257,7 +257,10 @@ func (n FunctionNode) ToSerializable() any {
 	return n.spec.output(n)
 }
 
-func (n FunctionNode) GetHelp() string { return n.spec.Help }
+func (n FunctionNode) GetHelp() string {
+	// TODO: Include usage / overload information
+	return n.spec.Help
+}
 
 func locate(source string, idx int) ast.Location {
 	out := &ast.Location{}
