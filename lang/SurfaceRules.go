@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"slices"
 
 	"github.com/minecraftmetascript/mms/lang/ast"
 	"github.com/minecraftmetascript/mms/lang/spec"
@@ -379,8 +380,26 @@ func YAboveSerializer(node spec.FunctionNode) any {
 
 // TODO: Properly handle IF, SEQUENCE, and NOT
 
-var SurfaceRuleBlock = spec.NewBlockSpec("Surface", []spec.ValueSpec{
-	Bandlands, Block,
+func init() {
 
-	AboveSurface, Biome, Hole, NoiseThreshold, Steep, StoneDepth, Frozen, Water, YAbove,
-})
+	Conditional = spec.NewConditionSpec()
+	SurfaceConditions = []spec.ValueSpec{AboveSurface, Biome, Hole, NoiseThreshold, Steep, StoneDepth, Frozen, Water, YAbove, Conditional}
+	SurfaceRules = []spec.ValueSpec{Bandlands, Block}
+	Conditional.
+		AddConditionOption(SurfaceConditions...).
+		AddValueOption(SurfaceRules...)
+
+	SurfaceRuleBlock = spec.NewBlockSpec(
+		"Surface",
+		slices.Concat(SurfaceRules, SurfaceConditions),
+	)
+	log.Println("Surface Rule Block!")
+
+	Blocks.Add(&SurfaceRuleBlock)
+}
+
+var SurfaceConditions []spec.ValueSpec
+var SurfaceRules []spec.ValueSpec
+var Conditional *spec.ConditionalSpec
+
+var SurfaceRuleBlock spec.BlockSpec

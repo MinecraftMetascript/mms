@@ -35,6 +35,10 @@ var NoiseBlock = spec.NewBlockSpec(
 	},
 )
 
+func init() {
+	Blocks.Add(&NoiseBlock)
+}
+
 var NoiseSerializer = func(fn spec.FunctionNode) any {
 	if fn.Name != "Noise" {
 		return "{ \"__\": \"MMS: Unable to serialize\"}"

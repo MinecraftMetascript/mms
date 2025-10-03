@@ -4,4 +4,4 @@ import (
 	"github.com/minecraftmetascript/mms/lang/spec"
 )
 
-var Blocks = spec.NewBlockSpecList(NoiseBlock, SurfaceRuleBlock)
+var Blocks = spec.NewBlockSpecList()

@@ -122,13 +122,13 @@ func TokenStop(ctx antlr.Token) Location {
 func RuleLocation(ctx antlr.ParserRuleContext) SourceLocation {
 	return SourceLocation{
 		Start: TokenStart(ctx.GetStart()),
-		Stop:  TokenStop(ctx.GetStop()),
+		Stop:  TokenStop(ctx.GetStop()).ColOffset(1),
 	}
 }
 
 func TerminalLocation(ctx antlr.TerminalNode) SourceLocation {
 	return SourceLocation{
 		Start: TokenStart(ctx.GetSymbol()),
-		Stop:  TokenStop(ctx.GetSymbol()),
+		Stop:  TokenStop(ctx.GetSymbol()).ColOffset(1),
 	}
 }

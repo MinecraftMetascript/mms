@@ -21,8 +21,9 @@ condition
   | '!' condition                                       #condNegate
   ;
 
-rootCondition: '!'? value;
+rootCondition: value;
 
+// TODO: Should we have support for "Else"?
 conditional: 'If'  NL* '(' NL* condition  NL* ')' NL* value;
 list: '['  NL* (value NL* ','? NL*)* value?  NL* ']';
 

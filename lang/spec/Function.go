@@ -610,6 +610,7 @@ func (n FunctionNode) Complete(fileSource string, position protocol.Position, tr
 	return items
 }
 
+// This is causing issues when the completion is triggered BEFORE the last completion
 func getBuilderInsertPosition(n FunctionNode) ast.Location {
 	endOffset := 0
 

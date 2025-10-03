@@ -1,9 +1,11 @@
 Namespace test_files {
 	Noise {
 		Xyz = Noise(-1).Amplitudes(1,2,3)
+
+
+		Zyx = Noise(-2).Amplitudes(1,2,3)
 	}
 	Surface {
-		Thresh = NoiseThreshold(test_files:Xyz)
-		X = NoiseThreshold(test_files:Xyz).Max()
+		Cond = If(Frozen()) Block(minecraft:stone)
 	}
 }

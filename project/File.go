@@ -4,6 +4,7 @@ import (
 	"slices"
 
 	"github.com/minecraftmetascript/mms/lang/ast"
+	"github.com/minecraftmetascript/mms/lib"
 )
 
 type File struct {
@@ -14,7 +15,7 @@ type File struct {
 }
 
 func (f *File) ingestNodes(node ast.Node) {
-	if node == nil {
+	if node == nil || lib.IsNilInterface(node) {
 		return
 	}
 	if node.GetLocation() == nil {

@@ -1,6 +1,8 @@
 package project
 
 import (
+	"fmt"
+
 	"github.com/antlr4-go/antlr/v4"
 	"github.com/minecraftmetascript/mms/lang"
 	"github.com/minecraftmetascript/mms/lang/ast"
@@ -49,17 +51,20 @@ func (p *Parser) ExitNamedBlock(ctx *grammar.NamedBlockContext) {
 
 		blockSpec := lang.Blocks.Get(blockKind.GetText())
 		if blockSpec == nil {
-			// TODO: ✏ Diagnose -- Invalid GetKind
+			p.diagnostics.Add(ast.Diagnostic{
+				Location: ast.TerminalLocation(blockKind),
+				Message:  fmt.Sprintf("Unknown block kind: %s", blockKind),
+				Severity: ast.Error,
+			})
 			continue
 		}
 		block, diags := blockSpec.Match(b)
+		// TODO: Is this really what we want?
+		p.diagnostics.Add(diags...)
 		if block == nil {
-			// TODO: ✏ Diagnose -- Invalid GetKind
 			continue
 		}
 		p.blocks = append(p.blocks, block)
-
-		p.diagnostics.Add(diags...)
 
 		for name, decl := range block.Declarations {
 			if symbol, ok := decl.(ast.Symbol); ok {
