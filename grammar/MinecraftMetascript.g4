@@ -13,12 +13,11 @@ fn: Identifier '(' (value ',')* (value ','?)? ')' ('.' fn)*?;
 value: number | String | fn | resourceReference | conditional | list;
 
 condition
-  : rootCondition                                       #condPrimary
-  | '(' NL* condition NL* '&&' NL* condition NL* ')'    #condGroupedAnd
-  | '(' NL* condition NL* '||' NL* condition NL* ')'    #condGroupedOr
+  : '!' condition                                       #condNegate
+  | rootCondition                                       #condPrimary
+  | '(' NL* condition NL* ')'                           #condGrouped
   | condition NL* '&&' NL*  condition                   #condAnd
   | condition NL* '||' NL*  condition                   #condOr
-  | '!' condition                                       #condNegate
   ;
 
 rootCondition: value;

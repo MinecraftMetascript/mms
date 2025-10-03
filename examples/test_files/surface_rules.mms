@@ -6,6 +6,9 @@ Namespace test_files {
 		Zyx = Noise(-2).Amplitudes(1,2,3)
 	}
 	Surface {
-		Cond = If(Frozen()) Block(minecraft:stone)
+		Cond = If(Frozen() && !Frozen() || (xyz)) Block(minecraft:stone)
+
+		Seq = [
+		]
 	}
 }

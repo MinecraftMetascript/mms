@@ -62,17 +62,11 @@ func (s *BaseMinecraftMetascriptListener) EnterValue(ctx *ValueContext) {}
 // ExitValue is called when production value is exited.
 func (s *BaseMinecraftMetascriptListener) ExitValue(ctx *ValueContext) {}
 
-// EnterCondGroupedOr is called when production condGroupedOr is entered.
-func (s *BaseMinecraftMetascriptListener) EnterCondGroupedOr(ctx *CondGroupedOrContext) {}
+// EnterCondGrouped is called when production condGrouped is entered.
+func (s *BaseMinecraftMetascriptListener) EnterCondGrouped(ctx *CondGroupedContext) {}
 
-// ExitCondGroupedOr is called when production condGroupedOr is exited.
-func (s *BaseMinecraftMetascriptListener) ExitCondGroupedOr(ctx *CondGroupedOrContext) {}
-
-// EnterCondGroupedAnd is called when production condGroupedAnd is entered.
-func (s *BaseMinecraftMetascriptListener) EnterCondGroupedAnd(ctx *CondGroupedAndContext) {}
-
-// ExitCondGroupedAnd is called when production condGroupedAnd is exited.
-func (s *BaseMinecraftMetascriptListener) ExitCondGroupedAnd(ctx *CondGroupedAndContext) {}
+// ExitCondGrouped is called when production condGrouped is exited.
+func (s *BaseMinecraftMetascriptListener) ExitCondGrouped(ctx *CondGroupedContext) {}
 
 // EnterCondNegate is called when production condNegate is entered.
 func (s *BaseMinecraftMetascriptListener) EnterCondNegate(ctx *CondNegateContext) {}

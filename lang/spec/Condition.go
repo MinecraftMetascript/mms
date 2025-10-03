@@ -32,19 +32,63 @@ func (c *ConditionalSpec) AddValueOption(spec ...ValueSpec) *ConditionalSpec {
 	return c
 }
 
+type ConditionAndNode struct {
+	ast.BaseNode
+	Left  ast.Node
+	Right ast.Node
+}
+type ConditionOrNode struct {
+	ast.BaseNode
+	Left  ast.Node
+	Right ast.Node
+}
+type ConditionNegateNode struct {
+	ast.BaseNode
+	Condition ast.Node
+}
+
 func (c *ConditionalSpec) matchConditionCtx(ctx grammar.IConditionContext) (ast.Node, []ast.Diagnostic) {
+	if ctx == nil {
+		return nil, nil
+	}
 	switch condition := ctx.(type) {
 	// TODO: If condition != primary, we need to match the children against the same spec
+	// TODO: Create a new node type for paired conditions, as well as one for negated conditions
+	// TODO: Is the distinction between grouped and ungrouped conditions necessary here? That may be handled by the parser
 	case *grammar.CondAndContext:
-		log.Println("AND", condition)
+		l, ld := c.matchConditionCtx(condition.Condition(0))
+		r, rd := c.matchConditionCtx(condition.Condition(1))
+		loc := ast.RuleLocation(ctx)
+		return &ConditionAndNode{
+			BaseNode: ast.BaseNode{
+				Location: &loc,
+			},
+			Left:  l,
+			Right: r,
+		}, slices.Concat(ld, rd)
 	case *grammar.CondOrContext:
-		log.Println("OR", condition)
-	case *grammar.CondGroupedOrContext:
-		log.Println("GROUPED OR", condition)
-	case *grammar.CondGroupedAndContext:
-		log.Println("GROUPED AND", condition)
+		l, ld := c.matchConditionCtx(condition.Condition(0))
+		r, rd := c.matchConditionCtx(condition.Condition(1))
+		loc := ast.RuleLocation(ctx)
+		return &ConditionOrNode{
+			BaseNode: ast.BaseNode{
+				Location: &loc,
+			},
+			Left:  l,
+			Right: r,
+		}, slices.Concat(ld, rd)
+	case *grammar.CondGroupedContext:
+		// Pass this through
+		return c.matchConditionCtx(condition.Condition())
 	case *grammar.CondNegateContext:
-		log.Println("NEGATE", condition)
+		neg, cd := c.matchConditionCtx(condition.Condition())
+		loc := ast.RuleLocation(ctx)
+		return &ConditionNegateNode{
+			BaseNode: ast.BaseNode{
+				Location: &loc,
+			},
+			Condition: neg,
+		}, cd
 	case *grammar.CondPrimaryContext:
 		for _, opt := range c.ConditionOptions {
 			r, diags := opt.Match(condition.RootCondition().Value())

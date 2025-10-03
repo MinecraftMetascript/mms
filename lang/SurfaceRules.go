@@ -378,16 +378,18 @@ func YAboveSerializer(node spec.FunctionNode) any {
 	return out
 }
 
-// TODO: Properly handle IF, SEQUENCE, and NOT
-
+// TODO: Properly handle SEQUENCE
 func init() {
-
+	// TODO: Conditional serialization (AND / OR / NOT) :(
 	Conditional = spec.NewConditionSpec()
 	SurfaceConditions = []spec.ValueSpec{AboveSurface, Biome, Hole, NoiseThreshold, Steep, StoneDepth, Frozen, Water, YAbove, Conditional}
-	SurfaceRules = []spec.ValueSpec{Bandlands, Block}
+	ListRule := spec.NewListSpec(SurfaceRules...)
+	SurfaceRules = []spec.ValueSpec{Bandlands, Block, ListRule}
 	Conditional.
 		AddConditionOption(SurfaceConditions...).
-		AddValueOption(SurfaceRules...)
+		AddConditionOption(spec.NewReferenceSpec(ast.SymbolSurfaceCondition)).
+		AddValueOption(SurfaceRules...).
+		AddValueOption(spec.NewReferenceSpec(ast.SymbolSurfaceRule))
 
 	SurfaceRuleBlock = spec.NewBlockSpec(
 		"Surface",

@@ -91,7 +91,6 @@ func (r ReferenceSpec) Match(valueCtx grammar.IValueContext) (ast.Node, []ast.Di
 			},
 		}
 	}
-
 }
 
 type ReferenceNode struct {

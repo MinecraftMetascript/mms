@@ -28,11 +28,8 @@ type MinecraftMetascriptListener interface {
 	// EnterValue is called when entering the value production.
 	EnterValue(c *ValueContext)
 
-	// EnterCondGroupedOr is called when entering the condGroupedOr production.
-	EnterCondGroupedOr(c *CondGroupedOrContext)
-
-	// EnterCondGroupedAnd is called when entering the condGroupedAnd production.
-	EnterCondGroupedAnd(c *CondGroupedAndContext)
+	// EnterCondGrouped is called when entering the condGrouped production.
+	EnterCondGrouped(c *CondGroupedContext)
 
 	// EnterCondNegate is called when entering the condNegate production.
 	EnterCondNegate(c *CondNegateContext)
@@ -79,11 +76,8 @@ type MinecraftMetascriptListener interface {
 	// ExitValue is called when exiting the value production.
 	ExitValue(c *ValueContext)
 
-	// ExitCondGroupedOr is called when exiting the condGroupedOr production.
-	ExitCondGroupedOr(c *CondGroupedOrContext)
-
-	// ExitCondGroupedAnd is called when exiting the condGroupedAnd production.
-	ExitCondGroupedAnd(c *CondGroupedAndContext)
+	// ExitCondGrouped is called when exiting the condGrouped production.
+	ExitCondGrouped(c *CondGroupedContext)
 
 	// ExitCondNegate is called when exiting the condNegate production.
 	ExitCondNegate(c *CondNegateContext)
