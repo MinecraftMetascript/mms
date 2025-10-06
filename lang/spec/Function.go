@@ -143,6 +143,22 @@ type FunctionSpec struct {
 	output func(fn FunctionNode) any
 }
 
+func (f FunctionSpec) Complete(fileSource string, position protocol.Position, triggerChar *string, symbols map[string]*ast.Namespace) []protocol.CompletionItem {
+	return []protocol.CompletionItem{{
+		Label:            fmt.Sprintf("[%s] %s", f.Kind, f.Name),
+		Kind:             &MethodKind,
+		Detail:           &f.Help,
+		InsertTextFormat: &SnippetFormat,
+		TextEdit: protocol.TextEdit{
+			Range: protocol.Range{
+				Start: position,
+				End:   position,
+			},
+			NewText: fmt.Sprintf("%s(${1})", f.Name),
+		},
+	}}
+}
+
 func (f FunctionSpec) matchFn(fnCtx grammar.IFnContext) (*FunctionNode, []ast.Diagnostic) {
 	l := ast.RuleLocation(fnCtx)
 
@@ -498,7 +514,6 @@ func (n FunctionNode) argCompletions(fileSource string, p protocol.Position, tri
 		// This handles the case where cursor is between args (e.g., after comma)
 		argEndIdx := al.Stop.IndexIn(fileSource)
 		if cursorIdx > argEndIdx+1 {
-			log.Println("Using offset argIdx because we might be overflowing?", al, al.Start, al.Start.IndexIn(fileSource), al.Stop, al.Stop.IndexIn(fileSource), cursorIdx, argEndIdx+1)
 			// Cursor is after this argument (and not immediately trailing), so we might be completing the next one
 			argIdx = i + 1
 		}
@@ -526,7 +541,6 @@ func (n FunctionNode) argCompletions(fileSource string, p protocol.Position, tri
 
 	// Clamp to valid range - if we're past all defined args, check for rest args
 	if argIdx >= len(n.overload.Args) {
-		log.Println("RestArg", argIdx, n.overload.Args, n.overload.RestArg)
 		if n.overload.RestArg != nil {
 			// Use rest arg spec for completions
 			if c, ok := n.overload.RestArg.(ast.CompletableNode); ok {
@@ -541,11 +555,7 @@ func (n FunctionNode) argCompletions(fileSource string, p protocol.Position, tri
 		log.Println("Node")
 		return completableNode.Complete(fileSource, p, triggerChar, symbols)
 	} else if completableSpec, ok := n.overload.Args[argIdx].(ast.CompletableNode); ok {
-		log.Println("Spec")
 		return completableSpec.Complete(fileSource, p, triggerChar, symbols)
-	} else {
-		log.Println("None", n.Arguments[argIdx], n.overload.Args[argIdx])
-
 	}
 
 	return make([]protocol.CompletionItem, 0)
@@ -587,12 +597,6 @@ func (n FunctionNode) Complete(fileSource string, position protocol.Position, tr
 		default:
 			mode = functionCompletionModeArgs
 		}
-	}
-	log.Println("mode: ", mode)
-	if triggerChar != nil {
-		log.Printf("triggerChar: '%s'", *triggerChar)
-	} else {
-		log.Println("triggerChar: nil")
 	}
 
 	switch mode {

@@ -74,6 +74,7 @@ var NoiseExporter = func(fn spec.FunctionNode, name string) *lib.FileTreeLike {
 	contentBytes, err := json.MarshalIndent(content, "", "  ")
 	if err != nil {
 		log.Println("Error marshalling noise: ", err)
+		return nil
 	}
 
 	root := lib.

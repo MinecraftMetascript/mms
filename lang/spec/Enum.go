@@ -2,7 +2,6 @@ package spec
 
 import (
 	"fmt"
-	"log"
 
 	"github.com/minecraftmetascript/mms/lang/ast"
 	"github.com/minecraftmetascript/mms/lang/grammar"
@@ -117,7 +116,6 @@ func (e EnumNode) GetHelp() string {
 func (e EnumNode) Complete(fileSource string, position protocol.Position, triggerChar *string, symbols map[string]*ast.Namespace) []protocol.CompletionItem {
 	// Extract any prefix the user has already typed
 	if lo.IndexOf(e.spec.Options, e.Value) != -1 {
-		log.Println("No completions required -- value exists in the spec", e.spec.Options, e.Value)
 		return make([]protocol.CompletionItem, 0)
 	}
 

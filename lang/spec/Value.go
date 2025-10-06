@@ -14,6 +14,7 @@ var SnippetFormat = protocol.InsertTextFormatSnippet
 var SnippetKind = protocol.CompletionItemKindSnippet
 var MethodKind = protocol.CompletionItemKindMethod
 var ReferenceKind = protocol.CompletionItemKindReference
+var StructKind = protocol.CompletionItemKindStruct
 
 // ExtractPrefixAtPosition extracts the identifier-like prefix before the cursor position.
 // It walks backwards from the position until it hits a non-identifier character.

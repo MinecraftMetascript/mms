@@ -157,21 +157,21 @@ func (b BlockNode) Complete(fileSource string, position protocol.Position, trigg
 
 	out := make([]protocol.CompletionItem, 0)
 	for _, v := range b.spec.AllowedValues.specs {
-		switch s := v.(type) {
-		case FunctionSpec:
+		if _, ok := v.(*ListSpec); ok {
 			out = append(out, protocol.CompletionItem{
-				Label:            fmt.Sprintf("[%s] %s", s.Kind, s.Name),
-				Kind:             &MethodKind,
-				Detail:           &s.Help,
+				Label:            "Sequence",
+				Kind:             &StructKind,
 				InsertTextFormat: &SnippetFormat,
 				TextEdit: protocol.TextEdit{
 					Range: protocol.Range{
 						Start: position,
 						End:   position,
 					},
-					NewText: fmt.Sprintf("%s(${1})", s.Name),
+					NewText: "[${1}]",
 				},
 			})
+		} else if c, ok := v.(ast.CompletableNode); ok {
+			out = append(out, c.Complete(fileSource, position, triggerChar, symbols)...)
 		}
 	}
 

@@ -3,6 +3,8 @@ package spec
 import (
 	"github.com/minecraftmetascript/mms/lang/ast"
 	"github.com/minecraftmetascript/mms/lang/grammar"
+	"github.com/minecraftmetascript/mms/lib"
+	protocol "github.com/tliron/glsp/protocol_3_16"
 )
 
 type ListSpec struct {
@@ -25,6 +27,7 @@ func (c ListSpec) Match(valueCtx grammar.IValueContext) (ast.Node, []ast.Diagnos
 			Location: &loc,
 		},
 		Values: make([]ast.Node, 0),
+		spec:   &c,
 	}
 
 	diags := make([]ast.Diagnostic, 0)
@@ -55,4 +58,35 @@ func (c ListSpec) Match(valueCtx grammar.IValueContext) (ast.Node, []ast.Diagnos
 type ListNode struct {
 	ast.BaseSymbol
 	Values []ast.Node
+	spec   *ListSpec
+}
+
+func (l ListNode) Children() []ast.Node {
+	return l.Values
+}
+
+func (l ListNode) Complete(fileSource string, position protocol.Position, triggerChar *string, symbols map[string]*ast.Namespace) []protocol.CompletionItem {
+	// Check if cursor is within an existing value
+	for _, v := range l.Values {
+		if !lib.IsNilInterface(v) && v.GetLocation() != nil && v.GetLocation().ContainsPosition(position) {
+			// If the value implements CompletableNode, delegate to it
+			if completable, ok := v.(ast.CompletableNode); ok {
+				return completable.Complete(fileSource, position, triggerChar, symbols)
+			}
+			return make([]protocol.CompletionItem, 0)
+		}
+	}
+
+	// Extract any prefix the user has already typed
+	prefix := ExtractPrefixAtPosition(fileSource, position)
+
+	// Provide completions for available value options
+	out := make([]protocol.CompletionItem, 0)
+	for _, valueSpec := range l.spec.ValueOptions {
+		if c, ok := valueSpec.(ast.CompletableNode); ok {
+			out = append(out, c.Complete(fileSource, position, triggerChar, symbols)...)
+		}
+	}
+	// Filter by prefix if user has typed something
+	return FilterCompletionsByPrefix(out, prefix)
 }

@@ -8,6 +8,7 @@ import (
 	"github.com/minecraftmetascript/mms/lang/ast"
 	"github.com/minecraftmetascript/mms/lang/grammar"
 	"github.com/minecraftmetascript/mms/lib"
+	protocol "github.com/tliron/glsp/protocol_3_16"
 )
 
 type ConditionalSpec struct {
@@ -119,6 +120,7 @@ func (c *ConditionalSpec) Match(valueCtx grammar.IValueContext) (ast.Node, []ast
 		BaseNode: ast.BaseNode{
 			Location: &l,
 		},
+		spec: c,
 	}
 
 	allDiags := make([]ast.Diagnostic, 0)
@@ -175,8 +177,58 @@ type ConditionalNode struct {
 	ast.BaseNode
 	Condition ast.Node
 	Value     ast.Node
+	spec      *ConditionalSpec
 }
 
 func (c ConditionalNode) Children() []ast.Node {
 	return []ast.Node{c.Condition, c.Value}
+}
+
+func (c ConditionalNode) Complete(fileSource string, position protocol.Position, triggerChar *string, symbols map[string]*ast.Namespace) []protocol.CompletionItem {
+
+	if c.Condition != nil && c.Condition.GetLocation().ContainsPosition(position) {
+		// Complete the condition?
+		if comp, ok := c.Condition.(ast.CompletableNode); ok {
+			return comp.Complete(fileSource, position, triggerChar, symbols)
+		}
+	} else if c.Value != nil && c.Value.GetLocation().ContainsPosition(position) {
+		if comp, ok := c.Value.(ast.CompletableNode); ok {
+			return comp.Complete(fileSource, position, triggerChar, symbols)
+		}
+	}
+
+	fullLocation := c.GetLocation()
+
+	mode := "NONE"
+	for idx := position.IndexIn(fileSource); idx > fullLocation.Start.Index; idx-- {
+		if fileSource[idx] == ')' {
+			// We are in value mode
+			mode = "VALUE"
+			break
+		} else if fileSource[idx] == '(' {
+			// We are in condition mode
+			mode = "CONDITION"
+			break
+		}
+		// We don't have anything right now
+	}
+
+	out := make([]protocol.CompletionItem, 0)
+	switch mode {
+	case "VALUE":
+		for _, spec := range c.spec.ValueOptions {
+			if comp, ok := spec.(ast.CompletableNode); ok {
+				out = append(out, comp.Complete(fileSource, position, triggerChar, symbols)...)
+			}
+		}
+	case "CONDITION":
+		for _, spec := range c.spec.ConditionOptions {
+			if comp, ok := spec.(ast.CompletableNode); ok {
+				out = append(out, comp.Complete(fileSource, position, triggerChar, symbols)...)
+			}
+		}
+
+	}
+
+	return out
 }

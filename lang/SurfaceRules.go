@@ -17,6 +17,7 @@ func SurfaceExporter(serializer func(node spec.FunctionNode) any) func(fn spec.F
 		contentBytes, err := json.MarshalIndent(content, "", "  ")
 		if err != nil {
 			log.Println("Error marshalling: ", err)
+			return nil
 		}
 
 		root := lib.
@@ -383,8 +384,11 @@ func init() {
 	// TODO: Conditional serialization (AND / OR / NOT) :(
 	Conditional = spec.NewConditionSpec()
 	SurfaceConditions = []spec.ValueSpec{AboveSurface, Biome, Hole, NoiseThreshold, Steep, StoneDepth, Frozen, Water, YAbove, Conditional}
+	SurfaceRules = []spec.ValueSpec{Bandlands, Block}
 	ListRule := spec.NewListSpec(SurfaceRules...)
-	SurfaceRules = []spec.ValueSpec{Bandlands, Block, ListRule}
+	SurfaceRules = append(SurfaceRules, ListRule)
+	ListRule.ValueOptions = append(ListRule.ValueOptions, spec.NewReferenceSpec(ast.SymbolSurfaceRule))
+
 	Conditional.
 		AddConditionOption(SurfaceConditions...).
 		AddConditionOption(spec.NewReferenceSpec(ast.SymbolSurfaceCondition)).
@@ -395,7 +399,6 @@ func init() {
 		"Surface",
 		slices.Concat(SurfaceRules, SurfaceConditions),
 	)
-	log.Println("Surface Rule Block!")
 
 	Blocks.Add(&SurfaceRuleBlock)
 }
