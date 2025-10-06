@@ -8,7 +8,7 @@ Namespace test_files {
 	}
 */
 	Surface {
-		Cond = If(!Frozen() || Hole()) Bandlands()
+		Cond = If(!(Frozen() && AboveSurface()) || Hole()) Block(stone)
 		/*Seq = [
 			Block(minecraft:air)
 			Block(minecraft:stone)

@@ -412,7 +412,9 @@ func init() {
 		AddValueOption(SurfaceRules...).
 		AddValueOption(spec.NewReferenceSpec(ast.SymbolSurfaceRule)).
 		SetOutputFn(func(n spec.ConditionalNode) any {
-			return SerializeConditional(n.Condition, n.Value)
+
+			return SerializeConditional(n.Condition, n.Value.ToSerializable())
+
 		})
 
 	SurfaceRuleBlock = spec.NewBlockSpec(
@@ -426,7 +428,6 @@ func init() {
 var SurfaceConditions []spec.ValueSpec
 var SurfaceRules []spec.ValueSpec
 var Conditional *spec.ConditionalSpec
-
 var SurfaceRuleBlock spec.BlockSpec
 
 type SurfaceRuleConditional struct {
@@ -435,6 +436,7 @@ type SurfaceRuleConditional struct {
 	Value     any    `json:"then_run"`
 }
 
+// Keep existing helpers:
 func mkSurfaceRuleConditional(cond any, value any) SurfaceRuleConditional {
 	return SurfaceRuleConditional{
 		Type:      "minecraft:condition",
@@ -443,16 +445,57 @@ func mkSurfaceRuleConditional(cond any, value any) SurfaceRuleConditional {
 	}
 }
 
-func SerializeConditional(cond ast.Symbol, value ast.Symbol) any {
-	log.Printf("COND %T // VALUE %T", cond, value)
+// NEW helper: build a minecraft:not condition wrapper for a single atomic condition
+func notCondition(inner any) any {
+	return struct {
+		Type   string `json:"type"`
+		Invert any    `json:"invert"`
+	}{
+		Type:   "minecraft:not",
+		Invert: inner,
+	}
+}
+
+// NEW helper: turn !(...) into an equivalent structure without top-level AND/OR,
+// by applying De Morgan’s and recursing back through SerializeConditional.
+func serializeNegated(cond ast.Symbol, then any) any {
 	switch c := cond.(type) {
 	case *spec.ConditionAndNode:
-		first := mkSurfaceRuleConditional(c.Left.ToSerializable(), value.ToSerializable())
-		second := mkSurfaceRuleConditional(c.Right.ToSerializable(), first)
-		return second
+		// !(A && B) == (!A) || (!B)
+		return SerializeConditional(&spec.ConditionOrNode{
+			Left:  &spec.ConditionNegateNode{Condition: c.Left},
+			Right: &spec.ConditionNegateNode{Condition: c.Right},
+		}, then)
+
 	case *spec.ConditionOrNode:
-		first := mkSurfaceRuleConditional(c.Left.ToSerializable(), value.ToSerializable())
-		second := mkSurfaceRuleConditional(c.Right.ToSerializable(), value.ToSerializable())
+		// !(A || B) == (!A) && (!B)
+		return SerializeConditional(&spec.ConditionAndNode{
+			Left:  &spec.ConditionNegateNode{Condition: c.Left},
+			Right: &spec.ConditionNegateNode{Condition: c.Right},
+		}, then)
+
+	case *spec.ConditionNegateNode:
+		// !!A == A
+		return SerializeConditional(c.Condition, then)
+
+	default:
+		// Atomic: wrap with minecraft:not and emit a single condition rule
+		return mkSurfaceRuleConditional(notCondition(c.ToSerializable()), then)
+	}
+}
+
+func SerializeConditional(cond ast.Symbol, value any) any {
+	switch c := cond.(type) {
+	case *spec.ConditionAndNode:
+		// A && B  -> condition(A, condition(B, then))
+		// Note: order (left then right) matches the tree; swap if you prefer right-associative.
+		inner := SerializeConditional(c.Right, value)
+		return SerializeConditional(c.Left, inner)
+
+	case *spec.ConditionOrNode:
+		// A || B  -> sequence(condition(A, then), condition(B, then))
+		first := SerializeConditional(c.Left, value)
+		second := SerializeConditional(c.Right, value)
 		return struct {
 			Type     string `json:"type"`
 			Sequence []any  `json:"sequence"`
@@ -460,16 +503,13 @@ func SerializeConditional(cond ast.Symbol, value ast.Symbol) any {
 			Type:     "minecraft:sequence",
 			Sequence: []any{first, second},
 		}
+
 	case *spec.ConditionNegateNode:
-		return struct {
-			Type   string `json:"type"`
-			Invert any    `json:"invert"`
-		}{
-			Type:   "minecraft:not",
-			Invert: SerializeConditional(c.Condition, value),
-		}
+		// Push NOT down until it hits atomics
+		return serializeNegated(c.Condition, value)
 
 	default:
-		return mkSurfaceRuleConditional(c.ToSerializable(), value.ToSerializable())
+		// Atomic condition: single condition node
+		return mkSurfaceRuleConditional(c.ToSerializable(), value)
 	}
 }
