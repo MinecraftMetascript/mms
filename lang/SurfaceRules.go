@@ -59,7 +59,7 @@ var Bandlands = spec.NewFunctionSpec(
 	SetHelp("Used in badlands to place terracotta.").
 	SetFileExporter(
 		SurfaceExporter(SimpleSerializer("Bandlands", "minecraft:bandlands")),
-	)
+	).SetOutputFn(SimpleSerializer("Bandlands", "minecraft:bandlands"))
 
 var Block = spec.NewFunctionSpec(
 	"Block",
@@ -385,7 +385,24 @@ func init() {
 	Conditional = spec.NewConditionSpec()
 	SurfaceConditions = []spec.ValueSpec{AboveSurface, Biome, Hole, NoiseThreshold, Steep, StoneDepth, Frozen, Water, YAbove, Conditional}
 	SurfaceRules = []spec.ValueSpec{Bandlands, Block}
-	ListRule := spec.NewListSpec(SurfaceRules...)
+	ListRule := spec.NewListSpec(SurfaceRules...).SetOutputFn(
+		func(node spec.ListNode) any {
+			out := struct {
+				Type     string `json:"type"`
+				Sequence []any  `json:"sequence"`
+			}{
+				Type:     "minecraft:sequence",
+				Sequence: make([]any, 0),
+			}
+
+			for _, val := range node.Values {
+				if s, ok := val.(ast.Symbol); ok && !lib.IsNilInterface(s) {
+					out.Sequence = append(out.Sequence, s.ToSerializable())
+				}
+			}
+
+			return out
+		})
 	SurfaceRules = append(SurfaceRules, ListRule)
 	ListRule.ValueOptions = append(ListRule.ValueOptions, spec.NewReferenceSpec(ast.SymbolSurfaceRule))
 
@@ -393,7 +410,10 @@ func init() {
 		AddConditionOption(SurfaceConditions...).
 		AddConditionOption(spec.NewReferenceSpec(ast.SymbolSurfaceCondition)).
 		AddValueOption(SurfaceRules...).
-		AddValueOption(spec.NewReferenceSpec(ast.SymbolSurfaceRule))
+		AddValueOption(spec.NewReferenceSpec(ast.SymbolSurfaceRule)).
+		SetOutputFn(func(n spec.ConditionalNode) any {
+			return SerializeConditional(n.Condition, n.Value)
+		})
 
 	SurfaceRuleBlock = spec.NewBlockSpec(
 		"Surface",
@@ -408,3 +428,48 @@ var SurfaceRules []spec.ValueSpec
 var Conditional *spec.ConditionalSpec
 
 var SurfaceRuleBlock spec.BlockSpec
+
+type SurfaceRuleConditional struct {
+	Type      string `json:"type"`
+	Condition any    `json:"if_true"`
+	Value     any    `json:"then_run"`
+}
+
+func mkSurfaceRuleConditional(cond any, value any) SurfaceRuleConditional {
+	return SurfaceRuleConditional{
+		Type:      "minecraft:condition",
+		Condition: cond,
+		Value:     value,
+	}
+}
+
+func SerializeConditional(cond ast.Symbol, value ast.Symbol) any {
+	log.Printf("COND %T // VALUE %T", cond, value)
+	switch c := cond.(type) {
+	case *spec.ConditionAndNode:
+		first := mkSurfaceRuleConditional(c.Left.ToSerializable(), value.ToSerializable())
+		second := mkSurfaceRuleConditional(c.Right.ToSerializable(), first)
+		return second
+	case *spec.ConditionOrNode:
+		first := mkSurfaceRuleConditional(c.Left.ToSerializable(), value.ToSerializable())
+		second := mkSurfaceRuleConditional(c.Right.ToSerializable(), value.ToSerializable())
+		return struct {
+			Type     string `json:"type"`
+			Sequence []any  `json:"sequence"`
+		}{
+			Type:     "minecraft:sequence",
+			Sequence: []any{first, second},
+		}
+	case *spec.ConditionNegateNode:
+		return struct {
+			Type   string `json:"type"`
+			Invert any    `json:"invert"`
+		}{
+			Type:   "minecraft:not",
+			Invert: SerializeConditional(c.Condition, value),
+		}
+
+	default:
+		return mkSurfaceRuleConditional(c.ToSerializable(), value.ToSerializable())
+	}
+}

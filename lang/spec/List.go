@@ -9,13 +9,16 @@ import (
 
 type ListSpec struct {
 	ValueOptions []ValueSpec
+
+	export func(fn ListNode, name string) *lib.FileTreeLike
+	output func(fn ListNode) any
 }
 
 func NewListSpec(valueOptions ...ValueSpec) *ListSpec {
 	return &ListSpec{ValueOptions: valueOptions}
 }
 
-func (c ListSpec) Match(valueCtx grammar.IValueContext) (ast.Node, []ast.Diagnostic) {
+func (l ListSpec) Match(valueCtx grammar.IValueContext) (ast.Node, []ast.Diagnostic) {
 	listCtx := valueCtx.List()
 	if listCtx == nil {
 		return nil, nil
@@ -27,17 +30,17 @@ func (c ListSpec) Match(valueCtx grammar.IValueContext) (ast.Node, []ast.Diagnos
 			Location: &loc,
 		},
 		Values: make([]ast.Node, 0),
-		spec:   &c,
+		spec:   &l,
 	}
 
 	diags := make([]ast.Diagnostic, 0)
 
 	for _, valCtx := range listCtx.AllValue() {
 		found := false
-		for _, spec := range c.ValueOptions {
+		for _, spec := range l.ValueOptions {
 			val, valDiags := spec.Match(valCtx)
 			diags = append(diags, valDiags...)
-			if val != nil {
+			if !lib.IsNilInterface(val) {
 				out.Values = append(out.Values, val)
 				found = true
 				break
@@ -54,11 +57,35 @@ func (c ListSpec) Match(valueCtx grammar.IValueContext) (ast.Node, []ast.Diagnos
 
 	return out, diags
 }
+func (l ListSpec) SetFileExporter(exporter func(n ListNode, name string) *lib.FileTreeLike) ListSpec {
+	out := &l
+	out.export = exporter
+	return *out
+}
+func (l ListSpec) SetOutputFn(outputFn func(n ListNode) any) ListSpec {
+	out := &l
+	out.output = outputFn
+	return *out
+}
 
 type ListNode struct {
 	ast.BaseSymbol
 	Values []ast.Node
 	spec   *ListSpec
+}
+
+func (l ListNode) ToFileTreeLike(name string) *lib.FileTreeLike {
+	if l.spec.export == nil {
+		return nil
+	}
+	return l.spec.export(l, name)
+}
+
+func (l ListNode) ToSerializable() any {
+	if l.spec.output == nil {
+		return nil
+	}
+	return l.spec.output(l)
 }
 
 func (l ListNode) Children() []ast.Node {

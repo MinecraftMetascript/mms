@@ -14,6 +14,8 @@ import (
 type ConditionalSpec struct {
 	ConditionOptions []ValueSpec
 	ValueOptions     []ValueSpec
+	export           func(fn ConditionalNode, name string) *lib.FileTreeLike
+	output           func(fn ConditionalNode) any
 }
 
 func NewConditionSpec() *ConditionalSpec {
@@ -21,6 +23,15 @@ func NewConditionSpec() *ConditionalSpec {
 		ConditionOptions: []ValueSpec{},
 		ValueOptions:     []ValueSpec{},
 	}
+}
+
+func (c *ConditionalSpec) SetFileExporter(exporter func(n ConditionalNode, name string) *lib.FileTreeLike) *ConditionalSpec {
+	c.export = exporter
+	return c
+}
+func (c *ConditionalSpec) SetOutputFn(outputFn func(n ConditionalNode) any) *ConditionalSpec {
+	c.output = outputFn
+	return c
 }
 
 func (c *ConditionalSpec) AddConditionOption(spec ...ValueSpec) *ConditionalSpec {
@@ -34,21 +45,21 @@ func (c *ConditionalSpec) AddValueOption(spec ...ValueSpec) *ConditionalSpec {
 }
 
 type ConditionAndNode struct {
-	ast.BaseNode
-	Left  ast.Node
-	Right ast.Node
+	ast.BaseSymbol
+	Left  ast.Symbol
+	Right ast.Symbol
 }
 type ConditionOrNode struct {
-	ast.BaseNode
-	Left  ast.Node
-	Right ast.Node
+	ast.BaseSymbol
+	Left  ast.Symbol
+	Right ast.Symbol
 }
 type ConditionNegateNode struct {
-	ast.BaseNode
-	Condition ast.Node
+	ast.BaseSymbol
+	Condition ast.Symbol
 }
 
-func (c *ConditionalSpec) matchConditionCtx(ctx grammar.IConditionContext) (ast.Node, []ast.Diagnostic) {
+func (c *ConditionalSpec) matchConditionCtx(ctx grammar.IConditionContext) (ast.Symbol, []ast.Diagnostic) {
 	if ctx == nil {
 		return nil, nil
 	}
@@ -61,8 +72,9 @@ func (c *ConditionalSpec) matchConditionCtx(ctx grammar.IConditionContext) (ast.
 		r, rd := c.matchConditionCtx(condition.Condition(1))
 		loc := ast.RuleLocation(ctx)
 		return &ConditionAndNode{
-			BaseNode: ast.BaseNode{
+			BaseSymbol: ast.BaseSymbol{
 				Location: &loc,
+				BaseNode: ast.BaseNode{},
 			},
 			Left:  l,
 			Right: r,
@@ -72,8 +84,9 @@ func (c *ConditionalSpec) matchConditionCtx(ctx grammar.IConditionContext) (ast.
 		r, rd := c.matchConditionCtx(condition.Condition(1))
 		loc := ast.RuleLocation(ctx)
 		return &ConditionOrNode{
-			BaseNode: ast.BaseNode{
+			BaseSymbol: ast.BaseSymbol{
 				Location: &loc,
+				BaseNode: ast.BaseNode{},
 			},
 			Left:  l,
 			Right: r,
@@ -85,8 +98,9 @@ func (c *ConditionalSpec) matchConditionCtx(ctx grammar.IConditionContext) (ast.
 		neg, cd := c.matchConditionCtx(condition.Condition())
 		loc := ast.RuleLocation(ctx)
 		return &ConditionNegateNode{
-			BaseNode: ast.BaseNode{
+			BaseSymbol: ast.BaseSymbol{
 				Location: &loc,
+				BaseNode: ast.BaseNode{},
 			},
 			Condition: neg,
 		}, cd
@@ -94,7 +108,15 @@ func (c *ConditionalSpec) matchConditionCtx(ctx grammar.IConditionContext) (ast.
 		for _, opt := range c.ConditionOptions {
 			r, diags := opt.Match(condition.RootCondition().Value())
 			if !lib.IsNilInterface(r) {
-				return r, diags
+				if out, ok := r.(ast.Symbol); ok {
+					return out, diags
+				}
+				diags = append(diags, ast.Diagnostic{
+					Location: ast.RuleLocation(condition.RootCondition().Value()),
+					Message:  "Invalid condition",
+					Severity: ast.Error,
+				})
+				return nil, diags
 			}
 		}
 	default:
@@ -113,16 +135,18 @@ func (c *ConditionalSpec) Match(valueCtx grammar.IValueContext) (ast.Node, []ast
 	if valueCtx.Conditional() == nil {
 		return nil, nil
 	}
+	log.Println("Trying condition")
 	conditionCtx := valueCtx.Conditional()
 
 	l := ast.RuleLocation(valueCtx)
 	out := &ConditionalNode{
-		BaseNode: ast.BaseNode{
-			Location: &l,
+		BaseSymbol: ast.BaseSymbol{
+			BaseNode: ast.BaseNode{
+				Location: &l,
+			},
 		},
 		spec: c,
 	}
-
 	allDiags := make([]ast.Diagnostic, 0)
 	iCondition := conditionCtx.Condition()
 	if iCondition != nil {
@@ -151,7 +175,9 @@ func (c *ConditionalSpec) Match(valueCtx grammar.IValueContext) (ast.Node, []ast
 				allDiags = slices.Concat(allDiags, valueDiags)
 			}
 			if !lib.IsNilInterface(valueNode) {
-				out.Value = valueNode
+				if value, ok := valueNode.(ast.Symbol); ok {
+					out.Value = value
+				}
 				break
 			}
 		}
@@ -174,9 +200,9 @@ func (c *ConditionalSpec) Match(valueCtx grammar.IValueContext) (ast.Node, []ast
 }
 
 type ConditionalNode struct {
-	ast.BaseNode
-	Condition ast.Node
-	Value     ast.Node
+	ast.BaseSymbol
+	Condition ast.Symbol
+	Value     ast.Symbol
 	spec      *ConditionalSpec
 }
 
@@ -227,8 +253,21 @@ func (c ConditionalNode) Complete(fileSource string, position protocol.Position,
 				out = append(out, comp.Complete(fileSource, position, triggerChar, symbols)...)
 			}
 		}
-
 	}
 
 	return out
+}
+
+func (c ConditionalNode) ToFileTreeLike(name string) *lib.FileTreeLike {
+	if c.spec.export == nil {
+		return nil
+	}
+	return c.spec.export(c, name)
+}
+
+func (c ConditionalNode) ToSerializable() any {
+	if c.spec.output == nil {
+		return nil
+	}
+	return c.spec.output(c)
 }
