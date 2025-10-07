@@ -1,6 +1,7 @@
 package spec
 
 import (
+	"fmt"
 	"log"
 	"reflect"
 	"slices"
@@ -14,6 +15,8 @@ import (
 type ConditionalSpec struct {
 	ConditionOptions []ValueSpec
 	ValueOptions     []ValueSpec
+	Kind             ast.SymbolKind
+	Help             string
 	export           func(fn ConditionalNode, name string) *lib.FileTreeLike
 	output           func(fn ConditionalNode) any
 }
@@ -22,6 +25,32 @@ func NewConditionSpec() *ConditionalSpec {
 	return &ConditionalSpec{
 		ConditionOptions: []ValueSpec{},
 		ValueOptions:     []ValueSpec{},
+	}
+}
+
+func (c *ConditionalSpec) SetKind(kind ast.SymbolKind) *ConditionalSpec {
+	c.Kind = kind
+	return c
+}
+func (c *ConditionalSpec) SetHelp(help string) *ConditionalSpec {
+	c.Help = help
+	return c
+}
+
+func (c *ConditionalSpec) Complete(fileSource string, position protocol.Position, triggerChar *string, symbols map[string]*ast.Namespace) []protocol.CompletionItem {
+	return []protocol.CompletionItem{{
+		Label:            fmt.Sprintf("[%s] Condition", c.Kind),
+		Kind:             &MethodKind,
+		Detail:           &c.Help,
+		InsertTextFormat: &SnippetFormat,
+		TextEdit: protocol.TextEdit{
+			Range: protocol.Range{
+				Start: position,
+				End:   position,
+			},
+			NewText: "If(${1}) ${2}",
+		},
+	},
 	}
 }
 
@@ -135,15 +164,13 @@ func (c *ConditionalSpec) Match(valueCtx grammar.IValueContext) (ast.Node, []ast
 	if valueCtx.Conditional() == nil {
 		return nil, nil
 	}
-	log.Println("Trying condition")
 	conditionCtx := valueCtx.Conditional()
 
 	l := ast.RuleLocation(valueCtx)
 	out := &ConditionalNode{
 		BaseSymbol: ast.BaseSymbol{
-			BaseNode: ast.BaseNode{
-				Location: &l,
-			},
+			Location: &l,
+			BaseNode: ast.BaseNode{},
 		},
 		spec: c,
 	}
@@ -211,7 +238,6 @@ func (c ConditionalNode) Children() []ast.Node {
 }
 
 func (c ConditionalNode) Complete(fileSource string, position protocol.Position, triggerChar *string, symbols map[string]*ast.Namespace) []protocol.CompletionItem {
-
 	if c.Condition != nil && c.Condition.GetLocation().ContainsPosition(position) {
 		// Complete the condition?
 		if comp, ok := c.Condition.(ast.CompletableNode); ok {
@@ -270,4 +296,8 @@ func (c ConditionalNode) ToSerializable() any {
 		return nil
 	}
 	return c.spec.output(c)
+}
+
+func (c ConditionalNode) GetKind() ast.SymbolKind {
+	return c.spec.Kind
 }

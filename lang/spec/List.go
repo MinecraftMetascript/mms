@@ -1,6 +1,9 @@
 package spec
 
 import (
+	"fmt"
+	"slices"
+
 	"github.com/minecraftmetascript/mms/lang/ast"
 	"github.com/minecraftmetascript/mms/lang/grammar"
 	"github.com/minecraftmetascript/mms/lib"
@@ -9,16 +12,50 @@ import (
 
 type ListSpec struct {
 	ValueOptions []ValueSpec
+	Kind         ast.SymbolKind
+	Help         string
 
 	export func(fn ListNode, name string) *lib.FileTreeLike
 	output func(fn ListNode) any
+}
+
+func (l *ListSpec) AddValueOption(spec ...ValueSpec) *ListSpec {
+	l.ValueOptions = slices.Concat(l.ValueOptions, spec)
+	return l
+}
+
+func (l *ListSpec) SetKind(kind ast.SymbolKind) *ListSpec {
+	l.Kind = kind
+	return l
+}
+func (l *ListSpec) SetHelp(help string) *ListSpec {
+	l.Help = help
+	return l
+}
+
+func (l *ListSpec) Complete(fileSource string, position protocol.Position, triggerChar *string, symbols map[string]*ast.Namespace) []protocol.CompletionItem {
+	return []protocol.CompletionItem{
+		{
+			Label:            fmt.Sprintf("[%s] List", l.Kind),
+			Kind:             &MethodKind,
+			Detail:           &l.Help,
+			InsertTextFormat: &SnippetFormat,
+			TextEdit: protocol.TextEdit{
+				Range: protocol.Range{
+					Start: position,
+					End:   position,
+				},
+				NewText: "[ ${1} ]",
+			},
+		},
+	}
 }
 
 func NewListSpec(valueOptions ...ValueSpec) *ListSpec {
 	return &ListSpec{ValueOptions: valueOptions}
 }
 
-func (l ListSpec) Match(valueCtx grammar.IValueContext) (ast.Node, []ast.Diagnostic) {
+func (l *ListSpec) Match(valueCtx grammar.IValueContext) (ast.Node, []ast.Diagnostic) {
 	listCtx := valueCtx.List()
 	if listCtx == nil {
 		return nil, nil
@@ -30,7 +67,7 @@ func (l ListSpec) Match(valueCtx grammar.IValueContext) (ast.Node, []ast.Diagnos
 			Location: &loc,
 		},
 		Values: make([]ast.Node, 0),
-		spec:   &l,
+		spec:   l,
 	}
 
 	diags := make([]ast.Diagnostic, 0)
@@ -57,15 +94,13 @@ func (l ListSpec) Match(valueCtx grammar.IValueContext) (ast.Node, []ast.Diagnos
 
 	return out, diags
 }
-func (l ListSpec) SetFileExporter(exporter func(n ListNode, name string) *lib.FileTreeLike) ListSpec {
-	out := &l
-	out.export = exporter
-	return *out
+func (l *ListSpec) SetFileExporter(exporter func(n ListNode, name string) *lib.FileTreeLike) *ListSpec {
+	l.export = exporter
+	return l
 }
-func (l ListSpec) SetOutputFn(outputFn func(n ListNode) any) ListSpec {
-	out := &l
-	out.output = outputFn
-	return *out
+func (l *ListSpec) SetOutputFn(outputFn func(n ListNode) any) *ListSpec {
+	l.output = outputFn
+	return l
 }
 
 type ListNode struct {
@@ -116,4 +151,8 @@ func (l ListNode) Complete(fileSource string, position protocol.Position, trigge
 	}
 	// Filter by prefix if user has typed something
 	return FilterCompletionsByPrefix(out, prefix)
+}
+
+func (l ListNode) GetKind() ast.SymbolKind {
+	return l.spec.Kind
 }

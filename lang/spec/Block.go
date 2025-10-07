@@ -2,6 +2,7 @@ package spec
 
 import (
 	"fmt"
+	"log"
 
 	"github.com/minecraftmetascript/mms/lang/ast"
 	"github.com/minecraftmetascript/mms/lang/grammar"
@@ -45,8 +46,12 @@ type BlockSpec struct {
 	AllowedValues ValueSpecList
 }
 
+func (b BlockNode) ExtractInlineSymbols() []ast.Symbol {
+	return b.inlineSymbols
+}
+
 func NewBlockSpec(kind string, allowedValues []ValueSpec) BlockSpec {
-	return BlockSpec{Kind: kind, AllowedValues: NewValueSpecList(allowedValues...)}
+	return BlockSpec{Kind: kind, AllowedValues: *NewValueSpecList(allowedValues...)}
 }
 
 func (b BlockSpec) Match(ctx grammar.IBlockContext) (*BlockNode, []ast.Diagnostic) {
@@ -65,10 +70,11 @@ func (b BlockSpec) Match(ctx grammar.IBlockContext) (*BlockNode, []ast.Diagnosti
 		return nil, nil
 	}
 	out := &BlockNode{
-		Kind:         b.Kind,
-		Declarations: make(map[string]ast.Node),
-		location:     ast.RuleLocation(ctx),
-		spec:         b,
+		Kind:          b.Kind,
+		Declarations:  make(map[string]ast.Node),
+		location:      ast.RuleLocation(ctx),
+		spec:          b,
+		inlineSymbols: []ast.Symbol{},
 	}
 	diags := make([]ast.Diagnostic, 0)
 	for _, decl := range ctx.AllVarDecl() {
@@ -85,6 +91,7 @@ func (b BlockSpec) Match(ctx grammar.IBlockContext) (*BlockNode, []ast.Diagnosti
 		valueCtx := decl.Value()
 
 		if val, d := b.AllowedValues.Match(valueCtx); lib.IsNilInterface(val) {
+			// Nil Case
 			if d != nil && len(d) > 0 {
 				// Use diagnostics from the value spec matching
 				diags = append(diags, d...)
@@ -116,6 +123,9 @@ func (b BlockSpec) Match(ctx grammar.IBlockContext) (*BlockNode, []ast.Diagnosti
 				s.SetNameLocation(&idL)
 			}
 			out.Declarations[id] = val
+			if e, ok := val.(ast.ExtractableNode); ok {
+				out.inlineSymbols = append(out.inlineSymbols, e.ExtractInlineSymbols()...)
+			}
 
 			// Include any warnings/info diagnostics from successful match
 			if d != nil && len(d) > 0 {
@@ -132,10 +142,11 @@ func (b BlockSpec) Match(ctx grammar.IBlockContext) (*BlockNode, []ast.Diagnosti
 
 // / Block Node
 type BlockNode struct {
-	Kind         string
-	Declarations map[string]ast.Node
-	location     ast.SourceLocation
-	spec         BlockSpec
+	Kind          string
+	Declarations  map[string]ast.Node
+	location      ast.SourceLocation
+	spec          BlockSpec
+	inlineSymbols []ast.Symbol
 }
 
 func (b BlockNode) Complete(fileSource string, position protocol.Position, triggerChar *string, symbols map[string]*ast.Namespace) []protocol.CompletionItem {
@@ -144,6 +155,11 @@ func (b BlockNode) Complete(fileSource string, position protocol.Position, trigg
 	}
 
 	for _, d := range b.Declarations {
+		if d.GetLocation() == nil {
+			// No location don't care
+			log.Printf("Symbol is missing location: %T\n", d)
+			return nil
+		}
 		if d.GetLocation().ContainsPosition(position) {
 			if _, ok := d.(*ast.EmptySymbol); ok {
 				break

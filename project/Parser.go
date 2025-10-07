@@ -7,6 +7,7 @@ import (
 	"github.com/minecraftmetascript/mms/lang"
 	"github.com/minecraftmetascript/mms/lang/ast"
 	"github.com/minecraftmetascript/mms/lang/grammar"
+	"github.com/minecraftmetascript/mms/lang/spec"
 )
 
 type Parser struct {
@@ -41,6 +42,7 @@ func (p *Parser) ExitNamedBlock(ctx *grammar.NamedBlockContext) {
 	}
 
 	ns := ast.NewNamespace(namespace)
+	inlinedNs := ast.NewNamespace("mms_inline")
 
 	for _, b := range ctx.AllBlock() {
 		blockKind := b.Identifier()
@@ -74,7 +76,26 @@ func (p *Parser) ExitNamedBlock(ctx *grammar.NamedBlockContext) {
 				)
 			}
 		}
-		p.namespaces[namespace] = ns
+		for _, decl := range block.ExtractInlineSymbols() {
+			decl.SetFilename(p.filename)
+			if v, ok := decl.(*spec.FunctionNode); ok {
+				v.SetRef(ast.InlineSymbolId(decl))
+			}
+			inlinedNs.Declare(
+				ast.InlineSymbolId(decl), decl,
+			)
+		}
+		if existing, ok := p.namespaces[namespace]; ok {
+			existing.Merge(ns)
+		} else {
+			p.namespaces[namespace] = ns
+		}
+		if existing, ok := p.namespaces["mms_inline"]; ok {
+			existing.Merge(inlinedNs)
+		} else {
+			p.namespaces["mms_inline"] = inlinedNs
+		}
+
 	}
 }
 

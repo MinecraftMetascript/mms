@@ -7,7 +7,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/minecraftmetascript/mms/project"
+	_project "github.com/minecraftmetascript/mms/project"
 	"github.com/spf13/cobra"
 )
 
@@ -42,7 +42,7 @@ var buildCmd = &cobra.Command{
 
 		}
 
-		project := project.NewProject()
+		project := _project.NewProject()
 
 		stat, err := fs.Stat(os.DirFS("."), inFile)
 
@@ -69,9 +69,9 @@ var buildCmd = &cobra.Command{
 			log.Println("Error exporting project:", err)
 			return
 		}
-		r, err := json.MarshalIndent(project.Symbols(), "", "  ")
 
 		if debugMode {
+			r, err := json.MarshalIndent(project.Symbols(), "", "  ")
 			log.Println(
 				string(r),
 				err,

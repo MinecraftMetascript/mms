@@ -1,8 +1,11 @@
 package project
 
 import (
+	"slices"
+
 	"github.com/minecraftmetascript/mms/lang/ast"
 	"github.com/minecraftmetascript/mms/lib"
+	"github.com/samber/lo"
 )
 
 type Project struct {
@@ -29,6 +32,10 @@ func (p *Project) AddFile(path, content string) (*File, error) {
 		// existing file before we re-parse it.
 		for _, decls := range p.symbols {
 			for name, decl := range decls.AllDecls() {
+				if decl == nil || decl.GetLocation() == nil {
+					// Symbol has unknown location, leave it untouched
+					continue
+				}
 				if decl.GetLocation().Filename == path {
 					decls.Delete(name)
 				}
@@ -47,8 +54,6 @@ func (p *Project) AddFile(path, content string) (*File, error) {
 			p.symbols[ns] = decls
 		}
 	}
-
-	
 
 	return f, err
 }
@@ -82,4 +87,10 @@ func (p *Project) Files() map[string]*File {
 
 func (p *Project) Symbols() map[string]*ast.Namespace {
 	return p.symbols
+}
+
+func (p *Project) AllDiagnostics() []ast.Diagnostic {
+	return lo.Reduce(lo.Values(p.Files()), func(agg []ast.Diagnostic, item *File, index int) []ast.Diagnostic {
+		return slices.Concat(agg, item.Diagnostics())
+	}, make([]ast.Diagnostic, 0))
 }

@@ -91,7 +91,7 @@ func BlockSerializer(node spec.FunctionNode) any {
 		},
 	}
 	if len(node.Arguments) > 0 {
-		if val := spec.GetStringNodeValue(node.Arguments[0]); val != nil {
+		if val := spec.GetReferenceNodeValue(node.Arguments[0]); val != nil {
 			out.ResultState.Name = *val
 		}
 	}
@@ -104,8 +104,8 @@ var AboveSurface = spec.NewFunctionSpec(
 ).
 	SetKind(ast.SymbolSurfaceCondition).
 	SetHelp("Checks if the current position is above the preliminary surface level, which is a Y-level usually a few blocks below the main surface, ignoring noise caves.").
-	SetOutputFn(SimpleSerializer("AboveSurface", "minecraft:above_surface")).
-	SetFileExporter(SurfaceExporter(SimpleSerializer("AboveSurface", "minecraft:above_surface")))
+	SetOutputFn(SimpleSerializer("AboveSurface", "minecraft:above_preliminary_surface")).
+	SetFileExporter(SurfaceExporter(SimpleSerializer("AboveSurface", "minecraft:above_preliminary_surface")))
 
 var Biome = spec.NewFunctionSpec(
 	"Biome",
@@ -166,7 +166,18 @@ var NoiseThreshold = spec.NewFunctionSpec(
 	SetOutputFn(NoiseThresholdSerializer).
 	SetFileExporter(
 		SurfaceExporter(NoiseThresholdSerializer),
-	)
+	).
+	SetSymbolExtractor(func(fn spec.FunctionNode) []ast.Symbol {
+		if len(fn.Arguments) < 1 {
+			return nil
+		}
+		if inlineNoise, ok := fn.Arguments[0].(*spec.FunctionNode); ok {
+			return []ast.Symbol{
+				inlineNoise,
+			}
+		}
+		return nil
+	})
 
 func NoiseThresholdSerializer(node spec.FunctionNode) any {
 	if node.Name != "NoiseThreshold" {
@@ -185,7 +196,12 @@ func NoiseThresholdSerializer(node spec.FunctionNode) any {
 	}
 	switch a := node.Arguments[0].(type) {
 	case *spec.FunctionNode:
-		log.Println("Found inline noise?")
+
+		if a.Ref() != "" {
+			out.Noise = a.Ref()
+		} else {
+			// TODO: Diagnose (?)
+		}
 		break
 	case *spec.ReferenceNode:
 		if a.Kind != ast.SymbolNoise {
@@ -335,11 +351,61 @@ func WaterSerializer(node spec.FunctionNode) any {
 	return out
 }
 
+var VerticalGradient = spec.NewFunctionSpec(
+	"VerticalGradient",
+	spec.NewOverloadSpec(
+		[]spec.ValueSpec{
+			spec.NewStringSpec(),
+		},
+		nil,
+		[]spec.FunctionSpec{
+			spec.NewFunctionSpec("Lower", spec.NewOverloadSpec([]spec.ValueSpec{VerticalAnchor}, nil, nil)),
+			spec.NewFunctionSpec("Upper", spec.NewOverloadSpec([]spec.ValueSpec{VerticalAnchor}, nil, nil)),
+		},
+	),
+).
+	SetHelp("Compares the current Y position, with a messy transition, just like the deepslate and bedrock transitions.").
+	SetKind(ast.SymbolSurfaceCondition).
+	SetOutputFn(VerticalGradientSerializer).
+	SetFileExporter(
+		SurfaceExporter(VerticalGradientSerializer),
+	)
+
+func VerticalGradientSerializer(node spec.FunctionNode) any {
+	if node.Name != "VerticalGradient" {
+		return "{ \"__\": \"MMS: Unable to serialize\"}"
+	}
+	out := struct {
+		Type       string `json:"type"`
+		RandomName string `json:"random_name"`
+		Lower      any    `json:"true_at_and_below"`
+		Upper      any    `json:"false_at_and_above"`
+	}{
+		Type: "minecraft:vertical_gradient",
+	}
+
+	if len(node.Arguments) > 0 {
+		if val := spec.GetStringNodeValue(node.Arguments[0]); val != nil {
+			out.RandomName = *val
+		}
+	}
+	for _, b := range node.Builders {
+		switch b.Name {
+		case "Lower":
+			out.Lower = ParseAnchor(b.Arguments[0])
+		case "Upper":
+			out.Upper = ParseAnchor(b.Arguments[0])
+		}
+	}
+
+	return out
+}
+
 var YAbove = spec.NewFunctionSpec(
 	"YAbove",
 	spec.NewOverloadSpec(
 		[]spec.ValueSpec{
-			/* TODO: Vertical Anchor */
+			VerticalAnchor,
 		},
 		nil,
 		[]spec.FunctionSpec{
@@ -359,11 +425,16 @@ func YAboveSerializer(node spec.FunctionNode) any {
 	}
 	out := struct {
 		Type            string  `json:"type"`
-		Anchor          float64 `json:"anchor"`
+		Anchor          any     `json:"anchor"`
 		AddStoneDepth   bool    `json:"add_stone_depth"`
 		DepthMultiplier float64 `json:"surface_depth_multiplier"`
 	}{
 		Type: "minecraft:y_above",
+	}
+	if len(node.Arguments) > 0 {
+		anchor := node.Arguments[0]
+
+		out.Anchor = ParseAnchor(anchor)
 	}
 
 	for _, b := range node.Builders {
@@ -379,32 +450,34 @@ func YAboveSerializer(node spec.FunctionNode) any {
 	return out
 }
 
-// TODO: Properly handle SEQUENCE
 func init() {
-	// TODO: Conditional serialization (AND / OR / NOT) :(
-	Conditional = spec.NewConditionSpec()
-	SurfaceConditions = []spec.ValueSpec{AboveSurface, Biome, Hole, NoiseThreshold, Steep, StoneDepth, Frozen, Water, YAbove, Conditional}
-	SurfaceRules = []spec.ValueSpec{Bandlands, Block}
-	ListRule := spec.NewListSpec(SurfaceRules...).SetOutputFn(
-		func(node spec.ListNode) any {
-			out := struct {
-				Type     string `json:"type"`
-				Sequence []any  `json:"sequence"`
-			}{
-				Type:     "minecraft:sequence",
-				Sequence: make([]any, 0),
-			}
-
-			for _, val := range node.Values {
-				if s, ok := val.(ast.Symbol); ok && !lib.IsNilInterface(s) {
-					out.Sequence = append(out.Sequence, s.ToSerializable())
+	Conditional = spec.NewConditionSpec().
+		SetKind(ast.SymbolSurfaceRule).
+		SetHelp("Applies a rule based on a surface condition")
+	SurfaceConditions = []spec.ValueSpec{AboveSurface, Biome, Hole, NoiseThreshold, Steep, StoneDepth, Frozen, Water, YAbove}
+	SurfaceRules = []spec.ValueSpec{Bandlands, Block, Conditional}
+	ListRule := spec.NewListSpec().
+		SetOutputFn(
+			func(node spec.ListNode) any {
+				out := struct {
+					Type     string `json:"type"`
+					Sequence []any  `json:"sequence"`
+				}{
+					Type:     "minecraft:sequence",
+					Sequence: make([]any, 0),
 				}
-			}
 
-			return out
-		})
+				for _, val := range node.Values {
+					if s, ok := val.(ast.Symbol); ok && !lib.IsNilInterface(s) {
+						out.Sequence = append(out.Sequence, s.ToSerializable())
+					}
+				}
+
+				return out
+			}).
+		SetKind(ast.SymbolSurfaceRule).
+		SetHelp("Creates a list of rules, the first valid rule will be used.s")
 	SurfaceRules = append(SurfaceRules, ListRule)
-	ListRule.ValueOptions = append(ListRule.ValueOptions, spec.NewReferenceSpec(ast.SymbolSurfaceRule))
 
 	Conditional.
 		AddConditionOption(SurfaceConditions...).
@@ -412,10 +485,16 @@ func init() {
 		AddValueOption(SurfaceRules...).
 		AddValueOption(spec.NewReferenceSpec(ast.SymbolSurfaceRule)).
 		SetOutputFn(func(n spec.ConditionalNode) any {
-
-			return SerializeConditional(n.Condition, n.Value.ToSerializable())
-
+			var val any = nil
+			if n.Value != nil && n.Value.ToSerializable() != nil {
+				val = n.Value.ToSerializable()
+			}
+			return SerializeConditional(n.Condition, val)
 		})
+
+	ListRule.
+		AddValueOption(spec.NewReferenceSpec(ast.SymbolSurfaceRule)).
+		AddValueOption(SurfaceRules...)
 
 	SurfaceRuleBlock = spec.NewBlockSpec(
 		"Surface",
@@ -507,7 +586,9 @@ func SerializeConditional(cond ast.Symbol, value any) any {
 	case *spec.ConditionNegateNode:
 		// Push NOT down until it hits atomics
 		return serializeNegated(c.Condition, value)
-
+	case nil:
+		// There is no condition yet
+		return mkSurfaceRuleConditional(nil, value)
 	default:
 		// Atomic condition: single condition node
 		return mkSurfaceRuleConditional(c.ToSerializable(), value)

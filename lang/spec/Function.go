@@ -139,8 +139,28 @@ type FunctionSpec struct {
 	Overloads []OverloadSpec
 	Help      string
 
-	export func(fn FunctionNode, name string) *lib.FileTreeLike
-	output func(fn FunctionNode) any
+	export          func(fn FunctionNode, name string) *lib.FileTreeLike
+	output          func(fn FunctionNode) any
+	symbolExtractor func(fn FunctionNode) []ast.Symbol
+}
+
+func (f FunctionSpec) AddOverload(overloads ...OverloadSpec) FunctionSpec {
+	out := &f
+	out.Overloads = append(out.Overloads, overloads...)
+	return *out
+}
+
+func (f FunctionSpec) SetSymbolExtractor(extractor func(fn FunctionNode) []ast.Symbol) FunctionSpec {
+	out := &f
+	out.symbolExtractor = extractor
+	return *out
+}
+
+func (f FunctionSpec) ExtractInlineSymbols(fn FunctionNode) []ast.Symbol {
+	if f.symbolExtractor != nil {
+		return f.symbolExtractor(fn)
+	}
+	return []ast.Symbol{}
 }
 
 func (f FunctionSpec) Complete(fileSource string, position protocol.Position, triggerChar *string, symbols map[string]*ast.Namespace) []protocol.CompletionItem {
@@ -396,9 +416,17 @@ type FunctionNode struct {
 	spec     FunctionSpec
 	parent   *FunctionNode
 	overload OverloadSpec
+	ref      string
 }
 
-func (n FunctionNode) Children() []ast.Node {
+func (n *FunctionNode) Ref() string {
+	return n.ref
+}
+func (n *FunctionNode) SetRef(ref string) {
+	n.ref = ref
+}
+
+func (n *FunctionNode) Children() []ast.Node {
 	children := make([]ast.Node, 0)
 	for _, a := range n.Arguments {
 		children = append(children, a)
@@ -410,21 +438,21 @@ func (n FunctionNode) Children() []ast.Node {
 	return children
 }
 
-func (n FunctionNode) ToFileTreeLike(name string) *lib.FileTreeLike {
+func (n *FunctionNode) ToFileTreeLike(name string) *lib.FileTreeLike {
 	if n.spec.export == nil {
 		return nil
 	}
-	return n.spec.export(n, name)
+	return n.spec.export(*n, name)
 }
 
-func (n FunctionNode) ToSerializable() any {
+func (n *FunctionNode) ToSerializable() any {
 	if n.spec.output == nil {
 		return nil
 	}
-	return n.spec.output(n)
+	return n.spec.output(*n)
 }
 
-func (n FunctionNode) GetHelp() string {
+func (n *FunctionNode) GetHelp() string {
 	// TODO: Include usage / overload information
 	return n.spec.Help
 }
@@ -445,7 +473,7 @@ func locate(source string, idx int) ast.Location {
 	return *out
 }
 
-func (n FunctionNode) builderCompletions(includeLeadingDot bool, fileSource string, position protocol.Position) []protocol.CompletionItem {
+func (n *FunctionNode) builderCompletions(includeLeadingDot bool, fileSource string, position protocol.Position) []protocol.CompletionItem {
 	items := make([]protocol.CompletionItem, 0)
 	builderSnapPosition := getBuilderInsertPosition(n)
 	for _, overload := range n.spec.Overloads {
@@ -486,7 +514,7 @@ func (n FunctionNode) builderCompletions(includeLeadingDot bool, fileSource stri
 	return FilterCompletionsByPrefix(items, prefix)
 }
 
-func (n FunctionNode) argCompletions(fileSource string, p protocol.Position, triggerChar *string, symbols map[string]*ast.Namespace) []protocol.CompletionItem {
+func (n *FunctionNode) argCompletions(fileSource string, p protocol.Position, triggerChar *string, symbols map[string]*ast.Namespace) []protocol.CompletionItem {
 	argIdx := -1
 	cursorIdx := p.IndexIn(fileSource)
 
@@ -561,6 +589,13 @@ func (n FunctionNode) argCompletions(fileSource string, p protocol.Position, tri
 	return make([]protocol.CompletionItem, 0)
 }
 
+func (n *FunctionNode) ExtractInlineSymbols() []ast.Symbol {
+	if n.spec.symbolExtractor != nil {
+		return n.spec.symbolExtractor(*n)
+	}
+	return []ast.Symbol{}
+}
+
 type functionCompletionMode string
 
 const (
@@ -568,7 +603,7 @@ const (
 	functionCompletionModeBuilders functionCompletionMode = "BUILDERS"
 )
 
-func (n FunctionNode) Complete(fileSource string, position protocol.Position, triggerChar *string, symbols map[string]*ast.Namespace) []protocol.CompletionItem {
+func (n *FunctionNode) Complete(fileSource string, position protocol.Position, triggerChar *string, symbols map[string]*ast.Namespace) []protocol.CompletionItem {
 	log.Printf("Completing function %s", n.Name)
 	items := make([]protocol.CompletionItem, 0)
 	var mode functionCompletionMode
@@ -615,7 +650,7 @@ func (n FunctionNode) Complete(fileSource string, position protocol.Position, tr
 }
 
 // This is causing issues when the completion is triggered BEFORE the last completion
-func getBuilderInsertPosition(n FunctionNode) ast.Location {
+func getBuilderInsertPosition(n *FunctionNode) ast.Location {
 	endOffset := 0
 
 	for i := len(n.source) - 1; i >= 0; i-- {

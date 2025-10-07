@@ -103,9 +103,9 @@ func (bsl *ValueSpecList) Match(ctx grammar.IValueContext) (ast.Node, []ast.Diag
 
 func NewValueSpecList(
 	specs ...ValueSpec,
-) ValueSpecList {
+) *ValueSpecList {
 	out := ValueSpecList{
 		specs: specs,
 	}
-	return out
+	return &out
 }

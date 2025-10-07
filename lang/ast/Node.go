@@ -28,3 +28,7 @@ type HelpfulNode interface {
 type CompletableNode interface {
 	Complete(fileSource string, position protocol.Position, triggerChar *string, symbols map[string]*Namespace) []protocol.CompletionItem
 }
+
+type ExtractableNode interface {
+	ExtractInlineSymbols() []Symbol
+}

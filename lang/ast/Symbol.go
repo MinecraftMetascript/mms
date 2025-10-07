@@ -2,6 +2,7 @@ package ast
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/minecraftmetascript/mms/lib"
 )
@@ -82,5 +83,14 @@ func MarshalSymbol(s Symbol, name, namespace string) SymbolExport {
 		Location:     s.GetLocation(),
 		Ref:          fmt.Sprintf("%s:%s", namespace, name),
 	}
+}
 
+func InlineSymbolId(s Symbol) string {
+	l := s.GetLocation()
+
+	fn := l.Filename
+	fn = strings.ReplaceAll(fn, "/", "_")
+	fn = strings.TrimSuffix(fn, ".mms")
+
+	return fmt.Sprintf("%s_%s__%d", s.GetKind(), fn, l.Start.Index)
 }
