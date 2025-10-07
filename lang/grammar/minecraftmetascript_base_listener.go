@@ -104,6 +104,12 @@ func (s *BaseMinecraftMetascriptListener) EnterConditional(ctx *ConditionalConte
 // ExitConditional is called when production conditional is exited.
 func (s *BaseMinecraftMetascriptListener) ExitConditional(ctx *ConditionalContext) {}
 
+// EnterConditionalBody is called when production conditionalBody is entered.
+func (s *BaseMinecraftMetascriptListener) EnterConditionalBody(ctx *ConditionalBodyContext) {}
+
+// ExitConditionalBody is called when production conditionalBody is exited.
+func (s *BaseMinecraftMetascriptListener) ExitConditionalBody(ctx *ConditionalBodyContext) {}
+
 // EnterList is called when production list is entered.
 func (s *BaseMinecraftMetascriptListener) EnterList(ctx *ListContext) {}
 

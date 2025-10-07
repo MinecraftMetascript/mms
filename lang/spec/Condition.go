@@ -93,9 +93,6 @@ func (c *ConditionalSpec) matchConditionCtx(ctx grammar.IConditionContext) (ast.
 		return nil, nil
 	}
 	switch condition := ctx.(type) {
-	// TODO: If condition != primary, we need to match the children against the same spec
-	// TODO: Create a new node type for paired conditions, as well as one for negated conditions
-	// TODO: Is the distinction between grouped and ungrouped conditions necessary here? That may be handled by the parser
 	case *grammar.CondAndContext:
 		l, ld := c.matchConditionCtx(condition.Condition(0))
 		r, rd := c.matchConditionCtx(condition.Condition(1))
@@ -175,8 +172,14 @@ func (c *ConditionalSpec) Match(valueCtx grammar.IValueContext) (ast.Node, []ast
 		spec: c,
 	}
 	allDiags := make([]ast.Diagnostic, 0)
-	iCondition := conditionCtx.Condition()
+	conditionBodyCtx := conditionCtx.ConditionalBody()
+	conditionBodyL := ast.RuleLocation(conditionBodyCtx)
+	out.conditionParenRange = &conditionBodyL
+	iCondition := conditionBodyCtx.Condition()
+
 	if iCondition != nil {
+		condL := ast.RuleLocation(iCondition)
+		out.conditionContentRange = &condL
 		conditionNode, conditionDiags := c.matchConditionCtx(iCondition)
 		if conditionDiags != nil {
 			allDiags = slices.Concat(allDiags, conditionDiags)
@@ -228,9 +231,11 @@ func (c *ConditionalSpec) Match(valueCtx grammar.IValueContext) (ast.Node, []ast
 
 type ConditionalNode struct {
 	ast.BaseSymbol
-	Condition ast.Symbol
-	Value     ast.Symbol
-	spec      *ConditionalSpec
+	Condition             ast.Symbol
+	Value                 ast.Symbol
+	spec                  *ConditionalSpec
+	conditionParenRange   *ast.SourceLocation
+	conditionContentRange *ast.SourceLocation
 }
 
 func (c ConditionalNode) Children() []ast.Node {
@@ -238,34 +243,15 @@ func (c ConditionalNode) Children() []ast.Node {
 }
 
 func (c ConditionalNode) Complete(fileSource string, position protocol.Position, triggerChar *string, symbols map[string]*ast.Namespace) []protocol.CompletionItem {
-	if c.Condition != nil && c.Condition.GetLocation().ContainsPosition(position) {
-		// Complete the condition?
-		if comp, ok := c.Condition.(ast.CompletableNode); ok {
-			return comp.Complete(fileSource, position, triggerChar, symbols)
-		}
-	} else if c.Value != nil && c.Value.GetLocation().ContainsPosition(position) {
-		if comp, ok := c.Value.(ast.CompletableNode); ok {
-			return comp.Complete(fileSource, position, triggerChar, symbols)
-		}
-	}
-
-	fullLocation := c.GetLocation()
-
 	mode := "NONE"
-	for idx := position.IndexIn(fileSource); idx > fullLocation.Start.Index; idx-- {
-		if fileSource[idx] == ')' {
-			// We are in value mode
-			mode = "VALUE"
-			break
-		} else if fileSource[idx] == '(' {
-			// We are in condition mode
-			mode = "CONDITION"
-			break
-		}
-		// We don't have anything right now
+	if c.conditionParenRange.ContainsPosition(position) {
+		mode = "CONDITION"
+	} else if c.conditionParenRange.BeforePosition(position) {
+		mode = "VALUE"
 	}
 
 	out := make([]protocol.CompletionItem, 0)
+
 	switch mode {
 	case "VALUE":
 		for _, spec := range c.spec.ValueOptions {
@@ -274,10 +260,39 @@ func (c ConditionalNode) Complete(fileSource string, position protocol.Position,
 			}
 		}
 	case "CONDITION":
-		for _, spec := range c.spec.ConditionOptions {
-			if comp, ok := spec.(ast.CompletableNode); ok {
-				out = append(out, comp.Complete(fileSource, position, triggerChar, symbols)...)
+		if c.conditionContentRange == nil || c.conditionContentRange.ContainsPosition(position) {
+			for _, spec := range c.spec.ConditionOptions {
+				if comp, ok := spec.(ast.CompletableNode); ok {
+					out = append(out, comp.Complete(fileSource, position, triggerChar, symbols)...)
+				}
 			}
+		} else {
+			out = append(out, protocol.CompletionItem{
+				Label:            "AND",
+				Kind:             &MethodKind,
+				Detail:           &c.spec.Help,
+				InsertTextFormat: &SnippetFormat,
+				TextEdit: protocol.TextEdit{
+					Range: protocol.Range{
+						Start: position,
+						End:   position,
+					},
+					NewText: "&& ${1}",
+				},
+			})
+			out = append(out, protocol.CompletionItem{
+				Label:            "OR",
+				Kind:             &MethodKind,
+				Detail:           &c.spec.Help,
+				InsertTextFormat: &SnippetFormat,
+				TextEdit: protocol.TextEdit{
+					Range: protocol.Range{
+						Start: position,
+						End:   position,
+					},
+					NewText: "|| ${1}",
+				},
+			})
 		}
 	}
 

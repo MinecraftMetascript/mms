@@ -49,6 +49,9 @@ type MinecraftMetascriptListener interface {
 	// EnterConditional is called when entering the conditional production.
 	EnterConditional(c *ConditionalContext)
 
+	// EnterConditionalBody is called when entering the conditionalBody production.
+	EnterConditionalBody(c *ConditionalBodyContext)
+
 	// EnterList is called when entering the list production.
 	EnterList(c *ListContext)
 
@@ -96,6 +99,9 @@ type MinecraftMetascriptListener interface {
 
 	// ExitConditional is called when exiting the conditional production.
 	ExitConditional(c *ConditionalContext)
+
+	// ExitConditionalBody is called when exiting the conditionalBody production.
+	ExitConditionalBody(c *ConditionalBodyContext)
 
 	// ExitList is called when exiting the list production.
 	ExitList(c *ListContext)

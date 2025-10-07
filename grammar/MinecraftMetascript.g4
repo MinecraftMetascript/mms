@@ -23,7 +23,8 @@ condition
 rootCondition: value;
 
 // TODO: Should we have support for "Else"?
-conditional: 'If'  NL* '(' NL* condition  NL* ')' NL* value;
+conditional: 'If'  NL* conditionalBody NL* value?;
+conditionalBody: '(' NL* condition?  NL* ')';
 list: '['  NL* (value NL* ','? NL*)* value?  NL* ']';
 
 Int: '-'? [0-9]+;

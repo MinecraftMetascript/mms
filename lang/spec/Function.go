@@ -549,7 +549,6 @@ func (n *FunctionNode) argCompletions(fileSource string, p protocol.Position, tr
 
 	// If we still haven't found an index, check if we're completing the first argument
 	if argIdx == -1 {
-		log.Println("No index found so far")
 		// Check if cursor is before the first argument (if any exist)
 		if len(n.Arguments) > 0 && n.Arguments[0] != nil {
 			firstArgLoc := n.Arguments[0].GetLocation()

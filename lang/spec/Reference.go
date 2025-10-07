@@ -11,13 +11,19 @@ import (
 )
 
 type ReferenceSpec struct {
-	Kind ast.SymbolKind
+	Kind             ast.SymbolKind
+	defaultNamespace string
 }
 
 func NewReferenceSpec(kind ast.SymbolKind) *ReferenceSpec {
 	return &ReferenceSpec{Kind: kind}
 }
-func (r ReferenceSpec) Complete(fileSource string, position protocol.Position, triggerChar *string, symbols map[string]*ast.Namespace) []protocol.CompletionItem {
+func (r *ReferenceSpec) SetDefaultNamespace(defaultNamespace string) *ReferenceSpec {
+	r.defaultNamespace = defaultNamespace
+	return r
+}
+
+func (r *ReferenceSpec) Complete(fileSource string, position protocol.Position, triggerChar *string, symbols map[string]*ast.Namespace) []protocol.CompletionItem {
 	// Extract any prefix the user has already typed
 	prefix := ExtractPrefixAtPosition(fileSource, position)
 
@@ -53,7 +59,7 @@ func (r ReferenceSpec) Complete(fileSource string, position protocol.Position, t
 	})
 }
 
-func (r ReferenceSpec) Match(valueCtx grammar.IValueContext) (ast.Node, []ast.Diagnostic) {
+func (r *ReferenceSpec) Match(valueCtx grammar.IValueContext) (ast.Node, []ast.Diagnostic) {
 	refCtx := valueCtx.ResourceReference()
 	if refCtx == nil {
 		return nil, nil
@@ -63,18 +69,20 @@ func (r ReferenceSpec) Match(valueCtx grammar.IValueContext) (ast.Node, []ast.Di
 	refL := ast.RuleLocation(refCtx)
 	if len(parts) == 1 {
 		return &ReferenceNode{
-			BaseNode: ast.BaseNode{
+			BaseSymbol: ast.BaseSymbol{
 				Location: &refL,
+				BaseNode: ast.BaseNode{},
 			},
-			Namespace: "",
+			Namespace: r.defaultNamespace,
 			Name:      parts[0].GetText(),
 			Kind:      r.Kind,
 		}, nil
 
 	} else if len(parts) == 2 {
 		return &ReferenceNode{
-			BaseNode: ast.BaseNode{
+			BaseSymbol: ast.BaseSymbol{
 				Location: &refL,
+				BaseNode: ast.BaseNode{},
 			},
 			Namespace: parts[0].GetText(),
 			Name:      parts[1].GetText(),
@@ -94,7 +102,7 @@ func (r ReferenceSpec) Match(valueCtx grammar.IValueContext) (ast.Node, []ast.Di
 }
 
 type ReferenceNode struct {
-	ast.BaseNode
+	ast.BaseSymbol
 	Namespace string
 	Name      string
 	Kind      ast.SymbolKind

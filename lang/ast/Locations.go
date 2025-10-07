@@ -104,6 +104,14 @@ func (sl SourceLocation) ContainsPosition(p protocol.Position) bool {
 	})
 }
 
+func (sl SourceLocation) BeforePosition(p protocol.Position) bool {
+	return sl.Stop.Line < int(p.Line)+1 || (sl.Stop.Line == int(p.Line)+1 && sl.Stop.Column < int(p.Character))
+}
+
+func (sl SourceLocation) AfterPosition(p protocol.Position) bool {
+	return sl.Start.Line > int(p.Line)+1 || (sl.Start.Line == int(p.Line)+1 && sl.Start.Column > int(p.Character))
+}
+
 func TokenStart(ctx antlr.Token) Location {
 	return Location{
 		Line:   ctx.GetLine(),

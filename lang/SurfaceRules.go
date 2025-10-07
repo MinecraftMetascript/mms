@@ -65,7 +65,7 @@ var Block = spec.NewFunctionSpec(
 	"Block",
 	spec.NewOverloadSpec(
 		[]spec.ValueSpec{
-			spec.NewReferenceSpec(ast.SymbolNever),
+			spec.NewReferenceSpec(ast.SymbolNever).SetDefaultNamespace("minecraft"),
 		},
 		nil,
 		nil,
