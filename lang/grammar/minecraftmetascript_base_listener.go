@@ -56,6 +56,12 @@ func (s *BaseMinecraftMetascriptListener) EnterFn(ctx *FnContext) {}
 // ExitFn is called when production fn is exited.
 func (s *BaseMinecraftMetascriptListener) ExitFn(ctx *FnContext) {}
 
+// EnterFnArgBody is called when production fnArgBody is entered.
+func (s *BaseMinecraftMetascriptListener) EnterFnArgBody(ctx *FnArgBodyContext) {}
+
+// ExitFnArgBody is called when production fnArgBody is exited.
+func (s *BaseMinecraftMetascriptListener) ExitFnArgBody(ctx *FnArgBodyContext) {}
+
 // EnterValue is called when production value is entered.
 func (s *BaseMinecraftMetascriptListener) EnterValue(ctx *ValueContext) {}
 

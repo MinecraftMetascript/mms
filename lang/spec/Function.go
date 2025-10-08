@@ -2,8 +2,8 @@ package spec
 
 import (
 	"fmt"
-	"log"
 	"slices"
+	"strings"
 
 	"github.com/minecraftmetascript/mms/lang/ast"
 	"github.com/minecraftmetascript/mms/lang/grammar"
@@ -16,6 +16,31 @@ type OverloadSpec struct {
 	Args     []ValueSpec
 	RestArg  ValueSpec
 	Builders []FunctionSpec
+}
+
+func (os *OverloadSpec) Usage() string {
+	usage := "("
+	argUsages := lo.Map(os.Args, func(item ValueSpec, index int) string {
+		return item.UsageStr()
+	})
+	if os.RestArg != nil {
+		argUsages = append(argUsages, os.RestArg.UsageStr()+"...")
+	}
+	usage += strings.Join(argUsages, ", ")
+	usage += ")"
+
+	builderUsages := lo.Map(os.Builders, func(item FunctionSpec, index int) string {
+		usages := item.Usage()
+		if len(usages) > 0 {
+			return usages[0]
+		}
+		return item.Name + "()"
+	})
+	if len(builderUsages) > 0 {
+		usage += "." + strings.Join(builderUsages, ".")
+	}
+	return usage
+
 }
 
 type Overload struct {
@@ -44,41 +69,51 @@ func NewOverloadSpec(args []ValueSpec, restArg ValueSpec, builders []FunctionSpe
 	}
 }
 
-func (spec *OverloadSpec) Match(ctx grammar.IFnContext) (ast.Node, []ast.Diagnostic) {
+func (os *OverloadSpec) Match(ctx grammar.IFnContext) (ast.Node, []ast.Diagnostic) {
 	diags := make([]ast.Diagnostic, 0)
 	l := ast.RuleLocation(ctx)
 	out := &Overload{
-		Args:     make([]ast.Node, len(spec.Args)),
+		Args:     make([]ast.Node, len(os.Args)),
 		Builders: make([]FunctionNode, 0),
 		BaseNode: ast.BaseNode{
 			Location: &l,
 		},
 	}
 
-	argCtxs := ctx.AllValue()
-
-	// Check for missing required arguments
-	if len(argCtxs) < len(spec.Args) {
+	body := ctx.FnArgBody()
+	if body == nil {
 		diags = append(diags, ast.Diagnostic{
 			Location: ast.RuleLocation(ctx),
-			Message:  fmt.Sprintf("Not enough arguments: expected %d, got %d", len(spec.Args), len(argCtxs)),
+			Message:  "Missing function args",
+			Severity: ast.Error,
+		})
+		return out, diags
+	}
+
+	argCtxs := body.AllValue()
+
+	// Check for missing required arguments
+	if len(argCtxs) < len(os.Args) {
+		diags = append(diags, ast.Diagnostic{
+			Location: ast.RuleLocation(ctx),
+			Message:  fmt.Sprintf("Not enough arguments: expected %d, got %d", len(os.Args), len(argCtxs)),
 			Severity: ast.Error,
 		})
 	}
 
 	for i, argCtx := range argCtxs {
 		var argSpec ValueSpec
-		if i >= len(spec.Args) {
-			if spec.RestArg == nil {
+		if i >= len(os.Args) {
+			if os.RestArg == nil {
 				diags = append(diags, ast.Diagnostic{
 					Location: ast.RuleLocation(argCtx),
 					Message:  fmt.Sprintf("Unexpected argument at position %d", i+1),
 					Severity: ast.Warning,
 				})
 			}
-			argSpec = spec.RestArg
+			argSpec = os.RestArg
 		} else {
-			argSpec = spec.Args[i]
+			argSpec = os.Args[i]
 		}
 
 		if argSpec == nil {
@@ -93,7 +128,7 @@ func (spec *OverloadSpec) Match(ctx grammar.IFnContext) (ast.Node, []ast.Diagnos
 		if argDiags != nil && len(argDiags) > 0 {
 			diags = append(diags, argDiags...)
 		} else if value != nil {
-			if i >= len(spec.Args) {
+			if i >= len(os.Args) {
 				// RestArgs
 				out.Args = append(out.Args, value)
 			} else {
@@ -111,7 +146,7 @@ func (spec *OverloadSpec) Match(ctx grammar.IFnContext) (ast.Node, []ast.Diagnos
 
 	builders := ctx.AllFn()
 	for _, builderCtx := range builders {
-		for _, builderSpec := range spec.Builders {
+		for _, builderSpec := range os.Builders {
 			builder, builderDiags := builderSpec.matchFn(builderCtx)
 
 			if builderDiags != nil && len(builderDiags) > 0 {
@@ -142,6 +177,10 @@ type FunctionSpec struct {
 	export          func(fn FunctionNode, name string) *lib.FileTreeLike
 	output          func(fn FunctionNode) any
 	symbolExtractor func(fn FunctionNode) []ast.Symbol
+}
+
+func (f FunctionSpec) UsageStr() string {
+	return f.Name + "()"
 }
 
 func (f FunctionSpec) AddOverload(overloads ...OverloadSpec) FunctionSpec {
@@ -197,7 +236,13 @@ func (f FunctionSpec) matchFn(fnCtx grammar.IFnContext) (*FunctionNode, []ast.Di
 	// Track all overload attempts for better diagnostics
 	allOverloadDiags := make([][]ast.Diagnostic, 0)
 	allOverloadResults := make([]*Overload, 0)
-	argCount := len(fnCtx.AllValue())
+	body := fnCtx.FnArgBody()
+	if body == nil {
+		// TODO: Diagnose?
+		return nil, nil
+	}
+	argCount := len(body.AllValue())
+	bodyLocation := ast.RuleLocation(body)
 
 	// First pass: try to find an overload without errors
 	for _, overload := range f.Overloads {
@@ -235,6 +280,7 @@ func (f FunctionSpec) matchFn(fnCtx grammar.IFnContext) (*FunctionNode, []ast.Di
 					Kind:     f.Kind,
 					Location: &l,
 				},
+				bodyLocation: &bodyLocation,
 			}
 
 			builders := make([]FunctionNode, 0)
@@ -290,6 +336,7 @@ func (f FunctionSpec) matchFn(fnCtx grammar.IFnContext) (*FunctionNode, []ast.Di
 				Kind:     f.Kind,
 				Location: &l,
 			},
+			bodyLocation: &bodyLocation,
 		}
 
 		builders := make([]FunctionNode, 0)
@@ -398,6 +445,14 @@ func (f FunctionSpec) SetHelp(help string) FunctionSpec {
 	out.Help = help
 	return *out
 }
+func (f FunctionSpec) Usage() []string {
+	out := make([]string, 0)
+	for _, overload := range f.Overloads {
+		out = append(out, fmt.Sprintf("%s%s", f.Name, overload.Usage()))
+	}
+
+	return out
+}
 
 func NewFunctionSpec(name string, overloads ...OverloadSpec) FunctionSpec {
 	return FunctionSpec{
@@ -412,11 +467,12 @@ type FunctionNode struct {
 	Arguments []ast.Node
 	Builders  []FunctionNode
 
-	source   string
-	spec     FunctionSpec
-	parent   *FunctionNode
-	overload OverloadSpec
-	ref      string
+	source       string
+	spec         FunctionSpec
+	parent       *FunctionNode
+	overload     OverloadSpec
+	ref          string
+	bodyLocation *ast.SourceLocation
 }
 
 func (n *FunctionNode) Ref() string {
@@ -453,8 +509,11 @@ func (n *FunctionNode) ToSerializable() any {
 }
 
 func (n *FunctionNode) GetHelp() string {
-	// TODO: Include usage / overload information
-	return n.spec.Help
+	usages := strings.Join(
+		lo.Map(n.spec.Usage(), func(i string, index int) string { return "      " + i }),
+		"\n",
+	)
+	return n.spec.Help + "\n\n Usage:\n\n" + usages
 }
 
 func locate(source string, idx int) ast.Location {
@@ -579,7 +638,6 @@ func (n *FunctionNode) argCompletions(fileSource string, p protocol.Position, tr
 
 	// Get completions for the identified argument
 	if completableNode, ok := n.Arguments[argIdx].(ast.CompletableNode); ok {
-		log.Println("Node")
 		return completableNode.Complete(fileSource, p, triggerChar, symbols)
 	} else if completableSpec, ok := n.overload.Args[argIdx].(ast.CompletableNode); ok {
 		return completableSpec.Complete(fileSource, p, triggerChar, symbols)
@@ -603,31 +661,32 @@ const (
 )
 
 func (n *FunctionNode) Complete(fileSource string, position protocol.Position, triggerChar *string, symbols map[string]*ast.Namespace) []protocol.CompletionItem {
-	log.Printf("Completing function %s", n.Name)
 	items := make([]protocol.CompletionItem, 0)
 	var mode functionCompletionMode
 	if triggerChar == nil || *triggerChar == "" {
 		// Infer mode based on cursor position
 		// If position is after the args closing paren, suggest builders
 		// Otherwise, suggest args
-		if n.Location != nil {
-			endOfArgs := getBuilderInsertPosition(n)
-			l := int(position.Line)
-			if l > endOfArgs.Line ||
-				(l == endOfArgs.Line && position.Character > uint32(endOfArgs.Column)) {
-				mode = functionCompletionModeBuilders
-			} else {
-				mode = functionCompletionModeArgs
-			}
+		if !n.bodyLocation.ContainsPosition(position) {
+			// Cursor is in the function args
+			mode = functionCompletionModeBuilders
 		} else {
 			mode = functionCompletionModeArgs
 		}
 	} else {
 		switch *triggerChar {
 		case ".", ")":
-			mode = functionCompletionModeBuilders
+			if !n.bodyLocation.ContainsPosition(position) {
+				mode = functionCompletionModeBuilders
+			} else {
+				return make([]protocol.CompletionItem, 0)
+			}
 		case "(", ",":
-			mode = functionCompletionModeArgs
+			if n.bodyLocation.ContainsPosition(position) {
+				mode = functionCompletionModeArgs
+			} else {
+				return make([]protocol.CompletionItem, 0)
+			}
 		default:
 			mode = functionCompletionModeArgs
 		}
@@ -644,7 +703,6 @@ func (n *FunctionNode) Complete(fileSource string, position protocol.Position, t
 		items = n.argCompletions(fileSource, position, triggerChar, symbols)
 	}
 
-	log.Println("Completions: ", items)
 	return items
 }
 

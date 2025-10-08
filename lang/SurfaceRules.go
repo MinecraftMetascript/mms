@@ -34,11 +34,8 @@ func SurfaceExporter(serializer func(node spec.FunctionNode) any) func(fn spec.F
 	}
 }
 
-func SimpleSerializer(name, t string) func(fn spec.FunctionNode) any {
+func SimpleSerializer(t string) func(fn spec.FunctionNode) any {
 	return func(fn spec.FunctionNode) any {
-		if fn.Name != name {
-			return "{ \"__\": \"MMS: Unable to serialize\"}"
-		}
 		out := struct {
 			Type string `json:"type"`
 		}{
@@ -58,8 +55,8 @@ var Bandlands = spec.NewFunctionSpec(
 	SetKind(ast.SymbolSurfaceRule).
 	SetHelp("Used in badlands to place terracotta.").
 	SetFileExporter(
-		SurfaceExporter(SimpleSerializer("Bandlands", "minecraft:bandlands")),
-	).SetOutputFn(SimpleSerializer("Bandlands", "minecraft:bandlands"))
+		SurfaceExporter(SimpleSerializer("minecraft:bandlands")),
+	).SetOutputFn(SimpleSerializer("minecraft:bandlands"))
 
 var Block = spec.NewFunctionSpec(
 	"Block",
@@ -91,7 +88,7 @@ func BlockSerializer(node spec.FunctionNode) any {
 		},
 	}
 	if len(node.Arguments) > 0 {
-		if val := spec.GetReferenceNodeValue(node.Arguments[0]); val != nil {
+		if val := spec.GetReferenceNodeValue(node.Arguments[0], ast.SymbolNever); val != nil {
 			out.ResultState.Name = *val
 		}
 	}
@@ -104,15 +101,15 @@ var AboveSurface = spec.NewFunctionSpec(
 ).
 	SetKind(ast.SymbolSurfaceCondition).
 	SetHelp("Checks if the current position is above the preliminary surface level, which is a Y-level usually a few blocks below the main surface, ignoring noise caves.").
-	SetOutputFn(SimpleSerializer("AboveSurface", "minecraft:above_preliminary_surface")).
-	SetFileExporter(SurfaceExporter(SimpleSerializer("AboveSurface", "minecraft:above_preliminary_surface")))
+	SetOutputFn(SimpleSerializer("minecraft:above_preliminary_surface")).
+	SetFileExporter(SurfaceExporter(SimpleSerializer("minecraft:above_preliminary_surface")))
 
 var Biome = spec.NewFunctionSpec(
 	"Biome",
 	spec.NewOverloadSpec(
 		[]spec.ValueSpec{
-			spec.NewReferenceSpec(ast.SymbolNever),
-		}, spec.NewReferenceSpec(ast.SymbolNever),
+			spec.NewReferenceSpec(ast.SymbolNever).SetDefaultNamespace("minecraft"),
+		}, spec.NewReferenceSpec(ast.SymbolNever).SetDefaultNamespace("minecraft"),
 		nil,
 	)).
 	SetHelp("Passes for columns where the biome matches the specified biomes.").
@@ -124,11 +121,11 @@ var Biome = spec.NewFunctionSpec(
 
 func BiomeSerializer(node spec.FunctionNode) any {
 	if node.Name != "Biome" {
-		return "{ \"__\": \"MMS: Unable to serialize\"}"
+		return "{ \"__\": \"MMS: Unable to serialisze\"}"
 	}
 	filters := make([]string, 0)
 	for _, arg := range node.Arguments {
-		if val := spec.GetReferenceNodeValue(arg); val != nil {
+		if val := spec.GetReferenceNodeValue(arg, ast.SymbolNever); val != nil {
 			filters = append(filters, *val)
 		}
 	}
@@ -148,81 +145,41 @@ var Hole = spec.NewFunctionSpec(
 ).
 	SetHelp("Passes for columns where the surface depth is 0.").
 	SetKind(ast.SymbolSurfaceCondition).
-	SetOutputFn(SimpleSerializer("Hole", "minecraft:hole")).
-	SetFileExporter(SurfaceExporter(SimpleSerializer("Hole", "minecraft:hole")))
+	SetOutputFn(SimpleSerializer("minecraft:hole")).
+	SetFileExporter(SurfaceExporter(SimpleSerializer("minecraft:hole")))
 
 var NoiseThreshold = spec.NewFunctionSpec(
 	"NoiseThreshold",
 	// Completion will try to use the first overload, so we want to prioritize that one
 	spec.NewOverloadSpec(
-		[]spec.ValueSpec{spec.NewReferenceSpec(ast.SymbolNoise)}, nil, []spec.FunctionSpec{MinBuilder, MaxBuilder},
-	),
-	spec.NewOverloadSpec(
-		[]spec.ValueSpec{noiseFn}, nil, []spec.FunctionSpec{MinBuilder, MaxBuilder},
+		[]spec.ValueSpec{spec.NewValueSpecList(spec.NewReferenceSpec(ast.SymbolNoise), noiseFn)}, nil, []spec.FunctionSpec{MinBuilder, MaxBuilder},
 	),
 ).
 	SetHelp("Passes for columns where the input noise is between the minimum and maximum values.").
 	SetKind(ast.SymbolSurfaceCondition).
-	SetOutputFn(NoiseThresholdSerializer).
+	SetOutputFn(noiseThresholdSerializer).
 	SetFileExporter(
-		SurfaceExporter(NoiseThresholdSerializer),
+		SurfaceExporter(noiseThresholdSerializer),
 	).
-	SetSymbolExtractor(func(fn spec.FunctionNode) []ast.Symbol {
-		if len(fn.Arguments) < 1 {
-			return nil
-		}
-		if inlineNoise, ok := fn.Arguments[0].(*spec.FunctionNode); ok {
-			return []ast.Symbol{
-				inlineNoise,
-			}
-		}
-		return nil
-	})
+	SetSymbolExtractor(ExtractInlineNoiseSymbol(0))
 
-func NoiseThresholdSerializer(node spec.FunctionNode) any {
+func noiseThresholdSerializer(node spec.FunctionNode) any {
 	if node.Name != "NoiseThreshold" {
 		return "{ \"__\": \"MMS: Unable to serialize\"}"
 	}
 	if len(node.Arguments) < 1 {
 		return "{ \"__\": \"MMS: Unable to serialize\"}"
 	}
-	out := struct {
+	out := &struct {
 		Type      string  `json:"type"`
 		Noise     string  `json:"noise"`
-		MinThresh float64 `json:"min_threshold"`
-		MaxThresh float64 `json:"max_threshold"`
+		MinThresh float64 `json:"min_threshold" mms_builder:"Min"`
+		MaxThresh float64 `json:"max_threshold" mms_builder:"Max"`
 	}{
 		Type: "minecraft:noise_threshold",
 	}
-	switch a := node.Arguments[0].(type) {
-	case *spec.FunctionNode:
-
-		if a.Ref() != "" {
-			out.Noise = a.Ref()
-		} else {
-			// TODO: Diagnose (?)
-		}
-		break
-	case *spec.ReferenceNode:
-		if a.Kind != ast.SymbolNoise {
-			// TODO: Diagnose (?)
-			break
-		}
-		out.Noise = a.String()
-	}
-
-	for _, b := range node.Builders {
-		switch b.Name {
-		case "Min":
-			if val := spec.GetNumberNodeValue(b.Arguments[0]); val != nil {
-				out.MinThresh = *val
-			}
-		case "Max":
-			if val := spec.GetNumberNodeValue(b.Arguments[0]); val != nil {
-				out.MaxThresh = *val
-			}
-		}
-	}
+	UnpackBuilders(out, node.Builders)
+	out.Noise = GetInlinedNoiseRef(node.Arguments[0])
 
 	return out
 }
@@ -233,8 +190,8 @@ var Steep = spec.NewFunctionSpec(
 ).
 	SetHelp("Checks if the current position is a steep face on the north or east sides of a mountain.").
 	SetKind(ast.SymbolSurfaceCondition).
-	SetOutputFn(SimpleSerializer("Steep", "minecraft:steep")).
-	SetFileExporter(SurfaceExporter(SimpleSerializer("Steep", "minecraft:steep")))
+	SetOutputFn(SimpleSerializer("minecraft:steep")).
+	SetFileExporter(SurfaceExporter(SimpleSerializer("minecraft:steep")))
 
 var Frozen = spec.NewFunctionSpec(
 	"Frozen",
@@ -242,8 +199,8 @@ var Frozen = spec.NewFunctionSpec(
 ).
 	SetHelp("Checks if the current position is in a biome that can snow.").
 	SetKind(ast.SymbolSurfaceCondition).
-	SetOutputFn(SimpleSerializer("Frozen", "minecraft:temperature")).
-	SetFileExporter(SurfaceExporter(SimpleSerializer("Frozen", "minecraft:temperature")))
+	SetOutputFn(SimpleSerializer("minecraft:temperature")).
+	SetFileExporter(SurfaceExporter(SimpleSerializer("minecraft:temperature")))
 
 var StoneDepth = spec.NewFunctionSpec(
 	"StoneDepth",
@@ -270,32 +227,19 @@ func StoneDepthSerializer(node spec.FunctionNode) any {
 	if node.Name != "StoneDepth" {
 		return "{ \"__\": \"MMS: Unable to serialize\"}"
 	}
-	out := struct {
+	out := &struct {
 		Type                string  `json:"type"`
 		SurfaceType         string  `json:"surface_type"`
-		Offset              float64 `json:"offset"`
-		AddDepth            bool    `json:"add_surface_depth"`
-		SecondaryDepthRange float64 `json:"secondary_depth_range"`
+		Offset              float64 `json:"offset" mms_builder:"Offset"`
+		AddDepth            bool    `json:"add_surface_depth" mms_builder:"AddSurfaceDepth"`
+		SecondaryDepthRange float64 `json:"secondary_depth_range" mms_builder:"SecondaryDepthRange"`
 	}{
 		Type: "minecraft:stone_depth",
 	}
+	UnpackBuilders(out, node.Builders)
 	if len(node.Arguments) > 0 {
 		if val := spec.GetEnumNodeValue(node.Arguments[0]); val != nil {
 			out.SurfaceType = *val
-		}
-	}
-	for _, b := range node.Builders {
-		switch b.Name {
-		case "Offset":
-			if val := spec.GetNumberNodeValue(b.Arguments[0]); val != nil {
-				out.Offset = *val
-			}
-		case "AddSurfaceDepth":
-			out.AddDepth = true
-		case "SecondaryDepthRange":
-			if val := spec.GetNumberNodeValue(b.Arguments[0]); val != nil {
-				out.SecondaryDepthRange = *val
-			}
 		}
 	}
 
@@ -325,28 +269,15 @@ func WaterSerializer(node spec.FunctionNode) any {
 	if node.Name != "Water" {
 		return "{ \"__\": \"MMS: Unable to serialize\"}"
 	}
-	out := struct {
+	out := &struct {
 		Type            string  `json:"type"`
-		AddStoneDepth   bool    `json:"add_stone_depth"`
-		Offset          float64 `json:"offset"`
-		DepthMultiplier float64 `json:"surface_depth_multiplier"`
+		AddStoneDepth   bool    `json:"add_stone_depth" mms_builder:"AddStoneDepth"`
+		Offset          float64 `json:"offset" mms_builder:"Offset"`
+		DepthMultiplier float64 `json:"surface_depth_multiplier" mms_builder:"DepthMultiplier"`
 	}{
 		Type: "minecraft:water",
 	}
-	for _, b := range node.Builders {
-		switch b.Name {
-		case "Offset":
-			if val := spec.GetNumberNodeValue(b.Arguments[0]); val != nil {
-				out.Offset = *val
-			}
-		case "DepthMultiplier":
-			if val := spec.GetNumberNodeValue(b.Arguments[0]); val != nil {
-				out.DepthMultiplier = *val
-			}
-		case "AddStoneDepth":
-			out.AddStoneDepth = true
-		}
-	}
+	UnpackBuilders(out, node.Builders)
 
 	return out
 }
@@ -378,23 +309,16 @@ func VerticalGradientSerializer(node spec.FunctionNode) any {
 	out := struct {
 		Type       string `json:"type"`
 		RandomName string `json:"random_name"`
-		Lower      any    `json:"true_at_and_below"`
-		Upper      any    `json:"false_at_and_above"`
+		Lower      any    `json:"true_at_and_below" mms_builder:"Lower"`
+		Upper      any    `json:"false_at_and_above" mms_builder:"Upper"`
 	}{
 		Type: "minecraft:vertical_gradient",
 	}
 
+	UnpackBuilders(&out, node.Builders)
 	if len(node.Arguments) > 0 {
 		if val := spec.GetStringNodeValue(node.Arguments[0]); val != nil {
 			out.RandomName = *val
-		}
-	}
-	for _, b := range node.Builders {
-		switch b.Name {
-		case "Lower":
-			out.Lower = ParseAnchor(b.Arguments[0])
-		case "Upper":
-			out.Upper = ParseAnchor(b.Arguments[0])
 		}
 	}
 
@@ -423,30 +347,21 @@ func YAboveSerializer(node spec.FunctionNode) any {
 	if node.Name != "YAbove" {
 		return "{ \"__\": \"MMS: Unable to serialize\"}"
 	}
-	out := struct {
+	out := &struct {
 		Type            string  `json:"type"`
 		Anchor          any     `json:"anchor"`
-		AddStoneDepth   bool    `json:"add_stone_depth"`
-		DepthMultiplier float64 `json:"surface_depth_multiplier"`
+		AddStoneDepth   bool    `json:"add_stone_depth" mms_builder:"AddStoneDepth"`
+		DepthMultiplier float64 `json:"surface_depth_multiplier" mms_builder:"DepthMultiplier"`
 	}{
 		Type: "minecraft:y_above",
 	}
+	UnpackBuilders(out, node.Builders)
 	if len(node.Arguments) > 0 {
 		anchor := node.Arguments[0]
 
 		out.Anchor = ParseAnchor(anchor)
 	}
 
-	for _, b := range node.Builders {
-		switch b.Name {
-		case "AddStoneDepth":
-			out.AddStoneDepth = true
-		case "DepthMultiplier":
-			if val := spec.GetNumberNodeValue(b.Arguments[0]); val != nil {
-				out.DepthMultiplier = *val
-			}
-		}
-	}
 	return out
 }
 
@@ -454,7 +369,7 @@ func init() {
 	Conditional = spec.NewConditionSpec().
 		SetKind(ast.SymbolSurfaceRule).
 		SetHelp("Applies a rule based on a surface condition")
-	SurfaceConditions = []spec.ValueSpec{AboveSurface, Biome, Hole, NoiseThreshold, Steep, StoneDepth, Frozen, Water, YAbove}
+	SurfaceConditions = []spec.ValueSpec{AboveSurface, Biome, Hole, NoiseThreshold, Steep, StoneDepth, Frozen, Water, VerticalGradient, YAbove}
 	SurfaceRules = []spec.ValueSpec{Bandlands, Block, Conditional}
 	ListRule := spec.NewListSpec().
 		SetOutputFn(

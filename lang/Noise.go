@@ -88,3 +88,31 @@ var NoiseExporter = func(fn spec.FunctionNode, name string) *lib.FileTreeLike {
 		)
 	return root
 }
+
+var InlinedNoise = spec.NewValueSpecList(spec.NewReferenceSpec(ast.SymbolNoise), noiseFn)
+
+func GetInlinedNoiseRef(v ast.Node) string {
+	if v == nil {
+		return ""
+	}
+	if val := spec.GetReferenceNodeValue(v, ast.SymbolNoise); !lib.IsNilInterface(val) {
+		return *val
+	} else if fn := v.(*spec.FunctionNode); fn != nil {
+		return fn.Ref()
+	}
+	return ""
+}
+
+func ExtractInlineNoiseSymbol(argIdx int) func(spec.FunctionNode) []ast.Symbol {
+	return func(fn spec.FunctionNode) []ast.Symbol {
+		if len(fn.Arguments) < 1 {
+			return nil
+		}
+		if inlineNoise, ok := fn.Arguments[argIdx].(*spec.FunctionNode); ok {
+			return []ast.Symbol{
+				inlineNoise,
+			}
+		}
+		return nil
+	}
+}

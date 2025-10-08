@@ -7,11 +7,11 @@ import (
 	"github.com/minecraftmetascript/mms/lang/ast"
 	"github.com/minecraftmetascript/mms/lang/grammar"
 	"github.com/minecraftmetascript/mms/lib"
+	"github.com/samber/lo"
 	protocol "github.com/tliron/glsp/protocol_3_16"
 )
 
 var SnippetFormat = protocol.InsertTextFormatSnippet
-var SnippetKind = protocol.CompletionItemKindSnippet
 var MethodKind = protocol.CompletionItemKindMethod
 var ReferenceKind = protocol.CompletionItemKindReference
 var StructKind = protocol.CompletionItemKindStruct
@@ -62,24 +62,42 @@ func FilterCompletionsByPrefix(items []protocol.CompletionItem, prefix string) [
 
 type ValueSpec interface {
 	Match(valueCtx grammar.IValueContext) (ast.Node, []ast.Diagnostic)
+	UsageStr() string
 }
 
 type ValueSpecList struct {
 	specs []ValueSpec
 }
 
-func (bsl *ValueSpecList) Add(bs ValueSpec) {
-	bsl.specs = append(bsl.specs, bs)
+func (vsl *ValueSpecList) UsageStr() string {
+	return strings.Join(
+		lo.Map(vsl.specs, func(item ValueSpec, index int) string { return item.UsageStr() }),
+		" | ",
+	)
 }
 
-func (bsl *ValueSpecList) Match(ctx grammar.IValueContext) (ast.Node, []ast.Diagnostic) {
+func (vsl *ValueSpecList) Complete(fileSource string, position protocol.Position, triggerChar *string, symbols map[string]*ast.Namespace) []protocol.CompletionItem {
+	completions := make([]protocol.CompletionItem, 0)
+	for _, spec := range vsl.specs {
+		if c, ok := spec.(ast.CompletableNode); ok {
+			completions = append(completions, c.Complete(fileSource, position, triggerChar, symbols)...)
+		}
+	}
+	return completions
+}
+
+func (vsl *ValueSpecList) Add(bs ValueSpec) {
+	vsl.specs = append(vsl.specs, bs)
+}
+
+func (vsl *ValueSpecList) Match(ctx grammar.IValueContext) (ast.Node, []ast.Diagnostic) {
 	if ctx == nil {
 		return nil, nil
 	}
 
 	allDiags := make([]ast.Diagnostic, 0)
 
-	for _, bs := range bsl.specs {
+	for _, bs := range vsl.specs {
 		val, diags := bs.Match(ctx)
 
 		if !lib.IsNilInterface(val) {
@@ -99,6 +117,10 @@ func (bsl *ValueSpecList) Match(ctx grammar.IValueContext) (ast.Node, []ast.Diag
 	}
 
 	return nil, nil
+}
+
+func (vsl *ValueSpecList) All() []ValueSpec {
+	return vsl.specs
 }
 
 func NewValueSpecList(

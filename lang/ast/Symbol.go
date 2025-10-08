@@ -14,6 +14,7 @@ const (
 	SymbolNoise            SymbolKind = "Noise"
 	SymbolSurfaceRule      SymbolKind = "SurfaceRule"
 	SymbolSurfaceCondition SymbolKind = "SurfaceCondition"
+	SymbolDensityFunction  SymbolKind = "DensityFunction"
 )
 
 type Symbol interface {
@@ -89,6 +90,7 @@ func InlineSymbolId(s Symbol) string {
 	l := s.GetLocation()
 
 	fn := l.Filename
+	fn = strings.TrimPrefix(fn, "file://")
 	fn = strings.ReplaceAll(fn, "/", "_")
 	fn = strings.TrimSuffix(fn, ".mms")
 

@@ -167,16 +167,11 @@ func (ls *LanguageServer) TextDocumentDidChange(context *glsp.Context, params *p
 
 func (ls *LanguageServer) TextDocumentHover(context *glsp.Context, params *protocol.HoverParams) (*protocol.Hover, error) {
 	file := ls.project.File(params.TextDocument.URI)
-	candidates := file.NodesAtPosition(
-		ast.Location{
-			Line:   int(params.Position.Line + 1),
-			Column: int(params.Position.Character),
-			Index:  params.Position.IndexIn(file.Content()),
-		},
-	)
+	candidates := positionToCandidateNodes(params.Position, file)
 
 	if len(candidates) > 0 {
 		for _, candidate := range candidates {
+			log.Println(candidate.GetLocation())
 			if helpful, ok := candidate.(ast.HelpfulNode); ok && helpful.GetHelp() != "" {
 				return &protocol.Hover{
 					Contents: protocol.MarkupContent{
@@ -191,26 +186,22 @@ func (ls *LanguageServer) TextDocumentHover(context *glsp.Context, params *proto
 	return nil, nil
 }
 
-func (ls *LanguageServer) TextDocumentCompletion(_ *glsp.Context, params *protocol.CompletionParams) (any, error) {
-	file := ls.project.File(params.TextDocument.URI)
-
+func positionToCandidateNodes(position protocol.Position, file *project.File) []ast.Node {
 	rangeStart := ast.Location{
-		Line:   int(params.Position.Line + 1),
-		Column: int(params.Position.Character - 1),
+		Line:   int(position.Line + 1),
+		Column: int(position.Character - 1),
 	}
 	rangeStart.Index = rangeStart.IndexIn(file.Content())
 
 	rangeEnd := ast.Location{
-		Line:   int(params.Position.Line + 1),
-		Column: int(params.Position.Character),
+		Line:   int(position.Line + 1),
+		Column: int(position.Character),
 	}
 	rangeEnd.Index = rangeEnd.IndexIn(file.Content())
 
 	candidates := file.NodesInRange(rangeStart, rangeEnd)
 
 	slices.SortStableFunc(candidates, func(a, b ast.Node) int {
-		// TODO: this appears to be prioritizing block completions
-		//cursorIdx := params.Position.IndexIn(file.Content())
 		aLoc := a.GetLocation()
 		bLoc := b.GetLocation()
 
@@ -225,14 +216,25 @@ func (ls *LanguageServer) TextDocumentCompletion(_ *glsp.Context, params *protoc
 			return 0
 		}
 	})
+	return candidates
+}
+
+func (ls *LanguageServer) TextDocumentCompletion(_ *glsp.Context, params *protocol.CompletionParams) (any, error) {
+	file := ls.project.File(params.TextDocument.URI)
+	candidates := positionToCandidateNodes(params.Position, file)
 
 	if len(candidates) > 0 {
 		for _, candidate := range candidates {
 			if completable, ok := candidate.(ast.CompletableNode); ok {
 				res := completable.Complete(file.Content(), params.Position, params.Context.TriggerCharacter, ls.project.Symbols())
 				if res != nil {
+					log.Println("Completion returned")
 					return res, nil
+				} else {
+					log.Printf("Completion skip indicated with nil return from %T\n", completable)
 				}
+			} else {
+				log.Println("Completion skip indicated with non-completable node")
 			}
 		}
 	}

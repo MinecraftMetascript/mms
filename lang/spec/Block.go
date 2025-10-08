@@ -89,8 +89,14 @@ func (b BlockSpec) Match(ctx grammar.IBlockContext) (*BlockNode, []ast.Diagnosti
 		}
 		id := idCtx.GetText()
 		valueCtx := decl.Value()
-
-		if val, d := b.AllowedValues.Match(valueCtx); lib.IsNilInterface(val) {
+		if valueCtx == nil {
+			diags = append(diags, ast.Diagnostic{
+				Location: ast.RuleLocation(decl),
+				Message:  "Missing value",
+				Severity: ast.Error,
+			})
+			continue
+		} else if val, d := b.AllowedValues.Match(valueCtx); lib.IsNilInterface(val) {
 			// Nil Case
 			if d != nil && len(d) > 0 {
 				// Use diagnostics from the value spec matching
@@ -123,6 +129,7 @@ func (b BlockSpec) Match(ctx grammar.IBlockContext) (*BlockNode, []ast.Diagnosti
 				s.SetNameLocation(&idL)
 			}
 			out.Declarations[id] = val
+
 			if e, ok := val.(ast.ExtractableNode); ok {
 				out.inlineSymbols = append(out.inlineSymbols, e.ExtractInlineSymbols()...)
 			}

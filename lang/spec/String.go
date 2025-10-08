@@ -9,6 +9,10 @@ import (
 
 type StringSpec struct{}
 
+func (s StringSpec) UsageStr() string {
+	return "string"
+}
+
 func NewStringSpec() *StringSpec {
 	return &StringSpec{}
 }

@@ -11,6 +11,14 @@ type NumberSpec struct {
 	floating bool
 }
 
+func (n NumberSpec) UsageStr() string {
+	if n.floating {
+		return "float"
+	} else {
+		return "int"
+	}
+}
+
 func NewNumberSpec(floating bool) *NumberSpec {
 	return &NumberSpec{
 		floating: floating,

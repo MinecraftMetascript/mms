@@ -25,6 +25,9 @@ type MinecraftMetascriptListener interface {
 	// EnterFn is called when entering the fn production.
 	EnterFn(c *FnContext)
 
+	// EnterFnArgBody is called when entering the fnArgBody production.
+	EnterFnArgBody(c *FnArgBodyContext)
+
 	// EnterValue is called when entering the value production.
 	EnterValue(c *ValueContext)
 
@@ -75,6 +78,9 @@ type MinecraftMetascriptListener interface {
 
 	// ExitFn is called when exiting the fn production.
 	ExitFn(c *FnContext)
+
+	// ExitFnArgBody is called when exiting the fnArgBody production.
+	ExitFnArgBody(c *FnArgBodyContext)
 
 	// ExitValue is called when exiting the value production.
 	ExitValue(c *ValueContext)

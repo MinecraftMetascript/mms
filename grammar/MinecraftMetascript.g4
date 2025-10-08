@@ -3,12 +3,13 @@ grammar MinecraftMetascript;
 file: NL* (namedBlock NL*)*;
 namedBlock: Identifier Identifier NL* '{' ((varDecl | block) NL*)* '}';
 block: Identifier NL* '{' NL* ((varDecl) NL*)* '}';
-varDecl: Identifier '=' /* A value? */ value;
+varDecl: Identifier '=' /* A value? */ value?;
 
 resourceReference: (Identifier ':')? Identifier;
 
 // Allow trailing commas to ensure this parses properly when editing
-fn: Identifier '(' (value ',')* (value ','?)? ')' ('.' fn)*?;
+fn: Identifier fnArgBody  ('.' fn)*?;
+fnArgBody: '(' (value ',')* (value ','?)? ')';
 
 value: number | String | fn | resourceReference | conditional | list;
 
@@ -28,7 +29,7 @@ conditionalBody: '(' NL* condition?  NL* ')';
 list: '['  NL* (value NL* ','? NL*)* value?  NL* ']';
 
 Int: '-'? [0-9]+;
-Float: '-'? [0-9]* '.' [0-9]+;
+Float: '-'? ([0-9]+ '.' [0-9]*) | ([0-9]* '.' [0-9]+);
 number: Int | Float;
 
 String: '"' ~[\r\n]* '"';

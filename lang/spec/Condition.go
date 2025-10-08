@@ -21,6 +21,10 @@ type ConditionalSpec struct {
 	output           func(fn ConditionalNode) any
 }
 
+func (c *ConditionalSpec) UsageStr() string {
+	return ""
+}
+
 func NewConditionSpec() *ConditionalSpec {
 	return &ConditionalSpec{
 		ConditionOptions: []ValueSpec{},
@@ -78,14 +82,28 @@ type ConditionAndNode struct {
 	Left  ast.Symbol
 	Right ast.Symbol
 }
+
+func (can ConditionAndNode) Children() []ast.Node {
+	return []ast.Node{can.Left, can.Right}
+}
+
 type ConditionOrNode struct {
 	ast.BaseSymbol
 	Left  ast.Symbol
 	Right ast.Symbol
 }
+
+func (con ConditionOrNode) Children() []ast.Node {
+	return []ast.Node{con.Left, con.Right}
+}
+
 type ConditionNegateNode struct {
 	ast.BaseSymbol
 	Condition ast.Symbol
+}
+
+func (cn ConditionNegateNode) Children() []ast.Node {
+	return []ast.Node{cn.Condition}
 }
 
 func (c *ConditionalSpec) matchConditionCtx(ctx grammar.IConditionContext) (ast.Symbol, []ast.Diagnostic) {
@@ -165,6 +183,7 @@ func (c *ConditionalSpec) Match(valueCtx grammar.IValueContext) (ast.Node, []ast
 
 	l := ast.RuleLocation(valueCtx)
 	out := &ConditionalNode{
+
 		BaseSymbol: ast.BaseSymbol{
 			Location: &l,
 			BaseNode: ast.BaseNode{},
@@ -294,6 +313,7 @@ func (c ConditionalNode) Complete(fileSource string, position protocol.Position,
 				},
 			})
 		}
+
 	}
 
 	return out

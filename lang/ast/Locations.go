@@ -88,10 +88,10 @@ func (sl SourceLocation) ContainsLocation(l Location) bool {
 	if !lineContained {
 		return false
 	}
-	if sl.Start.Line == l.Line && sl.Start.Column > l.Column {
+	if sl.Start.Line == l.Line && sl.Start.Column >= l.Column {
 		return false
 	}
-	if sl.Stop.Line == l.Line && sl.Stop.Column < l.Column {
+	if sl.Stop.Line == l.Line && sl.Stop.Column <= l.Column {
 		return false
 	}
 	return true

@@ -3,10 +3,12 @@ package spec
 import (
 	"fmt"
 	"slices"
+	"strings"
 
 	"github.com/minecraftmetascript/mms/lang/ast"
 	"github.com/minecraftmetascript/mms/lang/grammar"
 	"github.com/minecraftmetascript/mms/lib"
+	"github.com/samber/lo"
 	protocol "github.com/tliron/glsp/protocol_3_16"
 )
 
@@ -17,6 +19,13 @@ type ListSpec struct {
 
 	export func(fn ListNode, name string) *lib.FileTreeLike
 	output func(fn ListNode) any
+}
+
+func (l *ListSpec) UsageStr() string {
+	return "[" + strings.Join(
+		lo.Map(l.ValueOptions, func(item ValueSpec, index int) string { return fmt.Sprintf("{ %s }", item.UsageStr()) }),
+		" | ",
+	) + "]"
 }
 
 func (l *ListSpec) AddValueOption(spec ...ValueSpec) *ListSpec {

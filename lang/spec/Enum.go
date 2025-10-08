@@ -2,6 +2,7 @@ package spec
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/minecraftmetascript/mms/lang/ast"
 	"github.com/minecraftmetascript/mms/lang/grammar"
@@ -12,6 +13,10 @@ import (
 type EnumSpec struct {
 	Options []string
 	Help    string
+}
+
+func (e EnumSpec) UsageStr() string {
+	return strings.Join(e.Options, " | ")
 }
 
 func (e EnumSpec) Complete(

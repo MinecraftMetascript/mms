@@ -2,6 +2,7 @@ package spec
 
 import (
 	"fmt"
+	"log"
 	"strings"
 
 	"github.com/minecraftmetascript/mms/lang/ast"
@@ -13,6 +14,14 @@ import (
 type ReferenceSpec struct {
 	Kind             ast.SymbolKind
 	defaultNamespace string
+}
+
+func (r *ReferenceSpec) UsageStr() string {
+	if r.Kind == ast.SymbolNever {
+		return "ref"
+	} else {
+		return fmt.Sprintf("ref(%s)", r.Kind)
+	}
 }
 
 func NewReferenceSpec(kind ast.SymbolKind) *ReferenceSpec {
@@ -35,16 +44,16 @@ func (r *ReferenceSpec) Complete(fileSource string, position protocol.Position, 
 	out := make([]protocol.CompletionItem, 0)
 	for ns, nsSymbols := range symbols {
 		for n, s := range nsSymbols.AllDecls() {
+			log.Printf("%T %s %s %s", s, s.GetKind(), ns, n)
 			if s.GetKind() == r.Kind {
-				label := fmt.Sprintf("%s:%s", ns, n)
 				out = append(out, protocol.CompletionItem{
-					Label: label,
+					Label: fmt.Sprintf("[%s] %s:%s", s.GetKind(), ns, n),
 					TextEdit: protocol.TextEdit{
 						Range: protocol.Range{
 							Start: start,
 							End:   position,
 						},
-						NewText: label,
+						NewText: fmt.Sprintf("%s:%s", ns, n),
 					},
 					Kind: &ReferenceKind,
 				})
@@ -114,11 +123,14 @@ func (r *ReferenceNode) Children() []ast.Node {
 
 func (r *ReferenceNode) String() string { return fmt.Sprintf("%s:%s", r.Namespace, r.Name) }
 
-func GetReferenceNodeValue(n ast.Node) *string {
-	if n == nil {
+func GetReferenceNodeValue(node ast.Node, kind ast.SymbolKind) *string {
+	if node == nil {
 		return nil
 	}
-	if n, ok := n.(*ReferenceNode); ok {
+	if n, ok := node.(*ReferenceNode); ok {
+		if n.Kind != kind {
+			return nil
+		}
 		r := n.String()
 		return &r
 	}
