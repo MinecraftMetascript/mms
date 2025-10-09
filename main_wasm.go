@@ -46,16 +46,14 @@ func packageProject() (string, error) {
 	return string(serialized), nil
 }
 
-func updateFile(this js.Value, args []js.Value) any {
+func updateFile(_ js.Value, args []js.Value) any {
 	if len(args) != 3 {
-		log.Println("[Err]: Invalid number of arguments, expected 3, given", len(args))
 		return nil
 	}
 	filename := args[0].String()
 	content := args[1].String()
-	callback := args[2]
-	if callback.Type() != js.TypeFunction {
-		log.Println("[Err]: Invalid callback type, expected function, got", callback.Type())
+	dst := args[2]
+	if dst.Type() != js.TypeFunction {
 		return nil
 	}
 
@@ -65,15 +63,25 @@ func updateFile(this js.Value, args []js.Value) any {
 		return nil
 	}
 	projectStruct, err := packageProject()
+
 	if err != nil {
 		log.Println("[Err]:", err)
 	} else {
-		callback.Invoke(projectStruct)
+		out := js.Global().Get("Uint8Array").New(len(projectStruct))
+
+		js.CopyBytesToJS(out, []byte(projectStruct))
+		js.Global().Get("setTimeout").Invoke(
+			js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+				dst.Invoke(out)
+				return nil
+			}),
+			js.ValueOf(0),
+		)
 	}
 	return nil
 }
 
-func getFileDiag(this js.Value, args []js.Value) any {
+func getFileDiag(_ js.Value, args []js.Value) any {
 	if len(args) != 2 {
 		log.Println("[Err]: Invalid number of arguments, expected 2, given", len(args))
 		return nil
@@ -126,7 +134,10 @@ func main() {
 
 	// Start LSP using the same stream for both reading and writing
 
-	lsp.StartStreaming(stream)
+	err := lsp.StartStreaming(stream)
+	if err != nil {
+		panic(err)
+	}
 
 	select {} // Keep Go WASM running
 }
@@ -151,7 +162,7 @@ func NewWasmStream(toJS js.Value) *WasmStream {
 
 // fromJs is exposed to JS as mmsLspWrite. It accepts a single string argument
 // and appends it to the internal buffer for Read() to consume.
-func (w *WasmStream) fromJs(this js.Value, args []js.Value) any {
+func (w *WasmStream) fromJs(_ js.Value, args []js.Value) any {
 	if len(args) != 1 {
 		log.Println("[Err]: Invalid number of arguments, expected 1, given", len(args))
 		return nil
@@ -211,7 +222,9 @@ func (w *WasmStream) Write(p []byte) (n int, err error) {
 	if w.toJs.Type() != js.TypeFunction {
 		return 0, fmt.Errorf("destination JS function is not defined")
 	}
-	w.toJs.Invoke(string(p))
+	out := js.Global().Get("Uint8Array").New(len(p))
+	js.CopyBytesToJS(out, p)
+	w.toJs.Invoke(out)
 	return len(p), nil
 }
 

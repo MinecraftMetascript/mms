@@ -18,8 +18,9 @@ String=17
 WS=18
 NL=19
 Identifier=20
-BlockComment=21
-LineComment=22
+DocString=21
+BlockComment=22
+LineComment=23
 '{'=1
 '}'=2
 '='=3

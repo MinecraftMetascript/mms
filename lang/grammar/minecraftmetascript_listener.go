@@ -61,6 +61,9 @@ type MinecraftMetascriptListener interface {
 	// EnterNumber is called when entering the number production.
 	EnterNumber(c *NumberContext)
 
+	// EnterDocString is called when entering the docString production.
+	EnterDocString(c *DocStringContext)
+
 	// ExitFile is called when exiting the file production.
 	ExitFile(c *FileContext)
 
@@ -114,4 +117,7 @@ type MinecraftMetascriptListener interface {
 
 	// ExitNumber is called when exiting the number production.
 	ExitNumber(c *NumberContext)
+
+	// ExitDocString is called when exiting the docString production.
+	ExitDocString(c *DocStringContext)
 }

@@ -202,9 +202,11 @@ func (f FunctionSpec) ExtractInlineSymbols(fn FunctionNode) []ast.Symbol {
 	return []ast.Symbol{}
 }
 
-func (f FunctionSpec) Complete(fileSource string, position protocol.Position, triggerChar *string, symbols map[string]*ast.Namespace) []protocol.CompletionItem {
+func (f FunctionSpec) Complete(_ string, position protocol.Position, _ *string, _ map[string]*ast.Namespace) []protocol.CompletionItem {
 	return []protocol.CompletionItem{{
 		Label:            fmt.Sprintf("[%s] %s", f.Kind, f.Name),
+		FilterText:       &f.Name,
+		SortText:         &f.Name,
 		Kind:             &MethodKind,
 		Detail:           &f.Help,
 		InsertTextFormat: &SnippetFormat,
@@ -223,8 +225,6 @@ func (f FunctionSpec) matchFn(fnCtx grammar.IFnContext) (*FunctionNode, []ast.Di
 
 	fnKindCtx := fnCtx.Identifier()
 	if fnKindCtx == nil {
-		// TODO: Diagnose?
-
 		return nil, nil
 	}
 	fnKind := fnKindCtx.GetText()
@@ -238,8 +238,13 @@ func (f FunctionSpec) matchFn(fnCtx grammar.IFnContext) (*FunctionNode, []ast.Di
 	allOverloadResults := make([]*Overload, 0)
 	body := fnCtx.FnArgBody()
 	if body == nil {
-		// TODO: Diagnose?
-		return nil, nil
+		return nil, []ast.Diagnostic{
+			{
+				Location: ast.RuleLocation(fnCtx),
+				Message:  "Missing arguments",
+				Severity: ast.Error,
+			},
+		}
 	}
 	argCount := len(body.AllValue())
 	bodyLocation := ast.RuleLocation(body)
@@ -471,15 +476,7 @@ type FunctionNode struct {
 	spec         FunctionSpec
 	parent       *FunctionNode
 	overload     OverloadSpec
-	ref          string
 	bodyLocation *ast.SourceLocation
-}
-
-func (n *FunctionNode) Ref() string {
-	return n.ref
-}
-func (n *FunctionNode) SetRef(ref string) {
-	n.ref = ref
 }
 
 func (n *FunctionNode) Children() []ast.Node {
@@ -532,7 +529,7 @@ func locate(source string, idx int) ast.Location {
 	return *out
 }
 
-func (n *FunctionNode) builderCompletions(includeLeadingDot bool, fileSource string, position protocol.Position) []protocol.CompletionItem {
+func (n *FunctionNode) builderCompletions(includeLeadingDot bool, _ string, _ protocol.Position) []protocol.CompletionItem {
 	items := make([]protocol.CompletionItem, 0)
 	builderSnapPosition := getBuilderInsertPosition(n)
 	for _, overload := range n.spec.Overloads {
@@ -550,6 +547,7 @@ func (n *FunctionNode) builderCompletions(includeLeadingDot bool, fileSource str
 				items = append(items, protocol.CompletionItem{
 					Label:            b.Name,
 					Detail:           &b.Help,
+					SortText:         &b.Name,
 					Kind:             &MethodKind,
 					InsertTextFormat: &SnippetFormat,
 					TextEdit: protocol.TextEdit{
@@ -568,9 +566,7 @@ func (n *FunctionNode) builderCompletions(includeLeadingDot bool, fileSource str
 		return item.Label
 	})
 
-	// Extract any prefix the user has already typed and filter
-	prefix := ExtractPrefixAtPosition(fileSource, position)
-	return FilterCompletionsByPrefix(items, prefix)
+	return items
 }
 
 func (n *FunctionNode) argCompletions(fileSource string, p protocol.Position, triggerChar *string, symbols map[string]*ast.Namespace) []protocol.CompletionItem {
@@ -664,9 +660,6 @@ func (n *FunctionNode) Complete(fileSource string, position protocol.Position, t
 	items := make([]protocol.CompletionItem, 0)
 	var mode functionCompletionMode
 	if triggerChar == nil || *triggerChar == "" {
-		// Infer mode based on cursor position
-		// If position is after the args closing paren, suggest builders
-		// Otherwise, suggest args
 		if !n.bodyLocation.ContainsPosition(position) {
 			// Cursor is in the function args
 			mode = functionCompletionModeBuilders
@@ -691,16 +684,14 @@ func (n *FunctionNode) Complete(fileSource string, position protocol.Position, t
 			mode = functionCompletionModeArgs
 		}
 	}
-
-	switch mode {
-	case functionCompletionModeBuilders:
+	if mode == functionCompletionModeArgs {
+		items = n.argCompletions(fileSource, position, triggerChar, symbols)
+	} else {
 		idx := position.IndexIn(fileSource)
 		items = n.builderCompletions(fileSource[idx-1] == ')', fileSource, position)
 		if len(items) == 0 && n.parent != nil {
 			return n.parent.Complete(fileSource, position, triggerChar, symbols)
 		}
-	case functionCompletionModeArgs:
-		items = n.argCompletions(fileSource, position, triggerChar, symbols)
 	}
 
 	return items

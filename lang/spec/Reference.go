@@ -2,7 +2,6 @@ package spec
 
 import (
 	"fmt"
-	"log"
 	"strings"
 
 	"github.com/minecraftmetascript/mms/lang/ast"
@@ -32,7 +31,7 @@ func (r *ReferenceSpec) SetDefaultNamespace(defaultNamespace string) *ReferenceS
 	return r
 }
 
-func (r *ReferenceSpec) Complete(fileSource string, position protocol.Position, triggerChar *string, symbols map[string]*ast.Namespace) []protocol.CompletionItem {
+func (r *ReferenceSpec) Complete(fileSource string, position protocol.Position, _ *string, symbols map[string]*ast.Namespace) []protocol.CompletionItem {
 	// Extract any prefix the user has already typed
 	prefix := ExtractPrefixAtPosition(fileSource, position)
 
@@ -44,10 +43,11 @@ func (r *ReferenceSpec) Complete(fileSource string, position protocol.Position, 
 	out := make([]protocol.CompletionItem, 0)
 	for ns, nsSymbols := range symbols {
 		for n, s := range nsSymbols.AllDecls() {
-			log.Printf("%T %s %s %s", s, s.GetKind(), ns, n)
 			if s.GetKind() == r.Kind {
 				out = append(out, protocol.CompletionItem{
-					Label: fmt.Sprintf("[%s] %s:%s", s.GetKind(), ns, n),
+					Label:      fmt.Sprintf("[%s] %s:%s", s.GetKind(), ns, n),
+					FilterText: &n,
+					SortText:   &n,
 					TextEdit: protocol.TextEdit{
 						Range: protocol.Range{
 							Start: start,
@@ -117,6 +117,10 @@ type ReferenceNode struct {
 	Kind      ast.SymbolKind
 }
 
+func (r *ReferenceNode) Ref() string {
+	return fmt.Sprintf("%s:%s", r.Namespace, r.Name)
+}
+
 func (r *ReferenceNode) Children() []ast.Node {
 	return []ast.Node{}
 }
@@ -135,4 +139,33 @@ func GetReferenceNodeValue(node ast.Node, kind ast.SymbolKind) *string {
 		return &r
 	}
 	return nil
+}
+
+func SetDefaultNamespaces(root ast.Node, namespace string) {
+	if r, ok := root.(*ReferenceNode); ok {
+		if r.Namespace == "" {
+			r.Namespace = namespace
+		}
+	}
+	if root != nil {
+		for _, child := range root.Children() {
+			if child != nil {
+				SetDefaultNamespaces(child, namespace)
+			}
+		}
+	}
+}
+
+func SetFilenames(root ast.Node, filename string) {
+	if r, ok := root.(ast.Symbol); ok {
+		r.SetFilename(filename)
+	}
+
+	if root != nil {
+		for _, child := range root.Children() {
+			if child != nil {
+				SetFilenames(child, filename)
+			}
+		}
+	}
 }

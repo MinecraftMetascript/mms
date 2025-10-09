@@ -9,6 +9,7 @@ import (
 
 type NumberSpec struct {
 	floating bool
+	kind     ast.SymbolKind
 }
 
 func (n NumberSpec) UsageStr() string {
@@ -40,9 +41,11 @@ func (n NumberSpec) Match(valueCtx grammar.IValueContext) (ast.Node, []ast.Diagn
 			}
 			return &NumberNode{
 				Value: val,
-				BaseNode: ast.BaseNode{
+				BaseSymbol: ast.BaseSymbol{
 					Location: &numLocation,
+					BaseNode: ast.BaseNode{},
 				},
+				spec: &n,
 			}, nil
 		} else {
 			val, err := strconv.Atoi(numTxt)
@@ -55,9 +58,11 @@ func (n NumberSpec) Match(valueCtx grammar.IValueContext) (ast.Node, []ast.Diagn
 			}
 			return &NumberNode{
 				Value: float64(val),
-				BaseNode: ast.BaseNode{
+				BaseSymbol: ast.BaseSymbol{
 					Location: &numLocation,
+					BaseNode: ast.BaseNode{},
 				},
+				spec: &n,
 			}, nil
 		}
 	}
@@ -65,8 +70,9 @@ func (n NumberSpec) Match(valueCtx grammar.IValueContext) (ast.Node, []ast.Diagn
 }
 
 type NumberNode struct {
-	ast.BaseNode
+	ast.BaseSymbol
 	Value float64
+	spec  *NumberSpec
 }
 
 func GetNumberNodeValue(n ast.Node) *float64 {
@@ -77,4 +83,17 @@ func GetNumberNodeValue(n ast.Node) *float64 {
 		return &n.Value
 	}
 	return nil
+}
+
+func (n *NumberNode) ToSerializable() any {
+	return n.Value
+}
+
+func (n *NumberNode) GetKind() ast.SymbolKind {
+	return n.spec.kind
+}
+
+func (n *NumberSpec) SetKind(kind ast.SymbolKind) *NumberSpec {
+	n.kind = kind
+	return n
 }

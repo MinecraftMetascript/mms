@@ -125,8 +125,15 @@ func (b BlockSpec) Match(ctx grammar.IBlockContext) (*BlockNode, []ast.Diagnosti
 		} else {
 			// At this point, val should not equal nil
 			if s, ok := val.(ast.Symbol); ok {
+				docString := decl.DocString()
+				if docString != nil {
+					// TODO: This will probably kill newlines -- not what we want
+					s.SetDocstring(docString.GetText())
+				}
 				idL := ast.TerminalLocation(idCtx)
 				s.SetNameLocation(&idL)
+			} else {
+				log.Println("Invalid value for block declaration:", val)
 			}
 			out.Declarations[id] = val
 
@@ -157,14 +164,9 @@ type BlockNode struct {
 }
 
 func (b BlockNode) Complete(fileSource string, position protocol.Position, triggerChar *string, symbols map[string]*ast.Namespace) []protocol.CompletionItem {
-	if triggerChar == nil {
-		// TODO: We have to infer?
-	}
-
 	for _, d := range b.Declarations {
 		if d.GetLocation() == nil {
 			// No location don't care
-			log.Printf("Symbol is missing location: %T\n", d)
 			return nil
 		}
 		if d.GetLocation().ContainsPosition(position) {
@@ -173,16 +175,21 @@ func (b BlockNode) Complete(fileSource string, position protocol.Position, trigg
 			}
 			return nil
 		}
+		if s, ok := d.(ast.Symbol); ok {
+			if s.GetNameLocation().ContainsPosition(position) {
+				return nil
+			}
+		}
 	}
-
-	// Extract any prefix the user has already typed
-	prefix := ExtractPrefixAtPosition(fileSource, position)
 
 	out := make([]protocol.CompletionItem, 0)
 	for _, v := range b.spec.AllowedValues.specs {
 		if _, ok := v.(*ListSpec); ok {
+			filterTxt := "Sequence"
 			out = append(out, protocol.CompletionItem{
 				Label:            "Sequence",
+				FilterText:       &filterTxt,
+				SortText:         &filterTxt,
 				Kind:             &StructKind,
 				InsertTextFormat: &SnippetFormat,
 				TextEdit: protocol.TextEdit{
@@ -199,7 +206,7 @@ func (b BlockNode) Complete(fileSource string, position protocol.Position, trigg
 	}
 
 	// Filter by prefix if user has typed something
-	return FilterCompletionsByPrefix(out, prefix)
+	return out
 }
 
 func (b BlockNode) Children() []ast.Node {

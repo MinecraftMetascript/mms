@@ -127,3 +127,9 @@ func (s *BaseMinecraftMetascriptListener) EnterNumber(ctx *NumberContext) {}
 
 // ExitNumber is called when production number is exited.
 func (s *BaseMinecraftMetascriptListener) ExitNumber(ctx *NumberContext) {}
+
+// EnterDocString is called when production docString is entered.
+func (s *BaseMinecraftMetascriptListener) EnterDocString(ctx *DocStringContext) {}
+
+// ExitDocString is called when production docString is exited.
+func (s *BaseMinecraftMetascriptListener) ExitDocString(ctx *DocStringContext) {}

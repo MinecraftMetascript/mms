@@ -10,6 +10,13 @@ type Namespace struct {
 	Name         string            `json:"name"`
 }
 
+func (ns *Namespace) Size() int {
+	if ns.Declarations == nil {
+		return 0
+	}
+	return len(ns.Declarations)
+}
+
 func (ns *Namespace) MarshalJSON() ([]byte, error) {
 	out := map[string]any{}
 	for n, d := range ns.Declarations {

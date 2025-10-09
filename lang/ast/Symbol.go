@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/minecraftmetascript/mms/lib"
+	"github.com/samber/lo"
 )
 
 type SymbolKind string
@@ -12,6 +13,10 @@ type SymbolKind string
 const (
 	SymbolNever            SymbolKind = "Never" // Used for things like block references that MMS doesn't resolve
 	SymbolNoise            SymbolKind = "Noise"
+	SymbolDimensionType    SymbolKind = "DimensionType"
+	SymbolNoiseRouter      SymbolKind = "NoiseRouter"
+	SymbolNoiseSettings    SymbolKind = "NoiseSettings"
+	SymbolDimension        SymbolKind = "Dimension"
 	SymbolSurfaceRule      SymbolKind = "SurfaceRule"
 	SymbolSurfaceCondition SymbolKind = "SurfaceCondition"
 	SymbolDensityFunction  SymbolKind = "DensityFunction"
@@ -26,6 +31,12 @@ type Symbol interface {
 	GetNameLocation() *SourceLocation
 	SetNameLocation(loc *SourceLocation)
 	SetFilename(file string)
+
+	SetDocstring(doc string)
+	GetDocstring() string
+
+	Ref() string
+	SetRef(ref string)
 }
 
 type BaseSymbol struct {
@@ -33,10 +44,34 @@ type BaseSymbol struct {
 	Location     *SourceLocation `json:"location"`
 	NameLocation *SourceLocation `json:"nameLocation"`
 	Kind         SymbolKind      `json:"kind"`
+	DocString    string          `json:"doc"`
+	ref          string
 }
 
 type EmptySymbol struct {
 	BaseSymbol
+}
+
+func (n *BaseSymbol) Ref() string {
+	return n.ref
+}
+func (n *BaseSymbol) SetRef(ref string) {
+	n.ref = ref
+}
+
+func (n *BaseSymbol) GetDocstring() string {
+	return n.DocString
+}
+func (n *BaseSymbol) SetDocstring(doc string) {
+	final := doc
+	final = strings.TrimPrefix(final, "/**")
+	final = strings.TrimSuffix(final, "*/")
+
+	final = strings.Join(lo.Map(strings.Split(final, "\n"), func(line string, index int) string {
+		return strings.TrimPrefix(strings.TrimLeft(line, " \t"), "* ")
+	}), "\n")
+
+	n.DocString = final
 }
 
 func (n *BaseSymbol) GetLocation() *SourceLocation {
@@ -64,7 +99,7 @@ func (n *BaseSymbol) SetFilename(file string) {
 func (n *BaseSymbol) ToSerializable() any {
 	return ""
 }
-func (n *BaseSymbol) ToFileTreeLike(name string) *lib.FileTreeLike {
+func (n *BaseSymbol) ToFileTreeLike(_ string) *lib.FileTreeLike {
 	return nil
 }
 

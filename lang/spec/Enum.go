@@ -13,17 +13,21 @@ import (
 type EnumSpec struct {
 	Options []string
 	Help    string
+	Label   string
 }
 
 func (e EnumSpec) UsageStr() string {
+	if e.Label != "" {
+		return e.Label
+	}
 	return strings.Join(e.Options, " | ")
 }
 
 func (e EnumSpec) Complete(
 	fileSource string,
 	position protocol.Position,
-	triggerChar *string,
-	symbols map[string]*ast.Namespace,
+	_ *string,
+	_ map[string]*ast.Namespace,
 ) []protocol.CompletionItem {
 	prefix := ExtractPrefixAtPosition(fileSource, position)
 
@@ -36,9 +40,11 @@ func (e EnumSpec) Complete(
 	for _, option := range e.Options {
 		detail := e.Help
 		items = append(items, protocol.CompletionItem{
-			Label:  option,
-			Kind:   &ReferenceKind,
-			Detail: &detail,
+			Label:      option,
+			FilterText: &option,
+			SortText:   &option,
+			Kind:       &EnumKind,
+			Detail:     &detail,
 			TextEdit: protocol.TextEdit{
 				Range: protocol.Range{
 					Start: start,
@@ -48,9 +54,7 @@ func (e EnumSpec) Complete(
 			},
 		})
 	}
-
-	// Filter by prefix if user has typed something
-	return FilterCompletionsByPrefix(items, prefix)
+	return items
 }
 
 func NewEnumSpec(options ...string) EnumSpec {
@@ -108,6 +112,12 @@ func (e EnumSpec) SetHelp(help string) EnumSpec {
 	return *out
 }
 
+func (e EnumSpec) SetLabel(label string) EnumSpec {
+	out := &e
+	out.Label = label
+	return *out
+}
+
 type EnumNode struct {
 	ast.BaseSymbol
 	Value string
@@ -118,9 +128,9 @@ func (e EnumNode) GetHelp() string {
 	return e.spec.Help
 }
 
-func (e EnumNode) Complete(fileSource string, position protocol.Position, triggerChar *string, symbols map[string]*ast.Namespace) []protocol.CompletionItem {
-	// Extract any prefix the user has already typed
+func (e EnumNode) Complete(_ string, position protocol.Position, _ *string, _ map[string]*ast.Namespace) []protocol.CompletionItem {
 	if lo.IndexOf(e.spec.Options, e.Value) != -1 {
+		// The user has already typed a valid value for this enum
 		return make([]protocol.CompletionItem, 0)
 	}
 
@@ -129,9 +139,11 @@ func (e EnumNode) Complete(fileSource string, position protocol.Position, trigge
 	for _, option := range e.spec.Options {
 		detail := e.spec.Help
 		items = append(items, protocol.CompletionItem{
-			Label:  option,
-			Kind:   &ReferenceKind,
-			Detail: &detail,
+			Label:      option,
+			FilterText: &option,
+			SortText:   &option,
+			Kind:       &EnumKind,
+			Detail:     &detail,
 			TextEdit: protocol.TextEdit{
 				Range: protocol.Range{
 					Start: position,
@@ -142,8 +154,7 @@ func (e EnumNode) Complete(fileSource string, position protocol.Position, trigge
 		})
 	}
 
-	// Filter by prefix if user has typed something
-	return FilterCompletionsByPrefix(items, e.Value)
+	return items
 }
 
 func GetEnumNodeValue(n ast.Node) *string {

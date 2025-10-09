@@ -42,7 +42,7 @@ func (l *ListSpec) SetHelp(help string) *ListSpec {
 	return l
 }
 
-func (l *ListSpec) Complete(fileSource string, position protocol.Position, triggerChar *string, symbols map[string]*ast.Namespace) []protocol.CompletionItem {
+func (l *ListSpec) Complete(_ string, position protocol.Position, _ *string, _ map[string]*ast.Namespace) []protocol.CompletionItem {
 	return []protocol.CompletionItem{
 		{
 			Label:            fmt.Sprintf("[%s] List", l.Kind),
@@ -148,9 +148,6 @@ func (l ListNode) Complete(fileSource string, position protocol.Position, trigge
 		}
 	}
 
-	// Extract any prefix the user has already typed
-	prefix := ExtractPrefixAtPosition(fileSource, position)
-
 	// Provide completions for available value options
 	out := make([]protocol.CompletionItem, 0)
 	for _, valueSpec := range l.spec.ValueOptions {
@@ -159,7 +156,7 @@ func (l ListNode) Complete(fileSource string, position protocol.Position, trigge
 		}
 	}
 	// Filter by prefix if user has typed something
-	return FilterCompletionsByPrefix(out, prefix)
+	return out
 }
 
 func (l ListNode) GetKind() ast.SymbolKind {

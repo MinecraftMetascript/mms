@@ -52,7 +52,6 @@ var NoiseSerializer = func(fn spec.FunctionNode) any {
 	}
 
 	if len(fn.Arguments) < 1 {
-		// TODO: ERROR
 		return "{ \"__\": \"MMS: Unable to serialize\"}"
 	}
 	if firstOctave, ok := fn.Arguments[0].(*spec.NumberNode); ok {

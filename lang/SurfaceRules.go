@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"slices"
 
 	"github.com/minecraftmetascript/mms/lang/ast"
 	"github.com/minecraftmetascript/mms/lang/spec"
+	"github.com/minecraftmetascript/mms/lang/unpack"
 	"github.com/minecraftmetascript/mms/lib"
 )
 
@@ -45,7 +45,7 @@ func SimpleSerializer(t string) func(fn spec.FunctionNode) any {
 	}
 }
 
-var DepthMultiplier = spec.NewFunctionSpec("DepthMultiplier", SimpleNumberFn)
+var DepthMultiplier = spec.NewFunctionSpec("DepthMultiplier", SimpleFloatFn)
 var AddStoneDepth = spec.NewFunctionSpec("AddStoneDepth", EmptyFn)
 
 var Bandlands = spec.NewFunctionSpec(
@@ -178,7 +178,7 @@ func noiseThresholdSerializer(node spec.FunctionNode) any {
 	}{
 		Type: "minecraft:noise_threshold",
 	}
-	UnpackBuilders(out, node.Builders)
+	unpack.Builders(out, node.Builders)
 	out.Noise = GetInlinedNoiseRef(node.Arguments[0])
 
 	return out
@@ -212,7 +212,7 @@ var StoneDepth = spec.NewFunctionSpec(
 		[]spec.FunctionSpec{
 			OffsetBuilder,
 			spec.NewFunctionSpec("AddSurfaceDepth", EmptyFn),
-			spec.NewFunctionSpec("SecondaryDepthRange", SimpleNumberFn),
+			spec.NewFunctionSpec("SecondaryDepthRange", SimpleFloatFn),
 		},
 	),
 ).
@@ -236,7 +236,7 @@ func StoneDepthSerializer(node spec.FunctionNode) any {
 	}{
 		Type: "minecraft:stone_depth",
 	}
-	UnpackBuilders(out, node.Builders)
+	unpack.Builders(out, node.Builders)
 	if len(node.Arguments) > 0 {
 		if val := spec.GetEnumNodeValue(node.Arguments[0]); val != nil {
 			out.SurfaceType = *val
@@ -277,7 +277,7 @@ func WaterSerializer(node spec.FunctionNode) any {
 	}{
 		Type: "minecraft:water",
 	}
-	UnpackBuilders(out, node.Builders)
+	unpack.Builders(out, node.Builders)
 
 	return out
 }
@@ -308,19 +308,15 @@ func VerticalGradientSerializer(node spec.FunctionNode) any {
 	}
 	out := struct {
 		Type       string `json:"type"`
-		RandomName string `json:"random_name"`
-		Lower      any    `json:"true_at_and_below" mms_builder:"Lower"`
-		Upper      any    `json:"false_at_and_above" mms_builder:"Upper"`
+		RandomName string `json:"random_name" mms_arg:"0"`
+		Lower      any    `json:"true_at_and_below" mms_builder:"Lower" mms_arg:"0" mms_type:"symbol,DensityFn|float"`
+		Upper      any    `json:"false_at_and_above" mms_builder:"Upper" mms_arg:"0" mms_type:"symbol,DensityFn|float"`
 	}{
 		Type: "minecraft:vertical_gradient",
 	}
 
-	UnpackBuilders(&out, node.Builders)
-	if len(node.Arguments) > 0 {
-		if val := spec.GetStringNodeValue(node.Arguments[0]); val != nil {
-			out.RandomName = *val
-		}
-	}
+	unpack.Builders(&out, node.Builders)
+	unpack.Args(&out, node.Arguments)
 
 	return out
 }
@@ -355,7 +351,7 @@ func YAboveSerializer(node spec.FunctionNode) any {
 	}{
 		Type: "minecraft:y_above",
 	}
-	UnpackBuilders(out, node.Builders)
+	unpack.Builders(out, node.Builders)
 	if len(node.Arguments) > 0 {
 		anchor := node.Arguments[0]
 
@@ -369,8 +365,8 @@ func init() {
 	Conditional = spec.NewConditionSpec().
 		SetKind(ast.SymbolSurfaceRule).
 		SetHelp("Applies a rule based on a surface condition")
-	SurfaceConditions = []spec.ValueSpec{AboveSurface, Biome, Hole, NoiseThreshold, Steep, StoneDepth, Frozen, Water, VerticalGradient, YAbove}
-	SurfaceRules = []spec.ValueSpec{Bandlands, Block, Conditional}
+	SurfaceConditions.Add(AboveSurface, Biome, Hole, NoiseThreshold, Steep, StoneDepth, Frozen, Water, VerticalGradient, YAbove)
+	SurfaceRules.Add(Bandlands, Block, Conditional)
 	ListRule := spec.NewListSpec().
 		SetOutputFn(
 			func(node spec.ListNode) any {
@@ -392,12 +388,12 @@ func init() {
 			}).
 		SetKind(ast.SymbolSurfaceRule).
 		SetHelp("Creates a list of rules, the first valid rule will be used.s")
-	SurfaceRules = append(SurfaceRules, ListRule)
+	SurfaceRules.Add(ListRule)
 
 	Conditional.
-		AddConditionOption(SurfaceConditions...).
+		AddConditionOption(SurfaceConditions).
 		AddConditionOption(spec.NewReferenceSpec(ast.SymbolSurfaceCondition)).
-		AddValueOption(SurfaceRules...).
+		AddValueOption(SurfaceRules).
 		AddValueOption(spec.NewReferenceSpec(ast.SymbolSurfaceRule)).
 		SetOutputFn(func(n spec.ConditionalNode) any {
 			var val any = nil
@@ -409,18 +405,18 @@ func init() {
 
 	ListRule.
 		AddValueOption(spec.NewReferenceSpec(ast.SymbolSurfaceRule)).
-		AddValueOption(SurfaceRules...)
+		AddValueOption(SurfaceRules)
 
 	SurfaceRuleBlock = spec.NewBlockSpec(
 		"Surface",
-		slices.Concat(SurfaceRules, SurfaceConditions),
+		spec.NewValueSpecList(SurfaceRules, SurfaceConditions).All(),
 	)
 
 	Blocks.Add(&SurfaceRuleBlock)
 }
 
-var SurfaceConditions []spec.ValueSpec
-var SurfaceRules []spec.ValueSpec
+var SurfaceConditions = spec.NewValueSpecList()
+var SurfaceRules = spec.NewValueSpecList()
 var Conditional *spec.ConditionalSpec
 var SurfaceRuleBlock spec.BlockSpec
 

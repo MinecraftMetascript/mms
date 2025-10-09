@@ -9,7 +9,9 @@ import (
 	"strings"
 
 	"github.com/minecraftmetascript/mms/lang/ast"
+	"github.com/minecraftmetascript/mms/lang/spec"
 	"github.com/minecraftmetascript/mms/project"
+	"github.com/samber/lo"
 	"github.com/tliron/commonlog"
 	_ "github.com/tliron/commonlog/simple"
 	"github.com/tliron/glsp"
@@ -24,13 +26,6 @@ type LanguageServer struct {
 	version string
 	handler *protocol.Handler
 	project *project.Project
-}
-
-func abs(x int) int {
-	if x < 0 {
-		return -x
-	}
-	return x
 }
 
 type logTranslator struct {
@@ -62,6 +57,8 @@ func init() {
 		TextDocumentDocumentSymbol: ls.TextDocumentDocumentSymbol,
 		TextDocumentHover:          ls.TextDocumentHover,
 		TextDocumentCompletion:     ls.TextDocumentCompletion,
+		TextDocumentDefinition:     ls.TextDocumentDefinition,
+		TextDocumentReferences:     ls.TextDocumentReferences,
 	}
 
 }
@@ -84,7 +81,7 @@ func Start() error {
 
 	return serve.RunStdio()
 }
-func (ls *LanguageServer) TextDocumentDocumentSymbol(context *glsp.Context, params *protocol.DocumentSymbolParams) (any, error) {
+func (ls *LanguageServer) TextDocumentDocumentSymbol(_ *glsp.Context, params *protocol.DocumentSymbolParams) (any, error) {
 	path := params.TextDocument.URI
 
 	f := ls.project.File(path)
@@ -121,7 +118,7 @@ func (ls *LanguageServer) TextDocumentDidOpen(ctx *glsp.Context, params *protoco
 	return err
 }
 
-func (ls *LanguageServer) Initialize(context *glsp.Context, params *protocol.InitializeParams) (any, error) {
+func (ls *LanguageServer) Initialize(_ *glsp.Context, _ *protocol.InitializeParams) (any, error) {
 	capabilities := ls.handler.CreateServerCapabilities()
 	capabilities.CompletionProvider.TriggerCharacters = []string{".", "(", ")", ":", "=", " ", ","}
 
@@ -134,12 +131,12 @@ func (ls *LanguageServer) Initialize(context *glsp.Context, params *protocol.Ini
 	}, nil
 }
 
-func (ls *LanguageServer) Shutdown(context *glsp.Context) error {
+func (ls *LanguageServer) Shutdown(*glsp.Context) error {
 	ls.log.Info("Stopping...")
 	return nil
 }
 
-func (ls *LanguageServer) Initialized(context *glsp.Context, params *protocol.InitializedParams) error {
+func (ls *LanguageServer) Initialized(_ *glsp.Context, _ *protocol.InitializedParams) error {
 	return nil
 }
 
@@ -165,20 +162,57 @@ func (ls *LanguageServer) TextDocumentDidChange(context *glsp.Context, params *p
 	return err
 }
 
-func (ls *LanguageServer) TextDocumentHover(context *glsp.Context, params *protocol.HoverParams) (*protocol.Hover, error) {
+func (ls *LanguageServer) TextDocumentHover(_ *glsp.Context, params *protocol.HoverParams) (*protocol.Hover, error) {
 	file := ls.project.File(params.TextDocument.URI)
 	candidates := positionToCandidateNodes(params.Position, file)
 
 	if len(candidates) > 0 {
 		for _, candidate := range candidates {
-			log.Println(candidate.GetLocation())
+			if s, ok := candidate.(ast.Symbol); ok {
+				docstring := s.GetDocstring()
+				targetLocation := s.GetNameLocation()
+				kind := s.GetKind()
+				if r, ok := s.(*spec.ReferenceNode); ok {
+					if ns, ok := ls.project.Symbols()[r.Namespace]; ok {
+						if n := ns.GetDecl(r.Name); n != nil {
+							if n.GetDocstring() != "" {
+								docstring = n.GetDocstring()
+								targetLocation = r.GetLocation()
+								kind = n.GetKind()
+							}
+						}
+					}
+				}
+				if docstring != "" {
+					if targetLocation != nil && targetLocation.ContainsPosition(params.Position) {
+						out := &protocol.Hover{
+							Contents: protocol.MarkupContent{
+								Kind:  protocol.MarkupKindMarkdown,
+								Value: fmt.Sprintf("# %s\n> %s\n\n%s", s.Ref(), kind, docstring),
+							},
+						}
+
+						r := targetLocation.ToLspRange()
+						out.Range = &r
+
+						return out, nil
+					}
+				}
+			}
 			if helpful, ok := candidate.(ast.HelpfulNode); ok && helpful.GetHelp() != "" {
-				return &protocol.Hover{
+				out := &protocol.Hover{
 					Contents: protocol.MarkupContent{
 						Kind:  protocol.MarkupKindMarkdown,
 						Value: helpful.GetHelp(),
 					},
-				}, nil
+				}
+				l := helpful.GetLocation()
+				if l != nil {
+					r := l.ToLspRange()
+					out.Range = &r
+				}
+
+				return out, nil
 			}
 		}
 	}
@@ -219,7 +253,13 @@ func positionToCandidateNodes(position protocol.Position, file *project.File) []
 	return candidates
 }
 
+var completionIdx = 0
+
 func (ls *LanguageServer) TextDocumentCompletion(_ *glsp.Context, params *protocol.CompletionParams) (any, error) {
+	idx := completionIdx
+	completionIdx++
+	log.Println("TextDocumentCompletion called", idx)
+	defer func() { log.Println("TextDocumentCompletion done", idx) }()
 	file := ls.project.File(params.TextDocument.URI)
 	candidates := positionToCandidateNodes(params.Position, file)
 
@@ -228,16 +268,64 @@ func (ls *LanguageServer) TextDocumentCompletion(_ *glsp.Context, params *protoc
 			if completable, ok := candidate.(ast.CompletableNode); ok {
 				res := completable.Complete(file.Content(), params.Position, params.Context.TriggerCharacter, ls.project.Symbols())
 				if res != nil {
-					log.Println("Completion returned")
+					log.Println("TextDocumentCompletion returning", res)
 					return res, nil
-				} else {
-					log.Printf("Completion skip indicated with nil return from %T\n", completable)
 				}
-			} else {
-				log.Println("Completion skip indicated with non-completable node")
 			}
 		}
 	}
+	log.Println("TextDocumentCompletion returning empty array")
+	return make([]protocol.CompletionItem, 0), nil
+}
 
+func (ls *LanguageServer) TextDocumentDefinition(_ *glsp.Context, params *protocol.DefinitionParams) (any, error) {
+	// Location | []Location | []LocationLink | nil
+	file := ls.project.File(params.TextDocument.URI)
+	candidates := positionToCandidateNodes(params.Position, file)
+
+	if ref, ok := candidates[0].(*spec.ReferenceNode); ok {
+		if decl := ls.project.Symbols()[ref.Namespace].GetDecl(ref.Name); decl != nil {
+			return protocol.Location{
+				Range: decl.GetLocation().ToLspRange(),
+				URI:   decl.GetLocation().Filename,
+			}, nil
+		}
+	}
 	return nil, nil
+
+}
+func findRefs(node ast.Node, ns string, n string) []protocol.Location {
+	out := make([]protocol.Location, 0)
+	if ref, ok := node.(*spec.ReferenceNode); ok {
+		if ref.Namespace == ns && ref.Name == n {
+			out = append(out, protocol.Location{
+				Range: ref.GetLocation().ToLspRange(),
+				URI:   ref.GetLocation().Filename,
+			})
+		}
+	} else {
+		for _, c := range node.Children() {
+			out = append(out, findRefs(c, ns, n)...)
+		}
+	}
+	return out
+}
+func (ls *LanguageServer) TextDocumentReferences(_ *glsp.Context, params *protocol.ReferenceParams) ([]protocol.Location, error) {
+	file := ls.project.File(params.TextDocument.URI)
+	candidates := positionToCandidateNodes(params.Position, file)
+
+	out := make([]protocol.Location, 0)
+	if ref, ok := candidates[0].(*spec.ReferenceNode); ok {
+		for _, n := range file.AST() {
+			out = append(out, findRefs(n, ref.Namespace, ref.Name)...)
+		}
+	}
+	if s, ok := candidates[0].(ast.Symbol); ok {
+		for _, n := range file.AST() {
+			refParts := strings.Split(s.Ref(), ":")
+			out = append(out, findRefs(n, refParts[0], refParts[1])...)
+		}
+	}
+
+	return lo.Uniq(out), nil
 }

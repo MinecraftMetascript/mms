@@ -7,6 +7,7 @@ import (
 
 	"github.com/minecraftmetascript/mms/lang/ast"
 	"github.com/minecraftmetascript/mms/lang/spec"
+	"github.com/minecraftmetascript/mms/lang/unpack"
 	"github.com/minecraftmetascript/mms/lib"
 )
 
@@ -77,24 +78,38 @@ func unaryDensityFn(label, kind string) spec.FunctionSpec {
 
 func binaryDensityFn(label, kind string) spec.FunctionSpec {
 	return spec.NewFunctionSpec(
-		label, spec.NewOverloadSpec(
+		label,
+		spec.NewOverloadSpec(
 			[]spec.ValueSpec{DensityFunctions, DensityFunctions},
 			nil,
 			nil,
-		)).SetOutputFn(func(n spec.FunctionNode) any {
-		if len(n.Arguments) < 2 {
-			return nil
-		}
-		if arg1, ok := n.Arguments[0].(ast.Symbol); ok {
-			if arg2, ok := n.Arguments[1].(ast.Symbol); ok {
-				return serializeBinary(kind, arg1, arg2)
+		)).
+		SetKind(ast.SymbolDensityFunction).
+		SetOutputFn(func(n spec.FunctionNode) any {
+			if len(n.Arguments) < 2 {
+				return nil
 			}
-		}
-		return nil
-	}).SetKind(ast.SymbolDensityFunction) // TODO: Serialize / Export
+			if arg1, ok := n.Arguments[0].(ast.Symbol); ok {
+				if arg2, ok := n.Arguments[1].(ast.Symbol); ok {
+					return serializeBinary(kind, arg1, arg2)
+				}
+			}
+			return nil
+		}).
+		SetFileExporter(DensityFnExporter(func(n spec.FunctionNode) any {
+			if len(n.Arguments) < 2 {
+				return nil
+			}
+			if arg1, ok := n.Arguments[0].(ast.Symbol); ok {
+				if arg2, ok := n.Arguments[1].(ast.Symbol); ok {
+					return serializeBinary(kind, arg1, arg2)
+				}
+			}
+			return nil
+		}))
 }
 
-var DensityFunctions = spec.NewValueSpecList()
+var DensityFunctions = spec.NewValueSpecList().SetLabel("Density Function")
 
 var Interpolated = unaryDensityFn("Interpolated", "minecraft:interpolated")
 var Abs = unaryDensityFn("Abs", "minecraft:abs")
@@ -274,16 +289,18 @@ func serializeNoiseDensityFn(n spec.FunctionNode) any {
 		YScale:  1.0,
 	}
 
-	UnpackBuilders(out, n.Builders)
+	unpack.Builders(out, n.Builders)
 	out.Noise = GetInlinedNoiseRef(n.Arguments[0])
 
 	return out
 }
 
-var Noise = spec.NewFunctionSpec("Noise", spec.NewOverloadSpec(
-	[]spec.ValueSpec{InlinedNoise},
-	nil,
-	[]spec.FunctionSpec{XzScale, YScale}),
+var Noise = spec.NewFunctionSpec("Noise",
+	spec.NewOverloadSpec(
+		[]spec.ValueSpec{InlinedNoise},
+		nil,
+		[]spec.FunctionSpec{XzScale, YScale},
+	),
 ).
 	SetKind(ast.SymbolDensityFunction).
 	SetOutputFn(serializeNoiseDensityFn).
@@ -342,7 +359,7 @@ func serializeShiftedNoise(n spec.FunctionNode) any {
 		Xz:   1.0,
 		Y:    1.0,
 	}
-	UnpackBuilders(out, n.Builders)
+	unpack.Builders(out, n.Builders)
 	// arg0 = inlined noise (or ref)
 	if len(n.Arguments) > 0 {
 		out.Noise = GetInlinedNoiseRef(n.Arguments[0])
@@ -363,31 +380,164 @@ var ShiftedNoise = spec.NewFunctionSpec(
 	SetFileExporter(DensityFnExporter(serializeShiftedNoise)).
 	SetSymbolExtractor(ExtractInlineNoiseSymbol(0))
 
-var RangeChoice = spec.NewFunctionSpec("RangeChoice", spec.NewOverloadSpec(nil, nil, nil)).
-	SetKind(ast.SymbolDensityFunction).
-	SetOutputFn(func(n spec.FunctionNode) any { return nil }).
-	SetFileExporter(func(n spec.FunctionNode, name string) *lib.FileTreeLike { return nil })
+func serializeRangeChoice(n spec.FunctionNode) any {
+	out := &struct {
+		Type     string  `json:"type"`
+		Input    any     `json:"input" mms_arg:"0" mms_type:"symbol,DensityFn|float"`
+		Min      float64 `json:"min_inclusive" mms_builder:"Min"`
+		Max      float64 `json:"max_exclusive" mms_builder:"Max"`
+		InRange  any     `json:"when_in_range" mms_builder:"InRange" mms_arg:"0" mms_type:"symbol,DensityFn"`
+		OutRange any     `json:"when_out_of_range" mms_builder:"OutRange" mms_arg:"0" mms_type:"symbol,DensityFn"`
+	}{
+		Type: "minecraft:range_choice",
+	}
+	unpack.Builders(out, n.Builders)
+	unpack.Args(out, n.Arguments)
+	return out
+}
 
-var Clamp = spec.NewFunctionSpec("Clamp", spec.NewOverloadSpec(nil, nil, nil)).
-	SetKind(ast.SymbolDensityFunction).
-	SetOutputFn(func(n spec.FunctionNode) any { return nil }).
-	SetFileExporter(func(n spec.FunctionNode, name string) *lib.FileTreeLike { return nil })
+func getDensityFn(n spec.FunctionNode) any {
+	switch arg := n.Arguments[0].(type) {
+	case ast.Symbol:
+		return arg.ToSerializable()
+	case *spec.NumberNode:
+		return spec.GetNumberNodeValue(arg)
+	default:
+		return nil
+	}
+}
 
-var Spline = spec.NewFunctionSpec("Spline", spec.NewOverloadSpec(nil, nil, nil)).
+var RangeChoice = spec.NewFunctionSpec("RangeChoice", spec.NewOverloadSpec([]spec.ValueSpec{DensityFunctions}, nil,
+	[]spec.FunctionSpec{
+		Min, Max,
+		spec.NewFunctionSpec("InRange", spec.NewOverloadSpec([]spec.ValueSpec{DensityFunctions}, nil, nil)).
+			SetOutputFn(getDensityFn),
+		spec.NewFunctionSpec("OutRange", spec.NewOverloadSpec([]spec.ValueSpec{DensityFunctions}, nil, nil)).
+			SetOutputFn(getDensityFn),
+	})).
 	SetKind(ast.SymbolDensityFunction).
-	SetOutputFn(func(n spec.FunctionNode) any { return nil }).
-	SetFileExporter(func(n spec.FunctionNode, name string) *lib.FileTreeLike { return nil })
+	SetOutputFn(serializeRangeChoice).
+	SetFileExporter(DensityFnExporter(serializeRangeChoice))
 
-var YClampedGradient = spec.NewFunctionSpec("YClampedGradient", spec.NewOverloadSpec(nil, nil, nil)).
+func serializeClamp(n spec.FunctionNode) any {
+	out := &struct {
+		Type     string  `json:"type"`
+		Argument any     `json:"argument" mms_arg:"0" mms_type:"symbol,DensityFn|float"`
+		Min      float64 `json:"min" mms_builder:"Min"`
+		Max      float64 `json:"max" mms_builder:"Max"`
+	}{}
+	out.Type = "minecraft:clamp"
+	unpack.Builders(out, n.Builders)
+	unpack.Args(out, n.Arguments)
+	return out
+}
+
+var Clamp = spec.NewFunctionSpec("Clamp", spec.NewOverloadSpec([]spec.ValueSpec{DensityFunctions}, nil, []spec.FunctionSpec{MinBuilder, MaxBuilder})).
 	SetKind(ast.SymbolDensityFunction).
-	SetOutputFn(func(n spec.FunctionNode) any { return nil }).
-	SetFileExporter(func(n spec.FunctionNode, name string) *lib.FileTreeLike { return nil })
+	SetOutputFn(serializeClamp).
+	SetFileExporter(DensityFnExporter(serializeClamp))
+
+type splinePoint struct {
+	Location   float64 `json:"location" mms_builder:"Location"`
+	Derivative float64 `json:"derivative" mms_builder:"Derivative"`
+	Value      any     `json:"value"` // We have to process these by hand?
+}
+
+type spline struct {
+	Coordinate any           `json:"coordinate" mms_arg:"0" mms_type:"symbol,DensityFn|float"`
+	Points     []splinePoint `json:"points"`
+}
+
+func serializeSpline(n spec.FunctionNode) any {
+	out := &spline{
+		Points: []splinePoint{},
+	}
+	// Get Coordinate
+	unpack.Args(out, n.Arguments)
+
+	// Get Points
+	for _, builder := range n.Builders {
+		point := &splinePoint{}
+
+		unpack.Args(point, builder.Arguments)
+		unpack.Builders(point, builder.Builders)
+		out.Points = append(out.Points, *point)
+	}
+
+	return out
+}
+
+var Spline spec.FunctionSpec
+
+type yClampedGradientStop struct {
+	Y float64 `json:"y" mms_arg:"0"`
+	V float64 `json:"v" mms_arg:"1"`
+}
+
+func serializeYClampedGradient(n spec.FunctionNode) any {
+	out := &struct {
+		Type  string  `json:"type"`
+		FromY float64 `json:"from_y"`
+		ToY   float64 `json:"to_y"`
+		From  float64 `json:"from_value"`
+		To    float64 `json:"to_value"`
+	}{}
+	out.Type = "minecraft:y_clamped_gradient"
+	for _, builders := range n.Builders {
+		v := &yClampedGradientStop{}
+		unpack.Args(v, builders.Arguments)
+		switch builders.Name {
+		case "From":
+			out.FromY = v.Y
+			out.From = v.V
+		case "To":
+			out.ToY = v.Y
+			out.To = v.V
+		}
+	}
+
+	return out
+}
+
+var YClampedGradient = spec.NewFunctionSpec("YClampedGradient", spec.NewOverloadSpec(nil, nil, []spec.FunctionSpec{
+	spec.NewFunctionSpec("From", spec.NewOverloadSpec([]spec.ValueSpec{spec.NewNumberSpec(false), spec.NewNumberSpec(true)}, nil, nil)),
+	spec.NewFunctionSpec("To", spec.NewOverloadSpec([]spec.ValueSpec{spec.NewNumberSpec(false), spec.NewNumberSpec(true)}, nil, nil)),
+})).
+	SetKind(ast.SymbolDensityFunction).
+	SetOutputFn(serializeYClampedGradient).
+	SetFileExporter(DensityFnExporter(serializeYClampedGradient))
 
 var DensityFnBlock spec.BlockSpec
 
 func init() {
-	DensityFunctions.Add(spec.NewNumberSpec(true))                         // constants
-	DensityFunctions.Add(spec.NewReferenceSpec(ast.SymbolDensityFunction)) // constants
+	splineRef := spec.NewValueSpecList()
+	Spline = spec.NewFunctionSpec(
+		"Spline",
+		spec.NewOverloadSpec(
+			[]spec.ValueSpec{DensityFunctions}, // Coordinate
+			nil,
+			[]spec.FunctionSpec{ // Points
+				spec.NewFunctionSpec(
+					"Point",
+					spec.NewOverloadSpec(
+						[]spec.ValueSpec{
+							spec.NewNumberSpec(true), // Location
+							spec.NewNumberSpec(true), // Derivative
+							splineRef,                // Value
+						},
+						nil,
+						nil,
+					),
+				),
+			},
+		)).
+		SetKind(ast.SymbolDensityFunction).
+		SetOutputFn(serializeSpline).
+		SetFileExporter(DensityFnExporter(serializeSpline))
+	splineRef.Add(Spline)
+
+	DensityFunctions.Add(spec.NewNumberSpec(true).SetKind(ast.SymbolDensityFunction)) // constants
+	DensityFunctions.Add(spec.NewReferenceSpec(ast.SymbolDensityFunction))            // constants
 	DensityFunctions.Add(Interpolated)
 	DensityFunctions.Add(Cache)
 	DensityFunctions.Add(Shift)

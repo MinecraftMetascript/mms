@@ -76,6 +76,12 @@ var buildCmd = &cobra.Command{
 				string(r),
 				err,
 			)
+		} else {
+			// induce serialization for logging
+			_, e := json.MarshalIndent(project.Symbols(), "", "  ")
+			if e != nil {
+				log.Println("Error serializing project:", e)
+			}
 		}
 	},
 }

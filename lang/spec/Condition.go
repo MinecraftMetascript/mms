@@ -41,9 +41,12 @@ func (c *ConditionalSpec) SetHelp(help string) *ConditionalSpec {
 	return c
 }
 
-func (c *ConditionalSpec) Complete(fileSource string, position protocol.Position, triggerChar *string, symbols map[string]*ast.Namespace) []protocol.CompletionItem {
+func (c *ConditionalSpec) Complete(_ string, position protocol.Position, _ *string, _ map[string]*ast.Namespace) []protocol.CompletionItem {
+	filterTxt := "If"
 	return []protocol.CompletionItem{{
 		Label:            fmt.Sprintf("[%s] Condition", c.Kind),
+		FilterText:       &filterTxt,
+		SortText:         &filterTxt,
 		Kind:             &MethodKind,
 		Detail:           &c.Help,
 		InsertTextFormat: &SnippetFormat,
@@ -100,10 +103,6 @@ func (con ConditionOrNode) Children() []ast.Node {
 type ConditionNegateNode struct {
 	ast.BaseSymbol
 	Condition ast.Symbol
-}
-
-func (cn ConditionNegateNode) Children() []ast.Node {
-	return []ast.Node{cn.Condition}
 }
 
 func (c *ConditionalSpec) matchConditionCtx(ctx grammar.IConditionContext) (ast.Symbol, []ast.Diagnostic) {
@@ -286,8 +285,12 @@ func (c ConditionalNode) Complete(fileSource string, position protocol.Position,
 				}
 			}
 		} else {
+			filterTxtAnd := "&&"
+			filterTxtOr := "||"
 			out = append(out, protocol.CompletionItem{
 				Label:            "AND",
+				FilterText:       &filterTxtAnd,
+				SortText:         &filterTxtAnd,
 				Kind:             &MethodKind,
 				Detail:           &c.spec.Help,
 				InsertTextFormat: &SnippetFormat,
@@ -301,6 +304,8 @@ func (c ConditionalNode) Complete(fileSource string, position protocol.Position,
 			})
 			out = append(out, protocol.CompletionItem{
 				Label:            "OR",
+				FilterText:       &filterTxtOr,
+				SortText:         &filterTxtOr,
 				Kind:             &MethodKind,
 				Detail:           &c.spec.Help,
 				InsertTextFormat: &SnippetFormat,

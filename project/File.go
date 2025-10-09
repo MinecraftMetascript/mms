@@ -82,6 +82,13 @@ func (f *File) NodesInRange(start, stop ast.Location) []ast.Node {
 	for loc, v := range f.astNodes {
 		if loc.ContainsLocation(start) || loc.ContainsLocation(stop) {
 			candidates = append(candidates, v)
+		} else if s, ok := v.(ast.Symbol); ok {
+			nameLocation := s.GetNameLocation()
+			if nameLocation != nil {
+				if nameLocation.ContainsLocation(start) || nameLocation.ContainsLocation(stop) {
+					candidates = append(candidates, v)
+				}
+			}
 		}
 	}
 	slices.SortStableFunc(candidates, func(a, b ast.Node) int {

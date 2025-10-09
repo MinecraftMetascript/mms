@@ -3,7 +3,7 @@ grammar MinecraftMetascript;
 file: NL* (namedBlock NL*)*;
 namedBlock: Identifier Identifier NL* '{' ((varDecl | block) NL*)* '}';
 block: Identifier NL* '{' NL* ((varDecl) NL*)* '}';
-varDecl: Identifier '=' /* A value? */ value?;
+varDecl: (docString)? Identifier '=' /* A value? */ value?;
 
 resourceReference: (Identifier ':')? Identifier;
 
@@ -40,5 +40,7 @@ NL: [\n] -> channel(HIDDEN);
 // Laziest
 Identifier: [a-zA-Z_] [a-zA-Z0-9_/]*;
 
+docString: DocString NL*;
+DocString: '/**' .*? '*/';
 BlockComment: '/*' .*? '*/' -> channel(HIDDEN);
 LineComment: '//' ~[\r\n]* -> channel(HIDDEN);

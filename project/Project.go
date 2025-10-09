@@ -28,8 +28,6 @@ func (p *Project) AddFile(path, content string) (*File, error) {
 		astNodes: make(map[ast.SourceLocation]ast.Node),
 	}
 	if p.files[path] != nil {
-		// TODO: Ensure that we are properly deleting all symbols from an
-		// existing file before we re-parse it.
 		for _, decls := range p.symbols {
 			for name, decl := range decls.AllDecls() {
 				if decl == nil || decl.GetLocation() == nil {

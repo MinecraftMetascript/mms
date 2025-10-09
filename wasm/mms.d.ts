@@ -1,5 +1,5 @@
 declare global {
-    function updateFile(filename: string, content: string, callback: ProjectUpdateHook): void
+    function updateFile(filename: string, content: string, dst: (a: Uint8Array) => void): void
 
     function getFileDiag(filename: string, callback: (serial: string) => void)
 

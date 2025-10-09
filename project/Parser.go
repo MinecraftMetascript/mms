@@ -24,7 +24,6 @@ type Parser struct {
 func (p *Parser) ExitNamedBlock(ctx *grammar.NamedBlockContext) {
 	kind := ctx.Identifier(0)
 	if kind == nil {
-		// TODO: ✏ Diagnose -- No GetKind
 		return
 	}
 	if kind.GetText() != "Namespace" {
@@ -34,7 +33,11 @@ func (p *Parser) ExitNamedBlock(ctx *grammar.NamedBlockContext) {
 
 	nsIdCtx := ctx.Identifier(1)
 	if nsIdCtx == nil {
-		// TODO: ✏ Diagnose -- Missing namespace name
+		p.diagnostics.Add(ast.Diagnostic{
+			Location: ast.RuleLocation(ctx),
+			Message:  "Namespace must have a name.",
+			Severity: ast.Error,
+		})
 	}
 	namespace := "__unknown"
 	if nsIdCtx != nil {
@@ -47,7 +50,11 @@ func (p *Parser) ExitNamedBlock(ctx *grammar.NamedBlockContext) {
 	for _, b := range ctx.AllBlock() {
 		blockKind := b.Identifier()
 		if blockKind == nil {
-			// TODO: ✏ Diagnose -- No GetKind
+			p.diagnostics.Add(ast.Diagnostic{
+				Location: ast.RuleLocation(b),
+				Message:  "Block must have a kind.",
+				Severity: ast.Error,
+			})
 			continue
 		}
 
@@ -61,26 +68,25 @@ func (p *Parser) ExitNamedBlock(ctx *grammar.NamedBlockContext) {
 			continue
 		}
 		block, diags := blockSpec.Match(b)
-		// TODO: Is this really what we want?
+
 		p.diagnostics.Add(diags...)
 		if block == nil {
 			continue
 		}
 		p.blocks = append(p.blocks, block)
 
+		spec.SetDefaultNamespaces(block, namespace)
+		spec.SetFilenames(block, p.filename)
 		for name, decl := range block.Declarations {
 			if symbol, ok := decl.(ast.Symbol); ok {
-				symbol.SetFilename(p.filename)
+				symbol.SetRef(fmt.Sprintf("%s:%s", namespace, name))
 				ns.Declare(
 					name, symbol,
 				)
 			}
 		}
 		for _, decl := range block.ExtractInlineSymbols() {
-			decl.SetFilename(p.filename)
-			if v, ok := decl.(*spec.FunctionNode); ok {
-				v.SetRef(ast.InlineSymbolId(decl))
-			}
+			decl.SetRef(ast.InlineSymbolId(decl))
 			inlinedNs.Declare(
 				ast.InlineSymbolId(decl), decl,
 			)
@@ -95,7 +101,10 @@ func (p *Parser) ExitNamedBlock(ctx *grammar.NamedBlockContext) {
 		} else {
 			p.namespaces["mms_inline"] = inlinedNs
 		}
+	}
 
+	if p.namespaces["mms_inline"].Size() == 0 {
+		delete(p.namespaces, "mms_inline")
 	}
 }
 

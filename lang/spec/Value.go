@@ -15,6 +15,7 @@ var SnippetFormat = protocol.InsertTextFormatSnippet
 var MethodKind = protocol.CompletionItemKindMethod
 var ReferenceKind = protocol.CompletionItemKindReference
 var StructKind = protocol.CompletionItemKindStruct
+var EnumKind = protocol.CompletionItemKindEnum
 
 // ExtractPrefixAtPosition extracts the identifier-like prefix before the cursor position.
 // It walks backwards from the position until it hits a non-identifier character.
@@ -40,26 +41,6 @@ func ExtractPrefixAtPosition(fileSource string, position protocol.Position) stri
 	return strings.ToLower(prefix)
 }
 
-// FilterCompletionsByPrefix filters completion items based on a prefix.
-// It performs case-insensitive prefix matching on the Label field.
-func FilterCompletionsByPrefix(items []protocol.CompletionItem, prefix string) []protocol.CompletionItem {
-	if prefix == "" {
-		return items
-	}
-
-	filtered := make([]protocol.CompletionItem, 0)
-	lowerPrefix := strings.ToLower(prefix)
-
-	for _, item := range items {
-		labelLower := strings.ToLower(item.Label)
-		if strings.HasPrefix(labelLower, lowerPrefix) {
-			filtered = append(filtered, item)
-		}
-	}
-
-	return filtered
-}
-
 type ValueSpec interface {
 	Match(valueCtx grammar.IValueContext) (ast.Node, []ast.Diagnostic)
 	UsageStr() string
@@ -67,11 +48,22 @@ type ValueSpec interface {
 
 type ValueSpecList struct {
 	specs []ValueSpec
+	label string
+}
+
+func (vsl *ValueSpecList) SetLabel(label string) *ValueSpecList {
+	vsl.label = label
+	return vsl
 }
 
 func (vsl *ValueSpecList) UsageStr() string {
+	if vsl.label != "" {
+		return vsl.label
+	}
 	return strings.Join(
-		lo.Map(vsl.specs, func(item ValueSpec, index int) string { return item.UsageStr() }),
+		lo.Map(lo.Filter(vsl.specs, func(item ValueSpec, index int) bool {
+			return item != vsl
+		}), func(item ValueSpec, index int) string { return item.UsageStr() }),
 		" | ",
 	)
 }
@@ -86,8 +78,8 @@ func (vsl *ValueSpecList) Complete(fileSource string, position protocol.Position
 	return completions
 }
 
-func (vsl *ValueSpecList) Add(bs ValueSpec) {
-	vsl.specs = append(vsl.specs, bs)
+func (vsl *ValueSpecList) Add(bs ...ValueSpec) {
+	vsl.specs = append(vsl.specs, bs...)
 }
 
 func (vsl *ValueSpecList) Match(ctx grammar.IValueContext) (ast.Node, []ast.Diagnostic) {
