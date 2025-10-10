@@ -50,6 +50,12 @@ func (s *BaseMinecraftMetascriptListener) EnterResourceReference(ctx *ResourceRe
 // ExitResourceReference is called when production resourceReference is exited.
 func (s *BaseMinecraftMetascriptListener) ExitResourceReference(ctx *ResourceReferenceContext) {}
 
+// EnterResourceTag is called when production resourceTag is entered.
+func (s *BaseMinecraftMetascriptListener) EnterResourceTag(ctx *ResourceTagContext) {}
+
+// ExitResourceTag is called when production resourceTag is exited.
+func (s *BaseMinecraftMetascriptListener) ExitResourceTag(ctx *ResourceTagContext) {}
+
 // EnterFn is called when production fn is entered.
 func (s *BaseMinecraftMetascriptListener) EnterFn(ctx *FnContext) {}
 

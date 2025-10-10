@@ -3,7 +3,9 @@ package project
 import (
 	"slices"
 
+	"github.com/antlr4-go/antlr/v4"
 	"github.com/minecraftmetascript/mms/lang/ast"
+	"github.com/minecraftmetascript/mms/lang/grammar"
 	"github.com/minecraftmetascript/mms/lib"
 )
 
@@ -12,6 +14,13 @@ type File struct {
 	content     string
 	diagnostics ast.Diagnostics
 	astNodes    map[ast.SourceLocation]ast.Node
+}
+
+func (f *File) Tokens() antlr.TokenStream {
+	input := antlr.NewInputStream(f.content)
+	lexer := grammar.NewMinecraftMetascriptLexer(input)
+	lexer.RemoveErrorListeners()
+	return antlr.NewCommonTokenStream(lexer, 0)
 }
 
 func (f *File) ingestNodes(node ast.Node) {

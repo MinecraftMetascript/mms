@@ -21,9 +21,13 @@ func (n *BaseNode) Children() []Node {
 	return []Node{}
 }
 
+type Helpful interface {
+	GetHelp() string
+}
+
 type HelpfulNode interface {
 	Node
-	GetHelp() string
+	Helpful
 }
 type CompletableNode interface {
 	Complete(fileSource string, position protocol.Position, triggerChar *string, symbols map[string]*Namespace) []protocol.CompletionItem

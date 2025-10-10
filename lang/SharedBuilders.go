@@ -5,6 +5,7 @@ import (
 
 	"github.com/minecraftmetascript/mms/lang/ast"
 	"github.com/minecraftmetascript/mms/lang/spec"
+	"github.com/minecraftmetascript/mms/lang/unpack"
 )
 
 var EmptyFn = spec.NewOverloadSpec(nil, nil, nil)
@@ -41,6 +42,9 @@ var VerticalAnchor = spec.NewValueSpecList(
 	spec.NewFunctionSpec("Abs", SimpleFloatFn),
 )
 
+func init() {
+	unpack.RegisterParser("VerticalAnchor", ParseAnchor)
+}
 func ParseAnchor(anchor ast.Node) any {
 	if val := spec.GetNumberNodeValue(anchor); val != nil {
 		if *val > 0 {

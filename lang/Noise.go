@@ -7,6 +7,7 @@ import (
 
 	"github.com/minecraftmetascript/mms/lang/ast"
 	"github.com/minecraftmetascript/mms/lang/spec"
+	"github.com/minecraftmetascript/mms/lang/unpack"
 	"github.com/minecraftmetascript/mms/lib"
 )
 
@@ -89,6 +90,10 @@ var NoiseExporter = func(fn spec.FunctionNode, name string) *lib.FileTreeLike {
 }
 
 var InlinedNoise = spec.NewValueSpecList(spec.NewReferenceSpec(ast.SymbolNoise), noiseFn)
+
+func init() {
+	unpack.RegisterParser("InlineNoise", func(node ast.Node) any { return GetInlinedNoiseRef(node) })
+}
 
 func GetInlinedNoiseRef(v ast.Node) string {
 	if v == nil {

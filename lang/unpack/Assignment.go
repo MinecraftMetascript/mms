@@ -1,6 +1,7 @@
 package unpack
 
 import (
+	"log"
 	"reflect"
 	"strconv"
 	"strings"
@@ -9,6 +10,12 @@ import (
 	"github.com/minecraftmetascript/mms/lang/spec"
 	"github.com/minecraftmetascript/mms/lib"
 )
+
+var parseRegistry = make(map[string]func(arg ast.Node) any)
+
+func RegisterParser(name string, parser func(arg ast.Node) any) {
+	parseRegistry[name] = parser
+}
 
 func assignFloat(arg ast.Node, mutableField reflect.Value) {
 	if val := spec.GetNumberNodeValue(arg); val != nil {
@@ -51,6 +58,11 @@ func assignValue(field reflect.StructField, arg ast.Node, mutableField reflect.V
 			mmsTypeParts := strings.Split(candidate, ",")
 			mmsType := mmsTypeParts[0]
 			switch mmsType {
+			default:
+				log.Println("Attempting to find", mmsType)
+				if parser, ok := parseRegistry[mmsType]; ok {
+					mutableField.Set(reflect.ValueOf(parser(arg)))
+				}
 			case "float":
 				assignFloat(arg, mutableField)
 			case "string":
@@ -74,9 +86,10 @@ func assignValue(field reflect.StructField, arg ast.Node, mutableField reflect.V
 							if argIdx > len(fn.Arguments)-1 {
 								break
 							}
-
 						}
 					}
+				} else {
+					log.Printf("%T is not a symbol\n%v\n", arg, arg)
 				}
 			}
 		}

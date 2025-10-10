@@ -8,6 +8,29 @@ import (
 	"github.com/samber/lo"
 )
 
+type TagKind string
+
+const (
+	TagBlock                    = "Block"
+	TagItem                     = "Item"
+	TagFunction                 = "Function"
+	TagFluid                    = "Fluid"
+	TagEntityType               = "EntityType"
+	TagGameEvent                = "GameEvent"
+	TagBiome                    = "Biome"
+	TagFlatLevelGeneratorPreset = "FlatLevelGeneratorPreset"
+	TagWorldPreset              = "WorldPreset"
+	TagStructure                = "Structure"
+	TagCatVariant               = "CatVariant"
+	TagPOIType                  = "POIType"
+	TagPaintingVariant          = "PaintingVariant"
+	TagBannerPattern            = "BannerPattern"
+	TagInstrument               = "Instrument"
+	TagDamageType               = "DamageType"
+	TagEnchantment              = "Enchantment"
+	TagDialog                   = "Dialog"
+)
+
 type SymbolKind string
 
 const (

@@ -49,16 +49,17 @@ func init() {
 		project: project.NewProject(),
 	}
 	ls.handler = &protocol.Handler{
-		Initialize:                 ls.Initialize,
-		Initialized:                ls.Initialized,
-		Shutdown:                   ls.Shutdown,
-		TextDocumentDidOpen:        ls.TextDocumentDidOpen,
-		TextDocumentDidChange:      ls.TextDocumentDidChange,
-		TextDocumentDocumentSymbol: ls.TextDocumentDocumentSymbol,
-		TextDocumentHover:          ls.TextDocumentHover,
-		TextDocumentCompletion:     ls.TextDocumentCompletion,
-		TextDocumentDefinition:     ls.TextDocumentDefinition,
-		TextDocumentReferences:     ls.TextDocumentReferences,
+		Initialize:                     ls.Initialize,
+		Initialized:                    ls.Initialized,
+		Shutdown:                       ls.Shutdown,
+		TextDocumentDidOpen:            ls.TextDocumentDidOpen,
+		TextDocumentDidChange:          ls.TextDocumentDidChange,
+		TextDocumentDocumentSymbol:     ls.TextDocumentDocumentSymbol,
+		TextDocumentHover:              ls.TextDocumentHover,
+		TextDocumentCompletion:         ls.TextDocumentCompletion,
+		TextDocumentDefinition:         ls.TextDocumentDefinition,
+		TextDocumentReferences:         ls.TextDocumentReferences,
+		TextDocumentSemanticTokensFull: ls.TextDocumentSemanticTokensFull,
 	}
 
 }
@@ -94,14 +95,19 @@ func (ls *LanguageServer) TextDocumentDocumentSymbol(_ *glsp.Context, params *pr
 	for ns, decls := range ls.project.Symbols() {
 		for name, decl := range decls.AllDecls() {
 			if decl.GetLocation().Filename == path {
-				out = append(out, protocol.DocumentSymbol{
-					Name:           fmt.Sprintf("%s:%s", ns, name),
-					Detail:         nil,
-					Kind:           protocol.SymbolKindVariable,
-					Range:          decl.GetLocation().ToLspRange(),
-					SelectionRange: decl.GetNameLocation().ToLspRange(),
-					Children:       nil,
-				})
+				v := protocol.DocumentSymbol{
+					Name:     fmt.Sprintf("%s:%s", ns, name),
+					Detail:   nil,
+					Kind:     protocol.SymbolKindVariable,
+					Range:    decl.GetLocation().ToLspRange(),
+					Children: nil,
+				}
+				if nl := decl.GetNameLocation(); nl != nil {
+					v.SelectionRange = nl.ToLspRange()
+				} else {
+					v.SelectionRange = v.Range
+				}
+				out = append(out, v)
 			}
 		}
 	}
@@ -119,8 +125,22 @@ func (ls *LanguageServer) TextDocumentDidOpen(ctx *glsp.Context, params *protoco
 }
 
 func (ls *LanguageServer) Initialize(_ *glsp.Context, _ *protocol.InitializeParams) (any, error) {
+	f := false
 	capabilities := ls.handler.CreateServerCapabilities()
 	capabilities.CompletionProvider.TriggerCharacters = []string{".", "(", ")", ":", "=", " ", ","}
+	capabilities.SemanticTokensProvider = &protocol.SemanticTokensOptions{
+		Legend: protocol.SemanticTokensLegend{
+			TokenTypes: []string{
+				"keyword", "variable", "function", "number", "string",
+				"comment", "operator", "namespace", "type", "parameter",
+			},
+			TokenModifiers: []string{},
+		},
+		Full: protocol.SemanticDelta{
+			Delta: &f,
+		},
+		Range: nil, // optional, you can support range later
+	}
 
 	return protocol.InitializeResult{
 		Capabilities: capabilities,
@@ -253,13 +273,7 @@ func positionToCandidateNodes(position protocol.Position, file *project.File) []
 	return candidates
 }
 
-var completionIdx = 0
-
 func (ls *LanguageServer) TextDocumentCompletion(_ *glsp.Context, params *protocol.CompletionParams) (any, error) {
-	idx := completionIdx
-	completionIdx++
-	log.Println("TextDocumentCompletion called", idx)
-	defer func() { log.Println("TextDocumentCompletion done", idx) }()
 	file := ls.project.File(params.TextDocument.URI)
 	candidates := positionToCandidateNodes(params.Position, file)
 
@@ -268,13 +282,11 @@ func (ls *LanguageServer) TextDocumentCompletion(_ *glsp.Context, params *protoc
 			if completable, ok := candidate.(ast.CompletableNode); ok {
 				res := completable.Complete(file.Content(), params.Position, params.Context.TriggerCharacter, ls.project.Symbols())
 				if res != nil {
-					log.Println("TextDocumentCompletion returning", res)
 					return res, nil
 				}
 			}
 		}
 	}
-	log.Println("TextDocumentCompletion returning empty array")
 	return make([]protocol.CompletionItem, 0), nil
 }
 
@@ -329,3 +341,81 @@ func (ls *LanguageServer) TextDocumentReferences(_ *glsp.Context, params *protoc
 
 	return lo.Uniq(out), nil
 }
+
+//
+//func (ls *LanguageServer) TextDocumentSemanticTokensFull(context *glsp.Context, params *protocol.SemanticTokensParams) (*protocol.SemanticTokens, error) {
+//	out := &protocol.SemanticTokens{}
+//	out.Data = make([]uint32, 0)
+//
+//	file := ls.project.File(params.TextDocument.URI)
+//	if file == nil {
+//		return out, nil
+//	}
+//
+//	tokenStream := file.Tokens()
+//	if tokenStream == nil || tokenStream.Size() == 0 {
+//		return out, nil
+//	}
+//
+//	// Mapping your token kinds to LSP semantic token types (just example mapping)
+//	// You must adjust based on your token.Kind or token.Type or similar field.
+//	var tokenTypeMapping = map[string]uint32{
+//		"Keyword":      0,
+//		"Variable":     1,
+//		"Function":     2,
+//		"Number":       3,
+//		"String":       4,
+//		"Comment":      5,
+//		"Operator":     6,
+//		"Namespace":    7,
+//		"Type":         8,
+//		"Parameter":    9,
+//		"Int":          3,
+//		"Float":        3,
+//		"DocString":    5,
+//		"BlockComment": 5,
+//		"LineComment":  5,
+//		// Add your token types accordingly
+//	}
+//
+//	// You need to track previous token position for relative encoding
+//	prevLine := 0
+//	prevChar := 0
+//
+//	for i := 0; i < tokenStream.Size(); i++ {
+//		token := tokenStream.Get(i)
+//
+//		line := int(token.GetLine()) - 1       // Convert 1-based to 0-based index
+//		char := int(token.GetColumn()) - 1     // Convert 1-based to 0-based index
+//		length := uint32(len(token.GetText())) // Length of token text
+//
+//		deltaLine := uint32(line - prevLine)
+//		var deltaChar uint32
+//		if deltaLine == 0 {
+//			deltaChar = uint32(char - prevChar)
+//		} else {
+//			deltaChar = uint32(char)
+//		}
+//
+//		// Determine token type - You should get the token kind or type properly
+//		var tokenType uint32 = 0 // default unknown
+//		// Example: if token.Kind is available:
+//		// tokenType = tokenTypeMapping[token.Kind]
+//
+//		// If your token has a Kind or Type string, map it here:
+//		kindStr := grammar.MinecraftMetascriptLexerLexerStaticData.SymbolicNames[token.GetTokenType()] // or token.Kind if it's string; adjust accordingly
+//		if t, ok := tokenTypeMapping[kindStr]; ok {
+//			tokenType = t
+//		}
+//
+//		// No modifiers for now
+//		tokenModifiers := uint32(0)
+//
+//		out.Data = append(out.Data, deltaLine, deltaChar, length, tokenType, tokenModifiers)
+//
+//		prevLine = line
+//		prevChar = char
+//	}
+//
+//	return out, nil
+//}

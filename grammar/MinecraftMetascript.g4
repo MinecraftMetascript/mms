@@ -5,13 +5,15 @@ namedBlock: Identifier Identifier NL* '{' ((varDecl | block) NL*)* '}';
 block: Identifier NL* '{' NL* ((varDecl) NL*)* '}';
 varDecl: (docString)? Identifier '=' /* A value? */ value?;
 
-resourceReference: (Identifier ':')? Identifier;
+resourceReference: ((Identifier ':')? Identifier) | (Identifier ':' Identifier?);
+resourceTag: '#' resourceReference;
 
+// We allow the trailing "." here to prevent diag spam when typing
+fn: Identifier fnArgBody  ('.' fn)*? '.'?;
 // Allow trailing commas to ensure this parses properly when editing
-fn: Identifier fnArgBody  ('.' fn)*?;
 fnArgBody: '(' (value ',')* (value ','?)? ')';
 
-value: number | String | fn | resourceReference | conditional | list;
+value: number | String | fn | resourceReference | conditional | list | resourceTag;
 
 condition
   : '!' condition                                       #condNegate

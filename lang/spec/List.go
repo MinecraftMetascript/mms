@@ -22,8 +22,13 @@ type ListSpec struct {
 }
 
 func (l *ListSpec) UsageStr() string {
+
+	validOptions := lo.Filter(l.ValueOptions, func(item ValueSpec, index int) bool {
+		return !lib.IsNilInterface(item) && item != l
+	})
+
 	return "[" + strings.Join(
-		lo.Map(l.ValueOptions, func(item ValueSpec, index int) string { return fmt.Sprintf("{ %s }", item.UsageStr()) }),
+		lo.Map(validOptions, func(item ValueSpec, index int) string { return fmt.Sprintf("{ %s }", item.UsageStr()) }),
 		" | ",
 	) + "]"
 }

@@ -3,6 +3,8 @@ declare global {
 
     function getFileDiag(filename: string, callback: (serial: string) => void)
 
+    function getMmsSpec(): Uint8Array
+
     /**
      * Exported by mms.wasm
      * @param input

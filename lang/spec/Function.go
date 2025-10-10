@@ -37,7 +37,7 @@ func (os *OverloadSpec) Usage() string {
 		return item.Name + "()"
 	})
 	if len(builderUsages) > 0 {
-		usage += "." + strings.Join(builderUsages, ".")
+		usage += "\n  ." + strings.Join(builderUsages, "\n  .")
 	}
 	return usage
 
@@ -138,7 +138,7 @@ func (os *OverloadSpec) Match(ctx grammar.IFnContext) (ast.Node, []ast.Diagnosti
 			// Value is nil and no diagnostics - type mismatch
 			diags = append(diags, ast.Diagnostic{
 				Location: ast.RuleLocation(argCtx),
-				Message:  fmt.Sprintf("Argument at position %d does not match expected type", i+1),
+				Message:  fmt.Sprintf("Argument at position %d does not match expected type\nExpected one of %s, found %s", i+1, argSpec.UsageStr(), argCtx.GetText()),
 				Severity: ast.Error,
 			})
 		}
@@ -177,6 +177,10 @@ type FunctionSpec struct {
 	export          func(fn FunctionNode, name string) *lib.FileTreeLike
 	output          func(fn FunctionNode) any
 	symbolExtractor func(fn FunctionNode) []ast.Symbol
+}
+
+func (f FunctionSpec) GetHelp() string {
+	return f.Help
 }
 
 func (f FunctionSpec) UsageStr() string {
@@ -529,9 +533,33 @@ func locate(source string, idx int) ast.Location {
 	return *out
 }
 
-func (n *FunctionNode) builderCompletions(includeLeadingDot bool, _ string, _ protocol.Position) []protocol.CompletionItem {
+func (n *FunctionNode) builderCompletions(includeLeadingDot bool, _ string, cursorPosition protocol.Position) []protocol.CompletionItem {
 	items := make([]protocol.CompletionItem, 0)
-	builderSnapPosition := getBuilderInsertPosition(n)
+	targetPos := ast.Location{Index: -1}
+	for i, b := range n.Builders {
+		if b.GetLocation().ContainsPosition(cursorPosition) {
+			targetPos = b.GetLocation().Stop.ColOffset(1)
+			break
+		}
+
+		if b.GetLocation().BeforePosition(cursorPosition) {
+			if i+1 < len(n.Builders) {
+				b2 := n.Builders[i+1]
+				if b2.GetLocation().AfterPosition(cursorPosition) {
+					// This means we are between builders
+					targetPos.Line = int(cursorPosition.Line) + 1
+					targetPos.Column = int(cursorPosition.Character)
+					break
+				}
+			}
+		}
+	}
+	if targetPos.Index == -1 {
+		targetPos.Line = int(cursorPosition.Line) + 1
+		targetPos.Column = int(cursorPosition.Character)
+	}
+
+	//builderSnapPosition := getBuilderInsertPosition(n)
 	for _, overload := range n.spec.Overloads {
 		for _, b := range overload.Builders {
 			builderExists := slices.ContainsFunc(n.Builders, func(node FunctionNode) bool {
@@ -552,8 +580,8 @@ func (n *FunctionNode) builderCompletions(includeLeadingDot bool, _ string, _ pr
 					InsertTextFormat: &SnippetFormat,
 					TextEdit: protocol.TextEdit{
 						Range: protocol.Range{
-							Start: builderSnapPosition.ColOffset(offset).ToLspPosition(),
-							End:   builderSnapPosition.ColOffset(offset).ToLspPosition(),
+							Start: targetPos.ColOffset(offset).ToLspPosition(),
+							End:   targetPos.ColOffset(offset).ToLspPosition(),
 						},
 						NewText: fmt.Sprintf(snip, b.Name),
 					},

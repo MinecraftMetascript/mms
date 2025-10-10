@@ -68,11 +68,11 @@ func (e EnumSpec) Match(valueCtx grammar.IValueContext) (ast.Node, []ast.Diagnos
 	}
 	rr := valueCtx.ResourceReference()
 
-	if len(rr.AllIdentifier()) != 1 {
+	if len(rr.AllIdentifier()) == 0 {
 		// Not a match
 		return nil, nil
 	}
-	value := rr.Identifier(0).GetText()
+	value := rr.GetText()
 	l := ast.RuleLocation(valueCtx)
 
 	out := &EnumNode{
@@ -95,7 +95,7 @@ func (e EnumSpec) Match(valueCtx grammar.IValueContext) (ast.Node, []ast.Diagnos
 	if !valueValid {
 		// Build a helpful error message with valid options
 		msg := fmt.Sprintf("Invalid enum value '%s'. Expected one of: %v", value, e.Options)
-		return out, []ast.Diagnostic{
+		return nil, []ast.Diagnostic{
 			{
 				Location: ast.RuleLocation(valueCtx),
 				Message:  msg,

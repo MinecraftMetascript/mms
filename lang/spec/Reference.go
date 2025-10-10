@@ -2,8 +2,10 @@ package spec
 
 import (
 	"fmt"
+	"log"
 	"strings"
 
+	"github.com/antlr4-go/antlr/v4"
 	"github.com/minecraftmetascript/mms/lang/ast"
 	"github.com/minecraftmetascript/mms/lang/grammar"
 	"github.com/samber/lo"
@@ -72,6 +74,31 @@ func (r *ReferenceSpec) Match(valueCtx grammar.IValueContext) (ast.Node, []ast.D
 	refCtx := valueCtx.ResourceReference()
 	if refCtx == nil {
 		return nil, nil
+	}
+
+	children := refCtx.GetChildren()
+	if t, ok := children[0].(antlr.TerminalNode); ok {
+		if t.GetText() == ":" {
+			return nil, []ast.Diagnostic{
+				{
+					Location: ast.RuleLocation(valueCtx),
+					Message:  "Incomplete reference",
+					Severity: ast.Warning,
+				},
+			}
+		}
+	} else if t, ok = children[len(children)-1].(antlr.TerminalNode); ok {
+		if t.GetText() == ":" {
+			return nil, []ast.Diagnostic{
+				{
+					Location: ast.RuleLocation(valueCtx),
+					Message:  "Incomplete reference",
+					Severity: ast.Warning,
+				},
+			}
+		}
+	} else {
+		log.Println("All is fine", refCtx.GetText())
 	}
 
 	parts := refCtx.AllIdentifier()
@@ -145,6 +172,10 @@ func SetDefaultNamespaces(root ast.Node, namespace string) {
 	if r, ok := root.(*ReferenceNode); ok {
 		if r.Namespace == "" {
 			r.Namespace = namespace
+		}
+	} else if t, ok := root.(*TagNode); ok {
+		if t.Namespace == "" {
+			t.Namespace = namespace
 		}
 	}
 	if root != nil {

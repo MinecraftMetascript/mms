@@ -12,7 +12,9 @@ import (
 
 	"syscall/js"
 
+	"github.com/minecraftmetascript/mms/lang"
 	"github.com/minecraftmetascript/mms/lang/ast"
+	"github.com/minecraftmetascript/mms/lang/spec"
 	"github.com/minecraftmetascript/mms/lib"
 	"github.com/minecraftmetascript/mms/lsp"
 	"github.com/minecraftmetascript/mms/project"
@@ -117,6 +119,14 @@ func main() {
 
 	js.Global().Set("getFileDiag", js.FuncOf(getFileDiag))
 	logger.Println("getFileDiag function registered")
+
+	js.Global().Set("getMmsSpec", js.FuncOf(func(this js.Value, args []js.Value) any {
+		val := spec.GenerateSpecString(lang.Blocks)
+		dest := js.Global().Get("Uint8Array").New(len(val))
+		js.CopyBytesToJS(dest, []byte(val))
+		return dest
+	}))
+	logger.Println("getMmsSpec function registered")
 
 	logger.Println("MMS WASM loaded")
 

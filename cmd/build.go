@@ -18,7 +18,7 @@ var buildCmd = &cobra.Command{
 	Long:      ``,
 	ValidArgs: []cobra.Completion{"Input", "Output"},
 	Run: func(cmd *cobra.Command, args []string) {
-		log.SetFlags(0)
+		log.SetFlags(log.LstdFlags | log.Lshortfile)
 		if len(args) < 1 {
 			log.Println("Please provide an input file or directory")
 			return
@@ -39,7 +39,6 @@ var buildCmd = &cobra.Command{
 			log.Println(
 				fmt.Sprintf("Building your project from %s to %s", inFile, outFile),
 			)
-
 		}
 
 		project := _project.NewProject()

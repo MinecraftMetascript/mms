@@ -26,6 +26,9 @@ func (bsl *BlockSpecList) Get(kind string) *BlockSpec {
 func (bsl *BlockSpecList) Remove(bs *BlockSpec) {
 	delete(bsl.blocks, bs.Kind)
 }
+func (bsl *BlockSpecList) All() map[string]*BlockSpec {
+	return bsl.blocks
+}
 
 func NewBlockSpecList(
 	blocks ...BlockSpec,
@@ -71,7 +74,7 @@ func (b BlockSpec) Match(ctx grammar.IBlockContext) (*BlockNode, []ast.Diagnosti
 	}
 	out := &BlockNode{
 		Kind:          b.Kind,
-		Declarations:  make(map[string]ast.Node),
+		Declarations:  make(map[string]ast.Symbol),
 		location:      ast.RuleLocation(ctx),
 		spec:          b,
 		inlineSymbols: []ast.Symbol{},
@@ -132,10 +135,10 @@ func (b BlockSpec) Match(ctx grammar.IBlockContext) (*BlockNode, []ast.Diagnosti
 				}
 				idL := ast.TerminalLocation(idCtx)
 				s.SetNameLocation(&idL)
+				out.Declarations[id] = s
 			} else {
 				log.Println("Invalid value for block declaration:", val)
 			}
-			out.Declarations[id] = val
 
 			if e, ok := val.(ast.ExtractableNode); ok {
 				out.inlineSymbols = append(out.inlineSymbols, e.ExtractInlineSymbols()...)
@@ -157,7 +160,7 @@ func (b BlockSpec) Match(ctx grammar.IBlockContext) (*BlockNode, []ast.Diagnosti
 // / Block Node
 type BlockNode struct {
 	Kind          string
-	Declarations  map[string]ast.Node
+	Declarations  map[string]ast.Symbol
 	location      ast.SourceLocation
 	spec          BlockSpec
 	inlineSymbols []ast.Symbol

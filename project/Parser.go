@@ -16,7 +16,7 @@ type Parser struct {
 	parser *grammar.MinecraftMetascriptParser
 
 	namespaces  map[string]*ast.Namespace
-	blocks      []ast.Node
+	blocks      []*spec.BlockNode
 	diagnostics *ast.Diagnostics
 	filename    string
 }
@@ -116,7 +116,7 @@ func NewParser(content, filename string) *Parser {
 		parser:      grammar.NewMinecraftMetascriptParser(antlr.NewCommonTokenStream(lexer, 0)),
 		namespaces:  make(map[string]*ast.Namespace),
 		diagnostics: ast.NewDiagnostics(),
-		blocks:      make([]ast.Node, 0),
+		blocks:      make([]*spec.BlockNode, 0),
 		filename:    filename,
 	}
 

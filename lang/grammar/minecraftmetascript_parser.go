@@ -32,152 +32,161 @@ var MinecraftMetascriptParserStaticData struct {
 func minecraftmetascriptParserInit() {
 	staticData := &MinecraftMetascriptParserStaticData
 	staticData.LiteralNames = []string{
-		"", "'{'", "'}'", "'='", "':'", "'.'", "'('", "','", "')'", "'!'", "'&&'",
-		"'||'", "'If'", "'['", "']'",
+		"", "'{'", "'}'", "'='", "':'", "'#'", "'.'", "'('", "','", "')'", "'!'",
+		"'&&'", "'||'", "'If'", "'['", "']'",
 	}
 	staticData.SymbolicNames = []string{
-		"", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "Int", "Float",
-		"String", "WS", "NL", "Identifier", "DocString", "BlockComment", "LineComment",
+		"", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "Int",
+		"Float", "String", "WS", "NL", "Identifier", "DocString", "BlockComment",
+		"LineComment",
 	}
 	staticData.RuleNames = []string{
-		"file", "namedBlock", "block", "varDecl", "resourceReference", "fn",
-		"fnArgBody", "value", "condition", "rootCondition", "conditional", "conditionalBody",
-		"list", "number", "docString",
+		"file", "namedBlock", "block", "varDecl", "resourceReference", "resourceTag",
+		"fn", "fnArgBody", "value", "condition", "rootCondition", "conditional",
+		"conditionalBody", "list", "number", "docString",
 	}
 	staticData.PredictionContextCache = antlr.NewPredictionContextCache()
 	staticData.serializedATN = []int32{
-		4, 1, 23, 293, 2, 0, 7, 0, 2, 1, 7, 1, 2, 2, 7, 2, 2, 3, 7, 3, 2, 4, 7,
+		4, 1, 24, 308, 2, 0, 7, 0, 2, 1, 7, 1, 2, 2, 7, 2, 2, 3, 7, 3, 2, 4, 7,
 		4, 2, 5, 7, 5, 2, 6, 7, 6, 2, 7, 7, 7, 2, 8, 7, 8, 2, 9, 7, 9, 2, 10, 7,
-		10, 2, 11, 7, 11, 2, 12, 7, 12, 2, 13, 7, 13, 2, 14, 7, 14, 1, 0, 5, 0,
-		32, 8, 0, 10, 0, 12, 0, 35, 9, 0, 1, 0, 1, 0, 5, 0, 39, 8, 0, 10, 0, 12,
-		0, 42, 9, 0, 5, 0, 44, 8, 0, 10, 0, 12, 0, 47, 9, 0, 1, 1, 1, 1, 1, 1,
-		5, 1, 52, 8, 1, 10, 1, 12, 1, 55, 9, 1, 1, 1, 1, 1, 1, 1, 3, 1, 60, 8,
-		1, 1, 1, 5, 1, 63, 8, 1, 10, 1, 12, 1, 66, 9, 1, 5, 1, 68, 8, 1, 10, 1,
-		12, 1, 71, 9, 1, 1, 1, 1, 1, 1, 2, 1, 2, 5, 2, 77, 8, 2, 10, 2, 12, 2,
-		80, 9, 2, 1, 2, 1, 2, 5, 2, 84, 8, 2, 10, 2, 12, 2, 87, 9, 2, 1, 2, 1,
-		2, 5, 2, 91, 8, 2, 10, 2, 12, 2, 94, 9, 2, 5, 2, 96, 8, 2, 10, 2, 12, 2,
-		99, 9, 2, 1, 2, 1, 2, 1, 3, 3, 3, 104, 8, 3, 1, 3, 1, 3, 1, 3, 3, 3, 109,
-		8, 3, 1, 4, 1, 4, 3, 4, 113, 8, 4, 1, 4, 1, 4, 1, 5, 1, 5, 1, 5, 1, 5,
-		5, 5, 121, 8, 5, 10, 5, 12, 5, 124, 9, 5, 1, 6, 1, 6, 1, 6, 1, 6, 5, 6,
-		130, 8, 6, 10, 6, 12, 6, 133, 9, 6, 1, 6, 1, 6, 3, 6, 137, 8, 6, 3, 6,
-		139, 8, 6, 1, 6, 1, 6, 1, 7, 1, 7, 1, 7, 1, 7, 1, 7, 1, 7, 3, 7, 149, 8,
-		7, 1, 8, 1, 8, 1, 8, 1, 8, 1, 8, 1, 8, 5, 8, 157, 8, 8, 10, 8, 12, 8, 160,
-		9, 8, 1, 8, 1, 8, 5, 8, 164, 8, 8, 10, 8, 12, 8, 167, 9, 8, 1, 8, 1, 8,
-		3, 8, 171, 8, 8, 1, 8, 1, 8, 5, 8, 175, 8, 8, 10, 8, 12, 8, 178, 9, 8,
-		1, 8, 1, 8, 5, 8, 182, 8, 8, 10, 8, 12, 8, 185, 9, 8, 1, 8, 1, 8, 1, 8,
-		5, 8, 190, 8, 8, 10, 8, 12, 8, 193, 9, 8, 1, 8, 1, 8, 5, 8, 197, 8, 8,
-		10, 8, 12, 8, 200, 9, 8, 1, 8, 5, 8, 203, 8, 8, 10, 8, 12, 8, 206, 9, 8,
-		1, 9, 1, 9, 1, 10, 1, 10, 5, 10, 212, 8, 10, 10, 10, 12, 10, 215, 9, 10,
-		1, 10, 1, 10, 5, 10, 219, 8, 10, 10, 10, 12, 10, 222, 9, 10, 1, 10, 3,
-		10, 225, 8, 10, 1, 11, 1, 11, 5, 11, 229, 8, 11, 10, 11, 12, 11, 232, 9,
-		11, 1, 11, 3, 11, 235, 8, 11, 1, 11, 5, 11, 238, 8, 11, 10, 11, 12, 11,
-		241, 9, 11, 1, 11, 1, 11, 1, 12, 1, 12, 5, 12, 247, 8, 12, 10, 12, 12,
-		12, 250, 9, 12, 1, 12, 1, 12, 5, 12, 254, 8, 12, 10, 12, 12, 12, 257, 9,
-		12, 1, 12, 3, 12, 260, 8, 12, 1, 12, 5, 12, 263, 8, 12, 10, 12, 12, 12,
-		266, 9, 12, 5, 12, 268, 8, 12, 10, 12, 12, 12, 271, 9, 12, 1, 12, 3, 12,
-		274, 8, 12, 1, 12, 5, 12, 277, 8, 12, 10, 12, 12, 12, 280, 9, 12, 1, 12,
-		1, 12, 1, 13, 1, 13, 1, 14, 1, 14, 5, 14, 288, 8, 14, 10, 14, 12, 14, 291,
-		9, 14, 1, 14, 1, 122, 1, 16, 15, 0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20,
-		22, 24, 26, 28, 0, 1, 1, 0, 15, 16, 324, 0, 33, 1, 0, 0, 0, 2, 48, 1, 0,
-		0, 0, 4, 74, 1, 0, 0, 0, 6, 103, 1, 0, 0, 0, 8, 112, 1, 0, 0, 0, 10, 116,
-		1, 0, 0, 0, 12, 125, 1, 0, 0, 0, 14, 148, 1, 0, 0, 0, 16, 170, 1, 0, 0,
-		0, 18, 207, 1, 0, 0, 0, 20, 209, 1, 0, 0, 0, 22, 226, 1, 0, 0, 0, 24, 244,
-		1, 0, 0, 0, 26, 283, 1, 0, 0, 0, 28, 285, 1, 0, 0, 0, 30, 32, 5, 19, 0,
-		0, 31, 30, 1, 0, 0, 0, 32, 35, 1, 0, 0, 0, 33, 31, 1, 0, 0, 0, 33, 34,
-		1, 0, 0, 0, 34, 45, 1, 0, 0, 0, 35, 33, 1, 0, 0, 0, 36, 40, 3, 2, 1, 0,
-		37, 39, 5, 19, 0, 0, 38, 37, 1, 0, 0, 0, 39, 42, 1, 0, 0, 0, 40, 38, 1,
-		0, 0, 0, 40, 41, 1, 0, 0, 0, 41, 44, 1, 0, 0, 0, 42, 40, 1, 0, 0, 0, 43,
-		36, 1, 0, 0, 0, 44, 47, 1, 0, 0, 0, 45, 43, 1, 0, 0, 0, 45, 46, 1, 0, 0,
-		0, 46, 1, 1, 0, 0, 0, 47, 45, 1, 0, 0, 0, 48, 49, 5, 20, 0, 0, 49, 53,
-		5, 20, 0, 0, 50, 52, 5, 19, 0, 0, 51, 50, 1, 0, 0, 0, 52, 55, 1, 0, 0,
-		0, 53, 51, 1, 0, 0, 0, 53, 54, 1, 0, 0, 0, 54, 56, 1, 0, 0, 0, 55, 53,
-		1, 0, 0, 0, 56, 69, 5, 1, 0, 0, 57, 60, 3, 6, 3, 0, 58, 60, 3, 4, 2, 0,
-		59, 57, 1, 0, 0, 0, 59, 58, 1, 0, 0, 0, 60, 64, 1, 0, 0, 0, 61, 63, 5,
-		19, 0, 0, 62, 61, 1, 0, 0, 0, 63, 66, 1, 0, 0, 0, 64, 62, 1, 0, 0, 0, 64,
-		65, 1, 0, 0, 0, 65, 68, 1, 0, 0, 0, 66, 64, 1, 0, 0, 0, 67, 59, 1, 0, 0,
-		0, 68, 71, 1, 0, 0, 0, 69, 67, 1, 0, 0, 0, 69, 70, 1, 0, 0, 0, 70, 72,
-		1, 0, 0, 0, 71, 69, 1, 0, 0, 0, 72, 73, 5, 2, 0, 0, 73, 3, 1, 0, 0, 0,
-		74, 78, 5, 20, 0, 0, 75, 77, 5, 19, 0, 0, 76, 75, 1, 0, 0, 0, 77, 80, 1,
-		0, 0, 0, 78, 76, 1, 0, 0, 0, 78, 79, 1, 0, 0, 0, 79, 81, 1, 0, 0, 0, 80,
-		78, 1, 0, 0, 0, 81, 85, 5, 1, 0, 0, 82, 84, 5, 19, 0, 0, 83, 82, 1, 0,
-		0, 0, 84, 87, 1, 0, 0, 0, 85, 83, 1, 0, 0, 0, 85, 86, 1, 0, 0, 0, 86, 97,
-		1, 0, 0, 0, 87, 85, 1, 0, 0, 0, 88, 92, 3, 6, 3, 0, 89, 91, 5, 19, 0, 0,
-		90, 89, 1, 0, 0, 0, 91, 94, 1, 0, 0, 0, 92, 90, 1, 0, 0, 0, 92, 93, 1,
-		0, 0, 0, 93, 96, 1, 0, 0, 0, 94, 92, 1, 0, 0, 0, 95, 88, 1, 0, 0, 0, 96,
-		99, 1, 0, 0, 0, 97, 95, 1, 0, 0, 0, 97, 98, 1, 0, 0, 0, 98, 100, 1, 0,
-		0, 0, 99, 97, 1, 0, 0, 0, 100, 101, 5, 2, 0, 0, 101, 5, 1, 0, 0, 0, 102,
-		104, 3, 28, 14, 0, 103, 102, 1, 0, 0, 0, 103, 104, 1, 0, 0, 0, 104, 105,
-		1, 0, 0, 0, 105, 106, 5, 20, 0, 0, 106, 108, 5, 3, 0, 0, 107, 109, 3, 14,
-		7, 0, 108, 107, 1, 0, 0, 0, 108, 109, 1, 0, 0, 0, 109, 7, 1, 0, 0, 0, 110,
-		111, 5, 20, 0, 0, 111, 113, 5, 4, 0, 0, 112, 110, 1, 0, 0, 0, 112, 113,
-		1, 0, 0, 0, 113, 114, 1, 0, 0, 0, 114, 115, 5, 20, 0, 0, 115, 9, 1, 0,
-		0, 0, 116, 117, 5, 20, 0, 0, 117, 122, 3, 12, 6, 0, 118, 119, 5, 5, 0,
-		0, 119, 121, 3, 10, 5, 0, 120, 118, 1, 0, 0, 0, 121, 124, 1, 0, 0, 0, 122,
-		123, 1, 0, 0, 0, 122, 120, 1, 0, 0, 0, 123, 11, 1, 0, 0, 0, 124, 122, 1,
-		0, 0, 0, 125, 131, 5, 6, 0, 0, 126, 127, 3, 14, 7, 0, 127, 128, 5, 7, 0,
-		0, 128, 130, 1, 0, 0, 0, 129, 126, 1, 0, 0, 0, 130, 133, 1, 0, 0, 0, 131,
-		129, 1, 0, 0, 0, 131, 132, 1, 0, 0, 0, 132, 138, 1, 0, 0, 0, 133, 131,
-		1, 0, 0, 0, 134, 136, 3, 14, 7, 0, 135, 137, 5, 7, 0, 0, 136, 135, 1, 0,
-		0, 0, 136, 137, 1, 0, 0, 0, 137, 139, 1, 0, 0, 0, 138, 134, 1, 0, 0, 0,
-		138, 139, 1, 0, 0, 0, 139, 140, 1, 0, 0, 0, 140, 141, 5, 8, 0, 0, 141,
-		13, 1, 0, 0, 0, 142, 149, 3, 26, 13, 0, 143, 149, 5, 17, 0, 0, 144, 149,
-		3, 10, 5, 0, 145, 149, 3, 8, 4, 0, 146, 149, 3, 20, 10, 0, 147, 149, 3,
-		24, 12, 0, 148, 142, 1, 0, 0, 0, 148, 143, 1, 0, 0, 0, 148, 144, 1, 0,
-		0, 0, 148, 145, 1, 0, 0, 0, 148, 146, 1, 0, 0, 0, 148, 147, 1, 0, 0, 0,
-		149, 15, 1, 0, 0, 0, 150, 151, 6, 8, -1, 0, 151, 152, 5, 9, 0, 0, 152,
-		171, 3, 16, 8, 5, 153, 171, 3, 18, 9, 0, 154, 158, 5, 6, 0, 0, 155, 157,
-		5, 19, 0, 0, 156, 155, 1, 0, 0, 0, 157, 160, 1, 0, 0, 0, 158, 156, 1, 0,
-		0, 0, 158, 159, 1, 0, 0, 0, 159, 161, 1, 0, 0, 0, 160, 158, 1, 0, 0, 0,
-		161, 165, 3, 16, 8, 0, 162, 164, 5, 19, 0, 0, 163, 162, 1, 0, 0, 0, 164,
-		167, 1, 0, 0, 0, 165, 163, 1, 0, 0, 0, 165, 166, 1, 0, 0, 0, 166, 168,
-		1, 0, 0, 0, 167, 165, 1, 0, 0, 0, 168, 169, 5, 8, 0, 0, 169, 171, 1, 0,
-		0, 0, 170, 150, 1, 0, 0, 0, 170, 153, 1, 0, 0, 0, 170, 154, 1, 0, 0, 0,
-		171, 204, 1, 0, 0, 0, 172, 176, 10, 2, 0, 0, 173, 175, 5, 19, 0, 0, 174,
-		173, 1, 0, 0, 0, 175, 178, 1, 0, 0, 0, 176, 174, 1, 0, 0, 0, 176, 177,
-		1, 0, 0, 0, 177, 179, 1, 0, 0, 0, 178, 176, 1, 0, 0, 0, 179, 183, 5, 10,
-		0, 0, 180, 182, 5, 19, 0, 0, 181, 180, 1, 0, 0, 0, 182, 185, 1, 0, 0, 0,
-		183, 181, 1, 0, 0, 0, 183, 184, 1, 0, 0, 0, 184, 186, 1, 0, 0, 0, 185,
-		183, 1, 0, 0, 0, 186, 203, 3, 16, 8, 3, 187, 191, 10, 1, 0, 0, 188, 190,
-		5, 19, 0, 0, 189, 188, 1, 0, 0, 0, 190, 193, 1, 0, 0, 0, 191, 189, 1, 0,
+		10, 2, 11, 7, 11, 2, 12, 7, 12, 2, 13, 7, 13, 2, 14, 7, 14, 2, 15, 7, 15,
+		1, 0, 5, 0, 34, 8, 0, 10, 0, 12, 0, 37, 9, 0, 1, 0, 1, 0, 5, 0, 41, 8,
+		0, 10, 0, 12, 0, 44, 9, 0, 5, 0, 46, 8, 0, 10, 0, 12, 0, 49, 9, 0, 1, 1,
+		1, 1, 1, 1, 5, 1, 54, 8, 1, 10, 1, 12, 1, 57, 9, 1, 1, 1, 1, 1, 1, 1, 3,
+		1, 62, 8, 1, 1, 1, 5, 1, 65, 8, 1, 10, 1, 12, 1, 68, 9, 1, 5, 1, 70, 8,
+		1, 10, 1, 12, 1, 73, 9, 1, 1, 1, 1, 1, 1, 2, 1, 2, 5, 2, 79, 8, 2, 10,
+		2, 12, 2, 82, 9, 2, 1, 2, 1, 2, 5, 2, 86, 8, 2, 10, 2, 12, 2, 89, 9, 2,
+		1, 2, 1, 2, 5, 2, 93, 8, 2, 10, 2, 12, 2, 96, 9, 2, 5, 2, 98, 8, 2, 10,
+		2, 12, 2, 101, 9, 2, 1, 2, 1, 2, 1, 3, 3, 3, 106, 8, 3, 1, 3, 1, 3, 1,
+		3, 3, 3, 111, 8, 3, 1, 4, 1, 4, 3, 4, 115, 8, 4, 1, 4, 1, 4, 1, 4, 1, 4,
+		3, 4, 121, 8, 4, 3, 4, 123, 8, 4, 1, 5, 1, 5, 1, 5, 1, 6, 1, 6, 1, 6, 1,
+		6, 5, 6, 132, 8, 6, 10, 6, 12, 6, 135, 9, 6, 1, 6, 3, 6, 138, 8, 6, 1,
+		7, 1, 7, 1, 7, 1, 7, 5, 7, 144, 8, 7, 10, 7, 12, 7, 147, 9, 7, 1, 7, 1,
+		7, 3, 7, 151, 8, 7, 3, 7, 153, 8, 7, 1, 7, 1, 7, 1, 8, 1, 8, 1, 8, 1, 8,
+		1, 8, 1, 8, 1, 8, 3, 8, 164, 8, 8, 1, 9, 1, 9, 1, 9, 1, 9, 1, 9, 1, 9,
+		5, 9, 172, 8, 9, 10, 9, 12, 9, 175, 9, 9, 1, 9, 1, 9, 5, 9, 179, 8, 9,
+		10, 9, 12, 9, 182, 9, 9, 1, 9, 1, 9, 3, 9, 186, 8, 9, 1, 9, 1, 9, 5, 9,
+		190, 8, 9, 10, 9, 12, 9, 193, 9, 9, 1, 9, 1, 9, 5, 9, 197, 8, 9, 10, 9,
+		12, 9, 200, 9, 9, 1, 9, 1, 9, 1, 9, 5, 9, 205, 8, 9, 10, 9, 12, 9, 208,
+		9, 9, 1, 9, 1, 9, 5, 9, 212, 8, 9, 10, 9, 12, 9, 215, 9, 9, 1, 9, 5, 9,
+		218, 8, 9, 10, 9, 12, 9, 221, 9, 9, 1, 10, 1, 10, 1, 11, 1, 11, 5, 11,
+		227, 8, 11, 10, 11, 12, 11, 230, 9, 11, 1, 11, 1, 11, 5, 11, 234, 8, 11,
+		10, 11, 12, 11, 237, 9, 11, 1, 11, 3, 11, 240, 8, 11, 1, 12, 1, 12, 5,
+		12, 244, 8, 12, 10, 12, 12, 12, 247, 9, 12, 1, 12, 3, 12, 250, 8, 12, 1,
+		12, 5, 12, 253, 8, 12, 10, 12, 12, 12, 256, 9, 12, 1, 12, 1, 12, 1, 13,
+		1, 13, 5, 13, 262, 8, 13, 10, 13, 12, 13, 265, 9, 13, 1, 13, 1, 13, 5,
+		13, 269, 8, 13, 10, 13, 12, 13, 272, 9, 13, 1, 13, 3, 13, 275, 8, 13, 1,
+		13, 5, 13, 278, 8, 13, 10, 13, 12, 13, 281, 9, 13, 5, 13, 283, 8, 13, 10,
+		13, 12, 13, 286, 9, 13, 1, 13, 3, 13, 289, 8, 13, 1, 13, 5, 13, 292, 8,
+		13, 10, 13, 12, 13, 295, 9, 13, 1, 13, 1, 13, 1, 14, 1, 14, 1, 15, 1, 15,
+		5, 15, 303, 8, 15, 10, 15, 12, 15, 306, 9, 15, 1, 15, 1, 133, 1, 18, 16,
+		0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 0, 1, 1, 0,
+		16, 17, 342, 0, 35, 1, 0, 0, 0, 2, 50, 1, 0, 0, 0, 4, 76, 1, 0, 0, 0, 6,
+		105, 1, 0, 0, 0, 8, 122, 1, 0, 0, 0, 10, 124, 1, 0, 0, 0, 12, 127, 1, 0,
+		0, 0, 14, 139, 1, 0, 0, 0, 16, 163, 1, 0, 0, 0, 18, 185, 1, 0, 0, 0, 20,
+		222, 1, 0, 0, 0, 22, 224, 1, 0, 0, 0, 24, 241, 1, 0, 0, 0, 26, 259, 1,
+		0, 0, 0, 28, 298, 1, 0, 0, 0, 30, 300, 1, 0, 0, 0, 32, 34, 5, 20, 0, 0,
+		33, 32, 1, 0, 0, 0, 34, 37, 1, 0, 0, 0, 35, 33, 1, 0, 0, 0, 35, 36, 1,
+		0, 0, 0, 36, 47, 1, 0, 0, 0, 37, 35, 1, 0, 0, 0, 38, 42, 3, 2, 1, 0, 39,
+		41, 5, 20, 0, 0, 40, 39, 1, 0, 0, 0, 41, 44, 1, 0, 0, 0, 42, 40, 1, 0,
+		0, 0, 42, 43, 1, 0, 0, 0, 43, 46, 1, 0, 0, 0, 44, 42, 1, 0, 0, 0, 45, 38,
+		1, 0, 0, 0, 46, 49, 1, 0, 0, 0, 47, 45, 1, 0, 0, 0, 47, 48, 1, 0, 0, 0,
+		48, 1, 1, 0, 0, 0, 49, 47, 1, 0, 0, 0, 50, 51, 5, 21, 0, 0, 51, 55, 5,
+		21, 0, 0, 52, 54, 5, 20, 0, 0, 53, 52, 1, 0, 0, 0, 54, 57, 1, 0, 0, 0,
+		55, 53, 1, 0, 0, 0, 55, 56, 1, 0, 0, 0, 56, 58, 1, 0, 0, 0, 57, 55, 1,
+		0, 0, 0, 58, 71, 5, 1, 0, 0, 59, 62, 3, 6, 3, 0, 60, 62, 3, 4, 2, 0, 61,
+		59, 1, 0, 0, 0, 61, 60, 1, 0, 0, 0, 62, 66, 1, 0, 0, 0, 63, 65, 5, 20,
+		0, 0, 64, 63, 1, 0, 0, 0, 65, 68, 1, 0, 0, 0, 66, 64, 1, 0, 0, 0, 66, 67,
+		1, 0, 0, 0, 67, 70, 1, 0, 0, 0, 68, 66, 1, 0, 0, 0, 69, 61, 1, 0, 0, 0,
+		70, 73, 1, 0, 0, 0, 71, 69, 1, 0, 0, 0, 71, 72, 1, 0, 0, 0, 72, 74, 1,
+		0, 0, 0, 73, 71, 1, 0, 0, 0, 74, 75, 5, 2, 0, 0, 75, 3, 1, 0, 0, 0, 76,
+		80, 5, 21, 0, 0, 77, 79, 5, 20, 0, 0, 78, 77, 1, 0, 0, 0, 79, 82, 1, 0,
+		0, 0, 80, 78, 1, 0, 0, 0, 80, 81, 1, 0, 0, 0, 81, 83, 1, 0, 0, 0, 82, 80,
+		1, 0, 0, 0, 83, 87, 5, 1, 0, 0, 84, 86, 5, 20, 0, 0, 85, 84, 1, 0, 0, 0,
+		86, 89, 1, 0, 0, 0, 87, 85, 1, 0, 0, 0, 87, 88, 1, 0, 0, 0, 88, 99, 1,
+		0, 0, 0, 89, 87, 1, 0, 0, 0, 90, 94, 3, 6, 3, 0, 91, 93, 5, 20, 0, 0, 92,
+		91, 1, 0, 0, 0, 93, 96, 1, 0, 0, 0, 94, 92, 1, 0, 0, 0, 94, 95, 1, 0, 0,
+		0, 95, 98, 1, 0, 0, 0, 96, 94, 1, 0, 0, 0, 97, 90, 1, 0, 0, 0, 98, 101,
+		1, 0, 0, 0, 99, 97, 1, 0, 0, 0, 99, 100, 1, 0, 0, 0, 100, 102, 1, 0, 0,
+		0, 101, 99, 1, 0, 0, 0, 102, 103, 5, 2, 0, 0, 103, 5, 1, 0, 0, 0, 104,
+		106, 3, 30, 15, 0, 105, 104, 1, 0, 0, 0, 105, 106, 1, 0, 0, 0, 106, 107,
+		1, 0, 0, 0, 107, 108, 5, 21, 0, 0, 108, 110, 5, 3, 0, 0, 109, 111, 3, 16,
+		8, 0, 110, 109, 1, 0, 0, 0, 110, 111, 1, 0, 0, 0, 111, 7, 1, 0, 0, 0, 112,
+		113, 5, 21, 0, 0, 113, 115, 5, 4, 0, 0, 114, 112, 1, 0, 0, 0, 114, 115,
+		1, 0, 0, 0, 115, 116, 1, 0, 0, 0, 116, 123, 5, 21, 0, 0, 117, 118, 5, 21,
+		0, 0, 118, 120, 5, 4, 0, 0, 119, 121, 5, 21, 0, 0, 120, 119, 1, 0, 0, 0,
+		120, 121, 1, 0, 0, 0, 121, 123, 1, 0, 0, 0, 122, 114, 1, 0, 0, 0, 122,
+		117, 1, 0, 0, 0, 123, 9, 1, 0, 0, 0, 124, 125, 5, 5, 0, 0, 125, 126, 3,
+		8, 4, 0, 126, 11, 1, 0, 0, 0, 127, 128, 5, 21, 0, 0, 128, 133, 3, 14, 7,
+		0, 129, 130, 5, 6, 0, 0, 130, 132, 3, 12, 6, 0, 131, 129, 1, 0, 0, 0, 132,
+		135, 1, 0, 0, 0, 133, 134, 1, 0, 0, 0, 133, 131, 1, 0, 0, 0, 134, 137,
+		1, 0, 0, 0, 135, 133, 1, 0, 0, 0, 136, 138, 5, 6, 0, 0, 137, 136, 1, 0,
+		0, 0, 137, 138, 1, 0, 0, 0, 138, 13, 1, 0, 0, 0, 139, 145, 5, 7, 0, 0,
+		140, 141, 3, 16, 8, 0, 141, 142, 5, 8, 0, 0, 142, 144, 1, 0, 0, 0, 143,
+		140, 1, 0, 0, 0, 144, 147, 1, 0, 0, 0, 145, 143, 1, 0, 0, 0, 145, 146,
+		1, 0, 0, 0, 146, 152, 1, 0, 0, 0, 147, 145, 1, 0, 0, 0, 148, 150, 3, 16,
+		8, 0, 149, 151, 5, 8, 0, 0, 150, 149, 1, 0, 0, 0, 150, 151, 1, 0, 0, 0,
+		151, 153, 1, 0, 0, 0, 152, 148, 1, 0, 0, 0, 152, 153, 1, 0, 0, 0, 153,
+		154, 1, 0, 0, 0, 154, 155, 5, 9, 0, 0, 155, 15, 1, 0, 0, 0, 156, 164, 3,
+		28, 14, 0, 157, 164, 5, 18, 0, 0, 158, 164, 3, 12, 6, 0, 159, 164, 3, 8,
+		4, 0, 160, 164, 3, 22, 11, 0, 161, 164, 3, 26, 13, 0, 162, 164, 3, 10,
+		5, 0, 163, 156, 1, 0, 0, 0, 163, 157, 1, 0, 0, 0, 163, 158, 1, 0, 0, 0,
+		163, 159, 1, 0, 0, 0, 163, 160, 1, 0, 0, 0, 163, 161, 1, 0, 0, 0, 163,
+		162, 1, 0, 0, 0, 164, 17, 1, 0, 0, 0, 165, 166, 6, 9, -1, 0, 166, 167,
+		5, 10, 0, 0, 167, 186, 3, 18, 9, 5, 168, 186, 3, 20, 10, 0, 169, 173, 5,
+		7, 0, 0, 170, 172, 5, 20, 0, 0, 171, 170, 1, 0, 0, 0, 172, 175, 1, 0, 0,
+		0, 173, 171, 1, 0, 0, 0, 173, 174, 1, 0, 0, 0, 174, 176, 1, 0, 0, 0, 175,
+		173, 1, 0, 0, 0, 176, 180, 3, 18, 9, 0, 177, 179, 5, 20, 0, 0, 178, 177,
+		1, 0, 0, 0, 179, 182, 1, 0, 0, 0, 180, 178, 1, 0, 0, 0, 180, 181, 1, 0,
+		0, 0, 181, 183, 1, 0, 0, 0, 182, 180, 1, 0, 0, 0, 183, 184, 5, 9, 0, 0,
+		184, 186, 1, 0, 0, 0, 185, 165, 1, 0, 0, 0, 185, 168, 1, 0, 0, 0, 185,
+		169, 1, 0, 0, 0, 186, 219, 1, 0, 0, 0, 187, 191, 10, 2, 0, 0, 188, 190,
+		5, 20, 0, 0, 189, 188, 1, 0, 0, 0, 190, 193, 1, 0, 0, 0, 191, 189, 1, 0,
 		0, 0, 191, 192, 1, 0, 0, 0, 192, 194, 1, 0, 0, 0, 193, 191, 1, 0, 0, 0,
-		194, 198, 5, 11, 0, 0, 195, 197, 5, 19, 0, 0, 196, 195, 1, 0, 0, 0, 197,
+		194, 198, 5, 11, 0, 0, 195, 197, 5, 20, 0, 0, 196, 195, 1, 0, 0, 0, 197,
 		200, 1, 0, 0, 0, 198, 196, 1, 0, 0, 0, 198, 199, 1, 0, 0, 0, 199, 201,
-		1, 0, 0, 0, 200, 198, 1, 0, 0, 0, 201, 203, 3, 16, 8, 2, 202, 172, 1, 0,
-		0, 0, 202, 187, 1, 0, 0, 0, 203, 206, 1, 0, 0, 0, 204, 202, 1, 0, 0, 0,
-		204, 205, 1, 0, 0, 0, 205, 17, 1, 0, 0, 0, 206, 204, 1, 0, 0, 0, 207, 208,
-		3, 14, 7, 0, 208, 19, 1, 0, 0, 0, 209, 213, 5, 12, 0, 0, 210, 212, 5, 19,
-		0, 0, 211, 210, 1, 0, 0, 0, 212, 215, 1, 0, 0, 0, 213, 211, 1, 0, 0, 0,
-		213, 214, 1, 0, 0, 0, 214, 216, 1, 0, 0, 0, 215, 213, 1, 0, 0, 0, 216,
-		220, 3, 22, 11, 0, 217, 219, 5, 19, 0, 0, 218, 217, 1, 0, 0, 0, 219, 222,
-		1, 0, 0, 0, 220, 218, 1, 0, 0, 0, 220, 221, 1, 0, 0, 0, 221, 224, 1, 0,
-		0, 0, 222, 220, 1, 0, 0, 0, 223, 225, 3, 14, 7, 0, 224, 223, 1, 0, 0, 0,
-		224, 225, 1, 0, 0, 0, 225, 21, 1, 0, 0, 0, 226, 230, 5, 6, 0, 0, 227, 229,
-		5, 19, 0, 0, 228, 227, 1, 0, 0, 0, 229, 232, 1, 0, 0, 0, 230, 228, 1, 0,
-		0, 0, 230, 231, 1, 0, 0, 0, 231, 234, 1, 0, 0, 0, 232, 230, 1, 0, 0, 0,
-		233, 235, 3, 16, 8, 0, 234, 233, 1, 0, 0, 0, 234, 235, 1, 0, 0, 0, 235,
-		239, 1, 0, 0, 0, 236, 238, 5, 19, 0, 0, 237, 236, 1, 0, 0, 0, 238, 241,
-		1, 0, 0, 0, 239, 237, 1, 0, 0, 0, 239, 240, 1, 0, 0, 0, 240, 242, 1, 0,
-		0, 0, 241, 239, 1, 0, 0, 0, 242, 243, 5, 8, 0, 0, 243, 23, 1, 0, 0, 0,
-		244, 248, 5, 13, 0, 0, 245, 247, 5, 19, 0, 0, 246, 245, 1, 0, 0, 0, 247,
-		250, 1, 0, 0, 0, 248, 246, 1, 0, 0, 0, 248, 249, 1, 0, 0, 0, 249, 269,
-		1, 0, 0, 0, 250, 248, 1, 0, 0, 0, 251, 255, 3, 14, 7, 0, 252, 254, 5, 19,
-		0, 0, 253, 252, 1, 0, 0, 0, 254, 257, 1, 0, 0, 0, 255, 253, 1, 0, 0, 0,
-		255, 256, 1, 0, 0, 0, 256, 259, 1, 0, 0, 0, 257, 255, 1, 0, 0, 0, 258,
-		260, 5, 7, 0, 0, 259, 258, 1, 0, 0, 0, 259, 260, 1, 0, 0, 0, 260, 264,
-		1, 0, 0, 0, 261, 263, 5, 19, 0, 0, 262, 261, 1, 0, 0, 0, 263, 266, 1, 0,
-		0, 0, 264, 262, 1, 0, 0, 0, 264, 265, 1, 0, 0, 0, 265, 268, 1, 0, 0, 0,
-		266, 264, 1, 0, 0, 0, 267, 251, 1, 0, 0, 0, 268, 271, 1, 0, 0, 0, 269,
-		267, 1, 0, 0, 0, 269, 270, 1, 0, 0, 0, 270, 273, 1, 0, 0, 0, 271, 269,
-		1, 0, 0, 0, 272, 274, 3, 14, 7, 0, 273, 272, 1, 0, 0, 0, 273, 274, 1, 0,
-		0, 0, 274, 278, 1, 0, 0, 0, 275, 277, 5, 19, 0, 0, 276, 275, 1, 0, 0, 0,
-		277, 280, 1, 0, 0, 0, 278, 276, 1, 0, 0, 0, 278, 279, 1, 0, 0, 0, 279,
-		281, 1, 0, 0, 0, 280, 278, 1, 0, 0, 0, 281, 282, 5, 14, 0, 0, 282, 25,
-		1, 0, 0, 0, 283, 284, 7, 0, 0, 0, 284, 27, 1, 0, 0, 0, 285, 289, 5, 21,
-		0, 0, 286, 288, 5, 19, 0, 0, 287, 286, 1, 0, 0, 0, 288, 291, 1, 0, 0, 0,
-		289, 287, 1, 0, 0, 0, 289, 290, 1, 0, 0, 0, 290, 29, 1, 0, 0, 0, 291, 289,
-		1, 0, 0, 0, 42, 33, 40, 45, 53, 59, 64, 69, 78, 85, 92, 97, 103, 108, 112,
-		122, 131, 136, 138, 148, 158, 165, 170, 176, 183, 191, 198, 202, 204, 213,
-		220, 224, 230, 234, 239, 248, 255, 259, 264, 269, 273, 278, 289,
+		1, 0, 0, 0, 200, 198, 1, 0, 0, 0, 201, 218, 3, 18, 9, 3, 202, 206, 10,
+		1, 0, 0, 203, 205, 5, 20, 0, 0, 204, 203, 1, 0, 0, 0, 205, 208, 1, 0, 0,
+		0, 206, 204, 1, 0, 0, 0, 206, 207, 1, 0, 0, 0, 207, 209, 1, 0, 0, 0, 208,
+		206, 1, 0, 0, 0, 209, 213, 5, 12, 0, 0, 210, 212, 5, 20, 0, 0, 211, 210,
+		1, 0, 0, 0, 212, 215, 1, 0, 0, 0, 213, 211, 1, 0, 0, 0, 213, 214, 1, 0,
+		0, 0, 214, 216, 1, 0, 0, 0, 215, 213, 1, 0, 0, 0, 216, 218, 3, 18, 9, 2,
+		217, 187, 1, 0, 0, 0, 217, 202, 1, 0, 0, 0, 218, 221, 1, 0, 0, 0, 219,
+		217, 1, 0, 0, 0, 219, 220, 1, 0, 0, 0, 220, 19, 1, 0, 0, 0, 221, 219, 1,
+		0, 0, 0, 222, 223, 3, 16, 8, 0, 223, 21, 1, 0, 0, 0, 224, 228, 5, 13, 0,
+		0, 225, 227, 5, 20, 0, 0, 226, 225, 1, 0, 0, 0, 227, 230, 1, 0, 0, 0, 228,
+		226, 1, 0, 0, 0, 228, 229, 1, 0, 0, 0, 229, 231, 1, 0, 0, 0, 230, 228,
+		1, 0, 0, 0, 231, 235, 3, 24, 12, 0, 232, 234, 5, 20, 0, 0, 233, 232, 1,
+		0, 0, 0, 234, 237, 1, 0, 0, 0, 235, 233, 1, 0, 0, 0, 235, 236, 1, 0, 0,
+		0, 236, 239, 1, 0, 0, 0, 237, 235, 1, 0, 0, 0, 238, 240, 3, 16, 8, 0, 239,
+		238, 1, 0, 0, 0, 239, 240, 1, 0, 0, 0, 240, 23, 1, 0, 0, 0, 241, 245, 5,
+		7, 0, 0, 242, 244, 5, 20, 0, 0, 243, 242, 1, 0, 0, 0, 244, 247, 1, 0, 0,
+		0, 245, 243, 1, 0, 0, 0, 245, 246, 1, 0, 0, 0, 246, 249, 1, 0, 0, 0, 247,
+		245, 1, 0, 0, 0, 248, 250, 3, 18, 9, 0, 249, 248, 1, 0, 0, 0, 249, 250,
+		1, 0, 0, 0, 250, 254, 1, 0, 0, 0, 251, 253, 5, 20, 0, 0, 252, 251, 1, 0,
+		0, 0, 253, 256, 1, 0, 0, 0, 254, 252, 1, 0, 0, 0, 254, 255, 1, 0, 0, 0,
+		255, 257, 1, 0, 0, 0, 256, 254, 1, 0, 0, 0, 257, 258, 5, 9, 0, 0, 258,
+		25, 1, 0, 0, 0, 259, 263, 5, 14, 0, 0, 260, 262, 5, 20, 0, 0, 261, 260,
+		1, 0, 0, 0, 262, 265, 1, 0, 0, 0, 263, 261, 1, 0, 0, 0, 263, 264, 1, 0,
+		0, 0, 264, 284, 1, 0, 0, 0, 265, 263, 1, 0, 0, 0, 266, 270, 3, 16, 8, 0,
+		267, 269, 5, 20, 0, 0, 268, 267, 1, 0, 0, 0, 269, 272, 1, 0, 0, 0, 270,
+		268, 1, 0, 0, 0, 270, 271, 1, 0, 0, 0, 271, 274, 1, 0, 0, 0, 272, 270,
+		1, 0, 0, 0, 273, 275, 5, 8, 0, 0, 274, 273, 1, 0, 0, 0, 274, 275, 1, 0,
+		0, 0, 275, 279, 1, 0, 0, 0, 276, 278, 5, 20, 0, 0, 277, 276, 1, 0, 0, 0,
+		278, 281, 1, 0, 0, 0, 279, 277, 1, 0, 0, 0, 279, 280, 1, 0, 0, 0, 280,
+		283, 1, 0, 0, 0, 281, 279, 1, 0, 0, 0, 282, 266, 1, 0, 0, 0, 283, 286,
+		1, 0, 0, 0, 284, 282, 1, 0, 0, 0, 284, 285, 1, 0, 0, 0, 285, 288, 1, 0,
+		0, 0, 286, 284, 1, 0, 0, 0, 287, 289, 3, 16, 8, 0, 288, 287, 1, 0, 0, 0,
+		288, 289, 1, 0, 0, 0, 289, 293, 1, 0, 0, 0, 290, 292, 5, 20, 0, 0, 291,
+		290, 1, 0, 0, 0, 292, 295, 1, 0, 0, 0, 293, 291, 1, 0, 0, 0, 293, 294,
+		1, 0, 0, 0, 294, 296, 1, 0, 0, 0, 295, 293, 1, 0, 0, 0, 296, 297, 5, 15,
+		0, 0, 297, 27, 1, 0, 0, 0, 298, 299, 7, 0, 0, 0, 299, 29, 1, 0, 0, 0, 300,
+		304, 5, 22, 0, 0, 301, 303, 5, 20, 0, 0, 302, 301, 1, 0, 0, 0, 303, 306,
+		1, 0, 0, 0, 304, 302, 1, 0, 0, 0, 304, 305, 1, 0, 0, 0, 305, 31, 1, 0,
+		0, 0, 306, 304, 1, 0, 0, 0, 45, 35, 42, 47, 55, 61, 66, 71, 80, 87, 94,
+		99, 105, 110, 114, 120, 122, 133, 137, 145, 150, 152, 163, 173, 180, 185,
+		191, 198, 206, 213, 217, 219, 228, 235, 239, 245, 249, 254, 263, 270, 274,
+		279, 284, 288, 293, 304,
 	}
 	deserializer := antlr.NewATNDeserializer(nil)
 	staticData.atn = deserializer.Deserialize(staticData.serializedATN)
@@ -230,15 +239,16 @@ const (
 	MinecraftMetascriptParserT__11        = 12
 	MinecraftMetascriptParserT__12        = 13
 	MinecraftMetascriptParserT__13        = 14
-	MinecraftMetascriptParserInt          = 15
-	MinecraftMetascriptParserFloat        = 16
-	MinecraftMetascriptParserString_      = 17
-	MinecraftMetascriptParserWS           = 18
-	MinecraftMetascriptParserNL           = 19
-	MinecraftMetascriptParserIdentifier   = 20
-	MinecraftMetascriptParserDocString    = 21
-	MinecraftMetascriptParserBlockComment = 22
-	MinecraftMetascriptParserLineComment  = 23
+	MinecraftMetascriptParserT__14        = 15
+	MinecraftMetascriptParserInt          = 16
+	MinecraftMetascriptParserFloat        = 17
+	MinecraftMetascriptParserString_      = 18
+	MinecraftMetascriptParserWS           = 19
+	MinecraftMetascriptParserNL           = 20
+	MinecraftMetascriptParserIdentifier   = 21
+	MinecraftMetascriptParserDocString    = 22
+	MinecraftMetascriptParserBlockComment = 23
+	MinecraftMetascriptParserLineComment  = 24
 )
 
 // MinecraftMetascriptParser rules.
@@ -248,16 +258,17 @@ const (
 	MinecraftMetascriptParserRULE_block             = 2
 	MinecraftMetascriptParserRULE_varDecl           = 3
 	MinecraftMetascriptParserRULE_resourceReference = 4
-	MinecraftMetascriptParserRULE_fn                = 5
-	MinecraftMetascriptParserRULE_fnArgBody         = 6
-	MinecraftMetascriptParserRULE_value             = 7
-	MinecraftMetascriptParserRULE_condition         = 8
-	MinecraftMetascriptParserRULE_rootCondition     = 9
-	MinecraftMetascriptParserRULE_conditional       = 10
-	MinecraftMetascriptParserRULE_conditionalBody   = 11
-	MinecraftMetascriptParserRULE_list              = 12
-	MinecraftMetascriptParserRULE_number            = 13
-	MinecraftMetascriptParserRULE_docString         = 14
+	MinecraftMetascriptParserRULE_resourceTag       = 5
+	MinecraftMetascriptParserRULE_fn                = 6
+	MinecraftMetascriptParserRULE_fnArgBody         = 7
+	MinecraftMetascriptParserRULE_value             = 8
+	MinecraftMetascriptParserRULE_condition         = 9
+	MinecraftMetascriptParserRULE_rootCondition     = 10
+	MinecraftMetascriptParserRULE_conditional       = 11
+	MinecraftMetascriptParserRULE_conditionalBody   = 12
+	MinecraftMetascriptParserRULE_list              = 13
+	MinecraftMetascriptParserRULE_number            = 14
+	MinecraftMetascriptParserRULE_docString         = 15
 )
 
 // IFileContext is an interface to support dynamic dispatch.
@@ -384,7 +395,7 @@ func (p *MinecraftMetascriptParser) File() (localctx IFileContext) {
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
-	p.SetState(33)
+	p.SetState(35)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
 		goto errorExit
@@ -393,7 +404,7 @@ func (p *MinecraftMetascriptParser) File() (localctx IFileContext) {
 
 	for _la == MinecraftMetascriptParserNL {
 		{
-			p.SetState(30)
+			p.SetState(32)
 			p.Match(MinecraftMetascriptParserNL)
 			if p.HasError() {
 				// Recognition error - abort rule
@@ -401,14 +412,14 @@ func (p *MinecraftMetascriptParser) File() (localctx IFileContext) {
 			}
 		}
 
-		p.SetState(35)
+		p.SetState(37)
 		p.GetErrorHandler().Sync(p)
 		if p.HasError() {
 			goto errorExit
 		}
 		_la = p.GetTokenStream().LA(1)
 	}
-	p.SetState(45)
+	p.SetState(47)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
 		goto errorExit
@@ -417,10 +428,10 @@ func (p *MinecraftMetascriptParser) File() (localctx IFileContext) {
 
 	for _la == MinecraftMetascriptParserIdentifier {
 		{
-			p.SetState(36)
+			p.SetState(38)
 			p.NamedBlock()
 		}
-		p.SetState(40)
+		p.SetState(42)
 		p.GetErrorHandler().Sync(p)
 		if p.HasError() {
 			goto errorExit
@@ -429,7 +440,7 @@ func (p *MinecraftMetascriptParser) File() (localctx IFileContext) {
 
 		for _la == MinecraftMetascriptParserNL {
 			{
-				p.SetState(37)
+				p.SetState(39)
 				p.Match(MinecraftMetascriptParserNL)
 				if p.HasError() {
 					// Recognition error - abort rule
@@ -437,7 +448,7 @@ func (p *MinecraftMetascriptParser) File() (localctx IFileContext) {
 				}
 			}
 
-			p.SetState(42)
+			p.SetState(44)
 			p.GetErrorHandler().Sync(p)
 			if p.HasError() {
 				goto errorExit
@@ -445,7 +456,7 @@ func (p *MinecraftMetascriptParser) File() (localctx IFileContext) {
 			_la = p.GetTokenStream().LA(1)
 		}
 
-		p.SetState(47)
+		p.SetState(49)
 		p.GetErrorHandler().Sync(p)
 		if p.HasError() {
 			goto errorExit
@@ -644,7 +655,7 @@ func (p *MinecraftMetascriptParser) NamedBlock() (localctx INamedBlockContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(48)
+		p.SetState(50)
 		p.Match(MinecraftMetascriptParserIdentifier)
 		if p.HasError() {
 			// Recognition error - abort rule
@@ -652,14 +663,14 @@ func (p *MinecraftMetascriptParser) NamedBlock() (localctx INamedBlockContext) {
 		}
 	}
 	{
-		p.SetState(49)
+		p.SetState(51)
 		p.Match(MinecraftMetascriptParserIdentifier)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
 		}
 	}
-	p.SetState(53)
+	p.SetState(55)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
 		goto errorExit
@@ -668,7 +679,7 @@ func (p *MinecraftMetascriptParser) NamedBlock() (localctx INamedBlockContext) {
 
 	for _la == MinecraftMetascriptParserNL {
 		{
-			p.SetState(50)
+			p.SetState(52)
 			p.Match(MinecraftMetascriptParserNL)
 			if p.HasError() {
 				// Recognition error - abort rule
@@ -676,7 +687,7 @@ func (p *MinecraftMetascriptParser) NamedBlock() (localctx INamedBlockContext) {
 			}
 		}
 
-		p.SetState(55)
+		p.SetState(57)
 		p.GetErrorHandler().Sync(p)
 		if p.HasError() {
 			goto errorExit
@@ -684,14 +695,14 @@ func (p *MinecraftMetascriptParser) NamedBlock() (localctx INamedBlockContext) {
 		_la = p.GetTokenStream().LA(1)
 	}
 	{
-		p.SetState(56)
+		p.SetState(58)
 		p.Match(MinecraftMetascriptParserT__0)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
 		}
 	}
-	p.SetState(69)
+	p.SetState(71)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
 		goto errorExit
@@ -699,7 +710,7 @@ func (p *MinecraftMetascriptParser) NamedBlock() (localctx INamedBlockContext) {
 	_la = p.GetTokenStream().LA(1)
 
 	for _la == MinecraftMetascriptParserIdentifier || _la == MinecraftMetascriptParserDocString {
-		p.SetState(59)
+		p.SetState(61)
 		p.GetErrorHandler().Sync(p)
 		if p.HasError() {
 			goto errorExit
@@ -708,20 +719,20 @@ func (p *MinecraftMetascriptParser) NamedBlock() (localctx INamedBlockContext) {
 		switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 4, p.GetParserRuleContext()) {
 		case 1:
 			{
-				p.SetState(57)
+				p.SetState(59)
 				p.VarDecl()
 			}
 
 		case 2:
 			{
-				p.SetState(58)
+				p.SetState(60)
 				p.Block()
 			}
 
 		case antlr.ATNInvalidAltNumber:
 			goto errorExit
 		}
-		p.SetState(64)
+		p.SetState(66)
 		p.GetErrorHandler().Sync(p)
 		if p.HasError() {
 			goto errorExit
@@ -730,7 +741,7 @@ func (p *MinecraftMetascriptParser) NamedBlock() (localctx INamedBlockContext) {
 
 		for _la == MinecraftMetascriptParserNL {
 			{
-				p.SetState(61)
+				p.SetState(63)
 				p.Match(MinecraftMetascriptParserNL)
 				if p.HasError() {
 					// Recognition error - abort rule
@@ -738,7 +749,7 @@ func (p *MinecraftMetascriptParser) NamedBlock() (localctx INamedBlockContext) {
 				}
 			}
 
-			p.SetState(66)
+			p.SetState(68)
 			p.GetErrorHandler().Sync(p)
 			if p.HasError() {
 				goto errorExit
@@ -746,7 +757,7 @@ func (p *MinecraftMetascriptParser) NamedBlock() (localctx INamedBlockContext) {
 			_la = p.GetTokenStream().LA(1)
 		}
 
-		p.SetState(71)
+		p.SetState(73)
 		p.GetErrorHandler().Sync(p)
 		if p.HasError() {
 			goto errorExit
@@ -754,7 +765,7 @@ func (p *MinecraftMetascriptParser) NamedBlock() (localctx INamedBlockContext) {
 		_la = p.GetTokenStream().LA(1)
 	}
 	{
-		p.SetState(72)
+		p.SetState(74)
 		p.Match(MinecraftMetascriptParserT__1)
 		if p.HasError() {
 			// Recognition error - abort rule
@@ -905,14 +916,14 @@ func (p *MinecraftMetascriptParser) Block() (localctx IBlockContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(74)
+		p.SetState(76)
 		p.Match(MinecraftMetascriptParserIdentifier)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
 		}
 	}
-	p.SetState(78)
+	p.SetState(80)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
 		goto errorExit
@@ -921,7 +932,7 @@ func (p *MinecraftMetascriptParser) Block() (localctx IBlockContext) {
 
 	for _la == MinecraftMetascriptParserNL {
 		{
-			p.SetState(75)
+			p.SetState(77)
 			p.Match(MinecraftMetascriptParserNL)
 			if p.HasError() {
 				// Recognition error - abort rule
@@ -929,7 +940,7 @@ func (p *MinecraftMetascriptParser) Block() (localctx IBlockContext) {
 			}
 		}
 
-		p.SetState(80)
+		p.SetState(82)
 		p.GetErrorHandler().Sync(p)
 		if p.HasError() {
 			goto errorExit
@@ -937,14 +948,14 @@ func (p *MinecraftMetascriptParser) Block() (localctx IBlockContext) {
 		_la = p.GetTokenStream().LA(1)
 	}
 	{
-		p.SetState(81)
+		p.SetState(83)
 		p.Match(MinecraftMetascriptParserT__0)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
 		}
 	}
-	p.SetState(85)
+	p.SetState(87)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
 		goto errorExit
@@ -953,7 +964,7 @@ func (p *MinecraftMetascriptParser) Block() (localctx IBlockContext) {
 
 	for _la == MinecraftMetascriptParserNL {
 		{
-			p.SetState(82)
+			p.SetState(84)
 			p.Match(MinecraftMetascriptParserNL)
 			if p.HasError() {
 				// Recognition error - abort rule
@@ -961,14 +972,14 @@ func (p *MinecraftMetascriptParser) Block() (localctx IBlockContext) {
 			}
 		}
 
-		p.SetState(87)
+		p.SetState(89)
 		p.GetErrorHandler().Sync(p)
 		if p.HasError() {
 			goto errorExit
 		}
 		_la = p.GetTokenStream().LA(1)
 	}
-	p.SetState(97)
+	p.SetState(99)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
 		goto errorExit
@@ -977,11 +988,11 @@ func (p *MinecraftMetascriptParser) Block() (localctx IBlockContext) {
 
 	for _la == MinecraftMetascriptParserIdentifier || _la == MinecraftMetascriptParserDocString {
 		{
-			p.SetState(88)
+			p.SetState(90)
 			p.VarDecl()
 		}
 
-		p.SetState(92)
+		p.SetState(94)
 		p.GetErrorHandler().Sync(p)
 		if p.HasError() {
 			goto errorExit
@@ -990,7 +1001,7 @@ func (p *MinecraftMetascriptParser) Block() (localctx IBlockContext) {
 
 		for _la == MinecraftMetascriptParserNL {
 			{
-				p.SetState(89)
+				p.SetState(91)
 				p.Match(MinecraftMetascriptParserNL)
 				if p.HasError() {
 					// Recognition error - abort rule
@@ -998,7 +1009,7 @@ func (p *MinecraftMetascriptParser) Block() (localctx IBlockContext) {
 				}
 			}
 
-			p.SetState(94)
+			p.SetState(96)
 			p.GetErrorHandler().Sync(p)
 			if p.HasError() {
 				goto errorExit
@@ -1006,7 +1017,7 @@ func (p *MinecraftMetascriptParser) Block() (localctx IBlockContext) {
 			_la = p.GetTokenStream().LA(1)
 		}
 
-		p.SetState(99)
+		p.SetState(101)
 		p.GetErrorHandler().Sync(p)
 		if p.HasError() {
 			goto errorExit
@@ -1014,7 +1025,7 @@ func (p *MinecraftMetascriptParser) Block() (localctx IBlockContext) {
 		_la = p.GetTokenStream().LA(1)
 	}
 	{
-		p.SetState(100)
+		p.SetState(102)
 		p.Match(MinecraftMetascriptParserT__1)
 		if p.HasError() {
 			// Recognition error - abort rule
@@ -1145,7 +1156,7 @@ func (p *MinecraftMetascriptParser) VarDecl() (localctx IVarDeclContext) {
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
-	p.SetState(103)
+	p.SetState(105)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
 		goto errorExit
@@ -1154,13 +1165,13 @@ func (p *MinecraftMetascriptParser) VarDecl() (localctx IVarDeclContext) {
 
 	if _la == MinecraftMetascriptParserDocString {
 		{
-			p.SetState(102)
+			p.SetState(104)
 			p.DocString()
 		}
 
 	}
 	{
-		p.SetState(105)
+		p.SetState(107)
 		p.Match(MinecraftMetascriptParserIdentifier)
 		if p.HasError() {
 			// Recognition error - abort rule
@@ -1168,19 +1179,19 @@ func (p *MinecraftMetascriptParser) VarDecl() (localctx IVarDeclContext) {
 		}
 	}
 	{
-		p.SetState(106)
+		p.SetState(108)
 		p.Match(MinecraftMetascriptParserT__2)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
 		}
 	}
-	p.SetState(108)
+	p.SetState(110)
 	p.GetErrorHandler().Sync(p)
 
 	if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 12, p.GetParserRuleContext()) == 1 {
 		{
-			p.SetState(107)
+			p.SetState(109)
 			p.Value()
 		}
 
@@ -1279,13 +1290,52 @@ func (s *ResourceReferenceContext) ExitRule(listener antlr.ParseTreeListener) {
 func (p *MinecraftMetascriptParser) ResourceReference() (localctx IResourceReferenceContext) {
 	localctx = NewResourceReferenceContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 8, MinecraftMetascriptParserRULE_resourceReference)
-	p.EnterOuterAlt(localctx, 1)
-	p.SetState(112)
+	p.SetState(122)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
-	if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 13, p.GetParserRuleContext()) == 1 {
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 15, p.GetParserRuleContext()) {
+	case 1:
+		p.EnterOuterAlt(localctx, 1)
+		p.SetState(114)
+		p.GetErrorHandler().Sync(p)
+
+		if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 13, p.GetParserRuleContext()) == 1 {
+			{
+				p.SetState(112)
+				p.Match(MinecraftMetascriptParserIdentifier)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
+			}
+			{
+				p.SetState(113)
+				p.Match(MinecraftMetascriptParserT__3)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
+			}
+
+		} else if p.HasError() { // JIM
+			goto errorExit
+		}
 		{
-			p.SetState(110)
+			p.SetState(116)
+			p.Match(MinecraftMetascriptParserIdentifier)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
+		}
+
+	case 2:
+		p.EnterOuterAlt(localctx, 2)
+		{
+			p.SetState(117)
 			p.Match(MinecraftMetascriptParserIdentifier)
 			if p.HasError() {
 				// Recognition error - abort rule
@@ -1293,24 +1343,144 @@ func (p *MinecraftMetascriptParser) ResourceReference() (localctx IResourceRefer
 			}
 		}
 		{
-			p.SetState(111)
+			p.SetState(118)
 			p.Match(MinecraftMetascriptParserT__3)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
 			}
 		}
+		p.SetState(120)
+		p.GetErrorHandler().Sync(p)
 
-	} else if p.HasError() { // JIM
+		if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 14, p.GetParserRuleContext()) == 1 {
+			{
+				p.SetState(119)
+				p.Match(MinecraftMetascriptParserIdentifier)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
+			}
+
+		} else if p.HasError() { // JIM
+			goto errorExit
+		}
+
+	case antlr.ATNInvalidAltNumber:
 		goto errorExit
 	}
+
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
+	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
+}
+
+// IResourceTagContext is an interface to support dynamic dispatch.
+type IResourceTagContext interface {
+	antlr.ParserRuleContext
+
+	// GetParser returns the parser.
+	GetParser() antlr.Parser
+
+	// Getter signatures
+	ResourceReference() IResourceReferenceContext
+
+	// IsResourceTagContext differentiates from other interfaces.
+	IsResourceTagContext()
+}
+
+type ResourceTagContext struct {
+	antlr.BaseParserRuleContext
+	parser antlr.Parser
+}
+
+func NewEmptyResourceTagContext() *ResourceTagContext {
+	var p = new(ResourceTagContext)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = MinecraftMetascriptParserRULE_resourceTag
+	return p
+}
+
+func InitEmptyResourceTagContext(p *ResourceTagContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = MinecraftMetascriptParserRULE_resourceTag
+}
+
+func (*ResourceTagContext) IsResourceTagContext() {}
+
+func NewResourceTagContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ResourceTagContext {
+	var p = new(ResourceTagContext)
+
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
+
+	p.parser = parser
+	p.RuleIndex = MinecraftMetascriptParserRULE_resourceTag
+
+	return p
+}
+
+func (s *ResourceTagContext) GetParser() antlr.Parser { return s.parser }
+
+func (s *ResourceTagContext) ResourceReference() IResourceReferenceContext {
+	var t antlr.RuleContext
+	for _, ctx := range s.GetChildren() {
+		if _, ok := ctx.(IResourceReferenceContext); ok {
+			t = ctx.(antlr.RuleContext)
+			break
+		}
+	}
+
+	if t == nil {
+		return nil
+	}
+
+	return t.(IResourceReferenceContext)
+}
+
+func (s *ResourceTagContext) GetRuleContext() antlr.RuleContext {
+	return s
+}
+
+func (s *ResourceTagContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
+	return antlr.TreesStringTree(s, ruleNames, recog)
+}
+
+func (s *ResourceTagContext) EnterRule(listener antlr.ParseTreeListener) {
+	if listenerT, ok := listener.(MinecraftMetascriptListener); ok {
+		listenerT.EnterResourceTag(s)
+	}
+}
+
+func (s *ResourceTagContext) ExitRule(listener antlr.ParseTreeListener) {
+	if listenerT, ok := listener.(MinecraftMetascriptListener); ok {
+		listenerT.ExitResourceTag(s)
+	}
+}
+
+func (p *MinecraftMetascriptParser) ResourceTag() (localctx IResourceTagContext) {
+	localctx = NewResourceTagContext(p, p.GetParserRuleContext(), p.GetState())
+	p.EnterRule(localctx, 10, MinecraftMetascriptParserRULE_resourceTag)
+	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(114)
-		p.Match(MinecraftMetascriptParserIdentifier)
+		p.SetState(124)
+		p.Match(MinecraftMetascriptParserT__4)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
 		}
+	}
+	{
+		p.SetState(125)
+		p.ResourceReference()
 	}
 
 errorExit:
@@ -1458,12 +1628,12 @@ func (s *FnContext) ExitRule(listener antlr.ParseTreeListener) {
 
 func (p *MinecraftMetascriptParser) Fn() (localctx IFnContext) {
 	localctx = NewFnContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 10, MinecraftMetascriptParserRULE_fn)
+	p.EnterRule(localctx, 12, MinecraftMetascriptParserRULE_fn)
 	var _alt int
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(116)
+		p.SetState(127)
 		p.Match(MinecraftMetascriptParserIdentifier)
 		if p.HasError() {
 			// Recognition error - abort rule
@@ -1471,43 +1641,59 @@ func (p *MinecraftMetascriptParser) Fn() (localctx IFnContext) {
 		}
 	}
 	{
-		p.SetState(117)
+		p.SetState(128)
 		p.FnArgBody()
 	}
-	p.SetState(122)
+	p.SetState(133)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
 		goto errorExit
 	}
-	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 14, p.GetParserRuleContext())
+	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 16, p.GetParserRuleContext())
 	if p.HasError() {
 		goto errorExit
 	}
 	for _alt != 1 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1+1 {
 			{
-				p.SetState(118)
-				p.Match(MinecraftMetascriptParserT__4)
+				p.SetState(129)
+				p.Match(MinecraftMetascriptParserT__5)
 				if p.HasError() {
 					// Recognition error - abort rule
 					goto errorExit
 				}
 			}
 			{
-				p.SetState(119)
+				p.SetState(130)
 				p.Fn()
 			}
 
 		}
-		p.SetState(124)
+		p.SetState(135)
 		p.GetErrorHandler().Sync(p)
 		if p.HasError() {
 			goto errorExit
 		}
-		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 14, p.GetParserRuleContext())
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 16, p.GetParserRuleContext())
 		if p.HasError() {
 			goto errorExit
 		}
+	}
+	p.SetState(137)
+	p.GetErrorHandler().Sync(p)
+
+	if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 17, p.GetParserRuleContext()) == 1 {
+		{
+			p.SetState(136)
+			p.Match(MinecraftMetascriptParserT__5)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
+		}
+
+	} else if p.HasError() { // JIM
+		goto errorExit
 	}
 
 errorExit:
@@ -1633,38 +1819,38 @@ func (s *FnArgBodyContext) ExitRule(listener antlr.ParseTreeListener) {
 
 func (p *MinecraftMetascriptParser) FnArgBody() (localctx IFnArgBodyContext) {
 	localctx = NewFnArgBodyContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 12, MinecraftMetascriptParserRULE_fnArgBody)
+	p.EnterRule(localctx, 14, MinecraftMetascriptParserRULE_fnArgBody)
 	var _la int
 
 	var _alt int
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(125)
-		p.Match(MinecraftMetascriptParserT__5)
+		p.SetState(139)
+		p.Match(MinecraftMetascriptParserT__6)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
 		}
 	}
-	p.SetState(131)
+	p.SetState(145)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
 		goto errorExit
 	}
-	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 15, p.GetParserRuleContext())
+	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 18, p.GetParserRuleContext())
 	if p.HasError() {
 		goto errorExit
 	}
 	for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1 {
 			{
-				p.SetState(126)
+				p.SetState(140)
 				p.Value()
 			}
 			{
-				p.SetState(127)
-				p.Match(MinecraftMetascriptParserT__6)
+				p.SetState(141)
+				p.Match(MinecraftMetascriptParserT__7)
 				if p.HasError() {
 					// Recognition error - abort rule
 					goto errorExit
@@ -1672,39 +1858,39 @@ func (p *MinecraftMetascriptParser) FnArgBody() (localctx IFnArgBodyContext) {
 			}
 
 		}
-		p.SetState(133)
+		p.SetState(147)
 		p.GetErrorHandler().Sync(p)
 		if p.HasError() {
 			goto errorExit
 		}
-		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 15, p.GetParserRuleContext())
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 18, p.GetParserRuleContext())
 		if p.HasError() {
 			goto errorExit
 		}
 	}
-	p.SetState(138)
+	p.SetState(152)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
 		goto errorExit
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&1290240) != 0 {
+	if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&2580512) != 0 {
 		{
-			p.SetState(134)
+			p.SetState(148)
 			p.Value()
 		}
-		p.SetState(136)
+		p.SetState(150)
 		p.GetErrorHandler().Sync(p)
 		if p.HasError() {
 			goto errorExit
 		}
 		_la = p.GetTokenStream().LA(1)
 
-		if _la == MinecraftMetascriptParserT__6 {
+		if _la == MinecraftMetascriptParserT__7 {
 			{
-				p.SetState(135)
-				p.Match(MinecraftMetascriptParserT__6)
+				p.SetState(149)
+				p.Match(MinecraftMetascriptParserT__7)
 				if p.HasError() {
 					// Recognition error - abort rule
 					goto errorExit
@@ -1715,8 +1901,8 @@ func (p *MinecraftMetascriptParser) FnArgBody() (localctx IFnArgBodyContext) {
 
 	}
 	{
-		p.SetState(140)
-		p.Match(MinecraftMetascriptParserT__7)
+		p.SetState(154)
+		p.Match(MinecraftMetascriptParserT__8)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -1750,6 +1936,7 @@ type IValueContext interface {
 	ResourceReference() IResourceReferenceContext
 	Conditional() IConditionalContext
 	List() IListContext
+	ResourceTag() IResourceTagContext
 
 	// IsValueContext differentiates from other interfaces.
 	IsValueContext()
@@ -1871,6 +2058,22 @@ func (s *ValueContext) List() IListContext {
 	return t.(IListContext)
 }
 
+func (s *ValueContext) ResourceTag() IResourceTagContext {
+	var t antlr.RuleContext
+	for _, ctx := range s.GetChildren() {
+		if _, ok := ctx.(IResourceTagContext); ok {
+			t = ctx.(antlr.RuleContext)
+			break
+		}
+	}
+
+	if t == nil {
+		return nil
+	}
+
+	return t.(IResourceTagContext)
+}
+
 func (s *ValueContext) GetRuleContext() antlr.RuleContext {
 	return s
 }
@@ -1893,25 +2096,25 @@ func (s *ValueContext) ExitRule(listener antlr.ParseTreeListener) {
 
 func (p *MinecraftMetascriptParser) Value() (localctx IValueContext) {
 	localctx = NewValueContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 14, MinecraftMetascriptParserRULE_value)
-	p.SetState(148)
+	p.EnterRule(localctx, 16, MinecraftMetascriptParserRULE_value)
+	p.SetState(163)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
 		goto errorExit
 	}
 
-	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 18, p.GetParserRuleContext()) {
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 21, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
-			p.SetState(142)
+			p.SetState(156)
 			p.Number()
 		}
 
 	case 2:
 		p.EnterOuterAlt(localctx, 2)
 		{
-			p.SetState(143)
+			p.SetState(157)
 			p.Match(MinecraftMetascriptParserString_)
 			if p.HasError() {
 				// Recognition error - abort rule
@@ -1922,29 +2125,36 @@ func (p *MinecraftMetascriptParser) Value() (localctx IValueContext) {
 	case 3:
 		p.EnterOuterAlt(localctx, 3)
 		{
-			p.SetState(144)
+			p.SetState(158)
 			p.Fn()
 		}
 
 	case 4:
 		p.EnterOuterAlt(localctx, 4)
 		{
-			p.SetState(145)
+			p.SetState(159)
 			p.ResourceReference()
 		}
 
 	case 5:
 		p.EnterOuterAlt(localctx, 5)
 		{
-			p.SetState(146)
+			p.SetState(160)
 			p.Conditional()
 		}
 
 	case 6:
 		p.EnterOuterAlt(localctx, 6)
 		{
-			p.SetState(147)
+			p.SetState(161)
 			p.List()
+		}
+
+	case 7:
+		p.EnterOuterAlt(localctx, 7)
+		{
+			p.SetState(162)
+			p.ResourceTag()
 		}
 
 	case antlr.ATNInvalidAltNumber:
@@ -2333,60 +2543,60 @@ func (p *MinecraftMetascriptParser) condition(_p int) (localctx IConditionContex
 	localctx = NewConditionContext(p, p.GetParserRuleContext(), _parentState)
 	var _prevctx IConditionContext = localctx
 	var _ antlr.ParserRuleContext = _prevctx // TODO: To prevent unused variable warning.
-	_startState := 16
-	p.EnterRecursionRule(localctx, 16, MinecraftMetascriptParserRULE_condition, _p)
+	_startState := 18
+	p.EnterRecursionRule(localctx, 18, MinecraftMetascriptParserRULE_condition, _p)
 	var _la int
 
 	var _alt int
 
 	p.EnterOuterAlt(localctx, 1)
-	p.SetState(170)
+	p.SetState(185)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
 		goto errorExit
 	}
 
 	switch p.GetTokenStream().LA(1) {
-	case MinecraftMetascriptParserT__8:
+	case MinecraftMetascriptParserT__9:
 		localctx = NewCondNegateContext(p, localctx)
 		p.SetParserRuleContext(localctx)
 		_prevctx = localctx
 
 		{
-			p.SetState(151)
-			p.Match(MinecraftMetascriptParserT__8)
+			p.SetState(166)
+			p.Match(MinecraftMetascriptParserT__9)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
 			}
 		}
 		{
-			p.SetState(152)
+			p.SetState(167)
 			p.condition(5)
 		}
 
-	case MinecraftMetascriptParserT__11, MinecraftMetascriptParserT__12, MinecraftMetascriptParserInt, MinecraftMetascriptParserFloat, MinecraftMetascriptParserString_, MinecraftMetascriptParserIdentifier:
+	case MinecraftMetascriptParserT__4, MinecraftMetascriptParserT__12, MinecraftMetascriptParserT__13, MinecraftMetascriptParserInt, MinecraftMetascriptParserFloat, MinecraftMetascriptParserString_, MinecraftMetascriptParserIdentifier:
 		localctx = NewCondPrimaryContext(p, localctx)
 		p.SetParserRuleContext(localctx)
 		_prevctx = localctx
 		{
-			p.SetState(153)
+			p.SetState(168)
 			p.RootCondition()
 		}
 
-	case MinecraftMetascriptParserT__5:
+	case MinecraftMetascriptParserT__6:
 		localctx = NewCondGroupedContext(p, localctx)
 		p.SetParserRuleContext(localctx)
 		_prevctx = localctx
 		{
-			p.SetState(154)
-			p.Match(MinecraftMetascriptParserT__5)
+			p.SetState(169)
+			p.Match(MinecraftMetascriptParserT__6)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
 			}
 		}
-		p.SetState(158)
+		p.SetState(173)
 		p.GetErrorHandler().Sync(p)
 		if p.HasError() {
 			goto errorExit
@@ -2395,7 +2605,7 @@ func (p *MinecraftMetascriptParser) condition(_p int) (localctx IConditionContex
 
 		for _la == MinecraftMetascriptParserNL {
 			{
-				p.SetState(155)
+				p.SetState(170)
 				p.Match(MinecraftMetascriptParserNL)
 				if p.HasError() {
 					// Recognition error - abort rule
@@ -2403,7 +2613,7 @@ func (p *MinecraftMetascriptParser) condition(_p int) (localctx IConditionContex
 				}
 			}
 
-			p.SetState(160)
+			p.SetState(175)
 			p.GetErrorHandler().Sync(p)
 			if p.HasError() {
 				goto errorExit
@@ -2411,10 +2621,10 @@ func (p *MinecraftMetascriptParser) condition(_p int) (localctx IConditionContex
 			_la = p.GetTokenStream().LA(1)
 		}
 		{
-			p.SetState(161)
+			p.SetState(176)
 			p.condition(0)
 		}
-		p.SetState(165)
+		p.SetState(180)
 		p.GetErrorHandler().Sync(p)
 		if p.HasError() {
 			goto errorExit
@@ -2423,7 +2633,7 @@ func (p *MinecraftMetascriptParser) condition(_p int) (localctx IConditionContex
 
 		for _la == MinecraftMetascriptParserNL {
 			{
-				p.SetState(162)
+				p.SetState(177)
 				p.Match(MinecraftMetascriptParserNL)
 				if p.HasError() {
 					// Recognition error - abort rule
@@ -2431,7 +2641,7 @@ func (p *MinecraftMetascriptParser) condition(_p int) (localctx IConditionContex
 				}
 			}
 
-			p.SetState(167)
+			p.SetState(182)
 			p.GetErrorHandler().Sync(p)
 			if p.HasError() {
 				goto errorExit
@@ -2439,8 +2649,8 @@ func (p *MinecraftMetascriptParser) condition(_p int) (localctx IConditionContex
 			_la = p.GetTokenStream().LA(1)
 		}
 		{
-			p.SetState(168)
-			p.Match(MinecraftMetascriptParserT__7)
+			p.SetState(183)
+			p.Match(MinecraftMetascriptParserT__8)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -2452,12 +2662,12 @@ func (p *MinecraftMetascriptParser) condition(_p int) (localctx IConditionContex
 		goto errorExit
 	}
 	p.GetParserRuleContext().SetStop(p.GetTokenStream().LT(-1))
-	p.SetState(204)
+	p.SetState(219)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
 		goto errorExit
 	}
-	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 27, p.GetParserRuleContext())
+	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 30, p.GetParserRuleContext())
 	if p.HasError() {
 		goto errorExit
 	}
@@ -2467,90 +2677,20 @@ func (p *MinecraftMetascriptParser) condition(_p int) (localctx IConditionContex
 				p.TriggerExitRuleEvent()
 			}
 			_prevctx = localctx
-			p.SetState(202)
+			p.SetState(217)
 			p.GetErrorHandler().Sync(p)
 			if p.HasError() {
 				goto errorExit
 			}
 
-			switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 26, p.GetParserRuleContext()) {
+			switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 29, p.GetParserRuleContext()) {
 			case 1:
 				localctx = NewCondAndContext(p, NewConditionContext(p, _parentctx, _parentState))
 				p.PushNewRecursionContext(localctx, _startState, MinecraftMetascriptParserRULE_condition)
-				p.SetState(172)
+				p.SetState(187)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 2)) {
 					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 2)", ""))
-					goto errorExit
-				}
-				p.SetState(176)
-				p.GetErrorHandler().Sync(p)
-				if p.HasError() {
-					goto errorExit
-				}
-				_la = p.GetTokenStream().LA(1)
-
-				for _la == MinecraftMetascriptParserNL {
-					{
-						p.SetState(173)
-						p.Match(MinecraftMetascriptParserNL)
-						if p.HasError() {
-							// Recognition error - abort rule
-							goto errorExit
-						}
-					}
-
-					p.SetState(178)
-					p.GetErrorHandler().Sync(p)
-					if p.HasError() {
-						goto errorExit
-					}
-					_la = p.GetTokenStream().LA(1)
-				}
-				{
-					p.SetState(179)
-					p.Match(MinecraftMetascriptParserT__9)
-					if p.HasError() {
-						// Recognition error - abort rule
-						goto errorExit
-					}
-				}
-				p.SetState(183)
-				p.GetErrorHandler().Sync(p)
-				if p.HasError() {
-					goto errorExit
-				}
-				_la = p.GetTokenStream().LA(1)
-
-				for _la == MinecraftMetascriptParserNL {
-					{
-						p.SetState(180)
-						p.Match(MinecraftMetascriptParserNL)
-						if p.HasError() {
-							// Recognition error - abort rule
-							goto errorExit
-						}
-					}
-
-					p.SetState(185)
-					p.GetErrorHandler().Sync(p)
-					if p.HasError() {
-						goto errorExit
-					}
-					_la = p.GetTokenStream().LA(1)
-				}
-				{
-					p.SetState(186)
-					p.condition(3)
-				}
-
-			case 2:
-				localctx = NewCondOrContext(p, NewConditionContext(p, _parentctx, _parentState))
-				p.PushNewRecursionContext(localctx, _startState, MinecraftMetascriptParserRULE_condition)
-				p.SetState(187)
-
-				if !(p.Precpred(p.GetParserRuleContext(), 1)) {
-					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 1)", ""))
 					goto errorExit
 				}
 				p.SetState(191)
@@ -2611,6 +2751,76 @@ func (p *MinecraftMetascriptParser) condition(_p int) (localctx IConditionContex
 				}
 				{
 					p.SetState(201)
+					p.condition(3)
+				}
+
+			case 2:
+				localctx = NewCondOrContext(p, NewConditionContext(p, _parentctx, _parentState))
+				p.PushNewRecursionContext(localctx, _startState, MinecraftMetascriptParserRULE_condition)
+				p.SetState(202)
+
+				if !(p.Precpred(p.GetParserRuleContext(), 1)) {
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 1)", ""))
+					goto errorExit
+				}
+				p.SetState(206)
+				p.GetErrorHandler().Sync(p)
+				if p.HasError() {
+					goto errorExit
+				}
+				_la = p.GetTokenStream().LA(1)
+
+				for _la == MinecraftMetascriptParserNL {
+					{
+						p.SetState(203)
+						p.Match(MinecraftMetascriptParserNL)
+						if p.HasError() {
+							// Recognition error - abort rule
+							goto errorExit
+						}
+					}
+
+					p.SetState(208)
+					p.GetErrorHandler().Sync(p)
+					if p.HasError() {
+						goto errorExit
+					}
+					_la = p.GetTokenStream().LA(1)
+				}
+				{
+					p.SetState(209)
+					p.Match(MinecraftMetascriptParserT__11)
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
+				}
+				p.SetState(213)
+				p.GetErrorHandler().Sync(p)
+				if p.HasError() {
+					goto errorExit
+				}
+				_la = p.GetTokenStream().LA(1)
+
+				for _la == MinecraftMetascriptParserNL {
+					{
+						p.SetState(210)
+						p.Match(MinecraftMetascriptParserNL)
+						if p.HasError() {
+							// Recognition error - abort rule
+							goto errorExit
+						}
+					}
+
+					p.SetState(215)
+					p.GetErrorHandler().Sync(p)
+					if p.HasError() {
+						goto errorExit
+					}
+					_la = p.GetTokenStream().LA(1)
+				}
+				{
+					p.SetState(216)
 					p.condition(2)
 				}
 
@@ -2619,12 +2829,12 @@ func (p *MinecraftMetascriptParser) condition(_p int) (localctx IConditionContex
 			}
 
 		}
-		p.SetState(206)
+		p.SetState(221)
 		p.GetErrorHandler().Sync(p)
 		if p.HasError() {
 			goto errorExit
 		}
-		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 27, p.GetParserRuleContext())
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 30, p.GetParserRuleContext())
 		if p.HasError() {
 			goto errorExit
 		}
@@ -2727,10 +2937,10 @@ func (s *RootConditionContext) ExitRule(listener antlr.ParseTreeListener) {
 
 func (p *MinecraftMetascriptParser) RootCondition() (localctx IRootConditionContext) {
 	localctx = NewRootConditionContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 18, MinecraftMetascriptParserRULE_rootCondition)
+	p.EnterRule(localctx, 20, MinecraftMetascriptParserRULE_rootCondition)
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(207)
+		p.SetState(222)
 		p.Value()
 	}
 
@@ -2858,21 +3068,21 @@ func (s *ConditionalContext) ExitRule(listener antlr.ParseTreeListener) {
 
 func (p *MinecraftMetascriptParser) Conditional() (localctx IConditionalContext) {
 	localctx = NewConditionalContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 20, MinecraftMetascriptParserRULE_conditional)
+	p.EnterRule(localctx, 22, MinecraftMetascriptParserRULE_conditional)
 	var _la int
 
 	var _alt int
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(209)
-		p.Match(MinecraftMetascriptParserT__11)
+		p.SetState(224)
+		p.Match(MinecraftMetascriptParserT__12)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
 		}
 	}
-	p.SetState(213)
+	p.SetState(228)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
 		goto errorExit
@@ -2881,7 +3091,7 @@ func (p *MinecraftMetascriptParser) Conditional() (localctx IConditionalContext)
 
 	for _la == MinecraftMetascriptParserNL {
 		{
-			p.SetState(210)
+			p.SetState(225)
 			p.Match(MinecraftMetascriptParserNL)
 			if p.HasError() {
 				// Recognition error - abort rule
@@ -2889,7 +3099,7 @@ func (p *MinecraftMetascriptParser) Conditional() (localctx IConditionalContext)
 			}
 		}
 
-		p.SetState(215)
+		p.SetState(230)
 		p.GetErrorHandler().Sync(p)
 		if p.HasError() {
 			goto errorExit
@@ -2897,22 +3107,22 @@ func (p *MinecraftMetascriptParser) Conditional() (localctx IConditionalContext)
 		_la = p.GetTokenStream().LA(1)
 	}
 	{
-		p.SetState(216)
+		p.SetState(231)
 		p.ConditionalBody()
 	}
-	p.SetState(220)
+	p.SetState(235)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
 		goto errorExit
 	}
-	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 29, p.GetParserRuleContext())
+	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 32, p.GetParserRuleContext())
 	if p.HasError() {
 		goto errorExit
 	}
 	for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1 {
 			{
-				p.SetState(217)
+				p.SetState(232)
 				p.Match(MinecraftMetascriptParserNL)
 				if p.HasError() {
 					// Recognition error - abort rule
@@ -2921,22 +3131,22 @@ func (p *MinecraftMetascriptParser) Conditional() (localctx IConditionalContext)
 			}
 
 		}
-		p.SetState(222)
+		p.SetState(237)
 		p.GetErrorHandler().Sync(p)
 		if p.HasError() {
 			goto errorExit
 		}
-		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 29, p.GetParserRuleContext())
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 32, p.GetParserRuleContext())
 		if p.HasError() {
 			goto errorExit
 		}
 	}
-	p.SetState(224)
+	p.SetState(239)
 	p.GetErrorHandler().Sync(p)
 
-	if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 30, p.GetParserRuleContext()) == 1 {
+	if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 33, p.GetParserRuleContext()) == 1 {
 		{
-			p.SetState(223)
+			p.SetState(238)
 			p.Value()
 		}
 
@@ -3051,33 +3261,33 @@ func (s *ConditionalBodyContext) ExitRule(listener antlr.ParseTreeListener) {
 
 func (p *MinecraftMetascriptParser) ConditionalBody() (localctx IConditionalBodyContext) {
 	localctx = NewConditionalBodyContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 22, MinecraftMetascriptParserRULE_conditionalBody)
+	p.EnterRule(localctx, 24, MinecraftMetascriptParserRULE_conditionalBody)
 	var _la int
 
 	var _alt int
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(226)
-		p.Match(MinecraftMetascriptParserT__5)
+		p.SetState(241)
+		p.Match(MinecraftMetascriptParserT__6)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
 		}
 	}
-	p.SetState(230)
+	p.SetState(245)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
 		goto errorExit
 	}
-	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 31, p.GetParserRuleContext())
+	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 34, p.GetParserRuleContext())
 	if p.HasError() {
 		goto errorExit
 	}
 	for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1 {
 			{
-				p.SetState(227)
+				p.SetState(242)
 				p.Match(MinecraftMetascriptParserNL)
 				if p.HasError() {
 					// Recognition error - abort rule
@@ -3086,31 +3296,31 @@ func (p *MinecraftMetascriptParser) ConditionalBody() (localctx IConditionalBody
 			}
 
 		}
-		p.SetState(232)
+		p.SetState(247)
 		p.GetErrorHandler().Sync(p)
 		if p.HasError() {
 			goto errorExit
 		}
-		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 31, p.GetParserRuleContext())
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 34, p.GetParserRuleContext())
 		if p.HasError() {
 			goto errorExit
 		}
 	}
-	p.SetState(234)
+	p.SetState(249)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
 		goto errorExit
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&1290816) != 0 {
+	if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&2581664) != 0 {
 		{
-			p.SetState(233)
+			p.SetState(248)
 			p.condition(0)
 		}
 
 	}
-	p.SetState(239)
+	p.SetState(254)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
 		goto errorExit
@@ -3119,7 +3329,7 @@ func (p *MinecraftMetascriptParser) ConditionalBody() (localctx IConditionalBody
 
 	for _la == MinecraftMetascriptParserNL {
 		{
-			p.SetState(236)
+			p.SetState(251)
 			p.Match(MinecraftMetascriptParserNL)
 			if p.HasError() {
 				// Recognition error - abort rule
@@ -3127,7 +3337,7 @@ func (p *MinecraftMetascriptParser) ConditionalBody() (localctx IConditionalBody
 			}
 		}
 
-		p.SetState(241)
+		p.SetState(256)
 		p.GetErrorHandler().Sync(p)
 		if p.HasError() {
 			goto errorExit
@@ -3135,8 +3345,8 @@ func (p *MinecraftMetascriptParser) ConditionalBody() (localctx IConditionalBody
 		_la = p.GetTokenStream().LA(1)
 	}
 	{
-		p.SetState(242)
-		p.Match(MinecraftMetascriptParserT__7)
+		p.SetState(257)
+		p.Match(MinecraftMetascriptParserT__8)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -3276,33 +3486,33 @@ func (s *ListContext) ExitRule(listener antlr.ParseTreeListener) {
 
 func (p *MinecraftMetascriptParser) List() (localctx IListContext) {
 	localctx = NewListContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 24, MinecraftMetascriptParserRULE_list)
+	p.EnterRule(localctx, 26, MinecraftMetascriptParserRULE_list)
 	var _la int
 
 	var _alt int
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(244)
-		p.Match(MinecraftMetascriptParserT__12)
+		p.SetState(259)
+		p.Match(MinecraftMetascriptParserT__13)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
 		}
 	}
-	p.SetState(248)
+	p.SetState(263)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
 		goto errorExit
 	}
-	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 34, p.GetParserRuleContext())
+	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 37, p.GetParserRuleContext())
 	if p.HasError() {
 		goto errorExit
 	}
 	for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1 {
 			{
-				p.SetState(245)
+				p.SetState(260)
 				p.Match(MinecraftMetascriptParserNL)
 				if p.HasError() {
 					// Recognition error - abort rule
@@ -3311,44 +3521,44 @@ func (p *MinecraftMetascriptParser) List() (localctx IListContext) {
 			}
 
 		}
-		p.SetState(250)
+		p.SetState(265)
 		p.GetErrorHandler().Sync(p)
 		if p.HasError() {
 			goto errorExit
 		}
-		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 34, p.GetParserRuleContext())
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 37, p.GetParserRuleContext())
 		if p.HasError() {
 			goto errorExit
 		}
 	}
-	p.SetState(269)
+	p.SetState(284)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
 		goto errorExit
 	}
-	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 38, p.GetParserRuleContext())
+	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 41, p.GetParserRuleContext())
 	if p.HasError() {
 		goto errorExit
 	}
 	for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1 {
 			{
-				p.SetState(251)
+				p.SetState(266)
 				p.Value()
 			}
-			p.SetState(255)
+			p.SetState(270)
 			p.GetErrorHandler().Sync(p)
 			if p.HasError() {
 				goto errorExit
 			}
-			_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 35, p.GetParserRuleContext())
+			_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 38, p.GetParserRuleContext())
 			if p.HasError() {
 				goto errorExit
 			}
 			for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 				if _alt == 1 {
 					{
-						p.SetState(252)
+						p.SetState(267)
 						p.Match(MinecraftMetascriptParserNL)
 						if p.HasError() {
 							// Recognition error - abort rule
@@ -3357,27 +3567,27 @@ func (p *MinecraftMetascriptParser) List() (localctx IListContext) {
 					}
 
 				}
-				p.SetState(257)
+				p.SetState(272)
 				p.GetErrorHandler().Sync(p)
 				if p.HasError() {
 					goto errorExit
 				}
-				_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 35, p.GetParserRuleContext())
+				_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 38, p.GetParserRuleContext())
 				if p.HasError() {
 					goto errorExit
 				}
 			}
-			p.SetState(259)
+			p.SetState(274)
 			p.GetErrorHandler().Sync(p)
 			if p.HasError() {
 				goto errorExit
 			}
 			_la = p.GetTokenStream().LA(1)
 
-			if _la == MinecraftMetascriptParserT__6 {
+			if _la == MinecraftMetascriptParserT__7 {
 				{
-					p.SetState(258)
-					p.Match(MinecraftMetascriptParserT__6)
+					p.SetState(273)
+					p.Match(MinecraftMetascriptParserT__7)
 					if p.HasError() {
 						// Recognition error - abort rule
 						goto errorExit
@@ -3385,19 +3595,19 @@ func (p *MinecraftMetascriptParser) List() (localctx IListContext) {
 				}
 
 			}
-			p.SetState(264)
+			p.SetState(279)
 			p.GetErrorHandler().Sync(p)
 			if p.HasError() {
 				goto errorExit
 			}
-			_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 37, p.GetParserRuleContext())
+			_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 40, p.GetParserRuleContext())
 			if p.HasError() {
 				goto errorExit
 			}
 			for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 				if _alt == 1 {
 					{
-						p.SetState(261)
+						p.SetState(276)
 						p.Match(MinecraftMetascriptParserNL)
 						if p.HasError() {
 							// Recognition error - abort rule
@@ -3406,43 +3616,43 @@ func (p *MinecraftMetascriptParser) List() (localctx IListContext) {
 					}
 
 				}
-				p.SetState(266)
+				p.SetState(281)
 				p.GetErrorHandler().Sync(p)
 				if p.HasError() {
 					goto errorExit
 				}
-				_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 37, p.GetParserRuleContext())
+				_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 40, p.GetParserRuleContext())
 				if p.HasError() {
 					goto errorExit
 				}
 			}
 
 		}
-		p.SetState(271)
+		p.SetState(286)
 		p.GetErrorHandler().Sync(p)
 		if p.HasError() {
 			goto errorExit
 		}
-		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 38, p.GetParserRuleContext())
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 41, p.GetParserRuleContext())
 		if p.HasError() {
 			goto errorExit
 		}
 	}
-	p.SetState(273)
+	p.SetState(288)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
 		goto errorExit
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&1290240) != 0 {
+	if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&2580512) != 0 {
 		{
-			p.SetState(272)
+			p.SetState(287)
 			p.Value()
 		}
 
 	}
-	p.SetState(278)
+	p.SetState(293)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
 		goto errorExit
@@ -3451,7 +3661,7 @@ func (p *MinecraftMetascriptParser) List() (localctx IListContext) {
 
 	for _la == MinecraftMetascriptParserNL {
 		{
-			p.SetState(275)
+			p.SetState(290)
 			p.Match(MinecraftMetascriptParserNL)
 			if p.HasError() {
 				// Recognition error - abort rule
@@ -3459,7 +3669,7 @@ func (p *MinecraftMetascriptParser) List() (localctx IListContext) {
 			}
 		}
 
-		p.SetState(280)
+		p.SetState(295)
 		p.GetErrorHandler().Sync(p)
 		if p.HasError() {
 			goto errorExit
@@ -3467,8 +3677,8 @@ func (p *MinecraftMetascriptParser) List() (localctx IListContext) {
 		_la = p.GetTokenStream().LA(1)
 	}
 	{
-		p.SetState(281)
-		p.Match(MinecraftMetascriptParserT__13)
+		p.SetState(296)
+		p.Match(MinecraftMetascriptParserT__14)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -3565,12 +3775,12 @@ func (s *NumberContext) ExitRule(listener antlr.ParseTreeListener) {
 
 func (p *MinecraftMetascriptParser) Number() (localctx INumberContext) {
 	localctx = NewNumberContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 26, MinecraftMetascriptParserRULE_number)
+	p.EnterRule(localctx, 28, MinecraftMetascriptParserRULE_number)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(283)
+		p.SetState(298)
 		_la = p.GetTokenStream().LA(1)
 
 		if !(_la == MinecraftMetascriptParserInt || _la == MinecraftMetascriptParserFloat) {
@@ -3676,19 +3886,19 @@ func (s *DocStringContext) ExitRule(listener antlr.ParseTreeListener) {
 
 func (p *MinecraftMetascriptParser) DocString() (localctx IDocStringContext) {
 	localctx = NewDocStringContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 28, MinecraftMetascriptParserRULE_docString)
+	p.EnterRule(localctx, 30, MinecraftMetascriptParserRULE_docString)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(285)
+		p.SetState(300)
 		p.Match(MinecraftMetascriptParserDocString)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
 		}
 	}
-	p.SetState(289)
+	p.SetState(304)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
 		goto errorExit
@@ -3697,7 +3907,7 @@ func (p *MinecraftMetascriptParser) DocString() (localctx IDocStringContext) {
 
 	for _la == MinecraftMetascriptParserNL {
 		{
-			p.SetState(286)
+			p.SetState(301)
 			p.Match(MinecraftMetascriptParserNL)
 			if p.HasError() {
 				// Recognition error - abort rule
@@ -3705,7 +3915,7 @@ func (p *MinecraftMetascriptParser) DocString() (localctx IDocStringContext) {
 			}
 		}
 
-		p.SetState(291)
+		p.SetState(306)
 		p.GetErrorHandler().Sync(p)
 		if p.HasError() {
 			goto errorExit
@@ -3728,7 +3938,7 @@ errorExit:
 
 func (p *MinecraftMetascriptParser) Sempred(localctx antlr.RuleContext, ruleIndex, predIndex int) bool {
 	switch ruleIndex {
-	case 8:
+	case 9:
 		var t *ConditionContext = nil
 		if localctx != nil {
 			t = localctx.(*ConditionContext)

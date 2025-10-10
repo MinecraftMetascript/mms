@@ -109,7 +109,7 @@ func binaryDensityFn(label, kind string) spec.FunctionSpec {
 		}))
 }
 
-var DensityFunctions = spec.NewValueSpecList().SetLabel("Density Function")
+var DensityFunctions = spec.NewValueSpecList().SetLabel("DensityFunction")
 
 var Interpolated = unaryDensityFn("Interpolated", "minecraft:interpolated")
 var Abs = unaryDensityFn("Abs", "minecraft:abs")
@@ -386,8 +386,8 @@ func serializeRangeChoice(n spec.FunctionNode) any {
 		Input    any     `json:"input" mms_arg:"0" mms_type:"symbol,DensityFn|float"`
 		Min      float64 `json:"min_inclusive" mms_builder:"Min"`
 		Max      float64 `json:"max_exclusive" mms_builder:"Max"`
-		InRange  any     `json:"when_in_range" mms_builder:"InRange" mms_arg:"0" mms_type:"symbol,DensityFn"`
-		OutRange any     `json:"when_out_of_range" mms_builder:"OutRange" mms_arg:"0" mms_type:"symbol,DensityFn"`
+		InRange  any     `json:"when_in_range" mms_builder:"InRange" mms_type:"symbol,DensityFn"`
+		OutRange any     `json:"when_out_of_range" mms_builder:"OutRange" mms_type:"symbol,DensityFn"`
 	}{
 		Type: "minecraft:range_choice",
 	}

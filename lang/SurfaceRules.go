@@ -164,22 +164,16 @@ var NoiseThreshold = spec.NewFunctionSpec(
 	SetSymbolExtractor(ExtractInlineNoiseSymbol(0))
 
 func noiseThresholdSerializer(node spec.FunctionNode) any {
-	if node.Name != "NoiseThreshold" {
-		return "{ \"__\": \"MMS: Unable to serialize\"}"
-	}
-	if len(node.Arguments) < 1 {
-		return "{ \"__\": \"MMS: Unable to serialize\"}"
-	}
 	out := &struct {
 		Type      string  `json:"type"`
-		Noise     string  `json:"noise"`
+		Noise     string  `json:"noise" mms_arg:"0" mms_type:"InlineNoise"`
 		MinThresh float64 `json:"min_threshold" mms_builder:"Min"`
 		MaxThresh float64 `json:"max_threshold" mms_builder:"Max"`
 	}{
 		Type: "minecraft:noise_threshold",
 	}
 	unpack.Builders(out, node.Builders)
-	out.Noise = GetInlinedNoiseRef(node.Arguments[0])
+	unpack.Args(out, node.Arguments)
 
 	return out
 }
@@ -309,12 +303,11 @@ func VerticalGradientSerializer(node spec.FunctionNode) any {
 	out := struct {
 		Type       string `json:"type"`
 		RandomName string `json:"random_name" mms_arg:"0"`
-		Lower      any    `json:"true_at_and_below" mms_builder:"Lower" mms_arg:"0" mms_type:"symbol,DensityFn|float"`
-		Upper      any    `json:"false_at_and_above" mms_builder:"Upper" mms_arg:"0" mms_type:"symbol,DensityFn|float"`
+		Lower      any    `json:"true_at_and_below" mms_builder:"Lower" mms_type:"VerticalAnchor"`
+		Upper      any    `json:"false_at_and_above" mms_builder:"Upper" mms_type:"VerticalAnchor"`
 	}{
 		Type: "minecraft:vertical_gradient",
 	}
-
 	unpack.Builders(&out, node.Builders)
 	unpack.Args(&out, node.Arguments)
 
@@ -345,18 +338,14 @@ func YAboveSerializer(node spec.FunctionNode) any {
 	}
 	out := &struct {
 		Type            string  `json:"type"`
-		Anchor          any     `json:"anchor"`
+		Anchor          any     `json:"anchor" mms_arg:"0" mms_type:"VerticalAnchor"`
 		AddStoneDepth   bool    `json:"add_stone_depth" mms_builder:"AddStoneDepth"`
 		DepthMultiplier float64 `json:"surface_depth_multiplier" mms_builder:"DepthMultiplier"`
 	}{
 		Type: "minecraft:y_above",
 	}
 	unpack.Builders(out, node.Builders)
-	if len(node.Arguments) > 0 {
-		anchor := node.Arguments[0]
-
-		out.Anchor = ParseAnchor(anchor)
-	}
+	unpack.Args(out, node.Arguments)
 
 	return out
 }
@@ -415,8 +404,8 @@ func init() {
 	Blocks.Add(&SurfaceRuleBlock)
 }
 
-var SurfaceConditions = spec.NewValueSpecList()
-var SurfaceRules = spec.NewValueSpecList()
+var SurfaceConditions = spec.NewValueSpecList().SetLabel("SurfaceCondition")
+var SurfaceRules = spec.NewValueSpecList().SetLabel("SurfaceRule")
 var Conditional *spec.ConditionalSpec
 var SurfaceRuleBlock spec.BlockSpec
 

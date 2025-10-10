@@ -22,6 +22,9 @@ type MinecraftMetascriptListener interface {
 	// EnterResourceReference is called when entering the resourceReference production.
 	EnterResourceReference(c *ResourceReferenceContext)
 
+	// EnterResourceTag is called when entering the resourceTag production.
+	EnterResourceTag(c *ResourceTagContext)
+
 	// EnterFn is called when entering the fn production.
 	EnterFn(c *FnContext)
 
@@ -78,6 +81,9 @@ type MinecraftMetascriptListener interface {
 
 	// ExitResourceReference is called when exiting the resourceReference production.
 	ExitResourceReference(c *ResourceReferenceContext)
+
+	// ExitResourceTag is called when exiting the resourceTag production.
+	ExitResourceTag(c *ResourceTagContext)
 
 	// ExitFn is called when exiting the fn production.
 	ExitFn(c *FnContext)
