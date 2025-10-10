@@ -49,17 +49,16 @@ func init() {
 		project: project.NewProject(),
 	}
 	ls.handler = &protocol.Handler{
-		Initialize:                     ls.Initialize,
-		Initialized:                    ls.Initialized,
-		Shutdown:                       ls.Shutdown,
-		TextDocumentDidOpen:            ls.TextDocumentDidOpen,
-		TextDocumentDidChange:          ls.TextDocumentDidChange,
-		TextDocumentDocumentSymbol:     ls.TextDocumentDocumentSymbol,
-		TextDocumentHover:              ls.TextDocumentHover,
-		TextDocumentCompletion:         ls.TextDocumentCompletion,
-		TextDocumentDefinition:         ls.TextDocumentDefinition,
-		TextDocumentReferences:         ls.TextDocumentReferences,
-		TextDocumentSemanticTokensFull: ls.TextDocumentSemanticTokensFull,
+		Initialize:                 ls.Initialize,
+		Initialized:                ls.Initialized,
+		Shutdown:                   ls.Shutdown,
+		TextDocumentDidOpen:        ls.TextDocumentDidOpen,
+		TextDocumentDidChange:      ls.TextDocumentDidChange,
+		TextDocumentDocumentSymbol: ls.TextDocumentDocumentSymbol,
+		TextDocumentHover:          ls.TextDocumentHover,
+		TextDocumentCompletion:     ls.TextDocumentCompletion,
+		TextDocumentDefinition:     ls.TextDocumentDefinition,
+		TextDocumentReferences:     ls.TextDocumentReferences,
 	}
 
 }
@@ -128,19 +127,6 @@ func (ls *LanguageServer) Initialize(_ *glsp.Context, _ *protocol.InitializePara
 	f := false
 	capabilities := ls.handler.CreateServerCapabilities()
 	capabilities.CompletionProvider.TriggerCharacters = []string{".", "(", ")", ":", "=", " ", ","}
-	capabilities.SemanticTokensProvider = &protocol.SemanticTokensOptions{
-		Legend: protocol.SemanticTokensLegend{
-			TokenTypes: []string{
-				"keyword", "variable", "function", "number", "string",
-				"comment", "operator", "namespace", "type", "parameter",
-			},
-			TokenModifiers: []string{},
-		},
-		Full: protocol.SemanticDelta{
-			Delta: &f,
-		},
-		Range: nil, // optional, you can support range later
-	}
 
 	return protocol.InitializeResult{
 		Capabilities: capabilities,
