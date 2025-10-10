@@ -124,7 +124,6 @@ func (ls *LanguageServer) TextDocumentDidOpen(ctx *glsp.Context, params *protoco
 }
 
 func (ls *LanguageServer) Initialize(_ *glsp.Context, _ *protocol.InitializeParams) (any, error) {
-	f := false
 	capabilities := ls.handler.CreateServerCapabilities()
 	capabilities.CompletionProvider.TriggerCharacters = []string{".", "(", ")", ":", "=", " ", ","}
 
