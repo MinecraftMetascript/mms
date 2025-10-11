@@ -79,9 +79,8 @@ func (e EnumSpec) Match(valueCtx grammar.IValueContext) (ast.Node, []ast.Diagnos
 		spec:  e,
 		Value: value,
 		BaseSymbol: ast.BaseSymbol{
-			BaseNode: ast.BaseNode{
-				Location: &l,
-			},
+			Location: &l,
+			BaseNode: ast.BaseNode{},
 		},
 	}
 

@@ -1,6 +1,7 @@
 package unpack
 
 import (
+	"log"
 	"reflect"
 	"strconv"
 
@@ -15,7 +16,8 @@ func getArgIdxForField(field reflect.StructField, max int) int {
 	}
 	argIdx, err := strconv.Atoi(argIdxStr)
 	if err != nil {
-		return 0
+		log.Println("Cannot parse arg index for field ", field.Name, ": ", argIdxStr, "")
+		return -1 // Cannot parse, should fail
 	}
 	if argIdx > max {
 		return -1
@@ -42,7 +44,7 @@ func Args[T any](v T, args []ast.Node) {
 		if argIdx == -1 {
 			continue
 		}
-		if argIdx < len(args) {
+		if argIdx < len(args) && argIdx >= 0 {
 
 			arg := args[argIdx]
 			mutableField := mutableV.FieldByName(field.Name)

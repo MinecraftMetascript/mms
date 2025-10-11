@@ -18,7 +18,7 @@ var SimpleFloatFn = spec.NewOverloadSpec(
 )
 var SimpleIntFn = spec.NewOverloadSpec(
 	[]spec.ValueSpec{
-		spec.NewNumberSpec(true),
+		spec.NewNumberSpec(false),
 	},
 	nil,
 	nil,

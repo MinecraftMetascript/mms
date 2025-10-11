@@ -37,7 +37,8 @@ func NewBlockSpecList(
 		blocks: make(map[string]*BlockSpec),
 	}
 	for _, bs := range blocks {
-		out.Add(&bs)
+		bsCopy := bs
+		out.Add(&bsCopy)
 	}
 	return out
 }

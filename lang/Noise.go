@@ -101,7 +101,7 @@ func GetInlinedNoiseRef(v ast.Node) string {
 	}
 	if val := spec.GetReferenceNodeValue(v, ast.SymbolNoise); !lib.IsNilInterface(val) {
 		return *val
-	} else if fn := v.(*spec.FunctionNode); fn != nil {
+	} else if fn, ok := v.(*spec.FunctionNode); ok && fn != nil {
 		return fn.Ref()
 	}
 	return ""
@@ -109,7 +109,7 @@ func GetInlinedNoiseRef(v ast.Node) string {
 
 func ExtractInlineNoiseSymbol(argIdx int) func(spec.FunctionNode) []ast.Symbol {
 	return func(fn spec.FunctionNode) []ast.Symbol {
-		if len(fn.Arguments) < 1 {
+		if argIdx < 0 || argIdx >= len(fn.Arguments) {
 			return nil
 		}
 		if inlineNoise, ok := fn.Arguments[argIdx].(*spec.FunctionNode); ok {

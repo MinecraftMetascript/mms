@@ -76,7 +76,11 @@ func (sl SourceLocation) ToLspRange() protocol.Range {
 }
 
 func (sl SourceLocation) Intersects(other SourceLocation) bool {
-	return sl.ContainsLocation(other.Start) || sl.ContainsLocation(other.Stop)
+	selfContainsOtherBound := sl.ContainsLocation(other.Start) || sl.ContainsLocation(other.Stop)
+	otherContainsSelfBound := other.ContainsLocation(sl.Start) || other.ContainsLocation(sl.Stop)
+
+	return selfContainsOtherBound || otherContainsSelfBound
+
 }
 
 func (sl SourceLocation) Contains(other SourceLocation) bool {
@@ -88,10 +92,10 @@ func (sl SourceLocation) ContainsLocation(l Location) bool {
 	if !lineContained {
 		return false
 	}
-	if sl.Start.Line == l.Line && sl.Start.Column >= l.Column {
+	if sl.Start.Line == l.Line && sl.Start.Column > l.Column {
 		return false
 	}
-	if sl.Stop.Line == l.Line && sl.Stop.Column <= l.Column {
+	if sl.Stop.Line == l.Line && sl.Stop.Column < l.Column {
 		return false
 	}
 	return true

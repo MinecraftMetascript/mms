@@ -46,10 +46,12 @@ func (r *ReferenceSpec) Complete(fileSource string, position protocol.Position, 
 	for ns, nsSymbols := range symbols {
 		for n, s := range nsSymbols.AllDecls() {
 			if s.GetKind() == r.Kind {
+				filterText := n
+				sortText := n
 				out = append(out, protocol.CompletionItem{
 					Label:      fmt.Sprintf("[%s] %s:%s", s.GetKind(), ns, n),
-					FilterText: &n,
-					SortText:   &n,
+					FilterText: &filterText,
+					SortText:   &sortText,
 					TextEdit: protocol.TextEdit{
 						Range: protocol.Range{
 							Start: start,

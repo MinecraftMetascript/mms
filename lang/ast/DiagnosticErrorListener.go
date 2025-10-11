@@ -47,8 +47,8 @@ func (l *DiagnosticsErrorListener) SyntaxError(recognizer antlr.Recognizer, offe
 	}
 
 	loc := SourceLocation{
-		Start:    Location{Line: line, Column: startCol},
-		Stop:     Location{Line: line, Column: stopCol},
+		Start:    Location{Line: line, Column: startCol, Index: startIdx},
+		Stop:     Location{Line: line, Column: stopCol, Index: stopIdx},
 		Filename: l.filename,
 	}
 	l.diagnostics.Add(Diagnostic{

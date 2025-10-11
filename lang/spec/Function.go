@@ -54,8 +54,8 @@ func (o Overload) Children() []ast.Node {
 	for _, a := range o.Args {
 		children = append(children, a)
 	}
-	for _, b := range o.Builders {
-		children = append(children, &b)
+	for i := range o.Builders {
+		children = append(children, &o.Builders[i])
 	}
 
 	return children
@@ -488,8 +488,8 @@ func (n *FunctionNode) Children() []ast.Node {
 	for _, a := range n.Arguments {
 		children = append(children, a)
 	}
-	for _, b := range n.Builders {
-		children = append(children, &b)
+	for i := range n.Builders {
+		children = append(children, &n.Builders[i])
 	}
 
 	return children
@@ -572,10 +572,13 @@ func (n *FunctionNode) builderCompletions(includeLeadingDot bool, _ string, curs
 					snip = "." + snip
 					offset = 1
 				}
+				help := b.Help
+				builderName := b.Name
+
 				items = append(items, protocol.CompletionItem{
-					Label:            b.Name,
-					Detail:           &b.Help,
-					SortText:         &b.Name,
+					Label:            builderName,
+					Detail:           &help,
+					SortText:         &builderName,
 					Kind:             &MethodKind,
 					InsertTextFormat: &SnippetFormat,
 					TextEdit: protocol.TextEdit{
@@ -583,7 +586,7 @@ func (n *FunctionNode) builderCompletions(includeLeadingDot bool, _ string, curs
 							Start: targetPos.ColOffset(offset).ToLspPosition(),
 							End:   targetPos.ColOffset(offset).ToLspPosition(),
 						},
-						NewText: fmt.Sprintf(snip, b.Name),
+						NewText: fmt.Sprintf(snip, builderName),
 					},
 				})
 			}

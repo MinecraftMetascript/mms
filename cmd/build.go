@@ -128,7 +128,7 @@ func flushProject(root *lib.FileTreeLike, rootPath string) {
 func mkdirIfNotExists(dirPath string) error {
 	_, err := fs.Stat(os.DirFS("."), dirPath)
 	if err != nil {
-		if strings.HasSuffix(err.Error(), "no such file or directory") {
+		if os.IsNotExist(err) {
 			err = os.MkdirAll(dirPath, 0755)
 			if err != nil {
 				return err

@@ -51,7 +51,7 @@ func serializeDimensionType(n spec.FunctionNode) any {
 		MonsterLightLevel float64 `json:"monster_light_level" mms_builder:"MonsterLightLevel"`
 		MonsterLightLimit float64 `json:"monster_light_limit" mms_builder:"MonsterLightLimit"`
 		LogicalHeight     float64 `json:"logical_height" mms_builder:"LogicalHeight"`
-		CloudHeight       float64 `json:"cloud_height" mms_builder:"CLoudHeight"`
+		CloudHeight       float64 `json:"cloud_height" mms_builder:"CloudHeight"`
 		MinY              float64 `json:"min_y" mms_builder:"MinY"`
 		Height            float64 `json:"height" mms_builder:"Height"`
 

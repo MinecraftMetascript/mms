@@ -141,7 +141,11 @@ var Cache = spec.NewFunctionSpec(
 		}
 
 		kind := "minecraft:"
-		switch v := spec.GetEnumNodeValue(n.Arguments[0]); *v {
+		v := spec.GetEnumNodeValue(n.Arguments[0])
+		if v == nil {
+			return nil
+		}
+		switch *v {
 		case "flat":
 			kind += "flat_cache"
 		case "2d":
@@ -397,6 +401,9 @@ func serializeRangeChoice(n spec.FunctionNode) any {
 }
 
 func getDensityFn(n spec.FunctionNode) any {
+	if len(n.Arguments) == 0 {
+		return nil
+	}
 	switch arg := n.Arguments[0].(type) {
 	case ast.Symbol:
 		return arg.ToSerializable()
