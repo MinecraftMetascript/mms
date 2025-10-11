@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"log"
+
 	"github.com/minecraftmetascript/mms/lsp"
 
 	"github.com/spf13/cobra"
@@ -12,7 +14,9 @@ var lspCmd = &cobra.Command{
 
 	Run: func(cmd *cobra.Command, args []string) {
 
-		lsp.Start()
+		if err := lsp.Start(); err != nil {
+			log.Fatalf("Failed to start LSP server: %v\n", err)
+		}
 	},
 }
 
