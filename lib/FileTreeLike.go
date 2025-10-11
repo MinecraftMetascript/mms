@@ -92,9 +92,24 @@ func (ft *FileTreeLike) Get(name string) *FileTreeLike {
 	return current
 }
 
+func (ft *FileTreeLike) HasChild(name string) bool {
+	if ft.Children == nil {
+		return false
+	}
+	_, ok := ft.Children[name]
+	return ok
+}
+
 func (ft *FileTreeLike) AddChild(child *FileTreeLike) {
 	if ft.IsDir {
-		ft.Children[child.Name] = child
+		if ft.HasChild(child.Name) {
+			if ft.Children[child.Name].IsDir && child.IsDir {
+				ft.Children[child.Name].Merge(child)
+				return
+			}
+		} else {
+			ft.Children[child.Name] = child
+		}
 	}
 }
 

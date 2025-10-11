@@ -38,7 +38,7 @@ func assignBool(_ ast.Node, mutableField reflect.Value) {
 //	}
 //}
 
-func assignValue(field reflect.StructField, arg ast.Node, mutableField reflect.Value) {
+func assignNaivePrimitive(field reflect.StructField, arg ast.Node, mutableField reflect.Value) {
 	switch field.Type.Kind() {
 	case reflect.Float64:
 		assignFloat(arg, mutableField)
@@ -47,53 +47,55 @@ func assignValue(field reflect.StructField, arg ast.Node, mutableField reflect.V
 	case reflect.String:
 		assignString(arg, mutableField)
 	default:
-		mmsTypeRaw := field.Tag.Get("mms_type")
+		log.Println("Cannot handle type ", field.Type.Kind(), " for ", field.Name, "as primitive")
+	}
+}
 
-		if mmsTypeRaw == "" {
-			break
-		}
-		mmsTypeCandidates := strings.Split(mmsTypeRaw, "|")
+func assignValue(field reflect.StructField, arg ast.Node, mutableField reflect.Value) {
+	mmsTypeRaw := field.Tag.Get("mms_type")
+	mmsTypeCandidates := strings.Split(mmsTypeRaw, "|")
+	if mmsTypeRaw == "" {
+		assignNaivePrimitive(field, arg, mutableField)
+		return
+	}
 
-		for _, candidate := range mmsTypeCandidates {
-			mmsTypeParts := strings.Split(candidate, ",")
-			mmsType := mmsTypeParts[0]
-			switch mmsType {
-			default:
-				log.Println("Attempting to find", mmsType)
-				if parser, ok := parseRegistry[mmsType]; ok {
-					mutableField.Set(reflect.ValueOf(parser(arg)))
-				}
-			case "float":
-				assignFloat(arg, mutableField)
-			case "string":
-				// TODO: Check for symbol type
-				assignString(arg, mutableField)
-			case "symbol":
-				if s, ok := arg.(ast.Symbol); ok {
-					serialized := s.ToSerializable()
-					if !lib.IsNilInterface(serialized) {
-						mutableField.Set(reflect.ValueOf(serialized))
-					} else {
-						if fn, ok := s.(*spec.FunctionNode); ok {
-							if field.Tag.Get("mms_arg") == "" {
-								break
-							}
-							argIdxStr := field.Tag.Get("mms_arg")
-							argIdx, err := strconv.Atoi(argIdxStr)
-							if err != nil {
-								break
-							}
-							if argIdx > len(fn.Arguments)-1 {
-								break
-							}
+	for _, candidate := range mmsTypeCandidates {
+		mmsTypeParts := strings.Split(candidate, ",")
+		mmsType := mmsTypeParts[0]
+		switch mmsType {
+		default:
+			if parser, ok := parseRegistry[mmsType]; ok {
+				mutableField.Set(reflect.ValueOf(parser(arg)))
+			}
+		case "float":
+			assignFloat(arg, mutableField)
+		case "string":
+			// TODO: Check for symbol type
+			assignString(arg, mutableField)
+		case "symbol":
+			if s, ok := arg.(ast.Symbol); ok {
+				serialized := s.ToSerializable()
+				if !lib.IsNilInterface(serialized) {
+					mutableField.Set(reflect.ValueOf(serialized))
+				} else {
+					if fn, ok := s.(*spec.FunctionNode); ok {
+						if field.Tag.Get("mms_arg") == "" {
+							break
+						}
+						argIdxStr := field.Tag.Get("mms_arg")
+						argIdx, err := strconv.Atoi(argIdxStr)
+						if err != nil {
+							break
+						}
+						if argIdx > len(fn.Arguments)-1 {
+							break
 						}
 					}
-				} else {
-					log.Printf("%T is not a symbol\n%v\n", arg, arg)
 				}
+			} else {
+				log.Printf("%T is not a symbol\n%v\n", arg, arg)
 			}
 		}
-
-		break
 	}
+
 }

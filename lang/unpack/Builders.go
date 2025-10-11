@@ -1,7 +1,6 @@
 package unpack
 
 import (
-	"log"
 	"reflect"
 	"strconv"
 	"strings"
@@ -60,7 +59,6 @@ func Builders[T any](v T, builders []spec.FunctionNode) {
 		}
 
 		if argIdx < len(builder.Arguments) {
-			log.Println("Attempting assignment", builder.Name, field.Name)
 			assignValue(
 				field, builder.Arguments[argIdx], mutableField,
 			)

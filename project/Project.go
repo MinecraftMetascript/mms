@@ -65,7 +65,7 @@ func (p *Project) BuildFsLike(root string) *lib.FileTreeLike {
 		for name, decl := range decls.AllDecls() {
 			declFs := decl.ToFileTreeLike(name)
 			if declFs != nil {
-				nsDir.Merge(declFs)
+				nsDir.AddChild(declFs)
 			}
 		}
 	}

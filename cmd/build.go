@@ -6,7 +6,10 @@ import (
 	"io/fs"
 	"log"
 	"os"
+	"path"
+	"strings"
 
+	"github.com/minecraftmetascript/mms/lib"
 	_project "github.com/minecraftmetascript/mms/project"
 	"github.com/spf13/cobra"
 )
@@ -63,11 +66,27 @@ var buildCmd = &cobra.Command{
 				}
 			}
 		}
-		//fsLike := project.BuildFsLike(outFile)
+		fsLike := project.BuildFsLike(outFile)
 		if err != nil {
 			log.Println("Error exporting project:", err)
 			return
 		}
+
+		_, err = fs.Stat(os.DirFS("."), outFile)
+		if err != nil {
+			if strings.HasSuffix(err.Error(), "no such file or directory") {
+				err = os.MkdirAll(outFile, 0755)
+				if err != nil {
+					log.Println("Error creating output directory:", err)
+					return
+				}
+			} else {
+				log.Println("Error building project", err)
+			}
+			return
+		}
+
+		flushProject(fsLike, outFile)
 
 		if debugMode {
 			r, err := json.MarshalIndent(project.Symbols(), "", "  ")
@@ -83,6 +102,42 @@ var buildCmd = &cobra.Command{
 			}
 		}
 	},
+}
+
+func flushProject(root *lib.FileTreeLike, rootPath string) {
+	log.Println(root.Name)
+	for _, file := range root.Children {
+		targetPath := path.Join(rootPath, file.Name)
+		if file.IsDir {
+			err := mkdirIfNotExists(targetPath)
+			if err != nil {
+				log.Println("Error creating directory:", err)
+			}
+			flushProject(file, targetPath)
+		} else {
+			err := os.WriteFile(targetPath, []byte(file.Content), 0644)
+			if err != nil {
+				log.Println("Error writing file:", err)
+			}
+
+		}
+
+	}
+}
+
+func mkdirIfNotExists(dirPath string) error {
+	_, err := fs.Stat(os.DirFS("."), dirPath)
+	if err != nil {
+		if strings.HasSuffix(err.Error(), "no such file or directory") {
+			err = os.MkdirAll(dirPath, 0755)
+			if err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
+	}
+	return nil
 }
 
 func init() {
