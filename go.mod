@@ -4,6 +4,7 @@ go 1.24.4
 
 require (
 	github.com/antlr4-go/antlr/v4 v4.13.1
+	github.com/samber/lo v1.51.0
 	github.com/spf13/cobra v1.10.1
 	github.com/tliron/commonlog v0.2.20
 	github.com/tliron/glsp v0.2.3-0.20250617204849-59d6e3155c81
@@ -30,4 +31,5 @@ require (
 	golang.org/x/net v0.44.0 // indirect
 	golang.org/x/sys v0.36.0 // indirect
 	golang.org/x/term v0.35.0 // indirect
+	golang.org/x/text v0.29.0 // indirect
 )

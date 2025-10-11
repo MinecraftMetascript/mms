@@ -1,0 +1,343 @@
+package spec
+
+import (
+	"fmt"
+	"log"
+	"reflect"
+	"slices"
+
+	"github.com/minecraftmetascript/mms/lang/ast"
+	"github.com/minecraftmetascript/mms/lang/grammar"
+	"github.com/minecraftmetascript/mms/lib"
+	protocol "github.com/tliron/glsp/protocol_3_16"
+)
+
+type ConditionalSpec struct {
+	ConditionOptions []ValueSpec
+	ValueOptions     []ValueSpec
+	Kind             ast.SymbolKind
+	Help             string
+	export           func(fn ConditionalNode, name string) *lib.FileTreeLike
+	output           func(fn ConditionalNode) any
+}
+
+func (c *ConditionalSpec) UsageStr() string {
+	return ""
+}
+
+func NewConditionSpec() *ConditionalSpec {
+	return &ConditionalSpec{
+		ConditionOptions: []ValueSpec{},
+		ValueOptions:     []ValueSpec{},
+	}
+}
+
+func (c *ConditionalSpec) SetKind(kind ast.SymbolKind) *ConditionalSpec {
+	c.Kind = kind
+	return c
+}
+func (c *ConditionalSpec) SetHelp(help string) *ConditionalSpec {
+	c.Help = help
+	return c
+}
+
+func (c *ConditionalSpec) Complete(_ string, position protocol.Position, _ *string, _ map[string]*ast.Namespace) []protocol.CompletionItem {
+	filterTxt := "If"
+	return []protocol.CompletionItem{{
+		Label:            fmt.Sprintf("[%s] Condition", c.Kind),
+		FilterText:       &filterTxt,
+		SortText:         &filterTxt,
+		Kind:             &MethodKind,
+		Detail:           &c.Help,
+		InsertTextFormat: &SnippetFormat,
+		TextEdit: protocol.TextEdit{
+			Range: protocol.Range{
+				Start: position,
+				End:   position,
+			},
+			NewText: "If(${1}) ${2}",
+		},
+	},
+	}
+}
+
+func (c *ConditionalSpec) SetFileExporter(exporter func(n ConditionalNode, name string) *lib.FileTreeLike) *ConditionalSpec {
+	c.export = exporter
+	return c
+}
+func (c *ConditionalSpec) SetOutputFn(outputFn func(n ConditionalNode) any) *ConditionalSpec {
+	c.output = outputFn
+	return c
+}
+
+func (c *ConditionalSpec) AddConditionOption(spec ...ValueSpec) *ConditionalSpec {
+	c.ConditionOptions = slices.Concat(c.ConditionOptions, spec)
+	return c
+}
+
+func (c *ConditionalSpec) AddValueOption(spec ...ValueSpec) *ConditionalSpec {
+	c.ValueOptions = slices.Concat(c.ValueOptions, spec)
+	return c
+}
+
+type ConditionAndNode struct {
+	ast.BaseSymbol
+	Left  ast.Symbol
+	Right ast.Symbol
+}
+
+func (can ConditionAndNode) Children() []ast.Node {
+	return []ast.Node{can.Left, can.Right}
+}
+
+type ConditionOrNode struct {
+	ast.BaseSymbol
+	Left  ast.Symbol
+	Right ast.Symbol
+}
+
+func (con ConditionOrNode) Children() []ast.Node {
+	return []ast.Node{con.Left, con.Right}
+}
+
+type ConditionNegateNode struct {
+	ast.BaseSymbol
+	Condition ast.Symbol
+}
+
+func (c *ConditionalSpec) matchConditionCtx(ctx grammar.IConditionContext) (ast.Symbol, []ast.Diagnostic) {
+	if ctx == nil {
+		return nil, nil
+	}
+	switch condition := ctx.(type) {
+	case *grammar.CondAndContext:
+		l, ld := c.matchConditionCtx(condition.Condition(0))
+		r, rd := c.matchConditionCtx(condition.Condition(1))
+		loc := ast.RuleLocation(ctx)
+		return &ConditionAndNode{
+			BaseSymbol: ast.BaseSymbol{
+				Location: &loc,
+				BaseNode: ast.BaseNode{},
+			},
+			Left:  l,
+			Right: r,
+		}, slices.Concat(ld, rd)
+	case *grammar.CondOrContext:
+		l, ld := c.matchConditionCtx(condition.Condition(0))
+		r, rd := c.matchConditionCtx(condition.Condition(1))
+		loc := ast.RuleLocation(ctx)
+		return &ConditionOrNode{
+			BaseSymbol: ast.BaseSymbol{
+				Location: &loc,
+				BaseNode: ast.BaseNode{},
+			},
+			Left:  l,
+			Right: r,
+		}, slices.Concat(ld, rd)
+	case *grammar.CondGroupedContext:
+		// Pass this through
+		return c.matchConditionCtx(condition.Condition())
+	case *grammar.CondNegateContext:
+		neg, cd := c.matchConditionCtx(condition.Condition())
+		loc := ast.RuleLocation(ctx)
+		return &ConditionNegateNode{
+			BaseSymbol: ast.BaseSymbol{
+				Location: &loc,
+				BaseNode: ast.BaseNode{},
+			},
+			Condition: neg,
+		}, cd
+	case *grammar.CondPrimaryContext:
+		for _, opt := range c.ConditionOptions {
+			r, diags := opt.Match(condition.RootCondition().Value())
+			if !lib.IsNilInterface(r) {
+				if out, ok := r.(ast.Symbol); ok {
+					return out, diags
+				}
+				diags = append(diags, ast.Diagnostic{
+					Location: ast.RuleLocation(condition.RootCondition().Value()),
+					Message:  "Invalid condition",
+					Severity: ast.Error,
+				})
+				return nil, diags
+			}
+		}
+	default:
+		log.Printf("UNKNOWN: %s", reflect.TypeOf(condition))
+	}
+	return nil, []ast.Diagnostic{
+		{
+			Location: ast.RuleLocation(ctx),
+			Message:  "Invalid condition",
+			Severity: ast.Warning,
+		},
+	}
+}
+
+func (c *ConditionalSpec) Match(valueCtx grammar.IValueContext) (ast.Node, []ast.Diagnostic) {
+	if valueCtx.Conditional() == nil {
+		return nil, nil
+	}
+	conditionCtx := valueCtx.Conditional()
+
+	l := ast.RuleLocation(valueCtx)
+	out := &ConditionalNode{
+
+		BaseSymbol: ast.BaseSymbol{
+			Location: &l,
+			BaseNode: ast.BaseNode{},
+		},
+		spec: c,
+	}
+	allDiags := make([]ast.Diagnostic, 0)
+	conditionBodyCtx := conditionCtx.ConditionalBody()
+	conditionBodyL := ast.RuleLocation(conditionBodyCtx)
+	out.conditionParenRange = &conditionBodyL
+	iCondition := conditionBodyCtx.Condition()
+
+	if iCondition != nil {
+		condL := ast.RuleLocation(iCondition)
+		out.conditionContentRange = &condL
+		conditionNode, conditionDiags := c.matchConditionCtx(iCondition)
+		if conditionDiags != nil {
+			allDiags = slices.Concat(allDiags, conditionDiags)
+		}
+		if conditionNode != nil {
+			out.Condition = conditionNode
+		}
+	}
+
+	if out.Condition == nil {
+		allDiags = append(allDiags, ast.Diagnostic{
+			Location: ast.RuleLocation(valueCtx),
+			Message:  "Missing condition",
+			Severity: ast.Warning,
+		})
+	}
+
+	v := conditionCtx.Value()
+	if v != nil {
+		for _, opt := range c.ValueOptions {
+			valueNode, valueDiags := opt.Match(v)
+			if valueDiags != nil {
+				allDiags = slices.Concat(allDiags, valueDiags)
+			}
+			if !lib.IsNilInterface(valueNode) {
+				if value, ok := valueNode.(ast.Symbol); ok {
+					out.Value = value
+				}
+				break
+			}
+		}
+		if out.Value == nil {
+			allDiags = append(allDiags, ast.Diagnostic{
+				Location: ast.RuleLocation(v),
+				Message:  "Invalid value",
+				Severity: ast.Warning,
+			})
+		}
+	} else {
+		allDiags = append(allDiags, ast.Diagnostic{
+			Location: ast.RuleLocation(valueCtx),
+			Message:  "Missing value",
+			Severity: ast.Warning,
+		})
+	}
+
+	return out, allDiags
+}
+
+type ConditionalNode struct {
+	ast.BaseSymbol
+	Condition             ast.Symbol
+	Value                 ast.Symbol
+	spec                  *ConditionalSpec
+	conditionParenRange   *ast.SourceLocation
+	conditionContentRange *ast.SourceLocation
+}
+
+func (c ConditionalNode) Children() []ast.Node {
+	return []ast.Node{c.Condition, c.Value}
+}
+
+func (c ConditionalNode) Complete(fileSource string, position protocol.Position, triggerChar *string, symbols map[string]*ast.Namespace) []protocol.CompletionItem {
+	mode := "NONE"
+	if c.conditionParenRange.ContainsPosition(position) {
+		mode = "CONDITION"
+	} else if c.conditionParenRange.BeforePosition(position) {
+		mode = "VALUE"
+	}
+
+	out := make([]protocol.CompletionItem, 0)
+
+	switch mode {
+	case "VALUE":
+		for _, spec := range c.spec.ValueOptions {
+			if comp, ok := spec.(ast.CompletableNode); ok {
+				out = append(out, comp.Complete(fileSource, position, triggerChar, symbols)...)
+			}
+		}
+	case "CONDITION":
+		if c.conditionContentRange == nil || c.conditionContentRange.ContainsPosition(position) {
+			for _, spec := range c.spec.ConditionOptions {
+				if comp, ok := spec.(ast.CompletableNode); ok {
+					out = append(out, comp.Complete(fileSource, position, triggerChar, symbols)...)
+				}
+			}
+		} else {
+			filterTxtAnd := "&&"
+			filterTxtOr := "||"
+			out = append(out, protocol.CompletionItem{
+				Label:            "AND",
+				FilterText:       &filterTxtAnd,
+				SortText:         &filterTxtAnd,
+				Kind:             &MethodKind,
+				Detail:           &c.spec.Help,
+				InsertTextFormat: &SnippetFormat,
+				TextEdit: protocol.TextEdit{
+					Range: protocol.Range{
+						Start: position,
+						End:   position,
+					},
+					NewText: "&& ${1}",
+				},
+			})
+			out = append(out, protocol.CompletionItem{
+				Label:            "OR",
+				FilterText:       &filterTxtOr,
+				SortText:         &filterTxtOr,
+				Kind:             &MethodKind,
+				Detail:           &c.spec.Help,
+				InsertTextFormat: &SnippetFormat,
+				TextEdit: protocol.TextEdit{
+					Range: protocol.Range{
+						Start: position,
+						End:   position,
+					},
+					NewText: "|| ${1}",
+				},
+			})
+		}
+
+	}
+
+	return out
+}
+
+func (c ConditionalNode) ToFileTreeLike(name string) *lib.FileTreeLike {
+	if c.spec.export == nil {
+		return nil
+	}
+	return c.spec.export(c, name)
+}
+
+func (c ConditionalNode) ToSerializable() any {
+	if c.spec.output == nil {
+		return nil
+	}
+	return c.spec.output(c)
+}
+
+func (c ConditionalNode) GetKind() ast.SymbolKind {
+	return c.spec.Kind
+}

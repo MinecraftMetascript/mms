@@ -1,0 +1,11 @@
+# Add patterns to ignore here, one per line
+# Example:
+# *.log
+# tmp/
+lang/grammar
+result
+vendor
+.junie
+.helix
+.github
+wasm/mms.js

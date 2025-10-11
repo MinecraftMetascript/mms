@@ -6,9 +6,11 @@ import (
 	"io/fs"
 	"log"
 	"os"
+	"path"
+	"strings"
 
-	"github.com/minecraftmetascript/mms/lang"
-
+	"github.com/minecraftmetascript/mms/lib"
+	_project "github.com/minecraftmetascript/mms/project"
 	"github.com/spf13/cobra"
 )
 
@@ -19,6 +21,7 @@ var buildCmd = &cobra.Command{
 	Long:      ``,
 	ValidArgs: []cobra.Completion{"Input", "Output"},
 	Run: func(cmd *cobra.Command, args []string) {
+		log.SetFlags(log.LstdFlags | log.Lshortfile)
 		if len(args) < 1 {
 			log.Println("Please provide an input file or directory")
 			return
@@ -39,10 +42,9 @@ var buildCmd = &cobra.Command{
 			log.Println(
 				fmt.Sprintf("Building your project from %s to %s", inFile, outFile),
 			)
-
 		}
 
-		project := lang.NewProject()
+		project := _project.NewProject()
 
 		stat, err := fs.Stat(os.DirFS("."), inFile)
 
@@ -57,29 +59,85 @@ var buildCmd = &cobra.Command{
 			if content, err := os.ReadFile(inFile); err != nil {
 				log.Println("Error reading project:", err)
 			} else {
-				f := project.AddFile(inFile, string(content))
-				err = f.Parse()
+				_, err := project.AddFile(inFile, string(content))
+
 				if err != nil {
 					log.Println("Error parsing project:", err)
 				}
 			}
 		}
-		r, err := json.MarshalIndent(project.BuildFsLike(outFile), "", "  ")
+		fsLike := project.BuildFsLike(outFile)
+		if err != nil {
+			log.Println("Error exporting project:", err)
+			return
+		}
+
+		_, err = fs.Stat(os.DirFS("."), outFile)
+		if err != nil {
+			if strings.HasSuffix(err.Error(), "no such file or directory") {
+				err = os.MkdirAll(outFile, 0755)
+				if err != nil {
+					log.Println("Error creating output directory:", err)
+					return
+				}
+			} else {
+				log.Println("Error building project", err)
+			}
+			return
+		}
+
+		flushProject(fsLike, outFile)
 
 		if debugMode {
+			r, err := json.MarshalIndent(project.Symbols(), "", "  ")
 			log.Println(
 				string(r),
 				err,
 			)
-		}
-
-		if len(project.Diagnostics()) > 0 {
-			for _, diag := range project.Diagnostics() {
-				log.Println(diag)
+		} else {
+			// induce serialization for logging
+			_, e := json.MarshalIndent(project.Symbols(), "", "  ")
+			if e != nil {
+				log.Println("Error serializing project:", e)
 			}
 		}
-
 	},
+}
+
+func flushProject(root *lib.FileTreeLike, rootPath string) {
+	log.Println(root.Name)
+	for _, file := range root.Children {
+		targetPath := path.Join(rootPath, file.Name)
+		if file.IsDir {
+			err := mkdirIfNotExists(targetPath)
+			if err != nil {
+				log.Println("Error creating directory:", err)
+			}
+			flushProject(file, targetPath)
+		} else {
+			err := os.WriteFile(targetPath, []byte(file.Content), 0644)
+			if err != nil {
+				log.Println("Error writing file:", err)
+			}
+
+		}
+
+	}
+}
+
+func mkdirIfNotExists(dirPath string) error {
+	_, err := fs.Stat(os.DirFS("."), dirPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			err = os.MkdirAll(dirPath, 0755)
+			if err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
+	}
+	return nil
 }
 
 func init() {

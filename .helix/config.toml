@@ -1,0 +1,9 @@
+[keys.normal]
+C-space = "completion"
+C-r = ":reload"
+[keys.normal.l]
+r = ":lsp-restart"
+f = ":reload"
+c = "completion"
+l = [ ":vsplit", ":log-open" ]
+o = [ ":sh echo \"\" > ~/.cache/helix/helix.log", ":reload" ]

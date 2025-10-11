@@ -10,30 +10,34 @@ import (
 	"log"
 	"sync"
 
+	"syscall/js"
+
 	"github.com/minecraftmetascript/mms/lang"
-	"github.com/minecraftmetascript/mms/lang/traversal"
+	"github.com/minecraftmetascript/mms/lang/ast"
+	"github.com/minecraftmetascript/mms/lang/spec"
 	"github.com/minecraftmetascript/mms/lib"
 	"github.com/minecraftmetascript/mms/lsp"
+	"github.com/minecraftmetascript/mms/project"
 )
-import "syscall/js"
 
 var logger = log.Default()
 
 type packagedProject struct {
-	Source  map[string]string           `json:"source"`
-	Files   *lib.FileTreeLike           `json:"files"`
-	Symbols map[string]traversal.Symbol `json:"symbols"`
+	Source  map[string]string         `json:"source"`
+	Files   *lib.FileTreeLike         `json:"files"`
+	Symbols map[string]*ast.Namespace `json:"symbols"`
 }
 
 func packageProject() (string, error) {
+
 	out := packagedProject{
 		Source:  make(map[string]string),
-		Files:   project.BuildFsLike("my_mms_project"),
-		Symbols: project.GlobalScope.Symbols(),
+		Files:   instanceProject.BuildFsLike("my_mms_project"),
+		Symbols: instanceProject.Symbols(),
 	}
 
-	for _, file := range project.Files {
-		out.Source[file.Path] = file.Content
+	for _, file := range instanceProject.Files() {
+		out.Source[file.Path()] = file.Content()
 	}
 
 	serialized, err := json.Marshal(out)
@@ -44,34 +48,42 @@ func packageProject() (string, error) {
 	return string(serialized), nil
 }
 
-func updateFile(this js.Value, args []js.Value) any {
+func updateFile(_ js.Value, args []js.Value) any {
 	if len(args) != 3 {
-		log.Println("[Err]: Invalid number of arguments, expected 3, given", len(args))
 		return nil
 	}
 	filename := args[0].String()
 	content := args[1].String()
-	callback := args[2]
-	if callback.Type() != js.TypeFunction {
-		log.Println("[Err]: Invalid callback type, expected function, got", callback.Type())
+	dst := args[2]
+	if dst.Type() != js.TypeFunction {
 		return nil
 	}
 
-	err := project.AddFile(filename, content).Parse()
+	_, err := instanceProject.AddFile(filename, content)
 	if err != nil {
 		log.Println("[Err]: Failed to add file:", err)
 		return nil
 	}
 	projectStruct, err := packageProject()
+
 	if err != nil {
 		log.Println("[Err]:", err)
 	} else {
-		callback.Invoke(projectStruct)
+		out := js.Global().Get("Uint8Array").New(len(projectStruct))
+
+		js.CopyBytesToJS(out, []byte(projectStruct))
+		js.Global().Get("setTimeout").Invoke(
+			js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+				dst.Invoke(out)
+				return nil
+			}),
+			js.ValueOf(0),
+		)
 	}
 	return nil
 }
 
-func getFileDiag(this js.Value, args []js.Value) any {
+func getFileDiag(_ js.Value, args []js.Value) any {
 	if len(args) != 2 {
 		log.Println("[Err]: Invalid number of arguments, expected 2, given", len(args))
 		return nil
@@ -82,8 +94,8 @@ func getFileDiag(this js.Value, args []js.Value) any {
 		log.Println("[Err]: Invalid callback type, expected function, got", callback.Type())
 		return nil
 	}
-	if file, ok := project.Files[filename]; ok {
-		raw, err := json.Marshal(lib.Unique(file.Diagnostics))
+	if file := instanceProject.File(filename); file != nil {
+		raw, err := json.Marshal(file.Diagnostics())
 		if err != nil {
 			log.Println("[Err]:", err)
 			return nil
@@ -93,20 +105,28 @@ func getFileDiag(this js.Value, args []js.Value) any {
 	return nil
 }
 
-var project *lang.Project
+var instanceProject *project.Project
 
 func main() {
 	logger.SetPrefix("[MMS:WASM]: ")
 	logger.SetFlags(0)
 	logger.Println("MMS WASM loading")
 
-	project = lang.NewProject()
+	instanceProject = project.NewProject()
 
 	js.Global().Set("updateFile", js.FuncOf(updateFile))
 	logger.Println("updateFile function registered")
 
 	js.Global().Set("getFileDiag", js.FuncOf(getFileDiag))
 	logger.Println("getFileDiag function registered")
+
+	js.Global().Set("getMmsSpec", js.FuncOf(func(this js.Value, args []js.Value) any {
+		val := spec.GenerateSpecString(lang.Blocks)
+		dest := js.Global().Get("Uint8Array").New(len(val))
+		js.CopyBytesToJS(dest, []byte(val))
+		return dest
+	}))
+	logger.Println("getMmsSpec function registered")
 
 	logger.Println("MMS WASM loaded")
 
@@ -124,7 +144,10 @@ func main() {
 
 	// Start LSP using the same stream for both reading and writing
 
-	lsp.StartStreaming(stream)
+	err := lsp.StartStreaming(stream)
+	if err != nil {
+		panic(err)
+	}
 
 	select {} // Keep Go WASM running
 }
@@ -149,7 +172,7 @@ func NewWasmStream(toJS js.Value) *WasmStream {
 
 // fromJs is exposed to JS as mmsLspWrite. It accepts a single string argument
 // and appends it to the internal buffer for Read() to consume.
-func (w *WasmStream) fromJs(this js.Value, args []js.Value) any {
+func (w *WasmStream) fromJs(_ js.Value, args []js.Value) any {
 	if len(args) != 1 {
 		log.Println("[Err]: Invalid number of arguments, expected 1, given", len(args))
 		return nil
@@ -209,7 +232,9 @@ func (w *WasmStream) Write(p []byte) (n int, err error) {
 	if w.toJs.Type() != js.TypeFunction {
 		return 0, fmt.Errorf("destination JS function is not defined")
 	}
-	w.toJs.Invoke(string(p))
+	out := js.Global().Get("Uint8Array").New(len(p))
+	js.CopyBytesToJS(out, p)
+	w.toJs.Invoke(out)
 	return len(p), nil
 }
 
