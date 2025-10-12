@@ -61,7 +61,6 @@ func (p *Project) BuildFsLike(root string) *lib.FileTreeLike {
 
 	for ns, decls := range p.symbols {
 		nsDir := rootDir.MkDir(ns, nil)
-
 		for name, decl := range decls.AllDecls() {
 			declFs := decl.ToFileTreeLike(name)
 			if declFs != nil {

@@ -105,7 +105,6 @@ var buildCmd = &cobra.Command{
 }
 
 func flushProject(root *lib.FileTreeLike, rootPath string) {
-	log.Println(root.Name)
 	for _, file := range root.Children {
 		targetPath := path.Join(rootPath, file.Name)
 		if file.IsDir {

@@ -1,14 +1,15 @@
 Namespace mms_demo {
-    Dimension {
-        Sunk = DimensionType()
-            .CoordinateScale(16)
-            .HasRaids()
-            .BedsWork()
-            .PiglinSafe().Infiniburn(#b:la).Height(90)
-    }
+  Surface {
+    InFriendlyBiome = Biome(forest, plains, beach)
+    InUnfriendlyBiome = Biome(desert, badlands, deep_ocean)
 
+    HoneySurface = Block(honey)
+    SlimeSurface = Block(slime)
 
-    Surface {
-        A = NoiseThreshold(Noise(-5)).Min(5).Max(2)
-    }
+    MyStrangeSurface = [
+      If (mms_demo:InFriendlyBiome) HoneySurface
+      If (mms_demo:InUnfriendlyBiome) SlimeSurface
+      Block(magma_block)
+    ]
+  }
 }

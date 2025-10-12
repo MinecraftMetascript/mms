@@ -22,7 +22,6 @@ type ListSpec struct {
 }
 
 func (l *ListSpec) UsageStr() string {
-
 	validOptions := lo.Filter(l.ValueOptions, func(item ValueSpec, index int) bool {
 		return !lib.IsNilInterface(item) && item != l
 	})

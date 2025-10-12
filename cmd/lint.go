@@ -1,6 +1,12 @@
 package cmd
 
 import (
+	"io/fs"
+	"log"
+	"os"
+	"strings"
+
+	_project "github.com/minecraftmetascript/mms/project"
 	"github.com/spf13/cobra"
 )
 
@@ -11,16 +17,42 @@ var lintCmd = &cobra.Command{
 	Long:      ``,
 	ValidArgs: []cobra.Completion{"Input"},
 	Run: func(cmd *cobra.Command, args []string) {
-		//if len(args) < 1 {
-		//	log.Println("Please provide an input file or directory")
-		//	return
-		//}
-		//inFile := args[0]
-		//if strings.HasSuffix(inFile, "/") {
-		//	inFile = strings.TrimSuffix(inFile, "/")
-		//}
-		//
-		//project := lang.NewProject()
+		if len(args) < 1 {
+			log.Println("Please provide an input file or directory")
+			return
+		}
+		inFile := args[0]
+		if strings.HasSuffix(inFile, "/") {
+			inFile = strings.TrimSuffix(inFile, "/")
+		}
+
+		project := _project.NewProject()
+		stat, err := fs.Stat(os.DirFS("."), inFile)
+
+		if err != nil {
+			log.Println("Error building project", err)
+			return
+		}
+
+		if stat.IsDir() {
+			log.Println("Project is a directory")
+		} else {
+			if content, err := os.ReadFile(inFile); err != nil {
+				log.Println("Error reading project:", err)
+			} else {
+				_, err := project.AddFile(inFile, string(content))
+
+				if err != nil {
+					log.Println("Error parsing project:", err)
+				}
+			}
+		}
+		for _, diag := range project.AllDiagnostics() {
+			log.Println(diag)
+		}
+
+		project.BuildFsLike(".")
+
 		//
 		//stat, err := fs.Stat(os.DirFS("."), inFile)
 		//
