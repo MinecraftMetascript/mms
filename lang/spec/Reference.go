@@ -146,6 +146,10 @@ type ReferenceNode struct {
 	Kind      ast.SymbolKind
 }
 
+func (r *ReferenceNode) ToSerializable() any {
+	return r.Ref()
+}
+
 func (r *ReferenceNode) Ref() string {
 	return fmt.Sprintf("%s:%s", r.Namespace, r.Name)
 }

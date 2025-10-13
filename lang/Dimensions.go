@@ -11,6 +11,30 @@ import (
 	"github.com/minecraftmetascript/mms/lib"
 )
 
+func exporter[T any](serializer func(node T) any, rootPath []string, extension string) func(fn T, name string) *lib.FileTreeLike {
+	return func(fn T, name string) *lib.FileTreeLike {
+		content := serializer(fn)
+		contentBytes, err := json.MarshalIndent(content, "", "  ")
+		if err != nil {
+			log.Println("Error marshalling: ", err)
+			return nil
+		}
+
+		if len(rootPath) == 0 {
+			log.Println("exporter requires at least one path segment")
+			return nil
+		}
+		root := lib.NewDirLike(rootPath[0], nil)
+		current := root
+		for _, part := range rootPath[1:] {
+			current = current.MkDir(part, nil)
+		}
+		current.MkFile(fmt.Sprintf("%s.%s", name, extension), string(contentBytes), nil)
+
+		return root
+	}
+}
+
 func exportWorldgen(serializer func(node spec.FunctionNode) any, subdir string) func(fn spec.FunctionNode, name string) *lib.FileTreeLike {
 	return func(fn spec.FunctionNode, name string) *lib.FileTreeLike {
 		content := serializer(fn)

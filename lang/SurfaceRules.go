@@ -350,6 +350,27 @@ func YAboveSerializer(node spec.FunctionNode) any {
 	return out
 }
 
+func serializeListSurfaceRule(node spec.ListNode) any {
+	out := struct {
+		Type     string `json:"type"`
+		Sequence []any  `json:"sequence"`
+	}{
+		Type:     "minecraft:sequence",
+		Sequence: make([]any, 0),
+	}
+
+	for _, val := range node.Values {
+		if s, ok := val.(ast.Symbol); ok && !lib.IsNilInterface(s) {
+			out.Sequence = append(out.Sequence, s.ToSerializable())
+		}
+	}
+
+	return out
+}
+
+var SurfaceConditionRef = spec.NewReferenceSpec(ast.SymbolSurfaceCondition)
+var SurfaceRuleRef = spec.NewReferenceSpec(ast.SymbolSurfaceRule)
+
 func init() {
 	Conditional = spec.NewConditionSpec().
 		SetKind(ast.SymbolSurfaceRule).
@@ -357,43 +378,31 @@ func init() {
 	SurfaceConditions.Add(AboveSurface, Biome, Hole, NoiseThreshold, Steep, StoneDepth, Frozen, Water, VerticalGradient, YAbove)
 	SurfaceRules.Add(Bandlands, Block, Conditional)
 	ListRule := spec.NewListSpec().
-		SetOutputFn(
-			func(node spec.ListNode) any {
-				out := struct {
-					Type     string `json:"type"`
-					Sequence []any  `json:"sequence"`
-				}{
-					Type:     "minecraft:sequence",
-					Sequence: make([]any, 0),
-				}
-
-				for _, val := range node.Values {
-					if s, ok := val.(ast.Symbol); ok && !lib.IsNilInterface(s) {
-						out.Sequence = append(out.Sequence, s.ToSerializable())
-					}
-				}
-
-				return out
-			}).
+		SetOutputFn(serializeListSurfaceRule).
+		SetFileExporter(exporter(serializeListSurfaceRule, []string{"worldgen", "debug", "surface"}, "json")).
 		SetKind(ast.SymbolSurfaceRule).
 		SetHelp("Creates a list of rules, the first valid rule will be used.s")
 	SurfaceRules.Add(ListRule)
 
 	Conditional.
 		AddConditionOption(SurfaceConditions).
-		AddConditionOption(spec.NewReferenceSpec(ast.SymbolSurfaceCondition)).
+		AddConditionOption(SurfaceConditionRef).
 		AddValueOption(SurfaceRules).
-		AddValueOption(spec.NewReferenceSpec(ast.SymbolSurfaceRule)).
+		AddValueOption(SurfaceRuleRef).
 		SetOutputFn(func(n spec.ConditionalNode) any {
 			var val any = nil
-			if n.Value != nil && n.Value.ToSerializable() != nil {
-				val = n.Value.ToSerializable()
+			if !lib.IsNilInterface(n.Value) {
+				if ref, ok := n.Value.(*spec.ReferenceNode); ok {
+					val = getSymbolValue(ref.Namespace, ref.Name)
+				} else if !lib.IsNilInterface(n.Value.ToSerializable()) {
+					val = n.Value.ToSerializable()
+				}
 			}
 			return SerializeConditional(n.Condition, val)
 		})
 
 	ListRule.
-		AddValueOption(spec.NewReferenceSpec(ast.SymbolSurfaceRule)).
+		AddValueOption(SurfaceRuleRef).
 		AddValueOption(SurfaceRules)
 
 	SurfaceRuleBlock = spec.NewBlockSpec(
@@ -490,6 +499,12 @@ func SerializeConditional(cond ast.Symbol, value any) any {
 		// There is no condition yet
 		return mkSurfaceRuleConditional(nil, value)
 	default:
+		if ref, ok := c.(*spec.ReferenceNode); ok {
+			val := getSymbolValue(ref.Namespace, ref.Name)
+			if val != nil {
+				return mkSurfaceRuleConditional(val, value)
+			}
+		}
 		// Atomic condition: single condition node
 		return mkSurfaceRuleConditional(c.ToSerializable(), value)
 	}

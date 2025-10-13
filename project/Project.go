@@ -3,6 +3,7 @@ package project
 import (
 	"slices"
 
+	"github.com/minecraftmetascript/mms/lang"
 	"github.com/minecraftmetascript/mms/lang/ast"
 	"github.com/minecraftmetascript/mms/lib"
 	"github.com/samber/lo"
@@ -59,9 +60,10 @@ func (p *Project) AddFile(path, content string) (*File, error) {
 func (p *Project) BuildFsLike(root string) *lib.FileTreeLike {
 	rootDir := lib.NewDirLike(root, nil)
 
+	lang.JitSymbols = p.Symbols()
+
 	for ns, decls := range p.symbols {
 		nsDir := rootDir.MkDir(ns, nil)
-
 		for name, decl := range decls.AllDecls() {
 			declFs := decl.ToFileTreeLike(name)
 			if declFs != nil {
