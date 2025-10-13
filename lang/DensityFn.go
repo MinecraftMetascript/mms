@@ -429,7 +429,7 @@ var RangeChoice = spec.NewFunctionSpec("RangeChoice", spec.NewOverloadSpec([]spe
 func serializeClamp(n spec.FunctionNode) any {
 	out := &struct {
 		Type     string  `json:"type"`
-		Argument any     `json:"argument" mms_arg:"0" mms_type:"symbol,DensityFn|float"`
+		Argument any     `json:"input" mms_arg:"0" mms_type:"symbol,DensityFn|float"`
 		Min      float64 `json:"min" mms_builder:"Min"`
 		Max      float64 `json:"max" mms_builder:"Max"`
 	}{}
