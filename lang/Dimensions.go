@@ -20,18 +20,17 @@ func exporter[T any](serializer func(node T) any, rootPath []string, extension s
 			return nil
 		}
 
-		var root *lib.FileTreeLike
-		var child *lib.FileTreeLike
-		for _, part := range rootPath {
-			if root == nil {
-				root = lib.NewDirLike(part, nil)
-			} else if child == nil {
-				child = root.MkDir(part, nil)
-			} else {
-				child = child.MkDir(part, nil)
-			}
+		if len(rootPath) == 0 {
+			log.Println("exporter requires at least one path segment")
+			return nil
 		}
-		child.MkFile(fmt.Sprintf("%s.%s", name, extension), string(contentBytes), nil)
+		root := lib.NewDirLike(rootPath[0], nil)
+		current := root
+		for _, part := range rootPath[1:] {
+			current = current.MkDir(part, nil)
+		}
+		current.MkFile(fmt.Sprintf("%s.%s", name, extension), string(contentBytes), nil)
+
 		return root
 	}
 }
