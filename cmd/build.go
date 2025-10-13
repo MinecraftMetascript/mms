@@ -7,7 +7,6 @@ import (
 	"log"
 	"os"
 	"path"
-	"strings"
 
 	"github.com/minecraftmetascript/mms/lib"
 	_project "github.com/minecraftmetascript/mms/project"
@@ -72,17 +71,8 @@ var buildCmd = &cobra.Command{
 			return
 		}
 
-		_, err = fs.Stat(os.DirFS("."), outFile)
-		if err != nil {
-			if strings.HasSuffix(err.Error(), "no such file or directory") {
-				err = os.MkdirAll(outFile, 0755)
-				if err != nil {
-					log.Println("Error creating output directory:", err)
-					return
-				}
-			} else {
-				log.Println("Error building project", err)
-			}
+		if err = mkdirIfNotExists(outFile); err != nil {
+			log.Println("Error creating output directory:", err)
 			return
 		}
 

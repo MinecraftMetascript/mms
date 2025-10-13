@@ -391,8 +391,12 @@ func init() {
 		AddValueOption(SurfaceRuleRef).
 		SetOutputFn(func(n spec.ConditionalNode) any {
 			var val any = nil
-			if !lib.IsNilInterface(n.Value) && !lib.IsNilInterface(n.Value.ToSerializable()) {
-				val = n.Value.ToSerializable()
+			if !lib.IsNilInterface(n.Value) {
+				if ref, ok := n.Value.(*spec.ReferenceNode); ok {
+					val = getSymbolValue(ref.Namespace, ref.Name)
+				} else if !lib.IsNilInterface(n.Value.ToSerializable()) {
+					val = n.Value.ToSerializable()
+				}
 			}
 			return SerializeConditional(n.Condition, val)
 		})
@@ -495,6 +499,12 @@ func SerializeConditional(cond ast.Symbol, value any) any {
 		// There is no condition yet
 		return mkSurfaceRuleConditional(nil, value)
 	default:
+		if ref, ok := c.(*spec.ReferenceNode); ok {
+			val := getSymbolValue(ref.Namespace, ref.Name)
+			if val != nil {
+				return mkSurfaceRuleConditional(val, value)
+			}
+		}
 		// Atomic condition: single condition node
 		return mkSurfaceRuleConditional(c.ToSerializable(), value)
 	}
