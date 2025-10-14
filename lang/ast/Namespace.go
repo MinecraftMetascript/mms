@@ -11,6 +11,9 @@ type Namespace struct {
 }
 
 func (ns *Namespace) Size() int {
+	if ns == nil {
+		return 0
+	}
 	if ns.Declarations == nil {
 		return 0
 	}
