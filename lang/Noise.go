@@ -61,8 +61,10 @@ var NoiseSerializer = func(fn spec.FunctionNode) any {
 	if len(fn.Builders) > 0 {
 		amplitudes := fn.Builders[0]
 		for _, ampArg := range amplitudes.Arguments {
-			amp := ampArg.(*spec.NumberNode)
-			out.Amplitudes = append(out.Amplitudes, amp.Value)
+			amp, ok := ampArg.(*spec.NumberNode)
+			if ok {
+				out.Amplitudes = append(out.Amplitudes, amp.Value)
+			}
 		}
 	}
 
