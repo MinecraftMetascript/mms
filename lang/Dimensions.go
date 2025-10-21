@@ -88,6 +88,247 @@ func serializeDimensionType(n spec.FunctionNode) any {
 	return out
 }
 
+func serializeFlatSettings(n spec.FunctionNode) any {
+	out := &struct {
+		Type       string   `json:"type"`
+		Layers     []any    `json:"layers,omitempty"`
+		Structures []string `json:"structures,omitempty"`
+		Lakes      []string `json:"lakes,omitempty"`
+		Features   []string `json:"features,omitempty"`
+		Biome      string   `json:"biome,omitempty"`
+	}{
+		Type: "minecraft:flat",
+	}
+
+	// Handle layers
+	if layers := findBuilderByName(n.Builders, "Layers"); layers != nil {
+		for _, layerNode := range layers.Arguments {
+			if layer, ok := layerNode.(*spec.FunctionNode); ok && layer.Name == "FlatLayer" {
+				layerObj := struct {
+					Block  string `json:"block"`
+					Height int    `json:"height"`
+				}{}
+				if len(layer.Arguments) > 0 {
+					if ref := spec.GetReferenceNodeValue(layer.Arguments[0], ast.SymbolNever); ref != nil {
+						layerObj.Block = *ref
+					}
+				}
+				if len(layer.Arguments) > 1 {
+					if height := spec.GetNumberNodeValue(layer.Arguments[1]); height != nil {
+						layerObj.Height = int(*height)
+					}
+				}
+				out.Layers = append(out.Layers, layerObj)
+			}
+		}
+	}
+
+	// Handle other settings
+	if structures := findBuilderByName(n.Builders, "Structures"); structures != nil {
+		for _, arg := range structures.Arguments {
+			if ref := spec.GetReferenceNodeValue(arg, ast.SymbolNever); ref != nil {
+				out.Structures = append(out.Structures, *ref)
+			}
+		}
+	}
+
+	if lakes := findBuilderByName(n.Builders, "Lakes"); lakes != nil {
+		for _, arg := range lakes.Arguments {
+			if ref := spec.GetReferenceNodeValue(arg, ast.SymbolNever); ref != nil {
+				out.Lakes = append(out.Lakes, *ref)
+			}
+		}
+	}
+
+	if features := findBuilderByName(n.Builders, "Features"); features != nil {
+		for _, arg := range features.Arguments {
+			if ref := spec.GetReferenceNodeValue(arg, ast.SymbolNever); ref != nil {
+				out.Features = append(out.Features, *ref)
+			}
+		}
+	}
+
+	if biome := findBuilderByName(n.Builders, "Biome"); biome != nil {
+		if len(biome.Arguments) > 0 {
+			if ref := spec.GetReferenceNodeValue(biome.Arguments[0], ast.SymbolNever); ref != nil {
+				out.Biome = *ref
+			}
+		}
+	}
+
+	return out
+}
+
+func serializeBiomeSource(n spec.FunctionNode) any {
+	if len(n.Arguments) == 0 {
+		return nil
+	}
+
+	generatorType := spec.GetEnumNodeValue(n.Arguments[0])
+	if generatorType == nil {
+		return nil
+	}
+
+	switch *generatorType {
+	case "checkerboard":
+		return serializeCheckerboardBiomeSource(n)
+	case "fixed":
+		return serializeFixedBiomeSource(n)
+	case "multi_noise":
+		return serializeMultiNoiseBiomeSource(n)
+	case "the_end":
+		return struct {
+			Type string `json:"type"`
+		}{Type: "minecraft:the_end"}
+	default:
+		return nil
+	}
+}
+
+func serializeCheckerboardBiomeSource(n spec.FunctionNode) any {
+	out := &struct {
+		Type   string   `json:"type"`
+		Biomes []string `json:"biomes"`
+		Scale  int      `json:"scale"`
+	}{
+		Type: "minecraft:checkerboard",
+	}
+
+	// Handle biomes
+	if biomes := findBuilderByName(n.Builders, "Biomes"); biomes != nil {
+		for _, arg := range biomes.Arguments {
+			if ref := spec.GetReferenceNodeValue(arg, ast.SymbolNever); ref != nil {
+				out.Biomes = append(out.Biomes, *ref)
+			}
+		}
+	}
+
+	// Handle scale
+	if scale := findBuilderByName(n.Builders, "Scale"); scale != nil {
+		if len(scale.Arguments) > 0 {
+			if val := spec.GetNumberNodeValue(scale.Arguments[0]); val != nil {
+				out.Scale = int(*val)
+			}
+		}
+	}
+
+	return out
+}
+
+func serializeFixedBiomeSource(n spec.FunctionNode) any {
+	out := &struct {
+		Type  string `json:"type"`
+		Biome string `json:"biome"`
+	}{
+		Type: "minecraft:fixed",
+	}
+
+	if biome := findBuilderByName(n.Builders, "Biome"); biome != nil {
+		if len(biome.Arguments) > 0 {
+			if ref := spec.GetReferenceNodeValue(biome.Arguments[0], ast.SymbolNever); ref != nil {
+				out.Biome = *ref
+			}
+		}
+	}
+
+	return out
+}
+
+func serializeMultiNoiseBiomeSource(n spec.FunctionNode) any {
+	out := &struct {
+		Type   string `json:"type"`
+		Preset string `json:"preset,omitempty"`
+		Biomes []any  `json:"biomes,omitempty"`
+	}{
+		Type: "minecraft:multi_noise",
+	}
+
+	// Check for preset
+	if preset := findBuilderByName(n.Builders, "Preset"); preset != nil {
+		if len(preset.Arguments) > 0 {
+			if val := spec.GetEnumNodeValue(preset.Arguments[0]); val != nil {
+				out.Preset = *val
+			}
+		}
+	}
+
+	// Handle custom biomes
+	if biomes := findBuilderByName(n.Builders, "Biomes"); biomes != nil {
+		for _, arg := range biomes.Arguments {
+			if biomeNode, ok := arg.(*spec.FunctionNode); ok && biomeNode.Name == "MultiNoiseBiome" {
+				biomeObj := struct {
+					Biome      string `json:"biome"`
+					Parameters any    `json:"parameters,omitempty"`
+				}{}
+
+				if len(biomeNode.Arguments) > 0 {
+					if ref := spec.GetReferenceNodeValue(biomeNode.Arguments[0], ast.SymbolNever); ref != nil {
+						biomeObj.Biome = *ref
+					}
+				}
+
+				if params := findBuilderByName(biomeNode.Builders, "Parameters"); params != nil {
+					if len(params.Arguments) > 0 {
+						if paramNode, ok := params.Arguments[0].(*spec.FunctionNode); ok && paramNode.Name == "MultiNoiseParameters" {
+							biomeObj.Parameters = serializeMultiNoiseParameters(*paramNode)
+						}
+					}
+				}
+
+				out.Biomes = append(out.Biomes, biomeObj)
+			}
+		}
+	}
+
+	return out
+}
+
+func serializeMultiNoiseParameters(n spec.FunctionNode) any {
+	out := &struct {
+		Temperature     *float64 `json:"temperature,omitempty"`
+		Humidity        *float64 `json:"humidity,omitempty"`
+		Continentalness *float64 `json:"continentalness,omitempty"`
+		Erosion         *float64 `json:"erosion,omitempty"`
+		Weirdness       *float64 `json:"weirdness,omitempty"`
+		Depth           *float64 `json:"depth,omitempty"`
+		Offset          *float64 `json:"offset,omitempty"`
+	}{}
+
+	for _, builder := range n.Builders {
+		if len(builder.Arguments) > 0 {
+			if val := spec.GetNumberNodeValue(builder.Arguments[0]); val != nil {
+				switch builder.Name {
+				case "Temperature":
+					out.Temperature = val
+				case "Humidity":
+					out.Humidity = val
+				case "Continentalness":
+					out.Continentalness = val
+				case "Erosion":
+					out.Erosion = val
+				case "Weirdness":
+					out.Weirdness = val
+				case "Depth":
+					out.Depth = val
+				case "Offset":
+					out.Offset = val
+				}
+			}
+		}
+	}
+
+	return out
+}
+
+func findBuilderByName(builders []spec.FunctionNode, name string) *spec.FunctionNode {
+	for _, builder := range builders {
+		if builder.Name == name {
+			return &builder
+		}
+	}
+	return nil
+}
+
 var dimensionType = spec.NewFunctionSpec(
 	"DimensionType",
 	spec.NewOverloadSpec(
@@ -131,21 +372,49 @@ var dimension = spec.NewFunctionSpec(
 		),
 	}, nil, []spec.FunctionSpec{
 		spec.NewFunctionSpec("Generator",
-			// TODO: Modify Function.go so that it presents all 3 enums as a value
-			// We probably need to modify the completion behavior entirely to support all valid overloads, rather than only using one
+			// Debug generator
 			spec.NewOverloadSpec([]spec.ValueSpec{spec.NewEnumSpec("debug").SetHelp("Define a debug mode world")}, nil, nil),
+			// Flat generator
 			spec.NewOverloadSpec([]spec.ValueSpec{spec.NewEnumSpec("flat").SetHelp("Define a superflat world")}, nil, []spec.FunctionSpec{
-				// TODO: Define
-				spec.NewFunctionSpec("Settings").SetHelp("Superflat settings"),
+				spec.NewFunctionSpec("Settings", spec.NewOverloadSpec([]spec.ValueSpec{flatSettings}, nil, nil)).SetHelp("Superflat settings"),
 			}),
+			// Noise generator
 			spec.NewOverloadSpec([]spec.ValueSpec{spec.NewEnumSpec("noise").SetHelp("Define a normal world")}, nil, []spec.FunctionSpec{
-				spec.NewFunctionSpec("Settings", spec.NewOverloadSpec([]spec.ValueSpec{noiseSettings}, nil, nil)).SetHelp("Noise Settings"),
-				spec.NewFunctionSpec("Biomes", spec.NewOverloadSpec([]spec.ValueSpec{biomeSource}, nil, nil)).SetHelp("Biome source"),
+				spec.NewFunctionSpec("Settings", spec.NewOverloadSpec([]spec.ValueSpec{noiseSettings}, nil, nil)).SetHelp("Noise Settings - can be a reference or inline definition"),
+				spec.NewFunctionSpec("BiomeSource", spec.NewOverloadSpec([]spec.ValueSpec{biomeSource}, nil, nil)).SetHelp("Biome source - defines how biomes are distributed"),
 			}),
 		),
 	}),
 ).
-	SetKind(ast.SymbolDimension)
+	SetKind(ast.SymbolDimension).
+	SetHelp("Defines a Minecraft dimension with a type and generator settings")
+
+// TODO: Define proper AST symbols for flat settings and layers
+// For now, using basic function specs without custom symbols
+var flatSettings = spec.NewFunctionSpec(
+	"FlatSettings",
+	spec.NewOverloadSpec(nil, nil, []spec.FunctionSpec{
+		spec.NewFunctionSpec("Layers", spec.NewOverloadSpec([]spec.ValueSpec{
+			spec.NewValueSpecList(
+				spec.NewReferenceSpec(ast.SymbolNever),
+			)}, nil, nil)),
+		spec.NewFunctionSpec("Structures", spec.NewOverloadSpec([]spec.ValueSpec{
+			spec.NewTagSpec(ast.TagStructure)}, nil, nil)),
+		spec.NewFunctionSpec("Lakes", spec.NewOverloadSpec([]spec.ValueSpec{spec.NewTagSpec(ast.TagBiome)}, nil, nil)),
+		spec.NewFunctionSpec("Features", spec.NewOverloadSpec([]spec.ValueSpec{spec.NewTagSpec(ast.TagStructure)}, nil, nil)), // Using Structure tag for now
+		spec.NewFunctionSpec("Biome", spec.NewOverloadSpec([]spec.ValueSpec{spec.NewReferenceSpec(ast.SymbolNever)}, nil, nil)),
+	}),
+).
+	SetOutputFn(serializeFlatSettings).
+	SetFileExporter(exportWorldgen(serializeFlatSettings, "flat"))
+
+var flatLayer = spec.NewFunctionSpec(
+	"FlatLayer",
+	spec.NewOverloadSpec([]spec.ValueSpec{
+		spec.NewReferenceSpec(ast.SymbolNever),
+		spec.NewNumberSpec(false),
+	}, nil, nil),
+)
 
 var noiseSettings = spec.NewFunctionSpec(
 	"NoiseSettings",
@@ -199,7 +468,81 @@ var noiseRouter = spec.NewFunctionSpec(
 	noiseRouterDef,
 )
 
-var biomeSource = spec.NewFunctionSpec("BiomeSource", EmptyFn)
+func serializeMultiNoiseBiome(n spec.FunctionNode) any {
+	out := &struct {
+		Biome      string `json:"biome"`
+		Parameters any    `json:"parameters,omitempty"`
+	}{}
+
+	if len(n.Arguments) > 0 {
+		if ref := spec.GetReferenceNodeValue(n.Arguments[0], ast.SymbolNever); ref != nil {
+			out.Biome = *ref
+		}
+	}
+
+	if params := findBuilderByName(n.Builders, "Parameters"); params != nil {
+		if len(params.Arguments) > 0 {
+			if paramNode, ok := params.Arguments[0].(*spec.FunctionNode); ok && paramNode.Name == "MultiNoiseParameters" {
+				out.Parameters = serializeMultiNoiseParameters(*paramNode)
+			}
+		}
+	}
+
+	return out
+}
+
+var multiNoiseBiome = spec.NewFunctionSpec(
+	"MultiNoiseBiome",
+	spec.NewOverloadSpec([]spec.ValueSpec{
+		spec.NewReferenceSpec(ast.SymbolNever), // Biome
+	}, nil, []spec.FunctionSpec{
+		spec.NewFunctionSpec("Parameters", spec.NewOverloadSpec([]spec.ValueSpec{multiNoiseParameters}, nil, nil)),
+	}),
+).
+	SetOutputFn(serializeMultiNoiseBiome).
+	SetFileExporter(exportWorldgen(serializeMultiNoiseBiome, "biome_source"))
+
+var multiNoiseParameters = spec.NewFunctionSpec(
+	"MultiNoiseParameters",
+	spec.NewOverloadSpec(nil, nil, []spec.FunctionSpec{
+		spec.NewFunctionSpec("Temperature", spec.NewOverloadSpec([]spec.ValueSpec{spec.NewNumberSpec(true)}, nil, nil)),
+		spec.NewFunctionSpec("Humidity", spec.NewOverloadSpec([]spec.ValueSpec{spec.NewNumberSpec(true)}, nil, nil)),
+		spec.NewFunctionSpec("Continentalness", spec.NewOverloadSpec([]spec.ValueSpec{spec.NewNumberSpec(true)}, nil, nil)),
+		spec.NewFunctionSpec("Erosion", spec.NewOverloadSpec([]spec.ValueSpec{spec.NewNumberSpec(true)}, nil, nil)),
+		spec.NewFunctionSpec("Weirdness", spec.NewOverloadSpec([]spec.ValueSpec{spec.NewNumberSpec(true)}, nil, nil)),
+		spec.NewFunctionSpec("Depth", spec.NewOverloadSpec([]spec.ValueSpec{spec.NewNumberSpec(true)}, nil, nil)),
+		spec.NewFunctionSpec("Offset", spec.NewOverloadSpec([]spec.ValueSpec{spec.NewNumberSpec(true)}, nil, nil)),
+	}),
+).
+	SetOutputFn(serializeMultiNoiseParameters).
+	SetFileExporter(exportWorldgen(serializeMultiNoiseParameters, "biome_source"))
+
+var biomeSource = spec.NewFunctionSpec("BiomeSource",
+	// Checkerboard biome source
+	spec.NewOverloadSpec([]spec.ValueSpec{spec.NewEnumSpec("checkerboard")}, nil, []spec.FunctionSpec{
+		spec.NewFunctionSpec("Biomes", spec.NewOverloadSpec([]spec.ValueSpec{
+			spec.NewValueSpecList(
+				spec.NewReferenceSpec(ast.SymbolNever),
+				spec.NewTagSpec(ast.TagBiome),
+			)}, nil, nil)).SetHelp("Biome IDs or #biome tags to place in checkerboard pattern"),
+		spec.NewFunctionSpec("Scale", spec.NewOverloadSpec([]spec.ValueSpec{spec.NewNumberSpec(false)}, nil, nil)).SetHelp("Size of checkerboard squares (0-62, defaults to 2)"),
+	}),
+	// Fixed biome source
+	spec.NewOverloadSpec([]spec.ValueSpec{spec.NewEnumSpec("fixed")}, nil, []spec.FunctionSpec{
+		spec.NewFunctionSpec("Biome", spec.NewOverloadSpec([]spec.ValueSpec{spec.NewReferenceSpec(ast.SymbolNever)}, nil, nil)),
+	}),
+	// Multi-noise biome source
+	spec.NewOverloadSpec([]spec.ValueSpec{spec.NewEnumSpec("multi_noise")}, nil, []spec.FunctionSpec{
+		spec.NewFunctionSpec("Preset", spec.NewOverloadSpec([]spec.ValueSpec{spec.NewEnumSpec("overworld", "nether")}, nil, nil)).SetHelp("Use a predefined biome layout (overworld or nether)"),
+		spec.NewFunctionSpec("Biomes", spec.NewOverloadSpec([]spec.ValueSpec{
+			spec.NewValueSpecList(multiNoiseBiome),
+		}, nil, nil)).SetHelp("Custom list of biomes with their noise parameters"),
+	}),
+	// The End biome source
+	spec.NewOverloadSpec([]spec.ValueSpec{spec.NewEnumSpec("the_end")}, nil, nil),
+).
+	SetOutputFn(serializeBiomeSource).
+	SetFileExporter(exportWorldgen(serializeBiomeSource, "biome_source"))
 
 var DimensionStatements = spec.NewValueSpecList()
 var DimensionBlock spec.BlockSpec

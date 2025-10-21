@@ -405,10 +405,10 @@ func getDensityFn(n spec.FunctionNode) any {
 		return nil
 	}
 	switch arg := n.Arguments[0].(type) {
-	case ast.Symbol:
-		return arg.ToSerializable()
 	case *spec.NumberNode:
 		return spec.GetNumberNodeValue(arg)
+	case ast.Symbol:
+		return arg.ToSerializable()
 	default:
 		return nil
 	}
@@ -450,25 +450,69 @@ type splinePoint struct {
 	Value      any     `json:"value"` // We have to process these by hand?
 }
 
-type spline struct {
-	Coordinate any           `json:"coordinate" mms_arg:"0" mms_type:"symbol,DensityFn|float"`
-	Points     []splinePoint `json:"points"`
-}
-
 func serializeSpline(n spec.FunctionNode) any {
-	out := &spline{
+	// Build a proper minecraft:spline object
+	out := &struct {
+		Type       string        `json:"type"`
+		Coordinate any           `json:"coordinate"`
+		Points     []splinePoint `json:"points"`
+	}{
+		Type:   "minecraft:spline",
 		Points: []splinePoint{},
 	}
-	// Get Coordinate
-	unpack.Args(out, n.Arguments)
 
-	// Get Points
-	for _, builder := range n.Builders {
-		point := &splinePoint{}
+	// Coordinate can be a number or a density function (symbol or inline function)
+	if len(n.Arguments) > 0 {
+		switch arg := n.Arguments[0].(type) {
+		case *spec.NumberNode:
+			if v := spec.GetNumberNodeValue(arg); v != nil {
+				out.Coordinate = *v
+			}
+		case ast.Symbol:
+			out.Coordinate = arg.ToSerializable()
+		case *spec.FunctionNode:
+			// Inline function (including nested Spline)
+			out.Coordinate = arg.ToSerializable()
+		}
+	}
 
-		unpack.Args(point, builder.Arguments)
-		unpack.Builders(point, builder.Builders)
-		out.Points = append(out.Points, *point)
+	// Each Point(builder) has 3 arguments: location(number), derivative(number), value(number|dfn|spline)
+	for _, b := range n.Builders {
+		if b.Name != "Point" {
+			continue
+		}
+		pt := splinePoint{}
+
+		// location
+		if len(b.Arguments) > 0 {
+			if v := spec.GetNumberNodeValue(b.Arguments[0]); v != nil {
+				pt.Location = *v
+			}
+		}
+		// derivative
+		if len(b.Arguments) > 1 {
+			if v := spec.GetNumberNodeValue(b.Arguments[1]); v != nil {
+				pt.Derivative = *v
+			}
+		}
+		// value: number | symbol density fn | inline function (including nested Spline)
+		if len(b.Arguments) > 2 {
+			switch v := b.Arguments[2].(type) {
+			case *spec.NumberNode:
+				if num := spec.GetNumberNodeValue(v); num != nil {
+					pt.Value = *num
+				}
+			case ast.Symbol:
+				pt.Value = v.ToSerializable()
+			case *spec.FunctionNode:
+				// Allow nested inline functions (e.g., nested Spline)
+				pt.Value = v.ToSerializable()
+			default:
+				pt.Value = nil
+			}
+		}
+
+		out.Points = append(out.Points, pt)
 	}
 
 	return out
@@ -517,7 +561,7 @@ var YClampedGradient = spec.NewFunctionSpec("YClampedGradient", spec.NewOverload
 var DensityFnBlock spec.BlockSpec
 
 func init() {
-	splineRef := spec.NewValueSpecList()
+	splineRef := spec.NewValueSpecList(DensityFunctions)
 	Spline = spec.NewFunctionSpec(
 		"Spline",
 		spec.NewOverloadSpec(
