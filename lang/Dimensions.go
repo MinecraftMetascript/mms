@@ -234,6 +234,172 @@ func serializeFixedBiomeSource(n spec.FunctionNode) any {
 	return out
 }
 
+func serializeNoiseSettings(n spec.FunctionNode) any {
+	out := &struct {
+		SeaLevel       *float64   `json:"sea_level,omitempty" mms_builder:"SeaLevel"`
+		DisableMobGen  bool       `json:"disable_mob_generation,omitempty" mms_builder:"DisableMobGen"`
+		EnableOreVeins bool       `json:"ore_veins_enabled,omitempty" mms_builder:"EnableOreVeins"`
+		Aquifers       bool       `json:"aquifers_enabled,omitempty" mms_builder:"Aquifers"`
+		DefaultBlock   *string    `json:"default_block,omitempty" mms_builder:"DefaultBlock"`
+		DefaultFluid   *string    `json:"default_fluid,omitempty" mms_builder:"DefaultFluid"`
+		MinY           *float64   `json:"min_y,omitempty" mms_builder:"MinY"`
+		Height         *float64   `json:"height,omitempty" mms_builder:"Height"`
+		Size           [2]float64 `json:"size,omitempty" mms_builder:"Size"`
+		NoiseRouter    any        `json:"noise_router,omitempty" mms_builder:"NoiseRouter"`
+		SurfaceRule    any        `json:"surface_rule,omitempty" mms_builder:"SurfaceRule"`
+	}{}
+
+	// Manual mapping
+	for _, builder := range n.Builders {
+		switch builder.Name {
+		case "SeaLevel":
+			if len(builder.Arguments) > 0 {
+				if val := spec.GetNumberNodeValue(builder.Arguments[0]); val != nil {
+					out.SeaLevel = val
+				}
+			}
+		case "DisableMobGen":
+			out.DisableMobGen = true
+		case "EnableOreVeins":
+			out.EnableOreVeins = true
+		case "Aquifers":
+			out.Aquifers = true
+		case "DefaultBlock":
+			if len(builder.Arguments) > 0 {
+				if ref := spec.GetReferenceNodeValue(builder.Arguments[0], ast.SymbolNever); ref != nil {
+					out.DefaultBlock = ref
+				}
+			}
+		case "DefaultFluid":
+			if len(builder.Arguments) > 0 {
+				if ref := spec.GetReferenceNodeValue(builder.Arguments[0], ast.SymbolNever); ref != nil {
+					out.DefaultFluid = ref
+				}
+			}
+		case "MinY":
+			if len(builder.Arguments) > 0 {
+				if val := spec.GetNumberNodeValue(builder.Arguments[0]); val != nil {
+					out.MinY = val
+				}
+			}
+		case "Height":
+			if len(builder.Arguments) > 0 {
+				if val := spec.GetNumberNodeValue(builder.Arguments[0]); val != nil {
+					out.Height = val
+				}
+			}
+		case "Size":
+			if len(builder.Arguments) >= 2 {
+				if val1 := spec.GetNumberNodeValue(builder.Arguments[0]); val1 != nil {
+					out.Size[0] = *val1
+				}
+				if val2 := spec.GetNumberNodeValue(builder.Arguments[1]); val2 != nil {
+					out.Size[1] = *val2
+				}
+			}
+		case "NoiseRouter":
+			if len(builder.Arguments) > 0 {
+				if ref := spec.GetReferenceNodeValue(builder.Arguments[0], ast.SymbolNoiseRouter); ref != nil {
+					out.NoiseRouter = *ref
+				} else if fn, ok := builder.Arguments[0].(*spec.FunctionNode); ok {
+					out.NoiseRouter = serializeNoiseRouter(*fn)
+				}
+			}
+		case "SurfaceRule":
+			// For now, leave as nil
+		}
+	}
+
+	return out
+}
+
+func serializeNoiseRouter(n spec.FunctionNode) any {
+	out := map[string]any{}
+	for _, builder := range n.Builders {
+		if len(builder.Arguments) > 0 {
+			if ref := spec.GetReferenceNodeValue(builder.Arguments[0], ast.SymbolDensityFunction); ref != nil {
+				out[builder.Name] = *ref
+			} else {
+				out[builder.Name] = "placeholder" // Placeholder for density function serialization
+			}
+		}
+	}
+	return out
+}
+
+func serializeDimension(n spec.FunctionNode) any {
+	out := &struct {
+		Type      string `json:"type"`
+		Generator any    `json:"generator"`
+	}{}
+
+	// Get type from first argument
+	if len(n.Arguments) > 0 {
+		if ref := spec.GetReferenceNodeValue(n.Arguments[0], ast.SymbolDimensionType); ref != nil {
+			out.Type = *ref
+		} else if enum := spec.GetEnumNodeValue(n.Arguments[0]); enum != nil {
+			out.Type = *enum
+		}
+	}
+
+	// Find generator builder
+	if generator := findBuilderByName(n.Builders, "Generator"); generator != nil {
+		if len(generator.Arguments) > 0 {
+			genType := spec.GetEnumNodeValue(generator.Arguments[0])
+			if genType != nil {
+				switch *genType {
+				case "debug":
+					out.Generator = struct {
+						Type string `json:"type"`
+					}{Type: "minecraft:debug"}
+				case "flat":
+					flatOut := &struct {
+						Type     string `json:"type"`
+						Settings any    `json:"settings,omitempty"`
+					}{Type: "minecraft:flat"}
+					if settings := findBuilderByName(generator.Builders, "Settings"); settings != nil {
+						if len(settings.Arguments) > 0 {
+							if fn, ok := settings.Arguments[0].(*spec.FunctionNode); ok {
+								flatOut.Settings = serializeFlatSettings(*fn)
+							} else if ref := spec.GetReferenceNodeValue(settings.Arguments[0], ast.SymbolNoiseSettings); ref != nil {
+								flatOut.Settings = *ref
+							}
+						}
+					}
+					out.Generator = flatOut
+				case "noise":
+					noiseOut := &struct {
+						Type        string `json:"type"`
+						Settings    any    `json:"settings,omitempty"`
+						BiomeSource any    `json:"biome_source,omitempty"`
+					}{Type: "minecraft:noise"}
+					if settings := findBuilderByName(generator.Builders, "Settings"); settings != nil {
+						if len(settings.Arguments) > 0 {
+							if fn, ok := settings.Arguments[0].(*spec.FunctionNode); ok {
+								noiseOut.Settings = serializeNoiseSettings(*fn)
+							} else if ref := spec.GetReferenceNodeValue(settings.Arguments[0], ast.SymbolNoiseSettings); ref != nil {
+								noiseOut.Settings = *ref
+							}
+						}
+					}
+					if biomeSource := findBuilderByName(generator.Builders, "BiomeSource"); biomeSource != nil {
+						if len(biomeSource.Arguments) > 0 {
+							if fn, ok := biomeSource.Arguments[0].(*spec.FunctionNode); ok {
+								noiseOut.BiomeSource = serializeBiomeSource(*fn)
+							} else if ref := spec.GetReferenceNodeValue(biomeSource.Arguments[0], ast.SymbolNever); ref != nil {
+								noiseOut.BiomeSource = *ref
+							}
+						}
+					}
+					out.Generator = noiseOut
+				}
+			}
+		}
+	}
+
+	return out
+}
+
 func serializeMultiNoiseBiomeSource(n spec.FunctionNode) any {
 	out := &struct {
 		Type   string `json:"type"`
@@ -387,7 +553,7 @@ var dimension = spec.NewFunctionSpec(
 	}),
 ).
 	SetKind(ast.SymbolDimension).
-	SetHelp("Defines a Minecraft dimension with a type and generator settings")
+	SetHelp("Defines a Minecraft dimension with a type and generator settings").SetOutputFn(serializeDimension).SetFileExporter(exportWorldgen(serializeDimension, "dimension"))
 
 // TODO: Define proper AST symbols for flat settings and layers
 // For now, using basic function specs without custom symbols
@@ -436,7 +602,7 @@ var noiseSettings = spec.NewFunctionSpec(
 		),
 		spec.NewFunctionSpec("SurfaceRule", spec.NewOverloadSpec([]spec.ValueSpec{spec.NewValueSpecList(SurfaceRules, spec.NewReferenceSpec(ast.SymbolSurfaceRule))}, nil, nil)),
 	}),
-).SetKind(ast.SymbolNoiseSettings)
+).SetKind(ast.SymbolNoiseSettings).SetOutputFn(serializeNoiseSettings).SetFileExporter(exportWorldgen(serializeNoiseSettings, "noise_settings"))
 
 func noiseRouterFn(name string) spec.FunctionSpec {
 	return spec.NewFunctionSpec(name,
@@ -466,7 +632,7 @@ var noiseRouterDef = spec.NewOverloadSpec(nil, nil, []spec.FunctionSpec{
 var noiseRouter = spec.NewFunctionSpec(
 	"NoiseRouter",
 	noiseRouterDef,
-)
+).SetOutputFn(serializeNoiseRouter)
 
 func serializeMultiNoiseBiome(n spec.FunctionNode) any {
 	out := &struct {
