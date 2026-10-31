@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -84,7 +85,94 @@ func symSig(s *Symbol) string {
 		}
 		return s.Decl.Type.Text
 	}
-	return SigOf(s.Decl).String()
+	// Callers also depend on what the function calls, which decides
+	// whether a call is recursive.
+	return SigOf(s.Decl).String() + " calls " + strings.Join(callees(s.Decl, s.NS), ",")
+}
+
+// callees lists the functions a body calls, by id, sorted: calls in
+// statements and in ${...} interpolations.
+func callees(d *syntax.Decl, ns string) []string {
+	seen := map[string]bool{}
+	var walk func(n syntax.Node)
+	walk = func(n syntax.Node) {
+		switch x := n.(type) {
+		case *syntax.Call:
+			switch fx := x.Fn.(type) {
+			case *syntax.Ident:
+				seen[ns+":"+fx.Name] = true
+			case *syntax.ResLoc:
+				seen[fx.Text] = true
+			}
+		case *syntax.CommandStmt:
+			for _, e := range interpolations(x.Text) {
+				if f := syntax.Parse("X _ = " + e); len(f.Decls) == 1 && f.Decls[0].Value != nil {
+					walk(f.Decls[0].Value)
+				}
+			}
+		}
+		for _, c := range syntax.Children(n) {
+			walk(c)
+		}
+	}
+	if d.Body != nil {
+		walk(d.Body)
+	}
+	out := make([]string, 0, len(seen))
+	for id := range seen {
+		out = append(out, id)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// interpolations returns the expressions inside ${...} in a command.
+func interpolations(text string) []string {
+	var out []string
+	for {
+		i := strings.Index(text, "${")
+		if i < 0 {
+			return out
+		}
+		depth, j := 0, i+1
+		for ; j < len(text); j++ {
+			if text[j] == '{' {
+				depth++
+			} else if text[j] == '}' {
+				if depth--; depth == 0 {
+					break
+				}
+			}
+		}
+		if j >= len(text) {
+			return out
+		}
+		out = append(out, text[i+2:j])
+		text = text[j+1:]
+	}
+}
+
+// reaches reports whether calling from can lead back to target.
+func (f *fc) reaches(from, target string) bool {
+	seen := map[string]bool{}
+	queue := []string{from}
+	for len(queue) > 0 {
+		id := queue[0]
+		queue = queue[1:]
+		if id == target {
+			return true
+		}
+		if seen[id] {
+			continue
+		}
+		seen[id] = true
+		sym := f.c.findSig("function", id)
+		if sym == nil || sym.Decl == nil {
+			continue
+		}
+		queue = append(queue, callees(sym.Decl, sym.NS)...)
+	}
+	return false
 }
 
 // findSig looks a symbol up and records a dependency on its signature,
@@ -140,6 +228,10 @@ type fc struct {
 	temps  int
 	loops  int
 	selfID string
+	// frame lists the scores the function has used so far; a recursive
+	// call saves and restores them. strings is set once it uses storage.
+	frame   []fn.Score
+	strings bool
 }
 
 // CompileFunction checks a function body and lowers it to the IR. id is
@@ -168,6 +260,9 @@ func (c *Checker) CompileFunction(d *syntax.Decl, id string, src []rune) *fn.Fun
 			l := local{s: f.score(fn.Holder(path, p.Name.Text)), typ: t}
 			if t == tString {
 				l.path = fn.Storage(ns) + " " + fn.LocalPath(path, p.Name.Text)
+				f.strings = true
+			} else {
+				f.frame = append(f.frame, l.s)
 			}
 			f.scopes[0][p.Name.Text] = l
 		}
@@ -250,6 +345,9 @@ func (f *fc) declare(n *syntax.Name, typ string) local {
 	l := local{s: f.score(fn.Holder(f.path, holder)), typ: typ}
 	if typ == tString {
 		l.path = fn.Storage(f.ns) + " " + fn.LocalPath(f.path, holder)
+		f.strings = true
+	} else {
+		f.frame = append(f.frame, l.s)
 	}
 	f.scopes[len(f.scopes)-1][n.Text] = l
 	return l
@@ -258,6 +356,7 @@ func (f *fc) declare(n *syntax.Name, typ string) local {
 func (f *fc) temp() fn.Score {
 	s := f.score(fn.Holder(f.path, "_t"+strconv.Itoa(f.temps)))
 	f.temps++
+	f.frame = append(f.frame, s)
 	return s
 }
 
@@ -976,6 +1075,9 @@ func (f *fc) call(pre *[]fn.Op, e *syntax.Call, wantValue bool) *val {
 	}
 	calleeNS, calleePath, _ := strings.Cut(id, ":")
 	calleeObj := fn.Objective(calleeNS)
+	// A call that can come back to this function would overwrite its
+	// scores: they are saved on a storage stack around the call.
+	recursive := f.selfID != "" && f.reaches(id, f.selfID)
 	// Arguments are evaluated before any is stored, so one argument
 	// cannot see another's value when a function calls itself.
 	var stores []fn.Op
@@ -993,20 +1095,31 @@ func (f *fc) call(pre *[]fn.Op, e *syntax.Call, wantValue bool) *val {
 			return nil
 		}
 		if v.typ == tString {
+			if recursive && v.str == nil {
+				tmp := f.tempPath()
+				*pre = append(*pre, f.setString(tmp, v))
+				v = &val{typ: tString, path: tmp}
+			}
 			stores = append(stores, f.setString(fn.Storage(calleeNS)+" "+fn.LocalPath(calleePath, sig.Params[i].Name), v))
 			continue
 		}
 		op := f.operand(pre, v)
-		if !op.IsConst && id == f.selfID {
+		if !op.IsConst && recursive {
 			t := f.temp()
 			*pre = append(*pre, fn.Set{Dst: t, Src: op})
 			op = fn.Of(t)
 		}
 		stores = append(stores, fn.Set{Dst: fn.Score{Holder: fn.Holder(calleePath, sig.Params[i].Name), Obj: calleeObj}, Src: op})
 	}
-	*pre = append(*pre, stores...)
+	call := fn.Call{Fn: id, Args: stores, Recursive: recursive}
+	if recursive {
+		call.Frame = append([]fn.Score(nil), f.frame...)
+		if f.strings {
+			call.Strings = strings.TrimSuffix(fn.LocalPath(f.path, ""), ".")
+		}
+	}
 	if !wantValue {
-		*pre = append(*pre, fn.Call{Fn: id})
+		*pre = append(*pre, call)
 		return nil
 	}
 	if sig.Ret == "" {
@@ -1014,7 +1127,8 @@ func (f *fc) call(pre *[]fn.Op, e *syntax.Call, wantValue bool) *val {
 		return nil
 	}
 	t := f.temp()
-	*pre = append(*pre, fn.Call{Fn: id, Dst: &t})
+	call.Dst = &t
+	*pre = append(*pre, call)
 	return &val{typ: sig.Ret, op: fn.Of(t)}
 }
 
@@ -1084,6 +1198,7 @@ func (f *fc) setString(dst string, v *val) fn.Op {
 func (f *fc) tempPath() string {
 	p := fn.Storage(f.ns) + " " + fn.LocalPath(f.path, "_s"+strconv.Itoa(f.temps))
 	f.temps++
+	f.strings = true
 	return p
 }
 

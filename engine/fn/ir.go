@@ -59,10 +59,18 @@ type (
 		Op  string // "+=", "-=", "*=", "/=", "%=", "<", ">"
 		Src Operand
 	}
-	// Call runs a function, storing its result in Dst when set.
+	// Call runs a function, storing its result in Dst when set. Args
+	// pass the arguments (into the callee's parameter scores and storage)
+	// just before the call. A recursive call saves the scores in Frame
+	// that are still needed afterwards, and the storage at Strings, on a
+	// stack around the call.
 	Call struct {
-		Fn  string
-		Dst *Score
+		Fn        string
+		Dst       *Score
+		Args      []Op
+		Recursive bool
+		Frame     []Score
+		Strings   string
 	}
 	// If runs Then when Cond holds, otherwise Else.
 	If struct {

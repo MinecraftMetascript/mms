@@ -150,7 +150,7 @@ func (vm *VM) exec(line string) (result, error) {
 				return result{}, err
 			}
 			if !r.ok {
-				return result{}, fmt.Errorf("return run: the command produced no result")
+				return result{}, fmt.Errorf("return run: the command produced no result or failed")
 			}
 			return result{value: r.value, ok: true, returned: true}, nil
 		}
@@ -266,7 +266,7 @@ func (vm *VM) scoreboard(w []string) (result, error) {
 	case "get":
 		v, ok := vm.Score(holder, obj)
 		if !ok {
-			return result{}, fmt.Errorf("%s has no score on %s", holder, obj)
+			return result{failed: true}, nil // the game fails the command
 		}
 		return result{value: v, ok: true}, nil
 	case "reset":

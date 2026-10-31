@@ -145,6 +145,10 @@ A loop is a function that checks its condition, runs its body and calls itself. 
 
 **Results.** Functions return values with the `return` command, and callers read them with `execute store result score`.
 
+**Recursion.** A call that can lead back to the calling function, directly or through other functions, pushes the caller's scores onto a stack in storage, `<namespace>:mms stack`, and pops them afterwards. Only the scores read after the call are saved. Every other call costs nothing extra.
+
+**Optimisation.** Temporaries that only carry a value from one place to the next are removed, so `x = x + 1` becomes one `scoreboard players add`.
+
 **Load.** The generated load function creates the objective, sets the constants, and gives each global its first value.
 
 ## Generated functions

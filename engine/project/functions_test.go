@@ -281,3 +281,99 @@ Function run {
 		t.Errorf("said:\n%s\nwant:\n%s", strings.Join(vm.Said, "\n"), strings.Join(want, "\n"))
 	}
 }
+
+func TestRecursion(t *testing.T) {
+	vm := world(t, `
+Function fib(n: int): int {
+  if (n < 2) {
+    return n
+  }
+  return fib(n - 1) + fib(n - 2)
+}
+
+Function fact(n: int): int {
+  let here = n
+  if (n <= 1) {
+    return 1
+  }
+  let rest = fact(n - 1)
+  return here * rest
+}
+
+Function is_even(n: int): bool {
+  if (n == 0) {
+    return true
+  }
+  return is_odd(n - 1)
+}
+
+Function is_odd(n: int): bool {
+  if (n == 0) {
+    return false
+  }
+  return is_even(n - 1)
+}
+
+Function shout(word: string, n: int) {
+  if (n > 0) {
+    shout(word + "!", n - 1)
+    /say ${word}
+  }
+}
+`)
+	vm.Scores["mms.demo"]["#fib.n"] = 15
+	if v := call(t, vm, "demo:fib"); v != 610 {
+		t.Errorf("fib(15) = %d, want 610", v)
+	}
+	vm.Scores["mms.demo"]["#fact.n"] = 10
+	if v := call(t, vm, "demo:fact"); v != 3628800 {
+		t.Errorf("fact(10) = %d, want 3628800", v)
+	}
+	for n, want := range map[int32]int32{0: 1, 7: 0, 10: 1} {
+		vm.Scores["mms.demo"]["#is_even.n"] = n
+		if v := call(t, vm, "demo:is_even"); v != want {
+			t.Errorf("is_even(%d) = %d, want %d", n, v, want)
+		}
+	}
+	vm.Storage["demo:mms"] = map[string]any{"l": map[string]any{"shout": map[string]any{"word": "hey"}}}
+	vm.Scores["mms.demo"]["#shout.n"] = 3
+	call(t, vm, "demo:shout")
+	if got := strings.Join(vm.Said, " "); got != "hey!! hey! hey" {
+		t.Errorf("shout said %q", got)
+	}
+	if st, _ := vm.Storage["demo:mms"]["stack"].([]any); len(st) != 0 {
+		t.Errorf("stack left with %d frames", len(st))
+	}
+}
+
+// TestOptimizedOutput pins what the optimiser does to common shapes.
+func TestOptimizedOutput(t *testing.T) {
+	p := New(spec.MustDefault(), Config{Namespace: "demo"})
+	p.SetFile("main.mms", `
+Function inc {
+  let x = 1
+  x = x + 1
+}
+Function down(n: int): int {
+  if (n <= 0) {
+    return 0
+  }
+  let unused = n * 7
+  return down(n - 1) + n
+}
+`)
+	r, _ := p.Analyze(context.Background())
+	got := dumpFiles(r.Emit())
+	for _, want := range []string{
+		"=== data/demo/function/inc.mcfunction\nscoreboard players set #inc.x mms.demo 1\nscoreboard players add #inc.x mms.demo 1\n",
+		// Only n is needed after the recursive call, so only n is saved.
+		"data modify storage demo:mms stack append value {}\nexecute store result storage demo:mms stack[-1].s0 int 1 run scoreboard players get #down.n mms.demo\nscoreboard players operation #down.n",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("missing %q in:\n%s", want, got)
+		}
+	}
+	if strings.Contains(got, "stack[-1].s1") {
+		t.Errorf("saved more than n:\n%s", got)
+	}
+}

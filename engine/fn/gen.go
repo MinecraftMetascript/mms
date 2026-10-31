@@ -63,6 +63,7 @@ type gen struct {
 // Generate lowers f and returns its files. Generated sub-function names
 // and flags are numbered in source order, so output is deterministic.
 func Generate(f Func) *Output {
+	Optimize(&f)
 	ns, path, _ := strings.Cut(f.ID, ":")
 	g := &gen{ns: ns, path: path, obj: Objective(ns), out: &Output{Main: f.ID, Files: map[string][]string{}, Consts: map[int32]bool{}}}
 	fr := &frame{id: f.ID, kind: topFrame}
@@ -134,10 +135,7 @@ func (g *gen) op(fr *frame, op Op) []string {
 		}
 		return []string{fmt.Sprintf("scoreboard players operation %s %s %s", o.Dst, o.Op, src.S)}
 	case Call:
-		if o.Dst != nil {
-			return []string{fmt.Sprintf("execute store result score %s run function %s", *o.Dst, o.Fn)}
-		}
-		return []string{"function " + o.Fn}
+		return g.call(fr, o)
 	case Macro:
 		return g.macro(o)
 	case Return:
@@ -184,7 +182,11 @@ func (g *gen) single(fr *frame, b *Block) (string, bool) {
 		return "", false
 	}
 	switch o := b.Ops[0].(type) {
-	case Cmd, Set, Arith, Call:
+	case Call:
+		if len(o.Args) > 0 || o.Recursive {
+			return "", false
+		}
+	case Cmd, Set, Arith:
 	case Return:
 		if fr.kind != topFrame {
 			return "", false
@@ -431,4 +433,32 @@ func (g *gen) macro(o Macro) []string {
 // QuoteSNBT quotes a string for SNBT.
 func QuoteSNBT(s string) string {
 	return `"` + strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(s) + `"`
+}
+
+func (g *gen) call(fr *frame, o Call) []string {
+	st := Storage(g.ns)
+	var save, restore []string
+	if o.Recursive {
+		save = append(save, "data modify storage "+st+" stack append value {}")
+		for i, s := range o.Frame {
+			key := "stack[-1].s" + strconv.Itoa(i)
+			save = append(save, fmt.Sprintf("execute store result storage %s %s int 1 run scoreboard players get %s", st, key, s))
+			restore = append(restore, fmt.Sprintf("execute store result score %s run data get storage %s %s", s, st, key))
+		}
+		if o.Strings != "" {
+			save = append(save, fmt.Sprintf("data modify storage %s stack[-1].l set from storage %s %s", st, st, o.Strings))
+			restore = append(restore, fmt.Sprintf("data modify storage %s %s set from storage %s stack[-1].l", st, o.Strings, st))
+		}
+		restore = append(restore, "data remove storage "+st+" stack[-1]")
+	}
+	lines := save
+	for _, a := range o.Args {
+		lines = append(lines, g.op(fr, a)...)
+	}
+	if o.Dst != nil {
+		lines = append(lines, fmt.Sprintf("execute store result score %s run function %s", *o.Dst, o.Fn))
+	} else {
+		lines = append(lines, "function "+o.Fn)
+	}
+	return append(lines, restore...)
 }

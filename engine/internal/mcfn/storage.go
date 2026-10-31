@@ -249,7 +249,7 @@ func (vm *VM) data(w []string) (result, error) {
 		case "from":
 			src, err := vm.get(w[7], w[8])
 			if err != nil {
-				return result{}, err
+				return result{failed: true}, nil // nothing to copy: the command fails
 			}
 			v = clone(src)
 		case "string":
