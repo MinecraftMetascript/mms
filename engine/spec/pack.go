@@ -16,6 +16,11 @@ import (
 type Pack struct {
 	Version    string `json:"version"`
 	PackFormat int    `json:"packFormat"`
+	// ResourcePackFormat is the resource pack format of the same version.
+	ResourcePackFormat int `json:"resourcePackFormat"`
+	// DataVersion is the version's world data version, which structure
+	// files record.
+	DataVersion int `json:"dataVersion"`
 	// Sources records the upstream commits the pack was generated from.
 	Sources map[string]string `json:"sources"`
 

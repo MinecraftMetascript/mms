@@ -243,6 +243,8 @@ func (s *Server) initialize(ctx context.Context, p initializeParams) (any, *resp
 	}
 	s.proj = project.New(s.pack, cfg)
 	if s.root != "" {
+		// Asset helpers such as Texture("a.png") read project files.
+		s.proj.Files = os.DirFS(s.root)
 		if paths, err := cfg.SourceFiles(s.root); err == nil {
 			for _, rel := range paths {
 				full := filepath.Join(s.root, rel)
@@ -393,6 +395,7 @@ func (s *Server) setConfig(ctx context.Context, cfg project.Config) (any, *respE
 		return nil, &respError{Code: codeInvalidParams, Message: err.Error()}
 	}
 	np := project.New(s.pack, cfg)
+	np.Files = s.proj.Files
 	for _, path := range s.proj.Paths() {
 		t, _ := s.proj.Text(path)
 		np.SetFile(path, t)
@@ -757,7 +760,13 @@ func (s *Server) output(_ context.Context, _ struct{}) (any, *respError) {
 	out := make([]map[string]any, 0, len(files))
 	idx := map[string]*lines{}
 	for _, f := range files {
+		if f.Asset != "" {
+			continue // copied binary files have no text to preview
+		}
 		m := map[string]any{"path": f.Path, "text": string(f.Data)}
+		if f.Pack == sema.ResourcePack {
+			m["pack"] = "resources"
+		}
 		if f.Unit != "" {
 			l := idx[f.Unit]
 			if l == nil {

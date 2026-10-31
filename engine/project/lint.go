@@ -28,6 +28,8 @@ var Rules = []*Rule{
 		Doc: "An arithmetic expression of number literals can be written as its value."},
 	{ID: "deprecated", Severity: syntax.SeverityWarning, all: lintDeprecated,
 		Doc: "A use of a declaration whose doc comment has a `@deprecated` tag."},
+	{ID: "external-asset", Severity: syntax.SeverityWarning, all: lintExternalAsset,
+		Doc: "An id of a texture, sound or structure in the project's namespace that no Texture, Sound or Structure call in the project provides. The pack still loads, but the file must come from another pack."},
 	{ID: "overrides-vanilla", Severity: syntax.SeverityInfo, run: lintOverrides,
 		Doc: "A declaration in the minecraft namespace replaces the vanilla resource with the same id."},
 	{ID: "quoted-name", Severity: syntax.SeverityHint, run: lintQuoted,

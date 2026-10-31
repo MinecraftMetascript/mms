@@ -24,6 +24,11 @@ import (
 const (
 	version    = "26.3"
 	packFormat = 121
+	// From mcmeta's version.json for 26.3: resource_pack_version 97.1
+	// (the minor part needs no pin; max_format 97 covers it) and
+	// data_version.
+	resourcePackFormat = 97
+	dataVersion        = 5023
 
 	mcdocRepo   = "SpyglassMC/vanilla-mcdoc"
 	mcdocCommit = "5aab1da2ff00955cdb66f0d6c2a1154ef691a015" // generated branch
@@ -84,8 +89,10 @@ func run(out, cache string) error {
 	}
 
 	pack := &spec.Pack{
-		Version:    version,
-		PackFormat: packFormat,
+		Version:            version,
+		PackFormat:         packFormat,
+		ResourcePackFormat: resourcePackFormat,
+		DataVersion:        dataVersion,
 		Sources: map[string]string{
 			mcdocRepo:  mcdocCommit,
 			mcmetaRepo: mcmetaRef,
