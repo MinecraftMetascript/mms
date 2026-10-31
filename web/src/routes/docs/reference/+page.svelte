@@ -83,7 +83,7 @@
 
 	{#each shown as g (g.dispatcher)}
 		<section aria-label={groupTitle(g.dispatcher)}>
-			<h3 id={groupId(g.dispatcher)} tabindex="-1">
+			<h3 id={groupId(g.dispatcher)} data-toc={groupTitle(g.dispatcher)} tabindex="-1">
 				<a href="#{groupId(g.dispatcher)}">{groupTitle(g.dispatcher)}</a>
 				{#if g.dispatcher}<code class="ml-1 text-xs font-normal">{g.dispatcher}</code>{/if}
 			</h3>
