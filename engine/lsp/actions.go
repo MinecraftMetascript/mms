@@ -4,7 +4,6 @@ import (
 	"context"
 	"strings"
 
-	"github.com/minecraftmetascript/mms/engine/project"
 	"github.com/minecraftmetascript/mms/engine/syntax"
 )
 
@@ -26,7 +25,7 @@ func editsJSON(l *lines, edits []syntax.TextEdit) []map[string]any {
 
 // codeAction offers each fix of the diagnostics touching the range as a
 // quick fix, and "fix all" as a source action.
-func (s *Server) codeAction(_ context.Context, p struct {
+func (s *Server) codeAction(ctx context.Context, p struct {
 	TextDocument docID `json:"textDocument"`
 	Range        Range `json:"range"`
 	Context      struct {
@@ -70,8 +69,15 @@ func (s *Server) codeAction(_ context.Context, p struct {
 		}
 	}
 	if want("source.fixAll.mms") {
-		text, n := project.ApplyFixes(u.File.Src, ds)
-		if n > 0 {
+		// Fixes can expose more (an object inside one that became a call),
+		// so fix in rounds on the project, then put the text back.
+		orig := string(u.File.Src)
+		files, n, err := s.proj.FixAll(ctx, uri)
+		s.proj.SetFile(uri, orig)
+		if err != nil {
+			return nil, &respError{Code: codeRequestFailed, Message: err.Error()}
+		}
+		if text := files[uri]; n > 0 {
 			end := l.pos(len(u.File.Src))
 			out = append(out, map[string]any{
 				"title": "Fix all MMS problems",

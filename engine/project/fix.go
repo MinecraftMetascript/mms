@@ -47,8 +47,8 @@ func ApplyFixes(src []rune, ds []syntax.Diagnostic) (string, int) {
 }
 
 // FixAll applies safe fixes to the given files (every file when none are
-// given) until none are left, since a fix can expose another, for at most
-// a few rounds. It returns the files it changed, with their new text, and
+// given) until none are left, since a fix can expose another (an object inside
+// one that became a call), for at most 16 rounds. It returns the files it changed, with their new text, and
 // the number of fixes applied.
 func (p *Project) FixAll(ctx context.Context, paths ...string) (map[string]string, int, error) {
 	if len(paths) == 0 {
@@ -56,7 +56,7 @@ func (p *Project) FixAll(ctx context.Context, paths ...string) (map[string]strin
 	}
 	changed := map[string]string{}
 	total := 0
-	for round := 0; round < 5; round++ {
+	for round := 0; round < 16; round++ {
 		r, err := p.Analyze(ctx)
 		if err != nil {
 			return changed, total, err

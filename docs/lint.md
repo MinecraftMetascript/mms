@@ -7,6 +7,7 @@ The engine lints every declaration that checks without errors. Findings appear i
 | `unused` | hint | none | A density function, noise, feature, carver, processor list, surface rule or condition, predicate, item modifier or parameter list that nothing references, by id or in a command. The game never loads these on its own. Declarations in `minecraft` are skipped, because they override vanilla files. The editor fades the name. |
 | `quoted-name` | hint | safe | An id, dispatch key or enum name written in quotes: `"minecraft:stone"` becomes `stone`. |
 | `redundant-namespace` | hint | safe | A `minecraft:` prefix that can be dropped. It is kept when the project declares its own resource with the short name. |
+| `use-sugar` | hint | safe | An object literal with a shorter form: a dispatched object as its helper call (`{ type = noise, noise = ridge }` becomes `Noise(noise = ridge)`), and the sugar in [resources.md](resources.md): bare item entries, `1..3`, `diamond * 4`, trigger calls, `&&`, `||`, `!` and density arithmetic. Parentheses are added where precedence needs them. |
 | `constant-expression` | hint | safe | Arithmetic on number literals, such as `2 * 0.25`, which is replaced by its value. |
 | `overrides-vanilla` | info | none | A declaration that replaces a vanilla resource, such as `LootTable minecraft:blocks/stone`. It is skipped when the project namespace is `minecraft`. |
 

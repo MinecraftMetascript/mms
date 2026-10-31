@@ -131,6 +131,18 @@ func TestVanillaRoundTrip(t *testing.T) {
 		}
 	}
 	r2, _ := p.Analyze(context.Background())
+	afterErrs := 0
+	for _, u := range r2.Units {
+		for _, d := range r2.Diagnostics(u.Path) {
+			if d.Severity == 1 && !knownError(d.Message) {
+				afterErrs++
+				if afterErrs <= 5 {
+					line, col := u.File.LineCol(d.Sp.Start)
+					t.Errorf("after fixes: %s:%d:%d %s %s\n    %s", u.Path, line, col, d.Code, d.Message, strings.TrimSpace(u.File.LineText(line)))
+				}
+			}
+		}
+	}
 	refixed := 0
 	for _, f := range r2.Emit() {
 		want, ok := originals[f.Path]

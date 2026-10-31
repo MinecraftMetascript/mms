@@ -349,7 +349,13 @@ func (c *Checker) callableNames(v tview) []string {
 					}
 				}
 			} else if v.Name != "" {
-				set[spec.ShortPath(v.Name)] = true
+				short := spec.ShortPath(v.Name)
+				set[short] = true
+				for alias, target := range structAliases {
+					if target == short {
+						set[alias] = true
+					}
+				}
 			}
 			if disp == nil && len(fs) == 1 && fs[0].KeyType == nil {
 				set[Pascal(fs[0].Key)] = true

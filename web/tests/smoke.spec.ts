@@ -71,7 +71,7 @@ test('data packs and pasted JSON import as MMS', async ({ page }) => {
 	await page.getByLabel('JSON', { exact: true }).fill('{"type":"minecraft:block","pools":[{"rolls":1,"entries":[{"type":"minecraft:item","name":"minecraft:diamond"}]}]}');
 	await page.getByRole('button', { name: 'Convert' }).click();
 	await expect(page.locator('.cm-content')).toContainText('LootTable blocks/ruby_ore = {');
-	await expect(page.locator('.cm-content')).toContainText('name = diamond');
+	await expect(page.locator('.cm-content')).toContainText('entries = [diamond]');
 	await expect(status(page)).toHaveText(/No problems/);
 	await page.getByRole('tab', { name: 'Pack' }).click();
 	await expect(page.getByRole('button', { name: 'ruby_ore.json' })).toBeVisible();

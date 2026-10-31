@@ -251,7 +251,7 @@ func TestImportPack(t *testing.T) {
 	conv := c.result("mms/convertJSON", map[string]any{"uri": "file:///a.mms", "kind": "DensityFunction", "name": "hill",
 		"text": `{"type":"minecraft:noise","noise":"minecraft:ridge","xz_scale":1,"y_scale":1}`}).(map[string]any)
 	// minecraft:ridge keeps its prefix: the file declares a ridge noise.
-	if want := "DensityFunction hill = {\n  type = noise\n  noise = minecraft:ridge\n  xz_scale = 1\n  y_scale = 1\n}\n"; conv["text"] != want {
+	if want := "DensityFunction hill = Noise(noise = minecraft:ridge, xz_scale = 1, y_scale = 1)\n"; conv["text"] != want {
 		t.Errorf("convertJSON = %q\nwant %q", conv["text"], want)
 	}
 	kinds := c.result("mms/resourceKinds", map[string]any{}).([]any)
@@ -281,7 +281,7 @@ func TestCodeActions(t *testing.T) {
 	for _, a := range acts {
 		titles = append(titles, a.(map[string]any)["title"].(string))
 	}
-	if got := strings.Join(titles, "|"); got != "Write item|Ignore quoted-name on this line|Fix all MMS problems" {
+	if got := strings.Join(titles, "|"); got != "Write minecraft:diamond|Ignore use-sugar on this line|Write item|Ignore quoted-name on this line|Fix all MMS problems" {
 		t.Errorf("actions = %s", got)
 	}
 	all := c.result("textDocument/codeAction", map[string]any{"textDocument": map[string]any{"uri": uri}, "range": rng(0, 0),
@@ -290,7 +290,7 @@ func TestCodeActions(t *testing.T) {
 		t.Fatalf("fix all = %v", all)
 	}
 	edit := all[0].(map[string]any)["edit"].(map[string]any)["changes"].(map[string]any)[uri].([]any)[0].(map[string]any)
-	if want := "LootTable t = { pools = [{ rolls = 1, entries = [{ type = item, name = diamond }] }] }\n"; edit["newText"] != want {
+	if want := "LootTable t = { pools = [{ rolls = 1, entries = [diamond] }] }\n"; edit["newText"] != want {
 		t.Errorf("fix all text = %q", edit["newText"])
 	}
 }

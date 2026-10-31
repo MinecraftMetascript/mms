@@ -34,7 +34,7 @@ Function f {
 }
 `
 	got := strings.Join(lintCodes(t, cfg, src), " ")
-	want := "lint/unused@2 lint/unused@3 lint/constant-expression@3 lint/quoted-name@4 lint/quoted-name@4 lint/overrides-vanilla@5 lint/redundant-namespace@6"
+	want := "lint/unused@2 lint/unused@3 lint/constant-expression@3 lint/quoted-name@4 lint/quoted-name@4 lint/overrides-vanilla@5 lint/use-sugar@5 lint/redundant-namespace@6"
 	if got != want {
 		t.Errorf("lint = %s\nwant %s", got, want)
 	}
@@ -60,10 +60,10 @@ DensityFunction d = (1 + 2) * 0.5 + Noise(minecraft:ridge, 1, 1)
 	before := dumpFiles(r0.Emit())
 	files, n, err := p.FixAll(context.Background(), "a.mms")
 	text := files["a.mms"]
-	if err != nil || n != 4 {
+	if err != nil || n != 5 {
 		t.Fatalf("FixAll = %d fixes, %v", n, err)
 	}
-	want := `LootTable t = { pools = [{ rolls = 1, entries = [{ type = item, name = diamond }] }] }
+	want := `LootTable t = { pools = [{ rolls = 1, entries = [diamond] }] }
 DensityFunction d = 1.5 + Noise(ridge, 1, 1)
 `
 	if text != want {
@@ -72,5 +72,31 @@ DensityFunction d = 1.5 + Noise(ridge, 1, 1)
 	r, _ := p.Analyze(context.Background())
 	if after := dumpFiles(r.Emit()); after != before {
 		t.Errorf("fixes changed the output:\n%s\nwas\n%s", after, before)
+	}
+}
+
+func TestUseSugar(t *testing.T) {
+	p := New(spec.MustDefault(), Config{Namespace: "demo"})
+	src := `LootTable t = { pools = [{ rolls = { type = uniform, min = 1, max = 3 }, entries = [{ type = item, name = diamond }], condition = { type = inverted, term = { type = any_of, terms = [{ type = survives_explosion }, { type = random_chance, chance = 0.5 }] } } }] }
+DensityFunction d = { type = mul, left = { type = sub, left = { type = noise, noise = ridge, xz_scale = 1, y_scale = 1 }, right = 8.0 }, right = 0.5 }
+Recipe r = { type = crafting_shapeless, ingredients = [emerald_block], result = { id = emerald, count = 9 } }
+`
+	p.SetFile("a.mms", src)
+	r0, _ := p.Analyze(context.Background())
+	before := dumpFiles(r0.Emit())
+	files, _, err := p.FixAll(context.Background(), "a.mms")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := `LootTable t = { pools = [{ rolls = 1..3, entries = [diamond], condition = !(SurvivesExplosion() || RandomChance(chance = 0.5)) }] }
+DensityFunction d = (Noise(noise = ridge, xz_scale = 1, y_scale = 1) - 8.0) * 0.5
+Recipe r = Shapeless(ingredients = [emerald_block], result = emerald * 9)
+`
+	if files["a.mms"] != want {
+		t.Errorf("fixed:\n%s\nwant\n%s", files["a.mms"], want)
+	}
+	r, _ := p.Analyze(context.Background())
+	if after := dumpFiles(r.Emit()); after != before {
+		t.Errorf("sugar changed the output:\n%s\nwas\n%s", after, before)
 	}
 }

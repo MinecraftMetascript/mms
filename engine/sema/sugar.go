@@ -14,10 +14,25 @@ import (
 
 const (
 	tDensity      = "::java::data::worldgen::density_function::DensityFunction"
+	tDensityRef   = "::java::data::worldgen::density_function::DensityFunctionRef"
 	tMaterialRule = "::java::data::worldgen::material_rule::MaterialRule"
 	tMaterialCond = "::java::data::worldgen::material_condition::MaterialCondition"
 	tAnchor       = "::java::data::worldgen::VerticalAnchor"
 	tFullBlock    = "::java::util::block_state::FullBlockState"
+
+	tLootCondition = "::java::data::loot::condition::LootCondition"
+	// tLootConditionRef is an alias of tLootCondition used by loot tables.
+	tLootConditionRef = "::java::data::loot::LootCondition"
+	tPredicateRef     = "::java::data::predicate::PredicateRef"
+	tPredicate        = "::java::data::predicate::Predicate"
+	tLootEntry        = "::java::data::loot::LootPoolEntry"
+	tIntProvider      = "::java::data::number_provider::IntNumberProviderRef"
+	tFloatProvider    = "::java::data::number_provider::FloatNumberProviderRef"
+	tIntRange         = "::java::data::loot::IntRange"
+	tFloatRange       = "::java::data::loot::FloatRange"
+	tMinMax           = "::java::data::util::MinMaxBounds"
+	tItemStack        = "::java::world::item::ItemStackTemplate"
+	tCriterion        = "::java::data::advancement::AdvancementCriterion"
 )
 
 // overlay is per-helper data the schema lacks: builder methods that are
@@ -45,6 +60,10 @@ var callAliases = map[string]map[string]string{
 		"AboveWater":   "water",
 		"AboveSurface": "above_preliminary_surface",
 	},
+	"minecraft:recipe_serializer": {
+		"Shaped":    "crafting_shaped",
+		"Shapeless": "crafting_shapeless",
+	},
 }
 
 // structAliases name non-dispatched structs by a shorter helper name.
@@ -59,6 +78,13 @@ var sugarCallables = map[string][]string{
 }
 
 var overlays = map[string]*overlay{
+	"LootPool": {positional: []string{"rolls", "entries"}},
+	"minecraft:recipe_serializer/crafting_shaped": {
+		positional: []string{"pattern", "key", "result"},
+	},
+	"minecraft:recipe_serializer/crafting_shapeless": {
+		positional: []string{"ingredients", "result"},
+	},
 	"minecraft:material_condition/water": {
 		methods: map[string]methodAlias{
 			"Mul": {field: "surface_depth_multiplier"},
@@ -133,8 +159,166 @@ func (c *Checker) sugar(e syntax.Expr, v tview) *sugarRule {
 		if _, ok := e.(*syntax.Index); ok {
 			return &sugarRule{blockWithState}
 		}
+	case tLootCondition, tLootConditionRef:
+		switch x := e.(type) {
+		case *syntax.Unary:
+			if x.Op == "!" {
+				return &sugarRule{lootNot}
+			}
+		case *syntax.Binary:
+			if x.Op == "&&" || x.Op == "||" {
+				return &sugarRule{lootLogic}
+			}
+		}
+	case tLootEntry:
+		switch e.(type) {
+		case *syntax.Ident, *syntax.ResLoc:
+			return &sugarRule{entryItem}
+		case *syntax.Tag:
+			return &sugarRule{entryTag}
+		}
+	case tIntProvider, tFloatProvider:
+		if r, ok := e.(*syntax.Range); ok && r.Lo != nil && r.Hi != nil {
+			return &sugarRule{providerRange}
+		}
+	case tIntRange, tFloatRange, tMinMax:
+		if _, ok := e.(*syntax.Range); ok {
+			return &sugarRule{boundsRange}
+		}
+	case tItemStack:
+		if b, ok := e.(*syntax.Binary); ok && b.Op == "*" && isID(b.L) && isNumber(b.R) {
+			return &sugarRule{stackCount}
+		}
+	case tCriterion:
+		if x, ok := e.(*syntax.Call); ok {
+			if id, ok := x.Fn.(*syntax.Ident); ok && id.Name != "AdvancementCriterion" {
+				return &sugarRule{criterionCall}
+			}
+		}
 	}
 	return nil
+}
+
+func isID(e syntax.Expr) bool {
+	switch e.(type) {
+	case *syntax.Ident, *syntax.ResLoc:
+		return true
+	}
+	return false
+}
+
+// mkObject builds `{ k1 = v1, k2 = v2, ... }`; nil values are skipped.
+func mkObject(sp syntax.Span, kv ...any) *syntax.Object {
+	b := &syntax.Block{Closed: true, Sp: sp}
+	for i := 0; i+1 < len(kv); i += 2 {
+		v, _ := kv[i+1].(syntax.Expr)
+		if v == nil || isNilExpr(v) {
+			continue
+		}
+		b.Items = append(b.Items, &syntax.FieldStmt{Key: &syntax.Name{Text: kv[i].(string), Sp: sp}, Value: v, Sp: v.Span()})
+	}
+	return &syntax.Object{Body: b, Sp: sp}
+}
+
+func isNilExpr(e syntax.Expr) bool {
+	switch x := e.(type) {
+	case *syntax.Ident:
+		return x == nil
+	case *syntax.Number:
+		return x == nil
+	}
+	return false
+}
+
+func word(text string, sp syntax.Span) *syntax.Ident { return &syntax.Ident{Name: text, Sp: sp} }
+
+// lootLogic lowers `a && b && c` to all_of and `a || b` to any_of, with
+// chains of the same operator flattened into one list of terms.
+// Parenthesised groups stay nested.
+func lootLogic(c *Checker, e syntax.Expr, v tview) jsonv.Value {
+	b := e.(*syntax.Binary)
+	var terms []syntax.Expr
+	var add func(x syntax.Expr)
+	add = func(x syntax.Expr) {
+		// Parentheses keep a nested group: (a && b) && c is all_of(all_of(a, b), c).
+		if inner, ok := x.(*syntax.Binary); ok && inner.Op == b.Op {
+			add(inner.L)
+			add(inner.R)
+			return
+		}
+		terms = append(terms, x)
+	}
+	add(b)
+	kind := "all_of"
+	if b.Op == "||" {
+		kind = "any_of"
+	}
+	return c.check(mkObject(b.Sp, "type", word(kind, b.Sp), "terms", &syntax.List{Elems: terms, Sp: b.Sp}), v)
+}
+
+func lootNot(c *Checker, e syntax.Expr, v tview) jsonv.Value {
+	u := e.(*syntax.Unary)
+	return c.check(mkObject(u.Sp, "type", word("inverted", u.Sp), "term", u.X), v)
+}
+
+// entryItem lowers a bare id in a pool's entries to an item entry.
+func entryItem(c *Checker, e syntax.Expr, v tview) jsonv.Value {
+	return c.check(mkObject(e.Span(), "type", word("item", e.Span()), "name", e), v)
+}
+
+// entryTag lowers `#tag` in a pool's entries to a tag entry that expands
+// to one entry per item, so each item is equally likely.
+func entryTag(c *Checker, e syntax.Expr, v tview) jsonv.Value {
+	t := e.(*syntax.Tag)
+	return c.check(mkObject(t.Sp, "type", word("tag", t.Sp), "items", t, "expand", &syntax.Bool{Value: true, Sp: t.Sp}), v)
+}
+
+// providerRange lowers `a..b` to a uniform number provider.
+func providerRange(c *Checker, e syntax.Expr, v tview) jsonv.Value {
+	r := e.(*syntax.Range)
+	return c.check(mkObject(r.Sp, "type", word("uniform", r.Sp), "min", r.Lo, "max", r.Hi), v)
+}
+
+// boundsRange lowers `a..b`, `a..` or `..b` to `{min, max}` bounds.
+func boundsRange(c *Checker, e syntax.Expr, v tview) jsonv.Value {
+	r := e.(*syntax.Range)
+	var lo, hi syntax.Expr
+	if r.Lo != nil {
+		lo = r.Lo
+	}
+	if r.Hi != nil {
+		hi = r.Hi
+	}
+	return c.check(mkObject(r.Sp, "min", lo, "max", hi), v)
+}
+
+// stackCount lowers `diamond * 4` to an item stack of four.
+func stackCount(c *Checker, e syntax.Expr, v tview) jsonv.Value {
+	b := e.(*syntax.Binary)
+	return c.check(mkObject(b.Sp, "id", b.L, "count", b.R), v)
+}
+
+// criterionCall lowers `InventoryChanged(items = [...])` to a criterion
+// whose trigger is inventory_changed and whose conditions are the named
+// arguments.
+func criterionCall(c *Checker, e syntax.Expr, v tview) jsonv.Value {
+	call := e.(*syntax.Call)
+	name := call.Fn.(*syntax.Ident)
+	cond := &syntax.Block{Closed: true, Sp: call.ArgsSp}
+	for _, a := range call.Args {
+		if a.Name == nil {
+			c.errorf("mms/missing-field", a.Sp, "criterion conditions are named: %s(player = ...)", name.Name)
+			continue
+		}
+		cond.Items = append(cond.Items, &syntax.FieldStmt{Key: a.Name, Value: a.Value, Sp: a.Sp})
+	}
+	var conditions syntax.Expr
+	if len(cond.Items) > 0 {
+		conditions = &syntax.Object{Body: cond, Sp: call.ArgsSp}
+	}
+	in := c.info(name)
+	in.Type = v
+	return c.check(mkObject(call.Sp, "trigger", &syntax.Ident{Name: Snake(name.Name), Sp: name.Sp}, "conditions", conditions), v)
 }
 
 func mkCall(name string, sp syntax.Span, args ...syntax.Expr) *syntax.Call {

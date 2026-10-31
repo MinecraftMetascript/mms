@@ -1,0 +1,141 @@
+== loot_table example:chests/gems
+{
+  "pools": [
+    {
+      "rolls": {
+        "type": "minecraft:uniform",
+        "min": 1,
+        "max": 3
+      },
+      "entries": [
+        {
+          "type": "minecraft:item",
+          "name": "minecraft:diamond"
+        },
+        {
+          "type": "minecraft:item",
+          "name": "minecraft:emerald"
+        },
+        {
+          "type": "minecraft:tag",
+          "items": "#minecraft:logs",
+          "expand": true
+        }
+      ]
+    },
+    {
+      "rolls": 1,
+      "entries": [
+        {
+          "type": "minecraft:item",
+          "name": "minecraft:gold_ingot",
+          "weight": 3
+        }
+      ]
+    }
+  ]
+}
+== predicate example:stormy_night
+{
+  "type": "minecraft:all_of",
+  "terms": [
+    {
+      "type": "minecraft:weather_check",
+      "thundering": true
+    },
+    {
+      "type": "minecraft:inverted",
+      "term": {
+        "type": "minecraft:any_of",
+        "terms": [
+          {
+            "type": "minecraft:time_check",
+            "clock": "minecraft:overworld",
+            "value": {
+              "min": 0,
+              "max": 12000
+            }
+          },
+          {
+            "type": "minecraft:random_chance",
+            "chance": 0.5
+          }
+        ]
+      }
+    }
+  ]
+}
+== predicate example:high_score
+{
+  "type": "minecraft:entity_scores",
+  "entity": "this",
+  "scores": {
+    "kills": {
+      "min": 10
+    },
+    "deaths": {
+      "max": 2
+    }
+  }
+}
+== recipe example:ruby_block
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "RRR",
+    "RRR",
+    "RRR"
+  ],
+  "key": {
+    "R": "minecraft:emerald"
+  },
+  "result": "minecraft:emerald_block"
+}
+== recipe example:rubies
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    "minecraft:emerald_block"
+  ],
+  "result": {
+    "id": "minecraft:emerald",
+    "count": 9
+  }
+}
+== advancement example:first_gem
+{
+  "criteria": {
+    "has_gem": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": {
+        "items": [
+          {
+            "items": [
+              "minecraft:diamond",
+              "minecraft:emerald"
+            ]
+          }
+        ]
+      }
+    }
+  }
+}
+== predicate example:bad
+{
+  "type": "minecraft:all_of",
+  "terms": [
+    {
+      "type": "minecraft:weather_check",
+      "raining": true
+    }
+  ]
+}
+== recipe example:bad_count
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    "minecraft:emerald"
+  ]
+}
+! 28: mms/type-mismatch expected a predicate id or LootCondition, got number 1
+! 29: mms/type-mismatch expected ItemStackTemplate, got '*' expression

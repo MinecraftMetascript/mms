@@ -80,6 +80,23 @@ func (c *Checker) tagEntry(e syntax.Expr, k Kind, id idInfo) jsonv.Value {
 			return jsonv.String(c.resolveTag(rest, id, e))
 		}
 		return jsonv.String(c.resolveID(x.Value, id, e))
+	case *syntax.Call:
+		// Optional(x) is { id = x, required = false }: the tag still
+		// loads when x does not exist.
+		if fn, ok := x.Fn.(*syntax.Ident); ok && fn.Name == "Optional" {
+			if len(x.Args) != 1 || x.Args[0].Name != nil {
+				c.errorf("mms/type-mismatch", x.Sp, "Optional takes one id or tag: Optional(%s)", "some_id")
+				return nil
+			}
+			v := c.tagEntry(x.Args[0].Value, k, id)
+			if v == nil {
+				return nil
+			}
+			o := &jsonv.Object{}
+			o.Set("id", v)
+			o.Set("required", jsonv.Bool(false))
+			return o
+		}
 	case *syntax.Object:
 		o := &jsonv.Object{}
 		for _, it := range x.Body.Items {
