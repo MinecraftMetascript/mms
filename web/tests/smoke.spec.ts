@@ -58,6 +58,21 @@ test('projects persist and examples open', async ({ page }) => {
 	await expect(page.getByRole('button', { name: 'surface.mms' })).toBeVisible();
 });
 
+test('an example with several files in folders builds as one project', async ({ page }) => {
+	page.on('dialog', (d) => d.accept());
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	await page.getByRole('button', { name: /Project/ }).click();
+	await page.getByRole('button', { name: /treasure/ }).click();
+	// recipes/crafting.mms uses the #gems tag declared in tags.mms.
+	await page.getByRole('button', { name: 'recipes/crafting.mms' }).click();
+	await expect(page.locator('.cm-content')).toContainText('Recipe gem_block');
+	await expect(status(page)).toHaveText(/No problems/);
+	await page.getByRole('tab', { name: 'Pack' }).click();
+	await expect(page.getByText('gem_block.json')).toBeVisible();
+	await expect(page.getByText('buried.json')).toBeVisible();
+});
+
 test('data packs and pasted JSON import as MMS', async ({ page }) => {
 	page.on('dialog', (d) => d.accept());
 	await page.goto('./');

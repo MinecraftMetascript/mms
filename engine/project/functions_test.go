@@ -25,6 +25,13 @@ func world(t *testing.T, src string) *mcfn.VM {
 			t.Fatalf("%s: %s", d.Code, d.Message)
 		}
 	}
+	return load(t, r, "demo")
+}
+
+// load builds an interpreter from the result's functions and runs ns's
+// load function.
+func load(t *testing.T, r *Result, ns string) *mcfn.VM {
+	t.Helper()
 	files := map[string][]string{}
 	for _, f := range r.Emit() {
 		rest, ok := strings.CutPrefix(f.Path, "data/")
@@ -35,8 +42,8 @@ func world(t *testing.T, src string) *mcfn.VM {
 		files[ns+":"+path] = strings.Split(strings.TrimSuffix(string(f.Data), "\n"), "\n")
 	}
 	vm := mcfn.New(files)
-	if _, ok := files["demo:mms_gen/load"]; ok {
-		if _, _, err := vm.Run("demo:mms_gen/load"); err != nil {
+	if _, ok := files[ns+":mms_gen/load"]; ok {
+		if _, _, err := vm.Run(ns + ":mms_gen/load"); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -375,5 +382,25 @@ Function down(n: int): int {
 	}
 	if strings.Contains(got, "stack[-1].s1") {
 		t.Errorf("saved more than n:\n%s", got)
+	}
+}
+
+// TestExampleFunctions runs the function examples' demo functions.
+func TestExampleFunctions(t *testing.T) {
+	r, err := loadDir(t, "../../examples/functions-advanced").Analyze(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	vm := load(t, r, "adv")
+	call(t, vm, "adv:demo")
+	want := []string{
+		`"Hello, Steve!"`,
+		"fib(10) is 55",
+		"gcd(84, 36) is 12",
+		"2^10 is 1024",
+		`"Primes: 2 3 5 7 11 13 17 19 23 29 (10 in total)"`, // tellraw keeps its JSON text
+	}
+	if strings.Join(vm.Said, "\n") != strings.Join(want, "\n") {
+		t.Errorf("said:\n%s\nwant:\n%s", strings.Join(vm.Said, "\n"), strings.Join(want, "\n"))
 	}
 }

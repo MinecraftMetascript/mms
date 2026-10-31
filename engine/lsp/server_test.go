@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -292,5 +294,56 @@ func TestCodeActions(t *testing.T) {
 	edit := all[0].(map[string]any)["edit"].(map[string]any)["changes"].(map[string]any)[uri].([]any)[0].(map[string]any)
 	if want := "LootTable t = { pools = [{ rolls = 1, entries = [diamond] }] }\n"; edit["newText"] != want {
 		t.Errorf("fix all text = %q", edit["newText"])
+	}
+}
+
+// TestWorkspaceFiles checks that the server loads every project file from
+// the workspace, not just open ones, and resolves names across them.
+func TestWorkspaceFiles(t *testing.T) {
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, "terrain"), 0o755)
+	os.WriteFile(filepath.Join(dir, "mms.json"), []byte(`{"namespace": "demo"}`), 0o644)
+	os.WriteFile(filepath.Join(dir, "terrain", "base.mms"), []byte("DensityFunction base = 1\n"), 0o644)
+	os.WriteFile(filepath.Join(dir, "main.mms"), []byte("DensityFunction top = base * 2\n"), 0o644)
+	a, b := pathURI(filepath.Join(dir, "terrain", "base.mms")), pathURI(filepath.Join(dir, "main.mms"))
+
+	c := start(t)
+	c.result("initialize", map[string]any{"rootUri": pathURI(dir)})
+	c.notify("textDocument/didOpen", map[string]any{"textDocument": map[string]any{"uri": b, "languageId": "mms", "version": 1, "text": "DensityFunction top = base * 2\n"}})
+
+	// base is declared in a file that was never opened.
+	def := c.result("textDocument/definition", pos(b, 0, 23)).([]any)
+	if len(def) != 1 || def[0].(map[string]any)["uri"] != a {
+		t.Fatalf("definition = %v, want %s", def, a)
+	}
+	ren := c.result("textDocument/rename", map[string]any{"textDocument": map[string]any{"uri": b}, "position": map[string]any{"line": 0, "character": 23}, "newName": "ground"}).(map[string]any)
+	changes := ren["changes"].(map[string]any)
+	if len(changes) != 2 || changes[a] == nil || changes[b] == nil {
+		t.Errorf("rename changes = %v, want edits in both files", changes)
+	}
+}
+
+// TestURIs checks file URI handling, including Windows drives, which the
+// workspace scan and the client must spell the same way.
+func TestURIs(t *testing.T) {
+	for _, c := range []struct{ uri, path string }{
+		{"file:///home/me/a.mms", "/home/me/a.mms"},
+		{"file:///c%3A/Users/me/a.mms", filepath.FromSlash("c:/Users/me/a.mms")},
+		{"file:///C:/Users/me/a.mms", filepath.FromSlash("C:/Users/me/a.mms")},
+		{"mem:///a.mms", ""},
+	} {
+		if got := uriPath(c.uri); got != c.path {
+			t.Errorf("uriPath(%q) = %q, want %q", c.uri, got, c.path)
+		}
+	}
+	if got := pathURI("C:/Users/me/a.mms"); got != "file:///C:/Users/me/a.mms" {
+		t.Errorf("pathURI kept the drive as a host: %q", got)
+	}
+	// What VS Code sends and what the workspace scan builds become one key.
+	if a, b := canonURI("file:///c%3A/Users/me/a.mms"), pathURI(uriPath("file:///c%3A/Users/me/a.mms")); a != b {
+		t.Errorf("canonURI = %q, scan = %q", a, b)
+	}
+	if got := canonURI("mem:///a.mms"); got != "mem:///a.mms" {
+		t.Errorf("canonURI changed a mem URI: %q", got)
 	}
 }

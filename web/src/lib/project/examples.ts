@@ -1,7 +1,7 @@
 import type { ProjectData } from './project.svelte';
 
-// The repository's examples, bundled at build time.
-const raw = import.meta.glob('../../../../examples/*/*', {
+// The repository's examples, bundled at build time, with their subfolders.
+const raw = import.meta.glob('../../../../examples/**/*', {
 	query: '?raw',
 	import: 'default',
 	eager: true
@@ -16,9 +16,9 @@ export interface Example {
 export const examples: Example[] = (() => {
 	const byDir = new Map<string, { config?: string; files: { path: string; text: string }[] }>();
 	for (const [path, text] of Object.entries(raw)) {
-		const parts = path.split('/');
-		const dir = parts[parts.length - 2];
-		const name = parts[parts.length - 1];
+		// ../../../../examples/<dir>/<path inside the example>
+		const [dir, ...rest] = path.slice('../../../../examples/'.length).split('/');
+		const name = rest.join('/');
 		const e = byDir.get(dir) ?? { files: [] };
 		if (name === 'mms.json') e.config = text;
 		else if (name.endsWith('.mms')) e.files.push({ path: name, text });
@@ -27,6 +27,8 @@ export const examples: Example[] = (() => {
 	return [...byDir.entries()]
 		.sort(([a], [b]) => a.localeCompare(b))
 		.map(([id, e]) => {
+			// Top-level files first, then each folder's, alphabetically.
+			e.files.sort((a, b) => a.path.split('/').length - b.path.split('/').length || a.path.localeCompare(b.path));
 			const cfg = e.config ? JSON.parse(e.config) : {};
 			return {
 				id,

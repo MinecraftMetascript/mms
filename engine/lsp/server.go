@@ -284,8 +284,22 @@ type textDocumentItem struct {
 	Text string `json:"text"`
 }
 
+func (d *textDocumentItem) UnmarshalJSON(b []byte) error {
+	type plain textDocumentItem
+	err := json.Unmarshal(b, (*plain)(d))
+	d.URI = canonURI(d.URI)
+	return err
+}
+
 type docID struct {
 	URI string `json:"uri"`
+}
+
+func (d *docID) UnmarshalJSON(b []byte) error {
+	type plain docID
+	err := json.Unmarshal(b, (*plain)(d))
+	d.URI = canonURI(d.URI)
+	return err
 }
 
 func (s *Server) didOpen(ctx context.Context, p struct {
@@ -350,6 +364,7 @@ func (s *Server) didChangeWatched(ctx context.Context, p struct {
 	} `json:"changes"`
 }) (any, *respError) {
 	for _, c := range p.Changes {
+		c.URI = canonURI(c.URI)
 		if s.open[c.URI] {
 			continue
 		}
@@ -745,14 +760,38 @@ func (s *Server) output(_ context.Context, _ struct{}) (any, *respError) {
 
 // ---- URIs
 
+// uriPath turns a file URI into a path. A Windows drive keeps its letter:
+// file:///c%3A/x is c:/x, not /c:/x.
 func uriPath(uri string) string {
 	u, err := url.Parse(uri)
 	if err != nil || u.Scheme != "file" {
 		return ""
 	}
-	return filepath.FromSlash(u.Path)
+	p := u.Path
+	if len(p) >= 3 && p[0] == '/' && p[2] == ':' && isLetter(p[1]) {
+		p = p[1:]
+	}
+	return filepath.FromSlash(p)
 }
 
+// pathURI turns a path into a file URI. A Windows path gets a leading
+// slash, so its drive is part of the path rather than the host.
 func pathURI(path string) string {
-	return (&url.URL{Scheme: "file", Path: filepath.ToSlash(path)}).String()
+	p := filepath.ToSlash(path)
+	if !strings.HasPrefix(p, "/") {
+		p = "/" + p
+	}
+	return (&url.URL{Scheme: "file", Path: p}).String()
 }
+
+// canonURI spells a file URI the way pathURI does, so a file the client
+// opens and the same file found on disk share one key. Other schemes,
+// such as the browser editor's mem:, pass through.
+func canonURI(uri string) string {
+	if p := uriPath(uri); p != "" {
+		return pathURI(p)
+	}
+	return uri
+}
+
+func isLetter(c byte) bool { return 'a' <= c && c <= 'z' || 'A' <= c && c <= 'Z' }

@@ -1,0 +1,206 @@
+=== data/adv/function/demo.mcfunction
+data modify storage adv:mms l."greet".name set value "Steve"
+function adv:greet
+scoreboard players set #fib.n mms.adv 10
+execute store result score #demo._t0 mms.adv run function adv:fib
+execute store result storage adv:mms m.a0 int 1 run scoreboard players get #demo._t0 mms.adv
+function adv:demo/_macro0 with storage adv:mms m
+scoreboard players set #gcd.a mms.adv 84
+scoreboard players set #gcd.b mms.adv 36
+execute store result score #demo._t1 mms.adv run function adv:gcd
+execute store result storage adv:mms m.a0 int 1 run scoreboard players get #demo._t1 mms.adv
+function adv:demo/_macro1 with storage adv:mms m
+scoreboard players set #pow.a mms.adv 2
+scoreboard players set #pow.b mms.adv 10
+execute store result score #demo._t2 mms.adv run function adv:pow
+execute store result storage adv:mms m.a0 int 1 run scoreboard players get #demo._t2 mms.adv
+function adv:demo/_macro2 with storage adv:mms m
+scoreboard players set #primes_up_to.max mms.adv 30
+function adv:primes_up_to
+=== data/adv/function/demo/_macro0.mcfunction
+$say fib(10) is $(a0)
+=== data/adv/function/demo/_macro1.mcfunction
+$say gcd(84, 36) is $(a0)
+=== data/adv/function/demo/_macro2.mcfunction
+$say 2^10 is $(a0)
+=== data/adv/function/fib.mcfunction
+execute if score #fib.n mms.adv matches ..1 run return run scoreboard players get #fib.n mms.adv
+scoreboard players operation #fib._t1 mms.adv = #fib.n mms.adv
+scoreboard players remove #fib._t1 mms.adv 1
+data modify storage adv:mms stack append value {}
+execute store result storage adv:mms stack[-1].s0 int 1 run scoreboard players get #fib.n mms.adv
+scoreboard players operation #fib.n mms.adv = #fib._t1 mms.adv
+execute store result score #fib._t2 mms.adv run function adv:fib
+execute store result score #fib.n mms.adv run data get storage adv:mms stack[-1].s0
+data remove storage adv:mms stack[-1]
+scoreboard players operation #fib._t4 mms.adv = #fib.n mms.adv
+scoreboard players remove #fib._t4 mms.adv 2
+data modify storage adv:mms stack append value {}
+execute store result storage adv:mms stack[-1].s0 int 1 run scoreboard players get #fib._t2 mms.adv
+scoreboard players operation #fib.n mms.adv = #fib._t4 mms.adv
+execute store result score #fib._t5 mms.adv run function adv:fib
+execute store result score #fib._t2 mms.adv run data get storage adv:mms stack[-1].s0
+data remove storage adv:mms stack[-1]
+scoreboard players operation #fib._t6 mms.adv = #fib._t2 mms.adv
+scoreboard players operation #fib._t6 mms.adv += #fib._t5 mms.adv
+return run scoreboard players get #fib._t6 mms.adv
+=== data/adv/function/gcd.mcfunction
+function adv:gcd/_while0
+return run scoreboard players get #gcd.a mms.adv
+=== data/adv/function/gcd/_while0.mcfunction
+execute if score #gcd.b mms.adv matches 0 run return 0
+scoreboard players operation #gcd.t mms.adv = #gcd.b mms.adv
+scoreboard players operation #gcd._t0 mms.adv = #gcd.a mms.adv
+scoreboard players operation #gcd._t0 mms.adv %= #gcd.b mms.adv
+scoreboard players operation #gcd.b mms.adv = #gcd._t0 mms.adv
+scoreboard players operation #gcd.a mms.adv = #gcd.t mms.adv
+return run function adv:gcd/_while0
+=== data/adv/function/greet.mcfunction
+data modify storage adv:mms m.a1 set from storage adv:mms l."greet".name
+function adv:greet/_macro0 with storage adv:mms m
+data modify storage adv:mms l."greet".greeting set from storage adv:mms l."greet"._s0
+data modify storage adv:mms l."greet"._s1 set from storage adv:mms l."greet".name
+execute store success score #greet._t2 mms.adv run data modify storage adv:mms l."greet"._s1 set value "Notch"
+scoreboard players set #greet._f1 mms.adv 0
+execute if score #greet._t2 mms.adv matches 0 run scoreboard players set #greet._f1 mms.adv 1
+execute if score #greet._f1 mms.adv matches 1 run function adv:greet/_if2
+execute unless score #greet._f1 mms.adv matches 1 run function adv:greet/_else4
+data modify storage adv:mms m.a0 set from storage adv:mms l."greet".greeting
+function adv:greet/_macro6 with storage adv:mms m
+=== data/adv/function/greet/_else4.mcfunction
+data modify storage adv:mms m.a0 set from storage adv:mms l."greet".greeting
+function adv:greet/_macro5 with storage adv:mms m
+data modify storage adv:mms l."greet".greeting set from storage adv:mms l."greet"._s4
+=== data/adv/function/greet/_if2.mcfunction
+data modify storage adv:mms m.a0 set from storage adv:mms l."greet".greeting
+function adv:greet/_macro3 with storage adv:mms m
+data modify storage adv:mms l."greet".greeting set from storage adv:mms l."greet"._s3
+=== data/adv/function/greet/_macro0.mcfunction
+$data modify storage adv:mms l."greet"._s0 set value "Hello, $(a1)"
+=== data/adv/function/greet/_macro3.mcfunction
+$data modify storage adv:mms l."greet"._s3 set value "$(a0). Thanks for the game!"
+=== data/adv/function/greet/_macro5.mcfunction
+$data modify storage adv:mms l."greet"._s4 set value "$(a0)!"
+=== data/adv/function/greet/_macro6.mcfunction
+$tellraw @a "$(a0)"
+=== data/adv/function/is_prime.mcfunction
+execute if score #is_prime.n mms.adv matches ..1 run return 0
+scoreboard players set #is_prime.d mms.adv 2
+scoreboard players set #is_prime.prime mms.adv 1
+function adv:is_prime/_while0
+return run scoreboard players get #is_prime.prime mms.adv
+=== data/adv/function/is_prime/_if1.mcfunction
+scoreboard players set #is_prime.prime mms.adv 0
+scoreboard players set #cf mms.adv 1
+return 0
+=== data/adv/function/is_prime/_while0.mcfunction
+scoreboard players operation #is_prime._t0 mms.adv = #is_prime.n mms.adv
+scoreboard players operation #is_prime._t0 mms.adv /= #is_prime.d mms.adv
+execute unless score #is_prime.d mms.adv <= #is_prime._t0 mms.adv run return 0
+scoreboard players operation #is_prime._t1 mms.adv = #is_prime.n mms.adv
+scoreboard players operation #is_prime._t1 mms.adv %= #is_prime.d mms.adv
+execute if score #is_prime._t1 mms.adv matches 0 run function adv:is_prime/_if1
+execute if score #cf mms.adv matches 1 run return run scoreboard players set #cf mms.adv 0
+scoreboard players add #is_prime.d mms.adv 1
+return run function adv:is_prime/_while0
+=== data/adv/function/mms_gen/load.mcfunction
+scoreboard objectives add mms.adv dummy
+scoreboard players set #cf mms.adv 0
+scoreboard players set #c2 mms.adv 2
+execute unless data storage adv:mms g.last_report run data modify storage adv:mms g.last_report set value ""
+=== data/adv/function/mms_gen/ret.mcfunction
+scoreboard players set #cf mms.adv 0
+return run scoreboard players get #rv mms.adv
+=== data/adv/function/pow.mcfunction
+execute if score #pow.b mms.adv matches 0 run return 1
+scoreboard players operation #pow._t0 mms.adv = #pow.a mms.adv
+scoreboard players operation #pow._t2 mms.adv = #pow.b mms.adv
+scoreboard players operation #pow._t2 mms.adv /= #c2 mms.adv
+data modify storage adv:mms stack append value {}
+execute store result storage adv:mms stack[-1].s0 int 1 run scoreboard players get #pow.a mms.adv
+execute store result storage adv:mms stack[-1].s1 int 1 run scoreboard players get #pow.b mms.adv
+scoreboard players operation #pow.a mms.adv = #pow._t0 mms.adv
+scoreboard players operation #pow.b mms.adv = #pow._t2 mms.adv
+execute store result score #pow._t3 mms.adv run function adv:pow
+execute store result score #pow.a mms.adv run data get storage adv:mms stack[-1].s0
+execute store result score #pow.b mms.adv run data get storage adv:mms stack[-1].s1
+data remove storage adv:mms stack[-1]
+scoreboard players operation #pow.half mms.adv = #pow._t3 mms.adv
+scoreboard players operation #pow._t4 mms.adv = #pow.b mms.adv
+scoreboard players operation #pow._t4 mms.adv %= #c2 mms.adv
+execute if score #pow._t4 mms.adv matches 0 run function adv:pow/_if0
+execute if score #cf mms.adv matches 3 run return run function adv:mms_gen/ret
+scoreboard players operation #pow._t7 mms.adv = #pow.half mms.adv
+scoreboard players operation #pow._t7 mms.adv *= #pow.half mms.adv
+scoreboard players operation #pow._t7 mms.adv *= #pow.a mms.adv
+return run scoreboard players get #pow._t7 mms.adv
+=== data/adv/function/pow/_if0.mcfunction
+scoreboard players operation #pow._t5 mms.adv = #pow.half mms.adv
+scoreboard players operation #pow._t5 mms.adv *= #pow.half mms.adv
+scoreboard players operation #rv mms.adv = #pow._t5 mms.adv
+scoreboard players set #cf mms.adv 3
+return 0
+=== data/adv/function/primes_up_to.mcfunction
+data modify storage adv:mms l."primes_up_to".line set value "Primes:"
+scoreboard players set #primes_up_to.count mms.adv 0
+scoreboard players set #primes_up_to.n mms.adv 2
+scoreboard players operation #primes_up_to._t0 mms.adv = #primes_up_to.max mms.adv
+function adv:primes_up_to/_while0
+data modify storage adv:mms m.a0 set from storage adv:mms l."primes_up_to".line
+function adv:primes_up_to/_macro5 with storage adv:mms m
+data modify storage adv:mms m.a0 set from storage adv:mms l."primes_up_to"._s4
+execute store result storage adv:mms m.a1 int 1 run scoreboard players get #primes_up_to.count mms.adv
+function adv:primes_up_to/_macro6 with storage adv:mms m
+data modify storage adv:mms m.a0 set from storage adv:mms l."primes_up_to"._s5
+function adv:primes_up_to/_macro7 with storage adv:mms m
+data modify storage adv:mms g.last_report set from storage adv:mms l."primes_up_to"._s6
+data modify storage adv:mms m.a0 set from storage adv:mms g.last_report
+function adv:primes_up_to/_macro8 with storage adv:mms m
+=== data/adv/function/primes_up_to/_continue2.mcfunction
+scoreboard players set #cf mms.adv 0
+scoreboard players add #primes_up_to.n mms.adv 1
+return run function adv:primes_up_to/_while0
+=== data/adv/function/primes_up_to/_if1.mcfunction
+scoreboard players set #cf mms.adv 2
+return 0
+=== data/adv/function/primes_up_to/_macro3.mcfunction
+$data modify storage adv:mms l."primes_up_to"._s2 set value " $(a1)"
+=== data/adv/function/primes_up_to/_macro4.mcfunction
+$data modify storage adv:mms l."primes_up_to"._s3 set value "$(a0)$(a1)"
+=== data/adv/function/primes_up_to/_macro5.mcfunction
+$data modify storage adv:mms l."primes_up_to"._s4 set value "$(a0) ("
+=== data/adv/function/primes_up_to/_macro6.mcfunction
+$data modify storage adv:mms l."primes_up_to"._s5 set value "$(a0)$(a1)"
+=== data/adv/function/primes_up_to/_macro7.mcfunction
+$data modify storage adv:mms l."primes_up_to"._s6 set value "$(a0) in total)"
+=== data/adv/function/primes_up_to/_macro8.mcfunction
+$tellraw @a "$(a0)"
+=== data/adv/function/primes_up_to/_while0.mcfunction
+execute unless score #primes_up_to.n mms.adv <= #primes_up_to._t0 mms.adv run return 0
+scoreboard players operation #is_prime.n mms.adv = #primes_up_to.n mms.adv
+execute store result score #primes_up_to._t1 mms.adv run function adv:is_prime
+execute unless score #primes_up_to._t1 mms.adv matches 1 run function adv:primes_up_to/_if1
+execute if score #cf mms.adv matches 2 run return run function adv:primes_up_to/_continue2
+execute store result storage adv:mms m.a1 int 1 run scoreboard players get #primes_up_to.n mms.adv
+function adv:primes_up_to/_macro3 with storage adv:mms m
+data modify storage adv:mms m.a0 set from storage adv:mms l."primes_up_to".line
+data modify storage adv:mms m.a1 set from storage adv:mms l."primes_up_to"._s2
+function adv:primes_up_to/_macro4 with storage adv:mms m
+data modify storage adv:mms l."primes_up_to".line set from storage adv:mms l."primes_up_to"._s3
+scoreboard players add #primes_up_to.count mms.adv 1
+scoreboard players add #primes_up_to.n mms.adv 1
+return run function adv:primes_up_to/_while0
+=== data/minecraft/tags/function/load.json
+{
+  "values": [
+    "adv:mms_gen/load"
+  ]
+}
+=== pack.mcmeta
+{
+  "pack": {
+    "description": "Functions: parameters, return values, recursion, loops and strings",
+    "min_format": 121,
+    "max_format": 121
+  }
+}
