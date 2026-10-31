@@ -1,0 +1,13 @@
+Decl LootTable x
+  Block
+    Field pools
+      List
+        Call
+          Ident Pool
+          Number 1
+Decl Noise n
+  Call
+    Ident Noise
+    Number 1
+! 24-25 '[' is never closed
+! 12-13 '{' is never closed

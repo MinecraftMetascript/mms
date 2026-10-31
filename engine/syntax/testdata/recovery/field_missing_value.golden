@@ -1,0 +1,10 @@
+Decl LootTable x
+  Block
+    Field pools
+      List
+        Call
+          Ident Pool
+          Number 1
+    Field rolls
+      Bad 44-44
+! 44-45 cannot parse '}'

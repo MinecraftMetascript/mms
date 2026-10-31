@@ -1,0 +1,12 @@
+Decl Function f()
+  Block
+    Let x
+      Bad 28-28
+    Command "say hi"
+    If
+      Binary >
+        Ident x
+        Bad 46-46
+      Block
+! 28-35 unexpected '/say hi' expecting {'true', 'false', RESLOC, IDENT, NUMBER, STRING, '..', '{', '(', '[', '+', '-', '!', '#', '@', '~', '^'}
+! 46-47 cannot parse ')'

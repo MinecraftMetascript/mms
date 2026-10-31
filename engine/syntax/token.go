@@ -1,0 +1,65 @@
+package syntax
+
+import (
+	"github.com/minecraftmetascript/mms/engine/syntax/parser"
+)
+
+// TokenKind is the lexer token type (parser.MMSLexer* constants).
+type TokenKind int
+
+// Token is a lexed token with its text and span.
+type Token struct {
+	Kind   TokenKind
+	Text   string
+	Sp     Span
+	Hidden bool // whitespace and comments
+	// Synthetic tokens were inserted by recovery (an auto-closed bracket)
+	// and do not appear in the source.
+	Synthetic bool
+}
+
+func (t Token) IsComment() bool {
+	switch t.Kind {
+	case parser.MMSLexerLINE_COMMENT, parser.MMSLexerBLOCK_COMMENT, parser.MMSLexerDOC_COMMENT, parser.MMSLexerUNTERMINATED_COMMENT:
+		return true
+	}
+	return false
+}
+
+func (t Token) IsNewline() bool { return t.Kind == parser.MMSLexerNEWLINE }
+
+// Severity of a diagnostic, matching LSP's numbering.
+type Severity int
+
+const (
+	SeverityError Severity = iota + 1
+	SeverityWarning
+	SeverityInfo
+	SeverityHint
+)
+
+// Diagnostic is a problem found while parsing.
+type Diagnostic struct {
+	Code     string
+	Severity Severity
+	Message  string
+	Sp       Span
+}
+
+// TokenAt returns the index of the token containing offset off, preferring
+// the token that ends at off (the one just typed) over the one starting
+// there. It returns -1 for an empty file.
+func (f *File) TokenAt(off int) int {
+	best := -1
+	for i, t := range f.Tokens {
+		if t.Sp.Start <= off && off <= t.Sp.End {
+			if best == -1 || (t.Sp.End == off && !t.Hidden) {
+				best = i
+			}
+			if t.Sp.Start < off && off < t.Sp.End {
+				return i
+			}
+		}
+	}
+	return best
+}

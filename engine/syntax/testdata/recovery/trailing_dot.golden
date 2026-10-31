@@ -1,0 +1,6 @@
+Decl Noise ridges
+  Member .<missing>
+    Call
+      Ident Noise
+      Unary -
+        Number 7

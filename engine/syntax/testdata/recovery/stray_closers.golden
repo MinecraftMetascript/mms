@@ -1,0 +1,9 @@
+Decl Noise a
+  Call
+    Ident Noise
+    Number 1
+Decl Noise b
+  Call
+    Ident Noise
+    Number 2
+! 19-20 unexpected '}' expecting {end of file, IDENT}
