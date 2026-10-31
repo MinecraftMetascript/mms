@@ -19,6 +19,7 @@ import {
 	type MaterialRule
 } from 'deepslate';
 import { biomeColor, blockColor, CAVE, SKY, VOID, type Rgb } from './colors';
+import { speedUp } from './fastDensity';
 import { vanillaSummary, type PreviewFile, type PreviewRequest, type PreviewResponse } from './protocol';
 
 // Renders previews with Deepslate. User files are registered under their
@@ -238,6 +239,18 @@ function buildChunk(t: Terrain, chunkX: number): Uint16Array {
 
 // ---- Isometric terrain -------------------------------------------------
 
+/** Palette indices by block state object, so reading a chunk back doesn't build a name per block. */
+const stateIndices = new Map<BlockState, number>();
+function stateIndex(state: BlockState): number {
+	let i = stateIndices.get(state);
+	if (i === undefined) {
+		if (stateIndices.size > 4096) stateIndices.clear();
+		i = indexOf(state.getName().toString());
+		stateIndices.set(state, i);
+	}
+	return i;
+}
+
 /** Filled chunks (terrain shape before surface rules), most recently used last. */
 const fills = new Map<string, { chunk: Chunk; noiseChunk: unknown }>();
 const MAX_FILLS = 64;
@@ -328,7 +341,7 @@ function buildChunk3D(t: Terrain, cx: number, cz: number): Uint16Array<ArrayBuff
 			for (let z = 0; z < 16; z++) {
 				const base = (x * 16 + z) * height;
 				for (let y = 0; y < height; y++) {
-					out[base + y] = indexOf(chunk.getBlockState(BlockPos.create(x0 + x, minY + y, z0 + z)).getName().toString());
+					out[base + y] = stateIndex(chunk.getBlockState(BlockPos.create(x0 + x, minY + y, z0 + z)));
 				}
 			}
 		}
@@ -1088,7 +1101,7 @@ async function terrainOf(req: RenderRequest): Promise<{ terrain: Terrain; key: s
 		req.kind === 'dimension'
 			? await withVanilla((): Terrain => {
 					const dim = readDimension(req.id);
-					const rs = new RandomState(dim.settings, seed);
+					const rs = speedUp(new RandomState(dim.settings, seed));
 					return {
 						settings: dim.settings,
 						rule: dim.settings.materialRule,
@@ -1101,7 +1114,7 @@ async function terrainOf(req: RenderRequest): Promise<{ terrain: Terrain; key: s
 					const settingsId = req.kind === 'material_rule' ? Identifier.parse(req.options.terrain || 'minecraft:overworld') : id;
 					const settings = WorldgenRegistries.NOISE_SETTINGS.getOrThrow(settingsId);
 					const rule = req.kind === 'material_rule' ? WorldgenRegistries.MATERIAL_RULE.getOrThrow(id) : settings.materialRule;
-					const rs = new RandomState(settings, seed);
+					const rs = speedUp(new RandomState(settings, seed));
 					const shape = [shapeVersion, req.seed, 'noise_settings', settingsId].join('|');
 					return { settings, rule, rs, biomeAt: () => fixedBiome, shape };
 				});
@@ -1187,7 +1200,7 @@ async function render(req: RenderRequest): Promise<PreviewResponse> {
 	// Noise settings, density mode: the terrain's final density, side view at z = 0.
 	const { settings, router } = await withVanilla(() => {
 		const settings = WorldgenRegistries.NOISE_SETTINGS.getOrThrow(id);
-		const rs = new RandomState(settings, seed);
+		const rs = speedUp(new RandomState(settings, seed));
 		return { settings, router: rs.router as NoiseRouter };
 	});
 	const minY = settings.noise.minY;
