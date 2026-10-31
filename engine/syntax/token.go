@@ -63,3 +63,39 @@ func (f *File) TokenAt(off int) int {
 	}
 	return best
 }
+
+// LineCol returns the 1-based line and column (in runes) of an offset.
+func (f *File) LineCol(off int) (line, col int) {
+	line, col = 1, 1
+	for i, r := range f.Src {
+		if i >= off {
+			break
+		}
+		if r == '\n' {
+			line++
+			col = 1
+		} else {
+			col++
+		}
+	}
+	return line, col
+}
+
+// LineText returns the text of the 1-based line.
+func (f *File) LineText(line int) string {
+	n := 1
+	start := 0
+	for i, r := range f.Src {
+		if r == '\n' {
+			if n == line {
+				return string(f.Src[start:i])
+			}
+			n++
+			start = i + 1
+		}
+	}
+	if n == line {
+		return string(f.Src[start:])
+	}
+	return ""
+}

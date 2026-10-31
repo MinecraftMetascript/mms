@@ -1,0 +1,285 @@
+=== data/badlands_demo/worldgen/material_condition/in_badlands.json
+{
+  "type": "minecraft:biome",
+  "biome_is": [
+    "minecraft:badlands",
+    "minecraft:eroded_badlands",
+    "minecraft:wooded_badlands"
+  ]
+}
+=== data/badlands_demo/worldgen/material_rule/badlands.json
+{
+  "type": "minecraft:condition",
+  "if_true": "badlands_demo:in_badlands",
+  "then_run": {
+    "type": "minecraft:sequence",
+    "sequence": [
+      {
+        "type": "minecraft:condition",
+        "if_true": {
+          "type": "minecraft:y_above",
+          "anchor": {
+            "absolute": 63
+          },
+          "surface_depth_multiplier": 0,
+          "add_stone_depth": false
+        },
+        "then_run": {
+          "type": "minecraft:sequence",
+          "sequence": [
+            "badlands_demo:sky_terracotta",
+            "badlands_demo:terracotta_bands",
+            "badlands_demo:surface_sands",
+            "badlands_demo:non_hole_orange_terracotta",
+            "badlands_demo:white_terracotta",
+            "badlands_demo:stone_and_gravel"
+          ]
+        }
+      },
+      {
+        "type": "minecraft:condition",
+        "if_true": {
+          "type": "minecraft:y_above",
+          "anchor": {
+            "absolute": 63
+          },
+          "surface_depth_multiplier": -1,
+          "add_stone_depth": true
+        },
+        "then_run": {
+          "type": "minecraft:sequence",
+          "sequence": [
+            "badlands_demo:orange_terracotta_edge",
+            {
+              "type": "minecraft:bandlands"
+            }
+          ]
+        }
+      },
+      {
+        "type": "minecraft:condition",
+        "if_true": {
+          "type": "minecraft:stone_depth",
+          "offset": 0,
+          "surface_type": "floor",
+          "add_surface_depth": false,
+          "secondary_depth_range": 0
+        },
+        "then_run": "badlands_demo:white_terracotta"
+      }
+    ]
+  }
+}
+=== data/badlands_demo/worldgen/material_rule/non_hole_orange_terracotta.json
+{
+  "type": "minecraft:condition",
+  "if_true": {
+    "type": "minecraft:not",
+    "invert": {
+      "type": "minecraft:hole"
+    }
+  },
+  "then_run": {
+    "type": "minecraft:block",
+    "result_state": "minecraft:orange_terracotta"
+  }
+}
+=== data/badlands_demo/worldgen/material_rule/orange_terracotta.json
+{
+  "type": "minecraft:condition",
+  "if_true": {
+    "type": "minecraft:y_above",
+    "anchor": {
+      "absolute": 63
+    },
+    "surface_depth_multiplier": 0,
+    "add_stone_depth": false
+  },
+  "then_run": {
+    "type": "minecraft:block",
+    "result_state": "minecraft:orange_terracotta"
+  }
+}
+=== data/badlands_demo/worldgen/material_rule/orange_terracotta_edge.json
+{
+  "type": "minecraft:condition",
+  "if_true": {
+    "type": "minecraft:y_above",
+    "anchor": {
+      "absolute": 63
+    },
+    "surface_depth_multiplier": 0,
+    "add_stone_depth": false
+  },
+  "then_run": {
+    "type": "minecraft:condition",
+    "if_true": {
+      "type": "minecraft:not",
+      "invert": {
+        "type": "minecraft:y_above",
+        "anchor": {
+          "absolute": 74
+        },
+        "surface_depth_multiplier": 1,
+        "add_stone_depth": true
+      }
+    },
+    "then_run": {
+      "type": "minecraft:block",
+      "result_state": "minecraft:orange_terracotta"
+    }
+  }
+}
+=== data/badlands_demo/worldgen/material_rule/sky_terracotta.json
+{
+  "type": "minecraft:condition",
+  "if_true": {
+    "type": "minecraft:above_preliminary_surface"
+  },
+  "then_run": {
+    "type": "minecraft:block",
+    "result_state": "minecraft:stone"
+  }
+}
+=== data/badlands_demo/worldgen/material_rule/stone_and_gravel.json
+{
+  "type": "minecraft:sequence",
+  "sequence": [
+    {
+      "type": "minecraft:condition",
+      "if_true": {
+        "type": "minecraft:stone_depth",
+        "offset": 0,
+        "surface_type": "ceiling",
+        "add_surface_depth": false,
+        "secondary_depth_range": 0
+      },
+      "then_run": {
+        "type": "minecraft:block",
+        "result_state": "minecraft:stone"
+      }
+    },
+    {
+      "type": "minecraft:block",
+      "result_state": "minecraft:gravel"
+    }
+  ]
+}
+=== data/badlands_demo/worldgen/material_rule/surface_sands.json
+{
+  "type": "minecraft:condition",
+  "if_true": {
+    "type": "minecraft:water",
+    "offset": -1,
+    "surface_depth_multiplier": 0,
+    "add_stone_depth": false
+  },
+  "then_run": {
+    "type": "minecraft:sequence",
+    "sequence": [
+      {
+        "type": "minecraft:condition",
+        "if_true": {
+          "type": "minecraft:stone_depth",
+          "offset": 0,
+          "surface_type": "ceiling",
+          "add_surface_depth": false,
+          "secondary_depth_range": 0
+        },
+        "then_run": {
+          "type": "minecraft:block",
+          "result_state": "minecraft:red_sandstone"
+        }
+      },
+      {
+        "type": "minecraft:block",
+        "result_state": "minecraft:red_sand"
+      }
+    ]
+  }
+}
+=== data/badlands_demo/worldgen/material_rule/terracotta_bands.json
+{
+  "type": "minecraft:condition",
+  "if_true": {
+    "type": "minecraft:stone_depth",
+    "offset": 0,
+    "surface_type": "floor",
+    "add_surface_depth": false,
+    "secondary_depth_range": 0
+  },
+  "then_run": {
+    "type": "minecraft:sequence",
+    "sequence": [
+      {
+        "type": "minecraft:sequence",
+        "sequence": [
+          {
+            "type": "minecraft:condition",
+            "if_true": {
+              "type": "minecraft:noise_threshold",
+              "noise": "minecraft:surface",
+              "min_threshold": -0.909,
+              "max_threshold": -0.5454
+            },
+            "then_run": {
+              "type": "minecraft:block",
+              "result_state": "minecraft:terracotta"
+            }
+          },
+          {
+            "type": "minecraft:condition",
+            "if_true": {
+              "type": "minecraft:noise_threshold",
+              "noise": "minecraft:surface",
+              "min_threshold": -0.1818,
+              "max_threshold": 0.1818
+            },
+            "then_run": {
+              "type": "minecraft:block",
+              "result_state": "minecraft:terracotta"
+            }
+          },
+          {
+            "type": "minecraft:condition",
+            "if_true": {
+              "type": "minecraft:noise_threshold",
+              "noise": "minecraft:surface",
+              "min_threshold": 0.5454,
+              "max_threshold": 0.909
+            },
+            "then_run": {
+              "type": "minecraft:block",
+              "result_state": "minecraft:terracotta"
+            }
+          }
+        ]
+      },
+      {
+        "type": "minecraft:bandlands"
+      }
+    ]
+  }
+}
+=== data/badlands_demo/worldgen/material_rule/white_terracotta.json
+{
+  "type": "minecraft:condition",
+  "if_true": {
+    "type": "minecraft:water",
+    "offset": -6,
+    "surface_depth_multiplier": -1,
+    "add_stone_depth": true
+  },
+  "then_run": {
+    "type": "minecraft:block",
+    "result_state": "minecraft:white_terracotta"
+  }
+}
+=== pack.mcmeta
+{
+  "pack": {
+    "description": "Port of the old overworld badlands surface rules",
+    "min_format": 121,
+    "max_format": 121
+  }
+}

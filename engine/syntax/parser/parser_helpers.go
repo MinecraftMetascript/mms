@@ -28,3 +28,19 @@ func StartsDeclaration(ts antlr.TokenStream, k int) bool {
 	}
 	return false
 }
+
+// onNewLine reports whether the next token starts a later line than the
+// previous one. List items may be separated by a newline instead of a
+// comma.
+func (p *MMSParser) onNewLine() bool {
+	ts := p.GetTokenStream()
+	next, prev := ts.LT(1), ts.LT(-1)
+	if next == nil || prev == nil || next.GetTokenType() == antlr.TokenEOF {
+		return false
+	}
+	switch next.GetTokenType() {
+	case MMSLexerRBRACK, MMSLexerCOMMA:
+		return false
+	}
+	return next.GetLine() > prev.GetLine()
+}

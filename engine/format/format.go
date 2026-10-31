@@ -497,14 +497,15 @@ func (p *printer) item(n syntax.Node, body func() doc) item {
 	return it
 }
 
-// listBreaks: a list of objects or of calls with blocks reads better one
-// per line, so it always breaks.
+// listBreaks: a list of objects or of calls with blocks (such as surface
+// rules) reads better one per line, so it always breaks.
 func (p *printer) listBreaks(l *syntax.List) bool {
 	if len(l.Elems) < 2 {
 		return false
 	}
 	for _, x := range l.Elems {
-		if _, ok := x.(*syntax.Object); ok {
+		switch x.(type) {
+		case *syntax.Object, *syntax.Trailing:
 			return true
 		}
 	}

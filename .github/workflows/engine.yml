@@ -19,6 +19,8 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: engine/go.mod
+      - name: gofmt
+        run: test -z "$(gofmt -l . | grep -v syntax/parser)"
       # ANTLR's generated parser trips vet's unreachable-code check.
       - run: go vet $(go list ./... | grep -v /syntax/parser)
       - run: go test ./...
@@ -48,3 +50,20 @@ jobs:
       - run: ./gen.sh
         working-directory: engine/syntax
       - run: git diff --exit-code -- syntax/parser
+
+  vanilla:
+    # Every vanilla 26.3 data file must validate against the spec pack's
+    # types; this tests the type model against ground truth.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: engine/go.mod
+      - name: Fetch vanilla 26.3 data (mcmeta 26.3-data)
+        run: |
+          git init -q "$RUNNER_TEMP/mcmeta"
+          cd "$RUNNER_TEMP/mcmeta"
+          git fetch -q --depth 1 https://github.com/misode/mcmeta.git 538b2b167248c648b2198f2c0d56eced10dfc0cf
+          git checkout -q FETCH_HEAD
+      - run: MMS_VANILLA="$RUNNER_TEMP/mcmeta" go test ./sema -run TestVanillaValidates -v

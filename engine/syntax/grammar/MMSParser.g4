@@ -97,6 +97,6 @@ primary
     | AT IDENT                                           # selector
     | ((TILDE | CARET) (MINUS? NUMBER)?)+                # coordinate
     | LPAREN expr RPAREN                                 # parenExpr
-    | LBRACK (expr (COMMA expr)* COMMA?)? RBRACK         # listLit
+    | LBRACK (expr ((COMMA | {p.onNewLine()}?) expr)* COMMA?)? RBRACK # listLit
     | block                                              # objectLit
     ;

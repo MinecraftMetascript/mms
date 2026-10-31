@@ -1,0 +1,777 @@
+package sema
+
+import (
+	"fmt"
+	"math"
+	"strconv"
+	"strings"
+
+	"github.com/minecraftmetascript/mms/engine/jsonv"
+	"github.com/minecraftmetascript/mms/engine/spec"
+	"github.com/minecraftmetascript/mms/engine/syntax"
+)
+
+// Info is what the checker learned about one node, for editor features.
+type Info struct {
+	Type     tview   // the type the position expects
+	Symbol   *Symbol // the declaration an id resolved to
+	ID       string  // the id an identifier resolved to
+	Field    *field  // the field a key or named argument names
+	Fields   []field // for object bodies and calls: every field in scope
+	Disp     *dispInfo
+	Callable *Callable
+}
+
+// Callable is a resolved call: which struct (and dispatch case) it builds.
+type Callable struct {
+	Name   string // as written
+	Case   string // dispatch key, "" for a plain struct
+	Struct tview
+	Fields []field
+	Disp   *dispInfo
+	Ov     *overlay
+}
+
+// Checker checks expressions against expected types and lowers them to
+// JSON in the same walk. One Checker serves one declaration.
+type Checker struct {
+	Pack  *spec.Pack
+	Kinds *Kinds
+	Syms  *Table
+	NS    string
+	Diags []syntax.Diagnostic
+	// Info is filled unless the checker is running a trial for union
+	// narrowing.
+	Info map[syntax.Node]*Info
+
+	trial  bool
+	errs   int
+	depth  int
+	memo   map[memoKey]int
+	parent *Checker
+}
+
+type memoKey struct {
+	n syntax.Node
+	t *spec.Type
+	e *env
+}
+
+// NewChecker returns a checker for declarations in namespace ns.
+func NewChecker(p *spec.Pack, kinds *Kinds, syms *Table, ns string) *Checker {
+	return &Checker{Pack: p, Kinds: kinds, Syms: syms, NS: ns, Info: map[syntax.Node]*Info{}, memo: map[memoKey]int{}}
+}
+
+func (c *Checker) errorf(code string, sp syntax.Span, format string, args ...any) {
+	c.errs++
+	if c.trial {
+		return
+	}
+	c.Diags = append(c.Diags, syntax.Diagnostic{Code: code, Severity: syntax.SeverityError, Message: fmt.Sprintf(format, args...), Sp: sp})
+}
+
+func (c *Checker) warnf(code string, sp syntax.Span, format string, args ...any) {
+	if c.trial {
+		return
+	}
+	c.Diags = append(c.Diags, syntax.Diagnostic{Code: code, Severity: syntax.SeverityWarning, Message: fmt.Sprintf(format, args...), Sp: sp})
+}
+
+func (c *Checker) info(n syntax.Node) *Info {
+	if c.trial || n == nil {
+		return &Info{}
+	}
+	in := c.Info[n]
+	if in == nil {
+		in = &Info{}
+		c.Info[n] = in
+	}
+	return in
+}
+
+// Resource checks a declaration's value against a resource kind's root
+// type and returns its JSON.
+func (c *Checker) Resource(d *syntax.Decl, k Kind) jsonv.Value {
+	root := tview{T: c.Pack.Resources[k.Resource]}
+	if root.T != nil && root.T.Kind == "reference" {
+		root.Name = root.T.Path
+	}
+	switch {
+	case d.Body != nil:
+		return c.check(&syntax.Object{Body: d.Body, Sp: d.Body.Sp}, root)
+	case d.Value != nil:
+		return c.check(d.Value, root)
+	}
+	c.errorf("mms/missing-value", d.Kind.Sp, "%s needs a value: `= ...` or `{ ... }`", d.Kind.Name)
+	return nil
+}
+
+// check is the core walk: e at type v.
+func (c *Checker) check(e syntax.Expr, v tview) jsonv.Value {
+	if e == nil {
+		return nil
+	}
+	c.depth++
+	defer func() { c.depth-- }()
+	if c.depth > 200 {
+		c.errorf("mms/too-deep", e.Span(), "expression nests too deeply")
+		return nil
+	}
+	v = c.norm(v)
+	in := c.info(e)
+	in.Type = v
+	if p, ok := e.(*syntax.Paren); ok {
+		return c.check(p.X, v)
+	}
+	if _, ok := e.(*syntax.Bad); ok {
+		return nil // already reported by the parser
+	}
+	if r := c.sugar(e, v); r != nil {
+		return r.apply(c, e, v)
+	}
+	if v.T == nil {
+		return c.anyValue(e)
+	}
+	switch v.T.Kind {
+	case "union":
+		return c.union(e, v)
+	case "struct":
+		return c.structValue(e, v)
+	case "list":
+		return c.listValue(e, v)
+	case "tuple":
+		return c.tupleValue(e, v)
+	case "byte_array", "int_array", "long_array":
+		elem := strings.TrimSuffix(v.T.Kind, "_array")
+		return c.listValue(e, tview{T: &spec.Type{Kind: "list", Item: &spec.Type{Kind: elem}}})
+	case "string":
+		return c.stringValue(e, v)
+	case "boolean":
+		if b, ok := e.(*syntax.Bool); ok {
+			return jsonv.Bool(b.Value)
+		}
+	case "byte", "short", "int", "long", "float", "double":
+		return c.number(e, v)
+	case "literal":
+		return c.literal(e, v)
+	case "enum":
+		return c.enumValue(e, v)
+	case "any":
+		return c.anyValue(e)
+	default:
+		// Dynamic dispatchers and other types MMS cannot resolve
+		// statically are passed through unchecked.
+		return c.anyValue(e)
+	}
+	c.mismatch(e, v)
+	return nil
+}
+
+func (c *Checker) mismatch(e syntax.Expr, v tview) {
+	c.errorf("mms/type-mismatch", e.Span(), "expected %s, got %s", describe(v), exprKind(e))
+}
+
+func describe(v tview) string {
+	if v.Name != "" {
+		return spec.ShortPath(v.Name)
+	}
+	if v.T == nil {
+		return "any value"
+	}
+	switch v.T.Kind {
+	case "string":
+		if id := idOf(v.T); id.Registry != "" {
+			return "a " + id.Registry + " id"
+		}
+		return "a string"
+	case "boolean":
+		return "true or false"
+	case "int", "long", "short", "byte":
+		return "an integer" + rangeText(v.T.ValueRange)
+	case "float", "double":
+		return "a number" + rangeText(v.T.ValueRange)
+	case "list":
+		return "a list"
+	case "struct":
+		return "an object"
+	}
+	return spec.Format(v.T, 0)
+}
+
+func rangeText(r *spec.Range) string {
+	if r == nil {
+		return ""
+	}
+	return " in " + strings.TrimPrefix(spec.Format(&spec.Type{Kind: "int", ValueRange: r}, 0), "int @ ")
+}
+
+func exprKind(e syntax.Expr) string {
+	switch e := e.(type) {
+	case *syntax.Number:
+		return "number " + e.Text
+	case *syntax.String:
+		return "string " + e.Raw
+	case *syntax.Bool:
+		return strconv.FormatBool(e.Value)
+	case *syntax.Ident:
+		return "'" + e.Name + "'"
+	case *syntax.ResLoc:
+		return "'" + e.Text + "'"
+	case *syntax.Tag:
+		return "tag #" + e.Name
+	case *syntax.List:
+		return "a list"
+	case *syntax.Object:
+		return "an object"
+	case *syntax.Call, *syntax.Trailing:
+		if n := callName(e); n != "" {
+			return n + "(...)"
+		}
+		return "a call"
+	case *syntax.Binary:
+		return "'" + e.Op + "' expression"
+	case *syntax.Unary:
+		return "'" + e.Op + "' expression"
+	case *syntax.Range:
+		return "a range"
+	case *syntax.Member:
+		return "a member access"
+	case *syntax.Paren:
+		return exprKind(e.X)
+	}
+	return "an expression"
+}
+
+// union narrows a union by the expression's shape, then by trial checks,
+// and reports against the closest member when nothing fits.
+func (c *Checker) union(e syntax.Expr, v tview) jsonv.Value {
+	var cands []tview
+	for _, m := range v.T.Members {
+		mv := c.norm(tview{T: m, Env: v.Env})
+		if c.fits(e, mv) {
+			cands = append(cands, mv)
+		}
+	}
+	switch len(cands) {
+	case 0:
+		if name := callName(e); name != "" {
+			names := c.callableNames(v)
+			msg := "'" + name + "' does not make a " + unionText(v)
+			if s := closest(name, names); s != "" {
+				msg += "; did you mean " + s + "(...)?"
+			}
+			_, id, _, _ := unchain(e)
+			c.errorf("mms/unknown-callable", id.Sp, "%s", msg)
+			return nil
+		}
+		c.errorf("mms/type-mismatch", e.Span(), "expected %s, got %s", unionText(v), exprKind(e))
+		return nil
+	case 1:
+		return c.check(e, cands[0])
+	}
+	best, bestErrs := 0, math.MaxInt
+	for i, m := range cands {
+		n := c.trialErrors(e, m)
+		if n < bestErrs {
+			best, bestErrs = i, n
+		}
+		if n == 0 {
+			break
+		}
+	}
+	return c.check(e, cands[best])
+}
+
+func unionText(v tview) string {
+	if v.Name != "" {
+		return spec.ShortPath(v.Name)
+	}
+	var parts []string
+	for _, m := range v.T.Members {
+		parts = append(parts, describe(tview{T: m}))
+	}
+	return strings.Join(parts, " or ")
+}
+
+// trialErrors checks e at v without recording anything and returns the
+// number of errors. Results are memoised per node and type.
+func (c *Checker) trialErrors(e syntax.Expr, v tview) int {
+	k := memoKey{e, v.T, v.Env}
+	root := c
+	for root.parent != nil {
+		root = root.parent
+	}
+	if n, ok := root.memo[k]; ok {
+		return n
+	}
+	t := &Checker{Pack: c.Pack, Kinds: c.Kinds, Syms: c.Syms, NS: c.NS, trial: true, depth: c.depth, parent: root}
+	t.check(e, v)
+	root.memo[k] = t.errs
+	return t.errs
+}
+
+// fits is a cheap shape test: could e possibly be a value of v?
+func (c *Checker) fits(e syntax.Expr, v tview) bool {
+	if p, ok := e.(*syntax.Paren); ok {
+		return c.fits(p.X, v)
+	}
+	if _, ok := e.(*syntax.Bad); ok {
+		return true
+	}
+	v = c.norm(v)
+	if r := c.sugar(e, v); r != nil {
+		return true
+	}
+	if v.T == nil {
+		return true
+	}
+	switch v.T.Kind {
+	case "union":
+		for _, m := range v.T.Members {
+			if c.fits(e, tview{T: m, Env: v.Env}) {
+				return true
+			}
+		}
+		return false
+	case "any":
+		return true
+	case "struct":
+		switch e.(type) {
+		case *syntax.Object:
+			return true
+		case *syntax.Call, *syntax.Trailing:
+			return c.callable(e, v) != nil
+		}
+		return false
+	case "list", "tuple", "byte_array", "int_array", "long_array":
+		_, ok := e.(*syntax.List)
+		return ok
+	case "string":
+		switch e.(type) {
+		case *syntax.String:
+			return true
+		case *syntax.Ident, *syntax.ResLoc:
+			id := idOf(v.T)
+			return id.Present && id.Tags != "required"
+		case *syntax.Tag:
+			id := idOf(v.T)
+			return id.Present && id.Tags != ""
+		}
+		return false
+	case "boolean":
+		_, ok := e.(*syntax.Bool)
+		return ok
+	case "byte", "short", "int", "long", "float", "double":
+		return isNumber(e)
+	case "literal":
+		if v.T.Literal == nil {
+			return false
+		}
+		switch e.(type) {
+		case *syntax.String, *syntax.Ident:
+			return v.T.Literal.Kind == "string"
+		case *syntax.Bool:
+			return v.T.Literal.Kind == "boolean"
+		}
+		return isNumber(e) && v.T.Literal.Kind != "string" && v.T.Literal.Kind != "boolean"
+	case "enum":
+		if v.T.EnumKind == "string" {
+			switch e.(type) {
+			case *syntax.String, *syntax.Ident:
+				return true
+			}
+			return false
+		}
+		return isNumber(e)
+	}
+	return true
+}
+
+func isNumber(e syntax.Expr) bool {
+	switch e := e.(type) {
+	case *syntax.Number:
+		return true
+	case *syntax.Unary:
+		_, ok := e.X.(*syntax.Number)
+		return ok && (e.Op == "-" || e.Op == "+")
+	}
+	return false
+}
+
+func (c *Checker) listValue(e syntax.Expr, v tview) jsonv.Value {
+	l, ok := e.(*syntax.List)
+	if !ok {
+		c.mismatch(e, v)
+		return nil
+	}
+	item := tview{T: v.T.Item, Env: v.Env}
+	out := jsonv.Array{}
+	for _, x := range l.Elems {
+		if val := c.check(x, item); val != nil {
+			out = append(out, val)
+		}
+	}
+	if r := v.T.LengthRange; r != nil {
+		n := float64(len(l.Elems))
+		if (r.Min != nil && n < *r.Min) || (r.Max != nil && n > *r.Max) {
+			c.errorf("mms/out-of-range", l.Sp, "list must have%s items, got %d", rangeText(r), len(l.Elems))
+		}
+	}
+	return out
+}
+
+func (c *Checker) tupleValue(e syntax.Expr, v tview) jsonv.Value {
+	l, ok := e.(*syntax.List)
+	if !ok {
+		c.mismatch(e, v)
+		return nil
+	}
+	if len(l.Elems) != len(v.T.Items) {
+		c.errorf("mms/type-mismatch", l.Sp, "expected %d items, got %d", len(v.T.Items), len(l.Elems))
+	}
+	out := jsonv.Array{}
+	for i, x := range l.Elems {
+		if i < len(v.T.Items) {
+			out = append(out, c.check(x, tview{T: v.T.Items[i], Env: v.Env}))
+		}
+	}
+	return out
+}
+
+func (c *Checker) number(e syntax.Expr, v tview) jsonv.Value {
+	text, ok := numberText(e)
+	if !ok {
+		c.mismatch(e, v)
+		return nil
+	}
+	f, err := strconv.ParseFloat(text, 64)
+	if err != nil {
+		c.errorf("mms/type-mismatch", e.Span(), "invalid number %s", text)
+		return nil
+	}
+	switch v.T.Kind {
+	case "byte", "short", "int", "long":
+		if f != math.Trunc(f) {
+			c.errorf("mms/type-mismatch", e.Span(), "expected an integer, got %s", text)
+		}
+	}
+	if !inRange(f, v.T.ValueRange) {
+		c.errorf("mms/out-of-range", e.Span(), "value must be%s, got %s", rangeText(v.T.ValueRange), text)
+	}
+	return jsonv.Number(text)
+}
+
+func numberText(e syntax.Expr) (string, bool) {
+	switch e := e.(type) {
+	case *syntax.Number:
+		return e.Text, true
+	case *syntax.Unary:
+		if n, ok := e.X.(*syntax.Number); ok {
+			switch e.Op {
+			case "-":
+				return "-" + n.Text, true
+			case "+":
+				return n.Text, true
+			}
+		}
+	case *syntax.Paren:
+		return numberText(e.X)
+	}
+	return "", false
+}
+
+func inRange(f float64, r *spec.Range) bool {
+	if r == nil {
+		return true
+	}
+	minEx, maxEx := r.Kind&1 != 0, r.Kind&2 != 0
+	if r.Min != nil && (f < *r.Min || (minEx && f == *r.Min)) {
+		return false
+	}
+	if r.Max != nil && (f > *r.Max || (maxEx && f == *r.Max)) {
+		return false
+	}
+	return true
+}
+
+func (c *Checker) literal(e syntax.Expr, v tview) jsonv.Value {
+	lit := v.T.Literal
+	if lit == nil {
+		return c.anyValue(e)
+	}
+	want := lit.String()
+	var got string
+	switch e := e.(type) {
+	case *syntax.String:
+		got = e.Value
+	case *syntax.Ident:
+		got = e.Name
+	case *syntax.Bool:
+		got = strconv.FormatBool(e.Value)
+	default:
+		got, _ = numberText(e)
+	}
+	if got != want {
+		c.errorf("mms/type-mismatch", e.Span(), "expected %s, got %s", string(lit.Value), exprKind(e))
+		return nil
+	}
+	switch lit.Kind {
+	case "string":
+		return jsonv.String(want)
+	case "boolean":
+		return jsonv.Bool(want == "true")
+	}
+	return jsonv.Number(want)
+}
+
+func (c *Checker) enumValue(e syntax.Expr, v tview) jsonv.Value {
+	var got string
+	switch x := e.(type) {
+	case *syntax.String:
+		got = x.Value
+	case *syntax.Ident:
+		got = x.Name
+	default:
+		if t, ok := numberText(e); ok {
+			got = t
+		}
+	}
+	for _, val := range v.T.Values {
+		s := val.String()
+		if s == got || (isPascal(got) && s == Snake(got)) {
+			if v.T.EnumKind == "string" {
+				if v.RefID && !strings.Contains(s, ":") {
+					s = "minecraft:" + s
+				}
+				return jsonv.String(s)
+			}
+			return jsonv.Number(s)
+		}
+	}
+	var opts []string
+	for _, val := range v.T.Values {
+		opts = append(opts, val.String())
+	}
+	c.errorf("mms/type-mismatch", e.Span(), "expected one of %s, got %s", strings.Join(limit(opts, 12), ", "), exprKind(e))
+	return nil
+}
+
+func limit(s []string, n int) []string {
+	if len(s) > n {
+		return append(s[:n:n], "...")
+	}
+	return s
+}
+
+// anyValue converts an expression to JSON without a schema.
+func (c *Checker) anyValue(e syntax.Expr) jsonv.Value {
+	switch x := e.(type) {
+	case *syntax.Number, *syntax.Unary:
+		if t, ok := numberText(e); ok {
+			return jsonv.Number(t)
+		}
+	case *syntax.String:
+		return jsonv.String(x.Value)
+	case *syntax.Bool:
+		return jsonv.Bool(x.Value)
+	case *syntax.Ident:
+		return jsonv.String(x.Name)
+	case *syntax.ResLoc:
+		return jsonv.String(x.Text)
+	case *syntax.Tag:
+		return jsonv.String("#" + x.Name)
+	case *syntax.Paren:
+		return c.anyValue(x.X)
+	case *syntax.List:
+		out := jsonv.Array{}
+		for _, el := range x.Elems {
+			out = append(out, c.anyValue(el))
+		}
+		return out
+	case *syntax.Object:
+		o := &jsonv.Object{}
+		for _, it := range x.Body.Items {
+			fs, ok := it.(*syntax.FieldStmt)
+			if !ok {
+				c.errorf("mms/expected-field", it.Span(), "expected `key = value`")
+				continue
+			}
+			o.Set(fs.Key.Text, c.anyValue(fs.Value))
+		}
+		return o
+	}
+	c.errorf("mms/type-mismatch", e.Span(), "cannot use %s here", exprKind(e))
+	return nil
+}
+
+// stringValue checks strings, and ids when the string has an #[id].
+func (c *Checker) stringValue(e syntax.Expr, v tview) jsonv.Value {
+	id := idOf(v.T)
+	switch x := e.(type) {
+	case *syntax.String:
+		if id.Present && id.Registry != "" && x.Value != "" {
+			if strings.HasPrefix(x.Value, "#") {
+				return jsonv.String(c.resolveTag(x.Value[1:], id, e))
+			}
+			return jsonv.String(c.resolveID(x.Value, id, e))
+		}
+		if r := v.T.LengthRange; r != nil && !inRange(float64(len([]rune(x.Value))), r) {
+			c.errorf("mms/out-of-range", e.Span(), "string length must be%s", rangeText(r))
+		}
+		return jsonv.String(x.Value)
+	case *syntax.Ident, *syntax.ResLoc:
+		if id.Tags == "required" {
+			c.errorf("mms/type-mismatch", e.Span(), "expected a %s tag (#name) here", c.registryName(id.Registry))
+			return nil
+		}
+		if id.Present {
+			text := ""
+			if i, ok := x.(*syntax.Ident); ok {
+				text = i.Name
+			} else {
+				text = x.(*syntax.ResLoc).Text
+			}
+			return jsonv.String(c.resolveID(text, id, e))
+		}
+	case *syntax.Tag:
+		if id.Present && id.Tags != "" {
+			return jsonv.String(c.resolveTag(x.Name, id, e))
+		}
+		if id.Present {
+			c.errorf("mms/type-mismatch", e.Span(), "a tag is not allowed here; expected a single %s id", id.Registry)
+			return nil
+		}
+	}
+	c.mismatch(e, v)
+	return nil
+}
+
+// resolveID applies the name resolution rule: a qualified id is exact; an
+// unqualified one names a declaration in the current namespace if there is
+// one, and otherwise the registry's default namespace (minecraft).
+func (c *Checker) resolveID(text string, id idInfo, e syntax.Expr) string {
+	reg := c.registryName(id.Registry)
+	ns, path := splitID(text)
+	if path != strings.ToLower(path) {
+		c.errorf("mms/invalid-name", e.Span(), "resource ids are lowercase: did you mean '%s'?", Snake(path))
+		return text
+	}
+	var sym *Symbol
+	if ns == "" {
+		if reg != "" {
+			sym = c.Syms.Find(reg, c.NS+":"+path)
+		}
+		if sym != nil {
+			ns = c.NS
+		} else {
+			ns = "minecraft"
+		}
+	} else if reg != "" {
+		sym = c.Syms.Find(reg, ns+":"+path)
+	}
+	full := ns + ":" + path
+	in := c.info(e)
+	in.ID = full
+	in.Symbol = sym
+	if sym != nil || reg == "" {
+		return full
+	}
+	if ns == "minecraft" {
+		if _, known := c.Pack.Registries[reg]; known && !c.Pack.HasID(reg, path) {
+			msg := fmt.Sprintf("unknown %s '%s'", reg, full)
+			if s := closest(path, c.Pack.Registries[reg]); s != "" {
+				msg += fmt.Sprintf("; did you mean '%s'?", s)
+			}
+			c.errorf("mms/unknown-id", e.Span(), "%s", msg)
+		}
+		return full
+	}
+	if c.declaresNamespace(ns) {
+		c.errorf("mms/unknown-id", e.Span(), "no %s named '%s' is declared", reg, full)
+	}
+	return full
+}
+
+func (c *Checker) resolveTag(text string, id idInfo, e syntax.Expr) string {
+	reg := c.registryName(id.Registry)
+	ns, path := splitID(text)
+	var sym *Symbol
+	if ns == "" {
+		sym = c.Syms.Find("tags/"+reg, c.NS+":"+path)
+		if sym != nil {
+			ns = c.NS
+		} else {
+			ns = "minecraft"
+		}
+	} else {
+		sym = c.Syms.Find("tags/"+reg, ns+":"+path)
+	}
+	full := ns + ":" + path
+	in := c.info(e)
+	in.ID = "#" + full
+	in.Symbol = sym
+	if sym == nil && ns == "minecraft" {
+		if tags, known := c.Pack.Registries["tag/"+reg]; known && !contains(tags, path) {
+			c.errorf("mms/unknown-id", e.Span(), "unknown %s tag '#%s'", reg, full)
+		}
+	} else if sym == nil && c.declaresNamespace(ns) {
+		c.errorf("mms/unknown-id", e.Span(), "no %s tag named '#%s' is declared", reg, full)
+	}
+	return "#" + full
+}
+
+func (c *Checker) declaresNamespace(ns string) bool {
+	if ns == c.NS {
+		return true
+	}
+	for _, s := range c.Syms.All() {
+		if s.NS == ns {
+			return true
+		}
+	}
+	return false
+}
+
+func contains(xs []string, x string) bool {
+	for _, s := range xs {
+		if s == x {
+			return true
+		}
+	}
+	return false
+}
+
+// closest returns the candidate with the smallest edit distance to s, if
+// it is close enough to be a likely typo.
+func closest(s string, cands []string) string {
+	best, bestD := "", len(s)/3+2
+	for _, c := range cands {
+		if d := editDistance(s, c); d < bestD {
+			best, bestD = c, d
+		}
+	}
+	return best
+}
+
+func editDistance(a, b string) int {
+	if len(a) > 64 || len(b) > 64 {
+		return 99
+	}
+	prev := make([]int, len(b)+1)
+	cur := make([]int, len(b)+1)
+	for j := range prev {
+		prev[j] = j
+	}
+	for i := 1; i <= len(a); i++ {
+		cur[0] = i
+		for j := 1; j <= len(b); j++ {
+			cost := 1
+			if a[i-1] == b[j-1] {
+				cost = 0
+			}
+			cur[j] = min(prev[j]+1, cur[j-1]+1, prev[j-1]+cost)
+		}
+		prev, cur = cur, prev
+	}
+	return prev[len(b)]
+}

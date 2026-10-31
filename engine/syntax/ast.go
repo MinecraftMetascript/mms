@@ -38,7 +38,7 @@ type File struct {
 type Decl struct {
 	Kind   *Ident
 	Name   *Name
-	Type   *Name     // type annotation, e.g. `int` in `Global x: int = 0`
+	Type   *Name      // type annotation, e.g. `int` in `Global x: int = 0`
 	Params *ParamList // nil when the declaration has no parameter list
 	Value  Expr       // after '='
 	Body   *Block     // a `{ ... }` body

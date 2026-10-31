@@ -9,7 +9,10 @@ import (
 const usage = `usage: mms <command> [arguments]
 
 commands:
+  build   check the project and write the data pack
+  check   check the project and report problems
   fmt     format .mms files
+  init    create mms.json and a starter file
 `
 
 func main() {
@@ -19,6 +22,12 @@ func main() {
 	}
 	var code int
 	switch os.Args[1] {
+	case "build":
+		code = runBuild(os.Args[2:], os.Stdout, os.Stderr)
+	case "check":
+		code = runCheck(os.Args[2:], os.Stdout, os.Stderr)
+	case "init":
+		code = runInit(os.Args[2:], os.Stdout, os.Stderr)
 	case "fmt":
 		code = runFmt(os.Args[2:], os.Stdin, os.Stdout, os.Stderr)
 	case "help", "-h", "--help":
