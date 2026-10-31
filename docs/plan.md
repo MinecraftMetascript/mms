@@ -15,6 +15,7 @@ The full architecture and implementation plan is the doc [MMS rewrite: compiler,
 - Infix math is in (Brian), guarded by a precedence lint and formatter parentheses.
 - Formatter: two-space indent, 100 columns, no other options.
 - Hosting (Brian): the web editor is deployed to GitHub Pages, with no telemetry.
+- Web stack (Brian): SvelteKit 3 (currently 3.1.x) with Tailwind CSS (currently 4.x), built with the static adapter.
 
 ## Milestones
 
