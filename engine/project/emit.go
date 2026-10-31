@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/minecraftmetascript/mms/engine/fn"
 	"github.com/minecraftmetascript/mms/engine/jsonv"
 	"github.com/minecraftmetascript/mms/engine/syntax"
 )
@@ -48,8 +49,35 @@ func (r *Result) Emit() []OutFile {
 			}
 		}
 	}
+	objectives := map[string][]string{}
+	globals := map[string][]string{}
 	load := map[string][]string{}
 	tick := map[string][]string{}
+	consts := map[string]map[int32]bool{}
+	ret := map[string]bool{}
+	used := map[string]bool{} // namespaces whose objective the code uses
+	fnFiles := map[string]bool{}
+	addFn := func(d *Decl) {
+		for id, ls := range d.Fn.Files {
+			if fnFiles[id] {
+				continue // identical OnLoad bodies share their functions
+			}
+			fnFiles[id] = true
+			fns, fpath := splitID(id)
+			out = append(out, OutFile{Path: "data/" + fns + "/function/" + fpath + ".mcfunction", Data: lines(ls), Unit: d.Unit.Path, Span: d.D.Sp})
+			markUsed(used, ls)
+		}
+		ns, _ := splitID(d.Fn.ID())
+		if consts[ns] == nil {
+			consts[ns] = map[int32]bool{}
+		}
+		for v := range d.Fn.Consts {
+			consts[ns][v] = true
+		}
+		if d.Fn.Ret {
+			ret[ns] = true
+		}
+	}
 	for _, d := range r.Order {
 		id := d.ID()
 		ns, path := splitID(id)
@@ -65,20 +93,61 @@ func (r *Result) Emit() []OutFile {
 				continue
 			}
 			out = append(out, OutFile{Path: "data/" + ns + "/" + d.Kind.Resource + "/" + path + ".json", Data: jsonv.Marshal(d.Value), Unit: d.Unit.Path, Span: d.D.Sp})
-		case d.Kind.MMS == "Function":
-			out = append(out, OutFile{Path: "data/" + ns + "/function/" + path + ".mcfunction", Data: lines(d.Lines), Unit: d.Unit.Path, Span: d.D.Sp})
+		case d.Fn != nil:
+			addFn(d)
+			switch d.Kind.MMS {
+			case "OnLoad":
+				load[d.NS] = append(load[d.NS], d.Lines...)
+			case "OnTick":
+				tick[d.NS] = append(tick[d.NS], d.Lines...)
+			}
 		case d.Kind.MMS == "Objective":
-			load[d.NS] = append(load[d.NS], d.Lines...)
+			objectives[d.NS] = append(objectives[d.NS], d.Lines...)
+		case d.Kind.MMS == "Global":
+			gns := d.NS
+			if strings.Contains(d.D.NameText(), ":") {
+				gns, _ = splitID(d.D.NameText())
+			}
+			globals[gns] = append(globals[gns], d.Lines...)
+			used[gns] = true
 		case d.Kind.MMS == "OnLoad":
 			load[d.NS] = append(load[d.NS], d.Lines...)
+			markUsed(used, d.Lines)
 		case d.Kind.MMS == "OnTick":
 			tick[d.NS] = append(tick[d.NS], d.Lines...)
+			markUsed(used, d.Lines)
+		}
+	}
+	// The load function sets up objectives first, then the backend's
+	// objective and constants, then globals, then OnLoad bodies.
+	nss := map[string]bool{}
+	for _, m := range []map[string][]string{objectives, globals, load} {
+		for ns := range m {
+			nss[ns] = true
+		}
+	}
+	for ns := range used {
+		nss[ns] = true
+	}
+	for ns := range ret {
+		out = append(out, OutFile{Path: "data/" + ns + "/function/mms_gen/ret.mcfunction", Data: lines(fn.RetHelper(ns))})
+	}
+	fullLoad := map[string][]string{}
+	for ns := range nss {
+		ls := append([]string(nil), objectives[ns]...)
+		if used[ns] || len(consts[ns]) > 0 || ret[ns] {
+			ls = append(ls, fn.Setup(ns, consts[ns])...)
+		}
+		ls = append(ls, globals[ns]...)
+		ls = append(ls, load[ns]...)
+		if len(ls) > 0 {
+			fullLoad[ns] = ls
 		}
 	}
 	for _, gen := range []struct {
 		name string
 		fns  map[string][]string
-	}{{"load", load}, {"tick", tick}} {
+	}{{"load", fullLoad}, {"tick", tick}} {
 		for ns, ls := range gen.fns {
 			out = append(out, OutFile{Path: "data/" + ns + "/function/mms_gen/" + gen.name + ".mcfunction", Data: lines(ls)})
 			addTag("data/minecraft/tags/function/"+gen.name+".json", jsonv.Array{jsonv.String(ns + ":mms_gen/" + gen.name)}, nil)
@@ -108,6 +177,18 @@ func (r *Result) packMeta() []byte {
 	pack.Set("min_format", format)
 	pack.Set("max_format", format)
 	return jsonv.Marshal(&jsonv.Object{Members: []jsonv.Member{{Key: "pack", Value: pack}}})
+}
+
+// markUsed notes the namespaces whose backend objective (mms.<ns>) the
+// lines use.
+func markUsed(used map[string]bool, ls []string) {
+	for _, l := range ls {
+		for _, w := range strings.Fields(l) {
+			if ns, ok := strings.CutPrefix(w, "mms."); ok && ns != "" {
+				used[ns] = true
+			}
+		}
+	}
 }
 
 func lines(ls []string) []byte {

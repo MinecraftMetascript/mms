@@ -97,6 +97,10 @@ func DepsHold(t *Table, deps map[string]bool) bool {
 		var now bool
 		if ns, ok := strings.CutPrefix(k, "n|"); ok {
 			now = t.hasNamespace(ns)
+		} else if rest, ok := strings.CutPrefix(k, "s|"); ok {
+			// s|folder|id|signature: the symbol still has that signature.
+			parts := strings.SplitN(rest, "|", 3)
+			now = len(parts) == 3 && symSig(t.Find(parts[0], parts[1])) == parts[2]
 		} else {
 			rest := k[2:]
 			i := strings.IndexByte(rest, '|')

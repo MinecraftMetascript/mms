@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/minecraftmetascript/mms/engine/fn"
 	"github.com/minecraftmetascript/mms/engine/jsonv"
 	"github.com/minecraftmetascript/mms/engine/sema"
 	"github.com/minecraftmetascript/mms/engine/spec"
@@ -132,9 +133,12 @@ type Decl struct {
 	Tag   jsonv.Array // tag entries
 	// TagReplace is set when a tag replaces lower packs' entries.
 	TagReplace bool
-	Lines      []string // function commands
-	Info       map[syntax.Node]*sema.Info
-	Diags      []syntax.Diagnostic
+	Lines      []string // raw function commands, or load lines
+	// Fn is a compiled function's output: its files and what the load
+	// function must set up for it.
+	Fn    *fn.Output
+	Info  map[syntax.Node]*sema.Info
+	Diags []syntax.Diagnostic
 	// Deps are the symbol lookups the check made (see sema.DepsHold).
 	Deps map[string]bool
 
@@ -301,7 +305,7 @@ func (r *Result) reuse(u *sema.Unit, d *syntax.Decl, ns string, moved map[*synta
 func symbolKey(t *sema.Table) uint64 {
 	var keys []string
 	for _, s := range t.All() {
-		keys = append(keys, s.Kind.Folder()+"|"+s.ID())
+		keys = append(keys, s.Kind.Folder()+"|"+s.ID()+"|"+sema.SymSig(s))
 	}
 	sort.Strings(keys)
 	h := fnv.New64a()
@@ -320,7 +324,7 @@ func (p *Project) checkDecl(u *sema.Unit, d *syntax.Decl, k sema.Kind, syms *sem
 	c := sema.NewChecker(p.Pack, p.Kinds, syms, ns)
 	defer func() {
 		if rec := recover(); rec != nil {
-			dr.Value, dr.Tag, dr.Lines = nil, nil, nil
+			dr.Value, dr.Tag, dr.Lines, dr.Fn = nil, nil, nil, nil
 			dr.Info = c.Info
 			dr.Diags = append(c.Diags, syntax.Diagnostic{
 				Code: "mms/internal", Severity: syntax.SeverityError, Sp: d.Kind.Sp,
@@ -336,13 +340,24 @@ func (p *Project) checkDecl(u *sema.Unit, d *syntax.Decl, k sema.Kind, syms *sem
 		dr.Tag, dr.TagReplace = c.Tag(d, k)
 	case k.IsResource():
 		dr.Value = c.Resource(d, k)
-	case k.MMS == "Function" || k.MMS == "OnLoad" || k.MMS == "OnTick":
-		dr.Lines = c.Function(d)
+	case k.MMS == "Function":
+		if f := c.CompileFunction(d, dr.ID(), u.File.Src); f != nil && d.Name != nil {
+			dr.Fn = fn.Generate(*f)
+		}
+	case k.MMS == "OnLoad" || k.MMS == "OnTick":
+		if sema.IsRaw(d.Body) {
+			dr.Lines = c.Function(d)
+			break
+		}
+		id := sema.GeneratedID(ns, k.MMS, d, u.File.Src)
+		if f := c.CompileFunction(d, id, u.File.Src); f != nil {
+			dr.Fn = fn.Generate(*f)
+			dr.Lines = []string{"function " + id}
+		}
 	case k.MMS == "Objective":
 		dr.Lines = objective(c, d)
 	case k.MMS == "Global":
-		c.Diags = append(c.Diags, syntax.Diagnostic{Code: "mms/unsupported", Severity: syntax.SeverityError, Sp: d.Kind.Sp,
-			Message: "Global arrives with the function backend"})
+		dr.Lines = c.Global(d)
 	}
 	dr.Info = c.Info
 	dr.Diags = c.Diags

@@ -476,9 +476,17 @@ func (d *Decl) references() []string {
 			seen[s.Kind.Folder()+"|"+s.ID()] = true
 		}
 	}
-	for _, line := range d.Lines {
-		for _, id := range cmdIDRe.FindAllString(line, -1) {
-			seen[id] = true
+	scan := func(ls []string) {
+		for _, line := range ls {
+			for _, id := range cmdIDRe.FindAllString(line, -1) {
+				seen[id] = true
+			}
+		}
+	}
+	scan(d.Lines)
+	if d.Fn != nil {
+		for _, ls := range d.Fn.Files {
+			scan(ls)
 		}
 	}
 	d.refs = make([]string, 0, len(seen))

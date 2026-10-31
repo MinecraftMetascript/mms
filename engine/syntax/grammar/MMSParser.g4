@@ -13,9 +13,10 @@ file : declaration* EOF;
 // LootTable blocks/ruby_ore { pools = [ ... ] }
 // Global deaths: int = 0
 // Function on_kill(target: selector) { ... }
+// Function add(a: int, b: int): int { return a + b }
 // OnLoad { ... }
 declaration
-    : kind=IDENT name=declName typeAnnotation? params? declBody?
+    : kind=IDENT name=declName (typeAnnotation | params typeAnnotation?)? declBody?
     | kind=IDENT params? block
     ;
 
@@ -54,6 +55,7 @@ statement
     | COMMAND                                                     # commandStmt
     | fieldKey ASSIGN expr                                        # fieldStmt
     | IDENT (DOT IDENT)+ ASSIGN expr                              # pathAssignStmt
+    | IDENT LBRACK arg RBRACK ASSIGN expr                         # indexAssignStmt
     | expr op=(PLUS_EQ | MINUS_EQ | STAR_EQ | SLASH_EQ | PCT_EQ) expr # compoundAssignStmt
     | expr                                                        # exprStmt
     ;

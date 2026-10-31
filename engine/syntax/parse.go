@@ -347,6 +347,10 @@ func (b *builder) stmt(c parser.IStatementContext) Stmt {
 			target = &Member{X: target, Name: n, Sp: Span{sp.Start, n.Sp.End}}
 		}
 		return &AssignStmt{Target: target, Op: "=", Value: b.expr(s.Expr(), sp), Sp: sp}
+	case *parser.IndexAssignStmtContext:
+		id := s.IDENT()
+		target := &Index{X: &Ident{Name: id.GetText(), Sp: tokSpan(id.GetSymbol())}, Args: b.args([]parser.IArgContext{s.Arg()}), Sp: Span{sp.Start, tokSpan(s.RBRACK().GetSymbol()).End}}
+		return &AssignStmt{Target: target, Op: "=", Value: b.expr(s.Expr(), sp), Sp: sp}
 	case *parser.ExprStmtContext:
 		return &ExprStmt{X: b.expr(s.Expr(), sp), Sp: sp}
 	}

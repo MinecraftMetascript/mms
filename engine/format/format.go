@@ -286,11 +286,11 @@ func (p *printer) decl(d *syntax.Decl) doc {
 	if d.Name != nil {
 		parts = append(parts, txt(" "+d.Name.Text))
 	}
-	if d.Type != nil {
-		parts = append(parts, txt(": "+d.Type.Text))
-	}
 	if d.Params != nil {
 		parts = append(parts, p.params(d.Params))
+	}
+	if d.Type != nil {
+		parts = append(parts, txt(": "+d.Type.Text))
 	}
 	if d.Value != nil {
 		parts = append(parts, txt(" = "), p.expr(d.Value))
