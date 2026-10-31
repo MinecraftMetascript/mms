@@ -12,7 +12,8 @@
 	import { mmsHighlight, mmsLanguage } from './language';
 	import { semanticHighlighting } from './semantic';
 	import { forEachDiagnostic } from '@codemirror/lint';
-	import { findReferences, jumpToDefinition, renameSymbol } from '@codemirror/lsp-client';
+	import { findReferences, jumpToDefinition } from '@codemirror/lsp-client';
+	import { inlineRename, renameInline } from './rename';
 	import ContextMenu, { type MenuEntries } from './ContextMenu.svelte';
 
 	interface Props {
@@ -65,7 +66,7 @@
 		const items: MenuEntries = [
 			{ label: 'Go to definition', keys: 'F12', run: run(jumpToDefinition) },
 			{ label: 'Find references', keys: 'Shift+F12', run: run(findReferences) },
-			{ label: 'Rename symbol', keys: 'F2', run: run(renameSymbol) },
+			{ label: 'Rename symbol', keys: 'F2', run: run(renameInline) },
 			null,
 			{ label: 'Format document', keys: `Shift+${alt}+F`, run: run(formatCommand) },
 			{ label: 'Fix all in this file', keys: `${mod}+${alt}+F`, run: run(fixAllCommand) }
@@ -98,6 +99,7 @@
 				mmsHighlight,
 				engine.client.plugin(uriOf(p), 'mms'),
 				semanticHighlighting((uri) => engine.semanticTokens(uri)),
+				inlineRename(),
 				keymap.of([
 					{ key: 'Mod-s', run: formatCommand, preventDefault: true },
 					{ key: 'Shift-Alt-f', run: formatCommand, preventDefault: true },

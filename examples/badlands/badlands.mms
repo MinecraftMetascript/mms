@@ -1,7 +1,8 @@
 /** The three badlands biomes. */
 SurfaceCondition in_badlands = Biome(badlands, eroded_badlands, wooded_badlands)
 
-SurfaceRule sky_terracotta = If(AboveSurface()) { Block(stone) }
+/** Above the build limit, as in vanilla badlands. */
+SurfaceRule sky_terracotta = If(YAbove(256)) { Block(orange_terracotta) }
 
 SurfaceRule non_hole_orange_terracotta = If(!Hole()) { Block(orange_terracotta) }
 
@@ -32,7 +33,8 @@ SurfaceRule orange_terracotta_edge = If(YAbove(63) && !YAbove(74).Mul(1).Add()) 
   Block(orange_terracotta)
 }
 
-SurfaceRule badlands = If(in_badlands) {
+/** Only the top few blocks of the terrain in the badlands biomes are painted. */
+SurfaceRule badlands = If(in_badlands && StoneDepth(Floor).AddSurfaceDepth()) {
   If(YAbove(63)) {
     sky_terracotta
     terracotta_bands
