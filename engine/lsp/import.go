@@ -105,7 +105,11 @@ func (s *Server) resourceKinds(_ context.Context, _ struct{}) (any, *respError) 
 		if k.Resource == "" {
 			continue
 		}
-		out = append(out, map[string]string{"kind": name, "folder": k.Folder()})
+		folder := k.Folder()
+		if k.Assets != "" {
+			folder = "assets: " + k.Assets
+		}
+		out = append(out, map[string]string{"kind": name, "folder": folder})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i]["kind"] < out[j]["kind"] })
 	return out, nil

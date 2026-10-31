@@ -34,6 +34,10 @@ type Pack struct {
 	// Resources maps each data-pack resource kind (the folder under
 	// data/<ns>/, e.g. "worldgen/noise") to its root type.
 	Resources map[string]*Type `json:"resources"`
+	// Assets maps the resource-pack kinds among Resources ("model",
+	// "block_definition") to their folder under assets/<ns>/ ("models",
+	// "blockstates").
+	Assets map[string]string `json:"assets,omitempty"`
 
 	// Registries maps a registry name ("block", "worldgen/biome") to its ids,
 	// without the "minecraft:" prefix.
@@ -190,6 +194,18 @@ func (p *Pack) RegistryIDs(registry string) []string {
 func (p *Pack) ResourceKinds() []string {
 	kinds := make([]string, 0, len(p.Resources))
 	for k := range p.Resources {
+		if _, asset := p.Assets[k]; !asset {
+			kinds = append(kinds, k)
+		}
+	}
+	sort.Strings(kinds)
+	return kinds
+}
+
+// AssetKinds returns the sorted resource-pack kinds.
+func (p *Pack) AssetKinds() []string {
+	kinds := make([]string, 0, len(p.Assets))
+	for k := range p.Assets {
 		kinds = append(kinds, k)
 	}
 	sort.Strings(kinds)

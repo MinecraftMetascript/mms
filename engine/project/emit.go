@@ -101,7 +101,11 @@ func (r *Result) Emit() []OutFile {
 			if d.Value == nil {
 				continue
 			}
-			out = append(out, OutFile{Path: "data/" + ns + "/" + d.Kind.Resource + "/" + path + ".json", Data: jsonv.Marshal(d.Value), Unit: d.Unit.Path, Span: d.D.Sp})
+			f := OutFile{Path: d.Kind.Dir(ns) + "/" + path + ".json", Data: jsonv.Marshal(d.Value), Unit: d.Unit.Path, Span: d.D.Sp}
+			if d.Kind.Assets != "" {
+				f.Pack = sema.ResourcePack
+			}
+			out = append(out, f)
 		case d.Fn != nil:
 			addFn(d)
 			switch d.Kind.MMS {
@@ -175,7 +179,11 @@ func (r *Result) Emit() []OutFile {
 		out = append(out, f)
 	}
 	out = append(out, OutFile{Path: "pack.mcmeta", Data: packMeta(r.cfg.Description, r.pack.PackFormat)})
-	out = append(out, r.emitAssets()...)
+	hasResources := false
+	for _, f := range out {
+		hasResources = hasResources || f.Pack == sema.ResourcePack
+	}
+	out = append(out, r.emitAssets(hasResources)...)
 	sort.SliceStable(out, func(i, j int) bool {
 		if out[i].Pack != out[j].Pack {
 			return out[i].Pack < out[j].Pack

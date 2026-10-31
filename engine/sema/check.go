@@ -29,6 +29,9 @@ type Info struct {
 	Folder string
 	// Asset is set on an asset helper call such as Texture("a.png").
 	Asset *Asset
+	// Props are the block state properties a multipart `when` object
+	// body can test, for completion.
+	Props map[string][]string
 
 	typed bool
 }
@@ -158,11 +161,20 @@ func (c *Checker) Resource(d *syntax.Decl, k Kind) jsonv.Value {
 	if root.T != nil && root.T.Kind == "reference" {
 		root.Name = root.T.Path
 	}
+	var v jsonv.Value
 	switch {
 	case d.Body != nil:
-		return c.check(&syntax.Object{Body: d.Body, Sp: d.Body.Sp}, root)
+		v = c.check(&syntax.Object{Body: d.Body, Sp: d.Body.Sp}, root)
+		if k.Resource == "block_definition" {
+			c.blockState(d, d.Body)
+		}
+		return v
 	case d.Value != nil:
-		return c.check(d.Value, root)
+		v = c.check(d.Value, root)
+		if k.Resource == "block_definition" {
+			c.blockState(d, objectBody(d.Value))
+		}
+		return v
 	}
 	c.errorf("mms/missing-value", d.Kind.Sp, "%s needs a value: `= ...` or `{ ... }`", d.Kind.Name)
 	return nil
@@ -703,6 +715,9 @@ func (c *Checker) stringValue(e syntax.Expr, v tview) jsonv.Value {
 	id := idOf(v.T)
 	switch x := e.(type) {
 	case *syntax.String:
+		if id.Slot && strings.HasPrefix(x.Value, "#") {
+			return jsonv.String(x.Value) // another texture slot
+		}
 		if id.Present && id.Registry != "" && x.Value != "" {
 			if strings.HasPrefix(x.Value, "#") {
 				return jsonv.String(c.resolveTag(x.Value[1:], id, e))
@@ -783,10 +798,16 @@ func (c *Checker) resolveID(text string, id idInfo, e syntax.Expr) string {
 		return full
 	}
 	if ns == "minecraft" {
-		if _, known := c.Pack.Registries[reg]; known && !c.Pack.HasID(reg, id.Path+path) {
+		if _, known := c.Pack.Registries[reg]; known && !c.Pack.HasID(reg, id.Path+path) && !builtinIDs[reg+"|"+path] {
 			msg := fmt.Sprintf("unknown %s '%s'", reg, full)
 			if s := closest(path, withPrefix(c.Pack.Registries[reg], id.Path)); s != "" {
 				msg += fmt.Sprintf("; did you mean '%s'?", s)
+			}
+			if id.Slot {
+				// Atlases also make sprites that are not files, such as
+				// armor trim colours, so this may still work.
+				c.warnf("mms/unknown-id", e.Span(), "%s, unless an atlas makes it", msg)
+				return full
 			}
 			c.errorf("mms/unknown-id", e.Span(), "%s", msg)
 		}
@@ -801,6 +822,11 @@ func (c *Checker) resolveID(text string, id idInfo, e syntax.Expr) string {
 		c.errorf("mms/unknown-id", e.Span(), "no %s named '%s' is declared", reg, full)
 	}
 	return full
+}
+
+// builtinIDs are ids the game knows that are not in its registries.
+var builtinIDs = map[string]bool{
+	"model|builtin/generated": true, // item models made from their layer textures
 }
 
 func (c *Checker) resolveTag(text string, id idInfo, e syntax.Expr) string {

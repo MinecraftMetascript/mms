@@ -176,6 +176,9 @@ func (c *Checker) FieldCandidates(in *Info, present map[string]bool, call bool) 
 	if in == nil {
 		return nil
 	}
+	if in.Props != nil {
+		return c.blockPropCandidates(in, present)
+	}
 	fs := in.Fields
 	if in.Disp == nil && fs == nil && in.typed {
 		fs, _ = c.fields(in.Type, "")

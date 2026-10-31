@@ -2,7 +2,7 @@
 // scripts/build-wasm.sh.
 export interface Reference {
 	version: string;
-	kinds: { name: string; folder?: string; doc?: string }[];
+	kinds: { name: string; folder?: string; resources?: boolean; doc?: string }[];
 	groups: Group[];
 	types: TypeEntry[];
 }

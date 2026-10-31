@@ -1,6 +1,7 @@
 package sema
 
 import (
+	"encoding/json"
 	"sort"
 	"strings"
 
@@ -130,6 +131,9 @@ type dispInfo struct {
 	// KeyRegistry is the registry the key field's ids come from, which can
 	// list keys that have no dispatcher case (types without fields).
 	KeyRegistry string
+	// KeyEnum lists the values of a key field typed as a string enum,
+	// which can likewise name types without fields.
+	KeyEnum []string
 	// NoCase is set when the selected key has no dispatcher case: the
 	// mcdoc does not describe its fields, so extra fields are allowed.
 	NoCase bool
@@ -211,6 +215,9 @@ func (c *Checker) fieldsWith(v tview, keyOf func(keyField string) string) ([]fie
 		for _, f := range out {
 			if f.Key == disp.KeyField {
 				disp.KeyRegistry = c.idRegistry(f.Type)
+				if disp.KeyRegistry == "" {
+					disp.KeyEnum = c.stringEnum(f.Type)
+				}
 			}
 		}
 	}
@@ -250,11 +257,20 @@ type idInfo struct {
 	// banner pattern's "minecraft:base" name "entity/banner/base".
 	Path    string
 	Present bool
+	// Slot marks a model's texture value, which mcdoc tags
+	// #[texture_slot(kind="value")] rather than #[id]: a texture id, or
+	// "#name" for another slot of the same model.
+	Slot bool
 }
 
 func idOf(t *spec.Type) idInfo {
 	a, ok := t.Attr("id")
 	if !ok {
+		if ts, ok := t.Attr("texture_slot"); ok && ts.Value != nil && ts.Value.Kind == "tree" {
+			if k := ts.Value.Tree["kind"]; k != nil && k.Literal != nil && k.Literal.String() == "value" {
+				return idInfo{Registry: "texture", Present: true, Slot: true}
+			}
+		}
 		return idInfo{}
 	}
 	info := idInfo{Present: true}
@@ -321,6 +337,9 @@ func (c *Checker) dispatchKeys(d *dispInfo) []string {
 	for _, id := range c.Pack.Registries[d.KeyRegistry] {
 		set[id] = true
 	}
+	for _, k := range d.KeyEnum {
+		set[k] = true
+	}
 	keys := make([]string, 0, len(set))
 	for k := range set {
 		keys = append(keys, k)
@@ -333,7 +352,26 @@ func (c *Checker) hasDispatchKey(d *dispInfo, key string) bool {
 	if _, ok := c.Pack.Dispatch(d.Dispatcher, key); ok {
 		return true
 	}
-	return d.KeyRegistry != "" && c.Pack.HasID(d.KeyRegistry, key)
+	if d.KeyRegistry != "" && c.Pack.HasID(d.KeyRegistry, key) {
+		return true
+	}
+	return contains(d.KeyEnum, strings.TrimPrefix(key, "minecraft:"))
+}
+
+// stringEnum returns the values of a string enum type, or nil.
+func (c *Checker) stringEnum(v tview) []string {
+	v = c.norm(v)
+	if v.T == nil || v.T.Kind != "enum" {
+		return nil
+	}
+	var out []string
+	for _, ev := range v.T.Values {
+		var s string
+		if json.Unmarshal(ev.Value, &s) == nil {
+			out = append(out, s)
+		}
+	}
+	return out
 }
 
 // mapFieldFor picks the map-like field whose key type accepts key, falling

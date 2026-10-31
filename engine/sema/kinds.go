@@ -18,6 +18,18 @@ type Kind struct {
 	// MMS is set for language-level kinds: Namespace, Function, Objective,
 	// Global, OnLoad, OnTick.
 	MMS string
+	// Assets is the folder under assets/<ns>/ for resource-pack kinds
+	// ("blockstates", "models"), and "" for data-pack kinds.
+	Assets string
+}
+
+// Dir is the pack-relative folder a declaration's file goes in, before
+// its namespace path: "data/<ns>/loot_table" or "assets/<ns>/models".
+func (k Kind) Dir(ns string) string {
+	if k.Assets != "" {
+		return "assets/" + ns + "/" + k.Assets
+	}
+	return "data/" + ns + "/" + k.Folder()
 }
 
 // IsResource reports whether the declaration emits a JSON file.
@@ -42,7 +54,14 @@ var kindAliases = map[string]string{
 	"SurfaceRule":      "worldgen/material_rule",
 	"SurfaceCondition": "worldgen/material_condition",
 	"NoiseSettings":    "worldgen/noise_settings",
+	// Resource-pack kinds named after their folder or the component that
+	// uses them, rather than mcdoc's block_definition / item_definition.
+	"BlockState": "block_definition",
+	"ItemModel":  "item_definition",
 }
+
+// renamed are resource kinds that only an alias names.
+var renamed = map[string]bool{"block_definition": true, "item_definition": true}
 
 // Kinds resolves declaration kinds against one spec pack.
 type Kinds struct {
@@ -61,21 +80,22 @@ func NewKinds(p *spec.Pack) *Kinds {
 	// A resource kind is named after its last path segment, unless two
 	// kinds share it; then only the alias table can name them.
 	seen := map[string]int{}
-	for _, r := range p.ResourceKinds() {
+	all := append(p.ResourceKinds(), p.AssetKinds()...)
+	for _, r := range all {
 		seen[lastSeg(r)]++
 	}
-	for _, r := range p.ResourceKinds() {
-		if seen[lastSeg(r)] == 1 {
+	for _, r := range all {
+		if seen[lastSeg(r)] == 1 && !renamed[r] {
 			name := Pascal(lastSeg(r))
 			if _, taken := ks.byName[name]; !taken {
-				ks.byName[name] = Kind{Name: name, Resource: r}
+				ks.byName[name] = Kind{Name: name, Resource: r, Assets: p.Assets[r]}
 			}
 		}
 		ks.resource = append(ks.resource, r)
 	}
 	for name, r := range kindAliases {
 		if _, ok := p.Resources[r]; ok {
-			ks.byName[name] = Kind{Name: name, Resource: r}
+			ks.byName[name] = Kind{Name: name, Resource: r, Assets: p.Assets[r]}
 		}
 	}
 	// Tag kinds: any registry, named by its last segment. A registry at
