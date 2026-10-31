@@ -14,6 +14,8 @@
 	import { download, isDataPack, packZip, projectZip, readProjectZip, readZip } from '#lib/project/zip.ts';
 	import PasteJson from '#lib/components/PasteJson.svelte';
 	import { previewable } from '#lib/preview/protocol.ts';
+	import Inspect from '#lib/inspect/Inspect.svelte';
+	import { inspectable } from '#lib/inspect/common.ts';
 
 	const project = new Project();
 	let engine = $state<Engine | null>(null);
@@ -126,7 +128,7 @@
 
 	function selectOutput(path: string) {
 		selectedOutput = path;
-		rightTab = previewable(path) ? rightTab : 'json';
+		rightTab = previewable(path) || inspectable(path) ? rightTab : 'json';
 	}
 
 	function openExample(id: string) {
@@ -324,7 +326,11 @@
 			<div class="min-h-0 flex-1">
 				{#if engine}
 					<div class="h-full" class:hidden={rightTab !== 'preview'}>
-						<Preview output={engine.output} target={selectedOutput} />
+						{#if selectedFile && inspectable(selectedFile.path)}
+							<Inspect file={selectedFile} />
+						{:else}
+							<Preview output={engine.output} target={selectedOutput} />
+						{/if}
 					</div>
 					<div class="h-full" class:hidden={rightTab !== 'json'}>
 						<JsonView file={selectedFile} onsource={(f: OutputFile) => f.uri && f.range && reveal(f.uri, f.range)} />

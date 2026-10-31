@@ -103,3 +103,36 @@ test('lint fixes apply from the editor', async ({ page }) => {
 	await expect(page.locator('.cm-lintRange-hint')).toHaveCount(1);
 	await expect(page.locator('.cm-unnecessary')).toHaveText('d');
 });
+
+test('loot tables, recipes and biomes show in the inspector', async ({ page }) => {
+	const errors: string[] = [];
+	page.on('pageerror', (e) => errors.push(e.message));
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	await replaceText(
+		page,
+		[
+			'LootTable chest = { pools = [Pool(2, [Item(name = diamond).Weight(3), Item(name = emerald)])] }',
+			'Recipe ruby_block = Shaped(["RRR", "R R", "RRR"], { R = emerald }, emerald_block)',
+			'Biome warm = { temperature = 0.8, downfall = 0.4, has_precipitation = true, effects = { water_color = "#3f76e4" }, features = [], carvers = [] }',
+			''
+		].join('\n')
+	);
+	await expect(status(page)).toHaveText(/No problems/);
+	const inspector = page.getByLabel('Inspector');
+
+	await page.locator('.cm-line').nth(0).click();
+	await expect(inspector).toContainText('Pool 1');
+	await expect(inspector.getByRole('row', { name: /Diamond/ })).toContainText('75%');
+	await page.getByRole('button', { name: 'Roll' }).click();
+	await expect(page.getByLabel('Roll result')).toContainText('×');
+
+	await page.locator('.cm-line').nth(1).click();
+	await expect(page.getByLabel('Crafting grid').getByRole('img', { name: 'Emerald' })).toHaveCount(8);
+	await expect(page.getByLabel('Result')).toHaveText('Emerald Block');
+
+	await page.locator('.cm-line').nth(2).click();
+	await expect(inspector).toContainText('Temperature');
+	await expect(inspector).toContainText('#3f76e4');
+	expect(errors).toEqual([]);
+});
