@@ -162,29 +162,38 @@ func (c *Checker) Function(d *syntax.Decl) []string {
 // namespace the project declares must name a declaration.
 func (c *Checker) Command(cmd *syntax.CommandStmt) {
 	base := cmd.Sp.Start + 1 // after the '/'
+	n := len([]rune(cmd.Text))
+	c.commandText(cmd.Text, func(start, end int) syntax.Span {
+		sp := syntax.Span{Start: base + start, End: base + end}
+		if sp.End <= sp.Start {
+			if start >= n && sp.Start > base {
+				sp.Start-- // point at the last character rather than past the line
+			}
+			sp.End = sp.Start + 1
+		}
+		return sp
+	})
+}
+
+// commandText checks command text; at maps a rune range of the text to
+// the source span to report it at.
+func (c *Checker) commandText(text string, at func(start, end int) syntax.Span) {
 	folder := func(reg string) string {
 		if t, ok := strings.CutPrefix(reg, "tag/"); ok {
 			return "tags/" + t
 		}
 		return reg
 	}
-	r := command.New(c.Pack).CheckWith(cmd.Text, func(reg, id string) bool {
+	r := command.New(c.Pack).CheckWith(text, func(reg, id string) bool {
 		return c.find(folder(reg), id) != nil
 	})
 	if p := r.Problem; p != nil {
-		sp := syntax.Span{Start: base + p.Start, End: base + p.End}
-		if sp.End <= sp.Start {
-			if p.Start >= len([]rune(cmd.Text)) && sp.Start > base {
-				sp.Start-- // point at the last character rather than past the line
-			}
-			sp.End = sp.Start + 1
-		}
-		c.errorf("mms/command", sp, "%s", p.Message)
+		c.errorf("mms/command", at(p.Start, p.End), "%s", p.Message)
 		return
 	}
 	for _, id := range r.IDs {
 		v := strings.TrimPrefix(id.Value, "#")
-		sp := syntax.Span{Start: base + id.Start, End: base + id.End}
+		sp := at(id.Start, id.End)
 		if id.Registry == "objective" {
 			if sym := c.objective(v); sym != nil {
 				c.recordCommandRef(sp, id.Value, sym)
