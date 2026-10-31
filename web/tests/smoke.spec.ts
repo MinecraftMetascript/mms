@@ -311,3 +311,37 @@ test('Tab indents, Shift+Tab unindents, and Tab accepts a completion', async ({ 
 	await page.keyboard.press('Tab');
 	await expect(page.locator('.cm-content')).toContainText('DensityFunction x = Clamp');
 });
+
+test('F2 renames inline with a preview of occurrences', async ({ page }) => {
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	await replaceText(page, 'DensityFunction a = 0.5\nDensityFunction b = a * a\n');
+	await expect(status(page)).toHaveText(/No problems|warning/);
+	await page.locator('.cm-line').first().getByText('a', { exact: true }).click();
+
+	// Escape cancels without changes.
+	await page.keyboard.press('F2');
+	const box = page.getByRole('textbox', { name: 'New name' });
+	await expect(box).toBeFocused();
+	await expect(box).toHaveValue('a');
+	await expect(page.locator('.cm-rename-hint')).toContainText('3 occurrences');
+	await expect(page.locator('.cm-rename-occurrence')).toHaveCount(3);
+	await page.keyboard.press('Escape');
+	await expect(box).toBeHidden();
+	await expect(page.locator('.cm-rename-occurrence')).toHaveCount(0);
+	await expect(page.locator('.cm-content')).toBeFocused();
+
+	// Typing replaces the selected name; Enter applies it everywhere.
+	await page.keyboard.press('F2');
+	await expect(box).toBeFocused();
+	await page.keyboard.type('base');
+	await page.keyboard.press('Enter');
+	await expect(box).toBeHidden();
+	await expect(page.locator('.cm-content')).toContainText('DensityFunction base = 0.5DensityFunction b = base * base');
+
+	// The right-click menu opens the same box.
+	await page.locator('.cm-line').first().getByText('base', { exact: true }).click({ button: 'right' });
+	await page.getByRole('menuitem', { name: /Rename symbol/ }).click();
+	await expect(box).toHaveValue('base');
+	await page.keyboard.press('Escape');
+});
