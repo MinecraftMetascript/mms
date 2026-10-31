@@ -98,9 +98,10 @@ func run(out, cache string) error {
 		Dispatchers: map[string]map[string]*spec.Type{},
 	}
 
-	// Data-pack resource kinds (decision D5).
+	// Data-pack resource kinds: every kind whose type does not point into
+	// ::java::assets:: (decisions D5, D41).
 	for kind, t := range symbols.Dispatchers["minecraft:resource"] {
-		if t.Kind == "reference" && strings.HasPrefix(t.Path, "::java::data::") {
+		if b, _ := json.Marshal(t); !strings.Contains(string(b), `"::java::assets::`) {
 			pack.Resources[kind] = t
 		}
 	}

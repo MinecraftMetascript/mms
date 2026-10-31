@@ -28,9 +28,10 @@ type OutFile struct {
 func (r *Result) Emit() []OutFile {
 	var out []OutFile
 	type tagFile struct {
-		values jsonv.Array
-		seen   map[string]bool
-		decl   *Decl
+		values  jsonv.Array
+		seen    map[string]bool
+		decl    *Decl
+		replace bool
 	}
 	tags := map[string]*tagFile{}
 	addTag := func(path string, values jsonv.Array, d *Decl) {
@@ -54,7 +55,11 @@ func (r *Result) Emit() []OutFile {
 		ns, path := splitID(id)
 		switch {
 		case d.Kind.TagOf != "":
-			addTag("data/"+ns+"/"+d.Kind.Resource+"/"+path+".json", d.Tag, d)
+			p := "data/" + ns + "/" + d.Kind.Resource + "/" + path + ".json"
+			addTag(p, d.Tag, d)
+			if d.TagReplace {
+				tags[p].replace = true
+			}
 		case d.Kind.IsResource():
 			if d.Value == nil {
 				continue
@@ -80,7 +85,12 @@ func (r *Result) Emit() []OutFile {
 		}
 	}
 	for path, t := range tags {
-		f := OutFile{Path: path, Data: jsonv.Marshal(&jsonv.Object{Members: []jsonv.Member{{Key: "values", Value: t.values}}})}
+		o := &jsonv.Object{}
+		if t.replace {
+			o.Set("replace", jsonv.Bool(true))
+		}
+		o.Set("values", t.values)
+		f := OutFile{Path: path, Data: jsonv.Marshal(o)}
 		if t.decl != nil {
 			f.Unit, f.Span = t.decl.Unit.Path, t.decl.D.Sp
 		}

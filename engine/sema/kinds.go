@@ -135,3 +135,26 @@ func lastSeg(s string) string {
 	}
 	return s
 }
+
+// ForFolder returns the kind whose files live in folder (a resource kind
+// such as "loot_table", or "tags/<registry>").
+func (ks *Kinds) ForFolder(folder string) (Kind, bool) {
+	if reg, ok := strings.CutPrefix(folder, "tags/"); ok {
+		name := Pascal(lastSeg(reg)) + "Tag"
+		if k, ok := ks.Lookup(name); ok && k.TagOf == reg {
+			return k, true
+		}
+		return Kind{}, false
+	}
+	for _, k := range ks.byName {
+		if k.Resource == folder && kindAliases[k.Name] == "" {
+			return k, true
+		}
+	}
+	for name, r := range kindAliases {
+		if r == folder {
+			return ks.byName[name], true
+		}
+	}
+	return Kind{}, false
+}

@@ -127,9 +127,11 @@ type Decl struct {
 	NS    string
 	Value jsonv.Value // JSON resources
 	Tag   jsonv.Array // tag entries
-	Lines []string    // function commands
-	Info  map[syntax.Node]*sema.Info
-	Diags []syntax.Diagnostic
+	// TagReplace is set when a tag replaces lower packs' entries.
+	TagReplace bool
+	Lines      []string // function commands
+	Info       map[syntax.Node]*sema.Info
+	Diags      []syntax.Diagnostic
 	// Deps are the symbol lookups the check made (see sema.DepsHold).
 	Deps map[string]bool
 }
@@ -312,7 +314,7 @@ func (p *Project) checkDecl(u *sema.Unit, d *syntax.Decl, k sema.Kind, syms *sem
 	}()
 	switch {
 	case k.TagOf != "":
-		dr.Tag = c.Tag(d, k)
+		dr.Tag, dr.TagReplace = c.Tag(d, k)
 	case k.IsResource():
 		dr.Value = c.Resource(d, k)
 	case k.MMS == "Function" || k.MMS == "OnLoad" || k.MMS == "OnTick":

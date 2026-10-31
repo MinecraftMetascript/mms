@@ -12,6 +12,7 @@ commands:
   build   check the project and write the data pack
   check   check the project and report problems
   fmt     format .mms files
+  import  turn a data pack folder or zip into an MMS project
   init    create mms.json and a starter file
   lsp     run the language server over stdio
 `
@@ -31,6 +32,8 @@ func main() {
 		code = runInit(os.Args[2:], os.Stdout, os.Stderr)
 	case "fmt":
 		code = runFmt(os.Args[2:], os.Stdin, os.Stdout, os.Stderr)
+	case "import":
+		code = runImport(os.Args[2:], os.Stdout, os.Stderr)
 	case "lsp":
 		code = runLSP(os.Args[2:], os.Stdin, os.Stdout, os.Stderr)
 	case "help", "-h", "--help":

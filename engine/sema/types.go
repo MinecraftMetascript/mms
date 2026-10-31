@@ -232,7 +232,10 @@ func dynamicKey(idx []*spec.Index) (string, bool) {
 type idInfo struct {
 	Registry string // "" for any id
 	Tags     string // "", "allowed", "implicit" or "required"
-	Present  bool
+	// Path prefixes the id inside its registry: asset ids such as a
+	// banner pattern's "minecraft:base" name "entity/banner/base".
+	Path    string
+	Present bool
 }
 
 func idOf(t *spec.Type) idInfo {
@@ -251,6 +254,9 @@ func idOf(t *spec.Type) idInfo {
 		}
 		if tg := a.Value.Tree["tags"]; tg != nil && tg.Literal != nil {
 			info.Tags = tg.Literal.String()
+		}
+		if pa := a.Value.Tree["path"]; pa != nil && pa.Literal != nil {
+			info.Path = pa.Literal.String()
 		}
 	}
 	return info

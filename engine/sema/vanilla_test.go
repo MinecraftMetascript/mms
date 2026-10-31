@@ -17,6 +17,16 @@ import (
 // with the reason. Each is an upstream mcdoc gap, not an MMS bug.
 var knownMismatch = map[string]string{
 	"recipe/map_extending.json": "mcdoc requires result.id; vanilla writes result: {}",
+	"wolf_sound_variant/":       "mcdoc's WolfSounds lacks step_sound, which 26.3 adds",
+}
+
+func knownMismatchFor(rel string) (string, bool) {
+	for k, reason := range knownMismatch {
+		if rel == k || (strings.HasSuffix(k, "/") && strings.HasPrefix(rel, k)) {
+			return reason, true
+		}
+	}
+	return "", false
 }
 
 // TestVanillaValidates checks every vanilla 26.3 data file against the
@@ -61,7 +71,7 @@ func TestVanillaValidates(t *testing.T) {
 				stats[kind] = st
 			}
 			st.files++
-			if reason, ok := knownMismatch[filepath.ToSlash(rel)]; ok {
+			if reason, ok := knownMismatchFor(filepath.ToSlash(rel)); ok {
 				_ = reason
 				return nil
 			}

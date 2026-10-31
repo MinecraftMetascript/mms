@@ -66,4 +66,4 @@ jobs:
           cd "$RUNNER_TEMP/mcmeta"
           git fetch -q --depth 1 https://github.com/misode/mcmeta.git 538b2b167248c648b2198f2c0d56eced10dfc0cf
           git checkout -q FETCH_HEAD
-      - run: MMS_VANILLA="$RUNNER_TEMP/mcmeta" go test ./sema ./project -run "TestVanillaValidates|TestVanillaParity" -v
+      - run: MMS_VANILLA="$RUNNER_TEMP/mcmeta" go test ./sema ./project ./importer -run "TestVanillaValidates|TestVanillaParity|TestVanillaRoundTrip" -v

@@ -186,6 +186,10 @@ func (c *Checker) check(e syntax.Expr, v tview) jsonv.Value {
 		if b, ok := e.(*syntax.Bool); ok {
 			return jsonv.Bool(b.Value)
 		}
+		// NBT stores booleans as bytes, and data packs often write 0 or 1.
+		if n, ok := e.(*syntax.Number); ok && (n.Text == "0" || n.Text == "1") {
+			return jsonv.Number(n.Text)
+		}
 	case "byte", "short", "int", "long", "float", "double":
 		return c.number(e, v)
 	case "literal":
@@ -386,15 +390,22 @@ func (c *Checker) fits(e syntax.Expr, v tview) bool {
 		switch e.(type) {
 		case *syntax.String:
 			return true
-		case *syntax.Ident, *syntax.ResLoc:
+		case *syntax.Ident:
 			id := idOf(v.T)
 			return id.Present && id.Tags != "required"
+		case *syntax.ResLoc:
+			// A qualified resource location is also a plain string.
+			id := idOf(v.T)
+			return (id.Present && id.Tags != "required") || (!id.Present && qualified(e))
 		case *syntax.Tag:
 			id := idOf(v.T)
 			return id.Present && id.Tags != ""
 		}
 		return false
 	case "boolean":
+		if n, ok := e.(*syntax.Number); ok {
+			return n.Text == "0" || n.Text == "1"
+		}
 		_, ok := e.(*syntax.Bool)
 		return ok
 	case "byte", "short", "int", "long", "float", "double":
@@ -415,12 +426,21 @@ func (c *Checker) fits(e syntax.Expr, v tview) bool {
 			switch e.(type) {
 			case *syntax.String, *syntax.Ident:
 				return true
+			case *syntax.ResLoc:
+				return qualified(e)
 			}
 			return false
 		}
 		return isNumber(e)
 	}
 	return true
+}
+
+// qualified reports whether e is a resource location with a namespace
+// (minecraft:stone), which is also accepted as a plain string.
+func qualified(e syntax.Expr) bool {
+	r, ok := e.(*syntax.ResLoc)
+	return ok && strings.Contains(r.Text, ":")
 }
 
 func isNumber(e syntax.Expr) bool {
@@ -567,14 +587,19 @@ func (c *Checker) enumValue(e syntax.Expr, v tview) jsonv.Value {
 		got = x.Value
 	case *syntax.Ident:
 		got = x.Name
+	case *syntax.ResLoc:
+		got = x.Text
 	default:
 		if t, ok := numberText(e); ok {
 			got = t
 		}
 	}
+	if v.T.EnumKind == "string" {
+		got = strings.TrimPrefix(got, "minecraft:")
+	}
 	for _, val := range v.T.Values {
 		s := val.String()
-		if s == got || (isPascal(got) && s == Snake(got)) {
+		if strings.TrimPrefix(s, "minecraft:") == got || (isPascal(got) && s == Snake(got)) {
 			if v.T.EnumKind == "string" {
 				if v.RefID && !strings.Contains(s, ":") {
 					s = "minecraft:" + s
@@ -669,6 +694,9 @@ func (c *Checker) stringValue(e syntax.Expr, v tview) jsonv.Value {
 			}
 			return jsonv.String(c.resolveID(text, id, e))
 		}
+		if r, ok := x.(*syntax.ResLoc); ok && qualified(r) {
+			return jsonv.String(r.Text)
+		}
 	case *syntax.Tag:
 		if id.Present && id.Tags != "" {
 			return jsonv.String(c.resolveTag(x.Name, id, e))
@@ -686,6 +714,10 @@ func (c *Checker) stringValue(e syntax.Expr, v tview) jsonv.Value {
 // unqualified one names a declaration in the current namespace if there is
 // one, and otherwise the registry's default namespace (minecraft).
 func (c *Checker) resolveID(text string, id idInfo, e syntax.Expr) string {
+	if id.Tags == "implicit" {
+		// The id names a tag, written without '#'.
+		return strings.TrimPrefix(c.resolveTag(text, id, e), "#")
+	}
 	reg := c.registryName(id.Registry)
 	ns, path := splitID(text)
 	if path != strings.ToLower(path) {
@@ -713,9 +745,9 @@ func (c *Checker) resolveID(text string, id idInfo, e syntax.Expr) string {
 		return full
 	}
 	if ns == "minecraft" {
-		if _, known := c.Pack.Registries[reg]; known && !c.Pack.HasID(reg, path) {
+		if _, known := c.Pack.Registries[reg]; known && !c.Pack.HasID(reg, id.Path+path) {
 			msg := fmt.Sprintf("unknown %s '%s'", reg, full)
-			if s := closest(path, c.Pack.Registries[reg]); s != "" {
+			if s := closest(path, withPrefix(c.Pack.Registries[reg], id.Path)); s != "" {
 				msg += fmt.Sprintf("; did you mean '%s'?", s)
 			}
 			c.errorf("mms/unknown-id", e.Span(), "%s", msg)
@@ -765,6 +797,20 @@ func (c *Checker) declaresNamespace(ns string) bool {
 		c.Deps["n|"+ns] = has
 	}
 	return has
+}
+
+// withPrefix returns the ids that start with prefix, without it.
+func withPrefix(ids []string, prefix string) []string {
+	if prefix == "" {
+		return ids
+	}
+	var out []string
+	for _, id := range ids {
+		if rest, ok := strings.CutPrefix(id, prefix); ok {
+			out = append(out, rest)
+		}
+	}
+	return out
 }
 
 func contains(xs []string, x string) bool {

@@ -9,11 +9,36 @@ import (
 
 // Tag checks a tag declaration's entries: a list of ids and tags of the
 // tag's registry. Declarations of the same tag are merged by the emitter.
-func (c *Checker) Tag(d *syntax.Decl, k Kind) jsonv.Array {
+func (c *Checker) Tag(d *syntax.Decl, k Kind) (values jsonv.Array, replace bool) {
 	var elems []syntax.Expr
 	switch x := d.Value.(type) {
 	case *syntax.List:
 		elems = x.Elems
+	case *syntax.Object:
+		// The whole tag file: { replace = true, values = [...] }.
+		for _, it := range x.Body.Items {
+			f, ok := it.(*syntax.FieldStmt)
+			if !ok {
+				c.errorf("mms/type-mismatch", it.Span(), "expected 'values' or 'replace'")
+				continue
+			}
+			switch f.Key.Text {
+			case "values":
+				if l, ok := f.Value.(*syntax.List); ok {
+					elems = l.Elems
+				} else {
+					c.errorf("mms/type-mismatch", f.Value.Span(), "expected a list of %s ids", k.TagOf)
+				}
+			case "replace":
+				if b, ok := f.Value.(*syntax.Bool); ok {
+					replace = b.Value
+				} else {
+					c.errorf("mms/type-mismatch", f.Value.Span(), "expected true or false")
+				}
+			default:
+				c.errorf("mms/unknown-field", f.Key.Sp, "a tag has only 'values' and 'replace'")
+			}
+		}
 	case nil:
 		if d.Body != nil {
 			for _, it := range d.Body.Items {
@@ -30,21 +55,61 @@ func (c *Checker) Tag(d *syntax.Decl, k Kind) jsonv.Array {
 		elems = []syntax.Expr{x}
 	}
 	id := idInfo{Registry: k.TagOf, Tags: "allowed", Present: true}
-	out := jsonv.Array{}
+	values = jsonv.Array{}
 	for _, e := range elems {
-		c.info(e).Type = tview{}
-		switch x := e.(type) {
-		case *syntax.Ident:
-			out = append(out, jsonv.String(c.resolveID(x.Name, id, e)))
-		case *syntax.ResLoc:
-			out = append(out, jsonv.String(c.resolveID(x.Text, id, e)))
-		case *syntax.Tag:
-			out = append(out, jsonv.String(c.resolveTag(x.Name, id, e)))
-		default:
-			c.errorf("mms/type-mismatch", e.Span(), "expected a %s id or tag, got %s", k.TagOf, exprKind(e))
+		if v := c.tagEntry(e, k, id); v != nil {
+			values = append(values, v)
 		}
 	}
-	return out
+	return values, replace
+}
+
+// tagEntry checks one tag entry: an id, a #tag, either as a string, or
+// { id = ..., required = false }.
+func (c *Checker) tagEntry(e syntax.Expr, k Kind, id idInfo) jsonv.Value {
+	c.info(e).Type = tview{}
+	switch x := e.(type) {
+	case *syntax.Ident:
+		return jsonv.String(c.resolveID(x.Name, id, e))
+	case *syntax.ResLoc:
+		return jsonv.String(c.resolveID(x.Text, id, e))
+	case *syntax.Tag:
+		return jsonv.String(c.resolveTag(x.Name, id, e))
+	case *syntax.String:
+		if rest, ok := strings.CutPrefix(x.Value, "#"); ok {
+			return jsonv.String(c.resolveTag(rest, id, e))
+		}
+		return jsonv.String(c.resolveID(x.Value, id, e))
+	case *syntax.Object:
+		o := &jsonv.Object{}
+		for _, it := range x.Body.Items {
+			f, ok := it.(*syntax.FieldStmt)
+			if !ok {
+				continue
+			}
+			switch f.Key.Text {
+			case "id":
+				if v := c.tagEntry(f.Value, k, id); v != nil {
+					o.Set("id", v)
+				}
+			case "required":
+				if b, ok := f.Value.(*syntax.Bool); ok {
+					o.Set("required", jsonv.Bool(b.Value))
+				} else {
+					c.errorf("mms/type-mismatch", f.Value.Span(), "expected true or false")
+				}
+			default:
+				c.errorf("mms/unknown-field", f.Key.Sp, "a tag entry has only 'id' and 'required'")
+			}
+		}
+		if o.Get("id") == nil {
+			c.errorf("mms/missing-field", x.Span(), "a tag entry needs an 'id'")
+			return nil
+		}
+		return o
+	}
+	c.errorf("mms/type-mismatch", e.Span(), "expected a %s id or tag, got %s", k.TagOf, exprKind(e))
+	return nil
 }
 
 // Function checks a function body. Until the function backend lands
