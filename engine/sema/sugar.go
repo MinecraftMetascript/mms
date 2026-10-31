@@ -4,6 +4,7 @@ import (
 	"strconv"
 
 	"github.com/minecraftmetascript/mms/engine/jsonv"
+	"github.com/minecraftmetascript/mms/engine/spec"
 	"github.com/minecraftmetascript/mms/engine/syntax"
 )
 
@@ -421,6 +422,11 @@ func ruleIf(c *Checker, e syntax.Expr, v tview) jsonv.Value {
 	in := c.info(name)
 	in.Type = v
 	if len(args) != 2 {
+		if len(args) == 1 {
+			// Still check the condition, so hover, completion and
+			// signature help work while the body is unwritten.
+			c.check(args[0], c.norm(tview{T: &spec.Type{Kind: "reference", Path: tMaterialCond}}))
+		}
 		c.errorf("mms/missing-value", name.Sp, "If needs a condition and a rule: If(cond) { rule }")
 		return nil
 	}

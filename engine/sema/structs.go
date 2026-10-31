@@ -308,14 +308,14 @@ func (c *Checker) callableByName(name string, v tview) *Callable {
 		}
 		if c.hasDispatchKey(disp, key) {
 			cfs, _ := c.fields(v, key)
-			return &Callable{Name: name, Case: key, Struct: v, Fields: cfs, Disp: disp, Ov: overlays[disp.Dispatcher+"/"+key]}
+			return &Callable{Name: name, Case: key, Struct: v, Fields: withDocs(disp.Dispatcher+"/"+key, disp.Dispatcher, cfs), Disp: disp, Ov: overlays[disp.Dispatcher+"/"+key]}
 		}
 		return nil
 	}
 	if v.Name != "" {
 		short := spec.ShortPath(v.Name)
 		if name == short || structAliases[name] == short {
-			return &Callable{Name: name, Struct: v, Fields: fs, Ov: overlays[short]}
+			return &Callable{Name: name, Struct: v, Fields: withDocs(short, "", fs), Ov: overlays[short]}
 		}
 	}
 	if len(fs) == 1 && fs[0].KeyType == nil && Pascal(fs[0].Key) == name {

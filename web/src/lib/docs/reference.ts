@@ -17,6 +17,10 @@ export interface Helper {
 	case?: string;
 	signature: string;
 	params?: Param[];
+	/** Hand-written: what the helper does, as Markdown with `code` spans. */
+	doc?: string;
+	/** Hand-written: MMS source using the helper. */
+	example?: string;
 }
 
 export interface Param {
@@ -26,6 +30,8 @@ export interface Param {
 	/** The same type in pieces, with named types linked. */
 	typeParts?: TypePart[];
 	optional?: boolean;
+	/** The value MMS writes when the parameter is left out. */
+	default?: string;
 	doc?: string;
 }
 

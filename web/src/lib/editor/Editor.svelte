@@ -144,9 +144,18 @@
 	onMount(() => {
 		shown = path;
 		view = new EditorView({ state: stateFor(path, text), parent: host });
+		// Links in hovers (the reference) open beside the editor, not over it.
+		const openLink = (e: MouseEvent) => {
+			const a = (e.target as Element | null)?.closest?.('.cm-tooltip a[href]') as HTMLAnchorElement | null;
+			if (!a || !/^https?:/.test(a.href)) return;
+			e.preventDefault();
+			window.open(a.href, '_blank', 'noopener');
+		};
+		host.addEventListener('click', openLink);
 		restoreDiagnostics(view);
 		onview?.(view);
 		return () => {
+			host.removeEventListener('click', openLink);
 			view?.destroy();
 			view = null;
 		};

@@ -1,4 +1,5 @@
 import type { Transport } from '@codemirror/lsp-client';
+import { SignatureShim } from './signature';
 
 export type EngineStatus = 'starting' | 'ready' | 'restarting' | 'failed';
 
@@ -28,6 +29,7 @@ export class Supervisor {
 	private worker: Worker | null = null;
 	private handlers: ((value: string) => void)[] = [];
 	private pending: string[] = [];
+	private shim = new SignatureShim();
 	private ready = false;
 	private restarts: number[] = [];
 	private pingTimer: ReturnType<typeof setInterval> | null = null;
@@ -44,6 +46,7 @@ export class Supervisor {
 	/** The transport for LSPClient.connect. */
 	readonly transport: Transport = {
 		send: (message: string) => {
+			this.shim.sent(message);
 			if (this.ready && this.worker) this.worker.postMessage(message);
 			else this.pending.push(message);
 		},
@@ -77,7 +80,7 @@ export class Supervisor {
 					break;
 				case 'message':
 					if (this.isPong(m.text!)) return;
-					for (const h of this.handlers) h(m.text!);
+					for (const h of this.handlers) h(this.shim.received(m.text!));
 					break;
 				case 'exit':
 					this.crashed('the engine stopped');
