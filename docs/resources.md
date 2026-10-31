@@ -91,3 +91,28 @@ ItemTag gems = [diamond, #minecraft:logs, Optional(emerald)]
 ## Density functions
 
 `+`, `-`, `*` and `/` build `add`, `sub`, `mul` and `div`. Arithmetic on constants is folded. A unary `-x` is `x * -1`.
+
+## Asset files
+
+Textures, sounds and structure templates are files, not declarations. Keep them anywhere in the project and name them where they are used:
+
+```
+PaintingVariant sunset = { width = 2, height = 1, asset_id = Texture("art/sunset.png") }
+JukeboxSong tune = { sound_event = Sound("music/tune.ogg"), description = "Tune", length_in_seconds = 30, comparator_output = 3 }
+TemplatePool houses = {
+  fallback = minecraft:empty
+  elements = [{ weight = 1, element = { element_type = "minecraft:single_pool_element", location = Structure("builds/house.nbt"), projection = "rigid", processors = "minecraft:empty" } }]
+}
+```
+
+Each call stands for the id the file gets in your namespace: its base name, lowercased, or the second argument, as in `Texture("art/Sunset Final.png", "sunset")`. Only files that code uses are copied, to the path the game expects:
+
+| Helper | File | Copied to |
+| --- | --- | --- |
+| `Texture` | `.png` | `assets/<ns>/textures/<prefix><name>.png`, where the field sets the prefix, such as `painting/` |
+| `Sound` | `.ogg` | `assets/<ns>/sounds/<name>.ogg`, plus an entry in a generated `sounds.json` |
+| `Structure` | `.nbt` | `data/<ns>/structure/<name>.nbt` |
+
+Textures and sounds go into a resource pack built next to the data pack: `build-resources/` (set `resourcePack.output` in `mms.json` to change it), `<name>-resources.zip` with `mms build --zip`, and `<world>/resources.zip` with `mms build --world`, which Minecraft loads as that world's resource pack. `"icon": "art/icon.png"` in `mms.json` becomes `pack.png` in both packs.
+
+Once a file is included, its id can also be written plainly elsewhere, with its namespace, such as `asset_id = my_pack:sunset`. An id in your namespace that nothing provides is reported by the [`external-asset`](lint.md) lint rule. The web editor cannot hold asset files yet.

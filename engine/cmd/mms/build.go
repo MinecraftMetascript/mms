@@ -25,6 +25,12 @@ func load(dir string) (*project.Project, error) {
 		return nil, err
 	}
 	p := project.New(pack, cfg)
+	p.Files = os.DirFS(dir)
+	if cfg.Icon != "" {
+		if st, err := os.Stat(filepath.Join(dir, filepath.FromSlash(cfg.Icon))); err != nil || st.IsDir() {
+			return nil, fmt.Errorf("mms.json: icon: no file %q in the project", cfg.Icon)
+		}
+	}
 	paths, err := cfg.SourceFiles(dir)
 	if err != nil {
 		return nil, err
@@ -100,9 +106,9 @@ func runCheck(args []string, stdout, stderr io.Writer) int {
 func runBuild(args []string, stdout, stderr io.Writer) int {
 	fl := flag.NewFlagSet("build", flag.ContinueOnError)
 	fl.SetOutput(stderr)
-	out := fl.String("out", "", "output folder (default: mms.json output, or build)")
-	zipPath := fl.String("zip", "", "write a zip archive instead of a folder")
-	world := fl.String("world", "", "install into a world: writes <world>/datapacks/<namespace>")
+	out := fl.String("out", "", "output folder (default: mms.json output, or build); a resource pack goes next to it, in <out>-resources")
+	zipPath := fl.String("zip", "", "write a zip archive instead of a folder; a resource pack goes in <name>-resources.zip")
+	world := fl.String("world", "", "install into a world: writes <world>/datapacks/<namespace>, and the resource pack to <world>/resources.zip")
 	if err := fl.Parse(args); err != nil {
 		return 2
 	}
@@ -125,33 +131,73 @@ func runBuild(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	files := r.Emit()
+	if err := project.ReadAssets(files, p.Files); err != nil {
+		fmt.Fprintln(stderr, "mms:", err)
+		return 1
+	}
+	data, res := project.SplitPacks(files)
+	fail := func(err error) int {
+		fmt.Fprintln(stderr, "mms:", err)
+		return 1
+	}
+	writeZip := func(path string, files []project.OutFile) error {
+		b, err := project.Zip(files)
+		if err == nil {
+			err = os.WriteFile(path, b, 0o644)
+		}
+		return err
+	}
 	switch {
 	case *zipPath != "":
-		data, err := project.Zip(files)
-		if err == nil {
-			err = os.WriteFile(*zipPath, data, 0o644)
+		if err := writeZip(*zipPath, data); err != nil {
+			return fail(err)
 		}
-		if err != nil {
-			fmt.Fprintln(stderr, "mms:", err)
-			return 1
+		fmt.Fprintf(stdout, "wrote %s (%d files)\n", *zipPath, len(data))
+		if len(res) > 0 {
+			rz := strings.TrimSuffix(*zipPath, filepath.Ext(*zipPath)) + "-resources.zip"
+			if err := writeZip(rz, res); err != nil {
+				return fail(err)
+			}
+			fmt.Fprintf(stdout, "wrote resource pack %s (%d files)\n", rz, len(res))
 		}
-		fmt.Fprintf(stdout, "wrote %s (%d files)\n", *zipPath, len(files))
 		return 0
 	case *world != "":
-		target := filepath.Join(*world, "datapacks", p.Config.Namespace)
 		if _, err := os.Stat(filepath.Join(*world, "level.dat")); err != nil {
 			fmt.Fprintf(stderr, "mms: %s does not look like a world folder (no level.dat)\n", *world)
 			return 1
 		}
-		*out = target
-	case *out == "":
+		target := filepath.Join(*world, "datapacks", p.Config.Namespace)
+		if err := project.WriteDir(target, data); err != nil {
+			return fail(err)
+		}
+		fmt.Fprintf(stdout, "wrote %d files to %s\n", len(data), target)
+		// Minecraft loads <world>/resources.zip as the world's own
+		// resource pack, so the world gets the whole project.
+		if len(res) > 0 {
+			rz := filepath.Join(*world, "resources.zip")
+			if err := writeZip(rz, res); err != nil {
+				return fail(err)
+			}
+			fmt.Fprintf(stdout, "wrote resource pack %s (%d files)\n", rz, len(res))
+		}
+		return 0
+	}
+	resOut := filepath.Join(dir, p.Config.ResourceOutput())
+	if *out == "" {
 		*out = filepath.Join(dir, p.Config.Output)
+	} else {
+		resOut = filepath.Clean(*out) + "-resources"
 	}
-	if err := project.WriteDir(*out, files); err != nil {
-		fmt.Fprintln(stderr, "mms:", err)
-		return 1
+	if err := project.WriteDir(*out, data); err != nil {
+		return fail(err)
 	}
-	fmt.Fprintf(stdout, "wrote %d files to %s\n", len(files), *out)
+	fmt.Fprintf(stdout, "wrote %d files to %s\n", len(data), *out)
+	if len(res) > 0 {
+		if err := project.WriteDir(resOut, res); err != nil {
+			return fail(err)
+		}
+		fmt.Fprintf(stdout, "wrote resource pack: %d files to %s\n", len(res), resOut)
+	}
 	return 0
 }
 

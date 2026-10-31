@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"hash/fnv"
+	"io/fs"
 	"runtime/debug"
 	"sort"
 	"strings"
@@ -22,6 +23,10 @@ type Project struct {
 	Pack   *spec.Pack
 	Kinds  *sema.Kinds
 	Config Config
+	// Files are the project's files, which asset helpers such as
+	// Texture("a.png") read. Nil means the host has none; set it before
+	// the first Analyze.
+	Files fs.FS
 
 	mu     sync.Mutex
 	files  map[string]*sema.Unit
@@ -115,6 +120,9 @@ type Result struct {
 	Order []*Decl
 
 	collect  map[string][]syntax.Diagnostic
+	assets   []assetUse
+	assetErr map[string][]syntax.Diagnostic
+	files    fs.FS
 	lintMu   sync.Mutex
 	lintDone bool
 	lints    map[string][]syntax.Diagnostic
@@ -178,6 +186,7 @@ func (r *Result) Diagnostics(path string) []syntax.Diagnostic {
 	var out []syntax.Diagnostic
 	out = append(out, u.File.Diags...)
 	out = append(out, r.collect[path]...)
+	out = append(out, r.assetErr[path]...)
 	for _, d := range r.Order {
 		if d.Unit == u {
 			out = append(out, d.Diags...)
@@ -231,7 +240,7 @@ func (p *Project) Analyze(ctx context.Context) (*Result, error) {
 	sort.Slice(units, func(i, j int) bool { return units[i].Path < units[j].Path })
 
 	syms, collect := sema.Collect(units, p.Kinds, p.Config.Namespace)
-	r := &Result{Syms: syms, Units: units, Decls: map[*syntax.Decl]*Decl{}, collect: collect, pack: p.Pack, cfg: p.Config}
+	r := &Result{Syms: syms, Units: units, Decls: map[*syntax.Decl]*Decl{}, collect: collect, pack: p.Pack, cfg: p.Config, files: p.Files}
 	r.symKey = symbolKey(syms)
 	sameSyms := prev != nil && prev.symKey == r.symKey
 	for _, u := range units {
@@ -251,6 +260,10 @@ func (p *Project) Analyze(ctx context.Context) (*Result, error) {
 				if dr != nil && !sameSyms && (dr.Deps == nil || !sema.DepsHold(syms, dr.Deps)) {
 					dr = nil
 				}
+				// An asset file it read was added, removed or changed.
+				if dr != nil && !sema.AssetDepsHold(p.Files, dr.Deps) {
+					dr = nil
+				}
 			}
 			if dr == nil {
 				dr = p.checkDecl(u, d, k, syms)
@@ -259,6 +272,7 @@ func (p *Project) Analyze(ctx context.Context) (*Result, error) {
 			r.Order = append(r.Order, dr)
 		}
 	}
+	r.collectAssets()
 	p.mu.Lock()
 	p.last = r
 	p.mu.Unlock()
@@ -322,6 +336,7 @@ func (p *Project) checkDecl(u *sema.Unit, d *syntax.Decl, k sema.Kind, syms *sem
 	ns := syms.DeclNS[d]
 	dr = &Decl{Unit: u, D: d, Kind: k, NS: ns}
 	c := sema.NewChecker(p.Pack, p.Kinds, syms, ns)
+	c.Files = p.Files
 	defer func() {
 		if rec := recover(); rec != nil {
 			dr.Value, dr.Tag, dr.Lines, dr.Fn = nil, nil, nil, nil
