@@ -425,12 +425,29 @@ func ruleIf(c *Checker, e syntax.Expr, v tview) jsonv.Value {
 		if len(args) == 1 {
 			// Still check the condition, so hover, completion and
 			// signature help work while the body is unwritten.
-			c.check(args[0], c.norm(tview{T: &spec.Type{Kind: "reference", Path: tMaterialCond}}))
+			c.checkIfCond(args[0])
 		}
 		c.errorf("mms/missing-value", name.Sp, "If needs a condition and a rule: If(cond) { rule }")
 		return nil
 	}
 	return c.check(lowerIf(args[0], args[1], e.Span()), v)
+}
+
+// checkIfCond checks the condition of an If whose rule is missing,
+// operand by operand for `&&` and `||`, which only If lowers.
+func (c *Checker) checkIfCond(e syntax.Expr) {
+	switch x := e.(type) {
+	case *syntax.Paren:
+		c.checkIfCond(x.X)
+		return
+	case *syntax.Binary:
+		if x.Op == "&&" || x.Op == "||" {
+			c.checkIfCond(x.L)
+			c.checkIfCond(x.R)
+			return
+		}
+	}
+	c.check(e, c.norm(tview{T: &spec.Type{Kind: "reference", Path: tMaterialCond}}))
 }
 
 func lowerIf(cond, rule syntax.Expr, sp syntax.Span) syntax.Expr {

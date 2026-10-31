@@ -85,3 +85,23 @@ func TestSignatureInsideUnfinishedIf(t *testing.T) {
 		t.Errorf("signature = %+v, %v", h, ok)
 	}
 }
+
+// Named arguments hover with the hand-written text, and conditions
+// joined with && check before the If has a body.
+func TestHelperDocsNamedAndCompound(t *testing.T) {
+	s, off := session(t, "SurfaceRule r = If(StoneDepth(Floor, of|fset = 2)) { stone }\n")
+	if h, _ := s.Hover("main.mms", off); !strings.Contains(h, "Extra depth that still passes") {
+		t.Errorf("named argument hover = %s", h)
+	}
+	s, off = session(t, "SurfaceRule r = If(Biome(desert) && StoneDepth(Floor, |))\n")
+	if h, ok := s.Signature("main.mms", off); !ok || !strings.HasPrefix(h.Label, "StoneDepth(") {
+		t.Errorf("signature = %+v, %v", h, ok)
+	}
+	src := "SurfaceRule r = If(Biome(desert) && StoneDepth(Floor))\n"
+	s, _ = session(t, src)
+	for _, d := range s.R.Diagnostics("main.mms") {
+		if d.Code == "mms/unsupported-operator" {
+			t.Errorf("unexpected %s: %s", d.Code, d.Message)
+		}
+	}
+}

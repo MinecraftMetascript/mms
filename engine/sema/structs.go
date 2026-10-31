@@ -51,6 +51,9 @@ func (c *Checker) objectStruct(body *syntax.Block, sp syntax.Span, v tview) json
 			}
 			return secondaryKey(keys, k)
 		})
+		if disp != nil {
+			fs = withDocs(disp.Dispatcher+"/"+caseKey, disp.Dispatcher, fs)
+		}
 	}
 	in := c.info(body)
 	in.Type, in.Fields, in.Disp = v, fs, disp
@@ -469,6 +472,8 @@ func (c *Checker) callStruct(e syntax.Expr, v tview) jsonv.Value {
 			}
 			return secondaryKey(keys, k)
 		})
+		fs = withDocs(cl.Disp.Dispatcher+"/"+cl.Case, cl.Disp.Dispatcher, fs)
+		fs = withDocs(cl.Disp.Dispatcher+"/"+cl.Case, cl.Disp.Dispatcher, fs)
 	}
 	return c.buildStruct(fs, disp, cl.Case, as, name.Sp, cl.Ov, v, fixSite{call: base})
 }
