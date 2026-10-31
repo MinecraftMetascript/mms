@@ -49,7 +49,7 @@ func (c *Checker) objectStruct(body *syntax.Block, sp syntax.Span, v tview) json
 			if k == disp.KeyField {
 				return caseKey
 			}
-			return keys[k]
+			return secondaryKey(keys, k)
 		})
 	}
 	in := c.info(body)
@@ -464,7 +464,7 @@ func (c *Checker) callStruct(e syntax.Expr, v tview) jsonv.Value {
 			if k == cl.Disp.KeyField {
 				return cl.Case
 			}
-			return keys[k]
+			return secondaryKey(keys, k)
 		})
 	}
 	return c.buildStruct(fs, disp, cl.Case, as, name.Sp, cl.Ov, v)
