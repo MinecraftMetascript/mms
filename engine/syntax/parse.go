@@ -98,9 +98,26 @@ func (e *errorListener) SyntaxError(_ antlr.Recognizer, offending any, _, _ int,
 			sp = Span{t.GetStart(), t.GetStart()}
 		}
 	}
+	if t, ok := offending.(antlr.Token); ok && t != nil && t.GetTokenType() == parser.MMSLexerSLASH && commandFollows(t) {
+		msg = "a command must start on its own line"
+	} else {
+		msg = cleanMessage(msg)
+	}
 	e.diags = append(e.diags, Diagnostic{
-		Code: "syntax/error", Severity: SeverityError, Message: cleanMessage(msg), Sp: sp,
+		Code: "syntax/error", Severity: SeverityError, Message: msg, Sp: sp,
 	})
+}
+
+// commandFollows reports whether a '/' token is followed by a letter, so it
+// was meant as a command but is not at the start of a line.
+func commandFollows(t antlr.Token) bool {
+	in := t.GetInputStream()
+	next := t.GetStop() + 1
+	if in == nil || next >= in.Size() {
+		return false
+	}
+	c := in.GetText(next, next)
+	return c >= "a" && c <= "z"
 }
 
 // cleanMessage turns ANTLR's token-name messages into readable ones.
@@ -310,9 +327,10 @@ func (b *builder) stmt(c parser.IStatementContext) Stmt {
 			name = unquote(name)
 		}
 		return &FieldStmt{
-			Key:   &Name{Text: name, Sp: span(key)},
-			Value: b.expr(s.Expr(), sp),
-			Sp:    sp,
+			Key:       &Name{Text: name, Sp: span(key)},
+			KeyQuoted: key.STRING() != nil,
+			Value:     b.expr(s.Expr(), sp),
+			Sp:        sp,
 		}
 	case *parser.CompoundAssignStmtContext:
 		return &AssignStmt{
@@ -321,6 +339,14 @@ func (b *builder) stmt(c parser.IStatementContext) Stmt {
 			Value:  b.expr(s.Expr(1), sp),
 			Sp:     sp,
 		}
+	case *parser.PathAssignStmtContext:
+		ids := s.AllIDENT()
+		var target Expr = &Ident{Name: ids[0].GetText(), Sp: tokSpan(ids[0].GetSymbol())}
+		for _, id := range ids[1:] {
+			n := &Name{Text: id.GetText(), Sp: tokSpan(id.GetSymbol())}
+			target = &Member{X: target, Name: n, Sp: Span{sp.Start, n.Sp.End}}
+		}
+		return &AssignStmt{Target: target, Op: "=", Value: b.expr(s.Expr(), sp), Sp: sp}
 	case *parser.ExprStmtContext:
 		return &ExprStmt{X: b.expr(s.Expr(), sp), Sp: sp}
 	}
@@ -415,6 +441,12 @@ func (b *builder) postfix(x Expr, c parser.IPostfixContext, sp Span) Expr {
 		m := &Member{X: x, Sp: sp}
 		if p.GetName() != nil && p.GetName().GetStart() >= 0 {
 			m.Name = &Name{Text: p.GetName().GetText(), Sp: tokSpan(p.GetName())}
+		} else {
+			// Kept in the tree so completion after a '.' knows the receiver.
+			b.file.Diags = append(b.file.Diags, Diagnostic{
+				Code: "syntax/missing-name", Severity: SeverityError,
+				Message: "expected a name after '.'", Sp: Span{sp.End, sp.End},
+			})
 		}
 		return m
 	case *parser.CallPostfixContext:

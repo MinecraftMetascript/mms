@@ -20,7 +20,7 @@ FALSE    : 'false';
 // A raw command: a line in a function body whose first non-blank character
 // is '/' followed by a command name. The whole line is one token; the
 // command checker parses it against the command tree.
-COMMAND : {p.atLineStart()}? '/' [a-z] ~[\r\n]*;
+COMMAND : '/' {p.atLineStart()}? [a-z] ~[\r\n]*;
 
 DOC_COMMENT   : '/**' .*? '*/' -> channel(HIDDEN);
 BLOCK_COMMENT : '/*' .*? '*/' -> channel(HIDDEN);

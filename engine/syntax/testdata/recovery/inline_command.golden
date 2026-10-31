@@ -1,0 +1,8 @@
+Decl Function f
+  Block
+    If
+      Ident a
+      Block
+        Ident say
+        Ident hi
+! 24-25 a command must start on its own line

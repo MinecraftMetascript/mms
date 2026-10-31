@@ -132,9 +132,10 @@ type (
 	// FieldStmt is `key = value`: a field in a resource body, or an
 	// assignment in a function body.
 	FieldStmt struct {
-		Key   *Name
-		Value Expr
-		Sp    Span
+		Key       *Name
+		KeyQuoted bool // the key was written as a string
+		Value     Expr
+		Sp        Span
 	}
 	// AssignStmt is a compound assignment such as `x += 1`.
 	AssignStmt struct {

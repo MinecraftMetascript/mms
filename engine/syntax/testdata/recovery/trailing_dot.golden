@@ -4,3 +4,4 @@ Decl Noise ridges
       Ident Noise
       Unary -
         Number 7
+! 25-25 expected a name after '.'

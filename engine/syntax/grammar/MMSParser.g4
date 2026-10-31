@@ -53,6 +53,7 @@ statement
     | CONTINUE                                                    # continueStmt
     | COMMAND                                                     # commandStmt
     | fieldKey ASSIGN expr                                        # fieldStmt
+    | IDENT (DOT IDENT)+ ASSIGN expr                              # pathAssignStmt
     | expr op=(PLUS_EQ | MINUS_EQ | STAR_EQ | SLASH_EQ | PCT_EQ) expr # compoundAssignStmt
     | expr                                                        # exprStmt
     ;
