@@ -61,6 +61,13 @@ func TestCompletion(t *testing.T) {
 		{"local ref", "Noise n = { base_octave = -1, amplitude_modifiers = [1] }\nDensityFunction x = Noise(|)", []string{"n"}, false},
 		{"comment", "// Noise |\nNoise n = {}", nil, true},
 		{"string", "Noise n = { a = \"x|y\" }", nil, true},
+		{"command name", "Function f {\n  /scoreb|\n}", []string{"scoreboard", "say"}, false},
+		{"command literal", "Function f {\n  /scoreboard players |\n}", []string{"set", "operation"}, false},
+		{"command selector", "Function f {\n  /kill |\n}", []string{"@e", "@s"}, false},
+		{"command function", "Function f {\n  /function |\n}\nFunction g {\n  /say hi\n}", []string{"test:g", "test:f"}, false},
+		{"command objective", "Objective kills = deathCount\nFunction f {\n  /scoreboard players set @s |\n}", []string{"kills"}, false},
+		{"command after execute run", "Function f {\n  /execute as @a run gam|\n}", []string{"gamemode"}, false},
+		{"command registry", "Function f {\n  /effect give @s |\n}", []string{"speed"}, false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

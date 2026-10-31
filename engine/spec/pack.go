@@ -170,6 +170,17 @@ func (p *Pack) HasID(registry, id string) bool {
 	return ok
 }
 
+// HasRegistry reports whether the pack lists a registry's ids.
+func (p *Pack) HasRegistry(registry string) bool {
+	_, ok := p.registrySets[strings.TrimPrefix(registry, "minecraft:")]
+	return ok
+}
+
+// RegistryIDs returns a registry's ids, without the "minecraft:" prefix.
+func (p *Pack) RegistryIDs(registry string) []string {
+	return p.Registries[strings.TrimPrefix(registry, "minecraft:")]
+}
+
 // ResourceKinds returns the sorted data-pack resource kinds.
 func (p *Pack) ResourceKinds() []string {
 	kinds := make([]string, 0, len(p.Resources))

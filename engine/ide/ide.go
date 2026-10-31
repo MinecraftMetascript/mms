@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/minecraftmetascript/mms/engine/command"
 	"github.com/minecraftmetascript/mms/engine/jsonv"
 	"github.com/minecraftmetascript/mms/engine/project"
 	"github.com/minecraftmetascript/mms/engine/sema"
@@ -96,7 +97,7 @@ func (s *Session) Completion(path string, off int) ([]Item, syntax.Span) {
 			return nil, syntax.Span{Start: off, End: off}
 		}
 		if t.Kind == parser.MMSLexerCOMMAND && off > t.Sp.Start {
-			return nil, syntax.Span{Start: off, End: off}
+			return s.commandCompletion(a, t.Sp, off)
 		}
 	}
 	replace := syntax.Span{Start: off, End: off}
@@ -650,4 +651,38 @@ func (s *Session) Symbols(path string) []Symbol {
 		out = append(out, sym)
 	}
 	return out
+}
+
+// commandCompletion completes inside a raw command: literals from the
+// command tree and values for its arguments, including the project's own
+// functions, objectives and resources.
+func (s *Session) commandCompletion(a *at, sp syntax.Span, off int) ([]Item, syntax.Span) {
+	base := sp.Start + 1
+	text := string(a.u.File.Src[base:sp.End])
+	ids := func(reg string) []string {
+		folder := reg
+		if tg, ok := strings.CutPrefix(reg, "tag/"); ok {
+			folder = "tags/" + tg
+		}
+		var out []string
+		for _, sym := range s.R.Syms.All() {
+			switch {
+			case reg == "objective" && sym.Kind.MMS == "Objective":
+				out = append(out, sym.Path)
+			case reg != "objective" && sym.Kind.MMS != "Objective" && sym.Kind.MMS != "Global" && sym.Kind.Folder() == folder:
+				out = append(out, sym.ID()) // commands need ids namespaced
+			}
+		}
+		return out
+	}
+	sugg, ws := command.New(s.P.Pack).Complete(text, off-base, ids)
+	items := make([]Item, 0, len(sugg))
+	for i, sg := range sugg {
+		k := sema.CandKeyword
+		if sg.ID {
+			k = sema.CandID
+		}
+		items = append(items, Item{Label: sg.Label, Kind: k, Detail: sg.Detail, Sort: sortKey(i)})
+	}
+	return items, syntax.Span{Start: base + ws, End: off}
 }

@@ -214,3 +214,38 @@ func TestIncrementalMatchesFresh(t *testing.T) {
 		}
 	}
 }
+
+func TestCommandDiagnostics(t *testing.T) {
+	p := New(spec.MustDefault(), DefaultConfig())
+	src := `Namespace demo
+Function a {
+  /function demo:b
+  /function demo:missing
+  /gamemode creatve @s
+  /execute if predicate demo:night run function #demo:hooks
+  /give @s other:thing
+}
+Function b {
+  /say hi
+}
+Predicate night = { type = time_check, clock = overworld, value = 0..12000 }
+FunctionTag hooks = [demo:b]
+`
+	p.SetFile("a.mms", src)
+	r, _ := p.Analyze(context.Background())
+	var got []string
+	runes := []rune(src)
+	for _, d := range r.Diagnostics("a.mms") {
+		if strings.HasPrefix(d.Code, "lint/") {
+			continue
+		}
+		got = append(got, d.Code+" "+string(runes[d.Sp.Start:d.Sp.End])+": "+d.Message)
+	}
+	want := []string{
+		"mms/unknown-id demo:missing: no function named 'demo:missing' is declared",
+		"mms/command creatve: unknown game mode 'creatve'; expected adventure, creative, spectator, survival",
+	}
+	if strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Errorf("diagnostics:\n%s\nwant:\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+	}
+}

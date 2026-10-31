@@ -3,6 +3,8 @@ package sema
 import (
 	"strings"
 
+	"github.com/minecraftmetascript/mms/engine/command"
+
 	"github.com/minecraftmetascript/mms/engine/jsonv"
 	"github.com/minecraftmetascript/mms/engine/syntax"
 )
@@ -150,7 +152,52 @@ func (c *Checker) Function(d *syntax.Decl) []string {
 		if strings.Contains(cmd.Text, "${") {
 			c.errorf("mms/unsupported", cmd.Sp, "${...} interpolation arrives with the function backend")
 		}
+		c.Command(cmd)
 		lines = append(lines, cmd.Text)
 	}
 	return lines
+}
+
+// Command checks a raw command against the command tree. Ids in a
+// namespace the project declares must name a declaration.
+func (c *Checker) Command(cmd *syntax.CommandStmt) {
+	base := cmd.Sp.Start + 1 // after the '/'
+	folder := func(reg string) string {
+		if t, ok := strings.CutPrefix(reg, "tag/"); ok {
+			return "tags/" + t
+		}
+		return reg
+	}
+	r := command.New(c.Pack).CheckWith(cmd.Text, func(reg, id string) bool {
+		return c.find(folder(reg), id) != nil
+	})
+	if p := r.Problem; p != nil {
+		sp := syntax.Span{Start: base + p.Start, End: base + p.End}
+		if sp.End <= sp.Start {
+			if p.Start >= len([]rune(cmd.Text)) && sp.Start > base {
+				sp.Start-- // point at the last character rather than past the line
+			}
+			sp.End = sp.Start + 1
+		}
+		c.errorf("mms/command", sp, "%s", p.Message)
+		return
+	}
+	for _, id := range r.IDs {
+		v := strings.TrimPrefix(id.Value, "#")
+		ns, _ := splitID(v)
+		f := folder(id.Registry)
+		if ns == "" || ns == "minecraft" {
+			continue
+		}
+		if _, ok := c.Kinds.ForFolder(strings.TrimPrefix(f, "tags/")); !ok && f != "function" && f != "tags/function" {
+			continue
+		}
+		if c.declaresNamespace(ns) && c.find(f, v) == nil {
+			what := strings.ReplaceAll(strings.TrimPrefix(f, "tags/"), "_", " ")
+			if strings.HasPrefix(f, "tags/") {
+				what += " tag"
+			}
+			c.errorf("mms/unknown-id", syntax.Span{Start: base + id.Start, End: base + id.End}, "no %s named '%s' is declared", what, id.Value)
+		}
+	}
 }
