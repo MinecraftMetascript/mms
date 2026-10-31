@@ -75,6 +75,8 @@ Function banner_second {
   // A missing banner block (broken, burned, pushed) is put back.
   /execute at @e[tag=cs_core,limit=1] unless block ~ ~ ~ #minecraft:banners run setblock ~ ~ ~ minecraft:white_banner
   // Damage the lure took this second comes off the banner; then the lure heals.
+  // A lure that is not loaded (or was killed) counts as no damage, not a lost banner.
+  /execute unless entity @e[tag=cs_lure] run return 0
   /execute store result score #lure_hp cs_tmp run data get entity @e[tag=cs_lure,limit=1] Health
   let lost = 1024 - cs_tmp["#lure_hp"]
   /data modify entity @e[tag=cs_lure,limit=1] Health set value 1024f

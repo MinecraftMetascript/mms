@@ -66,6 +66,7 @@ execute at @e[tag=cs_core,limit=1] run playsound minecraft:entity.wither.death m
 function siege:reset
 === data/siege/function/banner_second.mcfunction
 execute at @e[tag=cs_core,limit=1] unless block ~ ~ ~ #minecraft:banners run setblock ~ ~ ~ minecraft:white_banner
+execute unless entity @e[tag=cs_lure] run return 0
 execute store result score #lure_hp cs_tmp run data get entity @e[tag=cs_lure,limit=1] Health
 scoreboard players set #banner_second.lost mms.siege 1024
 scoreboard players operation #banner_second.lost mms.siege -= #lure_hp cs_tmp
@@ -312,9 +313,9 @@ scoreboard players operation #stuck_check._t7 mms.siege += #stuck_check.dy mms.s
 scoreboard players operation #stuck_check._t7 mms.siege += #stuck_check.dz mms.siege
 scoreboard players operation #stuck_check.d mms.siege = #stuck_check._t7 mms.siege
 execute store result score #near cs_tmp if entity @a[distance=..8,gamemode=!spectator,gamemode=!creative]
-scoreboard players set #stuck_check._t9 mms.siege 0
-execute if score #stuck_check.d mms.siege matches 3.. run function siege:stuck_check/_if3
-execute if score #stuck_check._t9 mms.siege matches 1 if score @s cs_stuck matches ..0 if score #near cs_tmp matches 0 run scoreboard players set @s cs_stuck 50
+scoreboard players operation #stuck_check._t8 mms.siege = @s cs_prev
+scoreboard players remove #stuck_check._t8 mms.siege 2
+execute if score #stuck_check.d mms.siege > #stuck_check._t8 mms.siege if score @s cs_stuck matches ..0 if score #near cs_tmp matches 0 run scoreboard players set @s cs_stuck 50
 scoreboard players operation @s cs_prev = #stuck_check.d mms.siege
 === data/siege/function/stuck_check/_if0.mcfunction
 scoreboard players set #stuck_check._t3 mms.siege 0
@@ -328,10 +329,6 @@ scoreboard players operation #stuck_check.dy mms.siege = #stuck_check._t4 mms.si
 scoreboard players set #stuck_check._t5 mms.siege 0
 scoreboard players operation #stuck_check._t5 mms.siege -= #stuck_check.dz mms.siege
 scoreboard players operation #stuck_check.dz mms.siege = #stuck_check._t5 mms.siege
-=== data/siege/function/stuck_check/_if3.mcfunction
-scoreboard players operation #stuck_check._t8 mms.siege = @s cs_prev
-scoreboard players remove #stuck_check._t8 mms.siege 2
-execute if score #stuck_check.d mms.siege > #stuck_check._t8 mms.siege run scoreboard players set #stuck_check._t9 mms.siege 1
 === data/siege/tags/block/break_fast.json
 {
   "values": [

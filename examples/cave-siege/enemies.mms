@@ -78,7 +78,11 @@ Function retarget {
   /execute unless entity @a[distance=..8,gamemode=!spectator,gamemode=!creative] run damage @s 0.01 siege:lure_ping by @e[tag=cs_lure,limit=1]
 }
 
-/** An enemy that is not 2 blocks closer than 5 seconds ago, with no player near, becomes a breaker for 10 seconds. */
+/**
+ * An enemy that is not 2 blocks closer than 5 seconds ago, with no player near, becomes a breaker
+ * for 10 seconds. That includes one right next to the banner behind a 1-block wall; one already at
+ * the banner only "digs" walkable blocks, which does nothing.
+ */
 Function stuck_check {
   /execute store result score #ex cs_tmp run data get entity @s Pos[0]
   /execute store result score #ey cs_tmp run data get entity @s Pos[1]
@@ -97,7 +101,7 @@ Function stuck_check {
   }
   let d = dx + dy + dz
   /execute store result score #near cs_tmp if entity @a[distance=..8,gamemode=!spectator,gamemode=!creative]
-  if (d > 2 && d > cs_prev[@s] - 2 && cs_stuck[@s] <= 0 && cs_tmp["#near"] == 0) {
+  if (d > cs_prev[@s] - 2 && cs_stuck[@s] <= 0 && cs_tmp["#near"] == 0) {
     cs_stuck[@s] = 50
   }
   cs_prev[@s] = d
