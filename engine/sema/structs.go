@@ -51,6 +51,9 @@ func (c *Checker) objectStruct(body *syntax.Block, sp syntax.Span, v tview) json
 			}
 			return secondaryKey(keys, k)
 		})
+		if disp != nil {
+			fs = withDocs(disp.Dispatcher+"/"+caseKey, disp.Dispatcher, fs)
+		}
 	}
 	in := c.info(body)
 	in.Type, in.Fields, in.Disp = v, fs, disp
@@ -308,14 +311,14 @@ func (c *Checker) callableByName(name string, v tview) *Callable {
 		}
 		if c.hasDispatchKey(disp, key) {
 			cfs, _ := c.fields(v, key)
-			return &Callable{Name: name, Case: key, Struct: v, Fields: cfs, Disp: disp, Ov: overlays[disp.Dispatcher+"/"+key]}
+			return &Callable{Name: name, Case: key, Struct: v, Fields: withDocs(disp.Dispatcher+"/"+key, disp.Dispatcher, cfs), Disp: disp, Ov: overlays[disp.Dispatcher+"/"+key]}
 		}
 		return nil
 	}
 	if v.Name != "" {
 		short := spec.ShortPath(v.Name)
 		if name == short || structAliases[name] == short {
-			return &Callable{Name: name, Struct: v, Fields: fs, Ov: overlays[short]}
+			return &Callable{Name: name, Struct: v, Fields: withDocs(short, "", fs), Ov: overlays[short]}
 		}
 	}
 	if len(fs) == 1 && fs[0].KeyType == nil && Pascal(fs[0].Key) == name {
@@ -469,6 +472,8 @@ func (c *Checker) callStruct(e syntax.Expr, v tview) jsonv.Value {
 			}
 			return secondaryKey(keys, k)
 		})
+		fs = withDocs(cl.Disp.Dispatcher+"/"+cl.Case, cl.Disp.Dispatcher, fs)
+		fs = withDocs(cl.Disp.Dispatcher+"/"+cl.Case, cl.Disp.Dispatcher, fs)
 	}
 	return c.buildStruct(fs, disp, cl.Case, as, name.Sp, cl.Ov, v, fixSite{call: base})
 }

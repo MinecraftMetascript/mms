@@ -94,11 +94,12 @@
 						<a class="entry-name" href="#{id}">{h.name}</a>
 						{#if h.case}<span class="entry-meta">makes <code>{h.case}</code></span>{/if}
 					</div>
+					{#if h.doc}{#each h.doc.split(/\n\n+/) as para, i (i)}<p class="entry-doc"><Doc text={para} /></p>{/each}{/if}
 					<pre class="shape"><code>{callShape(h)}</code></pre>
 					{#if h.params?.length}
 						<dl class="params">
 							{#each h.params as p (p.name)}
-								<dt><code>{p.name}</code>{#if p.optional}<span class="opt">optional</span>{/if}</dt>
+								<dt><code>{p.name}</code>{#if p.default}<span class="opt">default <code>{p.default}</code></span>{:else if p.optional}<span class="opt">optional</span>{/if}</dt>
 								<dd>
 									<TypeText parts={p.typeParts ?? [{ text: p.type }]} onjump={jump} />
 									{#if p.doc}<p><Doc text={p.doc} /></p>{/if}
@@ -106,6 +107,7 @@
 							{/each}
 						</dl>
 					{/if}
+					{#if h.example}<pre class="example"><code>{h.example}</code></pre>{/if}
 				</div>
 			{/each}
 		</section>
@@ -227,6 +229,15 @@
 	.shape {
 		margin: 0.4rem 0 0.6rem;
 		padding: 0.3rem 0.6rem;
+		font-size: 12.5px;
+		white-space: pre-wrap;
+	}
+	.entry-doc {
+		margin: 0.35rem 0;
+	}
+	.example {
+		margin: 0.6rem 0 0.2rem;
+		padding: 0.4rem 0.6rem;
 		font-size: 12.5px;
 		white-space: pre-wrap;
 	}

@@ -42,6 +42,9 @@ type RefHelper struct {
 	Case      string     `json:"case,omitempty"`
 	Signature string     `json:"signature"`
 	Params    []RefParam `json:"params,omitempty"`
+	// Doc and Example are hand-written, from helpdocs/; Doc is Markdown.
+	Doc     string `json:"doc,omitempty"`
+	Example string `json:"example,omitempty"`
 }
 
 // RefParam is a helper parameter or a field of a type entry. Type is the
@@ -51,7 +54,9 @@ type RefParam struct {
 	Type      string     `json:"type"`
 	TypeParts []TypePart `json:"typeParts,omitempty"`
 	Optional  bool       `json:"optional,omitempty"`
-	Doc       string     `json:"doc,omitempty"`
+	// Default is the value MMS writes when the parameter is left out.
+	Default string `json:"default,omitempty"`
+	Doc     string `json:"doc,omitempty"`
 }
 
 var mmsKindDocs = map[string]string{
@@ -184,6 +189,9 @@ func BuildReference(p *spec.Pack, ks *Kinds) Reference {
 
 func (c *Checker) refHelper(rt *refTypes, cl *Callable) RefHelper {
 	h := RefHelper{Name: cl.Name, Signature: c.signature(cl)}
+	if d := HelpDoc(cl); d != nil {
+		h.Doc, h.Example = d.Summary, d.Example
+	}
 	if cl.Case != "" {
 		h.Case = "minecraft:" + strings.TrimPrefix(cl.Case, "minecraft:")
 	}
@@ -195,7 +203,7 @@ func (c *Checker) refHelper(rt *refTypes, cl *Callable) RefHelper {
 			}
 		}
 		parts := rt.format(f.Type, 0)
-		h.Params = append(h.Params, RefParam{Name: f.Key, Type: plainParts(parts), TypeParts: parts, Optional: opt, Doc: f.Desc})
+		h.Params = append(h.Params, RefParam{Name: f.Key, Type: plainParts(parts), TypeParts: parts, Optional: opt, Default: defaultOf(cl, f.Key), Doc: f.Desc})
 	}
 	return h
 }

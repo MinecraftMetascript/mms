@@ -104,6 +104,54 @@ body {
 	font-family: var(--font-mono);
 	font-size: 12px;
 }
+/* Hover and signature help: fit narrow screens, wrap long lines, and
+   scroll inside the box rather than off the page. */
+.cm-tooltip.cm-tooltip-hover,
+.cm-tooltip.cm-lsp-signature-tooltip {
+	max-width: min(36rem, calc(100vw - 32px));
+	overflow-y: auto;
+	overflow-wrap: anywhere;
+	font-size: 13px;
+	line-height: 1.45;
+}
+.cm-tooltip.cm-tooltip-hover {
+	max-height: min(28rem, 55vh);
+	padding: 4px 2px;
+}
+.cm-tooltip.cm-lsp-signature-tooltip {
+	max-height: min(14rem, 35vh);
+	padding: 4px 8px;
+}
+.cm-lsp-signature-tooltip .cm-lsp-signature {
+	font-family: var(--font-mono);
+	font-size: 12px;
+}
+.cm-lsp-signature-tooltip .cm-lsp-documentation {
+	font-size: 12.5px;
+	margin-top: 4px;
+}
+.cm-lsp-documentation pre {
+	white-space: pre-wrap;
+	background: var(--c-hover);
+	border-radius: 4px;
+	padding: 4px 6px;
+}
+.cm-lsp-documentation p,
+.cm-lsp-documentation pre,
+.cm-lsp-documentation ul {
+	margin: 4px 0;
+}
+.cm-lsp-documentation ul {
+	list-style: disc;
+	padding-left: 1.25em;
+}
+.cm-lsp-documentation li {
+	margin: 2px 0;
+}
+.cm-lsp-documentation a {
+	color: var(--c-accent);
+	text-decoration: underline;
+}
 
 /* Token colours (semantic tokens and the fallback tokenizer share them) */
 :root {
