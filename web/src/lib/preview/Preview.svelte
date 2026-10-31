@@ -133,7 +133,8 @@
 			}
 			error = '';
 			last = r;
-			if (r.scale && !isoView.scale) isoView.scale = r.scale;
+			// The worker picks the default size and keeps zooming out within what fills the canvas.
+			if (r.scale && (!isoView.scale || r.scale > isoView.scale)) isoView.scale = r.scale;
 			draw();
 		};
 		const ro = new ResizeObserver(() => request());
@@ -330,7 +331,7 @@
 		if (mode === 'iso') {
 			// Zooming out past a 2×2-chunk area builds more chunks, up to 4×4.
 			const s = isoView.scale || 8;
-			isoView.scale = Math.min(48, Math.max(2, s * Math.exp(-e.deltaY * 0.0015)));
+			isoView.scale = Math.min(48, Math.max(last?.minScale ?? 2, s * Math.exp(-e.deltaY * 0.0015)));
 			request();
 			return;
 		}

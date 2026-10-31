@@ -82,6 +82,8 @@ export type PreviewResponse =
 			legend?: { id: string; color: string }[];
 			/** For the isometric view: the block size in pixels it was drawn at. */
 			scale?: number;
+			/** For the isometric view: the smallest block size it allows (it fills the canvas with chunks). */
+			minScale?: number;
 			/** For the isometric view: the image itself, drawn in the worker (pixels is then empty). */
 			bitmap?: ImageBitmap;
 			/** More of this render follows (chunks are still being built). */
