@@ -1,0 +1,196 @@
+=== data/treasure/advancement/first_gem.json
+{
+  "criteria": {
+    "has_gem": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": {
+        "items": [
+          {
+            "items": "#treasure:gems"
+          }
+        ]
+      }
+    }
+  },
+  "rewards": {
+    "function": "treasure:found_gem"
+  }
+}
+=== data/treasure/function/found_gem.mcfunction
+tellraw @s "You found your first gem. Craft a treasure compass to find more!"
+execute if predicate treasure:stormy_night run loot give @s loot treasure:chests/storm_bonus
+=== data/treasure/loot_table/chests/buried.json
+{
+  "pools": [
+    {
+      "rolls": {
+        "type": "minecraft:uniform",
+        "min": 1,
+        "max": 3
+      },
+      "entries": [
+        {
+          "type": "minecraft:tag",
+          "items": "#treasure:gems",
+          "expand": true
+        }
+      ]
+    },
+    {
+      "rolls": 1,
+      "entries": [
+        {
+          "type": "minecraft:item",
+          "name": "minecraft:gold_ingot",
+          "weight": 5
+        },
+        {
+          "type": "minecraft:item",
+          "name": "minecraft:golden_apple",
+          "weight": 1
+        },
+        {
+          "type": "minecraft:item",
+          "name": "minecraft:enchanted_book",
+          "weight": 2
+        }
+      ]
+    }
+  ]
+}
+=== data/treasure/loot_table/chests/storm_bonus.json
+{
+  "pools": [
+    {
+      "rolls": 1,
+      "entries": [
+        {
+          "type": "minecraft:item",
+          "name": "minecraft:trident"
+        }
+      ],
+      "condition": "treasure:stormy_night"
+    }
+  ]
+}
+=== data/treasure/predicate/stormy_night.json
+{
+  "type": "minecraft:all_of",
+  "terms": [
+    {
+      "type": "minecraft:weather_check",
+      "thundering": true
+    },
+    {
+      "type": "minecraft:any_of",
+      "terms": [
+        {
+          "type": "minecraft:time_check",
+          "clock": "minecraft:overworld",
+          "value": {
+            "min": 13000,
+            "max": 23000
+          }
+        },
+        {
+          "type": "minecraft:random_chance",
+          "chance": 0.5
+        }
+      ]
+    }
+  ]
+}
+=== data/treasure/recipe/blast_raw_gold.json
+{
+  "type": "minecraft:blasting",
+  "ingredient": "minecraft:raw_gold_block",
+  "result": {
+    "id": "minecraft:gold_block"
+  },
+  "experience": 2,
+  "cookingtime": 200
+}
+=== data/treasure/recipe/cut_bricks.json
+{
+  "type": "minecraft:stonecutting",
+  "ingredient": "minecraft:stone",
+  "result": {
+    "id": "minecraft:stone_bricks",
+    "count": 2
+  }
+}
+=== data/treasure/recipe/gem_block.json
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "GG",
+    "GG"
+  ],
+  "key": {
+    "G": "#treasure:gems"
+  },
+  "result": "minecraft:emerald_block"
+}
+=== data/treasure/recipe/gems_from_block.json
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    "minecraft:emerald_block"
+  ],
+  "result": {
+    "id": "minecraft:emerald",
+    "count": 4
+  }
+}
+=== data/treasure/recipe/smelt_raw_gold.json
+{
+  "type": "minecraft:smelting",
+  "ingredient": "minecraft:raw_gold_block",
+  "result": {
+    "id": "minecraft:gold_block"
+  },
+  "experience": 2,
+  "cookingtime": 400
+}
+=== data/treasure/recipe/treasure_compass.json
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    " G ",
+    "GCG",
+    " G "
+  ],
+  "key": {
+    "G": "minecraft:gold_ingot",
+    "C": "minecraft:compass"
+  },
+  "result": "minecraft:recovery_compass"
+}
+=== data/treasure/tags/block/chest_floors.json
+{
+  "values": [
+    "#minecraft:logs",
+    "#minecraft:planks",
+    "minecraft:stone_bricks"
+  ]
+}
+=== data/treasure/tags/item/gems.json
+{
+  "values": [
+    "minecraft:diamond",
+    "minecraft:emerald",
+    "minecraft:amethyst_shard",
+    {
+      "id": "minecraft:lapis_lazuli",
+      "required": false
+    }
+  ]
+}
+=== pack.mcmeta
+{
+  "pack": {
+    "description": "Recipes, loot tables, tags, predicates and advancements, across folders",
+    "min_format": 121,
+    "max_format": 121
+  }
+}

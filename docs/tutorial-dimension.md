@@ -1,6 +1,6 @@
 # Tutorial: a custom dimension
 
-This tutorial builds a dimension of floating islands, step by step. The finished project is [`examples/sky-islands`](../examples/sky-islands/sky.mms). In the web editor, open it from **Examples**. The tests build it on every change, so it stays in step with the language.
+This tutorial builds a dimension of floating islands, step by step. The finished project is [`examples/sky-islands`](../examples/sky-islands/), split into `dimension.mms`, `terrain.mms` and `visit.mms`. In the web editor, open it from **Examples**. The tests build it on every change, so it stays in step with the language.
 
 A dimension is made of several resources that refer to each other by id:
 
@@ -13,7 +13,7 @@ A dimension is made of several resources that refer to each other by id:
 | `worldgen/noise_settings` | `NoiseSettings` | the generator: terrain, surface, sea level |
 | `dimension` | `Dimension` | the dimension itself, tying the rest together |
 
-In MMS these all go in one file. A name such as `islands` refers to the declaration of that kind in your namespace, and every reference is checked. Completion inside each `{ }` lists the fields the game accepts.
+In MMS they can share one file or be split across several, since every file in the project sees every declaration. A name such as `islands` refers to the declaration of that kind in your namespace, and every reference is checked. Completion inside each `{ }` lists the fields the game accepts.
 
 ## 1. Set up the project
 
@@ -22,7 +22,7 @@ mkdir sky-islands && cd sky-islands
 mms init -namespace sky
 ```
 
-This writes `mms.json` and a starter `main.mms`. Everything below goes in one file. Rename it `sky.mms`, or keep the name.
+This writes `mms.json` and a starter `main.mms`. You can put everything below in that file, or split it up the way the example does: the dimension type, biome and dimension in `dimension.mms`, steps 4 to 6 in `terrain.mms`, and the function in `visit.mms`. The order of files and declarations does not matter.
 
 ## 2. The dimension type
 

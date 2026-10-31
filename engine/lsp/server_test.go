@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -292,5 +294,31 @@ func TestCodeActions(t *testing.T) {
 	edit := all[0].(map[string]any)["edit"].(map[string]any)["changes"].(map[string]any)[uri].([]any)[0].(map[string]any)
 	if want := "LootTable t = { pools = [{ rolls = 1, entries = [diamond] }] }\n"; edit["newText"] != want {
 		t.Errorf("fix all text = %q", edit["newText"])
+	}
+}
+
+// TestWorkspaceFiles checks that the server loads every project file from
+// the workspace, not just open ones, and resolves names across them.
+func TestWorkspaceFiles(t *testing.T) {
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, "terrain"), 0o755)
+	os.WriteFile(filepath.Join(dir, "mms.json"), []byte(`{"namespace": "demo"}`), 0o644)
+	os.WriteFile(filepath.Join(dir, "terrain", "base.mms"), []byte("DensityFunction base = 1\n"), 0o644)
+	os.WriteFile(filepath.Join(dir, "main.mms"), []byte("DensityFunction top = base * 2\n"), 0o644)
+	a, b := pathURI(filepath.Join(dir, "terrain", "base.mms")), pathURI(filepath.Join(dir, "main.mms"))
+
+	c := start(t)
+	c.result("initialize", map[string]any{"rootUri": pathURI(dir)})
+	c.notify("textDocument/didOpen", map[string]any{"textDocument": map[string]any{"uri": b, "languageId": "mms", "version": 1, "text": "DensityFunction top = base * 2\n"}})
+
+	// base is declared in a file that was never opened.
+	def := c.result("textDocument/definition", pos(b, 0, 23)).([]any)
+	if len(def) != 1 || def[0].(map[string]any)["uri"] != a {
+		t.Fatalf("definition = %v, want %s", def, a)
+	}
+	ren := c.result("textDocument/rename", map[string]any{"textDocument": map[string]any{"uri": b}, "position": map[string]any{"line": 0, "character": 23}, "newName": "ground"}).(map[string]any)
+	changes := ren["changes"].(map[string]any)
+	if len(changes) != 2 || changes[a] == nil || changes[b] == nil {
+		t.Errorf("rename changes = %v, want edits in both files", changes)
 	}
 }

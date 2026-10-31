@@ -1,0 +1,74 @@
+=== data/basics/function/mms_gen/load.mcfunction
+scoreboard objectives add kills playerKillCount
+scoreboard objectives add points dummy
+scoreboard objectives add online dummy
+scoreboard objectives add mms.basics dummy
+scoreboard players set #cf mms.basics 0
+scoreboard players set #c10 mms.basics 10
+execute unless score $total_kills mms.basics = $total_kills mms.basics run scoreboard players set $total_kills mms.basics 0
+execute unless score $reward_every mms.basics = $reward_every mms.basics run scoreboard players set $reward_every mms.basics 5
+tellraw @a "Points game loaded"
+=== data/basics/function/mms_gen/tick.mcfunction
+execute as @a[scores={kills=1..}] run function basics:on_kill
+=== data/basics/function/on_kill.mcfunction
+scoreboard players operation $total_kills mms.basics += @s kills
+scoreboard players operation #on_kill._t0 mms.basics = @s kills
+scoreboard players operation #on_kill._t0 mms.basics *= #c10 mms.basics
+scoreboard players operation @s points += #on_kill._t0 mms.basics
+scoreboard players set @s kills 0
+scoreboard players operation #on_kill._t1 mms.basics = $reward_every mms.basics
+scoreboard players operation #on_kill._t1 mms.basics *= #c10 mms.basics
+scoreboard players operation #on_kill._t2 mms.basics = @s points
+scoreboard players operation #on_kill._t2 mms.basics %= #on_kill._t1 mms.basics
+execute if score #on_kill._t2 mms.basics matches 0 run function basics:reward
+=== data/basics/function/reward.mcfunction
+give @s diamond
+execute store result storage basics:mms m.a0 int 1 run scoreboard players get @s points
+function basics:reward/_macro0 with storage basics:mms m
+=== data/basics/function/reward/_macro0.mcfunction
+$tellraw @s "Reward! You have $(a0) points"
+=== data/basics/function/status.mcfunction
+scoreboard players set #status.i mms.basics 1
+function basics:status/_while0
+execute store result score #players online if entity @a
+scoreboard players operation #status.players mms.basics = #players online
+scoreboard players set #status.average mms.basics 0
+execute if score #status.players mms.basics matches 1.. run function basics:status/_if2
+execute store result storage basics:mms m.a0 int 1 run scoreboard players get $total_kills mms.basics
+execute store result storage basics:mms m.a1 int 1 run scoreboard players get #status.average mms.basics
+function basics:status/_macro3 with storage basics:mms m
+=== data/basics/function/status/_if2.mcfunction
+scoreboard players operation #status.average mms.basics = $total_kills mms.basics
+scoreboard players operation #status.average mms.basics /= #status.players mms.basics
+=== data/basics/function/status/_macro1.mcfunction
+$say $(a0)...
+=== data/basics/function/status/_macro3.mcfunction
+$tellraw @s "$(a0) kills in total, $(a1) per player"
+=== data/basics/function/status/_while0.mcfunction
+execute unless score #status.i mms.basics matches ..3 run return 0
+scoreboard players set #status._t0 mms.basics 4
+scoreboard players operation #status._t0 mms.basics -= #status.i mms.basics
+execute store result storage basics:mms m.a0 int 1 run scoreboard players get #status._t0 mms.basics
+function basics:status/_macro1 with storage basics:mms m
+scoreboard players add #status.i mms.basics 1
+return run function basics:status/_while0
+=== data/minecraft/tags/function/load.json
+{
+  "values": [
+    "basics:mms_gen/load"
+  ]
+}
+=== data/minecraft/tags/function/tick.json
+{
+  "values": [
+    "basics:mms_gen/tick"
+  ]
+}
+=== pack.mcmeta
+{
+  "pack": {
+    "description": "Functions: globals, scores, if and for, and ${} in commands",
+    "min_format": 121,
+    "max_format": 121
+  }
+}
