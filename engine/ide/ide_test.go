@@ -70,6 +70,13 @@ func TestCompletion(t *testing.T) {
 		{"command registry", "Function f {\n  /effect give @s |\n}", []string{"speed"}, false},
 		{"resource pack kind", "BlockSt|", []string{"BlockState"}, false},
 		{"block state property", "BlockState minecraft:oak_fence = {\n  multipart = [{ when = {\n    |\n  }, apply = { model = minecraft:block/oak_fence_post } }]\n}", []string{"north", "waterlogged"}, false},
+		{"execute helper", "Function f {\n  A|\n}", []string{"As", "At", "Positioned"}, false},
+		{"execute chain", "Function f {\n  As(@a).|\n}", []string{"At", "Facing"}, false},
+		{"execute chain prefix", "Function f {\n  As(@a).A| {\n    /say hi\n  }\n}", []string{"At", "Anchored"}, false},
+		{"execute nested", "OnTick {\n  As(@a) {\n    P|\n  }\n}", []string{"Positioned"}, false},
+		{"advancement trigger", "OnAdvancement a = Pla|", []string{"PlacedBlock"}, false},
+		{"advancement condition", "OnAdvancement a = PlacedBlock(|) {\n  /say hi\n}", []string{"location"}, false},
+		{"hook kind", "OnFirst|", []string{"OnFirstJoin"}, false},
 		{"model parent", "Model block/x = { parent = minecraft:block/cube_a| }", []string{"block/cube_all"}, false},
 	}
 	for _, tc := range cases {
@@ -164,5 +171,19 @@ func TestResourcePackNavigation(t *testing.T) {
 	h, _ := s.Hover("main.mms", strings.Index(src, "BlockState")+2)
 	if !strings.Contains(h, "assets/<namespace>/blockstates/<name>.json") || !strings.Contains(h, "resource pack") {
 		t.Errorf("kind hover = %q", h)
+	}
+}
+
+func TestExecuteHover(t *testing.T) {
+	for _, tc := range []struct{ src, want string }{
+		{"Function f {\n  A|s(@a).At(@s) {\n    /say hi\n  }\n}", "execute as"},
+		{"Function f {\n  As(@a).A|t(@s) {\n    /say hi\n  }\n}", "execute at"},
+		{"Function f {\n  /advancement grant @s only test:ki|lled\n}\nOnAdvancement killed = PlayerKilledEntity() {\n  /say hi\n}", "OnAdvancement test:killed"},
+	} {
+		s, off := session(t, tc.src)
+		h, _ := s.Hover("main.mms", off)
+		if !strings.Contains(h, tc.want) {
+			t.Errorf("%q: hover = %q, want %q", tc.src, h, tc.want)
+		}
 	}
 }

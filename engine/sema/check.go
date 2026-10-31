@@ -22,6 +22,9 @@ type Info struct {
 	Disp     *dispInfo
 	Callable *Callable
 	Local    *Local // a function's parameter or local variable
+	// Help is Markdown for a language helper such as an execute block's
+	// As(...), shown on hover.
+	Help string
 	// Bare says how a string literal here could be written unquoted:
 	// BareID for an id (Folder is its registry folder, "tags/..." for a
 	// tag), BareKey for a dispatch key, BareEnum for a string enum name.
