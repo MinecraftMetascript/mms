@@ -31,7 +31,7 @@
 		dimension: { x: 0, y: 64, scale: 2 },
 		biomes: { x: 0, y: 0, scale: 8 }
 	};
-	const modeNames: Record<PreviewMode, string> = { density: 'Density', blocks: 'Blocks', biomes: 'Biomes' };
+	const modeNames: Record<PreviewMode, string> = { density: 'Density', blocks: 'Blocks', biomes: 'Biomes', iso: '3D' };
 	const kindNames: Record<PreviewKind, string> = {
 		noise: 'noise',
 		density_function: 'density function',
@@ -59,7 +59,10 @@
 	let biomeY = $state(64);
 	const flat = $derived(info ? topDown(info.kind, mode) : false);
 	// CSS pixels per rendered pixel; terrain is costly to sample, so coarser.
-	const resolution = $derived(mode === 'density' ? (info?.kind === 'noise_settings' ? 4 : 2) : 3);
+	// The isometric view is drawn with polygons, so it renders at device pixels.
+	const resolution = $derived(
+		mode === 'iso' ? 1 / Math.min(2, globalThis.devicePixelRatio || 1) : mode === 'density' ? (info?.kind === 'noise_settings' ? 4 : 2) : 3
+	);
 	// Terrain is built a chunk at a time, so zooming out far gets slow.
 	const maxScale = $derived(mode === 'density' ? 64 : mode === 'biomes' ? 64 : 4);
 
@@ -171,6 +174,7 @@
 			lock = null;
 		}
 		view.scale = Math.min(view.scale, maxScale);
+		if (m === 'iso') lock = null;
 		last = null;
 		request();
 	}
@@ -248,6 +252,7 @@
 		return { px: ((e.clientX - r.left) / r.width) * (last?.width ?? 1), py: ((e.clientY - r.top) / r.height) * (last?.height ?? 1) };
 	}
 	function down(e: PointerEvent) {
+		if (mode === 'iso') return; // a fixed diagram: no pan, zoom or markers
 		canvas.setPointerCapture(e.pointerId);
 		drag = { x: e.clientX, y: e.clientY, vx: view.x, vy: view.y, moved: false };
 	}
@@ -272,6 +277,7 @@
 		drag = null;
 	}
 	function wheel(e: WheelEvent) {
+		if (mode === 'iso') return;
 		e.preventDefault();
 		const p = pointer(e as unknown as PointerEvent);
 		const [wx, wy] = toWorld(p.px, p.py);
@@ -294,7 +300,7 @@
 
 	const readout = $derived.by(() => {
 		const at = hover;
-		if (!at || !last) return '';
+		if (!at || !last || mode === 'iso') return '';
 		const ix = Math.floor(at.px);
 		const iy = Math.floor(at.py);
 		if (ix < 0 || iy < 0 || ix >= last.width || iy >= last.height) return '';
@@ -338,7 +344,7 @@
 					</select>
 				</label>
 			{/if}
-			{#if mode === 'blocks' && info.kind !== 'dimension'}
+			{#if (mode === 'blocks' || mode === 'iso') && info.kind !== 'dimension'}
 				<label class="flex items-center gap-1" title="The biome Biome() conditions in surface rules see">
 					Biome
 					<select aria-label="Biome" class="rounded border border-line bg-panel px-1 py-0.5 text-ink" bind:value={biome} onchange={() => request()}>
@@ -398,6 +404,9 @@
 				{#if lockValue}<span class="text-red-300">● {lockValue}</span>{/if}
 				{#if busy && (!last || mode !== 'density')}<span>Rendering…</span>{/if}
 			</div>
+		{/if}
+		{#if info && last?.notice}
+			<div class="pointer-events-none absolute inset-x-3 top-3 rounded bg-black/60 px-3 py-2 text-xs text-white">{last.notice}</div>
 		{/if}
 		{#if info && last?.legend}
 			<div class="pointer-events-none absolute top-2 right-2 flex max-h-[60%] flex-col gap-0.5 overflow-hidden rounded bg-black/60 px-2 py-1 text-[11px] text-white" aria-label="Biomes in view">
