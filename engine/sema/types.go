@@ -183,7 +183,7 @@ func (c *Checker) fieldsWith(v tview, keyOf func(keyField string) string) ([]fie
 						}
 						if caseKey := keyOf(acc); caseKey != "" {
 							cs, ok := c.Pack.Dispatch(st.Registry, caseKey)
-							if !ok && disp.KeyField == acc {
+							if !ok && disp.KeyField == acc && caseKey != noneKey {
 								disp.NoCase = true
 							}
 							if ok {
@@ -215,6 +215,20 @@ func (c *Checker) fieldsWith(v tview, keyOf func(keyField string) string) ([]fie
 		}
 	}
 	return out, disp
+}
+
+// noneKey is the dispatcher case mcdoc picks when the key field is absent,
+// as in `{ preset?: ..., ...minecraft:multi_noise_biome_source[[preset]] }`
+// where a source without a preset lists its biomes inline.
+const noneKey = "%none"
+
+// secondaryKey gives the case for a secondary dispatcher's key field from
+// the keys a struct literal sets: noneKey when the field is absent.
+func secondaryKey(keys map[string]string, k string) string {
+	if v, ok := keys[k]; ok {
+		return v
+	}
+	return noneKey
 }
 
 func dynamicKey(idx []*spec.Index) (string, bool) {

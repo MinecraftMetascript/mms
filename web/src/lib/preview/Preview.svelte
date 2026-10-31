@@ -1,7 +1,18 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import type { OutputFile } from '../engine/engine.svelte';
-	import { previewable, type PreviewKind, type PreviewRequest, type PreviewResponse, type PreviewView } from './protocol';
+	import {
+		modesOf,
+		previewable,
+		previewFile,
+		topDown,
+		type PreviewFile,
+		type PreviewKind,
+		type PreviewMode,
+		type PreviewRequest,
+		type PreviewResponse,
+		type PreviewView
+	} from './protocol';
 
 	interface Props {
 		output: OutputFile[];
@@ -12,11 +23,23 @@
 
 	// A target the pack no longer has (renamed or deleted) shows nothing.
 	const info = $derived(target && output.some((f) => f.path === target) ? previewable(target) : null);
-	const defaults: Record<PreviewKind, PreviewView> = {
+	const defaults: Record<PreviewKind | 'biomes', PreviewView> = {
 		noise: { x: 0, y: 0, scale: 4 },
 		density_function: { x: 0, y: 64, scale: 2 },
-		noise_settings: { x: 0, y: 64, scale: 2 }
+		noise_settings: { x: 0, y: 64, scale: 2 },
+		material_rule: { x: 0, y: 64, scale: 1 },
+		dimension: { x: 0, y: 64, scale: 2 },
+		biomes: { x: 0, y: 0, scale: 8 }
 	};
+	const modeNames: Record<PreviewMode, string> = { density: 'Density', blocks: 'Blocks', biomes: 'Biomes' };
+	const kindNames: Record<PreviewKind, string> = {
+		noise: 'noise',
+		density_function: 'density function',
+		noise_settings: 'noise settings',
+		material_rule: 'surface rule',
+		dimension: 'dimension'
+	};
+	const defaultView = (kind: PreviewKind, mode: PreviewMode) => ({ ...defaults[mode === 'biomes' ? 'biomes' : kind] });
 
 	let canvas: HTMLCanvasElement;
 	let box: HTMLDivElement;
@@ -29,9 +52,55 @@
 	let hover = $state<{ px: number; py: number } | null>(null);
 	let lock = $state<{ x: number; y: number } | null>(null);
 	let seq = 0;
-	let lastKind: PreviewKind | null = null;
+	let lastTarget: string | null = null;
+	let mode = $state<PreviewMode>('density');
+	let biome = $state('minecraft:plains');
+	let terrain = $state('minecraft:overworld');
+	let biomeY = $state(64);
+	const flat = $derived(info ? topDown(info.kind, mode) : false);
 	// CSS pixels per rendered pixel; terrain is costly to sample, so coarser.
-	const resolution = $derived(info?.kind === 'noise_settings' ? 4 : 2);
+	const resolution = $derived(mode === 'density' ? (info?.kind === 'noise_settings' ? 4 : 2) : 3);
+	// Terrain is built a chunk at a time, so zooming out far gets slow.
+	const maxScale = $derived(mode === 'density' ? 64 : mode === 'biomes' ? 64 : 4);
+
+	// Biomes a surface rule can be tested against: the pack's own, those its
+	// rules name in Biome() conditions, and a few vanilla ones.
+	function biomesIn(json: unknown, out: Set<string>) {
+		if (Array.isArray(json)) for (const v of json) biomesIn(v, out);
+		else if (json && typeof json === 'object') {
+			for (const [k, v] of Object.entries(json)) {
+				if (k === 'biome_is') for (const b of Array.isArray(v) ? v : [v]) if (typeof b === 'string' && !b.startsWith('#')) out.add(b.includes(':') ? b : `minecraft:${b}`);
+				biomesIn(v, out);
+			}
+		}
+	}
+	const parsed = $derived.by(() => {
+		const files: (PreviewFile & { text: string })[] = [];
+		for (const f of output) {
+			const p = previewFile(f.path);
+			if (!p) continue;
+			try {
+				files.push({ ...p, json: JSON.parse(f.text), text: f.text });
+			} catch {
+				/* skip */
+			}
+		}
+		return files;
+	});
+	const targetFile = $derived(info ? parsed.find((f) => f.kind === info.kind && f.id === info.id) : undefined);
+	const biomeChoices = $derived.by(() => {
+		const own = new Set<string>();
+		if (targetFile) biomesIn(targetFile.json, own);
+		const all = new Set(own);
+		for (const f of output) {
+			const m = /^data\/([^/]+)\/worldgen\/biome\/(.+)\.json$/.exec(f.path);
+			if (m) all.add(`${m[1]}:${m[2]}`);
+		}
+		for (const f of parsed) if (f.kind === 'material_rule' || f.kind === 'material_condition') biomesIn(f.json, all);
+		for (const b of ['plains', 'desert', 'badlands', 'forest', 'snowy_plains', 'beach', 'ocean', 'swamp']) all.add(`minecraft:${b}`);
+		return { first: [...own][0], all: [...all].sort() };
+	});
+	const terrainChoices = $derived(['minecraft:overworld', ...parsed.filter((f) => f.kind === 'noise_settings').map((f) => f.id)]);
 
 	onMount(() => {
 		worker = new Worker(new URL('./preview.worker.ts', import.meta.url), { type: 'module' });
@@ -57,28 +126,44 @@
 
 	// Re-register files whenever the pack changes, then re-render.
 	$effect(() => {
-		const files: { kind: PreviewKind; id: string; json: unknown }[] = [];
-		for (const f of output) {
-			const p = previewable(f.path);
-			if (!p) continue;
-			try {
-				files.push({ ...p, json: JSON.parse(f.text) });
-			} catch {
-				/* skip */
-			}
-		}
+		const files = parsed.map(({ kind, id, json }) => ({ kind, id, json }));
 		worker?.postMessage({ type: 'setup', files } satisfies PreviewRequest);
 		request();
 	});
 
+	// A new target starts from its kind's default mode, view and options.
 	$effect(() => {
-		if (info && info.kind !== lastKind) {
-			lastKind = info.kind;
-			view = { ...defaults[info.kind] };
-			lock = null;
+		const key = info ? `${info.kind}|${info.id}` : null;
+		if (info && key !== lastTarget) {
+			const sameKind = lastTarget?.startsWith(`${info.kind}|`);
+			lastTarget = key;
+			if (!sameKind) {
+				mode = modesOf[info.kind][0];
+				view = defaultView(info.kind, mode);
+				lock = null;
+				last = null;
+			}
+			biome = biomeChoices.first ?? 'minecraft:plains';
+			if (info.kind === 'material_rule') {
+				const user = parsed.find((f) => f.kind === 'noise_settings' && f.text.includes(`"${info.id}"`));
+				terrain = user?.id ?? 'minecraft:overworld';
+			}
 		}
 		request();
 	});
+
+	function setMode(m: PreviewMode) {
+		if (!info || m === mode) return;
+		const wasFlat = flat;
+		mode = m;
+		if (topDown(info.kind, m) !== wasFlat) {
+			view = defaultView(info.kind, m);
+			lock = null;
+		}
+		view.scale = Math.min(view.scale, maxScale);
+		last = null;
+		request();
+	}
 
 	let pending = false;
 	function request() {
@@ -94,11 +179,13 @@
 				type: 'render',
 				seq: ++seq,
 				kind: info.kind,
+				mode,
 				id: info.id,
 				width,
 				height,
 				view: $state.snapshot(view),
-				seed
+				seed,
+				options: { biome, terrain, y: biomeY }
 			} satisfies PreviewRequest);
 		});
 	}
@@ -109,7 +196,7 @@
 		canvas.height = last.height;
 		const ctx = canvas.getContext('2d')!;
 		ctx.putImageData(new ImageData(last.pixels, last.width, last.height), 0, 0);
-		if (last.seaLevel !== undefined && info?.kind !== 'noise') {
+		if (last.seaLevel !== undefined && mode === 'density') {
 			const py = (view.y - last.seaLevel) / view.scale + last.height / 2;
 			ctx.strokeStyle = 'rgba(30, 80, 160, 0.6)';
 			ctx.setLineDash([4, 3]);
@@ -134,14 +221,14 @@
 		const h = last?.height ?? 0;
 		const x = view.x + (px - w / 2) * view.scale;
 		// Side views have y up; the noise view has z down.
-		const y = info?.kind === 'noise' ? view.y + (py - h / 2) * view.scale : view.y - (py - h / 2) * view.scale;
+		const y = flat ? view.y + (py - h / 2) * view.scale : view.y - (py - h / 2) * view.scale;
 		return [Math.floor(x), Math.floor(y)];
 	}
 	function toPixel(x: number, y: number): [number, number] {
 		const w = last?.width ?? 0;
 		const h = last?.height ?? 0;
 		const px = (x - view.x) / view.scale + w / 2;
-		const py = info?.kind === 'noise' ? (y - view.y) / view.scale + h / 2 : (view.y - y) / view.scale + h / 2;
+		const py = flat ? (y - view.y) / view.scale + h / 2 : (view.y - y) / view.scale + h / 2;
 		return [px, py];
 	}
 
@@ -162,7 +249,7 @@
 		if (Math.abs(dx) + Math.abs(dy) > 2) drag.moved = true;
 		if (!drag.moved) return;
 		view.x = drag.vx - dx * view.scale;
-		view.y = info?.kind === 'noise' ? drag.vy - dy * view.scale : drag.vy + dy * view.scale;
+		view.y = flat ? drag.vy - dy * view.scale : drag.vy + dy * view.scale;
 		request();
 	}
 	function up(e: PointerEvent) {
@@ -179,14 +266,20 @@
 		const p = pointer(e as unknown as PointerEvent);
 		const [wx, wy] = toWorld(p.px, p.py);
 		const f = Math.exp(e.deltaY * 0.0015);
-		const scale = Math.min(64, Math.max(1 / 16, view.scale * f));
+		const scale = Math.min(maxScale, Math.max(1 / 16, view.scale * f));
 		// Keep the point under the cursor fixed.
 		const w = last?.width ?? 0;
 		const h = last?.height ?? 0;
 		view.scale = scale;
 		view.x = wx - (p.px - w / 2) * scale;
-		view.y = info?.kind === 'noise' ? wy - (p.py - h / 2) * scale : wy + (p.py - h / 2) * scale;
+		view.y = flat ? wy - (p.py - h / 2) * scale : wy + (p.py - h / 2) * scale;
 		request();
+	}
+
+	/** A sampled value, or the block or biome it indexes. */
+	function show(v: number): string {
+		const labels = last?.labels;
+		return labels ? labels[v].replace(/^minecraft:/, '') : v.toFixed(4);
 	}
 
 	const readout = $derived.by(() => {
@@ -197,8 +290,8 @@
 		if (ix < 0 || iy < 0 || ix >= last.width || iy >= last.height) return '';
 		const v = last.values[iy * last.width + ix];
 		const [x, y] = toWorld(at.px, at.py);
-		const coord = info?.kind === 'noise' ? `x ${x}, z ${y}` : `x ${x}, y ${y}`;
-		return Number.isNaN(v) ? coord : `${coord} · ${v.toFixed(4)}`;
+		const coord = flat ? `x ${x}, z ${y}` : `x ${x}, y ${y}`;
+		return Number.isNaN(v) ? coord : `${coord} · ${show(v)}`;
 	});
 	const lockValue = $derived.by(() => {
 		if (!lock || !last) return '';
@@ -207,7 +300,7 @@
 		const iy = Math.floor(py);
 		if (ix < 0 || iy < 0 || ix >= last.width || iy >= last.height) return `${lock.x}, ${lock.y}`;
 		const v = last.values[iy * last.width + ix];
-		return `${lock.x}, ${lock.y} · ${Number.isNaN(v) ? '–' : v.toFixed(4)}`;
+		return `${lock.x}, ${lock.y} · ${Number.isNaN(v) ? '–' : show(v)}`;
 	});
 </script>
 
@@ -215,7 +308,45 @@
 	<div class="flex flex-wrap items-center gap-2 border-b border-line px-3 py-1.5 text-xs text-muted">
 		{#if info}
 			<span class="font-medium text-ink">{info.id}</span>
-			<span>{info.kind.replace('_', ' ')}</span>
+			<span>{kindNames[info.kind]}</span>
+			{#if modesOf[info.kind].length > 1}
+				<div class="flex overflow-hidden rounded border border-line" role="group" aria-label="Preview mode">
+					{#each modesOf[info.kind] as m (m)}
+						<button
+							class="px-1.5 py-0.5 {mode === m ? 'bg-accent text-white' : 'hover:bg-hover'}"
+							aria-pressed={mode === m}
+							onclick={() => setMode(m)}>{modeNames[m]}</button
+						>
+					{/each}
+				</div>
+			{/if}
+			{#if info.kind === 'material_rule'}
+				<label class="flex items-center gap-1">
+					Terrain
+					<select aria-label="Terrain" class="rounded border border-line bg-panel px-1 py-0.5 text-ink" bind:value={terrain} onchange={() => request()}>
+						{#each terrainChoices as t (t)}<option value={t}>{t.replace(/^minecraft:/, '')}</option>{/each}
+					</select>
+				</label>
+			{/if}
+			{#if mode === 'blocks' && info.kind !== 'dimension'}
+				<label class="flex items-center gap-1" title="The biome Biome() conditions in surface rules see">
+					Biome
+					<select aria-label="Biome" class="rounded border border-line bg-panel px-1 py-0.5 text-ink" bind:value={biome} onchange={() => request()}>
+						{#each biomeChoices.all as b (b)}<option value={b}>{b.replace(/^minecraft:/, '')}</option>{/each}
+					</select>
+				</label>
+			{/if}
+			{#if mode === 'biomes'}
+				<label class="flex items-center gap-1">
+					Y
+					<input
+						type="number"
+						class="w-16 rounded border border-line bg-panel px-1.5 py-0.5 text-ink"
+						bind:value={biomeY}
+						oninput={() => request()}
+					/>
+				</label>
+			{/if}
 			<label class="ml-auto flex items-center gap-1">
 				Seed
 				<input
@@ -227,12 +358,12 @@
 			<button
 				class="rounded px-1.5 py-0.5 hover:bg-hover"
 				onclick={() => {
-					view = { ...defaults[info.kind] };
+					view = defaultView(info.kind, mode);
 					request();
 				}}>Reset view</button
 			>
 		{:else}
-			<span>Put the cursor in a noise, density function or noise settings declaration to preview it.</span>
+			<span>Put the cursor in a noise, density function, noise settings, surface rule or dimension declaration to preview it.</span>
 		{/if}
 	</div>
 	<div class="relative min-h-0 flex-1 bg-canvas" bind:this={box}>
@@ -255,7 +386,15 @@
 			<div class="pointer-events-none absolute bottom-2 left-2 flex flex-col gap-0.5 rounded bg-black/60 px-2 py-1 font-mono text-[11px] text-white">
 				{#if readout}<span>{readout}</span>{/if}
 				{#if lockValue}<span class="text-red-300">● {lockValue}</span>{/if}
-				{#if busy && !last}<span>Rendering…</span>{/if}
+				{#if busy && (!last || mode !== 'density')}<span>Rendering…</span>{/if}
+			</div>
+		{/if}
+		{#if info && last?.legend}
+			<div class="pointer-events-none absolute top-2 right-2 flex max-h-[60%] flex-col gap-0.5 overflow-hidden rounded bg-black/60 px-2 py-1 text-[11px] text-white" aria-label="Biomes in view">
+				{#each last.legend.slice(0, 12) as b (b.id)}
+					<span class="flex items-center gap-1.5"><span class="inline-block h-2.5 w-2.5 rounded-sm" style:background={b.color}></span>{b.id.replace(/^minecraft:/, '')}</span>
+				{/each}
+				{#if last.legend.length > 12}<span class="text-white/70">+{last.legend.length - 12} more</span>{/if}
 			</div>
 		{/if}
 		{#if info && last && last.min !== Infinity}
