@@ -27,6 +27,19 @@
 	let cursor = $state<{ uri: string; line: number } | null>(null);
 	let theme = $state<'system' | 'light' | 'dark'>('system');
 	let menu = $state(false);
+	let menuRoot: HTMLDivElement | undefined = $state();
+	let menuButton: HTMLButtonElement | undefined = $state();
+
+	// Close the Project menu on a click outside it, or on Escape.
+	function onWindowPointerDown(e: PointerEvent) {
+		if (menu && menuRoot && !menuRoot.contains(e.target as Node)) menu = false;
+	}
+	function onWindowKeydown(e: KeyboardEvent) {
+		if (menu && e.key === 'Escape') {
+			menu = false;
+			menuButton?.focus();
+		}
+	}
 	let fileInput: HTMLInputElement;
 	let pasteJson = $state<ReturnType<typeof PasteJson> | null>(null);
 	let editor = $state<ReturnType<typeof Editor> | null>(null);
@@ -217,12 +230,14 @@
 	);
 </script>
 
+<svelte:window onpointerdown={onWindowPointerDown} onkeydown={onWindowKeydown} />
+
 <div class="flex h-dvh flex-col">
 	<header class="flex items-center gap-3 border-b border-line bg-panel px-3 py-2">
 		<span class="font-semibold tracking-tight">MMS</span>
 		<span class="hidden text-sm text-muted sm:inline">{project.name}</span>
-		<div class="relative ml-2">
-			<button class="rounded px-2 py-1 text-sm whitespace-nowrap hover:bg-hover" onclick={() => (menu = !menu)} aria-expanded={menu}>Project ▾</button>
+		<div class="relative ml-2" bind:this={menuRoot}>
+			<button class="rounded px-2 py-1 text-sm whitespace-nowrap hover:bg-hover" bind:this={menuButton} onclick={() => (menu = !menu)} aria-expanded={menu}>Project ▾</button>
 			{#if menu}
 				<div class="absolute top-full left-0 z-20 mt-1 w-64 rounded-md border border-line bg-panel p-1 text-sm shadow-lg">
 					<button class="block w-full rounded px-2 py-1.5 text-left hover:bg-hover" onclick={newProject}>New project</button>
@@ -256,6 +271,12 @@
 				</div>
 			{/if}
 		</div>
+		<button
+			class="rounded px-2 py-1 text-sm whitespace-nowrap hover:bg-hover disabled:opacity-50"
+			disabled={!editor || !project.activeFile}
+			onclick={() => editor?.format()}
+			title="Format this file (Ctrl/⌘+S or Shift+Alt+F)">Format</button
+		>
 		<input type="file" accept=".zip" class="hidden" bind:this={fileInput} onchange={importZip} />
 		{#if engine}
 			<PasteJson bind:this={pasteJson} {engine} uri={uriOf(project.active)} oninsert={insertDecl} />

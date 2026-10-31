@@ -180,3 +180,26 @@ test('the docs render guides and the reference', async ({ page }) => {
 	await expect(filter).toHaveValue('');
 	await expect(page.locator('#type-util-direction-Axis')).toBeInViewport();
 });
+
+test('the Project menu closes on outside click and Escape, and Format formats', async ({ page }) => {
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	const projectButton = page.getByRole('button', { name: /Project/ });
+	const newProject = page.getByRole('button', { name: 'New project' });
+
+	await projectButton.click();
+	await expect(newProject).toBeVisible();
+	await page.locator('.cm-content').click();
+	await expect(newProject).toBeHidden();
+
+	await projectButton.click();
+	await expect(newProject).toBeVisible();
+	await page.keyboard.press('Escape');
+	await expect(newProject).toBeHidden();
+	await expect(projectButton).toBeFocused();
+
+	await replaceText(page, 'DensityFunction   x=Clamp( 1,0 ,1 )\n');
+	await expect(status(page)).toHaveText(/No problems/);
+	await page.getByRole('button', { name: 'Format', exact: true }).click();
+	await expect(page.locator('.cm-content')).toHaveText('DensityFunction x = Clamp(1, 0, 1)');
+});
