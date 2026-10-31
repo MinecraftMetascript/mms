@@ -28,17 +28,20 @@ type Server struct {
 	// Log receives internal errors; nil discards them.
 	Log io.Writer
 
-	proj      *project.Project
-	res       *project.Result
-	root      string // project folder on disk, "" in the browser
-	open      map[string]bool
+	proj *project.Project
+	res  *project.Result
+	root string // project folder on disk, "" in the browser
+	open map[string]bool
+	// managed files were given by mms/setFiles: closing their editor
+	// keeps them in the project (the browser has no disk to fall back on).
+	managed   map[string]bool
 	published map[string]bool
 	shutdown  bool
 }
 
 // NewServer returns a server over tr checking against pack.
 func NewServer(tr Transport, pack *spec.Pack) *Server {
-	return &Server{tr: tr, pack: pack, open: map[string]bool{}, published: map[string]bool{}}
+	return &Server{tr: tr, pack: pack, open: map[string]bool{}, managed: map[string]bool{}, published: map[string]bool{}}
 }
 
 type message struct {
@@ -188,6 +191,8 @@ func init() {
 		"workspace/didChangeWatchedFiles":  typed((*Server).didChangeWatched),
 		"mms/output":                       typed((*Server).output),
 		"mms/setConfig":                    typed((*Server).setConfig),
+		"mms/setFiles":                     typed((*Server).setFiles),
+		"mms/ping":                         func(*Server, context.Context, json.RawMessage) (any, *respError) { return "pong", nil },
 	}
 }
 
@@ -247,7 +252,7 @@ func (s *Server) initialize(ctx context.Context, p initializeParams) (any, *resp
 	return map[string]any{
 		"capabilities": map[string]any{
 			"positionEncoding": "utf-16",
-			"textDocumentSync": map[string]any{"openClose": true, "change": 1, "save": map[string]any{"includeText": false}},
+			"textDocumentSync": map[string]any{"openClose": true, "change": 2, "save": map[string]any{"includeText": false}},
 			"completionProvider": map[string]any{
 				"triggerCharacters": []string{".", "(", ",", "=", "[", "#", ":"},
 			},
@@ -316,6 +321,9 @@ func (s *Server) didClose(ctx context.Context, p struct {
 }) (any, *respError) {
 	uri := p.TextDocument.URI
 	delete(s.open, uri)
+	if s.managed[uri] {
+		return nil, nil
+	}
 	// A file that belongs to the project on disk stays, with its saved
 	// text; anything else leaves the project.
 	if path := uriPath(uri); path != "" && s.inProject(path) {
@@ -370,6 +378,30 @@ func (s *Server) setConfig(ctx context.Context, cfg project.Config) (any, *respE
 		np.SetFile(path, t)
 	}
 	s.proj = np
+	s.analyze(ctx)
+	return nil, nil
+}
+
+// setFiles adds, replaces and removes project files that are not open in
+// an editor. The browser sends the whole project this way on start.
+func (s *Server) setFiles(ctx context.Context, p struct {
+	Files []struct {
+		URI  string `json:"uri"`
+		Text string `json:"text"`
+	} `json:"files"`
+	Remove []string `json:"remove"`
+}) (any, *respError) {
+	for _, f := range p.Files {
+		s.managed[f.URI] = true
+		if !s.open[f.URI] {
+			s.proj.SetFile(f.URI, f.Text)
+		}
+	}
+	for _, uri := range p.Remove {
+		delete(s.managed, uri)
+		delete(s.open, uri)
+		s.proj.RemoveFile(uri)
+	}
 	s.analyze(ctx)
 	return nil, nil
 }

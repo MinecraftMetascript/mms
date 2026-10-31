@@ -186,3 +186,34 @@ func TestPositions(t *testing.T) {
 		t.Errorf("pos(5) = %v", p)
 	}
 }
+
+func TestManagedFiles(t *testing.T) {
+	c := start(t)
+	c.result("initialize", map[string]any{})
+	a, b := "mem:///a.mms", "mem:///b.mms"
+	c.notify("mms/setFiles", map[string]any{"files": []any{
+		map[string]any{"uri": a, "text": "DensityFunction a = 1\n"},
+		map[string]any{"uri": b, "text": "DensityFunction b = a + 1\n"},
+	}})
+	c.notify("textDocument/didOpen", map[string]any{"textDocument": map[string]any{"uri": a, "text": "DensityFunction a = 2\n"}})
+	c.notify("textDocument/didClose", map[string]any{"textDocument": map[string]any{"uri": a}})
+	out := c.result("mms/output", map[string]any{}).(map[string]any)
+	texts := map[string]string{}
+	for _, f := range out["files"].([]any) {
+		m := f.(map[string]any)
+		texts[m["path"].(string)] = m["text"].(string)
+	}
+	if !strings.Contains(texts["data/mms/worldgen/density_function/a.json"], "2") {
+		t.Errorf("closing a managed file lost its edits: %v", texts)
+	}
+	c.notify("mms/setFiles", map[string]any{"remove": []any{b}})
+	out = c.result("mms/output", map[string]any{}).(map[string]any)
+	for _, f := range out["files"].([]any) {
+		if strings.Contains(f.(map[string]any)["path"].(string), "/b.json") {
+			t.Error("removed file still built")
+		}
+	}
+	if c.result("mms/ping", nil) != "pong" {
+		t.Error("ping")
+	}
+}

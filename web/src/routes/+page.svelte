@@ -1,0 +1,283 @@
+<script lang="ts">
+	import { onMount, tick } from 'svelte';
+	import { asset } from '$app/paths';
+	import { LSPPlugin } from '@codemirror/lsp-client';
+	import { EditorSelection } from '@codemirror/state';
+	import { EditorView } from '@codemirror/view';
+	import Editor from '#lib/editor/Editor.svelte';
+	import Sidebar from '#lib/components/Sidebar.svelte';
+	import JsonView from '#lib/components/JsonView.svelte';
+	import Preview from '#lib/preview/Preview.svelte';
+	import { Engine, type Diagnostic, type DocSymbol, type OutputFile } from '#lib/engine/engine.svelte.ts';
+	import { Project, pathOf, uriOf, starter } from '#lib/project/project.svelte.ts';
+	import { examples } from '#lib/project/examples.ts';
+	import { download, packZip, projectZip, readProjectZip } from '#lib/project/zip.ts';
+	import { previewable } from '#lib/preview/protocol.ts';
+
+	const project = new Project();
+	let engine = $state<Engine | null>(null);
+	let view: EditorView | null = null;
+	let viewWaiters: ((v: EditorView) => void)[] = [];
+	let loaded = $state(false);
+	let selectedOutput = $state<string | null>(null);
+	let rightTab = $state<'preview' | 'json'>('preview');
+	let cursor = $state<{ uri: string; line: number } | null>(null);
+	let theme = $state<'system' | 'light' | 'dark'>('system');
+	let menu = $state(false);
+	let fileInput: HTMLInputElement;
+
+	onMount(() => {
+		try {
+			theme = (localStorage.getItem('mms-theme') as typeof theme) ?? 'system';
+		} catch {
+			/* storage unavailable */
+		}
+		const e = new Engine(asset('mms-worker.js'), {
+			onText: (uri, text) => project.setText(pathOf(uri), text),
+			display: async (uri) => {
+				const path = pathOf(uri);
+				if (!project.files.some((f) => f.path === path)) return null;
+				if (project.active === path && view) return view;
+				const v = new Promise<EditorView>((resolve) => viewWaiters.push(resolve));
+				project.active = path;
+				return v;
+			}
+		});
+		engine = e;
+		project.load().then(() => {
+			syncEngine();
+			loaded = true;
+		});
+		return () => e.dispose();
+	});
+
+	// Keep the server's file set and config in step with the project.
+	function syncEngine() {
+		if (!engine) return;
+		engine.setConfig($state.snapshot(project.config));
+		engine.workspace.setFiles(project.files.map((f) => ({ uri: uriOf(f.path), text: f.text })));
+		engine.scheduleRefresh();
+	}
+	$effect(() => {
+		// Track the set of paths (not their text, which the editor syncs).
+		void project.files.map((f) => f.path).join('\n');
+		void project.config.namespace;
+		void project.config.description;
+		if (loaded) syncEngine();
+	});
+
+	$effect(() => {
+		const t = theme;
+		if (t === 'system') document.documentElement.removeAttribute('data-theme');
+		else document.documentElement.setAttribute('data-theme', t);
+		try {
+			localStorage.setItem('mms-theme', t);
+		} catch {
+			/* ignore */
+		}
+	});
+
+	function onview(v: EditorView) {
+		view = v;
+		for (const w of viewWaiters.splice(0)) w(v);
+		trackCursor(v);
+	}
+
+	// Follow the cursor: the declaration under it picks the preview and JSON.
+	function trackCursor(v: EditorView) {
+		const line = v.state.doc.lineAt(v.state.selection.main.head).number - 1;
+		cursor = { uri: uriOf(project.active), line };
+	}
+	const cursorExt = EditorView.updateListener.of((u) => {
+		if (u.selectionSet || u.docChanged) trackCursor(u.view);
+	});
+
+	const within = (r: Diagnostic['range'], line: number) => r.start.line <= line && line <= r.end.line;
+	const cursorOutput = $derived.by(() => {
+		if (!engine || !cursor) return null;
+		const c = cursor;
+		return engine.output.find((f) => f.uri === c.uri && f.range && within(f.range, c.line)) ?? null;
+	});
+	$effect(() => {
+		if (cursorOutput) selectedOutput = cursorOutput.path;
+	});
+	const selectedFile = $derived(engine?.output.find((f) => f.path === selectedOutput) ?? null);
+
+	async function reveal(uri: string, range: Diagnostic['range']) {
+		const path = pathOf(uri);
+		if (project.active !== path) {
+			const v = new Promise<EditorView>((resolve) => viewWaiters.push(resolve));
+			project.active = path;
+			await v;
+		}
+		await tick();
+		const v = view;
+		const plugin = v && LSPPlugin.get(v);
+		if (!v || !plugin) return;
+		const doc = v.state.doc;
+		const from = Math.min(plugin.fromPosition(range.start, doc), doc.length);
+		const to = Math.min(plugin.fromPosition(range.end, doc), doc.length);
+		v.dispatch({ selection: EditorSelection.range(from, to), effects: EditorView.scrollIntoView(from, { y: 'center' }) });
+		v.focus();
+	}
+
+	function selectOutput(path: string) {
+		selectedOutput = path;
+		rightTab = previewable(path) ? rightTab : 'json';
+	}
+
+	function openExample(id: string) {
+		const ex = examples.find((e) => e.id === id);
+		menu = false;
+		if (!ex) return;
+		if (!confirm(`Open the ${ex.id} example? It replaces the current project; export it first to keep a copy.`)) return;
+		project.replace(structuredClone(ex.data));
+	}
+	function newProject() {
+		menu = false;
+		if (confirm('Start a new project? It replaces the current one; export it first to keep a copy.')) project.replace(structuredClone(starter));
+	}
+	async function importZip(e: Event) {
+		const file = (e.target as HTMLInputElement).files?.[0];
+		(e.target as HTMLInputElement).value = '';
+		if (!file) return;
+		try {
+			const data = readProjectZip(file.name, new Uint8Array(await file.arrayBuffer()));
+			if (confirm(`Import ${data.files.length} file(s) from ${file.name}? It replaces the current project.`)) project.replace(data);
+		} catch (err) {
+			alert(`Could not import ${file.name}: ${err instanceof Error ? err.message : err}`);
+		}
+	}
+	function exportPack() {
+		if (!engine) return;
+		if (engine.hasErrors && !confirm('The project has errors, so the pack is incomplete. Download it anyway?')) return;
+		download(`${project.name || 'pack'}.zip`, packZip(engine.output));
+	}
+
+	const totals = $derived.by(() => {
+		let errors = 0;
+		let warnings = 0;
+		for (const ds of Object.values(engine?.diagnostics ?? {})) {
+			for (const d of ds) {
+				if ((d.severity ?? 1) === 1) errors++;
+				else if (d.severity === 2) warnings++;
+			}
+		}
+		return { errors, warnings };
+	});
+	const statusText = $derived(
+		!engine
+			? 'Loading'
+			: engine.status === 'ready'
+				? totals.errors
+					? `${totals.errors} error${totals.errors === 1 ? '' : 's'}`
+					: totals.warnings
+						? `${totals.warnings} warning${totals.warnings === 1 ? '' : 's'}`
+						: 'No problems'
+				: engine.status === 'starting'
+					? 'Starting engine…'
+					: engine.status === 'restarting'
+						? 'Restarting engine…'
+						: 'Engine stopped'
+	);
+</script>
+
+<div class="flex h-dvh flex-col">
+	<header class="flex items-center gap-3 border-b border-line bg-panel px-3 py-2">
+		<span class="font-semibold tracking-tight">MMS</span>
+		<span class="hidden text-sm text-muted sm:inline">{project.name}</span>
+		<div class="relative ml-2">
+			<button class="rounded px-2 py-1 text-sm hover:bg-hover" onclick={() => (menu = !menu)} aria-expanded={menu}>Project ▾</button>
+			{#if menu}
+				<div class="absolute top-full left-0 z-20 mt-1 w-64 rounded-md border border-line bg-panel p-1 text-sm shadow-lg">
+					<button class="block w-full rounded px-2 py-1.5 text-left hover:bg-hover" onclick={newProject}>New project</button>
+					<button class="block w-full rounded px-2 py-1.5 text-left hover:bg-hover" onclick={() => { menu = false; fileInput.click(); }}>Import project zip…</button>
+					<button class="block w-full rounded px-2 py-1.5 text-left hover:bg-hover" onclick={() => { menu = false; download(`${project.name || 'project'}-source.zip`, projectZip(project.data())); }}>Export project zip</button>
+					<div class="my-1 border-t border-line"></div>
+					<div class="px-2 pt-1 pb-0.5 text-[11px] font-medium tracking-wide text-muted uppercase">Examples</div>
+					{#each examples as ex (ex.id)}
+						<button class="block w-full rounded px-2 py-1.5 text-left hover:bg-hover" onclick={() => openExample(ex.id)}>
+							<span class="block">{ex.id}</span>
+							<span class="block text-xs text-muted">{ex.description}</span>
+						</button>
+					{/each}
+					<div class="my-1 border-t border-line"></div>
+					<label class="flex items-center justify-between px-2 py-1.5">
+						Theme
+						<select class="rounded border border-line bg-panel px-1 py-0.5 text-sm" bind:value={theme}>
+							<option value="system">System</option>
+							<option value="light">Light</option>
+							<option value="dark">Dark</option>
+						</select>
+					</label>
+				</div>
+			{/if}
+		</div>
+		<input type="file" accept=".zip" class="hidden" bind:this={fileInput} onchange={importZip} />
+		<div class="ml-auto flex items-center gap-2 text-sm">
+			<span class="flex items-center gap-1.5 text-muted" role="status">
+				<span
+					class="inline-block size-2 rounded-full {engine?.status === 'ready'
+						? totals.errors
+							? 'bg-red-500'
+							: 'bg-emerald-500'
+						: engine?.status === 'failed'
+							? 'bg-red-500'
+							: 'bg-amber-400'}"
+				></span>
+				{statusText}
+			</span>
+			{#if engine?.status === 'failed'}
+				<button class="rounded px-2 py-1 text-accent hover:bg-hover" onclick={() => engine?.restart()} title={engine.statusDetail}>Restart</button>
+			{/if}
+			<button class="rounded bg-accent px-3 py-1 font-medium text-white hover:opacity-90 disabled:opacity-50" disabled={!engine?.output.length} onclick={exportPack}>Download pack</button>
+		</div>
+	</header>
+
+	<main class="grid min-h-0 flex-1 grid-cols-1 grid-rows-[minmax(0,1fr)_minmax(0,1fr)] md:grid-cols-[13rem_minmax(0,1fr)_minmax(0,1fr)] md:grid-rows-1">
+		<aside class="hidden min-h-0 border-r border-line bg-panel md:block">
+			{#if engine}
+				<Sidebar {project} {engine} {selectedOutput} onoutput={selectOutput} onsymbol={(uri: string, s: DocSymbol) => reveal(uri, s.selectionRange)} />
+			{/if}
+		</aside>
+		<section class="min-h-0 border-b border-line md:border-r md:border-b-0">
+			{#if engine && loaded && project.activeFile}
+				<Editor
+					{engine}
+					path={project.active}
+					text={project.activeFile.text}
+					onchange={(p: string, t: string) => project.setText(p, t)}
+					onview={(v: EditorView) => {
+						onview(v);
+						v.dispatch({ effects: [] });
+					}}
+					extra={cursorExt}
+				/>
+			{:else if loaded}
+				<p class="p-4 text-sm text-muted">No files. Add one from the sidebar.</p>
+			{/if}
+		</section>
+		<section class="flex min-h-0 flex-col bg-panel">
+			<div class="flex border-b border-line text-xs" role="tablist">
+				{#each [['preview', 'Preview'], ['json', 'JSON']] as [id, label] (id)}
+					<button
+						role="tab"
+						aria-selected={rightTab === id}
+						class="border-b-2 px-3 py-2 font-medium {rightTab === id ? 'border-accent text-ink' : 'border-transparent text-muted hover:text-ink'}"
+						onclick={() => (rightTab = id as typeof rightTab)}>{label}</button
+					>
+				{/each}
+			</div>
+			<div class="min-h-0 flex-1">
+				{#if engine}
+					<div class="h-full" class:hidden={rightTab !== 'preview'}>
+						<Preview output={engine.output} target={selectedOutput} />
+					</div>
+					<div class="h-full" class:hidden={rightTab !== 'json'}>
+						<JsonView file={selectedFile} onsource={(f: OutputFile) => f.uri && f.range && reveal(f.uri, f.range)} />
+					</div>
+				{/if}
+			</div>
+		</section>
+	</main>
+</div>

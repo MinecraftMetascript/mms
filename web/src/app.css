@@ -1,0 +1,169 @@
+@import 'tailwindcss';
+
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
+:root {
+	--c-bg: #f6f7f9;
+	--c-panel: #ffffff;
+	--c-ink: #1b1f24;
+	--c-muted: #65707d;
+	--c-line: #e2e5ea;
+	--c-hover: #eef1f5;
+	--c-selected: #e3ecfb;
+	--c-accent: #2563eb;
+	--c-canvas: #eceff3;
+	color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme='light']) {
+		--c-bg: #111418;
+		--c-panel: #171b20;
+		--c-ink: #e6e9ed;
+		--c-muted: #8d97a3;
+		--c-line: #2a3038;
+		--c-hover: #212730;
+		--c-selected: #1f3150;
+		--c-accent: #6ea2ff;
+		--c-canvas: #0d1013;
+		color-scheme: dark;
+	}
+}
+:root[data-theme='dark'] {
+	--c-bg: #111418;
+	--c-panel: #171b20;
+	--c-ink: #e6e9ed;
+	--c-muted: #8d97a3;
+	--c-line: #2a3038;
+	--c-hover: #212730;
+	--c-selected: #1f3150;
+	--c-accent: #6ea2ff;
+	--c-canvas: #0d1013;
+	color-scheme: dark;
+}
+
+@theme inline {
+	--color-bg: var(--c-bg);
+	--color-panel: var(--c-panel);
+	--color-ink: var(--c-ink);
+	--color-muted: var(--c-muted);
+	--color-line: var(--c-line);
+	--color-hover: var(--c-hover);
+	--color-selected: var(--c-selected);
+	--color-accent: var(--c-accent);
+	--color-canvas: var(--c-canvas);
+	--font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+	--font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+html,
+body {
+	height: 100%;
+	background: var(--c-bg);
+	color: var(--c-ink);
+}
+
+/* Editor */
+.editor .cm-editor {
+	height: 100%;
+	background: var(--c-panel);
+	color: var(--c-ink);
+	font-size: 13.5px;
+}
+.editor .cm-scroller {
+	font-family: var(--font-mono);
+	line-height: 1.55;
+}
+.editor .cm-gutters {
+	background: var(--c-panel);
+	border-right: 1px solid var(--c-line);
+	color: var(--c-muted);
+}
+.editor .cm-activeLine,
+.editor .cm-activeLineGutter {
+	background: color-mix(in srgb, var(--c-hover) 70%, transparent);
+}
+.editor .cm-cursor {
+	border-left-color: var(--c-ink);
+}
+.editor .cm-selectionBackground,
+.editor .cm-focused .cm-selectionBackground {
+	background: color-mix(in srgb, var(--c-accent) 25%, transparent) !important;
+}
+.cm-tooltip {
+	background: var(--c-panel) !important;
+	color: var(--c-ink);
+	border: 1px solid var(--c-line) !important;
+	border-radius: 6px;
+}
+.cm-tooltip-autocomplete > ul > li[aria-selected] {
+	background: var(--c-selected) !important;
+	color: var(--c-ink) !important;
+}
+.cm-lsp-documentation code,
+.cm-lsp-documentation pre {
+	font-family: var(--font-mono);
+	font-size: 12px;
+}
+
+/* Token colours (semantic tokens and the fallback tokenizer share them) */
+:root {
+	--t-keyword: #8a3ffc;
+	--t-comment: #6e7781;
+	--t-string: #0a7f3f;
+	--t-number: #b45309;
+	--t-type: #0f62fe;
+	--t-function: #a2191f;
+	--t-method: #a2191f;
+	--t-property: #005d5d;
+	--t-variable: #1b1f24;
+	--t-enum: #6929c4;
+	--t-macro: #9f1853;
+}
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme='light']) {
+		--t-keyword: #be95ff;
+		--t-comment: #7d8590;
+		--t-string: #6fdc8c;
+		--t-number: #ffb784;
+		--t-type: #78a9ff;
+		--t-function: #ff8389;
+		--t-method: #ff8389;
+		--t-property: #3ddbd9;
+		--t-variable: #e6e9ed;
+		--t-enum: #d4bbff;
+		--t-macro: #ff7eb6;
+	}
+}
+:root[data-theme='dark'] {
+	--t-keyword: #be95ff;
+	--t-comment: #7d8590;
+	--t-string: #6fdc8c;
+	--t-number: #ffb784;
+	--t-type: #78a9ff;
+	--t-function: #ff8389;
+	--t-method: #ff8389;
+	--t-property: #3ddbd9;
+	--t-variable: #e6e9ed;
+	--t-enum: #d4bbff;
+	--t-macro: #ff7eb6;
+}
+.cm-sem-keyword { color: var(--t-keyword); }
+.cm-sem-comment { color: var(--t-comment); font-style: italic; }
+.cm-sem-string { color: var(--t-string); }
+.cm-sem-number { color: var(--t-number); }
+.cm-sem-operator { color: var(--c-muted); }
+.cm-sem-type { color: var(--t-type); font-weight: 600; }
+.cm-sem-namespace { color: var(--t-type); }
+.cm-sem-variable { color: var(--t-variable); }
+.cm-sem-declaration { font-weight: 600; }
+.cm-sem-function { color: var(--t-function); }
+.cm-sem-method { color: var(--t-method); }
+.cm-sem-property { color: var(--t-property); }
+.cm-sem-enumMember { color: var(--t-enum); }
+.cm-sem-macro { color: var(--t-macro); }
+
+/* JSON view */
+.json .j-key { color: var(--t-property); }
+.json .j-str { color: var(--t-string); }
+.json .j-num { color: var(--t-number); }
+.json .j-lit { color: var(--t-keyword); }
