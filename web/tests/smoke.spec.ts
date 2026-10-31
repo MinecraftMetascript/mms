@@ -106,6 +106,12 @@ test('dimensions, noise settings and surface rules preview as terrain', async ({
 	await expect(page.getByRole('combobox', { name: 'Terrain' })).toHaveValue('sky:islands');
 	await expect(canvas).toBeVisible({ timeout: 30_000 });
 	await expect(failed).toBeHidden();
+
+	// A rule that tests a biome through a named condition starts on that biome.
+	await page.getByRole('button', { name: /Project/ }).click();
+	await page.getByRole('button', { name: /badlands/ }).click();
+	await page.locator('.cm-line', { hasText: 'SurfaceRule badlands' }).click();
+	await expect(page.getByRole('combobox', { name: 'Biome' })).toHaveValue('minecraft:badlands');
 	expect(errors).toEqual([]);
 });
 

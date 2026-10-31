@@ -27,7 +27,7 @@
 		noise: { x: 0, y: 0, scale: 4 },
 		density_function: { x: 0, y: 64, scale: 2 },
 		noise_settings: { x: 0, y: 64, scale: 2 },
-		material_rule: { x: 0, y: 64, scale: 1 },
+		material_rule: { x: 0, y: 64, scale: 0.5 },
 		dimension: { x: 0, y: 64, scale: 2 },
 		biomes: { x: 0, y: 0, scale: 8 }
 	};
@@ -64,13 +64,21 @@
 	const maxScale = $derived(mode === 'density' ? 64 : mode === 'biomes' ? 64 : 4);
 
 	// Biomes a surface rule can be tested against: the pack's own, those its
-	// rules name in Biome() conditions, and a few vanilla ones.
-	function biomesIn(json: unknown, out: Set<string>) {
-		if (Array.isArray(json)) for (const v of json) biomesIn(v, out);
+	// rules name in Biome() conditions, and a few vanilla ones. With refs,
+	// rules and conditions referenced by id are followed, so a rule that
+	// says If(in_badlands) finds the biomes in in_badlands.
+	function biomesIn(json: unknown, out: Set<string>, refs?: Map<string, unknown>, seen = new Set<string>()) {
+		if (typeof json === 'string') {
+			const ref = refs?.get(json);
+			if (ref !== undefined && !seen.has(json)) {
+				seen.add(json);
+				biomesIn(ref, out, refs, seen);
+			}
+		} else if (Array.isArray(json)) for (const v of json) biomesIn(v, out, refs, seen);
 		else if (json && typeof json === 'object') {
 			for (const [k, v] of Object.entries(json)) {
 				if (k === 'biome_is') for (const b of Array.isArray(v) ? v : [v]) if (typeof b === 'string' && !b.startsWith('#')) out.add(b.includes(':') ? b : `minecraft:${b}`);
-				biomesIn(v, out);
+				biomesIn(v, out, refs, seen);
 			}
 		}
 	}
@@ -90,7 +98,9 @@
 	const targetFile = $derived(info ? parsed.find((f) => f.kind === info.kind && f.id === info.id) : undefined);
 	const biomeChoices = $derived.by(() => {
 		const own = new Set<string>();
-		if (targetFile) biomesIn(targetFile.json, own);
+		const refs = new Map<string, unknown>();
+		for (const f of parsed) if (f.kind === 'material_rule' || f.kind === 'material_condition') refs.set(f.id, f.json);
+		if (targetFile) biomesIn(targetFile.json, own, refs);
 		const all = new Set(own);
 		for (const f of output) {
 			const m = /^data\/([^/]+)\/worldgen\/biome\/(.+)\.json$/.exec(f.path);
