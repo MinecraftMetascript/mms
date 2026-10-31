@@ -73,6 +73,42 @@ test('an example with several files in folders builds as one project', async ({ 
 	await expect(page.getByText('buried.json')).toBeVisible();
 });
 
+test('dimensions, noise settings and surface rules preview as terrain', async ({ page }) => {
+	const errors: string[] = [];
+	page.on('pageerror', (e) => errors.push(e.message));
+	page.on('dialog', (d) => d.accept());
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	await page.getByRole('button', { name: /Project/ }).click();
+	await page.getByRole('button', { name: /sky-islands/ }).click();
+	await expect(status(page)).toHaveText(/No problems/);
+	const failed = page.getByText(/Preview failed/);
+
+	// The dimension opens on a biome map with a legend.
+	await page.getByRole('button', { name: 'dimension.mms' }).click();
+	await page.locator('.cm-line', { hasText: 'Dimension islands' }).click();
+	await expect(page.getByText('sky:islands', { exact: true })).toBeVisible();
+	await expect(page.getByLabel('Biomes in view')).toContainText('sky:meadow', { timeout: 20_000 });
+
+	// Blocks mode builds the terrain; hovering names the block.
+	await page.getByRole('button', { name: 'Blocks', exact: true }).click();
+	const canvas = page.locator('canvas');
+	await expect(canvas).toBeVisible({ timeout: 30_000 });
+	await expect(failed).toBeHidden();
+	const box = (await canvas.boundingBox())!;
+	await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+	await expect(page.getByText(/x -?\d+, y -?\d+ · \w+/)).toBeVisible();
+
+	// A surface rule is drawn on the noise settings that use it.
+	await page.getByRole('button', { name: 'terrain.mms' }).click();
+	await page.locator('.cm-line', { hasText: 'SurfaceRule surface' }).click();
+	await expect(page.getByText('surface rule', { exact: true })).toBeVisible();
+	await expect(page.getByRole('combobox', { name: 'Terrain' })).toHaveValue('sky:islands');
+	await expect(canvas).toBeVisible({ timeout: 30_000 });
+	await expect(failed).toBeHidden();
+	expect(errors).toEqual([]);
+});
+
 test('data packs and pasted JSON import as MMS', async ({ page }) => {
 	page.on('dialog', (d) => d.accept());
 	await page.goto('./');
@@ -161,6 +197,7 @@ test('the docs render guides and the reference', async ({ page }) => {
 	const nav = page.getByRole('navigation', { name: 'Docs' });
 	await nav.getByRole('link', { name: 'Tutorial: a custom dimension' }).click();
 	await expect(page.getByRole('heading', { level: 1 })).toHaveText('Tutorial: a custom dimension');
+	await expect(page.getByRole('navigation', { name: 'On this page' }).getByRole('link').first()).toBeVisible();
 	await page.getByRole('main').getByRole('link', { name: 'Writing resources' }).click();
 	await expect(page).toHaveURL(/\/docs\/resources#density-functions$/);
 	await expect(page.locator('#density-functions')).toBeVisible();
@@ -169,7 +206,12 @@ test('the docs render guides and the reference', async ({ page }) => {
 	await nav.getByRole('link', { name: 'Reference' }).click();
 	await expect(page.getByRole('cell', { name: 'DensityFunction', exact: true })).toBeVisible();
 	const filter = page.getByRole('searchbox', { name: 'Filter helpers' });
+	const toc = page.getByRole('navigation', { name: 'On this page' });
+	await expect(toc.getByRole('link', { name: 'Loot function', exact: true })).toBeVisible();
 	await filter.fill('gradient');
+	// The page sections follow the filter.
+	await expect(toc.getByRole('link', { name: 'Loot function', exact: true })).toHaveCount(0);
+	await expect(toc.getByRole('link', { name: 'Density function', exact: true })).toBeVisible();
 	await expect(page.getByText(/^Gradient\(axis, /)).toBeVisible();
 	await expect(page.getByRole('region', { name: 'Loot function' })).toHaveCount(0);
 
@@ -179,6 +221,29 @@ test('the docs render guides and the reference', async ({ page }) => {
 	await expect(page).toHaveURL(/#type-util-direction-Axis$/);
 	await expect(filter).toHaveValue('');
 	await expect(page.locator('#type-util-direction-Axis')).toBeInViewport();
+});
+
+test('the Project menu closes on outside click and Escape, and Format formats', async ({ page }) => {
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	const projectButton = page.getByRole('button', { name: /Project/ });
+	const newProject = page.getByRole('button', { name: 'New project' });
+
+	await projectButton.click();
+	await expect(newProject).toBeVisible();
+	await page.locator('.cm-content').click();
+	await expect(newProject).toBeHidden();
+
+	await projectButton.click();
+	await expect(newProject).toBeVisible();
+	await page.keyboard.press('Escape');
+	await expect(newProject).toBeHidden();
+	await expect(projectButton).toBeFocused();
+
+	await replaceText(page, 'DensityFunction   x=Clamp( 1,0 ,1 )\n');
+	await expect(status(page)).toHaveText(/No problems/);
+	await page.getByRole('button', { name: 'Format', exact: true }).click();
+	await expect(page.locator('.cm-content')).toHaveText('DensityFunction x = Clamp(1, 0, 1)');
 });
 
 test('doc comments show on hover over a use', async ({ page }) => {

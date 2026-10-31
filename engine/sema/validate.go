@@ -64,7 +64,12 @@ func (c *Checker) validate(val jsonv.Value, v tview, path string, errs *[]string
 			}
 			return ""
 		}
-		fs, disp := c.fieldsWith(v, keyOf)
+		fs, disp := c.fieldsWith(v, func(k string) string {
+			if o.Get(k) == nil {
+				return noneKey
+			}
+			return keyOf(k)
+		})
 		if disp != nil {
 			if key := keyOf(disp.KeyField); key != "" && !c.hasDispatchKey(disp, key) {
 				fail("unknown %s '%s'", disp.KeyField, key)
