@@ -25,3 +25,4 @@ vite.config.ts.timestamp-*
 /playwright-report
 /static/mms.wasm
 /static/wasm_exec.js
+/src/lib/docs/reference.json

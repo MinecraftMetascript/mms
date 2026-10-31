@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Builds the engine for the browser into static/: mms.wasm plus Go's
-# wasm_exec.js loader, both matching the installed Go toolchain.
+# wasm_exec.js loader, both matching the installed Go toolchain. Also
+# writes the language reference the docs pages are built from.
 set -euo pipefail
 cd "$(dirname "$0")/../../engine"
 GOOS=js GOARCH=wasm go build -trimpath -ldflags="-s -w" -o ../web/static/mms.wasm ./cmd/mms-wasm
@@ -11,3 +12,5 @@ else
 	cp "$root/misc/wasm/wasm_exec.js" ../web/static/wasm_exec.js
 fi
 ls -l ../web/static/mms.wasm
+# The language reference for the docs pages.
+go run ./cmd/mms reference > ../web/src/lib/docs/reference.json

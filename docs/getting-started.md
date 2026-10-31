@@ -1,0 +1,85 @@
+# Getting started
+
+MMS is a small language that compiles to Minecraft Java Edition data packs. You declare resources and functions in `.mms` files, and `mms build` writes the JSON and `.mcfunction` files. The target is Minecraft 26.3.
+
+## Install
+
+- **In the browser:** the [editor](https://minecraftmetascript.github.io/mms/) needs no install. Projects are saved in your browser, and **Download pack** gives you the data pack as a zip.
+- **Command line:** download `mms` for your system from the [releases page](https://github.com/MinecraftMetascript/mms/releases). Or, with Go installed, run `go install github.com/minecraftmetascript/mms/engine/cmd/mms@latest`.
+- **VS Code:** install `mms-*.vsix` from the same release, through **Extensions → … → Install from VSIX**. It runs `mms lsp`, so `mms` must be on your `PATH`, or set in `mms.path`.
+
+## A first project
+
+```sh
+mkdir gems && cd gems
+mms init -namespace gems
+```
+
+`mms init` writes `mms.json` (the namespace, the pack description, the output folder) and a starter file. Every `.mms` file in the folder belongs to the project. Put this in `gems.mms`:
+
+```
+/** Gems that drop from the gem chest. */
+ItemTag gems = [diamond, emerald, amethyst_shard]
+
+LootTable chests/gems {
+  pools = [Pool(1..3, #gems)]
+}
+
+Recipe gem_block = Shaped(["GG", "GG"], { G = #gems }, emerald_block)
+
+Objective found = dummy
+
+Function find {
+  found[@s] += 1
+  /loot give @s loot gems:chests/gems
+  /tellraw @s "You have found ${found[@s]} gem chests"
+}
+```
+
+Then build:
+
+```sh
+mms build                                     # writes build/
+mms build -world ~/.minecraft/saves/MyWorld   # installs into a world
+```
+
+## Declarations
+
+Each declaration is `Kind name = value`, or `Kind name { fields }` for an object:
+
+- **Kinds** are PascalCase: `LootTable`, `DensityFunction`, `ItemTag`. Every resource folder in a data pack has one. The [reference](https://minecraftmetascript.github.io/mms/docs/reference) lists them all.
+- **Names** become ids in the file's namespace: `chests/gems` in namespace `gems` is `gems:chests/gems`, written to `data/gems/loot_table/chests/gems.json`.
+- **Doc comments** (`/** ... */`) show up on hover wherever the name is used.
+
+A `Namespace` line switches the namespace for the rest of the file:
+
+```
+Namespace minecraft
+
+ItemTag swords = [diamond_sword]
+```
+
+Replacing a vanilla resource like this is allowed. The editor notes that it happens, since vanilla's version is lost.
+
+## Values
+
+- **Object literals** mirror the JSON: `{ key = value }`. Fields are separated by newlines or commas.
+- **Lists** are `[a, b, c]`.
+- **Ids** can drop `minecraft:`. A bare name such as `diamond` or `#gems` means your own declaration if one exists, otherwise the vanilla one.
+- **Helpers** build typed objects: `Pool(...)` is a loot pool, and `Noise(...)` is `{ type = noise, ... }`. Every dispatched type has a helper named after its type, and arguments can be positional or named. See [Writing resources](resources.md) and the [reference](https://minecraftmetascript.github.io/mms/docs/reference).
+
+Every value is checked against the 26.3 schema as you type. Completion offers the fields, helpers and ids that fit where the cursor is, and hover shows the field's documentation.
+
+## Formatting and lint
+
+`mms fmt` (and format-on-save in the editors) prints every file in one style, so there is nothing to configure. `mms check` reports errors and [lint](lint.md) findings, and `mms fix` applies the fixes that are always safe.
+
+## Next
+
+- [Writing resources](resources.md): the shorthand for loot tables, recipes, density functions and more.
+- [Functions](functions.md): variables, control flow, calls and strings in function code.
+- [Tutorial: a custom dimension](tutorial-dimension.md): a complete worldgen project.
+
+## Importing
+
+`mms import` reads a data pack folder or zip and writes one `.mms` file per resource folder, such as `loot_table.mms`, using the shorthand wherever it applies. In the browser, use **Project ▾ → Import zip…**, or paste one JSON file with **Paste JSON as MMS…**.

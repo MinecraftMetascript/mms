@@ -136,3 +136,24 @@ test('loot tables, recipes and biomes show in the inspector', async ({ page }) =
 	await expect(inspector).toContainText('#3f76e4');
 	expect(errors).toEqual([]);
 });
+
+test('the docs render guides and the reference', async ({ page }) => {
+	await page.goto('./');
+	await page.getByRole('link', { name: 'Docs' }).click();
+	await expect(page.getByRole('heading', { level: 1 })).toHaveText('Getting started');
+
+	// A guide, and a link from one guide to a section of another.
+	const nav = page.getByRole('navigation', { name: 'Docs' });
+	await nav.getByRole('link', { name: 'Tutorial: a custom dimension' }).click();
+	await expect(page.getByRole('heading', { level: 1 })).toHaveText('Tutorial: a custom dimension');
+	await page.getByRole('main').getByRole('link', { name: 'Writing resources' }).click();
+	await expect(page).toHaveURL(/\/docs\/resources#density-functions$/);
+	await expect(page.locator('#density-functions')).toBeVisible();
+
+	// The generated reference, filtered.
+	await nav.getByRole('link', { name: 'Reference' }).click();
+	await expect(page.getByRole('cell', { name: 'DensityFunction', exact: true })).toBeVisible();
+	await page.getByRole('searchbox', { name: 'Filter helpers' }).fill('gradient');
+	await expect(page.getByText(/^Gradient\(axis: /)).toBeVisible();
+	await expect(page.getByRole('region', { name: 'Loot function' })).toHaveCount(0);
+});

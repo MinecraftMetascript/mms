@@ -42,6 +42,7 @@
 		"codemirror": "^6.0.2",
 		"deepslate": "^0.27.2",
 		"fflate": "^0.8.2",
-		"idb-keyval": "^6.3.0"
+		"idb-keyval": "^6.3.0",
+		"marked": "15.0.12"
 	}
 }

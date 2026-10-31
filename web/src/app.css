@@ -178,3 +178,113 @@ body {
 	text-decoration: underline dotted color-mix(in oklab, var(--color-muted) 70%, transparent);
 	text-underline-offset: 3px;
 }
+
+/* Docs: rendered Markdown */
+.prose-mms {
+	max-width: 46rem;
+	line-height: 1.65;
+	font-size: 15px;
+}
+.prose-mms h1 {
+	font-size: 1.9rem;
+	font-weight: 700;
+	letter-spacing: -0.01em;
+	margin: 0 0 1rem;
+}
+.prose-mms h2 {
+	font-size: 1.35rem;
+	font-weight: 650;
+	margin: 2.2rem 0 0.75rem;
+	padding-top: 0.5rem;
+	border-top: 1px solid var(--c-line);
+}
+.prose-mms h3 {
+	font-size: 1.08rem;
+	font-weight: 650;
+	margin: 1.6rem 0 0.5rem;
+}
+.prose-mms :is(h1, h2, h3, h4) {
+	scroll-margin-top: 4rem;
+}
+.prose-mms :is(h1, h2, h3, h4) > a {
+	color: inherit;
+	text-decoration: none;
+}
+.prose-mms :is(p, ul, ol, table, pre, dl) {
+	margin: 0 0 1rem;
+}
+.prose-mms ul {
+	list-style: disc;
+	padding-left: 1.4rem;
+}
+.prose-mms ol {
+	list-style: decimal;
+	padding-left: 1.4rem;
+}
+.prose-mms li {
+	margin: 0.25rem 0;
+}
+.prose-mms a {
+	color: var(--c-accent);
+	text-decoration: underline;
+	text-underline-offset: 2px;
+}
+.prose-mms code {
+	font-family: var(--font-mono);
+	font-size: 0.86em;
+	background: var(--c-hover);
+	border-radius: 4px;
+	padding: 0.1em 0.3em;
+	overflow-wrap: anywhere;
+}
+.prose-mms pre {
+	background: var(--c-panel);
+	border: 1px solid var(--c-line);
+	border-radius: 6px;
+	padding: 0.75rem 1rem;
+	overflow-x: auto;
+	font-size: 13px;
+	line-height: 1.55;
+}
+.prose-mms pre code {
+	background: none;
+	padding: 0;
+	font-size: inherit;
+	overflow-wrap: normal;
+}
+.prose-mms table {
+	display: block;
+	max-width: 100%;
+	width: max-content;
+	overflow-x: auto;
+	border-collapse: collapse;
+	font-size: 14px;
+}
+.prose-mms :is(th, td) {
+	border: 1px solid var(--c-line);
+	padding: 0.35rem 0.6rem;
+	text-align: left;
+	vertical-align: top;
+}
+.prose-mms th {
+	background: var(--c-hover);
+	font-weight: 600;
+}
+.prose-mms dt {
+	margin-top: 0.6rem;
+}
+.prose-mms dd {
+	margin: 0.2rem 0 0 1rem;
+	font-size: 14px;
+	color: var(--c-muted);
+}
+.prose-mms dd ul {
+	margin: 0;
+}
+.prose-mms td code {
+	white-space: nowrap;
+	overflow-wrap: normal;
+}
+.prose-mms :is(dt, dd) {
+	overflow-wrap: anywhere;
+}

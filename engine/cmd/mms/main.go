@@ -37,6 +37,7 @@ commands:
   import  turn a data pack folder or zip into an MMS project
   init    create mms.json and a starter file
   lsp     run the language server over stdio
+  reference print every kind and helper as JSON
   version print the version
 `
 
@@ -61,6 +62,8 @@ func main() {
 		code = runImport(os.Args[2:], os.Stdout, os.Stderr)
 	case "lsp":
 		code = runLSP(os.Args[2:], os.Stdin, os.Stdout, os.Stderr)
+	case "reference":
+		code = runReference(os.Args[2:], os.Stdout, os.Stderr)
 	case "version", "-v", "--version":
 		fmt.Println(versionString())
 	case "help", "-h", "--help":

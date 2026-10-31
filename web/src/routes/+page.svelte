@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
-	import { asset } from '$app/paths';
+	import { asset, resolve } from '$app/paths';
 	import { LSPPlugin } from '@codemirror/lsp-client';
 	import { EditorSelection } from '@codemirror/state';
 	import { EditorView } from '@codemirror/view';
@@ -273,6 +273,7 @@
 				></span>
 				<span class="hidden sm:inline">{statusText}</span>
 			</span>
+			<a class="rounded px-2 py-1 hover:bg-hover" href={resolve('/docs')}>Docs</a>
 			{#if engine?.status === 'failed'}
 				<button class="rounded px-2 py-1 text-accent hover:bg-hover" onclick={() => engine?.restart()} title={engine.statusDetail}>Restart</button>
 			{/if}
