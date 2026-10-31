@@ -14,15 +14,9 @@ function serverOptions(): ServerOptions {
 
 async function start(context: vscode.ExtensionContext) {
 	const clientOptions: LanguageClientOptions = {
-		documentSelector: [{ scheme: 'file', language: 'mms' }],
-		synchronize: {
-			// mms.json changes the namespace and lint settings; asset files
-			// used by Texture, Sound and Structure are checked on change.
-			fileEvents: [
-				vscode.workspace.createFileSystemWatcher('**/mms.json'),
-				vscode.workspace.createFileSystemWatcher('**/*.{png,ogg,nbt}')
-			]
-		}
+		// The server registers its own file watchers (mms.json, sources
+		// and asset files), so no synchronize.fileEvents here.
+		documentSelector: [{ scheme: 'file', language: 'mms' }]
 	};
 	client = new LanguageClient('mms', 'MMS Language Server', serverOptions(), clientOptions);
 	try {

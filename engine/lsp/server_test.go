@@ -347,3 +347,37 @@ func TestURIs(t *testing.T) {
 		t.Errorf("canonURI changed a mem URI: %q", got)
 	}
 }
+
+func TestRegistersWatchers(t *testing.T) {
+	c := start(t)
+	caps := map[string]any{"workspace": map[string]any{"didChangeWatchedFiles": map[string]any{"dynamicRegistration": true}}}
+	c.result("initialize", map[string]any{"rootUri": nil, "capabilities": caps})
+	c.notify("initialized", map[string]any{})
+	c.result("mms/ping", nil)
+	var globs []string
+	for _, n := range c.notes {
+		if n["method"] != "client/registerCapability" {
+			continue
+		}
+		for _, r := range n["params"].(map[string]any)["registrations"].([]any) {
+			opts := r.(map[string]any)["registerOptions"].(map[string]any)
+			for _, w := range opts["watchers"].([]any) {
+				globs = append(globs, w.(map[string]any)["globPattern"].(string))
+			}
+		}
+	}
+	if strings.Join(globs, " ") != "**/*.mms **/mms.json **/*.{png,ogg,nbt}" {
+		t.Fatalf("watchers = %q", globs)
+	}
+
+	// Without dynamic registration the server must not send the request.
+	c2 := start(t)
+	c2.result("initialize", map[string]any{"rootUri": nil})
+	c2.notify("initialized", map[string]any{})
+	c2.result("mms/ping", nil)
+	for _, n := range c2.notes {
+		if n["method"] == "client/registerCapability" {
+			t.Fatal("registered watchers for a client without dynamic registration")
+		}
+	}
+}

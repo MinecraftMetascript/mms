@@ -37,6 +37,10 @@ type Server struct {
 	managed   map[string]bool
 	published map[string]bool
 	shutdown  bool
+	// watchFiles is set when the client lets the server register file
+	// watchers itself (Zed, Neovim and Helix rely on this; VS Code does
+	// too).
+	watchFiles bool
 }
 
 // NewServer returns a server over tr checking against pack.
@@ -168,8 +172,11 @@ var handlers map[string]handler
 
 func init() {
 	handlers = map[string]handler{
-		"initialize":  typed((*Server).initialize),
-		"initialized": func(*Server, context.Context, json.RawMessage) (any, *respError) { return nil, nil },
+		"initialize": typed((*Server).initialize),
+		"initialized": func(s *Server, _ context.Context, _ json.RawMessage) (any, *respError) {
+			s.registerWatchers()
+			return nil, nil
+		},
 		"shutdown": func(s *Server, _ context.Context, _ json.RawMessage) (any, *respError) {
 			s.shutdown = true
 			return nil, nil
@@ -221,6 +228,41 @@ type initializeParams struct {
 	WorkspaceFolders []struct {
 		URI string `json:"uri"`
 	} `json:"workspaceFolders"`
+	Capabilities struct {
+		Workspace struct {
+			DidChangeWatchedFiles struct {
+				DynamicRegistration bool `json:"dynamicRegistration"`
+			} `json:"didChangeWatchedFiles"`
+		} `json:"workspace"`
+	} `json:"capabilities"`
+}
+
+// watchedGlobs are the files whose changes on disk the server needs to
+// hear about: sources edited outside the editor (a git checkout, say),
+// and the assets that Texture, Sound and Structure read.
+var watchedGlobs = []string{"**/*.mms", "**/" + project.ConfigFile, "**/*.{png,ogg,nbt}"}
+
+// registerWatchers asks the client to send workspace/didChangeWatchedFiles
+// for watchedGlobs. Clients only watch files a server registers for, so
+// without this, editors other than VS Code would miss changes on disk.
+func (s *Server) registerWatchers() {
+	if !s.watchFiles {
+		return
+	}
+	watchers := make([]map[string]any, len(watchedGlobs))
+	for i, g := range watchedGlobs {
+		watchers[i] = map[string]any{"globPattern": g}
+	}
+	s.send(map[string]any{
+		"jsonrpc": "2.0",
+		"id":      "mms/registerWatchers",
+		"method":  "client/registerCapability",
+		"params": map[string]any{"registrations": []any{map[string]any{
+			"id":              "mms/watchedFiles",
+			"method":          "workspace/didChangeWatchedFiles",
+			"registerOptions": map[string]any{"watchers": watchers},
+		}}},
+	})
 }
 
 func (s *Server) initialize(ctx context.Context, p initializeParams) (any, *respError) {
@@ -233,6 +275,7 @@ func (s *Server) initialize(ctx context.Context, p initializeParams) (any, *resp
 	} else {
 		s.root = p.RootPath
 	}
+	s.watchFiles = p.Capabilities.Workspace.DidChangeWatchedFiles.DynamicRegistration
 	cfg := project.DefaultConfig()
 	if s.root != "" {
 		if c, err := project.LoadConfig(s.root); err == nil {

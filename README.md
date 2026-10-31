@@ -10,6 +10,8 @@ This branch is a full rewrite. The plan is in [docs/plan.md](docs/plan.md), prog
 | `web/` | Browser editor (SvelteKit, CodeMirror 6, Deepslate previews), deployed to GitHub Pages |
 | `docs/` | Guides, plan, task list, decision log |
 | `editors/vscode/` | VS Code extension (a client for `mms lsp`) |
+| `editors/zed/` | Zed extension (a client for `mms lsp`, highlighting from `editors/tree-sitter-mms`) |
+| `editors/tree-sitter-mms/` | Tree-sitter grammar, for Zed and other tree-sitter editors |
 | `examples/` | Example projects, built by the tests and listed in the web editor |
 
 Target: Minecraft Java Edition 26.3 (data pack format 121).
