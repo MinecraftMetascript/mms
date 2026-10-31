@@ -18,12 +18,14 @@ type Reference struct {
 	Types []*RefType `json:"types"`
 }
 
-// RefKind is a declaration kind. Folder is the data pack folder of a
-// resource kind, "" for the kinds MMS adds.
+// RefKind is a declaration kind. Folder is the folder under
+// data/<namespace>/ of a data pack kind, or under assets/<namespace>/
+// when Resources is set; "" for the kinds MMS adds.
 type RefKind struct {
-	Name   string `json:"name"`
-	Folder string `json:"folder,omitempty"`
-	Doc    string `json:"doc,omitempty"`
+	Name      string `json:"name"`
+	Folder    string `json:"folder,omitempty"`
+	Resources bool   `json:"resources,omitempty"`
+	Doc       string `json:"doc,omitempty"`
 }
 
 // RefGroup is the helpers of one dispatcher, such as
@@ -69,6 +71,9 @@ func BuildReference(p *spec.Pack, ks *Kinds) Reference {
 	for _, name := range ks.Names() {
 		k, _ := ks.Lookup(name)
 		rk := RefKind{Name: name, Folder: k.Folder()}
+		if k.Assets != "" {
+			rk.Folder, rk.Resources = k.Assets, true
+		}
 		if k.MMS != "" {
 			rk.Folder = ""
 			rk.Doc = mmsKindDocs[name]
@@ -135,7 +140,7 @@ func BuildReference(p *spec.Pack, ks *Kinds) Reference {
 			}
 		}
 	}
-	for _, r := range p.ResourceKinds() {
+	for _, r := range append(p.ResourceKinds(), p.AssetKinds()...) {
 		walk(tview{T: p.Resources[r]}, 0)
 	}
 

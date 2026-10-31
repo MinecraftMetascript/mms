@@ -65,10 +65,11 @@ func (r *Result) providedAssets() map[string]bool {
 // emitAssets lists the copied files and the files generated for them:
 // sounds.json, the resource pack's pack.mcmeta, and pack.png from the
 // icon. Copies carry their source in Asset and no Data until ReadAssets.
-func (r *Result) emitAssets() []OutFile {
+// hasResources says the project already declares resource-pack files
+// (models, block states).
+func (r *Result) emitAssets(hasResources bool) []OutFile {
 	var out []OutFile
 	sounds := map[string][]string{}
-	hasResources := false
 	for _, u := range r.assets {
 		f := OutFile{Path: u.Out, Asset: u.Src, Pack: u.Pack, Unit: u.decl.Unit.Path, Span: u.sp}
 		out = append(out, f)
@@ -148,6 +149,7 @@ func lintExternalAsset(l *lintRun) {
 	for _, d := range l.r.Order {
 		declared[d.NS] = true
 	}
+	declarable := map[string]string{"model": "Model", "item_definition": "ItemModel", "equipment": "Equipment", "atlas": "Atlas", "font": "Font", "post_effect": "PostEffect"}
 	helperFor := map[string]string{"texture": "Texture", "sound_event": "Sound", "weighed_sound_event": "Sound", "structure": "Structure"}
 	for _, d := range l.r.Order {
 		if hasErrors(d.Diags) {
@@ -174,6 +176,12 @@ func lintExternalAsset(l *lintRun) {
 			msg := fmt.Sprintf("this project does not provide the %s '%s'; it must come from another pack", what, in.ID)
 			if h != "" {
 				msg += fmt.Sprintf(", or include the file with %s(\"path\")", h)
+			} else if k := declarable[in.Folder]; k != "" {
+				name := in.ID
+				if ns == l.r.cfg.Namespace {
+					_, name, _ = strings.Cut(in.ID, ":")
+				}
+				msg += fmt.Sprintf(", or be declared here: %s %s = { ... }", k, name)
 			}
 			hits = append(hits, hit{n.Span(), msg})
 		}

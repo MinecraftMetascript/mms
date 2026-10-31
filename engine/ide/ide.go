@@ -403,7 +403,11 @@ func (s *Session) Hover(path string, off int) (string, syntax.Span) {
 	if d.Kind.Sp.Contains(off) {
 		k := a.decl
 		if k != nil && k.Kind.Resource != "" {
-			return "```mms\n" + d.Kind.Name + "\n```\nWrites `data/<namespace>/" + k.Kind.Resource + "/<name>.json`.", d.Kind.Sp
+			where := "."
+			if k.Kind.Assets != "" {
+				where = ", in the resource pack."
+			}
+			return "```mms\n" + d.Kind.Name + "\n```\nWrites `" + k.Kind.Dir("<namespace>") + "/<name>.json`" + where, d.Kind.Sp
 		}
 		return "", syntax.Span{}
 	}

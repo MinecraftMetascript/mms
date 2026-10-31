@@ -230,3 +230,86 @@ func knownError(msg string) bool {
 	}
 	return false
 }
+
+// TestVanillaAssetsRoundTrip imports vanilla's resource pack files (block
+// states, models, item models, ...) into MMS, builds them and compares
+// the output with the originals. Files the schema rejects (editor fields
+// such as __comment) are skipped; TestVanillaAssetsValidate covers them.
+// Set MMS_VANILLA_ASSETS to an mcmeta 26.3-assets-json checkout.
+func TestVanillaAssetsRoundTrip(t *testing.T) {
+	root := os.Getenv("MMS_VANILLA_ASSETS")
+	if root == "" {
+		t.Skip("set MMS_VANILLA_ASSETS to an mcmeta 26.3-assets-json checkout")
+	}
+	pack := spec.MustDefault()
+	kinds := sema.NewKinds(pack)
+	p := project.New(pack, project.Config{Namespace: "minecraft"})
+	originals := map[string]jsonv.Value{}
+	skipped := 0
+	for _, res := range pack.AssetKinds() {
+		k, ok := kinds.ForFolder(res)
+		if !ok {
+			t.Fatalf("no kind for %s", res)
+		}
+		dir := filepath.Join(root, "assets", "minecraft", pack.Assets[res])
+		var sb strings.Builder
+		filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
+			if err != nil || d.IsDir() || !strings.HasSuffix(path, ".json") {
+				return nil
+			}
+			rel, _ := filepath.Rel(dir, path)
+			rel = filepath.ToSlash(rel)
+			if res == "lang" && rel == "deprecated.json" {
+				return nil
+			}
+			b, _ := os.ReadFile(path)
+			v, err := jsonv.Parse(b)
+			if err != nil {
+				t.Errorf("%s: %v", rel, err)
+				return nil
+			}
+			if len(sema.Validate(pack, kinds, res, v)) > 0 {
+				skipped++
+				return nil
+			}
+			sb.WriteString(Decl(k, "minecraft", "minecraft:"+strings.TrimSuffix(rel, ".json"), v))
+			originals["assets/minecraft/"+pack.Assets[res]+"/"+rel] = v
+			return nil
+		})
+		p.SetFile(res+".mms", sb.String())
+	}
+	r, err := p.Analyze(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	errs := 0
+	for _, u := range r.Units {
+		for _, d := range r.Diagnostics(u.Path) {
+			if d.Severity != 1 {
+				continue
+			}
+			if errs++; errs <= 40 {
+				line, _ := u.File.LineCol(d.Sp.Start)
+				t.Errorf("%s:%d %s %s", u.Path, line, d.Code, d.Message)
+			}
+		}
+	}
+	built, mismatch := 0, 0
+	for _, f := range r.Emit() {
+		want, ok := originals[f.Path]
+		if !ok {
+			continue
+		}
+		built++
+		got, _ := jsonv.Parse(f.Data)
+		if !reflect.DeepEqual(normalize(got), normalize(want)) {
+			if mismatch++; mismatch <= 10 {
+				t.Errorf("%s differs:\n got %s\nwant %s", f.Path, jsonv.Compact(got), jsonv.Compact(want))
+			}
+		}
+	}
+	t.Logf("%d files, %d built, %d errors, %d differ, %d skipped", len(originals), built, errs, mismatch, skipped)
+	if built != len(originals) {
+		t.Errorf("built %d of %d files", built, len(originals))
+	}
+}

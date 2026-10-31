@@ -68,6 +68,9 @@ func TestCompletion(t *testing.T) {
 		{"command objective", "Objective kills = deathCount\nFunction f {\n  /scoreboard players set @s |\n}", []string{"kills"}, false},
 		{"command after execute run", "Function f {\n  /execute as @a run gam|\n}", []string{"gamemode"}, false},
 		{"command registry", "Function f {\n  /effect give @s |\n}", []string{"speed"}, false},
+		{"resource pack kind", "BlockSt|", []string{"BlockState"}, false},
+		{"block state property", "BlockState minecraft:oak_fence = {\n  multipart = [{ when = {\n    |\n  }, apply = { model = minecraft:block/oak_fence_post } }]\n}", []string{"north", "waterlogged"}, false},
+		{"model parent", "Model block/x = { parent = minecraft:block/cube_a| }", []string{"block/cube_all"}, false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -148,5 +151,18 @@ func TestSemanticTokens(t *testing.T) {
 		if toks[i].Span.Start < toks[i-1].Span.End {
 			t.Errorf("overlap at %v", toks[i].Span)
 		}
+	}
+}
+
+func TestResourcePackNavigation(t *testing.T) {
+	src := "Model block/glow = { parent = minecraft:block/cube_all }\nBlockState minecraft:glowstone = { variants = { \"\" = [{ model = block/gl|ow, weight = 3 }] } }\n"
+	s, off := session(t, src)
+	defs := s.Definition("main.mms", off)
+	if len(defs) != 1 || defs[0].Span.Start != strings.Index(src, "block/glow") {
+		t.Errorf("definition = %+v", defs)
+	}
+	h, _ := s.Hover("main.mms", strings.Index(src, "BlockState")+2)
+	if !strings.Contains(h, "assets/<namespace>/blockstates/<name>.json") || !strings.Contains(h, "resource pack") {
+		t.Errorf("kind hover = %q", h)
 	}
 }

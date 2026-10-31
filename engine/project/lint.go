@@ -255,7 +255,8 @@ func (ig ignoreSet) covers(d syntax.Diagnostic, line int) bool {
 // ---- rules
 
 func lintOverrides(l *lintRun, d *Decl) {
-	if l.r.cfg.Namespace == "minecraft" || !d.Kind.IsResource() || d.D.Name == nil {
+	// A block state only does anything when it replaces vanilla's.
+	if l.r.cfg.Namespace == "minecraft" || !d.Kind.IsResource() || d.D.Name == nil || d.Kind.Resource == "block_definition" {
 		return
 	}
 	id := d.ID()
@@ -271,7 +272,11 @@ func lintOverrides(l *lintRun, d *Decl) {
 		vanilla = l.r.pack.HasID(folder, path)
 	}
 	if vanilla {
-		l.report(d, d.D.Name.Sp, fmt.Sprintf("this replaces vanilla's %s '%s'", folder, id))
+		what := folder
+		if d.Kind.Assets != "" {
+			what = strings.ReplaceAll(sema.Snake(d.Kind.Name), "_", " ")
+		}
+		l.report(d, d.D.Name.Sp, fmt.Sprintf("this replaces vanilla's %s '%s'", what, id))
 	}
 }
 
