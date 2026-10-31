@@ -4,7 +4,28 @@ package main
 import (
 	"fmt"
 	"os"
+	"runtime/debug"
+
+	"github.com/minecraftmetascript/mms/engine/spec"
 )
+
+// version is set by release builds: -ldflags "-X main.version=v1.0.0".
+var version = ""
+
+func versionString() string {
+	v := version
+	if v == "" {
+		v = "dev"
+		if info, ok := debug.ReadBuildInfo(); ok && info.Main.Version != "" && info.Main.Version != "(devel)" {
+			v = info.Main.Version
+		}
+	}
+	mc := "?"
+	if p, err := spec.Default(); err == nil {
+		mc = p.Version
+	}
+	return fmt.Sprintf("mms %s (Minecraft %s)", v, mc)
+}
 
 const usage = `usage: mms <command> [arguments]
 
@@ -16,6 +37,7 @@ commands:
   import  turn a data pack folder or zip into an MMS project
   init    create mms.json and a starter file
   lsp     run the language server over stdio
+  version print the version
 `
 
 func main() {
@@ -39,6 +61,8 @@ func main() {
 		code = runImport(os.Args[2:], os.Stdout, os.Stderr)
 	case "lsp":
 		code = runLSP(os.Args[2:], os.Stdin, os.Stdout, os.Stderr)
+	case "version", "-v", "--version":
+		fmt.Println(versionString())
 	case "help", "-h", "--help":
 		fmt.Print(usage)
 	default:
