@@ -1,0 +1,189 @@
+========================================
+Arithmetic precedence
+========================================
+
+DensityFunction t = Clamp(Abs(r) * 0.5 + YGradient(-64 -> 1, 320 -> -1), -1, 1)
+
+----------------------------------------
+
+(source_file
+  (declaration
+    (identifier)
+    (identifier)
+    (call_expression
+      (identifier)
+      (arguments
+        (argument
+          (binary_expression
+            (binary_expression
+              (call_expression
+                (identifier)
+                (arguments
+                  (argument
+                    (identifier))))
+              (number))
+            (call_expression
+              (identifier)
+              (arguments
+                (argument
+                  (arrow_expression
+                    (unary_expression
+                      (number))
+                    (number)))
+                (argument
+                  (arrow_expression
+                    (number)
+                    (unary_expression
+                      (number))))))))
+        (argument
+          (unary_expression
+            (number)))
+        (argument
+          (number))))))
+
+========================================
+Method chains
+========================================
+
+DensityFunction d = Noise(n).XzScale(1).YScale(0)
+
+----------------------------------------
+
+(source_file
+  (declaration
+    (identifier)
+    (identifier)
+    (call_expression
+      (member_expression
+        (call_expression
+          (member_expression
+            (call_expression
+              (identifier)
+              (arguments
+                (argument
+                  (identifier))))
+            (identifier))
+          (arguments
+            (argument
+              (number))))
+        (identifier))
+      (arguments
+        (argument
+          (number))))))
+
+========================================
+Block calls in a list
+========================================
+
+SurfaceRule s = Sequence(
+  If(Biome(badlands) && !YAbove(74)) { Block(stone) },
+  If(StoneDepth(Floor)) { Block(dirt) }
+)
+
+----------------------------------------
+
+(source_file
+  (declaration
+    (identifier)
+    (identifier)
+    (call_expression
+      (identifier)
+      (arguments
+        (argument
+          (block_call_expression
+            (call_expression
+              (identifier)
+              (arguments
+                (argument
+                  (binary_expression
+                    (call_expression
+                      (identifier)
+                      (arguments
+                        (argument
+                          (identifier))))
+                    (unary_expression
+                      (call_expression
+                        (identifier)
+                        (arguments
+                          (argument
+                            (number)))))))))
+            (block
+              (expression_statement
+                (call_expression
+                  (identifier)
+                  (arguments
+                    (argument
+                      (identifier))))))))
+        (argument
+          (block_call_expression
+            (call_expression
+              (identifier)
+              (arguments
+                (argument
+                  (call_expression
+                    (identifier)
+                    (arguments
+                      (argument
+                        (identifier)))))))
+            (block
+              (expression_statement
+                (call_expression
+                  (identifier)
+                  (arguments
+                    (argument
+                      (identifier))))))))))))
+
+========================================
+Tags, selectors and coordinates
+========================================
+
+Function f {
+  let t = #minecraft:logs
+  let s = @a
+  let p = ~ ~1 ~-2
+}
+
+----------------------------------------
+
+(source_file
+  (declaration
+    (identifier)
+    (identifier)
+    (block
+      (let_statement
+        (identifier)
+        (tag
+          (resource_location)))
+      (let_statement
+        (identifier)
+        (selector
+          (identifier)))
+      (let_statement
+        (identifier)
+        (coordinates))
+      (expression_statement
+        (number))
+      (expression_statement
+        (binary_expression
+          (coordinates)
+          (number))))))
+
+========================================
+Partial member access
+========================================
+
+Noise n = Noise(-7).
+
+----------------------------------------
+
+(source_file
+  (declaration
+    (identifier)
+    (identifier)
+    (member_expression
+      (call_expression
+        (identifier)
+        (arguments
+          (argument
+            (unary_expression
+              (number))))))))

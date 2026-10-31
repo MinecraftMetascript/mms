@@ -1,0 +1,146 @@
+========================================
+Control flow
+========================================
+
+Function f(n: int) {
+  for i in 0..n {
+    if (i % 2 == 0) {
+      continue
+    } else if (i > 10) {
+      break
+    } else {
+      x += i
+    }
+  }
+  while (x > 0) {
+    x -= 1
+  }
+}
+
+----------------------------------------
+
+(source_file
+  (declaration
+    (identifier)
+    (identifier)
+    (parameters
+      (parameter
+        (identifier)
+        (type_annotation
+          (type
+            (identifier)))))
+    (block
+      (for_statement
+        (identifier)
+        (range_expression
+          (number)
+          (identifier))
+        (block
+          (if_statement
+            (binary_expression
+              (binary_expression
+                (identifier)
+                (number))
+              (number))
+            (block
+              (continue_statement))
+            (if_statement
+              (binary_expression
+                (identifier)
+                (number))
+              (block
+                (break_statement))
+              (block
+                (compound_assignment
+                  (identifier)
+                  (identifier)))))))
+      (while_statement
+        (binary_expression
+          (identifier)
+          (number))
+        (block
+          (compound_assignment
+            (identifier)
+            (number)))))))
+
+========================================
+Commands with interpolation
+========================================
+
+Function demo {
+  /say fib(10) is ${fib(10)}
+  /tellraw @a "${greeting}"
+  /kill @e[type=minecraft:zombie]
+}
+
+----------------------------------------
+
+(source_file
+  (declaration
+    (identifier)
+    (identifier)
+    (block
+      (command
+        (command_name)
+        (command_text)
+        (interpolation
+          (call_expression
+            (identifier)
+            (arguments
+              (argument
+                (number))))))
+      (command
+        (command_name)
+        (command_text)
+        (interpolation
+          (identifier))
+        (command_text))
+      (command
+        (command_name)
+        (command_text)))))
+
+========================================
+Division is not a command
+========================================
+
+Function f {
+  let a = b / c
+}
+
+----------------------------------------
+
+(source_file
+  (declaration
+    (identifier)
+    (identifier)
+    (block
+      (let_statement
+        (identifier)
+        (binary_expression
+          (identifier)
+          (identifier))))))
+
+========================================
+Comments
+========================================
+
+// line
+/* block */
+/**/
+Noise n = Noise(1) // trailing
+
+----------------------------------------
+
+(source_file
+  (line_comment)
+  (block_comment)
+  (block_comment)
+  (declaration
+    (identifier)
+    (identifier)
+    (call_expression
+      (identifier)
+      (arguments
+        (argument
+          (number)))))
+  (line_comment))

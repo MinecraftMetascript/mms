@@ -18,3 +18,11 @@
 .DS_Store
 .idea/
 .vscode/
+
+# Editors
+/editors/tree-sitter-mms/node_modules/
+/editors/tree-sitter-mms/build/
+/editors/tree-sitter-mms/*.wasm
+/editors/zed/target/
+/editors/zed/grammars/
+/editors/zed/extension.wasm

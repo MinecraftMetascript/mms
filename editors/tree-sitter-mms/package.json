@@ -1,0 +1,19 @@
+{
+  "name": "tree-sitter-mms",
+  "version": "1.0.0",
+  "description": "Tree-sitter grammar for Minecraft Metascript (.mms)",
+  "license": "UNLICENSED",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/MinecraftMetascript/mms.git",
+    "directory": "editors/tree-sitter-mms"
+  },
+  "scripts": {
+    "generate": "tree-sitter generate",
+    "test": "tree-sitter test && ./scripts/check.sh"
+  },
+  "devDependencies": {
+    "tree-sitter-cli": "0.25.10"
+  }
+}

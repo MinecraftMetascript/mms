@@ -1,0 +1,4 @@
+editors/tree-sitter-mms/src/parser.c linguist-generated=true
+editors/tree-sitter-mms/src/grammar.json linguist-generated=true
+editors/tree-sitter-mms/src/node-types.json linguist-generated=true
+editors/tree-sitter-mms/src/tree_sitter/** linguist-generated=true
