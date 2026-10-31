@@ -88,6 +88,19 @@ ItemTag gems = [diamond, #minecraft:logs, Optional(emerald)]
 | `#minecraft:logs` | `"#minecraft:logs"`: another tag's entries |
 | `Optional(emerald)` | `{ id = emerald, required = false }`: the tag still loads if the entry is missing |
 
+## Structures
+
+A structure that generates in new chunks takes four resources, each naming the next:
+
+| Kind | Says |
+| --- | --- |
+| `StructureSet` | how far apart structures start, with `RandomSpread(spacing, separation, salt)` |
+| `Structure` | the biomes, the height, and for `Jigsaw(...)` the pool to start from |
+| `TemplatePool` | the templates (`.nbt` files) to place, with their processors |
+| `ProcessorList` | rules that change blocks as a template is placed |
+
+A template's chests can get a loot table from a `Rule` processor with `block_entity_modifier = AppendLoot(chests/buried)`. That works on vanilla templates too, so a structure can reuse one without its own `.nbt` file. The [`treasure`](../examples/treasure/) example does this in `worldgen.mms`.
+
 ## Density functions
 
 `+`, `-`, `*` and `/` build `add`, `sub`, `mul` and `div`. Arithmetic on constants is folded. A unary `-x` is `x * -1`.
