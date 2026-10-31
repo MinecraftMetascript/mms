@@ -4,6 +4,7 @@ export interface Reference {
 	version: string;
 	kinds: { name: string; folder?: string; doc?: string }[];
 	groups: Group[];
+	types: TypeEntry[];
 }
 
 export interface Group {
@@ -15,7 +16,31 @@ export interface Helper {
 	name: string;
 	case?: string;
 	signature: string;
-	params?: { name: string; type: string; optional?: boolean; doc?: string }[];
+	params?: Param[];
+}
+
+export interface Param {
+	name: string;
+	/** The readable type as text. */
+	type: string;
+	/** The same type in pieces, with named types linked. */
+	typeParts?: TypePart[];
+	optional?: boolean;
+	doc?: string;
+}
+
+export interface TypePart {
+	text: string;
+	link?: { group?: string; helper?: string; type?: string };
+}
+
+/** A named type that no helper group explains, such as an enum. */
+export interface TypeEntry {
+	id: string;
+	name: string;
+	def?: TypePart[];
+	values?: { value: string; doc?: string }[];
+	fields?: Param[];
 }
 
 /** A group's heading: what its helpers build. */
@@ -30,19 +55,46 @@ export function groupTitle(dispatcher: string): string {
 }
 
 export const groupId = (dispatcher: string) => (dispatcher ? dispatcher.replace(/^minecraft:/, '').replace(/\W/g, '-') : 'objects');
+export const helperId = (dispatcher: string, name: string) => `${groupId(dispatcher)}-${name}`;
+export const typeId = (id: string) => `type-${id.replace(/\W/g, '-')}`;
 
-/** Groups with only the helpers whose name, type or parameters match q. */
+/** The anchor a type part links to, or "" for plain text. */
+export function linkId(link: TypePart['link']): string {
+	if (!link) return '';
+	if (link.type) return typeId(link.type);
+	if (link.group === undefined) return '';
+	return link.helper ? helperId(link.group, link.helper) : groupId(link.group);
+}
+
+/** The call shape without types, such as `Noise(noise, xz_scale?, y_scale?)`. */
+export const callShape = (h: Helper) => `${h.name}(${(h.params ?? []).map((p) => p.name + (p.optional ? '?' : '')).join(', ')})`;
+
+const matches = (s: string, q: string) => s.toLowerCase().includes(q);
+
+/**
+ * Groups with only the helpers that match q: by name, the type they make,
+ * their group, or a parameter's name or type.
+ */
 export function filterGroups(groups: Group[], q: string): Group[] {
 	const s = q.trim().toLowerCase();
 	if (!s) return groups;
 	return groups
-		.map((g) => ({
-			...g,
-			helpers: g.helpers.filter(
-				(h) => h.name.toLowerCase().includes(s) || (h.case ?? '').includes(s) || groupTitle(g.dispatcher).toLowerCase().includes(s)
-			)
-		}))
+		.map((g) => {
+			if (matches(groupTitle(g.dispatcher), s) || matches(g.dispatcher, s)) return g;
+			return {
+				...g,
+				helpers: g.helpers.filter(
+					(h) => matches(h.name, s) || matches(h.case ?? '', s) || (h.params ?? []).some((p) => matches(p.name, s) || matches(p.type, s))
+				)
+			};
+		})
 		.filter((g) => g.helpers.length);
+}
+
+/** Types whose name matches q. */
+export function filterTypes(types: TypeEntry[], q: string): TypeEntry[] {
+	const s = q.trim().toLowerCase();
+	return s ? types.filter((t) => matches(t.name, s)) : types;
 }
 
 /** Splits schema documentation into text and `code` parts. */

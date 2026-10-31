@@ -13,6 +13,9 @@ type Reference struct {
 	Version string     `json:"version"`
 	Kinds   []RefKind  `json:"kinds"`
 	Groups  []RefGroup `json:"groups"`
+	// Types explains the named types that signatures link to and that no
+	// helper group covers, such as enums and id-or-object unions.
+	Types []*RefType `json:"types"`
 }
 
 // RefKind is a declaration kind. Folder is the data pack folder of a
@@ -39,11 +42,14 @@ type RefHelper struct {
 	Params    []RefParam `json:"params,omitempty"`
 }
 
+// RefParam is a helper parameter or a field of a type entry. Type is the
+// readable type as plain text; TypeParts is the same with links.
 type RefParam struct {
-	Name     string `json:"name"`
-	Type     string `json:"type"`
-	Optional bool   `json:"optional,omitempty"`
-	Doc      string `json:"doc,omitempty"`
+	Name      string     `json:"name"`
+	Type      string     `json:"type"`
+	TypeParts []TypePart `json:"typeParts,omitempty"`
+	Optional  bool       `json:"optional,omitempty"`
+	Doc       string     `json:"doc,omitempty"`
 }
 
 var mmsKindDocs = map[string]string{
@@ -72,26 +78,15 @@ func BuildReference(p *spec.Pack, ks *Kinds) Reference {
 		ref.Kinds = append(ref.Kinds, rk)
 	}
 
-	groups := map[string]map[string]RefHelper{}
+	groups := map[string]map[string]*Callable{}
 	seen := map[*spec.Type]bool{}
 	add := func(group string, cl *Callable) {
 		if groups[group] == nil {
-			groups[group] = map[string]RefHelper{}
+			groups[group] = map[string]*Callable{}
 		}
-		if _, ok := groups[group][cl.Name]; ok {
-			return
+		if _, ok := groups[group][cl.Name]; !ok {
+			groups[group][cl.Name] = cl
 		}
-		h := RefHelper{Name: cl.Name, Signature: c.signature(cl)}
-		if cl.Case != "" {
-			h.Case = "minecraft:" + strings.TrimPrefix(cl.Case, "minecraft:")
-		}
-		_, params, docs := c.Signature(&Info{Callable: cl})
-		for i, p := range params {
-			name, typ, _ := strings.Cut(p, ": ")
-			rp := RefParam{Name: strings.TrimSuffix(name, "?"), Type: typ, Optional: strings.HasSuffix(name, "?"), Doc: docs[i]}
-			h.Params = append(h.Params, rp)
-		}
-		groups[group][cl.Name] = h
 	}
 
 	var walk func(v tview, depth int)
@@ -144,6 +139,14 @@ func BuildReference(p *spec.Pack, ks *Kinds) Reference {
 		walk(tview{T: p.Resources[r]}, 0)
 	}
 
+	rt := &refTypes{c: c, types: map[string]*RefType{}, helper: func(group, name string) bool {
+		hs, ok := groups[group]
+		if name == "" {
+			return ok
+		}
+		_, ok = hs[name]
+		return ok
+	}}
 	names := make([]string, 0, len(groups))
 	for g := range groups {
 		names = append(names, g)
@@ -151,11 +154,40 @@ func BuildReference(p *spec.Pack, ks *Kinds) Reference {
 	sort.Strings(names)
 	for _, g := range names {
 		rg := RefGroup{Dispatcher: g}
-		for _, h := range groups[g] {
-			rg.Helpers = append(rg.Helpers, h)
+		for _, cl := range groups[g] {
+			rg.Helpers = append(rg.Helpers, c.refHelper(rt, cl))
 		}
 		sort.Slice(rg.Helpers, func(i, j int) bool { return rg.Helpers[i].Name < rg.Helpers[j].Name })
 		ref.Groups = append(ref.Groups, rg)
 	}
+	rt.define()
+	for _, t := range rt.types {
+		ref.Types = append(ref.Types, t)
+	}
+	sort.Slice(ref.Types, func(i, j int) bool {
+		a, b := ref.Types[i], ref.Types[j]
+		if a.Name != b.Name {
+			return a.Name < b.Name
+		}
+		return a.ID < b.ID
+	})
 	return ref
+}
+
+func (c *Checker) refHelper(rt *refTypes, cl *Callable) RefHelper {
+	h := RefHelper{Name: cl.Name, Signature: c.signature(cl)}
+	if cl.Case != "" {
+		h.Case = "minecraft:" + strings.TrimPrefix(cl.Case, "minecraft:")
+	}
+	for _, f := range c.positional(cl) {
+		opt := f.Optional
+		if cl.Ov != nil {
+			if _, ok := cl.Ov.defaults[f.Key]; ok {
+				opt = true
+			}
+		}
+		parts := rt.format(f.Type, 0)
+		h.Params = append(h.Params, RefParam{Name: f.Key, Type: plainParts(parts), TypeParts: parts, Optional: opt, Doc: f.Desc})
+	}
+	return h
 }
