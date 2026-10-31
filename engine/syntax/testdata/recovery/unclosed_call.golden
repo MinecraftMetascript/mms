@@ -1,0 +1,10 @@
+Decl Noise ridges
+  Call
+    Ident Noise
+    Unary -
+      Number 7
+Decl DensityFunction d
+  Call
+    Ident Abs
+    Ident ridges
+! 20-21 '(' is never closed

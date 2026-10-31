@@ -1,0 +1,35 @@
+== loot_table example:blocks/ruby_ore
+{
+  "type": "minecraft:block",
+  "pools": [
+    {
+      "rolls": 1,
+      "entries": [
+        {
+          "type": "minecraft:item",
+          "name": "minecraft:diamond"
+        }
+      ]
+    },
+    {
+      "rolls": 2,
+      "entries": [
+        {
+          "type": "minecraft:item",
+          "name": "minecraft:emerald"
+        }
+      ]
+    }
+  ]
+}
+== loot_table example:broken
+{
+  "pools": [
+    {
+      "rolls": "minecraft:x",
+      "entries": []
+    }
+  ]
+}
+! 16: mms/unknown-id unknown context_int_provider 'minecraft:x'
+! 15: mms/unknown-field unknown field 'pols' in LootTable; did you mean 'pools'?

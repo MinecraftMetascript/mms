@@ -1,0 +1,62 @@
+== worldgen/noise example:ridges_noise
+{
+  "base_octave": -7,
+  "octave_count": 2
+}
+== worldgen/density_function example:continents
+{
+  "type": "minecraft:cache",
+  "input": {
+    "type": "minecraft:noise",
+    "noise": "minecraft:continentalness",
+    "xz_scale": 0.25,
+    "y_scale": 0
+  }
+}
+== worldgen/density_function example:shaped
+{
+  "type": "minecraft:clamp",
+  "input": {
+    "type": "minecraft:sub",
+    "left": {
+      "type": "minecraft:add",
+      "left": {
+        "type": "minecraft:mul",
+        "left": "example:continents",
+        "right": 2
+      },
+      "right": 0.5
+    },
+    "right": {
+      "type": "minecraft:abs",
+      "input": "example:ridges_noise_df"
+    }
+  },
+  "min": -1,
+  "max": 1
+}
+== worldgen/density_function example:ridges_noise_df
+{
+  "type": "minecraft:noise",
+  "noise": "example:ridges_noise",
+  "xz_scale": 1,
+  "y_scale": 0
+}
+== worldgen/density_function example:constant
+7
+== worldgen/density_function example:typo
+== worldgen/density_function example:missing
+{
+  "type": "minecraft:noise",
+  "noise": "minecraft:nope",
+  "xz_scale": 1,
+  "y_scale": 1
+}
+== worldgen/density_function example:neg
+{
+  "type": "minecraft:mul",
+  "left": -1,
+  "right": "example:continents"
+}
+! 13: mms/unknown-callable 'Clmp' does not make a DensityFunction; did you mean Clamp(...)?
+! 14: mms/unknown-id unknown worldgen/noise 'minecraft:nope'

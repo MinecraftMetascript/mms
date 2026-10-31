@@ -1,0 +1,67 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Minecraft Metascript",
+  "scopeName": "source.mms",
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#command" },
+    { "include": "#declaration" },
+    { "include": "#expression" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        { "name": "comment.block.documentation.mms", "begin": "/\\*\\*", "end": "\\*/" },
+        { "name": "comment.block.mms", "begin": "/\\*", "end": "\\*/" },
+        { "name": "comment.line.double-slash.mms", "match": "//.*$" }
+      ]
+    },
+    "command": {
+      "name": "meta.command.mms",
+      "begin": "^\\s*(/)([a-z]+)",
+      "beginCaptures": {
+        "1": { "name": "punctuation.definition.command.mms" },
+        "2": { "name": "support.function.command.mms" }
+      },
+      "end": "$",
+      "patterns": [
+        {
+          "name": "meta.interpolation.mms",
+          "begin": "\\$\\{",
+          "end": "\\}",
+          "beginCaptures": { "0": { "name": "punctuation.section.interpolation.begin.mms" } },
+          "endCaptures": { "0": { "name": "punctuation.section.interpolation.end.mms" } },
+          "patterns": [{ "include": "#expression" }]
+        },
+        { "name": "variable.language.selector.mms", "match": "@[aenprs]\\b" },
+        { "name": "string.quoted.double.mms", "match": "\"(\\\\.|[^\"\\\\])*\"" },
+        { "name": "constant.numeric.mms", "match": "(?<![\\w.])[~^]?-?\\d+(\\.\\d+)?\\b|[~^]" },
+        { "name": "entity.name.resource.mms", "match": "#?[a-z0-9_.-]+:[a-z0-9_./-]+" }
+      ]
+    },
+    "declaration": {
+      "match": "^\\s*([A-Z][A-Za-z0-9]*)\\s+([A-Za-z0-9_.:/-]+)",
+      "captures": {
+        "1": { "name": "storage.type.kind.mms" },
+        "2": { "name": "entity.name.declaration.mms" }
+      }
+    },
+    "expression": {
+      "patterns": [
+        { "include": "#comments" },
+        { "name": "keyword.control.mms", "match": "\\b(if|else|while|for|in|return|break|continue)\\b" },
+        { "name": "storage.modifier.mms", "match": "\\blet\\b" },
+        { "name": "constant.language.mms", "match": "\\b(true|false)\\b" },
+        { "name": "string.quoted.double.mms", "begin": "\"", "end": "\"", "patterns": [{ "name": "constant.character.escape.mms", "match": "\\\\." }] },
+        { "name": "string.quoted.single.mms", "begin": "'", "end": "'", "patterns": [{ "name": "constant.character.escape.mms", "match": "\\\\." }] },
+        { "name": "entity.name.tag.mms", "match": "#[a-z0-9_.-]+(:[a-z0-9_./-]+)?" },
+        { "name": "entity.name.resource.mms", "match": "\\b[a-z0-9_.-]+:[a-z0-9_./-]+" },
+        { "name": "variable.language.selector.mms", "match": "@[aenprs]\\b" },
+        { "name": "constant.numeric.mms", "match": "\\b\\d+(\\.\\d+)?([eE][+-]?\\d+)?\\b" },
+        { "name": "entity.name.function.mms", "match": "\\b[A-Z][A-Za-z0-9]*(?=\\s*\\()" },
+        { "name": "support.type.mms", "match": "(?<=:\\s)(int|bool|string)\\b" },
+        { "name": "keyword.operator.mms", "match": "\\.\\.|->|[-+*/%]=?|==|!=|<=|>=|&&|\\|\\||[<>!=]" }
+      ]
+    }
+  }
+}

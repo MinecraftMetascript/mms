@@ -1,0 +1,9 @@
+Decl Block b
+  Call
+    Ident Block
+    Index
+      Ident oak_log
+      Arg axis =
+        Bad 30-30
+! 23-24 '[' is never closed
+! 15-16 '(' is never closed

@@ -1,0 +1,7 @@
+Decl Noise a
+  Bad 9-9
+Decl Noise b
+  Call
+    Ident Noise
+    Number 2
+! 8-9 expected a value after '='

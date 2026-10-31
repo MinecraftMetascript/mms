@@ -1,0 +1,82 @@
+{
+  "name": "mms",
+  "displayName": "Minecraft Metascript",
+  "description": "Language support for Minecraft Metascript (.mms): diagnostics, completion, formatting and quick fixes from the MMS language server.",
+  "version": "1.0.0",
+  "publisher": "minecraftmetascript",
+  "license": "SEE LICENSE IN README.md",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/MinecraftMetascript/mms.git"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["Programming Languages", "Formatters", "Linters"],
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "workspaceContains:**/mms.json"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "mms",
+        "aliases": ["Minecraft Metascript", "MMS"],
+        "extensions": [".mms"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "mms",
+        "scopeName": "source.mms",
+        "path": "./syntaxes/mms.tmLanguage.json"
+      }
+    ],
+    "configuration": {
+      "title": "Minecraft Metascript",
+      "properties": {
+        "mms.path": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the mms executable. Empty means `mms` on your PATH."
+        },
+        "mms.trace.server": {
+          "type": "string",
+          "enum": ["off", "messages", "verbose"],
+          "default": "off",
+          "description": "Log the messages between VS Code and the MMS language server."
+        }
+      }
+    },
+    "commands": [
+      {
+        "command": "mms.restartServer",
+        "title": "MMS: Restart Language Server"
+      }
+    ],
+    "configurationDefaults": {
+      "[mms]": {
+        "editor.formatOnSave": true,
+        "editor.tabSize": 2,
+        "editor.insertSpaces": true,
+        "editor.semanticHighlighting.enabled": true
+      }
+    }
+  },
+  "scripts": {
+    "build": "esbuild src/extension.ts --bundle --platform=node --format=cjs --external:vscode --outfile=out/extension.js --minify",
+    "check": "tsc --noEmit",
+    "package": "npm run check && npm run build && vsce package --skip-license"
+  },
+  "dependencies": {
+    "vscode-languageclient": "9.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "20.17.6",
+    "@types/vscode": "1.85.0",
+    "@vscode/vsce": "3.2.1",
+    "esbuild": "0.24.0",
+    "typescript": "5.6.3"
+  }
+}

@@ -1,0 +1,10 @@
+Decl Function f()
+  Block
+    Command "say ${@s}"
+    Trailing
+      Call
+        Ident As
+        Selector a
+      Block
+! 37-38 '{' is never closed
+! 13-14 '{' is never closed

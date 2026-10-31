@@ -1,0 +1,6 @@
+Decl Noise ridges
+  Member .Ampl
+    Call
+      Ident Noise
+      Unary -
+        Number 7

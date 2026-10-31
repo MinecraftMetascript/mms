@@ -1,12 +1,20 @@
-mms/grammars
-result
-vscode-extension/node_modules
-.antlr
-mms_build
-gen
-extensions/vscode-extension/node_modules
-overworld.json
-surface_rules_wiki.txt
-repomix-output.xml
-spec.md
-mms_dist
+# Go
+/engine/bin/
+*.test
+*.out
+
+# Web
+/web/node_modules/
+/web/dist/
+/web/.svelte-kit/
+/web/build/
+/web/static/mms.wasm
+/web/static/wasm_exec.js
+
+# Spec generation cache
+/engine/specgen/.cache/
+
+# Editors and OS
+.DS_Store
+.idea/
+.vscode/

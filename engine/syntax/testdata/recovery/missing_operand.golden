@@ -1,0 +1,14 @@
+Decl SurfaceRule s
+  Trailing
+    Call
+      Ident If
+      Binary &&
+        Call
+          Ident Biome
+          Ident badlands
+        Bad 38-38
+    Block
+      Call
+        Ident Block
+        Ident stone
+! 38-39 cannot parse ')'

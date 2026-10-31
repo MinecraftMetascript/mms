@@ -1,0 +1,56 @@
+=== data/mms_demo/worldgen/material_condition/in_friendly_biome.json
+{
+  "type": "minecraft:biome",
+  "biome_is": [
+    "minecraft:forest",
+    "minecraft:plains",
+    "minecraft:beach"
+  ]
+}
+=== data/mms_demo/worldgen/material_condition/in_unfriendly_biome.json
+{
+  "type": "minecraft:biome",
+  "biome_is": [
+    "minecraft:desert",
+    "minecraft:badlands",
+    "minecraft:deep_ocean"
+  ]
+}
+=== data/mms_demo/worldgen/material_rule/honey_surface.json
+{
+  "type": "minecraft:block",
+  "result_state": "minecraft:honey_block"
+}
+=== data/mms_demo/worldgen/material_rule/my_strange_surface.json
+{
+  "type": "minecraft:sequence",
+  "sequence": [
+    {
+      "type": "minecraft:condition",
+      "if_true": "mms_demo:in_friendly_biome",
+      "then_run": "mms_demo:honey_surface"
+    },
+    {
+      "type": "minecraft:condition",
+      "if_true": "mms_demo:in_unfriendly_biome",
+      "then_run": "mms_demo:slime_surface"
+    },
+    {
+      "type": "minecraft:block",
+      "result_state": "minecraft:magma_block"
+    }
+  ]
+}
+=== data/mms_demo/worldgen/material_rule/slime_surface.json
+{
+  "type": "minecraft:block",
+  "result_state": "minecraft:slime_block"
+}
+=== pack.mcmeta
+{
+  "pack": {
+    "description": "Port of the old surface_rules example",
+    "min_format": 121,
+    "max_format": 121
+  }
+}

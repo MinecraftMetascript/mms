@@ -1,0 +1,7 @@
+Decl Noise ridges
+  Member .<missing>
+    Call
+      Ident Noise
+      Unary -
+        Number 7
+! 25-25 expected a name after '.'
