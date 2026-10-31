@@ -32,6 +32,8 @@ type Candidate struct {
 	Kind   CandidateKind
 	Detail string
 	Doc    string
+	// Deprecated is set for declarations whose doc comment says so.
+	Deprecated bool
 	// Insert is a snippet ($1 marks the cursor), or "" to insert Label.
 	Insert string
 	// Rank orders candidates: lower first.
@@ -107,7 +109,7 @@ func (c *Checker) valueCandidates(v tview, depth int) []Candidate {
 		if id.Tags != "required" {
 			for _, s := range c.Syms.All() {
 				if s.Kind.Folder() == reg {
-					out = append(out, Candidate{Label: c.shortID(s.ID()), Kind: CandID, Detail: s.Kind.Name, Doc: s.Decl.Doc, Rank: 0})
+					out = append(out, Candidate{Label: c.shortID(s.ID()), Kind: CandID, Detail: s.Kind.Name, Doc: DocMarkdown(s.Decl.Doc), Deprecated: Deprecated(s.Decl), Rank: 0})
 				}
 			}
 			for _, x := range c.Pack.Registries[reg] {
@@ -117,7 +119,7 @@ func (c *Checker) valueCandidates(v tview, depth int) []Candidate {
 		if id.Tags != "" {
 			for _, s := range c.Syms.All() {
 				if s.Kind.TagOf == reg {
-					out = append(out, Candidate{Label: "#" + c.shortID(s.ID()), Kind: CandID, Detail: reg + " tag", Rank: 1})
+					out = append(out, Candidate{Label: "#" + c.shortID(s.ID()), Kind: CandID, Detail: reg + " tag", Doc: DocMarkdown(s.Decl.Doc), Deprecated: Deprecated(s.Decl), Rank: 1})
 				}
 			}
 			for _, x := range c.Pack.Registries["tag/"+reg] {
@@ -353,9 +355,22 @@ func (c *Checker) Hover(in *Info) string {
 		}
 	case in.Symbol != nil:
 		s := in.Symbol
-		parts = append(parts, fmt.Sprintf("```mms\n%s %s\n```", s.Kind.Name, s.ID()))
-		if s.Decl.Doc != "" {
-			parts = append(parts, s.Decl.Doc)
+		parts = append(parts, "```mms\n"+SymbolHead(s.Kind.Name, s.ID(), s.Decl)+"\n```")
+		if md := DocMarkdown(s.Decl.Doc); md != "" {
+			parts = append(parts, md)
+		}
+	case in.Local != nil:
+		l := in.Local
+		head := "let " + l.Name + ": " + l.Type
+		switch l.What {
+		case "parameter":
+			head = "(parameter) " + l.Name + ": " + l.Type
+		case "for":
+			head = "(loop variable) " + l.Name + ": " + l.Type
+		}
+		parts = append(parts, "```mms\n"+head+"\n```")
+		if md := DocMarkdown(l.Doc); md != "" {
+			parts = append(parts, md)
 		}
 	case in.ID != "":
 		parts = append(parts, "`"+in.ID+"`")
@@ -366,6 +381,48 @@ func (c *Checker) Hover(in *Info) string {
 		parts = append(parts, "Expected: "+describe(in.Type))
 	}
 	return strings.Join(parts, "\n\n")
+}
+
+// SymbolHead is the code line a hover shows for a declaration: its kind
+// and id, plus the signature of a Function and the type of a Global.
+func SymbolHead(kind, id string, d *syntax.Decl) string {
+	head := kind + " " + id
+	if d == nil {
+		return head
+	}
+	switch kind {
+	case "Function":
+		if d.Params != nil {
+			sig := SigOf(d)
+			var ps []string
+			for _, p := range sig.Params {
+				ps = append(ps, p.Name+": "+p.Type)
+			}
+			head += "(" + strings.Join(ps, ", ") + ")"
+		}
+		if d.Type != nil {
+			head += ": " + d.Type.Text
+		}
+	case "Global":
+		if d.Type != nil {
+			head += ": " + d.Type.Text
+		}
+	}
+	return head
+}
+
+// DocMarkdown renders a declaration's doc comment, tags included, as
+// Markdown; "" when there is none.
+func DocMarkdown(doc string) string {
+	if doc == "" {
+		return ""
+	}
+	return syntax.ParseDoc(doc).Markdown()
+}
+
+// Deprecated reports whether a declaration's doc comment has @deprecated.
+func Deprecated(d *syntax.Decl) bool {
+	return d != nil && d.Doc != "" && syntax.ParseDoc(d.Doc).Deprecated != nil
 }
 
 // TypeDoc renders the expected type in mcdoc-like syntax, for hover.

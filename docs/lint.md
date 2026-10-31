@@ -9,6 +9,7 @@ The engine lints every declaration that checks without errors. Findings appear i
 | `redundant-namespace` | hint | safe | A `minecraft:` prefix that can be dropped. It is kept when the project declares its own resource with the short name. |
 | `use-sugar` | hint | safe | An object literal with a shorter form: a dispatched object as its helper call (`{ type = noise, noise = ridge }` becomes `Noise(noise = ridge)`), and the sugar in [resources.md](resources.md): bare item entries, `1..3`, `diamond * 4`, trigger calls, `&&`, `||`, `!` and density arithmetic. Parentheses are added where precedence needs them. |
 | `constant-expression` | hint | safe | Arithmetic on number literals, such as `2 * 0.25`, which is replaced by its value. |
+| `deprecated` | warning | none | A use of a declaration whose [doc comment](getting-started.md#doc-comments) has a `@deprecated` tag, anywhere in the project, commands included. The message carries the tag's text, and the editor strikes the use out. |
 | `overrides-vanilla` | info | none | A declaration that replaces a vanilla resource, such as `LootTable minecraft:blocks/stone`. It is skipped when the project namespace is `minecraft`. |
 
 ## Configuration

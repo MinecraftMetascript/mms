@@ -291,6 +291,8 @@ func (r *Result) reuse(u *sema.Unit, d *syntax.Decl, ns string, moved map[*synta
 	for n, in := range old.Info {
 		if nn, ok := m.Nodes[n]; ok {
 			cp.Info[nn] = in
+		} else if nn := syntax.ShiftLeaf(n, m.Delta); nn != nil {
+			cp.Info[nn] = in // a reference inside a command
 		}
 	}
 	cp.Diags = make([]syntax.Diagnostic, len(old.Diags))

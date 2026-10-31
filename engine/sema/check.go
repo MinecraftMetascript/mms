@@ -20,6 +20,7 @@ type Info struct {
 	Fields   []field // for object bodies and calls: every field in scope
 	Disp     *dispInfo
 	Callable *Callable
+	Local    *Local // a function's parameter or local variable
 	// Bare says how a string literal here could be written unquoted:
 	// BareID for an id (Folder is its registry folder, "tags/..." for a
 	// tag), BareKey for a dispatch key, BareEnum for a string enum name.

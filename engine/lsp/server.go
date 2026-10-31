@@ -466,8 +466,11 @@ func (s *Server) publish(u *sema.Unit, ds []syntax.Diagnostic) {
 		if d.Code != "" {
 			m["code"] = d.Code
 		}
-		if d.Unnecessary {
+		switch {
+		case d.Unnecessary:
 			m["tags"] = []int{1}
+		case d.Deprecated:
+			m["tags"] = []int{2}
 		}
 		if len(d.Fixes) > 0 {
 			// The web editor applies fixes straight from the diagnostic.
@@ -526,6 +529,9 @@ func (s *Server) completion(_ context.Context, p posParams) (any, *respError) {
 		if it.Doc != "" {
 			m["documentation"] = map[string]any{"kind": "markdown", "value": it.Doc}
 		}
+		if it.Deprecated {
+			m["tags"] = []int{1} // CompletionItemTag.Deprecated
+		}
 		text := it.Label
 		if it.Snippet {
 			text = it.Insert
@@ -555,17 +561,25 @@ func (s *Server) signatureHelp(_ context.Context, p posParams) (any, *respError)
 	if !ok {
 		return nil, nil
 	}
-	label, params, active, ok := sess.Signature(p.TextDocument.URI, off)
+	h, ok := sess.Signature(p.TextDocument.URI, off)
 	if !ok {
 		return nil, nil
 	}
-	ps := make([]map[string]any, 0, len(params))
-	for _, pr := range params {
-		ps = append(ps, map[string]any{"label": pr})
+	ps := make([]map[string]any, 0, len(h.Params))
+	for i, pr := range h.Params {
+		m := map[string]any{"label": pr}
+		if i < len(h.ParamDocs) && h.ParamDocs[i] != "" {
+			m["documentation"] = map[string]any{"kind": "markdown", "value": h.ParamDocs[i]}
+		}
+		ps = append(ps, m)
+	}
+	sig := map[string]any{"label": h.Label, "parameters": ps}
+	if h.Doc != "" {
+		sig["documentation"] = map[string]any{"kind": "markdown", "value": h.Doc}
 	}
 	return map[string]any{
-		"signatures":      []any{map[string]any{"label": label, "parameters": ps}},
-		"activeSignature": 0, "activeParameter": active,
+		"signatures":      []any{sig},
+		"activeSignature": 0, "activeParameter": h.Active,
 	}, nil
 }
 

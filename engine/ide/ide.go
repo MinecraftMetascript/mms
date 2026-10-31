@@ -71,13 +71,15 @@ func (a *at) info(n syntax.Node) *sema.Info {
 
 // Item is a completion item.
 type Item struct {
-	Label   string
-	Kind    sema.CandidateKind
-	Detail  string
-	Doc     string
-	Insert  string // snippet when Snippet is set
-	Snippet bool
-	Sort    string
+	Label  string
+	Kind   sema.CandidateKind
+	Detail string
+	Doc    string
+	// Deprecated marks a declaration whose doc comment has @deprecated.
+	Deprecated bool
+	Insert     string // snippet when Snippet is set
+	Snippet    bool
+	Sort       string
 }
 
 // Completion lists completions at off, and the span the chosen item
@@ -113,7 +115,7 @@ func (s *Session) Completion(path string, off int) ([]Item, syntax.Span) {
 	cands := s.complete(a, off)
 	items := make([]Item, 0, len(cands))
 	for i, c := range cands {
-		it := Item{Label: c.Label, Kind: c.Kind, Detail: c.Detail, Doc: c.Doc, Sort: sortKey(i)}
+		it := Item{Label: c.Label, Kind: c.Kind, Detail: c.Detail, Doc: c.Doc, Deprecated: c.Deprecated, Sort: sortKey(i)}
 		if c.Insert != "" {
 			it.Insert, it.Snippet = c.Insert, true
 		}
@@ -405,6 +407,12 @@ func (s *Session) Hover(path string, off int) (string, syntax.Span) {
 		}
 		return "", syntax.Span{}
 	}
+	if n, in := a.inCommand(off); in != nil {
+		if md := a.c.Hover(in); md != "" {
+			return md, n.Span()
+		}
+		return "", syntax.Span{}
+	}
 	for i := len(a.path) - 1; i >= 2; i-- {
 		n := a.path[i]
 		if in := a.info(n); in != nil {
@@ -422,9 +430,9 @@ func (s *Session) Hover(path string, off int) (string, syntax.Span) {
 
 func (s *Session) declHover(d *project.Decl) string {
 	var sb strings.Builder
-	sb.WriteString("```mms\n" + d.D.Kind.Name + " " + d.ID() + "\n```\n")
-	if d.D.Doc != "" {
-		sb.WriteString(d.D.Doc + "\n\n")
+	sb.WriteString("```mms\n" + sema.SymbolHead(d.D.Kind.Name, d.ID(), d.D) + "\n```\n")
+	if md := sema.DocMarkdown(d.D.Doc); md != "" {
+		sb.WriteString(md + "\n\n")
 	}
 	if d.Value != nil {
 		js := string(jsonv.Marshal(d.Value))
@@ -437,12 +445,20 @@ func (s *Session) declHover(d *project.Decl) string {
 	return sb.String()
 }
 
-// Signature returns signature help for the call around off: the label,
-// the parameter labels and the active parameter.
-func (s *Session) Signature(path string, off int) (label string, params []string, active int, ok bool) {
+// SignatureHelp describes the call around the cursor.
+type SignatureHelp struct {
+	Label     string
+	Doc       string   // Markdown, or ""
+	Params    []string // parameter labels
+	ParamDocs []string // Markdown per parameter, "" when undocumented
+	Active    int
+}
+
+// Signature returns signature help for the call around off.
+func (s *Session) Signature(path string, off int) (SignatureHelp, bool) {
 	a := s.at(path, off)
 	if a == nil {
-		return "", nil, 0, false
+		return SignatureHelp{}, false
 	}
 	for i := len(a.path) - 1; i >= 0; i-- {
 		call, isCall := a.path[i].(*syntax.Call)
@@ -450,20 +466,48 @@ func (s *Session) Signature(path string, off int) (label string, params []string
 			continue
 		}
 		if _, isMethod := call.Fn.(*syntax.Member); isMethod {
-			return "", nil, 0, false
+			return SignatureHelp{}, false
 		}
-		label, params, _ := a.c.Signature(a.info(call))
-		if label == "" {
-			return "", nil, 0, false
+		var h SignatureHelp
+		h.Label, h.Params, h.ParamDocs = a.c.Signature(a.info(call))
+		if h.Label == "" {
+			h = s.functionSignature(a.info(call.Fn))
 		}
+		if h.Label == "" {
+			return SignatureHelp{}, false
+		}
+		active := 0
 		for _, arg := range call.Args {
 			if arg.Name == nil && arg.Sp.End < off && commaBetween(a.u.File, arg.Sp.End, off) {
 				active++
 			}
 		}
-		return label, params, min(active, max(len(params)-1, 0)), true
+		h.Active = min(active, max(len(h.Params)-1, 0))
+		return h, true
 	}
-	return "", nil, 0, false
+	return SignatureHelp{}, false
+}
+
+// functionSignature is signature help for a call to one of the project's
+// Functions, with its doc comment and @param texts.
+func (s *Session) functionSignature(in *sema.Info) SignatureHelp {
+	if in == nil || in.Symbol == nil {
+		return SignatureHelp{}
+	}
+	sym := s.current(in.Symbol)
+	if sym.Kind.MMS != "Function" {
+		return SignatureHelp{}
+	}
+	doc := syntax.ParseDoc(sym.Decl.Doc)
+	h := SignatureHelp{Label: strings.TrimPrefix(sema.SymbolHead("Function", sym.Path, sym.Decl), "Function "), Doc: doc.Text}
+	if doc.Deprecated != nil {
+		h.Doc = strings.TrimSpace("**Deprecated.** " + *doc.Deprecated + "\n\n" + h.Doc)
+	}
+	for _, p := range sema.SigOf(sym.Decl).Params {
+		h.Params = append(h.Params, p.Name+": "+p.Type)
+		h.ParamDocs = append(h.ParamDocs, doc.Param(p.Name))
+	}
+	return h
 }
 
 // target finds the symbol at off: a reference or a declaration's name.
@@ -481,12 +525,45 @@ func (s *Session) target(path string, off int) *sema.Symbol {
 		}
 		return nil
 	}
+	if _, in := a.inCommand(off); in != nil {
+		return s.current(in.Symbol) // nil for a local
+	}
 	for i := len(a.path) - 1; i >= 2; i-- {
 		if in := a.info(a.path[i]); in != nil && in.Symbol != nil {
 			return s.current(in.Symbol)
 		}
 	}
 	return nil
+}
+
+// inCommand finds the reference at off inside a raw command: an id the
+// command names, or a name inside ${...}. Commands are text in the syntax
+// tree, so the checker records these with nodes of their own.
+func (a *at) inCommand(off int) (syntax.Node, *sema.Info) {
+	cmd, ok := a.path[len(a.path)-1].(*syntax.CommandStmt)
+	if !ok || a.decl == nil {
+		return nil, nil
+	}
+	var best syntax.Node
+	var bestIn *sema.Info
+	for n, in := range a.decl.Info {
+		if in.Symbol == nil && in.Local == nil {
+			continue
+		}
+		switch n.(type) {
+		case *syntax.Ident, *syntax.ResLoc, *syntax.Tag, *syntax.String:
+		default:
+			continue
+		}
+		sp := n.Span()
+		if !sp.Contains(off) || sp.Start < cmd.Sp.Start || sp.End > cmd.Sp.End {
+			continue
+		}
+		if best == nil || sp.Len() < best.Span().Len() || sp.Len() == best.Span().Len() && sp.Start < best.Span().Start {
+			best, bestIn = n, in
+		}
+	}
+	return best, bestIn
 }
 
 // current maps a symbol recorded by an earlier analysis (a declaration
@@ -496,7 +573,7 @@ func (s *Session) current(sym *sema.Symbol) *sema.Symbol {
 	if sym == nil {
 		return nil
 	}
-	if cur := s.R.Syms.Find(sym.Kind.Folder(), sym.ID()); cur != nil {
+	if cur := s.R.Syms.Same(sym); cur != nil {
 		return cur
 	}
 	return sym
@@ -659,6 +736,7 @@ func (s *Session) Symbols(path string) []Symbol {
 func (s *Session) commandCompletion(a *at, sp syntax.Span, off int) ([]Item, syntax.Span) {
 	base := sp.Start + 1
 	text := string(a.u.File.Src[base:sp.End])
+	docs := map[string]*sema.Symbol{} // suggested label -> declaration
 	ids := func(reg string) []string {
 		folder := reg
 		if tg, ok := strings.CutPrefix(reg, "tag/"); ok {
@@ -669,8 +747,10 @@ func (s *Session) commandCompletion(a *at, sp syntax.Span, off int) ([]Item, syn
 			switch {
 			case reg == "objective" && sym.Kind.MMS == "Objective":
 				out = append(out, sym.Path)
+				docs[sym.Path] = sym
 			case reg != "objective" && sym.Kind.MMS != "Objective" && sym.Kind.MMS != "Global" && sym.Kind.Folder() == folder:
 				out = append(out, sym.ID()) // commands need ids namespaced
+				docs[sym.ID()], docs["#"+sym.ID()] = sym, sym
 			}
 		}
 		return out
@@ -682,7 +762,11 @@ func (s *Session) commandCompletion(a *at, sp syntax.Span, off int) ([]Item, syn
 		if sg.ID {
 			k = sema.CandID
 		}
-		items = append(items, Item{Label: sg.Label, Kind: k, Detail: sg.Detail, Sort: sortKey(i)})
+		it := Item{Label: sg.Label, Kind: k, Detail: sg.Detail, Sort: sortKey(i)}
+		if sym := docs[sg.Label]; sg.ID && sym != nil {
+			it.Doc, it.Deprecated = sema.DocMarkdown(sym.Decl.Doc), sema.Deprecated(sym.Decl)
+		}
+		items = append(items, it)
 	}
 	return items, syntax.Span{Start: base + ws, End: off}
 }

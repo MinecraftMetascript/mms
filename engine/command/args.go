@@ -134,6 +134,9 @@ func (s *state) arg(name string, n *spec.CommandNode, pos int) (int, bool) {
 		if end == pos {
 			return 0, s.fail(pos, s.word(pos), "expected "+parserNames[p]+" name")
 		}
+		if p == "objective" {
+			s.ids = append(s.ids, ID{Start: pos, End: end, Registry: "objective", Value: string(s.src[pos:end])})
+		}
 		return end, true
 	case "int_range", "float_range":
 		return s.rangeArg(pos, p == "int_range")
