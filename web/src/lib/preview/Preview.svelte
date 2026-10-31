@@ -396,6 +396,11 @@
 		if (!pointers.has(e.pointerId)) return;
 		pointers.delete(e.pointerId);
 		if (pinch) {
+			if (pointers.size >= 2) {
+				// A third touch (a palm, say) lifted: keep pinching with the two left.
+				startPinch();
+				return;
+			}
 			// Back to one finger: carry on panning from where it is now.
 			pinch = null;
 			const rest = [...pointers.values()][0];
