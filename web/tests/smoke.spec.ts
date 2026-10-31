@@ -258,3 +258,36 @@ test('doc comments show on hover over a use', async ({ page }) => {
 	const tip = page.locator('.cm-tooltip-hover, .cm-tooltip-lint').filter({ hasText: 'Kills needed' });
 	await expect(tip.first()).toContainText('Deprecated.');
 });
+
+test('right-click opens editor actions with quick fixes', async ({ page }) => {
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	await replaceText(page, 'DensityFunction a = 2 * 0.25\nDensityFunction b = a * 2\n');
+	await expect(page.locator('.cm-lintRange-hint').first()).toBeVisible();
+	const menu = page.getByRole('menu', { name: 'Editor actions' });
+
+	// Go to definition from a reference.
+	await page.locator('.cm-line').nth(1).getByText('a', { exact: true }).click({ button: 'right' });
+	await expect(menu).toBeVisible();
+	await expect(menu.getByRole('menuitem', { name: /Find references/ })).toContainText('Shift+F12');
+	await menu.getByRole('menuitem', { name: /Go to definition/ }).click();
+	await expect(menu).toBeHidden();
+	await expect(page.locator('.cm-activeLine')).toContainText('DensityFunction a');
+
+	// Escape and outside clicks close it.
+	await page.locator('.cm-line').first().click({ button: 'right' });
+	await expect(menu).toBeVisible();
+	await page.keyboard.press('Escape');
+	await expect(menu).toBeHidden();
+	await page.locator('.cm-line').first().click({ button: 'right' });
+	await page.getByRole('tab', { name: 'JSON' }).click();
+	await expect(menu).toBeHidden();
+
+	// A quick fix for the problem under the cursor.
+	await page.locator('.cm-lintRange-hint', { hasText: '2 * 0.25' }).click({ button: 'right' });
+	await expect(menu.getByRole('menuitem', { name: /mms-ignore|Ignore/i })).toBeVisible();
+	const fix = menu.getByRole('menuitem').filter({ hasNotText: /Fix all|ignore/i }).last();
+	await expect(fix).not.toContainText('Format');
+	await fix.click();
+	await expect(page.locator('.cm-content')).toContainText('DensityFunction a = 0.5');
+});

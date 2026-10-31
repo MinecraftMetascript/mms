@@ -9,6 +9,9 @@
 	import { uriOf } from '../project/project.svelte';
 	import { mmsHighlight, mmsLanguage } from './language';
 	import { semanticHighlighting } from './semantic';
+	import { forEachDiagnostic } from '@codemirror/lint';
+	import { findReferences, jumpToDefinition, renameSymbol } from '@codemirror/lsp-client';
+	import ContextMenu, { type MenuEntries } from './ContextMenu.svelte';
 
 	interface Props {
 		engine: Engine;
@@ -33,6 +36,42 @@
 		if (view) formatCommand(view);
 	}
 	let shown = '';
+	let menu: ContextMenu | undefined = $state();
+
+	const mac = typeof navigator !== 'undefined' && /Mac|iP(hone|ad)/.test(navigator.platform);
+	const mod = mac ? '⌘' : 'Ctrl';
+	const alt = mac ? '⌥' : 'Alt';
+
+	/** The right-click menu: language actions, then fixes for problems under the cursor. */
+	function openMenu(v: EditorView, e: MouseEvent) {
+		// Shift+right-click keeps the browser's own menu (copy, paste, spellcheck).
+		if (e.shiftKey) return false;
+		e.preventDefault();
+		const at = v.posAtCoords({ x: e.clientX, y: e.clientY });
+		const sel = v.state.selection.main;
+		if (at != null && (at < sel.from || at > sel.to)) v.dispatch({ selection: { anchor: at } });
+		const head = v.state.selection.main.head;
+		const run = (cmd: (v: EditorView) => boolean) => () => {
+			v.focus();
+			cmd(v);
+		};
+		const fixes: MenuEntries = [];
+		forEachDiagnostic(v.state, (d, from, to) => {
+			if (head < from || head > to) return;
+			for (const a of d.actions ?? []) fixes.push({ label: a.name, run: () => (v.focus(), a.apply(v, from, to)) });
+		});
+		const items: MenuEntries = [
+			{ label: 'Go to definition', keys: 'F12', run: run(jumpToDefinition) },
+			{ label: 'Find references', keys: 'Shift+F12', run: run(findReferences) },
+			{ label: 'Rename symbol', keys: 'F2', run: run(renameSymbol) },
+			null,
+			{ label: 'Format document', keys: `Shift+${alt}+F`, run: run(formatCommand) },
+			{ label: 'Fix all in this file', keys: `${mod}+${alt}+F`, run: run(fixAllCommand) }
+		];
+		if (fixes.length) items.push(null, ...fixes);
+		menu?.show({ x: e.clientX, y: e.clientY }, items, () => v.focus());
+		return true;
+	}
 	const theme = new Compartment();
 
 	function formatCommand(v: EditorView) {
@@ -62,6 +101,7 @@
 					{ key: 'Shift-Alt-f', run: formatCommand, preventDefault: true },
 					{ key: 'Mod-Alt-f', run: fixAllCommand, preventDefault: true }
 				]),
+				EditorView.domEventHandlers({ contextmenu: (e, v) => openMenu(v, e) }),
 				theme.of([]),
 				extra,
 				EditorView.updateListener.of((u) => {
@@ -111,3 +151,4 @@
 </script>
 
 <div class="editor h-full min-h-0 overflow-hidden" bind:this={host}></div>
+<ContextMenu bind:this={menu} />
