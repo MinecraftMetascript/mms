@@ -288,17 +288,92 @@
 	}
 
 	let drag: { x: number; y: number; vx: number; vy: number; moved: boolean } | null = null;
-	function pointer(e: PointerEvent) {
+	/** Pointers down on the canvas (fingers, or the mouse), in client coordinates. */
+	const pointers = new Map<number, { x: number; y: number }>();
+	/** A two-finger pinch: where it started, and the view then. */
+	let pinch: { dist: number; mid: { px: number; py: number }; vx: number; vy: number; scale: number } | null = null;
+	/** Whether this gesture pinched, so lifting a finger after it doesn't count as a tap. */
+	let pinched = false;
+
+	function pointer(e: { clientX: number; clientY: number }) {
 		const r = canvas.getBoundingClientRect();
 		return { px: ((e.clientX - r.left) / r.width) * (last?.width ?? 1), py: ((e.clientY - r.top) / r.height) * (last?.height ?? 1) };
 	}
+	/** The current block size of the 3D view (before its first render, what the worker picked). */
+	function isoScale(): number {
+		return isoView.scale || last?.scale || 8;
+	}
+	/** The world x/z under a canvas point of the 3D view, at block size s (screen x = (x - z)·s, y = (x + z)·s/2). */
+	function isoWorld(px: number, py: number, s: number, vx: number, vz: number): [number, number] {
+		const dx = px - (last?.width ?? 0) / 2;
+		const dy = py - (last?.height ?? 0) / 2;
+		return [vx + (dx / s + (2 * dy) / s) / 2, vz + ((2 * dy) / s - dx / s) / 2];
+	}
+	/** The world point under a canvas point of a 2D view. */
+	function flatWorld(px: number, py: number, scale: number, vx: number, vy: number): [number, number] {
+		const dx = px - (last?.width ?? 0) / 2;
+		const dy = py - (last?.height ?? 0) / 2;
+		return [vx + dx * scale, flat ? vy + dy * scale : vy - dy * scale];
+	}
+	/**
+	 * Zooms to a new size, keeping the world point that was under `from`
+	 * (at the starting view) under `to`. A pinch moves and zooms at once;
+	 * the wheel zooms about the cursor.
+	 */
+	function zoomTo(from: { px: number; py: number }, to: { px: number; py: number }, start: { vx: number; vy: number; scale: number }, factor: number) {
+		if (mode === 'iso') {
+			const s = Math.min(48, Math.max(last?.minScale ?? 2, start.scale * factor));
+			const [wx, wz] = isoWorld(from.px, from.py, start.scale, start.vx, start.vy);
+			const [ox, oz] = isoWorld(to.px, to.py, s, 0, 0);
+			isoView = { x: wx - ox, y: wz - oz, scale: s };
+		} else {
+			const scale = Math.min(maxScale, Math.max(1 / 16, start.scale / factor));
+			const [wx, wy] = flatWorld(from.px, from.py, start.scale, start.vx, start.vy);
+			const [ox, oy] = flatWorld(to.px, to.py, scale, 0, 0);
+			view.scale = scale;
+			view.x = wx - ox;
+			view.y = wy - oy;
+		}
+		request();
+	}
+	function startDrag(at: { x: number; y: number }) {
+		const v = mode === 'iso' ? isoView : view;
+		drag = { x: at.x, y: at.y, vx: v.x, vy: v.y, moved: pinched };
+	}
+	function startPinch() {
+		const [a, b] = [...pointers.values()];
+		const pa = pointer({ clientX: a.x, clientY: a.y });
+		const pb = pointer({ clientX: b.x, clientY: b.y });
+		const v = mode === 'iso' ? isoView : view;
+		pinch = {
+			dist: Math.hypot(pa.px - pb.px, pa.py - pb.py) || 1,
+			mid: { px: (pa.px + pb.px) / 2, py: (pa.py + pb.py) / 2 },
+			vx: v.x,
+			vy: v.y,
+			scale: mode === 'iso' ? isoScale() : view.scale
+		};
+		pinched = true;
+		drag = null;
+	}
+
 	function down(e: PointerEvent) {
 		canvas.setPointerCapture(e.pointerId);
-		const v = mode === 'iso' ? isoView : view;
-		drag = { x: e.clientX, y: e.clientY, vx: v.x, vy: v.y, moved: false };
+		if (pointers.size === 0) pinched = false;
+		pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+		if (pointers.size === 2) startPinch();
+		else if (pointers.size === 1) startDrag({ x: e.clientX, y: e.clientY });
 	}
 	function move(e: PointerEvent) {
 		hover = pointer(e);
+		if (pointers.has(e.pointerId)) pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+		if (pinch && pointers.size >= 2) {
+			const [a, b] = [...pointers.values()];
+			const pa = pointer({ clientX: a.x, clientY: a.y });
+			const pb = pointer({ clientX: b.x, clientY: b.y });
+			const dist = Math.hypot(pa.px - pb.px, pa.py - pb.py) || 1;
+			zoomTo(pinch.mid, { px: (pa.px + pb.px) / 2, py: (pa.py + pb.py) / 2 }, pinch, dist / pinch.dist);
+			return;
+		}
 		if (!drag) return;
 		const dx = (e.clientX - drag.x) / resolution;
 		const dy = (e.clientY - drag.y) / resolution;
@@ -307,7 +382,7 @@
 		if (mode === 'iso') {
 			// Undo the projection (screen x = (x - z)·s, screen y = (x + z)·s/2),
 			// so the ground follows the pointer.
-			const s = isoView.scale || 8;
+			const s = isoScale();
 			isoView.x = drag.vx - (dx / s + (2 * dy) / s) / 2;
 			isoView.y = drag.vy - ((2 * dy) / s - dx / s) / 2;
 			request();
@@ -318,7 +393,21 @@
 		request();
 	}
 	function up(e: PointerEvent) {
-		if (drag && !drag.moved && mode !== 'iso') {
+		if (!pointers.has(e.pointerId)) return;
+		pointers.delete(e.pointerId);
+		if (pinch) {
+			if (pointers.size >= 2) {
+				// A third touch (a palm, say) lifted: keep pinching with the two left.
+				startPinch();
+				return;
+			}
+			// Back to one finger: carry on panning from where it is now.
+			pinch = null;
+			const rest = [...pointers.values()][0];
+			if (rest) startDrag(rest);
+			return;
+		}
+		if (e.type === 'pointerup' && drag && !drag.moved && !pinched && mode !== 'iso') {
 			const p = pointer(e);
 			const [x, y] = toWorld(p.px, p.py);
 			lock = lock && lock.x === x && lock.y === y ? null : { x, y };
@@ -328,24 +417,11 @@
 	}
 	function wheel(e: WheelEvent) {
 		e.preventDefault();
-		if (mode === 'iso') {
-			// Zooming out past a 2×2-chunk area builds more chunks, up to 4×4.
-			const s = isoView.scale || 8;
-			isoView.scale = Math.min(48, Math.max(last?.minScale ?? 2, s * Math.exp(-e.deltaY * 0.0015)));
-			request();
-			return;
-		}
-		const p = pointer(e as unknown as PointerEvent);
-		const [wx, wy] = toWorld(p.px, p.py);
-		const f = Math.exp(e.deltaY * 0.0015);
-		const scale = Math.min(maxScale, Math.max(1 / 16, view.scale * f));
-		// Keep the point under the cursor fixed.
-		const w = last?.width ?? 0;
-		const h = last?.height ?? 0;
-		view.scale = scale;
-		view.x = wx - (p.px - w / 2) * scale;
-		view.y = flat ? wy - (p.py - h / 2) * scale : wy + (p.py - h / 2) * scale;
-		request();
+		const p = pointer(e);
+		// Trackpad pinches arrive as ctrl+wheel with small deltas; scale them up to match.
+		const f = Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0015));
+		const v = mode === 'iso' ? isoView : view;
+		zoomTo(p, p, { vx: v.x, vy: v.y, scale: mode === 'iso' ? isoScale() : view.scale }, f);
 	}
 
 	/** A sampled value, or the block or biome it indexes. */
@@ -444,9 +520,11 @@
 			bind:this={canvas}
 			class="absolute inset-0 h-full w-full touch-none [image-rendering:pixelated]"
 			class:invisible={!info || !last}
+			data-view={JSON.stringify(mode === 'iso' ? isoView : view)}
 			onpointerdown={down}
 			onpointermove={move}
 			onpointerup={up}
+			onpointercancel={up}
 			onpointerleave={() => (hover = null)}
 			onwheel={wheel}
 		></canvas>

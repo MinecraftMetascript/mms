@@ -404,3 +404,63 @@ test('built-in helpers explain themselves on hover and while typing', async ({ p
 	await expect(sig.locator('.cm-lsp-active-parameter')).toHaveText(/^offset/);
 	await expect(sig).toContainText('Extra depth that still passes');
 });
+
+test.describe('on a phone', () => {
+	test.use({ viewport: { width: 390, height: 664 }, hasTouch: true, isMobile: true });
+
+	test('the 3D preview pans with a finger and zooms with a pinch about the pinch', async ({ page, context }) => {
+		page.on('dialog', (d) => d.accept());
+		await page.goto('./');
+		await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+		await page.getByRole('button', { name: /Project/ }).click();
+		await page.getByRole('button', { name: /badlands/ }).click();
+		const rule = page.locator('.cm-line', { hasText: 'SurfaceRule badlands' });
+		// The editor only renders lines near the viewport; scroll until the rule is there.
+		for (let i = 0; i < 20 && (await rule.count()) === 0; i++) {
+			await page.locator('.cm-scroller').evaluate((s) => (s.scrollTop += 300));
+		}
+		await rule.tap();
+		await page.getByRole('button', { name: '3D', exact: true }).tap();
+		const canvas = page.locator('canvas');
+		await expect(canvas).toBeVisible({ timeout: 30_000 });
+		await expect(canvas).toHaveAttribute('data-view', /"scale":[1-9]/);
+
+		const box = (await canvas.boundingBox())!;
+		const x = box.x + box.width * 0.65;
+		const y = box.y + Math.min(box.height / 2, 50);
+		const view = async () => JSON.parse((await canvas.getAttribute('data-view'))!);
+		/** The world x/z under a client point, by the view's projection. */
+		const worldAt = async () => {
+			const v = await view();
+			return canvas.evaluate((c: HTMLCanvasElement, [x, y, v]) => {
+				const r = c.getBoundingClientRect();
+				const dx = ((x - r.left) / r.width) * c.width - c.width / 2;
+				const dy = ((y - r.top) / r.height) * c.height - c.height / 2;
+				return [v.x + (dx / v.scale + (2 * dy) / v.scale) / 2, v.y + ((2 * dy) / v.scale - dx / v.scale) / 2];
+			}, [x, y, v] as const);
+		};
+		const cdp = await context.newCDPSession(page);
+		const touch = (type: string, points: [number, number][]) =>
+			cdp.send('Input.dispatchTouchEvent', { type: type as 'touchStart', touchPoints: points.map(([x, y], id) => ({ x, y, id })) });
+
+		// Spreading two fingers zooms in and keeps the ground under them in place.
+		const before = await view();
+		const ground = await worldAt();
+		await touch('touchStart', [[x - 20, y], [x + 20, y]]);
+		for (let i = 1; i <= 10; i++) await touch('touchMove', [[x - 20 - i * 6, y], [x + 20 + i * 6, y]]);
+		await touch('touchEnd', []);
+		await expect.poll(async () => (await view()).scale).toBeCloseTo(before.scale * 4, 5);
+		const after = await worldAt();
+		expect(after[0]).toBeCloseTo(ground[0], 5);
+		expect(after[1]).toBeCloseTo(ground[1], 5);
+
+		// One finger pans; the page itself neither zooms nor scrolls.
+		const zoomed = await view();
+		await touch('touchStart', [[x, y]]);
+		for (let i = 1; i <= 8; i++) await touch('touchMove', [[x - i * 10, y]]);
+		await touch('touchEnd', []);
+		await expect.poll(async () => (await view()).x).toBeGreaterThan(zoomed.x);
+		expect(await page.evaluate(() => [visualViewport!.scale, scrollX, scrollY])).toEqual([1, 0, 0]);
+		await expect(page.getByText(/Preview failed/)).toBeHidden();
+	});
+});
