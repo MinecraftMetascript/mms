@@ -2,6 +2,7 @@ package importer
 
 import (
 	"encoding/json"
+	"errors"
 	"io/fs"
 	"path"
 	"sort"
@@ -57,10 +58,10 @@ func Pack(fsys fs.FS, kinds *sema.Kinds, sp *spec.Pack) (*Result, error) {
 	perNS := map[string]int{}
 	err := fs.WalkDir(fsys, "data", func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
-			if p == "data" {
+			if p == "data" && !errors.Is(err, fs.ErrNotExist) {
 				return err
 			}
-			return nil
+			return nil // no data folder: an empty pack
 		}
 		if d.IsDir() {
 			return nil

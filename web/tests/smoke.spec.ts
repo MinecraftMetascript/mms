@@ -57,3 +57,37 @@ test('projects persist and examples open', async ({ page }) => {
 	await page.reload();
 	await expect(page.getByRole('button', { name: 'surface.mms' })).toBeVisible();
 });
+
+test('data packs and pasted JSON import as MMS', async ({ page }) => {
+	page.on('dialog', (d) => d.accept());
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+
+	// Paste JSON appends a declaration to the open file.
+	await page.getByRole('button', { name: /Project/ }).click();
+	await page.getByRole('button', { name: /Paste JSON/ }).click();
+	await page.getByLabel('Kind', { exact: true }).selectOption('LootTable');
+	await page.getByLabel('Name', { exact: true }).fill('blocks/ruby_ore');
+	await page.getByLabel('JSON', { exact: true }).fill('{"type":"minecraft:block","pools":[{"rolls":1,"entries":[{"type":"minecraft:item","name":"minecraft:diamond"}]}]}');
+	await page.getByRole('button', { name: 'Convert' }).click();
+	await expect(page.locator('.cm-content')).toContainText('LootTable blocks/ruby_ore = {');
+	await expect(status(page)).toHaveText(/No problems/);
+	await page.getByRole('tab', { name: 'Pack' }).click();
+	await expect(page.getByRole('button', { name: 'ruby_ore.json' })).toBeVisible();
+
+	// A data pack zip becomes a project.
+	const { zipSync, strToU8 } = await import('fflate');
+	const zip = zipSync({
+		'gems/pack.mcmeta': strToU8('{"pack":{"pack_format":121,"description":"Gems"}}'),
+		'gems/data/gems/tags/item/shiny.json': strToU8('{"values":["minecraft:diamond"]}'),
+		'gems/data/gems/function/hello.mcfunction': strToU8('say hello\n')
+	});
+	await page.locator('input[type=file]').setInputFiles({ name: 'gems.zip', mimeType: 'application/zip', buffer: Buffer.from(zip) });
+	await page.getByRole('tab', { name: 'Sources' }).click();
+	await expect(page.getByRole('button', { name: 'tags_item.mms' })).toBeVisible();
+	await expect(page.getByRole('button', { name: 'function.mms' })).toBeVisible();
+	await expect(status(page)).toHaveText(/No problems/);
+	await page.getByRole('tab', { name: 'Pack' }).click();
+	await expect(page.getByRole('button', { name: 'shiny.json' })).toBeVisible();
+	await expect(page.getByRole('button', { name: 'hello.mcfunction' })).toBeVisible();
+});

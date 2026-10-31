@@ -11,7 +11,8 @@
 	import { Engine, type Diagnostic, type DocSymbol, type OutputFile } from '#lib/engine/engine.svelte.ts';
 	import { Project, pathOf, uriOf, starter } from '#lib/project/project.svelte.ts';
 	import { examples } from '#lib/project/examples.ts';
-	import { download, packZip, projectZip, readProjectZip } from '#lib/project/zip.ts';
+	import { download, isDataPack, packZip, projectZip, readProjectZip, readZip } from '#lib/project/zip.ts';
+	import PasteJson from '#lib/components/PasteJson.svelte';
 	import { previewable } from '#lib/preview/protocol.ts';
 
 	const project = new Project();
@@ -25,6 +26,7 @@
 	let theme = $state<'system' | 'light' | 'dark'>('system');
 	let menu = $state(false);
 	let fileInput: HTMLInputElement;
+	let pasteJson = $state<ReturnType<typeof PasteJson> | null>(null);
 
 	onMount(() => {
 		try {
@@ -142,10 +144,40 @@
 		(e.target as HTMLInputElement).value = '';
 		if (!file) return;
 		try {
-			const data = readProjectZip(file.name, new Uint8Array(await file.arrayBuffer()));
+			const entries = readZip(new Uint8Array(await file.arrayBuffer()));
+			if (isDataPack(entries)) {
+				if (!engine) return;
+				const res = await engine.importPack([...entries].map(([path, text]) => ({ path, text })));
+				if (!res.files.length) throw new Error('the pack has no resources MMS can import');
+				const skipped = res.skipped.length ? ` ${res.skipped.length} file(s) cannot be imported and will be left out.` : '';
+				if (!confirm(`Import ${res.count} resource(s) from the data pack ${file.name}?${skipped} It replaces the current project.`)) return;
+				const files = res.files.map((f) => ({ path: f.path, text: f.text }));
+				project.replace({
+					name: file.name.replace(/\.zip$/i, ''),
+					config: { namespace: res.namespace, description: res.description || 'Imported with MMS' },
+					files,
+					active: files[0].path
+				});
+				return;
+			}
+			const data = readProjectZip(file.name, entries);
 			if (confirm(`Import ${data.files.length} file(s) from ${file.name}? It replaces the current project.`)) project.replace(data);
 		} catch (err) {
 			alert(`Could not import ${file.name}: ${err instanceof Error ? err.message : err}`);
+		}
+	}
+	// Appends a declaration to the open file and selects it.
+	async function insertDecl(text: string) {
+		const f = project.activeFile;
+		if (!f) return;
+		const sep = f.text === '' ? '' : f.text.endsWith('\n\n') ? '' : f.text.endsWith('\n') ? '\n' : '\n\n';
+		const v = view;
+		if (v) {
+			const from = v.state.doc.length;
+			v.dispatch({ changes: { from, insert: sep + text }, selection: EditorSelection.cursor(from + sep.length), scrollIntoView: true });
+			v.focus();
+		} else {
+			project.setText(f.path, f.text + sep + text);
 		}
 	}
 	function exportPack() {
@@ -191,7 +223,11 @@
 			{#if menu}
 				<div class="absolute top-full left-0 z-20 mt-1 w-64 rounded-md border border-line bg-panel p-1 text-sm shadow-lg">
 					<button class="block w-full rounded px-2 py-1.5 text-left hover:bg-hover" onclick={newProject}>New project</button>
-					<button class="block w-full rounded px-2 py-1.5 text-left hover:bg-hover" onclick={() => { menu = false; fileInput.click(); }}>Import project zip…</button>
+					<button class="block w-full rounded px-2 py-1.5 text-left hover:bg-hover" onclick={() => { menu = false; fileInput.click(); }}>
+						<span class="block">Import zip…</span>
+						<span class="block text-xs text-muted">An MMS project or a data pack</span>
+					</button>
+					<button class="block w-full rounded px-2 py-1.5 text-left hover:bg-hover" disabled={!project.activeFile} onclick={() => { menu = false; pasteJson?.open(); }}>Paste JSON as MMS…</button>
 					<button class="block w-full rounded px-2 py-1.5 text-left hover:bg-hover" onclick={() => { menu = false; download(`${project.name || 'project'}-source.zip`, projectZip(project.data())); }}>Export project zip</button>
 					<div class="my-1 border-t border-line"></div>
 					<div class="px-2 pt-1 pb-0.5 text-[11px] font-medium tracking-wide text-muted uppercase">Examples</div>
@@ -214,6 +250,9 @@
 			{/if}
 		</div>
 		<input type="file" accept=".zip" class="hidden" bind:this={fileInput} onchange={importZip} />
+		{#if engine}
+			<PasteJson bind:this={pasteJson} {engine} namespace={project.config.namespace} oninsert={insertDecl} />
+		{/if}
 		<div class="ml-auto flex items-center gap-2 text-sm">
 			<span class="flex items-center gap-1.5 text-muted" role="status">
 				<span

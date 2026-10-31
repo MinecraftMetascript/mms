@@ -25,6 +25,19 @@ export interface DocSymbol {
 	selectionRange: Diagnostic['range'];
 }
 
+export interface PackImport {
+	files: { path: string; text: string }[];
+	namespace: string;
+	description: string;
+	skipped: string[];
+	count: number;
+}
+
+export interface ResourceKind {
+	kind: string;
+	folder: string;
+}
+
 export interface EngineHooks {
 	onText(uri: string, text: string): void;
 	display(uri: string): Promise<EditorView | null>;
@@ -128,6 +141,18 @@ export class Engine {
 	}
 
 	/** Formats a whole document, returning the new text or null. */
+	/** Converts data pack files into formatted MMS files. */
+	async importPack(files: { path: string; text: string }[]): Promise<PackImport> {
+		await this.client.initializing;
+		return this.client.request<object, PackImport>('mms/importPack', { files });
+	}
+
+	/** The JSON resource kinds and their data pack folders. */
+	async resourceKinds(): Promise<ResourceKind[]> {
+		await this.client.initializing;
+		return this.client.request<object, ResourceKind[]>('mms/resourceKinds', {});
+	}
+
 	async format(uri: string): Promise<string | null> {
 		this.client.sync();
 		const edits = await this.client.request<object, { newText: string }[] | null>('textDocument/formatting', {

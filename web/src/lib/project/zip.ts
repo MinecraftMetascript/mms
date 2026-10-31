@@ -19,25 +19,41 @@ export function projectZip(p: ProjectData): Uint8Array {
 	return zipSync(z, { level: 6 });
 }
 
-/** Reads a project zip; a single top-level folder is stripped. */
-export function readProjectZip(name: string, data: Uint8Array): ProjectData {
+/** A zip's text files, with a single top-level folder stripped. */
+export function readZip(data: Uint8Array): Map<string, string> {
 	const entries = unzipSync(data);
-	let paths = Object.keys(entries).filter((p) => !p.endsWith('/'));
+	const paths = Object.keys(entries).filter((p) => !p.endsWith('/') && !p.startsWith('__MACOSX/'));
 	const tops = new Set(paths.map((p) => p.split('/')[0]));
 	let prefix = '';
 	if (tops.size === 1 && paths.every((p) => p.includes('/'))) prefix = [...tops][0] + '/';
-	const config = { namespace: 'mms', description: '' };
-	const files = [];
+	const out = new Map<string, string>();
 	for (const p of paths) {
 		const rel = p.slice(prefix.length);
+		// Structures (.nbt) and other binary files have no MMS form.
+		if (/\.(mms|json|mcmeta|mcfunction)$/.test(rel) || rel === 'mms.json') out.set(rel, strFromU8(entries[p]));
+	}
+	return out;
+}
+
+/** Whether a zip holds a data pack rather than an MMS project. */
+export function isDataPack(files: Map<string, string>): boolean {
+	const paths = [...files.keys()];
+	return !paths.some((p) => p.endsWith('.mms')) && paths.some((p) => p === 'pack.mcmeta' || p.startsWith('data/'));
+}
+
+/** Reads an MMS project zip. */
+export function readProjectZip(name: string, entries: Map<string, string>): ProjectData {
+	const config = { namespace: 'mms', description: '' };
+	const files = [];
+	for (const [rel, text] of entries) {
 		if (rel === 'mms.json') {
 			try {
-				Object.assign(config, JSON.parse(strFromU8(entries[p])));
+				Object.assign(config, JSON.parse(text));
 			} catch {
 				/* keep defaults */
 			}
 		} else if (rel.endsWith('.mms')) {
-			files.push({ path: rel, text: strFromU8(entries[p]) });
+			files.push({ path: rel, text });
 		}
 	}
 	if (!files.length) throw new Error('the zip has no .mms files');

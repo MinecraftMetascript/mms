@@ -4,7 +4,7 @@ The browser editor for MMS: SvelteKit 3, Tailwind CSS 4 and CodeMirror 6, built 
 
 - The engine runs as WASM in a Web Worker (`static/mms-worker.js`) and speaks LSP to the editor through `@codemirror/lsp-client`. A supervisor restarts it if it crashes or hangs.
 - Previews render with Deepslate in a second worker. Vanilla files that a pack references are fetched from mcmeta at the commit the spec pack was built from.
-- Projects are kept in IndexedDB and can be imported and exported as zips.
+- Projects are kept in IndexedDB and can be imported and exported as zips. Importing a data pack zip, or pasting one JSON file, converts it to MMS through the engine (`mms/importPack`).
 
 ## Develop
 

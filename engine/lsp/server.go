@@ -192,6 +192,8 @@ func init() {
 		"mms/output":                       typed((*Server).output),
 		"mms/setConfig":                    typed((*Server).setConfig),
 		"mms/setFiles":                     typed((*Server).setFiles),
+		"mms/importPack":                   typed((*Server).importPack),
+		"mms/resourceKinds":                typed((*Server).resourceKinds),
 		"mms/ping":                         func(*Server, context.Context, json.RawMessage) (any, *respError) { return "pong", nil },
 	}
 }

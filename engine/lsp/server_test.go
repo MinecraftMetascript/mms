@@ -217,3 +217,38 @@ func TestManagedFiles(t *testing.T) {
 		t.Error("ping")
 	}
 }
+
+func TestImportPack(t *testing.T) {
+	c := start(t)
+	c.result("initialize", map[string]any{})
+	c.notify("initialized", map[string]any{})
+	res := c.result("mms/importPack", map[string]any{"files": []any{
+		map[string]any{"path": "pack.mcmeta", "text": `{"pack":{"description":"Gems"}}`},
+		map[string]any{"path": "data/gems/tags/item/shiny.json", "text": `{"values":["minecraft:diamond"]}`},
+		map[string]any{"path": "data/gems/notes.txt", "text": "hi"},
+	}}).(map[string]any)
+	files := res["files"].([]any)
+	if len(files) != 1 || res["namespace"] != "gems" || res["description"] != "Gems" {
+		t.Fatalf("import = %v", res)
+	}
+	if text := files[0].(map[string]any)["text"]; text != "ItemTag shiny = [minecraft:diamond]\n" {
+		t.Errorf("text = %q", text)
+	}
+	if sk := res["skipped"].([]any); len(sk) != 1 {
+		t.Errorf("skipped = %v", sk)
+	}
+	empty := c.result("mms/importPack", map[string]any{"files": []any{}}).(map[string]any)
+	if len(empty["files"].([]any)) != 0 {
+		t.Errorf("empty import = %v", empty)
+	}
+	kinds := c.result("mms/resourceKinds", map[string]any{}).([]any)
+	found := false
+	for _, k := range kinds {
+		if m := k.(map[string]any); m["kind"] == "LootTable" && m["folder"] == "loot_table" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("LootTable missing from %d kinds", len(kinds))
+	}
+}
