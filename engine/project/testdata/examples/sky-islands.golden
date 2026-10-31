@@ -1,0 +1,149 @@
+=== data/sky/dimension/islands.json
+{
+  "type": "sky:islands",
+  "generator": {
+    "type": "minecraft:noise",
+    "settings": "sky:islands",
+    "biome_source": {
+      "type": "minecraft:fixed",
+      "biome": "sky:meadow"
+    }
+  }
+}
+=== data/sky/dimension_type/islands.json
+{
+  "attributes": {
+    "minecraft:visual/sky_color": "#9ad0ff",
+    "minecraft:visual/fog_color": "#d8ecff",
+    "minecraft:visual/cloud_height": 40
+  },
+  "default_clock": "minecraft:overworld",
+  "has_skylight": true,
+  "has_ceiling": false,
+  "has_ender_dragon_fight": false,
+  "coordinate_scale": 1,
+  "ambient_light": 0.1,
+  "logical_height": 256,
+  "infiniburn": "#minecraft:infiniburn_overworld",
+  "min_y": 0,
+  "height": 256,
+  "monster_spawn_light_level": 0,
+  "monster_spawn_block_light_limit": 0
+}
+=== data/sky/function/visit.mcfunction
+execute in sky:islands run tp @s 0 160 0
+tellraw @s "Welcome to the sky islands"
+=== data/sky/worldgen/biome/meadow.json
+{
+  "temperature": 0.7,
+  "downfall": 0.6,
+  "has_precipitation": true,
+  "effects": {
+    "water_color": "#3f76e4"
+  },
+  "carvers": [],
+  "features": []
+}
+=== data/sky/worldgen/density_function/height.json
+{
+  "type": "minecraft:gradient",
+  "axis": "y",
+  "from_coordinate": 32,
+  "to_coordinate": 224,
+  "from_value": -1,
+  "to_value": 1
+}
+=== data/sky/worldgen/density_function/islands.json
+{
+  "type": "minecraft:sub",
+  "left": {
+    "type": "minecraft:sub",
+    "left": {
+      "type": "minecraft:noise",
+      "noise": "sky:island_noise",
+      "xz_scale": 1,
+      "y_scale": 2
+    },
+    "right": {
+      "type": "minecraft:mul",
+      "left": "sky:height",
+      "right": "sky:height"
+    }
+  },
+  "right": 0.3
+}
+=== data/sky/worldgen/material_rule/surface.json
+{
+  "type": "minecraft:sequence",
+  "sequence": [
+    {
+      "type": "minecraft:condition",
+      "if_true": {
+        "type": "minecraft:stone_depth",
+        "offset": 0,
+        "surface_type": "floor",
+        "add_surface_depth": false,
+        "secondary_depth_range": 0
+      },
+      "then_run": {
+        "type": "minecraft:block",
+        "result_state": "minecraft:grass_block"
+      }
+    },
+    {
+      "type": "minecraft:condition",
+      "if_true": {
+        "type": "minecraft:stone_depth",
+        "offset": 3,
+        "surface_type": "floor",
+        "add_surface_depth": false,
+        "secondary_depth_range": 0
+      },
+      "then_run": {
+        "type": "minecraft:block",
+        "result_state": "minecraft:dirt"
+      }
+    }
+  ]
+}
+=== data/sky/worldgen/noise/island_noise.json
+{
+  "base_octave": -6,
+  "amplitude_modifiers": [
+    1,
+    1,
+    0.5
+  ]
+}
+=== data/sky/worldgen/noise_settings/islands.json
+{
+  "default_block": "minecraft:stone",
+  "default_fluid": "minecraft:air",
+  "sea_level": 0,
+  "disable_mob_generation": false,
+  "legacy_random_source": false,
+  "noise": {
+    "min_y": 0,
+    "height": 256
+  },
+  "noise_router": {
+    "temperature": 0,
+    "vegetation": 0,
+    "continents": 0,
+    "erosion": 0,
+    "depth": 0,
+    "ridges": 0,
+    "chunk_surface_level": 0,
+    "final_density": "sky:islands"
+  },
+  "spawn_target": [],
+  "material_rule": "sky:surface"
+}
+=== pack.mcmeta
+{
+  "pack": {
+    "description": "A custom dimension of floating islands, from the tutorial",
+    "min_format": 121,
+    "max_format": 121
+  }
+}
