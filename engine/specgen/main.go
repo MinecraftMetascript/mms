@@ -36,6 +36,24 @@ const (
 	mcmetaRef   = "d96c75fec200c4580dd75e033a76341521165461" // tag 26.3-summary
 )
 
+// assetFolders maps the resource-pack kinds MMS declares to their folder
+// under assets/<ns>/. Left out: sounds (generated from Sound uses),
+// texture_meta (a .png.mcmeta next to its texture), shader, and the
+// vanilla-only credits, gpu_warnlist, regional_compliancies and
+// lang/deprecated.
+var assetFolders = map[string]string{
+	"block_definition": "blockstates",
+	"model":            "models",
+	"item_definition":  "items",
+	"atlas":            "atlases",
+	"font":             "font",
+	"lang":             "lang",
+	"equipment":        "equipment",
+	"particle":         "particles",
+	"post_effect":      "post_effect",
+	"waypoint_style":   "waypoint_style",
+}
+
 func main() {
 	out := flag.String("out", "spec/data/"+version+".json.gz", "output file")
 	cache := flag.String("cache", "specgen/.cache", "download cache directory")
@@ -98,6 +116,7 @@ func run(out, cache string) error {
 			mcmetaRepo: mcmetaRef,
 		},
 		Resources:   map[string]*spec.Type{},
+		Assets:      map[string]string{},
 		Registries:  registries,
 		Blocks:      map[string]*spec.BlockStates{},
 		Commands:    &commands,
@@ -106,10 +125,19 @@ func run(out, cache string) error {
 	}
 
 	// Data-pack resource kinds: every kind whose type does not point into
-	// ::java::assets:: (decisions D5, D41).
+	// ::java::assets:: (decisions D5, D41). Resource-pack kinds are the
+	// ones in assetFolders, which says where their files go (D76).
 	for kind, t := range symbols.Dispatchers["minecraft:resource"] {
-		if b, _ := json.Marshal(t); !strings.Contains(string(b), `"::java::assets::`) {
+		if folder, ok := assetFolders[kind]; ok {
 			pack.Resources[kind] = t
+			pack.Assets[kind] = folder
+		} else if b, _ := json.Marshal(t); !strings.Contains(string(b), `"::java::assets::`) {
+			pack.Resources[kind] = t
+		}
+	}
+	for kind := range assetFolders {
+		if pack.Assets[kind] == "" {
+			return fmt.Errorf("resource pack kind %s is not in the mcdoc", kind)
 		}
 	}
 
@@ -150,8 +178,8 @@ func run(out, cache string) error {
 	if _, err := spec.Decode(bytes.NewReader(buf.Bytes())); err != nil {
 		return fmt.Errorf("round trip: %w", err)
 	}
-	fmt.Printf("spec pack %s (format %d): %d types, %d dispatchers, %d resource kinds, %d registries, %d blocks\n",
-		version, packFormat, len(pack.Types), len(pack.Dispatchers), len(pack.Resources), len(pack.Registries), len(pack.Blocks))
+	fmt.Printf("spec pack %s (format %d): %d types, %d dispatchers, %d resource kinds (%d resource pack), %d registries, %d blocks\n",
+		version, packFormat, len(pack.Types), len(pack.Dispatchers), len(pack.Resources), len(pack.Assets), len(pack.Registries), len(pack.Blocks))
 	fmt.Printf("wrote %s: %d KB gzipped, decodes in %s\n", out, buf.Len()/1024, time.Since(start).Round(time.Millisecond))
 	return nil
 }

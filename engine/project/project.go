@@ -339,6 +339,7 @@ func (p *Project) checkDecl(u *sema.Unit, d *syntax.Decl, k sema.Kind, syms *sem
 	dr = &Decl{Unit: u, D: d, Kind: k, NS: ns}
 	c := sema.NewChecker(p.Pack, p.Kinds, syms, ns)
 	c.Files = p.Files
+	c.Src = u.File.Src
 	defer func() {
 		if rec := recover(); rec != nil {
 			dr.Value, dr.Tag, dr.Lines, dr.Fn = nil, nil, nil, nil
@@ -361,7 +362,12 @@ func (p *Project) checkDecl(u *sema.Unit, d *syntax.Decl, k sema.Kind, syms *sem
 		if f := c.CompileFunction(d, dr.ID(), u.File.Src); f != nil && d.Name != nil {
 			dr.Fn = fn.Generate(*f)
 		}
-	case k.MMS == "OnLoad" || k.MMS == "OnTick":
+	case k.MMS == "OnAdvancement":
+		adv, f := c.OnAdvancement(d, dr.ID(), u.File.Src)
+		if f != nil {
+			dr.Value, dr.Fn = adv, fn.Generate(*f)
+		}
+	case sema.HookKinds[k.MMS] != "":
 		if sema.IsRaw(d.Body) {
 			dr.Lines = c.Function(d)
 			break
@@ -383,7 +389,11 @@ func (p *Project) checkDecl(u *sema.Unit, d *syntax.Decl, k sema.Kind, syms *sem
 	// the schema means a lowering bug, reported as an internal error
 	// rather than written as bad JSON.
 	if dr.Value != nil && !hasErrors(dr.Diags) {
-		if errs := sema.Validate(p.Pack, p.Kinds, k.Resource, dr.Value); len(errs) > 0 {
+		res := k.Resource
+		if k.MMS == "OnAdvancement" {
+			res = "advancement"
+		}
+		if errs := sema.Validate(p.Pack, p.Kinds, res, dr.Value); len(errs) > 0 {
 			dr.Diags = append(dr.Diags, syntax.Diagnostic{
 				Code: "mms/internal", Severity: syntax.SeverityError, Sp: d.Kind.Sp,
 				Message: "internal error: the generated JSON does not match the schema (" + errs[0] + "). Please report this with the declaration's source.",

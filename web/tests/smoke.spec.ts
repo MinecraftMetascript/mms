@@ -106,6 +106,28 @@ test('dimensions, noise settings and surface rules preview as terrain', async ({
 	await expect(page.getByRole('combobox', { name: 'Terrain' })).toHaveValue('sky:islands');
 	await expect(canvas).toBeVisible({ timeout: 30_000 });
 	await expect(failed).toBeHidden();
+
+	// The 3D toggle draws the same rule as an isometric diagram.
+	await page.getByRole('button', { name: '3D', exact: true }).click();
+	await expect(page.getByRole('button', { name: '3D', exact: true })).toHaveAttribute('aria-pressed', 'true');
+	await expect(canvas).toBeVisible({ timeout: 30_000 });
+	await expect(failed).toBeHidden();
+
+	// It pans by dragging and zooms with the wheel.
+	const iso = (await canvas.boundingBox())!;
+	await page.mouse.move(iso.x + iso.width / 2, iso.y + iso.height / 2);
+	await page.mouse.down();
+	await page.mouse.move(iso.x + iso.width / 2 - 120, iso.y + iso.height / 2 - 60, { steps: 5 });
+	await page.mouse.up();
+	await page.mouse.wheel(0, -300);
+	await expect(page.getByText('Rendering…')).toBeHidden({ timeout: 30_000 });
+	await expect(failed).toBeHidden();
+
+	// A rule that tests a biome through a named condition starts on that biome.
+	await page.getByRole('button', { name: /Project/ }).click();
+	await page.getByRole('button', { name: /badlands/ }).click();
+	await page.locator('.cm-line', { hasText: 'SurfaceRule badlands' }).click();
+	await expect(page.getByRole('combobox', { name: 'Biome' })).toHaveValue('minecraft:badlands');
 	expect(errors).toEqual([]);
 });
 
@@ -257,4 +279,91 @@ test('doc comments show on hover over a use', async ({ page }) => {
 	await page.locator('.cm-deprecated').hover();
 	const tip = page.locator('.cm-tooltip-hover, .cm-tooltip-lint').filter({ hasText: 'Kills needed' });
 	await expect(tip.first()).toContainText('Deprecated.');
+});
+
+test('right-click opens editor actions with quick fixes', async ({ page }) => {
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	await replaceText(page, 'DensityFunction a = 2 * 0.25\nDensityFunction b = a * 2\n');
+	await expect(page.locator('.cm-lintRange-hint').first()).toBeVisible();
+	const menu = page.getByRole('menu', { name: 'Editor actions' });
+
+	// Go to definition from a reference.
+	await page.locator('.cm-line').nth(1).getByText('a', { exact: true }).click({ button: 'right' });
+	await expect(menu).toBeVisible();
+	await expect(menu.getByRole('menuitem', { name: /Find references/ })).toContainText('Shift+F12');
+	await menu.getByRole('menuitem', { name: /Go to definition/ }).click();
+	await expect(menu).toBeHidden();
+	await expect(page.locator('.cm-activeLine')).toContainText('DensityFunction a');
+
+	// Escape and outside clicks close it.
+	await page.locator('.cm-line').first().click({ button: 'right' });
+	await expect(menu).toBeVisible();
+	await page.keyboard.press('Escape');
+	await expect(menu).toBeHidden();
+	await page.locator('.cm-line').first().click({ button: 'right' });
+	await page.getByRole('tab', { name: 'JSON' }).click();
+	await expect(menu).toBeHidden();
+
+	// A quick fix for the problem under the cursor.
+	await page.locator('.cm-lintRange-hint', { hasText: '2 * 0.25' }).click({ button: 'right' });
+	await expect(menu.getByRole('menuitem', { name: /mms-ignore|Ignore/i })).toBeVisible();
+	const fix = menu.getByRole('menuitem').filter({ hasNotText: /Fix all|ignore/i }).last();
+	await expect(fix).not.toContainText('Format');
+	await fix.click();
+	await expect(page.locator('.cm-content')).toContainText('DensityFunction a = 0.5');
+});
+
+test('Tab indents, Shift+Tab unindents, and Tab accepts a completion', async ({ page }) => {
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	await replaceText(page, 'Function f {\n/say hi\n}\n');
+	const line = page.locator('.cm-line').nth(1);
+	await line.click();
+	await page.keyboard.press('Tab');
+	await expect(line).toHaveText('  /say hi');
+	await expect(page.locator('.cm-content')).toBeFocused();
+	await page.keyboard.press('Shift+Tab');
+	await expect(line).toHaveText('/say hi');
+
+	await replaceText(page, 'DensityFunction x = Cl');
+	await page.keyboard.press('ControlOrMeta+Space');
+	await expect(page.locator('.cm-tooltip-autocomplete li[aria-selected]')).toContainText('Clamp');
+	await page.waitForTimeout(300);
+	await page.keyboard.press('Tab');
+	await expect(page.locator('.cm-content')).toContainText('DensityFunction x = Clamp');
+});
+
+test('F2 renames inline with a preview of occurrences', async ({ page }) => {
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	await replaceText(page, 'DensityFunction a = 0.5\nDensityFunction b = a * a\n');
+	await expect(status(page)).toHaveText(/No problems|warning/);
+	await page.locator('.cm-line').first().getByText('a', { exact: true }).click();
+
+	// Escape cancels without changes.
+	await page.keyboard.press('F2');
+	const box = page.getByRole('textbox', { name: 'New name' });
+	await expect(box).toBeFocused();
+	await expect(box).toHaveValue('a');
+	await expect(page.locator('.cm-rename-hint')).toContainText('3 occurrences');
+	await expect(page.locator('.cm-rename-occurrence')).toHaveCount(3);
+	await page.keyboard.press('Escape');
+	await expect(box).toBeHidden();
+	await expect(page.locator('.cm-rename-occurrence')).toHaveCount(0);
+	await expect(page.locator('.cm-content')).toBeFocused();
+
+	// Typing replaces the selected name; Enter applies it everywhere.
+	await page.keyboard.press('F2');
+	await expect(box).toBeFocused();
+	await page.keyboard.type('base');
+	await page.keyboard.press('Enter');
+	await expect(box).toBeHidden();
+	await expect(page.locator('.cm-content')).toContainText('DensityFunction base = 0.5DensityFunction b = base * base');
+
+	// The right-click menu opens the same box.
+	await page.locator('.cm-line').first().getByText('base', { exact: true }).click({ button: 'right' });
+	await page.getByRole('menuitem', { name: /Rename symbol/ }).click();
+	await expect(box).toHaveValue('base');
+	await page.keyboard.press('Escape');
 });

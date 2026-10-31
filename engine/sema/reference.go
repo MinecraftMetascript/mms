@@ -18,12 +18,14 @@ type Reference struct {
 	Types []*RefType `json:"types"`
 }
 
-// RefKind is a declaration kind. Folder is the data pack folder of a
-// resource kind, "" for the kinds MMS adds.
+// RefKind is a declaration kind. Folder is the folder under
+// data/<namespace>/ of a data pack kind, or under assets/<namespace>/
+// when Resources is set; "" for the kinds MMS adds.
 type RefKind struct {
-	Name   string `json:"name"`
-	Folder string `json:"folder,omitempty"`
-	Doc    string `json:"doc,omitempty"`
+	Name      string `json:"name"`
+	Folder    string `json:"folder,omitempty"`
+	Resources bool   `json:"resources,omitempty"`
+	Doc       string `json:"doc,omitempty"`
 }
 
 // RefGroup is the helpers of one dispatcher, such as
@@ -53,12 +55,15 @@ type RefParam struct {
 }
 
 var mmsKindDocs = map[string]string{
-	"Namespace": "Sets the namespace for the declarations after it in the file.",
-	"Function":  "A function: commands, variables and control flow, compiled to .mcfunction files.",
-	"Objective": "A scoreboard objective, created by the generated load function.",
-	"Global":    "A value for the whole pack, set when the pack first loads.",
-	"OnLoad":    "Code that runs when the pack loads, from #minecraft:load.",
-	"OnTick":    "Code that runs every tick, from #minecraft:tick.",
+	"Namespace":     "Sets the namespace for the declarations after it in the file.",
+	"Function":      "A function: commands, variables and control flow, compiled to .mcfunction files.",
+	"Objective":     "A scoreboard objective, created by the generated load function.",
+	"Global":        "A value for the whole pack, set when the pack first loads.",
+	"OnLoad":        "Code that runs when the pack loads, from #minecraft:load.",
+	"OnTick":        "Code that runs every tick, from #minecraft:tick.",
+	"OnFirstJoin":   "Code that runs once for each player, the first time they are in the world with the pack, as and at that player.",
+	"OnRespawn":     "Code that runs as and at a player right after they respawn.",
+	"OnAdvancement": "Code that runs as and at a player each time they meet a trigger: `OnAdvancement name = Trigger(...) { ... }` writes the advancement, its reward function and the revoke.",
 }
 
 // BuildReference walks every type reachable from the pack's resources and
@@ -69,6 +74,9 @@ func BuildReference(p *spec.Pack, ks *Kinds) Reference {
 	for _, name := range ks.Names() {
 		k, _ := ks.Lookup(name)
 		rk := RefKind{Name: name, Folder: k.Folder()}
+		if k.Assets != "" {
+			rk.Folder, rk.Resources = k.Assets, true
+		}
 		if k.MMS != "" {
 			rk.Folder = ""
 			rk.Doc = mmsKindDocs[name]
@@ -135,7 +143,7 @@ func BuildReference(p *spec.Pack, ks *Kinds) Reference {
 			}
 		}
 	}
-	for _, r := range p.ResourceKinds() {
+	for _, r := range append(p.ResourceKinds(), p.AssetKinds()...) {
 		walk(tview{T: p.Resources[r]}, 0)
 	}
 

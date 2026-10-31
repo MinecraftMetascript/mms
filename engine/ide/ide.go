@@ -169,6 +169,11 @@ func (s *Session) complete(a *at, off int) []sema.Candidate {
 		}
 		switch n := n.(type) {
 		case *syntax.Ident, *syntax.ResLoc, *syntax.Bad:
+			// A word starting a statement in function code, or a helper
+			// of an execute chain.
+			if a.code() && startsStatement(a.path, i) {
+				return sema.ExecCandidates(true)
+			}
 			// A bare word in an object body is a field being typed.
 			if _, ok := parent.(*syntax.ExprStmt); ok && i >= 2 {
 				if b, ok := a.path[i-2].(*syntax.Block); ok {
@@ -196,6 +201,9 @@ func (s *Session) complete(a *at, off int) []sema.Candidate {
 		case *syntax.Name:
 			switch p := parent.(type) {
 			case *syntax.Member:
+				if a.code() && sema.IsExecChain(p.X) {
+					return sema.ExecCandidates(false)
+				}
 				return a.methods(p)
 			case *syntax.FieldStmt:
 				if i >= 2 {
@@ -213,6 +221,9 @@ func (s *Session) complete(a *at, off int) []sema.Candidate {
 			return nil
 		case *syntax.Member:
 			if n.Name == nil || !n.Name.Sp.Contains(off) {
+				if a.code() && sema.IsExecChain(n.X) {
+					return sema.ExecCandidates(false)
+				}
 				return a.methods(n)
 			}
 		case *syntax.Call:
@@ -240,6 +251,38 @@ func (s *Session) complete(a *at, off int) []sema.Candidate {
 		}
 	}
 	return nil
+}
+
+// code reports whether the cursor's declaration holds function code.
+func (a *at) code() bool { return a.decl != nil && sema.IsCodeKind(a.decl.Kind) }
+
+// startsStatement reports whether path[i] is the head word of a statement:
+// the word itself, or the first helper name of a call chain such as
+// `As(@a).At(@s) { ... }`.
+func startsStatement(path []syntax.Node, i int) bool {
+	child := path[i]
+	for j := i - 1; j >= 0; j-- {
+		switch p := path[j].(type) {
+		case *syntax.ExprStmt:
+			return true
+		case *syntax.Call:
+			if p.Fn != child {
+				return false
+			}
+		case *syntax.Member:
+			if p.X != child {
+				return false
+			}
+		case *syntax.Trailing:
+			if p.X != child {
+				return false
+			}
+		default:
+			return false
+		}
+		child = path[j]
+	}
+	return false
 }
 
 // badAfter finds a Bad node under n starting between from and to.
@@ -351,9 +394,21 @@ func (a *at) callArgs(call *syntax.Call, off int) []sema.Candidate {
 	}
 	in := a.info(call)
 	if in == nil || in.Callable == nil {
-		// Sugar such as If(...) records the expected type on the call.
-		if in != nil && in.HasType() && len(call.Args) == 0 {
-			return nil
+		// Sugar such as a criterion helper records the fields its named
+		// arguments set.
+		if in != nil && in.Fields != nil {
+			named := map[string]bool{}
+			for _, arg := range call.Args {
+				if arg.Name != nil {
+					named[arg.Name.Text] = true
+				}
+			}
+			var out []sema.Candidate
+			for _, c := range a.c.FieldCandidates(in, named, true) {
+				c.Insert = c.Label + " = $1"
+				out = append(out, c)
+			}
+			return out
 		}
 		return nil
 	}
@@ -403,7 +458,11 @@ func (s *Session) Hover(path string, off int) (string, syntax.Span) {
 	if d.Kind.Sp.Contains(off) {
 		k := a.decl
 		if k != nil && k.Kind.Resource != "" {
-			return "```mms\n" + d.Kind.Name + "\n```\nWrites `data/<namespace>/" + k.Kind.Resource + "/<name>.json`.", d.Kind.Sp
+			where := "."
+			if k.Kind.Assets != "" {
+				where = ", in the resource pack."
+			}
+			return "```mms\n" + d.Kind.Name + "\n```\nWrites `" + k.Kind.Dir("<namespace>") + "/<name>.json`" + where, d.Kind.Sp
 		}
 		return "", syntax.Span{}
 	}

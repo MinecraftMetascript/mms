@@ -126,6 +126,38 @@ Each call stands for the id the file gets in your namespace: its base name, lowe
 | `Sound` | `.ogg` | `assets/<ns>/sounds/<name>.ogg`, plus an entry in a generated `sounds.json` |
 | `Structure` | `.nbt` | `data/<ns>/structure/<name>.nbt` |
 
-Textures and sounds go into a resource pack built next to the data pack: `build-resources/` (set `resourcePack.output` in `mms.json` to change it), `<name>-resources.zip` with `mms build --zip`, and `<world>/resources.zip` with `mms build --world`, which Minecraft loads as that world's resource pack. `"icon": "art/icon.png"` in `mms.json` becomes `pack.png` in both packs.
+Textures, sounds and [resource pack declarations](#resource-packs) go into a resource pack built next to the data pack: `build-resources/` (set `resourcePack.output` in `mms.json` to change it), `<name>-resources.zip` with `mms build --zip`, and `<world>/resources.zip` with `mms build --world`, which Minecraft loads as that world's resource pack. `"icon": "art/icon.png"` in `mms.json` becomes `pack.png` in both packs.
 
 Once a file is included, its id can also be written plainly elsewhere, with its namespace, such as `asset_id = my_pack:sunset`. An id in your namespace that nothing provides is reported by the [`external-asset`](lint.md) lint rule. The web editor cannot hold asset files yet.
+
+## Resource packs
+
+Block states, models and the other JSON files of a resource pack are declarations too. They are written to `assets/<ns>/...` in the resource pack, and the schema checks them like any other resource.
+
+```
+BlockState minecraft:glowstone = {
+  variants = {
+    "" = [
+      { model = block/glowstone_1, weight = 3 },
+      { model = block/glowstone_2, y = 90 },
+    ]
+  }
+}
+Model block/glowstone_1 = { parent = block/cube_all, textures = { all = Texture("art/glow1.png", "block/glowstone_1") } }
+Model block/glowstone_2 = { parent = block/cube_all, textures = { all = Texture("art/glow2.png", "block/glowstone_2") } }
+```
+
+| Kind | Writes | For |
+| --- | --- | --- |
+| `BlockState` | `blockstates/` | which model a block shows in each state: `variants`, weighted lists, `multipart` |
+| `Model` | `models/` | block and item models, with `parent`, `textures` and `elements` |
+| `ItemModel` | `items/` | the item model definition that the `item_model` component names |
+| `Lang` | `lang/` | translations, such as `Lang en_us = { "item.my_pack.charm" = "Charm" }` |
+| `Equipment` | `equipment/` | worn armour layers, named by the `equippable` component's `asset_id` |
+| `Font`, `Atlas`, `Particle`, `PostEffect`, `WaypointStyle` | `font/`, `atlases/`, `particles/`, `post_effect/`, `waypoint_style/` | as in the game |
+
+A block state is named after the block it replaces, such as `minecraft:glowstone`: the game only reads block states of its own blocks. Variant keys (`"facing=north,lit=true"`, or `""` for every state) and multipart `when` conditions are checked against the block's properties, and the editor completes property names in `when`.
+
+In a model's `textures`, a value is a texture id, `"#name"` for another slot, or `Texture("file.png", "block/name")`, which copies the file to `textures/block/name.png`. A texture id can name a vanilla texture, such as `block/stone`.
+
+`sounds.json` is still generated from `Sound(...)`, and textures cannot have `.png.mcmeta` animation yet. The [`resource-pack`](../examples/resource-pack/) example shows each kind without asset files, so it also runs in the web editor.

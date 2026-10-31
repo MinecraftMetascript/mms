@@ -1,0 +1,136 @@
+=== data/glow/recipe/lantern_charm.json
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    "minecraft:torch",
+    "minecraft:glowstone_dust"
+  ],
+  "result": {
+    "id": "minecraft:torch",
+    "components": {
+      "item_model": "glow:lantern_charm",
+      "item_name": {
+        "translate": "item.glow.lantern_charm"
+      }
+    }
+  }
+}
+=== pack.mcmeta
+{
+  "pack": {
+    "description": "Resource pack: weighted block variants, multipart block states, models, an item model and translations",
+    "min_format": 121,
+    "max_format": 121
+  }
+}
+=== assets/glow/items/lantern_charm.json
+{
+  "model": {
+    "type": "minecraft:model",
+    "model": "glow:block/glowstone_warm"
+  }
+}
+=== assets/glow/lang/en_us.json
+{
+  "item.glow.lantern_charm": "Lantern Charm"
+}
+=== assets/glow/models/block/glowstone_plain.json
+{
+  "parent": "minecraft:block/cube_all",
+  "textures": {
+    "all": "minecraft:block/glowstone"
+  }
+}
+=== assets/glow/models/block/glowstone_warm.json
+{
+  "parent": "minecraft:block/cube_all",
+  "textures": {
+    "all": "minecraft:block/shroomlight"
+  }
+}
+=== assets/minecraft/blockstates/glowstone.json
+{
+  "variants": {
+    "": [
+      {
+        "model": "glow:block/glowstone_plain",
+        "weight": 2
+      },
+      {
+        "model": "glow:block/glowstone_plain",
+        "y": 90
+      },
+      {
+        "model": "glow:block/glowstone_warm"
+      }
+    ]
+  }
+}
+=== assets/minecraft/blockstates/oak_fence.json
+{
+  "multipart": [
+    {
+      "apply": {
+        "model": "minecraft:block/oak_fence_post"
+      }
+    },
+    {
+      "when": {
+        "north": "true"
+      },
+      "apply": {
+        "model": "minecraft:block/oak_fence_side",
+        "uvlock": true
+      }
+    },
+    {
+      "when": {
+        "east": "true"
+      },
+      "apply": {
+        "model": "minecraft:block/oak_fence_side",
+        "y": 90,
+        "uvlock": true
+      }
+    },
+    {
+      "when": {
+        "south": "true"
+      },
+      "apply": {
+        "model": "minecraft:block/oak_fence_side",
+        "y": 180,
+        "uvlock": true
+      }
+    },
+    {
+      "when": {
+        "west": "true"
+      },
+      "apply": {
+        "model": "minecraft:block/oak_fence_side",
+        "y": 270,
+        "uvlock": true
+      }
+    }
+  ]
+}
+=== assets/minecraft/blockstates/redstone_lamp.json
+{
+  "variants": {
+    "lit=false": {
+      "model": "minecraft:block/redstone_lamp"
+    },
+    "lit=true": {
+      "model": "glow:block/glowstone_warm"
+    }
+  }
+}
+=== pack.mcmeta
+{
+  "pack": {
+    "description": "Resource pack: weighted block variants, multipart block states, models, an item model and translations",
+    "min_format": 97,
+    "max_format": 97
+  }
+}

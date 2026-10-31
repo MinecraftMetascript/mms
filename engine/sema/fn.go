@@ -185,11 +185,12 @@ func (c *Checker) findSig(folder, id string) *Symbol {
 	return s
 }
 
-// GeneratedID names the function an OnLoad or OnTick body compiles to
-// when it needs one: by content, so it is stable while the code is.
+// GeneratedID names the function an OnLoad, OnTick, OnFirstJoin or
+// OnRespawn body compiles to when it needs one: by content, so it is
+// stable while the code is.
 func GeneratedID(ns, kind string, d *syntax.Decl, src []rune) string {
 	h := sha256.Sum256([]byte(string(src[d.Sp.Start:d.Sp.End])))
-	return ns + ":mms_gen/" + strings.ToLower(strings.TrimPrefix(kind, "On")) + "/" + hex.EncodeToString(h[:4])
+	return ns + ":mms_gen/" + HookKinds[kind] + "/" + hex.EncodeToString(h[:4])
 }
 
 // IsRaw reports whether a body holds only raw commands, which need no
@@ -236,6 +237,9 @@ type fc struct {
 	names  map[string]int // holder names used, to keep shadowed locals apart
 	temps  int
 	loops  int
+	// exec counts the execute blocks being compiled; control flow cannot
+	// leave them.
+	exec   int
 	selfID string
 	// loopVar is set while declaring a for loop's variable.
 	loopVar bool
@@ -479,18 +483,35 @@ func (f *fc) stmt(out *fn.Block, s syntax.Stmt) {
 	case *syntax.ReturnStmt:
 		f.returnStmt(out, s)
 	case *syntax.BreakStmt:
+		if f.loops == 0 && f.exec > 0 {
+			c.errorf("mms/misplaced", s.Sp, "break cannot leave an execute block, which can run once per entity; put the loop inside the block")
+			return
+		}
 		if f.loops == 0 {
 			c.errorf("mms/misplaced", s.Sp, "break is only allowed inside a loop")
 			return
 		}
 		out.Add(fn.Break{})
 	case *syntax.ContinueStmt:
+		if f.loops == 0 && f.exec > 0 {
+			c.errorf("mms/misplaced", s.Sp, "continue cannot leave an execute block, which can run once per entity; put the loop inside the block")
+			return
+		}
 		if f.loops == 0 {
 			c.errorf("mms/misplaced", s.Sp, "continue is only allowed inside a loop")
 			return
 		}
 		out.Add(fn.Continue{})
 	case *syntax.ExprStmt:
+		if t, ok := s.X.(*syntax.Trailing); ok {
+			f.execBlock(out, t)
+			return
+		}
+		if IsExecChain(s.X) {
+			name, _ := execHeadName(s.X)
+			c.errorf("mms/missing-value", s.Sp, "an execute chain needs a block to run: %s(...) { ... }", name)
+			return
+		}
 		call, ok := s.X.(*syntax.Call)
 		if !ok {
 			c.errorf("mms/unused-value", s.Sp, "this expression does nothing; did you mean to assign it?")
@@ -554,6 +575,10 @@ func (f *fc) forStmt(out *fn.Block, s *syntax.ForStmt) {
 }
 
 func (f *fc) returnStmt(out *fn.Block, s *syntax.ReturnStmt) {
+	if f.exec > 0 {
+		f.c.errorf("mms/misplaced", s.Sp, "return cannot leave an execute block, which can run once per entity; set a variable in the block and return after it")
+		return
+	}
 	if s.Value == nil {
 		if f.sig.Ret != "" {
 			f.c.errorf("mms/missing-value", s.Sp, "this function returns %s; return a value", f.sig.Ret)

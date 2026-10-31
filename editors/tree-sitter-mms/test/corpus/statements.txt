@@ -144,3 +144,72 @@ Noise n = Noise(1) // trailing
         (argument
           (number)))))
   (line_comment))
+
+========================================
+Execute blocks and event hooks
+========================================
+
+Function f {
+  As(@a).At(@s) {
+    /say hi
+  }
+}
+
+OnAdvancement placed = PlacedBlock(location = 1) {
+  banners[@s] += 1
+}
+
+OnFirstJoin {
+  /give @s minecraft:bread 4
+}
+
+----------------------------------------
+
+(source_file
+  (declaration
+    (identifier)
+    (identifier)
+    (block
+      (expression_statement
+        (block_call_expression
+          (call_expression
+            (member_expression
+              (call_expression
+                (identifier)
+                (arguments
+                  (argument
+                    (selector
+                      (identifier)))))
+              (identifier))
+            (arguments
+              (argument
+                (selector
+                  (identifier)))))
+          (block
+            (command
+              (command_name)
+              (command_text)))))))
+  (declaration
+    (identifier)
+    (identifier)
+    (block_call_expression
+      (call_expression
+        (identifier)
+        (arguments
+          (argument
+            (identifier)
+            (number))))
+      (block
+        (compound_assignment
+          (index_expression
+            (identifier)
+            (argument
+              (selector
+                (identifier))))
+          (number)))))
+  (declaration
+    (identifier)
+    (block
+      (command
+        (command_name)
+        (command_text)))))

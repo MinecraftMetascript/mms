@@ -63,7 +63,7 @@ func (c *Checker) objectStruct(body *syntax.Block, sp syntax.Span, v tview) json
 		}
 		as = append(as, assign{key: f.Key.Text, expr: f.Value, sp: f.Key.Sp, node: f.Key})
 	}
-	return c.buildStruct(fs, disp, caseKey, as, syntax.Span{Start: sp.Start, End: sp.Start + 1}, nil, v)
+	return c.buildStruct(fs, disp, caseKey, as, syntax.Span{Start: sp.Start, End: sp.Start + 1}, nil, v, fixSite{block: body})
 }
 
 // caseKeyOf reads a dispatch key such as `type = add` or `type = "minecraft:add"`.
@@ -97,7 +97,7 @@ func (c *Checker) caseKeyOf(e syntax.Expr, disp *dispInfo) string {
 // buildStruct turns assignments into an object in schema field order,
 // checking each value at its field's type and reporting missing and
 // unknown fields.
-func (c *Checker) buildStruct(fs []field, disp *dispInfo, caseKey string, as []assign, at syntax.Span, ov *overlay, v tview) jsonv.Value {
+func (c *Checker) buildStruct(fs []field, disp *dispInfo, caseKey string, as []assign, at syntax.Span, ov *overlay, v tview, site fixSite) jsonv.Value {
 	o := &jsonv.Object{}
 	byKey := map[string]*assign{}
 	for i := range as {
@@ -192,6 +192,9 @@ func (c *Checker) buildStruct(fs []field, disp *dispInfo, caseKey string, as []a
 			c.errorf("mms/missing-field", at, "%s needs a '%s' field (or use a helper like %s(...))", describe(v), disp.KeyField, exampleCallable(c, disp))
 		} else {
 			c.errorf("mms/missing-field", at, "missing %s %s", plural(len(missing), "field"), quoteList(missing))
+			if !c.trial {
+				c.Diags[len(c.Diags)-1].Fixes = c.missingFix(site, fs, missing)
+			}
 		}
 	}
 	return o
@@ -467,7 +470,7 @@ func (c *Checker) callStruct(e syntax.Expr, v tview) jsonv.Value {
 			return secondaryKey(keys, k)
 		})
 	}
-	return c.buildStruct(fs, disp, cl.Case, as, name.Sp, cl.Ov, v)
+	return c.buildStruct(fs, disp, cl.Case, as, name.Sp, cl.Ov, v, fixSite{call: base})
 }
 
 // keyText reads an id-like value as a dispatch key, without namespace.

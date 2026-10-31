@@ -68,6 +68,16 @@ func TestCompletion(t *testing.T) {
 		{"command objective", "Objective kills = deathCount\nFunction f {\n  /scoreboard players set @s |\n}", []string{"kills"}, false},
 		{"command after execute run", "Function f {\n  /execute as @a run gam|\n}", []string{"gamemode"}, false},
 		{"command registry", "Function f {\n  /effect give @s |\n}", []string{"speed"}, false},
+		{"resource pack kind", "BlockSt|", []string{"BlockState"}, false},
+		{"block state property", "BlockState minecraft:oak_fence = {\n  multipart = [{ when = {\n    |\n  }, apply = { model = minecraft:block/oak_fence_post } }]\n}", []string{"north", "waterlogged"}, false},
+		{"execute helper", "Function f {\n  A|\n}", []string{"As", "At", "Positioned"}, false},
+		{"execute chain", "Function f {\n  As(@a).|\n}", []string{"At", "Facing"}, false},
+		{"execute chain prefix", "Function f {\n  As(@a).A| {\n    /say hi\n  }\n}", []string{"At", "Anchored"}, false},
+		{"execute nested", "OnTick {\n  As(@a) {\n    P|\n  }\n}", []string{"Positioned"}, false},
+		{"advancement trigger", "OnAdvancement a = Pla|", []string{"PlacedBlock"}, false},
+		{"advancement condition", "OnAdvancement a = PlacedBlock(|) {\n  /say hi\n}", []string{"location"}, false},
+		{"hook kind", "OnFirst|", []string{"OnFirstJoin"}, false},
+		{"model parent", "Model block/x = { parent = minecraft:block/cube_a| }", []string{"block/cube_all"}, false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -147,6 +157,33 @@ func TestSemanticTokens(t *testing.T) {
 	for i := 1; i < len(toks); i++ {
 		if toks[i].Span.Start < toks[i-1].Span.End {
 			t.Errorf("overlap at %v", toks[i].Span)
+		}
+	}
+}
+
+func TestResourcePackNavigation(t *testing.T) {
+	src := "Model block/glow = { parent = minecraft:block/cube_all }\nBlockState minecraft:glowstone = { variants = { \"\" = [{ model = block/gl|ow, weight = 3 }] } }\n"
+	s, off := session(t, src)
+	defs := s.Definition("main.mms", off)
+	if len(defs) != 1 || defs[0].Span.Start != strings.Index(src, "block/glow") {
+		t.Errorf("definition = %+v", defs)
+	}
+	h, _ := s.Hover("main.mms", strings.Index(src, "BlockState")+2)
+	if !strings.Contains(h, "assets/<namespace>/blockstates/<name>.json") || !strings.Contains(h, "resource pack") {
+		t.Errorf("kind hover = %q", h)
+	}
+}
+
+func TestExecuteHover(t *testing.T) {
+	for _, tc := range []struct{ src, want string }{
+		{"Function f {\n  A|s(@a).At(@s) {\n    /say hi\n  }\n}", "execute as"},
+		{"Function f {\n  As(@a).A|t(@s) {\n    /say hi\n  }\n}", "execute at"},
+		{"Function f {\n  /advancement grant @s only test:ki|lled\n}\nOnAdvancement killed = PlayerKilledEntity() {\n  /say hi\n}", "OnAdvancement test:killed"},
+	} {
+		s, off := session(t, tc.src)
+		h, _ := s.Hover("main.mms", off)
+		if !strings.Contains(h, tc.want) {
+			t.Errorf("%q: hover = %q, want %q", tc.src, h, tc.want)
 		}
 	}
 }

@@ -9,8 +9,9 @@
 //	#cf, #rv     control flow code and return value, used to leave
 //	             generated sub-functions early
 //
-// Structured control flow becomes generated sub-functions next to the
-// function: <fn>/_if0, <fn>/_while1 and so on.
+// Structured control flow and execute blocks become generated
+// sub-functions next to the function: <fn>/_if0, <fn>/_while1,
+// <fn>/_exec2 and so on.
 package fn
 
 import (
@@ -89,6 +90,13 @@ type (
 		Line string
 		Args []MacroArg
 	}
+	// Exec runs Body under an execute chain ("as @a", "at @s"), which
+	// may run it once per entity or not at all. Body never leaves early:
+	// the checker rejects break, continue and return inside it.
+	Exec struct {
+		Parts []string
+		Body  *Block
+	}
 	// Return leaves the function, with a value when Val is set.
 	Return   struct{ Val *Operand }
 	Break    struct{}
@@ -102,6 +110,7 @@ func (Arith) op()    {}
 func (Call) op()     {}
 func (If) op()       {}
 func (Loop) op()     {}
+func (Exec) op()     {}
 func (Return) op()   {}
 func (Break) op()    {}
 func (Continue) op() {}

@@ -5,16 +5,17 @@ export type PreviewKind = 'noise' | 'density_function' | 'noise_settings' | 'mat
  * - density: sampled values (noise, density functions, noise settings' final density)
  * - blocks: a terrain slice from the chunk generator, with aquifers and surface rules
  * - biomes: a top-down map of a dimension's biome source
+ * - iso: an isometric block diagram of a couple of chunks of terrain
  */
-export type PreviewMode = 'density' | 'blocks' | 'biomes';
+export type PreviewMode = 'density' | 'blocks' | 'biomes' | 'iso';
 
 /** The modes each kind offers, the first being the default. */
 export const modesOf: Record<PreviewKind, PreviewMode[]> = {
 	noise: ['density'],
 	density_function: ['density'],
-	noise_settings: ['blocks', 'density'],
-	material_rule: ['blocks'],
-	dimension: ['biomes', 'blocks']
+	noise_settings: ['blocks', 'iso', 'density'],
+	material_rule: ['blocks', 'iso'],
+	dimension: ['biomes', 'blocks', 'iso']
 };
 
 /** Whether a view looks down on x/z (otherwise it is a side view of x/y at z = 0). */
@@ -47,6 +48,10 @@ export interface PreviewFile {
 
 export type PreviewRequest =
 	| { type: 'setup'; files: PreviewFile[] }
+	/** Ports to helper workers that build chunks for the isometric view. */
+	| { type: 'helpers'; ports: MessagePort[] }
+	/** Makes this worker a helper, taking chunk jobs on the port. */
+	| { type: 'serve'; port: MessagePort }
 	| {
 			type: 'render';
 			seq: number;
@@ -75,6 +80,16 @@ export type PreviewResponse =
 			labels?: string[];
 			/** For biome maps: the biomes in view with their colours, most common first. */
 			legend?: { id: string; color: string }[];
+			/** For the isometric view: the block size in pixels it was drawn at. */
+			scale?: number;
+			/** For the isometric view: the smallest block size it allows (it fills the canvas with chunks). */
+			minScale?: number;
+			/** For the isometric view: the image itself, drawn in the worker (pixels is then empty). */
+			bitmap?: ImageBitmap;
+			/** More of this render follows (chunks are still being built). */
+			partial?: boolean;
+			/** Something to tell the viewer about an otherwise empty render. */
+			notice?: string;
 			/** For terrain: the sea level and world height. */
 			seaLevel?: number;
 			minY?: number;

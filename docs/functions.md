@@ -1,6 +1,6 @@
 # Functions
 
-`Function`, `OnLoad` and `OnTick` bodies compile to `.mcfunction` files.
+`Function` bodies and event hooks (`OnLoad`, `OnTick`, `OnFirstJoin`, `OnRespawn`, `OnAdvancement`) compile to `.mcfunction` files.
 
 ## Raw commands
 
@@ -123,6 +123,74 @@ A call looks like `add(1, 2)`, or `other_ns:add(1, 2)` for a function in another
 
 Parameters are `int`, `bool` or `string`. Functions return `int` or `bool`. To hand a string back, assign it to a Global.
 
+## Execute blocks
+
+A chain of execute helpers followed by a block runs the block under `execute`:
+
+```
+Objective hits
+
+Function zap {
+  As(@e[tag=tower]).At(@s) {
+    /particle minecraft:flame ~ ~1 ~
+    hits[@s] += 1
+  }
+  Positioned(~ ~1 ~) {
+    /say above
+  }
+  Execute("if entity @e[tag=boss]").In(the_nether) {
+    /say the boss is here
+  }
+}
+```
+
+| Helper | Subcommand |
+|---|---|
+| `As(targets)` | `as` |
+| `At(targets)` | `at` |
+| `Positioned(pos)`, `Positioned(targets)` | `positioned`, `positioned as` |
+| `Rotated(rot)`, `Rotated(targets)` | `rotated`, `rotated as` |
+| `Facing(pos)`, `Facing(targets, anchor)` | `facing`, `facing entity` (the anchor defaults to `eyes`) |
+| `In(dimension)` | `in` |
+| `Anchored(eyes)` | `anchored` |
+| `Align(xyz)` | `align` |
+| `On(relation)` | `on` |
+| `Summon(entity)` | `summon` |
+| `Execute("...")` | any subcommands, written as text |
+
+Arguments are written into the command as they appear: selectors as `@e[tag=x]`, coordinates as `~ ~1 ~` or `0, 64, 0`, ids as `the_nether`. The chain is checked against the command tree like a raw command, and `Execute("...")` covers conditions such as `if block` and anything without a helper.
+
+A body with one command is written inline, as `execute as @a at @s run particle ...`. A longer body becomes a sub-function, such as `demo:zap/_exec0`.
+
+The body can use the function's variables. They are not per entity: a body that runs for five entities updates one `n` five times. Keep per-entity values in an objective, such as `hits[@s]`.
+
+`break`, `continue` and `return` cannot leave an execute block, because the block may run once per entity. Set a variable inside it and act on it afterwards.
+
+## Event hooks
+
+These declarations run their body when something happens, as the player it happens to, at their position:
+
+```
+Objective banners
+
+/** Counts every banner a player places. */
+OnAdvancement placed_banner = PlacedBlock(location = LocationCheck(predicate = { block = { blocks = #banners } })) {
+  banners[@s] += 1
+}
+
+OnFirstJoin {
+  /give @s minecraft:bread 4
+}
+
+OnRespawn {
+  /effect give @s minecraft:regeneration 5 1
+}
+```
+
+- **`OnAdvancement name = Trigger(...) { ... }`** runs each time a player meets a trigger. The trigger is one of the criterion helpers, such as `PlacedBlock`, `PlayerKilledEntity`, `InventoryChanged` or `Tick`, and its named arguments are the conditions. It writes the advancement `<namespace>:<name>` and a reward function, `<namespace>:mms_gen/advancement/<name>`, which revokes the advancement and then runs the body, so it fires again next time. Commands can refer to it, as in `/advancement grant @s only demo:placed_banner`.
+- **`OnFirstJoin { ... }`** runs once per player, the first time they are in the world with the pack. It uses a tick advancement, `<namespace>:mms_gen/first_join`, that is never revoked; `/advancement revoke @s only <namespace>:mms_gen/first_join` makes it run again.
+- **`OnRespawn { ... }`** runs right after a player respawns. A `deathCount` objective, `mms_respawn.<namespace>`, notes the death, and the tick function runs the body once the player is alive again.
+
 ## How it compiles
 
 Values live on one scoreboard objective per namespace, `mms.<namespace>`:
@@ -153,6 +221,6 @@ A loop is a function that checks its condition, runs its body and calls itself. 
 
 ## Generated functions
 
-`OnLoad { ... }` and `OnTick { ... }` bodies, and `Objective` declarations, are collected into `<namespace>:mms_gen/load` and `<namespace>:mms_gen/tick`. These are registered in `#minecraft:load` and `#minecraft:tick`.
+`OnLoad { ... }` and `OnTick { ... }` bodies, and `Objective` declarations, are collected into `<namespace>:mms_gen/load` and `<namespace>:mms_gen/tick`. These are registered in `#minecraft:load` and `#minecraft:tick`. `OnFirstJoin` and `OnRespawn` bodies are collected the same way, into `<namespace>:mms_gen/first_join` and `<namespace>:mms_gen/respawn`.
 
-An `OnLoad` or `OnTick` body that holds only commands is copied into these functions as it is. A body with variables or control flow compiles to its own function, `<namespace>:mms_gen/load/<hash>`, which the generated function calls.
+A hook body that holds only commands is copied into these functions as it is. A body with variables or control flow compiles to its own function, such as `<namespace>:mms_gen/load/<hash>`, which the generated function calls.

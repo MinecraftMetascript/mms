@@ -47,12 +47,12 @@
 			{/each}
 		</tbody>
 	</table>
-	<p>Each of these makes one resource in the data pack folder shown. Tags of other registries follow the same pattern, such as <code>DamageTypeTag</code>.</p>
+	<p>Each of these makes one resource in the folder shown: in the data pack, or for <code>assets/</code> folders in the resource pack. Tags of other registries follow the same pattern, such as <code>DamageTypeTag</code>.</p>
 	<table>
 		<thead><tr><th>Kind</th><th>Folder</th></tr></thead>
 		<tbody>
 			{#each resources as k (k.name)}
-				<tr><td><code>{k.name}</code></td><td><code>data/&lt;namespace&gt;/{k.folder}/</code></td></tr>
+				<tr><td><code>{k.name}</code></td><td><code>{k.resources ? 'assets' : 'data'}/&lt;namespace&gt;/{k.folder}/</code></td></tr>
 			{/each}
 		</tbody>
 	</table>

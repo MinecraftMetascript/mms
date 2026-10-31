@@ -27,11 +27,11 @@
 		noise: { x: 0, y: 0, scale: 4 },
 		density_function: { x: 0, y: 64, scale: 2 },
 		noise_settings: { x: 0, y: 64, scale: 2 },
-		material_rule: { x: 0, y: 64, scale: 1 },
+		material_rule: { x: 0, y: 64, scale: 0.5 },
 		dimension: { x: 0, y: 64, scale: 2 },
 		biomes: { x: 0, y: 0, scale: 8 }
 	};
-	const modeNames: Record<PreviewMode, string> = { density: 'Density', blocks: 'Blocks', biomes: 'Biomes' };
+	const modeNames: Record<PreviewMode, string> = { density: 'Density', blocks: 'Blocks', biomes: 'Biomes', iso: '3D' };
 	const kindNames: Record<PreviewKind, string> = {
 		noise: 'noise',
 		density_function: 'density function',
@@ -45,6 +45,9 @@
 	let box: HTMLDivElement;
 	let worker: Worker | null = null;
 	let view = $state<PreviewView>({ ...defaults.density_function });
+	// The 3D view's own camera: x and y are the world x and z at the centre,
+	// scale is a block's size in pixels (0 until the first render fits it).
+	let isoView = $state<PreviewView>({ x: 0, y: 0, scale: 0 });
 	let seed = $state('0');
 	let error = $state('');
 	let busy = $state(false);
@@ -59,18 +62,29 @@
 	let biomeY = $state(64);
 	const flat = $derived(info ? topDown(info.kind, mode) : false);
 	// CSS pixels per rendered pixel; terrain is costly to sample, so coarser.
-	const resolution = $derived(mode === 'density' ? (info?.kind === 'noise_settings' ? 4 : 2) : 3);
+	// The isometric view is drawn with polygons, so it renders at device pixels.
+	const resolution = $derived(
+		mode === 'iso' ? 1 / Math.min(2, globalThis.devicePixelRatio || 1) : mode === 'density' ? (info?.kind === 'noise_settings' ? 4 : 2) : 3
+	);
 	// Terrain is built a chunk at a time, so zooming out far gets slow.
 	const maxScale = $derived(mode === 'density' ? 64 : mode === 'biomes' ? 64 : 4);
 
 	// Biomes a surface rule can be tested against: the pack's own, those its
-	// rules name in Biome() conditions, and a few vanilla ones.
-	function biomesIn(json: unknown, out: Set<string>) {
-		if (Array.isArray(json)) for (const v of json) biomesIn(v, out);
+	// rules name in Biome() conditions, and a few vanilla ones. With refs,
+	// rules and conditions referenced by id are followed, so a rule that
+	// says If(in_badlands) finds the biomes in in_badlands.
+	function biomesIn(json: unknown, out: Set<string>, refs?: Map<string, unknown>, seen = new Set<string>()) {
+		if (typeof json === 'string') {
+			const ref = refs?.get(json);
+			if (ref !== undefined && !seen.has(json)) {
+				seen.add(json);
+				biomesIn(ref, out, refs, seen);
+			}
+		} else if (Array.isArray(json)) for (const v of json) biomesIn(v, out, refs, seen);
 		else if (json && typeof json === 'object') {
 			for (const [k, v] of Object.entries(json)) {
 				if (k === 'biome_is') for (const b of Array.isArray(v) ? v : [v]) if (typeof b === 'string' && !b.startsWith('#')) out.add(b.includes(':') ? b : `minecraft:${b}`);
-				biomesIn(v, out);
+				biomesIn(v, out, refs, seen);
 			}
 		}
 	}
@@ -90,7 +104,9 @@
 	const targetFile = $derived(info ? parsed.find((f) => f.kind === info.kind && f.id === info.id) : undefined);
 	const biomeChoices = $derived.by(() => {
 		const own = new Set<string>();
-		if (targetFile) biomesIn(targetFile.json, own);
+		const refs = new Map<string, unknown>();
+		for (const f of parsed) if (f.kind === 'material_rule' || f.kind === 'material_condition') refs.set(f.id, f.json);
+		if (targetFile) biomesIn(targetFile.json, own, refs);
 		const all = new Set(own);
 		for (const f of output) {
 			const m = /^data\/([^/]+)\/worldgen\/biome\/(.+)\.json$/.exec(f.path);
@@ -106,14 +122,19 @@
 		worker = new Worker(new URL('./preview.worker.ts', import.meta.url), { type: 'module' });
 		worker.onmessage = (e: MessageEvent<PreviewResponse>) => {
 			const r = e.data;
-			if (r.seq !== seq) return;
-			busy = false;
+			if (r.seq !== seq) {
+				if (r.type === 'rendered') r.bitmap?.close();
+				return;
+			}
+			busy = r.type === 'rendered' && !!r.partial;
 			if (r.type === 'error') {
 				error = r.message;
 				return;
 			}
 			error = '';
 			last = r;
+			// The worker picks the default size and keeps zooming out within what fills the canvas.
+			if (r.scale && (!isoView.scale || r.scale > isoView.scale)) isoView.scale = r.scale;
 			draw();
 		};
 		const ro = new ResizeObserver(() => request());
@@ -121,6 +142,7 @@
 		return () => {
 			ro.disconnect();
 			worker?.terminate();
+			for (const h of helpers) h.terminate();
 		};
 	});
 
@@ -161,8 +183,32 @@
 			lock = null;
 		}
 		view.scale = Math.min(view.scale, maxScale);
+		if (m === 'iso') {
+			// Start the 3D view over the slice's x, with the slice (z = 0) through the middle.
+			isoView = { x: Math.round(view.x), y: 0, scale: 0 };
+			lock = null;
+		}
 		last = null;
 		request();
+	}
+
+	/**
+	 * Workers that build chunks for the 3D view in parallel, started the
+	 * first time it is shown and talking to the main worker directly.
+	 */
+	let helpers: Worker[] = [];
+	function startHelpers() {
+		if (helpers.length > 0 || !worker) return;
+		const count = Math.max(1, Math.min(6, (navigator.hardwareConcurrency || 4) - 1));
+		const ports: MessagePort[] = [];
+		for (let i = 0; i < count; i++) {
+			const helper = new Worker(new URL('./preview.worker.ts', import.meta.url), { type: 'module' });
+			const channel = new MessageChannel();
+			helper.postMessage({ type: 'serve', port: channel.port2 } satisfies PreviewRequest, [channel.port2]);
+			ports.push(channel.port1);
+			helpers.push(helper);
+		}
+		worker.postMessage({ type: 'helpers', ports } satisfies PreviewRequest, ports);
 	}
 
 	let pending = false;
@@ -175,6 +221,7 @@
 			const width = Math.max(16, Math.floor(box.clientWidth / resolution));
 			const height = Math.max(16, Math.floor(box.clientHeight / resolution));
 			busy = true;
+			if (mode === 'iso') startHelpers();
 			worker.postMessage({
 				type: 'render',
 				seq: ++seq,
@@ -183,19 +230,27 @@
 				id: info.id,
 				width,
 				height,
-				view: $state.snapshot(view),
+				view: $state.snapshot(mode === 'iso' ? isoView : view),
 				seed,
 				options: { biome, terrain, y: biomeY }
 			} satisfies PreviewRequest);
 		});
 	}
 
+	/** The worker-drawn image on screen, closed once it is replaced. */
+	let shown: ImageBitmap | null = null;
 	function draw() {
 		if (!last || !canvas) return;
 		canvas.width = last.width;
 		canvas.height = last.height;
 		const ctx = canvas.getContext('2d')!;
-		ctx.putImageData(new ImageData(last.pixels, last.width, last.height), 0, 0);
+		if (last.bitmap) {
+			ctx.drawImage(last.bitmap, 0, 0);
+			if (shown && shown !== last.bitmap) shown.close();
+			shown = last.bitmap;
+		} else {
+			ctx.putImageData(new ImageData(last.pixels, last.width, last.height), 0, 0);
+		}
 		if (last.seaLevel !== undefined && mode === 'density') {
 			const py = (view.y - last.seaLevel) / view.scale + last.height / 2;
 			ctx.strokeStyle = 'rgba(30, 80, 160, 0.6)';
@@ -239,7 +294,8 @@
 	}
 	function down(e: PointerEvent) {
 		canvas.setPointerCapture(e.pointerId);
-		drag = { x: e.clientX, y: e.clientY, vx: view.x, vy: view.y, moved: false };
+		const v = mode === 'iso' ? isoView : view;
+		drag = { x: e.clientX, y: e.clientY, vx: v.x, vy: v.y, moved: false };
 	}
 	function move(e: PointerEvent) {
 		hover = pointer(e);
@@ -248,12 +304,21 @@
 		const dy = (e.clientY - drag.y) / resolution;
 		if (Math.abs(dx) + Math.abs(dy) > 2) drag.moved = true;
 		if (!drag.moved) return;
+		if (mode === 'iso') {
+			// Undo the projection (screen x = (x - z)·s, screen y = (x + z)·s/2),
+			// so the ground follows the pointer.
+			const s = isoView.scale || 8;
+			isoView.x = drag.vx - (dx / s + (2 * dy) / s) / 2;
+			isoView.y = drag.vy - ((2 * dy) / s - dx / s) / 2;
+			request();
+			return;
+		}
 		view.x = drag.vx - dx * view.scale;
 		view.y = flat ? drag.vy - dy * view.scale : drag.vy + dy * view.scale;
 		request();
 	}
 	function up(e: PointerEvent) {
-		if (drag && !drag.moved) {
+		if (drag && !drag.moved && mode !== 'iso') {
 			const p = pointer(e);
 			const [x, y] = toWorld(p.px, p.py);
 			lock = lock && lock.x === x && lock.y === y ? null : { x, y };
@@ -263,6 +328,13 @@
 	}
 	function wheel(e: WheelEvent) {
 		e.preventDefault();
+		if (mode === 'iso') {
+			// Zooming out past a 2×2-chunk area builds more chunks, up to 4×4.
+			const s = isoView.scale || 8;
+			isoView.scale = Math.min(48, Math.max(last?.minScale ?? 2, s * Math.exp(-e.deltaY * 0.0015)));
+			request();
+			return;
+		}
 		const p = pointer(e as unknown as PointerEvent);
 		const [wx, wy] = toWorld(p.px, p.py);
 		const f = Math.exp(e.deltaY * 0.0015);
@@ -284,7 +356,7 @@
 
 	const readout = $derived.by(() => {
 		const at = hover;
-		if (!at || !last) return '';
+		if (!at || !last || mode === 'iso') return '';
 		const ix = Math.floor(at.px);
 		const iy = Math.floor(at.py);
 		if (ix < 0 || iy < 0 || ix >= last.width || iy >= last.height) return '';
@@ -328,7 +400,7 @@
 					</select>
 				</label>
 			{/if}
-			{#if mode === 'blocks' && info.kind !== 'dimension'}
+			{#if (mode === 'blocks' || mode === 'iso') && info.kind !== 'dimension'}
 				<label class="flex items-center gap-1" title="The biome Biome() conditions in surface rules see">
 					Biome
 					<select aria-label="Biome" class="rounded border border-line bg-panel px-1 py-0.5 text-ink" bind:value={biome} onchange={() => request()}>
@@ -358,7 +430,8 @@
 			<button
 				class="rounded px-1.5 py-0.5 hover:bg-hover"
 				onclick={() => {
-					view = defaultView(info.kind, mode);
+					if (mode === 'iso') isoView = { x: Math.round(view.x), y: 0, scale: 0 };
+					else view = defaultView(info.kind, mode);
 					request();
 				}}>Reset view</button
 			>
@@ -388,6 +461,9 @@
 				{#if lockValue}<span class="text-red-300">● {lockValue}</span>{/if}
 				{#if busy && (!last || mode !== 'density')}<span>Rendering…</span>{/if}
 			</div>
+		{/if}
+		{#if info && last?.notice}
+			<div class="pointer-events-none absolute inset-x-3 top-3 rounded bg-black/60 px-3 py-2 text-xs text-white">{last.notice}</div>
 		{/if}
 		{#if info && last?.legend}
 			<div class="pointer-events-none absolute top-2 right-2 flex max-h-[60%] flex-col gap-0.5 overflow-hidden rounded bg-black/60 px-2 py-1 text-[11px] text-white" aria-label="Biomes in view">
