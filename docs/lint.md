@@ -11,7 +11,7 @@ The engine lints every declaration that checks without errors. Findings appear i
 | `constant-expression` | hint | safe | Arithmetic on number literals, such as `2 * 0.25`, which is replaced by its value. |
 | `deprecated` | warning | none | A use of a declaration whose [doc comment](getting-started.md#doc-comments) has a `@deprecated` tag, anywhere in the project, commands included. The message carries the tag's text, and the editor strikes the use out. |
 | `external-asset` | warning | none | A texture, sound or structure id in a namespace the project declares that no `Texture`, `Sound` or `Structure` call in the project provides. The pack still loads, so this is a warning: the file has to come from another pack. See [Asset files](resources.md#asset-files). |
-| `overrides-vanilla` | info | none | A declaration that replaces a vanilla resource, such as `LootTable minecraft:blocks/stone`. It is skipped when the project namespace is `minecraft`. |
+| `overrides-vanilla` | info | none | A declaration that replaces a vanilla resource, such as `LootTable minecraft:blocks/stone`. A tag only counts when it sets `replace`, since otherwise it adds to vanilla's entries. It is skipped when the project namespace is `minecraft`. |
 
 ## Configuration
 
