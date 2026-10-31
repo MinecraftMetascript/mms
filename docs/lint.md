@@ -9,6 +9,7 @@ The engine lints every declaration that checks without errors. Findings appear i
 | `redundant-namespace` | hint | safe | A `minecraft:` prefix that can be dropped. It is kept when the project declares its own resource with the short name. |
 | `use-sugar` | hint | safe | An object literal with a shorter form: a dispatched object as its helper call (`{ type = noise, noise = ridge }` becomes `Noise(noise = ridge)`), and the sugar in [resources.md](resources.md): bare item entries, `1..3`, `diamond * 4`, trigger calls, `&&`, `||`, `!` and density arithmetic. Parentheses are added where precedence needs them. |
 | `constant-expression` | hint | safe | Arithmetic on number literals, such as `2 * 0.25`, which is replaced by its value. |
+| `external-asset` | warning | none | A texture, sound or structure id in a namespace the project declares that no `Texture`, `Sound` or `Structure` call in the project provides. The pack still loads, so this is a warning: the file has to come from another pack. See [Asset files](resources.md#asset-files). |
 | `overrides-vanilla` | info | none | A declaration that replaces a vanilla resource, such as `LootTable minecraft:blocks/stone`. It is skipped when the project namespace is `minecraft`. |
 
 ## Configuration
