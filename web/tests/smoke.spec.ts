@@ -153,7 +153,15 @@ test('the docs render guides and the reference', async ({ page }) => {
 	// The generated reference, filtered.
 	await nav.getByRole('link', { name: 'Reference' }).click();
 	await expect(page.getByRole('cell', { name: 'DensityFunction', exact: true })).toBeVisible();
-	await page.getByRole('searchbox', { name: 'Filter helpers' }).fill('gradient');
-	await expect(page.getByText(/^Gradient\(axis: /)).toBeVisible();
+	const filter = page.getByRole('searchbox', { name: 'Filter helpers' });
+	await filter.fill('gradient');
+	await expect(page.getByText(/^Gradient\(axis, /)).toBeVisible();
 	await expect(page.getByRole('region', { name: 'Loot function' })).toHaveCount(0);
+
+	// A type in a signature links to its entry, even from a filtered list.
+	const gradient = page.locator('#density_function-Gradient');
+	await gradient.getByRole('link', { name: 'Axis', exact: true }).click();
+	await expect(page).toHaveURL(/#type-util-direction-Axis$/);
+	await expect(filter).toHaveValue('');
+	await expect(page.locator('#type-util-direction-Axis')).toBeInViewport();
 });
