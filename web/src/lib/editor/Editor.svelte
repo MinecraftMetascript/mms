@@ -28,6 +28,10 @@
 	export function fixAll() {
 		if (view) fixAllCommand(view);
 	}
+	/** Formats the open file with the engine's formatter. */
+	export function format() {
+		if (view) formatCommand(view);
+	}
 	let shown = '';
 	const theme = new Compartment();
 
