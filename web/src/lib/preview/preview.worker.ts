@@ -240,10 +240,10 @@ function buildChunk(t: Terrain, chunkX: number): Uint16Array {
 
 /** Filled chunks (terrain shape before surface rules), most recently used last. */
 const fills = new Map<string, { chunk: Chunk; noiseChunk: unknown }>();
-const MAX_FILLS = 32;
+const MAX_FILLS = 40;
 
 /** A full 16×16 chunk with surface rules, indexed ((x * 16 + z) * height + y). */
-function buildChunk3D(t: Terrain, cx: number, cz: number): Uint16Array {
+function buildChunk3D(t: Terrain, cx: number, cz: number): Uint16Array<ArrayBuffer> {
 	const { settings } = t;
 	const minY = settings.noise.minY;
 	const height = settings.noise.height;
@@ -268,80 +268,101 @@ function buildChunk3D(t: Terrain, cx: number, cz: number): Uint16Array {
 	const { chunk, noiseChunk } = fill;
 	// Blocks the surface rule replaces, put back afterwards so the fill can be reused.
 	const replaced: [BlockPos, BlockState][] = [];
-	// Deepslate's MaterialSystem.buildSurface only paints the first z row
-	// (its previews are slices), so this is its loop over the whole chunk.
-	const context = new MaterialRuleContext(
-		t.rs.surfaceSystem,
-		t.rs,
-		chunk,
-		noiseChunk as never,
-		gen.getWorldgenContext() as never,
-		(pos: BlockPos) => t.biomeAt(pos[0], pos[1], pos[2])
-	);
-	const rule = t.rule.compile(context);
-	const x0 = cx * 16;
-	const z0 = cz * 16;
-	const maxY = minY + height - 1;
-	for (let x = 0; x < 16; x++) {
-		for (let z = 0; z < 16; z++) {
-			const bx = x0 + x;
-			const bz = z0 + z;
-			context.updateXZ(bx, bz);
-			let stoneAbove = 0;
-			let waterHeight = Number.MIN_SAFE_INTEGER;
-			let nextCeiling = Number.MAX_SAFE_INTEGER;
-			for (let y = maxY; y >= minY; y--) {
-				const pos = BlockPos.create(bx, y, bz);
-				const old = chunk.getBlockState(pos);
-				if (old.equals(BlockState.AIR)) {
-					stoneAbove = 0;
-					waterHeight = Number.MIN_SAFE_INTEGER;
-					continue;
-				}
-				if (old.isFluid()) {
-					if (waterHeight === Number.MIN_SAFE_INTEGER) waterHeight = y + 1;
-					continue;
-				}
-				if (nextCeiling >= y) {
-					nextCeiling = Number.MIN_SAFE_INTEGER;
-					for (let ly = y - 1; ly >= minY; ly--) {
-						const next = chunk.getBlockState(BlockPos.create(bx, ly, bz));
-						if (next.equals(BlockState.AIR) || next.isFluid()) {
-							nextCeiling = ly + 1;
-							break;
+	try {
+		// Deepslate's MaterialSystem.buildSurface only paints the first z row
+		// (its previews are slices), so this is its loop over the whole chunk.
+		const context = new MaterialRuleContext(
+			t.rs.surfaceSystem,
+			t.rs,
+			chunk,
+			noiseChunk as never,
+			gen.getWorldgenContext() as never,
+			(pos: BlockPos) => t.biomeAt(pos[0], pos[1], pos[2])
+		);
+		const rule = t.rule.compile(context);
+		const x0 = cx * 16;
+		const z0 = cz * 16;
+		const maxY = minY + height - 1;
+		for (let x = 0; x < 16; x++) {
+			for (let z = 0; z < 16; z++) {
+				const bx = x0 + x;
+				const bz = z0 + z;
+				context.updateXZ(bx, bz);
+				let stoneAbove = 0;
+				let waterHeight = Number.MIN_SAFE_INTEGER;
+				let nextCeiling = Number.MAX_SAFE_INTEGER;
+				for (let y = maxY; y >= minY; y--) {
+					const pos = BlockPos.create(bx, y, bz);
+					const old = chunk.getBlockState(pos);
+					if (old.equals(BlockState.AIR)) {
+						stoneAbove = 0;
+						waterHeight = Number.MIN_SAFE_INTEGER;
+						continue;
+					}
+					if (old.isFluid()) {
+						if (waterHeight === Number.MIN_SAFE_INTEGER) waterHeight = y + 1;
+						continue;
+					}
+					if (nextCeiling >= y) {
+						nextCeiling = Number.MIN_SAFE_INTEGER;
+						for (let ly = y - 1; ly >= minY; ly--) {
+							const next = chunk.getBlockState(BlockPos.create(bx, ly, bz));
+							if (next.equals(BlockState.AIR) || next.isFluid()) {
+								nextCeiling = ly + 1;
+								break;
+							}
 						}
 					}
-				}
-				stoneAbove += 1;
-				context.updateY(stoneAbove, y - nextCeiling + 1, waterHeight, y);
-				const state = rule(bx, y, bz);
-				if (state) {
-					replaced.push([pos, old]);
-					chunk.setBlockState(pos, state);
+					stoneAbove += 1;
+					context.updateY(stoneAbove, y - nextCeiling + 1, waterHeight, y);
+					const state = rule(bx, y, bz);
+					if (state) {
+						replaced.push([pos, old]);
+						chunk.setBlockState(pos, state);
+					}
 				}
 			}
 		}
-	}
-	const out = new Uint16Array(16 * 16 * height);
-	for (let x = 0; x < 16; x++) {
-		for (let z = 0; z < 16; z++) {
-			const base = (x * 16 + z) * height;
-			for (let y = 0; y < height; y++) {
-				out[base + y] = indexOf(chunk.getBlockState(BlockPos.create(x0 + x, minY + y, z0 + z)).getName().toString());
+		const out = new Uint16Array(16 * 16 * height);
+		for (let x = 0; x < 16; x++) {
+			for (let z = 0; z < 16; z++) {
+				const base = (x * 16 + z) * height;
+				for (let y = 0; y < height; y++) {
+					out[base + y] = indexOf(chunk.getBlockState(BlockPos.create(x0 + x, minY + y, z0 + z)).getName().toString());
+				}
 			}
 		}
+		return out;
+	} finally {
+		for (const [pos, old] of replaced) chunk.setBlockState(pos, old);
 	}
-	for (const [pos, old] of replaced) chunk.setBlockState(pos, old);
-	return out;
 }
 
 let isoKey = '';
-const isoChunks = new Map<string, Uint16Array>();
+
+/** A built chunk for the isometric view, with what its faces need. */
+interface IsoChunk {
+	/** Block palette indices, ((x * 16 + z) * height + y). */
+	data: Uint16Array;
+	/** Lowest and highest top block of its columns (h and -1 when every column is open to the void). */
+	lowest: number;
+	highest: number;
+	/** Its visible faces, by the area bottom and which neighbours are present. */
+	faces: Map<string, ChunkFaces>;
+}
+interface ChunkFaces {
+	/** Per face: chunk-local block x, y, z and side (0 top, 1 +x, 2 +z). */
+	faces: Int16Array;
+	fills: string[];
+}
+/** Built chunks for the current terrain, least recently used first. */
+const isoChunks = new Map<string, IsoChunk>();
+const MAX_ISO_CHUNKS = 256;
 
 /**
  * The visible faces of an area of chunks, in back-to-front order. Hidden
- * blocks are pruned once per area, so a pan or zoom only projects and
- * fills what can be seen.
+ * blocks are pruned per chunk, so a pan or zoom only projects and fills
+ * what can be seen, and a chunk arriving only re-prunes its neighbours.
  */
 interface IsoArea {
 	key: string;
@@ -370,46 +391,108 @@ function fillsOf(id: string): string[] {
 	return f;
 }
 
-function isoAreaOf(key: string, chunks: (Uint16Array | undefined)[][], n: number, h: number): IsoArea {
-	const air = indexOf('minecraft:air');
-	const caveAir = indexOf('minecraft:cave_air');
-	const at = (x: number, y: number, z: number): number => {
-		if (x < 0 || z < 0 || x >= n || z >= n || y < 0 || y >= h) return air;
-		const c = chunks[x >> 4][z >> 4];
-		return c ? c[((x & 15) * 16 + (z & 15)) * h + y] : air;
-	};
-	const empty = (b: number) => b === air || b === caveAir;
-
-	// Show from a little below the lowest surface to the highest one, so the
-	// cut sides show the layers the surface rules paint.
-	let lowest = h;
-	let highest = 0;
-	for (let x = 0; x < n; x++) {
-		for (let z = 0; z < n; z++) {
-			let y = h - 1;
-			while (y > 0 && empty(at(x, y, z))) y--;
-			if (empty(at(x, y, z))) continue; // open to the void, as under sky islands
-			lowest = Math.min(lowest, y);
-			highest = Math.max(highest, y);
-		}
+let airIndex = -1;
+let caveAirIndex = -1;
+function isEmpty(b: number): boolean {
+	if (airIndex < 0) {
+		airIndex = indexOf('minecraft:air');
+		caveAirIndex = indexOf('minecraft:cave_air');
 	}
-	const bottom = Math.max(0, lowest - 16);
+	return b === airIndex || b === caveAirIndex;
+}
+
+function isoChunkOf(data: Uint16Array, h: number): IsoChunk {
+	let lowest = h;
+	let highest = -1;
+	for (let col = 0; col < 256; col++) {
+		const base = col * h;
+		let y = h - 1;
+		while (y >= 0 && isEmpty(data[base + y])) y--;
+		if (y < 0) continue; // open to the void, as under sky islands
+		if (y < lowest) lowest = y;
+		if (y > highest) highest = y;
+	}
+	return { data, lowest, highest, faces: new Map() };
+}
+
+/**
+ * A chunk's exposed top, +x and +z faces from bottom up, in back-to-front
+ * order (x, then z, then y). Faces against a missing neighbour or the area's
+ * edge are drawn, so the area's sides show its layers.
+ */
+function chunkFaces(c: IsoChunk, east: IsoChunk | undefined, south: IsoChunk | undefined, bottom: number, h: number): ChunkFaces {
+	const key = `${bottom}|${east ? 1 : 0}|${south ? 1 : 0}`;
+	const hit = c.faces.get(key);
+	if (hit) return hit;
+	const { data } = c;
 	const faces: number[] = [];
 	const fills: string[] = [];
-	// Back to front: every block only hides blocks with smaller x, z or y.
-	for (let x = 0; x < n; x++) {
-		for (let z = 0; z < n; z++) {
-			for (let y = bottom; y <= highest; y++) {
-				const b = at(x, y, z);
-				if (empty(b)) continue;
+	for (let x = 0; x < 16; x++) {
+		for (let z = 0; z < 16; z++) {
+			const base = (x * 16 + z) * h;
+			const eastBase = x < 15 ? base + 16 * h : z * h;
+			const eastData = x < 15 ? data : east?.data;
+			const southBase = z < 15 ? base + h : x * 16 * h;
+			const southData = z < 15 ? data : south?.data;
+			for (let y = bottom; y <= c.highest; y++) {
+				const b = data[base + y];
+				if (isEmpty(b)) continue;
 				const f = fillsOf(palette[b]);
-				if (y === highest || empty(at(x, y + 1, z))) faces.push(x, y, z, 0), fills.push(f[0]);
-				if (x === n - 1 || empty(at(x + 1, y, z))) faces.push(x, y, z, 1), fills.push(f[1]);
-				if (z === n - 1 || empty(at(x, y, z + 1))) faces.push(x, y, z, 2), fills.push(f[2]);
+				if (y === h - 1 || isEmpty(data[base + y + 1])) faces.push(x, y, z, 0), fills.push(f[0]);
+				if (!eastData || isEmpty(eastData[eastBase + y])) faces.push(x, y, z, 1), fills.push(f[1]);
+				if (!southData || isEmpty(southData[southBase + y])) faces.push(x, y, z, 2), fills.push(f[2]);
 			}
 		}
 	}
-	return { key, n, bottom, top: highest, faces: Int16Array.from(faces), fills };
+	const out = { faces: Int16Array.from(faces), fills };
+	// Keep a few variants (bottoms differ between areas); drop the oldest.
+	if (c.faces.size >= 4) c.faces.delete(c.faces.keys().next().value!);
+	c.faces.set(key, out);
+	return out;
+}
+
+/** The area's faces, chunk by chunk. Chunk order (x-major, then z) is a valid back-to-front order too. */
+function isoAreaOf(key: string, chunks: (IsoChunk | undefined)[][], n: number, h: number): IsoArea {
+	const across = chunks.length;
+	let lowest = h;
+	let highest = -1;
+	for (const row of chunks) {
+		for (const c of row) {
+			if (!c || c.highest < 0) continue;
+			lowest = Math.min(lowest, c.lowest);
+			highest = Math.max(highest, c.highest);
+		}
+	}
+	// From a little below the lowest surface, so the cut sides show the layers the surface rules paint.
+	const bottom = Math.max(0, lowest - 16);
+	const parts: ChunkFaces[] = [];
+	const offsets: [number, number][] = [];
+	let total = 0;
+	for (let i = 0; i < across; i++) {
+		for (let j = 0; j < across; j++) {
+			const c = chunks[i][j];
+			if (!c || c.highest < 0) continue;
+			const part = chunkFaces(c, i + 1 < across ? chunks[i + 1][j] : undefined, j + 1 < across ? chunks[i][j + 1] : undefined, bottom, h);
+			parts.push(part);
+			offsets.push([i * 16, j * 16]);
+			total += part.faces.length;
+		}
+	}
+	const faces = new Int16Array(total);
+	const fills: string[] = [];
+	let o = 0;
+	parts.forEach((part, k) => {
+		const [dx, dz] = offsets[k];
+		const f = part.faces;
+		for (let i = 0; i < f.length; i += 4) {
+			faces[o++] = f[i] + dx;
+			faces[o++] = f[i + 1];
+			faces[o++] = f[i + 2] + dz;
+			faces[o++] = f[i + 3];
+		}
+		for (const s of part.fills) fills.push(s);
+	});
+	return { key, n, bottom, top: highest, faces, fills };
 }
 
 /** Fills an area's faces, with block (x, y, z) at screen (ox + (x - z)·s, oy + (x + z)·s/2 - y·s), skipping those outside w × h. */
@@ -448,16 +531,178 @@ function drawFaces(ctx: OffscreenCanvasRenderingContext2D, area: IsoArea, s: num
 
 /** The largest area image kept for panning, in pixels. */
 const MAX_IMAGE = 4096 * 4096;
+/** The most chunks across the isometric view shows when zoomed out. */
+const MAX_ACROSS = 8;
+
+// ---- Chunk building helpers -------------------------------------------
+//
+// Building a chunk is most of the isometric view's cost (Deepslate's noise
+// fill, about 0.4 s each), so the page starts a few helper copies of this
+// worker and hands their ports over. Visible chunks are built first, in
+// parallel; the ring just outside the view is built next, so a pan rarely
+// waits. Without helpers, chunks are built here one at a time.
+
+type HelperMessage =
+	| { type: 'setup'; files: PreviewFile[] }
+	| { type: 'chunk'; job: number; req: RenderRequest; cx: number; cz: number };
+type HelperReply =
+	| { type: 'chunk'; job: number; data: Uint16Array<ArrayBuffer>; ids: string[] }
+	| { type: 'chunk'; job: number; error: string };
+
+interface Job {
+	id: number;
+	key: string;
+	cx: number;
+	cz: number;
+	req: RenderRequest;
+	prefetch: boolean;
+	promise: Promise<IsoChunk>;
+	resolve: (c: IsoChunk) => void;
+	reject: (e: unknown) => void;
+}
+const helpers: { port: MessagePort; job: Job | null }[] = [];
+let lastSetup: HelperMessage | null = null;
+let queue: Job[] = [];
+/** Queued and running jobs, by chunk. */
+const jobs = new Map<string, Job>();
+let nextJob = 0;
+
+function addHelpers(ports: MessagePort[]) {
+	for (const port of ports) {
+		const helper: (typeof helpers)[number] = { port, job: null };
+		port.onmessage = (e: MessageEvent<HelperReply>) => finish(helper, e.data);
+		if (lastSetup) port.postMessage(lastSetup);
+		helpers.push(helper);
+	}
+	dispatch();
+}
+
+function finish(helper: (typeof helpers)[number], reply: HelperReply) {
+	const job = helper.job;
+	helper.job = null;
+	if (job && job.id === reply.job) {
+		if (jobs.get(`${job.cx},${job.cz}`) === job) jobs.delete(`${job.cx},${job.cz}`);
+		if ('error' in reply) {
+			job.reject(new Error(reply.error));
+		} else if (job.key !== isoKey) {
+			job.reject(new Superseded());
+		} else {
+			// The helper's palette differs from this one's.
+			const map = Uint16Array.from(reply.ids, indexOf);
+			const data = reply.data;
+			for (let i = 0; i < data.length; i++) data[i] = map[data[i]];
+			const c = keep(`${job.cx},${job.cz}`, isoChunkOf(data, data.length / 256));
+			job.resolve(c);
+		}
+	}
+	dispatch();
+}
+
+function keep(at: string, c: IsoChunk): IsoChunk {
+	isoChunks.set(at, c);
+	if (isoChunks.size > MAX_ISO_CHUNKS) isoChunks.delete(isoChunks.keys().next().value!);
+	return c;
+}
+
+/**
+ * Each chunk goes to the same helper every time, so that helper's filled
+ * chunks are reused when a surface rule changes.
+ */
+function helperOf(cx: number, cz: number): number {
+	const n = helpers.length;
+	return (((cx * 31 + cz) % n) + n) % n;
+}
+
+function dispatch() {
+	helpers.forEach((helper, h) => {
+		if (helper.job) return;
+		// The queue holds visible chunks first, in the order asked.
+		const k = queue.findIndex((j) => helperOf(j.cx, j.cz) === h);
+		if (k < 0) return;
+		const job = queue.splice(k, 1)[0];
+		helper.job = job;
+		helper.port.postMessage({ type: 'chunk', job: job.id, req: job.req, cx: job.cx, cz: job.cz } satisfies HelperMessage);
+	});
+}
+
+/**
+ * Asks for the chunks an area needs, visible ones first, then the ring
+ * around them. Queued chunks no longer wanted are dropped.
+ */
+function plan(req: RenderRequest, visible: [number, number][], ring: [number, number][]): Map<string, Promise<IsoChunk>> {
+	const wanted = new Map<string, boolean>();
+	for (const [cx, cz] of visible) wanted.set(`${cx},${cz}`, false);
+	for (const [cx, cz] of ring) if (!wanted.has(`${cx},${cz}`)) wanted.set(`${cx},${cz}`, true);
+	queue = queue.filter((j) => {
+		const at = `${j.cx},${j.cz}`;
+		if (j.key === isoKey && wanted.has(at)) return true;
+		if (jobs.get(at) === j) jobs.delete(at);
+		j.reject(new Superseded());
+		return false;
+	});
+	const out = new Map<string, Promise<IsoChunk>>();
+	for (const [at, prefetch] of wanted) {
+		if (isoChunks.has(at)) continue;
+		let job = jobs.get(at);
+		if (job && job.key !== isoKey) job = undefined;
+		if (!job) {
+			const [cx, cz] = at.split(',').map(Number);
+			let resolve!: (c: IsoChunk) => void;
+			let reject!: (e: unknown) => void;
+			const promise = new Promise<IsoChunk>((res, rej) => ((resolve = res), (reject = rej)));
+			promise.catch(() => {}); // a dropped prefetch is nobody's error
+			job = { id: nextJob++, key: isoKey, cx, cz, req, prefetch, promise, resolve, reject };
+			jobs.set(at, job);
+			queue.push(job);
+		}
+		job.prefetch = prefetch;
+		if (!prefetch) out.set(at, job.promise);
+	}
+	// Keep visible jobs in the order asked, ahead of the ring.
+	queue.sort((a, b) => Number(a.prefetch) - Number(b.prefetch));
+	dispatch();
+	return out;
+}
+
+/**
+ * Builds a chunk, fetching vanilla entries its surface rule references the
+ * first time they are missing (re-registering everything only then).
+ */
+async function buildIsoChunk(t: Terrain, cx: number, cz: number): Promise<Uint16Array<ArrayBuffer>> {
+	try {
+		return buildChunk3D(t, cx, cz);
+	} catch (e) {
+		if (!String(e).includes('Missing key')) throw e;
+		return withVanilla(() => buildChunk3D(t, cx, cz));
+	}
+}
+
+/** In a helper: builds one chunk for the main worker. */
+async function serve(port: MessagePort, msg: HelperMessage) {
+	if (msg.type === 'setup') {
+		setup(msg.files);
+		return;
+	}
+	try {
+		const { terrain } = await terrainOf(msg.req);
+		const data = await buildIsoChunk(terrain, msg.cx, msg.cz);
+		port.postMessage({ type: 'chunk', job: msg.job, data, ids: palette.slice() } satisfies HelperReply, [data.buffer]);
+	} catch (err) {
+		port.postMessage({ type: 'chunk', job: msg.job, error: String(err instanceof Error ? err.message : err) } satisfies HelperReply);
+	}
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /**
  * Draws the terrain as an isometric block diagram. In this mode the view's
  * x and y are the world x and z at the centre, and its scale is the size of
- * a block in pixels (0 to fit a 2×2-chunk area to the canvas). Zooming out
- * builds more chunks, up to 4×4.
+ * a block in pixels (0 to fit a 3×3-chunk area to the canvas). Zooming out
+ * shows more chunks, up to 8×8.
  *
- * Built chunks, the pruned face list and the drawn area are each cached, so
+ * Built chunks, their pruned faces and the drawn area are each cached, so
  * a pan only moves an image and a zoom only redraws the visible faces.
- * While chunks are being built, each one is shown as it finishes.
+ * While chunks are being built, they are shown as they finish.
  */
 async function renderIso(req: RenderRequest, t: Terrain, key: string): Promise<Rendered> {
 	const { width, height } = req;
@@ -470,26 +715,36 @@ async function renderIso(req: RenderRequest, t: Terrain, key: string): Promise<R
 	}
 	const fit = !(req.view.scale > 0);
 	// Blocks across the area: enough to fill the canvas at this zoom.
-	const across = fit ? 32 : width / (2 * req.view.scale);
-	const chunksAcross = across <= 40 ? 2 : across <= 56 ? 3 : 4;
+	const across = fit ? 48 : width / (2 * req.view.scale);
+	const chunksAcross = Math.max(2, Math.min(MAX_ACROSS, Math.ceil((across - 8) / 16)));
 	const n = chunksAcross * 16;
 	const cx = req.view.x;
 	const cz = req.view.y;
 	const cx0 = Math.round(cx / 16 - chunksAcross / 2);
 	const cz0 = Math.round(cz / 16 - chunksAcross / 2);
-	const chunks: (Uint16Array | undefined)[][] = [];
+	const chunks: (IsoChunk | undefined)[][] = [];
 	const missing: [number, number][] = [];
 	for (let i = 0; i < chunksAcross; i++) {
 		chunks.push([]);
 		for (let j = 0; j < chunksAcross; j++) {
-			const c = isoChunks.get(`${cx0 + i},${cz0 + j}`);
+			const at = `${cx0 + i},${cz0 + j}`;
+			const c = isoChunks.get(at);
+			if (c) {
+				// Most recently used last, so eviction takes chunks far from here.
+				isoChunks.delete(at);
+				isoChunks.set(at, c);
+			}
 			chunks[i].push(c);
 			if (!c) missing.push([i, j]);
 		}
 	}
+	// Nearest the centre first.
+	const mid = (chunksAcross - 1) / 2;
+	missing.sort((a, b) => Math.hypot(a[0] - mid, a[1] - mid) - Math.hypot(b[0] - mid, b[1] - mid));
 
 	const frame = (): Rendered => {
-		const areaKey = `${cx0},${cz0},${chunksAcross},${missing.length}`;
+		const present = chunks.map((row) => row.map((c) => (c ? 1 : 0)).join('')).join('');
+		const areaKey = `${cx0},${cz0},${chunksAcross},${present}`;
 		if (isoArea?.key !== areaKey) {
 			isoArea = isoAreaOf(areaKey, chunks, n, h);
 			isoImage = null;
@@ -534,17 +789,46 @@ async function renderIso(req: RenderRequest, t: Terrain, key: string): Promise<R
 		};
 	};
 
-	while (missing.length > 0) {
-		// Show what is built so far, then build the next chunk.
-		if (isoChunks.size > 0) post({ ...frame(), partial: true });
-		await breathe();
-		if (req.seq !== latest) throw new Superseded();
-		const [i, j] = missing[0];
-		const c = buildChunk3D(t, cx0 + i, cz0 + j);
-		isoChunks.set(`${cx0 + i},${cz0 + j}`, c);
-		chunks[i][j] = c;
-		missing.shift();
+	if (helpers.length === 0) {
+		// No helpers: build here, showing each chunk as it finishes.
+		while (missing.length > 0) {
+			if (missing.length < chunksAcross * chunksAcross) post({ ...frame(), partial: true });
+			await breathe();
+			if (req.seq !== latest) throw new Superseded();
+			const [i, j] = missing.shift()!;
+			chunks[i][j] = keep(`${cx0 + i},${cz0 + j}`, isoChunkOf(await buildIsoChunk(t, cx0 + i, cz0 + j), h));
+		}
+		return frame();
 	}
+
+	const visible = missing.map(([i, j]): [number, number] => [cx0 + i, cz0 + j]);
+	const ring: [number, number][] = [];
+	for (let i = -1; i <= chunksAcross; i++) {
+		for (let j = -1; j <= chunksAcross; j++) {
+			if (i < 0 || j < 0 || i >= chunksAcross || j >= chunksAcross) ring.push([cx0 + i, cz0 + j]);
+		}
+	}
+	ring.sort((a, b) => Math.hypot(a[0] - cx / 16, a[1] - cz / 16) - Math.hypot(b[0] - cx / 16, b[1] - cz / 16));
+	const wanted = plan(req, visible, ring);
+	let waiting = missing.length;
+	const all = Promise.all(
+		missing.map(([i, j]) =>
+			wanted.get(`${cx0 + i},${cz0 + j}`)!.then((c) => {
+				chunks[i][j] = c;
+				waiting--;
+			})
+		)
+	);
+	all.catch(() => {});
+	let shown = -1;
+	while (waiting > 0) {
+		// Show what is built so far, a few times a second at most.
+		if (waiting !== shown && waiting < chunksAcross * chunksAcross) post({ ...frame(), partial: true });
+		shown = waiting;
+		await Promise.race([all, sleep(150)]);
+		if (req.seq !== latest) throw new Superseded();
+	}
+	await all; // rethrows a helper's error
 	return frame();
 }
 
@@ -676,6 +960,39 @@ async function renderBiomes(req: RenderRequest, dim: Dimension, rs: RandomState)
 /** The last terrain set up, so panning doesn't rebuild its random state each frame. */
 let cached: { key: string; t: Terrain } | null = null;
 
+/** The terrain a block view draws: a dimension's, or noise settings with a surface rule. */
+async function terrainOf(req: RenderRequest): Promise<{ terrain: Terrain; key: string }> {
+	const seed = seedOf(req.seed);
+	const id = Identifier.parse(req.id);
+	const fixedBiome = Identifier.parse(req.options.biome || 'minecraft:plains');
+	const what = req.kind === 'dimension' ? '' : `${req.options.terrain}|${fixedBiome}`;
+	const key = [version, req.seed, req.kind, req.id, req.mode, what].join('|');
+	if (cached?.key === key) return { terrain: cached.t, key };
+	const terrain =
+		req.kind === 'dimension'
+			? await withVanilla((): Terrain => {
+					const dim = readDimension(req.id);
+					const rs = new RandomState(dim.settings, seed);
+					return {
+						settings: dim.settings,
+						rule: dim.settings.materialRule,
+						rs,
+						biomeAt: (x, y, z) => dim.biomes.getBiome(x >> 2, y >> 2, z >> 2, rs.sampler),
+						shape: [shapeVersion, req.seed, 'dimension', req.id].join('|')
+					};
+				})
+			: await withVanilla((): Terrain => {
+					const settingsId = req.kind === 'material_rule' ? Identifier.parse(req.options.terrain || 'minecraft:overworld') : id;
+					const settings = WorldgenRegistries.NOISE_SETTINGS.getOrThrow(settingsId);
+					const rule = req.kind === 'material_rule' ? WorldgenRegistries.MATERIAL_RULE.getOrThrow(id) : settings.materialRule;
+					const rs = new RandomState(settings, seed);
+					const shape = [shapeVersion, req.seed, 'noise_settings', settingsId].join('|');
+					return { settings, rule, rs, biomeAt: () => fixedBiome, shape };
+				});
+	cached = { key, t: terrain };
+	return { terrain, key };
+}
+
 async function render(req: RenderRequest): Promise<PreviewResponse> {
 	const { width, height, view } = req;
 	const seed = seedOf(req.seed);
@@ -690,15 +1007,7 @@ async function render(req: RenderRequest): Promise<PreviewResponse> {
 		if (v < min) min = v;
 		if (v > max) max = v;
 	};
-	const fixedBiome = Identifier.parse(req.options.biome || 'minecraft:plains');
-	const terrainKey = (what: string) => [version, req.seed, req.kind, req.id, req.mode, what].join('|');
-
-	if (req.kind === 'dimension' && req.mode !== 'biomes' && cached?.key === terrainKey('')) {
-		const key = terrainKey('');
-		await warm(cached.t, key);
-		return req.mode === 'iso' ? renderIso(req, cached.t, key) : renderTerrain(req, cached.t, key);
-	}
-	if (req.kind === 'dimension') {
+	if (req.kind === 'dimension' && req.mode === 'biomes') {
 		const { dim, rs } = await withVanilla(() => {
 			const dim = readDimension(req.id);
 			const rs = new RandomState(dim.settings, seed);
@@ -706,33 +1015,14 @@ async function render(req: RenderRequest): Promise<PreviewResponse> {
 			rs.sampler.sample(0, 0, 0);
 			return { dim, rs };
 		});
-		if (req.mode === 'biomes') return renderBiomes(req, dim, rs);
-		const key = terrainKey('');
-		const terrain: Terrain = {
-			settings: dim.settings,
-			rule: dim.settings.materialRule,
-			rs,
-			biomeAt: (x, y, z) => dim.biomes.getBiome(x >> 2, y >> 2, z >> 2, rs.sampler),
-			shape: [shapeVersion, req.seed, 'dimension', req.id].join('|')
-		};
-		cached = { key, t: terrain };
-		await warm(terrain, key);
-		return req.mode === 'iso' ? renderIso(req, terrain, key) : renderTerrain(req, terrain, key);
+		return renderBiomes(req, dim, rs);
 	}
 
-	if (req.kind === 'material_rule' || (req.kind === 'noise_settings' && req.mode !== 'density')) {
-		const key = terrainKey(`${req.options.terrain}|${fixedBiome}`);
-		const terrain = cached?.key === key ? cached.t : await withVanilla((): Terrain => {
-			const settingsId = req.kind === 'material_rule' ? Identifier.parse(req.options.terrain || 'minecraft:overworld') : id;
-			const settings = WorldgenRegistries.NOISE_SETTINGS.getOrThrow(settingsId);
-			const rule = req.kind === 'material_rule' ? WorldgenRegistries.MATERIAL_RULE.getOrThrow(id) : settings.materialRule;
-			const rs = new RandomState(settings, seed);
-			const shape = [shapeVersion, req.seed, 'noise_settings', settingsId].join('|');
-			return { settings, rule, rs, biomeAt: () => fixedBiome, shape };
-		});
-		cached = { key, t: terrain };
+	if (req.kind === 'dimension' || req.kind === 'material_rule' || (req.kind === 'noise_settings' && req.mode !== 'density')) {
+		const { terrain, key } = await terrainOf(req);
+		if (req.mode === 'iso') return renderIso(req, terrain, key);
 		await warm(terrain, key);
-		return req.mode === 'iso' ? renderIso(req, terrain, key) : renderTerrain(req, terrain, key);
+		return renderTerrain(req, terrain, key);
 	}
 
 	if (req.kind === 'noise') {
@@ -820,18 +1110,33 @@ function post(res: Rendered) {
 	(self as unknown as Worker).postMessage(res, transfer);
 }
 
+function setup(files: PreviewFile[]) {
+	userFiles = files;
+	dimensions = new Map(files.filter((f) => f.kind === 'dimension').map((f) => [f.id, f.json]));
+	version++;
+	const shape = shapeOf(files);
+	if (shape !== shapeSignature) {
+		shapeSignature = shape;
+		shapeVersion++;
+	}
+	lastSetup = { type: 'setup', files };
+	for (const helper of helpers) helper.port.postMessage(lastSetup);
+}
+
 let latest = 0;
 self.onmessage = async (e: MessageEvent<PreviewRequest>) => {
 	const req = e.data;
 	if (req.type === 'setup') {
-		userFiles = req.files;
-		dimensions = new Map(req.files.filter((f) => f.kind === 'dimension').map((f) => [f.id, f.json]));
-		version++;
-		const shape = shapeOf(req.files);
-		if (shape !== shapeSignature) {
-			shapeSignature = shape;
-			shapeVersion++;
-		}
+		setup(req.files);
+		return;
+	}
+	if (req.type === 'helpers') {
+		addHelpers(req.ports);
+		return;
+	}
+	if (req.type === 'serve') {
+		const { port } = req;
+		port.onmessage = (m: MessageEvent<HelperMessage>) => serve(port, m.data);
 		return;
 	}
 	latest = req.seq;
