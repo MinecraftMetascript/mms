@@ -5,7 +5,9 @@ import {
 	Chunk,
 	ChunkPos,
 	DensityFunction,
+	BlockState,
 	FixedBiomeSource,
+	MaterialRuleContext,
 	Holder,
 	HolderSet,
 	Identifier,
@@ -221,6 +223,187 @@ function buildChunk(t: Terrain, chunkX: number): Uint16Array {
 	return out;
 }
 
+// ---- Isometric terrain -------------------------------------------------
+
+/** A full 16×16 chunk with surface rules, indexed ((x * 16 + z) * height + y). */
+function buildChunk3D(t: Terrain, cx: number, cz: number): Uint16Array {
+	const { settings } = t;
+	const minY = settings.noise.minY;
+	const height = settings.noise.height;
+	const chunk = new Chunk(minY, height, ChunkPos.create(cx, cz));
+	const gen = new NoiseChunkGenerator(new FixedBiomeSource(Identifier.create('plains')), settings) as unknown as {
+		createNoiseChunk(rs: RandomState, chunk: Chunk, onlyFirstZ: boolean): unknown;
+		doFill(chunk: Chunk, noiseChunk: unknown): void;
+		getWorldgenContext(): unknown;
+	};
+	const noiseChunk = gen.createNoiseChunk(t.rs, chunk, false);
+	gen.doFill(chunk, noiseChunk);
+	// Deepslate's MaterialSystem.buildSurface only paints the first z row
+	// (its previews are slices), so this is its loop over the whole chunk.
+	const context = new MaterialRuleContext(
+		t.rs.surfaceSystem,
+		t.rs,
+		chunk,
+		noiseChunk as never,
+		gen.getWorldgenContext() as never,
+		(pos: BlockPos) => t.biomeAt(pos[0], pos[1], pos[2])
+	);
+	const rule = t.rule.compile(context);
+	const x0 = cx * 16;
+	const z0 = cz * 16;
+	const maxY = minY + height - 1;
+	for (let x = 0; x < 16; x++) {
+		for (let z = 0; z < 16; z++) {
+			const bx = x0 + x;
+			const bz = z0 + z;
+			context.updateXZ(bx, bz);
+			let stoneAbove = 0;
+			let waterHeight = Number.MIN_SAFE_INTEGER;
+			let nextCeiling = Number.MAX_SAFE_INTEGER;
+			for (let y = maxY; y >= minY; y--) {
+				const pos = BlockPos.create(bx, y, bz);
+				const old = chunk.getBlockState(pos);
+				if (old.equals(BlockState.AIR)) {
+					stoneAbove = 0;
+					waterHeight = Number.MIN_SAFE_INTEGER;
+					continue;
+				}
+				if (old.isFluid()) {
+					if (waterHeight === Number.MIN_SAFE_INTEGER) waterHeight = y + 1;
+					continue;
+				}
+				if (nextCeiling >= y) {
+					nextCeiling = Number.MIN_SAFE_INTEGER;
+					for (let ly = y - 1; ly >= minY; ly--) {
+						const next = chunk.getBlockState(BlockPos.create(bx, ly, bz));
+						if (next.equals(BlockState.AIR) || next.isFluid()) {
+							nextCeiling = ly + 1;
+							break;
+						}
+					}
+				}
+				stoneAbove += 1;
+				context.updateY(stoneAbove, y - nextCeiling + 1, waterHeight, y);
+				const state = rule(bx, y, bz);
+				if (state) chunk.setBlockState(pos, state);
+			}
+		}
+	}
+	const out = new Uint16Array(16 * 16 * height);
+	for (let x = 0; x < 16; x++) {
+		for (let z = 0; z < 16; z++) {
+			const base = (x * 16 + z) * height;
+			for (let y = 0; y < height; y++) {
+				out[base + y] = indexOf(chunk.getBlockState(BlockPos.create(x0 + x, minY + y, z0 + z)).getName().toString());
+			}
+		}
+	}
+	return out;
+}
+
+let isoKey = '';
+const isoChunks = new Map<string, Uint16Array>();
+/** Chunks across the isometric view (it shows ISO_CHUNKS² chunks); even, so it centres on a chunk corner. */
+const ISO_CHUNKS = 2;
+
+/** Draws the terrain around the view's x (and z = 0) as an isometric block diagram. */
+async function renderIso(req: RenderRequest, t: Terrain, key: string): Promise<Rendered> {
+	const { width, height } = req;
+	const h = t.settings.noise.height;
+	if (key !== isoKey) {
+		isoKey = key;
+		isoChunks.clear();
+	}
+	const n = ISO_CHUNKS * 16;
+	// Centred on the slice's x, with z = 0 (the slice) running through the middle.
+	const cx0 = Math.round(req.view.x / 16) - ISO_CHUNKS / 2;
+	const cz0 = -ISO_CHUNKS / 2;
+	const chunks: Uint16Array[][] = [];
+	for (let i = 0; i < ISO_CHUNKS; i++) {
+		chunks.push([]);
+		for (let j = 0; j < ISO_CHUNKS; j++) {
+			const k = `${cx0 + i},${cz0 + j}`;
+			let c = isoChunks.get(k);
+			if (!c) {
+				await breathe();
+				if (req.seq !== latest) throw new Superseded();
+				c = buildChunk3D(t, cx0 + i, cz0 + j);
+				isoChunks.set(k, c);
+			}
+			chunks[i].push(c);
+		}
+	}
+	const air = indexOf('minecraft:air');
+	const caveAir = indexOf('minecraft:cave_air');
+	const at = (x: number, y: number, z: number): number => {
+		if (x < 0 || z < 0 || x >= n || z >= n || y < 0 || y >= h) return air;
+		return chunks[x >> 4][z >> 4][((x & 15) * 16 + (z & 15)) * h + y];
+	};
+	const empty = (b: number) => b === air || b === caveAir;
+
+	// Show from a little below the lowest surface to the highest one, so the
+	// cut sides show the layers the surface rules paint.
+	let lowest = h;
+	let highest = 0;
+	for (let x = 0; x < n; x++) {
+		for (let z = 0; z < n; z++) {
+			let y = h - 1;
+			while (y > 0 && empty(at(x, y, z))) y--;
+			if (empty(at(x, y, z))) continue; // open to the void, as under sky islands
+			lowest = Math.min(lowest, y);
+			highest = Math.max(highest, y);
+		}
+	}
+	if (lowest > highest) {
+		const pixels = new Uint8ClampedArray(width * height * 4);
+		for (let i = 0; i < width * height; i++) put(pixels, i * 4, SKY);
+		const notice = 'No blocks in these chunks. Pan the Blocks view to some terrain, then switch back.';
+		return { type: 'rendered', seq: req.seq, width, height, pixels, values: new Float32Array(width * height).fill(NaN), min: Infinity, max: -Infinity, notice };
+	}
+	const bottom = Math.max(0, lowest - 16);
+	const span = highest + 1 - bottom;
+
+	const canvas = new OffscreenCanvas(width, height);
+	const ctx = canvas.getContext('2d')!;
+	ctx.fillStyle = `rgb(${SKY.join(' ')})`;
+	ctx.fillRect(0, 0, width, height);
+	const s = Math.max(1, Math.min(width / (2 * n), height / (n + span)) * 0.92);
+	const ox = width / 2;
+	const oy = (height - (n + span) * s) / 2 + span * s;
+	const px = (x: number, y: number, z: number): [number, number] => [ox + (x - z) * s, oy + ((x + z) * s) / 2 - (y - bottom) * s];
+	const face = (pts: [number, number][], c: Rgb, shade: number) => {
+		const fill = `rgb(${Math.round(c[0] * shade)} ${Math.round(c[1] * shade)} ${Math.round(c[2] * shade)})`;
+		ctx.fillStyle = fill;
+		ctx.strokeStyle = fill;
+		ctx.beginPath();
+		ctx.moveTo(pts[0][0], pts[0][1]);
+		for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+		ctx.closePath();
+		ctx.fill();
+		ctx.stroke(); // hides hairline seams between faces
+	};
+	ctx.lineWidth = 0.5;
+	// Back to front: every block only hides blocks with smaller x, z or y.
+	for (let x = 0; x < n; x++) {
+		for (let z = 0; z < n; z++) {
+			for (let y = bottom; y <= highest; y++) {
+				const b = at(x, y, z);
+				if (empty(b)) continue;
+				const c = blockColor(palette[b]);
+				const above = y === highest || empty(at(x, y + 1, z));
+				const right = x === n - 1 || empty(at(x + 1, y, z));
+				const front = z === n - 1 || empty(at(x, y, z + 1));
+				if (above) face([px(x, y + 1, z), px(x + 1, y + 1, z), px(x + 1, y + 1, z + 1), px(x, y + 1, z + 1)], c, 1);
+				if (right) face([px(x + 1, y + 1, z), px(x + 1, y + 1, z + 1), px(x + 1, y, z + 1), px(x + 1, y, z)], c, 0.62);
+				if (front) face([px(x, y + 1, z + 1), px(x + 1, y + 1, z + 1), px(x + 1, y, z + 1), px(x, y, z + 1)], c, 0.8);
+			}
+		}
+	}
+	const pixels = new Uint8ClampedArray(ctx.getImageData(0, 0, width, height).data.buffer);
+	const values = new Float32Array(width * height).fill(NaN);
+	return { type: 'rendered', seq: req.seq, width, height, pixels, values, min: Infinity, max: -Infinity };
+}
+
 /**
  * Builds the chunk at the view's centre inside withVanilla, so entries the
  * surface rules reference are fetched before the full pass.
@@ -378,10 +561,12 @@ async function render(req: RenderRequest): Promise<PreviewResponse> {
 			rs,
 			biomeAt: (x, y, z) => dim.biomes.getBiome(x >> 2, y >> 2, z >> 2, rs.sampler)
 		};
-		return renderTerrain(req, await warm(terrain, terrainKey('')), terrainKey(''));
+		const key = terrainKey('');
+		await warm(terrain, key);
+		return req.mode === 'iso' ? renderIso(req, terrain, key) : renderTerrain(req, terrain, key);
 	}
 
-	if (req.kind === 'material_rule' || (req.kind === 'noise_settings' && req.mode === 'blocks')) {
+	if (req.kind === 'material_rule' || (req.kind === 'noise_settings' && req.mode !== 'density')) {
 		const key = terrainKey(`${req.options.terrain}|${fixedBiome}`);
 		const terrain = await withVanilla((): Terrain => {
 			const settingsId = req.kind === 'material_rule' ? Identifier.parse(req.options.terrain || 'minecraft:overworld') : id;
@@ -390,7 +575,8 @@ async function render(req: RenderRequest): Promise<PreviewResponse> {
 			const rs = new RandomState(settings, seed);
 			return { settings, rule, rs, biomeAt: () => fixedBiome };
 		});
-		return renderTerrain(req, await warm(terrain, key), key);
+		await warm(terrain, key);
+		return req.mode === 'iso' ? renderIso(req, terrain, key) : renderTerrain(req, terrain, key);
 	}
 
 	if (req.kind === 'noise') {

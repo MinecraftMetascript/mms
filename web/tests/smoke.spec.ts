@@ -107,6 +107,12 @@ test('dimensions, noise settings and surface rules preview as terrain', async ({
 	await expect(canvas).toBeVisible({ timeout: 30_000 });
 	await expect(failed).toBeHidden();
 
+	// The 3D toggle draws the same rule as an isometric diagram.
+	await page.getByRole('button', { name: '3D', exact: true }).click();
+	await expect(page.getByRole('button', { name: '3D', exact: true })).toHaveAttribute('aria-pressed', 'true');
+	await expect(canvas).toBeVisible({ timeout: 30_000 });
+	await expect(failed).toBeHidden();
+
 	// A rule that tests a biome through a named condition starts on that biome.
 	await page.getByRole('button', { name: /Project/ }).click();
 	await page.getByRole('button', { name: /badlands/ }).click();
