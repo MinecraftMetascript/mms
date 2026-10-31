@@ -94,9 +94,9 @@ scoreboard players set #is_prime.prime mms.adv 0
 scoreboard players set #cf mms.adv 1
 return 0
 === data/adv/function/is_prime/_while0.mcfunction
-scoreboard players operation #is_prime._t0 mms.adv = #is_prime.d mms.adv
-scoreboard players operation #is_prime._t0 mms.adv *= #is_prime.d mms.adv
-execute unless score #is_prime._t0 mms.adv <= #is_prime.n mms.adv run return 0
+scoreboard players operation #is_prime._t0 mms.adv = #is_prime.n mms.adv
+scoreboard players operation #is_prime._t0 mms.adv /= #is_prime.d mms.adv
+execute unless score #is_prime.d mms.adv <= #is_prime._t0 mms.adv run return 0
 scoreboard players operation #is_prime._t1 mms.adv = #is_prime.n mms.adv
 scoreboard players operation #is_prime._t1 mms.adv %= #is_prime.d mms.adv
 execute if score #is_prime._t1 mms.adv matches 0 run function adv:is_prime/_if1

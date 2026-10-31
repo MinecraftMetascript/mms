@@ -17,7 +17,7 @@
   }
 }
 === data/treasure/function/found_gem.mcfunction
-tellraw @s "You found your first gem. Craft a treasure compass to find more!"
+tellraw @s "You found your first gem. Four gems craft into a gem block!"
 execute if predicate treasure:stormy_night run loot give @s loot treasure:chests/storm_bonus
 === data/treasure/loot_table/chests/buried.json
 {
@@ -110,6 +110,20 @@ execute if predicate treasure:stormy_night run loot give @s loot treasure:chests
   "experience": 2,
   "cookingtime": 200
 }
+=== data/treasure/recipe/cheap_recovery_compass.json
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    " G ",
+    "GCG",
+    " G "
+  ],
+  "key": {
+    "G": "minecraft:gold_ingot",
+    "C": "minecraft:compass"
+  },
+  "result": "minecraft:recovery_compass"
+}
 === data/treasure/recipe/cut_bricks.json
 {
   "type": "minecraft:stonecutting",
@@ -151,20 +165,6 @@ execute if predicate treasure:stormy_night run loot give @s loot treasure:chests
   },
   "experience": 2,
   "cookingtime": 400
-}
-=== data/treasure/recipe/treasure_compass.json
-{
-  "type": "minecraft:crafting_shaped",
-  "pattern": [
-    " G ",
-    "GCG",
-    " G "
-  ],
-  "key": {
-    "G": "minecraft:gold_ingot",
-    "C": "minecraft:compass"
-  },
-  "result": "minecraft:recovery_compass"
 }
 === data/treasure/tags/block/chest_floors.json
 {

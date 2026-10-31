@@ -6,8 +6,8 @@ Recipe gem_block = Shaped(["GG", "GG"], { G = #gems }, emerald_block)
 /** Break a gem block back down. */
 Recipe gems_from_block = Shapeless([emerald_block], emerald * 4)
 
-/** A compass that points to treasure. */
-Recipe treasure_compass = Shaped(
+/** A cheaper recovery compass, which points to where you last died. */
+Recipe cheap_recovery_compass = Shaped(
   [" G ", "GCG", " G "],
   {
     G = gold_ingot

@@ -12,6 +12,6 @@ Advancement first_gem = {
 
 /** Runs as the player who earned first_gem. */
 Function found_gem {
-  /tellraw @s "You found your first gem. Craft a treasure compass to find more!"
+  /tellraw @s "You found your first gem. Four gems craft into a gem block!"
   /execute if predicate treasure:stormy_night run loot give @s loot treasure:chests/storm_bonus
 }

@@ -63,9 +63,9 @@ Replacing a vanilla resource like this is allowed. The editor notes that it happ
 
 ## Projects with several files
 
-A project is every `.mms` file under the folder that holds `mms.json`, including subfolders. The build output folder and folders starting with `.` are skipped. To limit the project to some files, list glob patterns in `sources` in `mms.json`, such as `["src/**/*.mms"]`.
+A project is every `.mms` file under the folder that holds `mms.json`, including subfolders. The build output folder, `node_modules` and any folder whose name starts with `.` are skipped, at any depth. To limit the project to some files, list glob patterns in `sources` in `mms.json`, such as `["src/**/*.mms"]`.
 
-- **One namespace of names.** A declaration in any file can be used from any other, and the order of files and declarations does not matter. Declaring the same id twice is an error that points to the other declaration.
+- **One namespace of names.** A declaration in any file can be used from any other, and the order of files and declarations does not matter. Declaring the same id twice for one kind is an error that points to the other declaration. Tags are the exception: declarations of the same tag merge, so a tag can be built up across files. Different kinds can share an id, such as a `Recipe` and a `LootTable` both named `gem_block`.
 - **Namespaces per file.** Each file starts in the namespace from `mms.json`. A `Namespace` line changes it for the rest of that file only.
 - **Folders are for you.** A file's folder does not change the ids it declares: `LootTable chests/buried` in `loot/chests.mms` is still `<namespace>:chests/buried`.
 - **Editors see the whole project.** The language server loads every project file, not only the open ones, so go-to-definition, references and rename work across files. The web editor's sidebar adds, renames and deletes files, and file names can include folders, such as `recipes/crafting.mms`.

@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 )
 
 // ConfigFile is the project file name.
@@ -91,7 +92,7 @@ func (c Config) SourceFiles(dir string) ([]string, error) {
 		rel, _ := filepath.Rel(dir, path)
 		rel = filepath.ToSlash(rel)
 		if d.IsDir() {
-			if rel != "." && (rel == c.Output || rel[0] == '.' || d.Name() == "node_modules") {
+			if rel != "." && (rel == c.Output || strings.HasPrefix(d.Name(), ".") || d.Name() == "node_modules") {
 				return filepath.SkipDir
 			}
 			return nil

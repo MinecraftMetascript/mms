@@ -25,7 +25,8 @@ Function is_prime(n: int): bool {
   }
   let d = 2
   let prime = true
-  while (d * d <= n) {
+  // d <= n / d rather than d * d <= n, which overflows for large n.
+  while (d <= n / d) {
     if (n % d == 0) {
       prime = false
       break

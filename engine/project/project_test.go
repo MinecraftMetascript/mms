@@ -249,3 +249,19 @@ FunctionTag hooks = [demo:b]
 		t.Errorf("diagnostics:\n%s\nwant:\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
 	}
 }
+
+// TestSourceFiles checks which files make up a project.
+func TestSourceFiles(t *testing.T) {
+	dir := t.TempDir()
+	for _, f := range []string{"a.mms", "src/b.mms", "src/.old/c.mms", ".git/d.mms", "build/e.mms", "web/node_modules/f.mms", "notes.txt"} {
+		os.MkdirAll(filepath.Join(dir, filepath.Dir(f)), 0o755)
+		os.WriteFile(filepath.Join(dir, f), nil, 0o644)
+	}
+	got, err := DefaultConfig().SourceFiles(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "a.mms src/b.mms"; strings.Join(got, " ") != want {
+		t.Errorf("SourceFiles = %v, want %s", got, want)
+	}
+}

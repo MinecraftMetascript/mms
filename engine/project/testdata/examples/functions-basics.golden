@@ -1,7 +1,7 @@
 === data/basics/function/mms_gen/load.mcfunction
-scoreboard objectives add kills playerKillCount
-scoreboard objectives add points dummy
-scoreboard objectives add online dummy
+scoreboard objectives add basics_kills playerKillCount
+scoreboard objectives add basics_points dummy
+scoreboard objectives add basics_online dummy
 scoreboard objectives add mms.basics dummy
 scoreboard players set #cf mms.basics 0
 scoreboard players set #c10 mms.basics 10
@@ -9,29 +9,39 @@ execute unless score $total_kills mms.basics = $total_kills mms.basics run score
 execute unless score $reward_every mms.basics = $reward_every mms.basics run scoreboard players set $reward_every mms.basics 5
 tellraw @a "Points game loaded"
 === data/basics/function/mms_gen/tick.mcfunction
-execute as @a[scores={kills=1..}] run function basics:on_kill
+execute as @a[scores={basics_kills=1..}] run function basics:on_kill
 === data/basics/function/on_kill.mcfunction
-scoreboard players operation $total_kills mms.basics += @s kills
-scoreboard players operation #on_kill._t0 mms.basics = @s kills
+scoreboard players operation #on_kill.before mms.basics = @s basics_points
+scoreboard players operation $total_kills mms.basics += @s basics_kills
+scoreboard players operation #on_kill._t0 mms.basics = @s basics_kills
 scoreboard players operation #on_kill._t0 mms.basics *= #c10 mms.basics
-scoreboard players operation @s points += #on_kill._t0 mms.basics
-scoreboard players set @s kills 0
-scoreboard players operation #on_kill._t1 mms.basics = $reward_every mms.basics
-scoreboard players operation #on_kill._t1 mms.basics *= #c10 mms.basics
-scoreboard players operation #on_kill._t2 mms.basics = @s points
-scoreboard players operation #on_kill._t2 mms.basics %= #on_kill._t1 mms.basics
-execute if score #on_kill._t2 mms.basics matches 0 run function basics:reward
+scoreboard players operation @s basics_points += #on_kill._t0 mms.basics
+scoreboard players set @s basics_kills 0
+scoreboard players operation #on_kill.step mms.basics = $reward_every mms.basics
+scoreboard players operation #on_kill.step mms.basics *= #c10 mms.basics
+scoreboard players operation #on_kill._t2 mms.basics = @s basics_points
+scoreboard players operation #on_kill._t2 mms.basics /= #on_kill.step mms.basics
+scoreboard players operation #on_kill._t3 mms.basics = #on_kill.before mms.basics
+scoreboard players operation #on_kill._t3 mms.basics /= #on_kill.step mms.basics
+scoreboard players operation #on_kill.rewards mms.basics = #on_kill._t2 mms.basics
+scoreboard players operation #on_kill.rewards mms.basics -= #on_kill._t3 mms.basics
+function basics:on_kill/_while0
+=== data/basics/function/on_kill/_while0.mcfunction
+execute unless score #on_kill.rewards mms.basics matches 1.. run return 0
+function basics:reward
+scoreboard players remove #on_kill.rewards mms.basics 1
+return run function basics:on_kill/_while0
 === data/basics/function/reward.mcfunction
 give @s diamond
-execute store result storage basics:mms m.a0 int 1 run scoreboard players get @s points
+execute store result storage basics:mms m.a0 int 1 run scoreboard players get @s basics_points
 function basics:reward/_macro0 with storage basics:mms m
 === data/basics/function/reward/_macro0.mcfunction
 $tellraw @s "Reward! You have $(a0) points"
 === data/basics/function/status.mcfunction
 scoreboard players set #status.i mms.basics 1
 function basics:status/_while0
-execute store result score #players online if entity @a
-scoreboard players operation #status.players mms.basics = #players online
+execute store result score #players basics_online if entity @a
+scoreboard players operation #status.players mms.basics = #players basics_online
 scoreboard players set #status.average mms.basics 0
 execute if score #status.players mms.basics matches 1.. run function basics:status/_if2
 execute store result storage basics:mms m.a0 int 1 run scoreboard players get $total_kills mms.basics

@@ -322,3 +322,28 @@ func TestWorkspaceFiles(t *testing.T) {
 		t.Errorf("rename changes = %v, want edits in both files", changes)
 	}
 }
+
+// TestURIs checks file URI handling, including Windows drives, which the
+// workspace scan and the client must spell the same way.
+func TestURIs(t *testing.T) {
+	for _, c := range []struct{ uri, path string }{
+		{"file:///home/me/a.mms", "/home/me/a.mms"},
+		{"file:///c%3A/Users/me/a.mms", filepath.FromSlash("c:/Users/me/a.mms")},
+		{"file:///C:/Users/me/a.mms", filepath.FromSlash("C:/Users/me/a.mms")},
+		{"mem:///a.mms", ""},
+	} {
+		if got := uriPath(c.uri); got != c.path {
+			t.Errorf("uriPath(%q) = %q, want %q", c.uri, got, c.path)
+		}
+	}
+	if got := pathURI("C:/Users/me/a.mms"); got != "file:///C:/Users/me/a.mms" {
+		t.Errorf("pathURI kept the drive as a host: %q", got)
+	}
+	// What VS Code sends and what the workspace scan builds become one key.
+	if a, b := canonURI("file:///c%3A/Users/me/a.mms"), pathURI(uriPath("file:///c%3A/Users/me/a.mms")); a != b {
+		t.Errorf("canonURI = %q, scan = %q", a, b)
+	}
+	if got := canonURI("mem:///a.mms"); got != "mem:///a.mms" {
+		t.Errorf("canonURI changed a mem URI: %q", got)
+	}
+}
