@@ -1,0 +1,36 @@
+name: engine
+
+on:
+  push:
+    branches: [main]
+    paths: ["engine/**", ".github/workflows/engine.yml"]
+  pull_request:
+    paths: ["engine/**", ".github/workflows/engine.yml"]
+
+defaults:
+  run:
+    working-directory: engine
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: engine/go.mod
+      - run: go vet ./...
+      - run: go test ./...
+      - name: WASM build
+        run: GOOS=js GOARCH=wasm go build -o mms.wasm ./cmd/mms-wasm && ls -l mms.wasm
+
+  spec-pack:
+    # The committed pack must match what specgen produces from the pinned inputs.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: engine/go.mod
+      - run: go run ./specgen
+      - run: git diff --exit-code -- spec/data
