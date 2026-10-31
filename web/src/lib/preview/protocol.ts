@@ -48,6 +48,10 @@ export interface PreviewFile {
 
 export type PreviewRequest =
 	| { type: 'setup'; files: PreviewFile[] }
+	/** Ports to helper workers that build chunks for the isometric view. */
+	| { type: 'helpers'; ports: MessagePort[] }
+	/** Makes this worker a helper, taking chunk jobs on the port. */
+	| { type: 'serve'; port: MessagePort }
 	| {
 			type: 'render';
 			seq: number;

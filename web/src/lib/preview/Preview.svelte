@@ -141,6 +141,7 @@
 		return () => {
 			ro.disconnect();
 			worker?.terminate();
+			for (const h of helpers) h.terminate();
 		};
 	});
 
@@ -190,6 +191,25 @@
 		request();
 	}
 
+	/**
+	 * Workers that build chunks for the 3D view in parallel, started the
+	 * first time it is shown and talking to the main worker directly.
+	 */
+	let helpers: Worker[] = [];
+	function startHelpers() {
+		if (helpers.length > 0 || !worker) return;
+		const count = Math.max(1, Math.min(6, (navigator.hardwareConcurrency || 4) - 1));
+		const ports: MessagePort[] = [];
+		for (let i = 0; i < count; i++) {
+			const helper = new Worker(new URL('./preview.worker.ts', import.meta.url), { type: 'module' });
+			const channel = new MessageChannel();
+			helper.postMessage({ type: 'serve', port: channel.port2 } satisfies PreviewRequest, [channel.port2]);
+			ports.push(channel.port1);
+			helpers.push(helper);
+		}
+		worker.postMessage({ type: 'helpers', ports } satisfies PreviewRequest, ports);
+	}
+
 	let pending = false;
 	function request() {
 		if (pending) return;
@@ -200,6 +220,7 @@
 			const width = Math.max(16, Math.floor(box.clientWidth / resolution));
 			const height = Math.max(16, Math.floor(box.clientHeight / resolution));
 			busy = true;
+			if (mode === 'iso') startHelpers();
 			worker.postMessage({
 				type: 'render',
 				seq: ++seq,
