@@ -52,7 +52,7 @@ export function showDiagnostics(view: EditorView, ds: Diagnostic[]) {
 		severity: severities[d.severity ?? 1] ?? 'error',
 		message: d.message,
 		source: d.code,
-		markClass: d.tags?.includes(1) ? 'cm-unnecessary' : undefined,
+		markClass: d.tags?.includes(1) ? 'cm-unnecessary' : d.tags?.includes(2) ? 'cm-deprecated' : undefined,
 		actions: actions(d.data?.fixes)
 	}));
 	view.dispatch(setDiagnostics(view.state, out));

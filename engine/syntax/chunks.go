@@ -141,7 +141,9 @@ func splitChunks(src []rune) []int {
 			}
 			j++
 		}
-		if comment && !content && topLevel {
+		// A line inside a block comment continues a run of comment lines
+		// but never starts one: the comment may have opened after code.
+		if comment && !content && depth == 0 && (topLevel || commentRun >= 0) {
 			if commentRun < 0 {
 				commentRun = lineStart
 			}

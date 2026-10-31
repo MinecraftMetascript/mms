@@ -19,6 +19,11 @@
 === data/treasure/function/found_gem.mcfunction
 tellraw @s "You found your first gem. Four gems craft into a gem block!"
 execute if predicate treasure:stormy_night run loot give @s loot treasure:chests/storm_bonus
+=== data/treasure/function/hide_chest.mcfunction
+execute if block ~ ~-1 ~ #treasure:chest_floors run setblock ~ ~ ~ chest{LootTable:"treasure:chests/buried"}
+execute unless block ~ ~-1 ~ #treasure:chest_floors run tellraw @s "Stand on logs, planks or stone bricks to hide a chest"
+=== data/treasure/function/preview_loot.mcfunction
+loot give @s loot treasure:chests/buried
 === data/treasure/loot_table/chests/buried.json
 {
   "pools": [
@@ -186,10 +191,130 @@ execute if predicate treasure:stormy_night run loot give @s loot treasure:chests
     }
   ]
 }
+=== data/treasure/tags/worldgen/biome/wreck_biomes.json
+{
+  "values": [
+    "minecraft:plains",
+    "minecraft:sunflower_plains",
+    "minecraft:savanna",
+    "minecraft:desert"
+  ]
+}
+=== data/treasure/worldgen/processor_list/wreck_loot.json
+{
+  "processors": [
+    {
+      "processor_type": "minecraft:rule",
+      "rules": [
+        {
+          "location_predicate": {
+            "predicate_type": "minecraft:always_true"
+          },
+          "input_predicate": {
+            "predicate_type": "minecraft:blockstate_match",
+            "block_state": {
+              "id": "minecraft:chest",
+              "properties": {
+                "facing": "west"
+              }
+            }
+          },
+          "output_state": {
+            "id": "minecraft:chest",
+            "properties": {
+              "facing": "west"
+            }
+          },
+          "block_entity_modifier": {
+            "type": "minecraft:append_loot",
+            "loot_table": "treasure:chests/buried"
+          }
+        },
+        {
+          "location_predicate": {
+            "predicate_type": "minecraft:always_true"
+          },
+          "input_predicate": {
+            "predicate_type": "minecraft:blockstate_match",
+            "block_state": {
+              "id": "minecraft:chest",
+              "properties": {
+                "facing": "north"
+              }
+            }
+          },
+          "output_state": {
+            "id": "minecraft:chest",
+            "properties": {
+              "facing": "north"
+            }
+          },
+          "block_entity_modifier": {
+            "type": "minecraft:append_loot",
+            "loot_table": "treasure:chests/buried"
+          }
+        }
+      ]
+    },
+    {
+      "processor_type": "minecraft:block_rot",
+      "integrity": 0.85,
+      "rottable_blocks": "#minecraft:planks"
+    }
+  ]
+}
+=== data/treasure/worldgen/structure/wreck.json
+{
+  "type": "minecraft:jigsaw",
+  "biomes": "#treasure:wreck_biomes",
+  "step": "surface_structures",
+  "spawn_overrides": {},
+  "start_pool": "treasure:wreck",
+  "size": 1,
+  "start_height": {
+    "type": "minecraft:constant",
+    "value": {
+      "absolute": -2
+    }
+  },
+  "project_start_to_heightmap": "WORLD_SURFACE_WG",
+  "max_distance_from_center": 80,
+  "use_expansion_hack": false
+}
+=== data/treasure/worldgen/structure_set/wreck.json
+{
+  "structures": [
+    {
+      "structure": "treasure:wreck",
+      "weight": 1
+    }
+  ],
+  "placement": {
+    "type": "minecraft:random_spread",
+    "salt": 20261031,
+    "spacing": 24,
+    "separation": 8
+  }
+}
+=== data/treasure/worldgen/template_pool/wreck.json
+{
+  "fallback": "minecraft:empty",
+  "elements": [
+    {
+      "weight": 1,
+      "element": {
+        "element_type": "minecraft:single_pool_element",
+        "projection": "rigid",
+        "location": "minecraft:shipwreck/rightsideup_backhalf",
+        "processors": "treasure:wreck_loot"
+      }
+    }
+  ]
+}
 === pack.mcmeta
 {
   "pack": {
-    "description": "Recipes, loot tables, tags, predicates and advancements, across folders",
+    "description": "Recipes, loot tables, tags, predicates, advancements and a structure, across folders",
     "min_format": 121,
     "max_format": 121
   }

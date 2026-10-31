@@ -173,6 +173,10 @@ body {
 	opacity: 0.55;
 	background: none;
 }
+/* Uses of @deprecated declarations are struck through. */
+.editor .cm-deprecated {
+	text-decoration: line-through;
+}
 .editor .cm-lintRange-hint {
 	background-image: none;
 	text-decoration: underline dotted color-mix(in oklab, var(--color-muted) 70%, transparent);
