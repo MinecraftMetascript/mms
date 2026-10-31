@@ -22,27 +22,58 @@ type Project struct {
 	Kinds  *sema.Kinds
 	Config Config
 
-	mu    sync.Mutex
-	files map[string]*sema.Unit
-	texts map[string]string
+	mu     sync.Mutex
+	files  map[string]*sema.Unit
+	texts  map[string]string
+	chunks map[string][]syntax.Chunk
+	// moved records declarations reparsed at a new offset since the last
+	// analysis, so their checked results can be carried over.
+	moved map[*syntax.Decl]syntax.Moved
 	last  *Result
 }
 
 // New returns an empty project.
 func New(pack *spec.Pack, cfg Config) *Project {
-	return &Project{Pack: pack, Kinds: sema.NewKinds(pack), Config: cfg, files: map[string]*sema.Unit{}, texts: map[string]string{}}
+	return &Project{Pack: pack, Kinds: sema.NewKinds(pack), Config: cfg, files: map[string]*sema.Unit{}, texts: map[string]string{},
+		chunks: map[string][]syntax.Chunk{}, moved: map[*syntax.Decl]syntax.Moved{}}
 }
 
-// SetFile adds or replaces a file. Unchanged text keeps the old parse, so
-// cached results for the file stay valid.
+// SetFile adds or replaces a file. Parsing is incremental: declarations
+// whose text did not change keep their parse, and their checked results
+// carry over to the next analysis.
 func (p *Project) SetFile(path, text string) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if old, ok := p.texts[path]; ok && old == text {
 		return
 	}
+	f, chunks, moved := syntax.Reparse(text, p.chunks[path])
+	for d, m := range moved {
+		// A declaration moved twice since the last analysis: chain the
+		// records back to the node the analysis knows.
+		if first, ok := p.moved[m.Old]; ok {
+			nodes := make(map[syntax.Node]syntax.Node, len(first.Nodes))
+			for oldest, mid := range first.Nodes {
+				if n, ok := m.Nodes[mid]; ok {
+					nodes[oldest] = n
+				}
+			}
+			moved[d] = syntax.Moved{Old: first.Old, Nodes: nodes, Delta: first.Delta + m.Delta}
+		}
+	}
+	for _, d := range f.Decls {
+		if m, ok := p.moved[d]; ok {
+			if _, again := moved[d]; !again {
+				moved[d] = m // reused in place after an earlier move
+			}
+		}
+	}
+	for d, m := range moved {
+		p.moved[d] = m
+	}
 	p.texts[path] = text
-	p.files[path] = &sema.Unit{Path: path, File: syntax.Parse(text)}
+	p.chunks[path] = chunks
+	p.files[path] = &sema.Unit{Path: path, File: f}
 }
 
 // RemoveFile drops a file.
@@ -51,6 +82,7 @@ func (p *Project) RemoveFile(path string) {
 	defer p.mu.Unlock()
 	delete(p.texts, path)
 	delete(p.files, path)
+	delete(p.chunks, path)
 }
 
 // Text returns a file's current text.
@@ -98,6 +130,8 @@ type Decl struct {
 	Lines []string    // function commands
 	Info  map[syntax.Node]*sema.Info
 	Diags []syntax.Diagnostic
+	// Deps are the symbol lookups the check made (see sema.DepsHold).
+	Deps map[string]bool
 }
 
 // ID returns "ns:path" for a named declaration.
@@ -154,7 +188,9 @@ func (r *Result) HasErrors() bool {
 // Analyze checks the whole project. Declarations in files whose text did
 // not change since the last analysis reuse their results, as long as the
 // set of declared names is the same: checking a declaration depends only
-// on its own text, its namespace and which names exist.
+// on its own text, its namespace and which names exist; when the names
+// change, results are kept for declarations whose lookups still resolve
+// the same way.
 func (p *Project) Analyze(ctx context.Context) (*Result, error) {
 	p.mu.Lock()
 	units := make([]*sema.Unit, 0, len(p.files))
@@ -162,13 +198,17 @@ func (p *Project) Analyze(ctx context.Context) (*Result, error) {
 		units = append(units, u)
 	}
 	prev := p.last
+	// Move records point at nodes of the previous analysis; edits from
+	// now on are recorded relative to this one.
+	moved := p.moved
+	p.moved = map[*syntax.Decl]syntax.Moved{}
 	p.mu.Unlock()
 	sort.Slice(units, func(i, j int) bool { return units[i].Path < units[j].Path })
 
 	syms, collect := sema.Collect(units, p.Kinds, p.Config.Namespace)
 	r := &Result{Syms: syms, Units: units, Decls: map[*syntax.Decl]*Decl{}, collect: collect, pack: p.Pack, cfg: p.Config}
 	r.symKey = symbolKey(syms)
-	reuse := prev != nil && prev.symKey == r.symKey
+	sameSyms := prev != nil && prev.symKey == r.symKey
 	for _, u := range units {
 		for _, d := range u.File.Decls {
 			if err := ctx.Err(); err != nil {
@@ -179,8 +219,13 @@ func (p *Project) Analyze(ctx context.Context) (*Result, error) {
 				continue
 			}
 			var dr *Decl
-			if reuse {
-				dr = prev.Decls[d]
+			if prev != nil {
+				dr = prev.reuse(u, d, syms.DeclNS[d], moved)
+				// With different declared names, a result still holds if
+				// every name it looked up resolves the same way.
+				if dr != nil && !sameSyms && (dr.Deps == nil || !sema.DepsHold(syms, dr.Deps)) {
+					dr = nil
+				}
 			}
 			if dr == nil {
 				dr = p.checkDecl(u, d, k, syms)
@@ -193,6 +238,42 @@ func (p *Project) Analyze(ctx context.Context) (*Result, error) {
 	p.last = r
 	p.mu.Unlock()
 	return r, nil
+}
+
+// reuse returns d's result from this (previous) analysis, if d was not
+// changed: the same node, or a node reparsed at a new offset from
+// unchanged text, whose Info and diagnostics are moved over.
+func (r *Result) reuse(u *sema.Unit, d *syntax.Decl, ns string, moved map[*syntax.Decl]syntax.Moved) *Decl {
+	if old := r.Decls[d]; old != nil && old.NS == ns {
+		if old.Unit == u {
+			return old
+		}
+		cp := *old
+		cp.Unit = u
+		return &cp
+	}
+	m, ok := moved[d]
+	if !ok {
+		return nil
+	}
+	old := r.Decls[m.Old]
+	if old == nil || old.NS != ns {
+		return nil
+	}
+	cp := *old
+	cp.Unit, cp.D = u, d
+	cp.Info = make(map[syntax.Node]*sema.Info, len(old.Info))
+	for n, in := range old.Info {
+		if nn, ok := m.Nodes[n]; ok {
+			cp.Info[nn] = in
+		}
+	}
+	cp.Diags = make([]syntax.Diagnostic, len(old.Diags))
+	for i, dg := range old.Diags {
+		dg.Sp = syntax.Span{Start: dg.Sp.Start + m.Delta, End: dg.Sp.End + m.Delta}
+		cp.Diags[i] = dg
+	}
+	return &cp
 }
 
 // symbolKey fingerprints the declared names and declaration namespaces.
@@ -244,6 +325,7 @@ func (p *Project) checkDecl(u *sema.Unit, d *syntax.Decl, k sema.Kind, syms *sem
 	}
 	dr.Info = c.Info
 	dr.Diags = c.Diags
+	dr.Deps = c.Deps
 	// Re-validate lowered output: a value that passed the checker but not
 	// the schema means a lowering bug, reported as an internal error
 	// rather than written as bad JSON.

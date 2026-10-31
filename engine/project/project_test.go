@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/minecraftmetascript/mms/engine/jsonv"
 	"github.com/minecraftmetascript/mms/engine/spec"
 )
 
@@ -91,11 +92,20 @@ func TestCachingAndDeterminism(t *testing.T) {
 	if r1.Order[1] == r2.Order[1] {
 		t.Error("b was not re-checked after its text changed")
 	}
-	// Adding a name invalidates everything: resolution may change.
+	// Adding a name a does not look up keeps a's result.
 	p.SetFile("c.mms", "Namespace demo\nDensityFunction c = 1\n")
 	r3, _ := p.Analyze(context.Background())
-	if r2.Order[0] == r3.Order[0] {
-		t.Error("a kept its result although the set of names changed")
+	if r2.Order[0] != r3.Order[0] {
+		t.Error("a was re-checked although no name it uses changed")
+	}
+	// Declaring demo:continentalness changes what a's noise resolves to.
+	p.SetFile("c.mms", "Namespace demo\nNoise continentalness = { base_octave = -1, amplitude_modifiers = [1] }\n")
+	r3b, _ := p.Analyze(context.Background())
+	if r3.Order[0] == r3b.Order[0] {
+		t.Error("a kept its result although a name it uses was declared")
+	}
+	if !strings.Contains(string(jsonv.Compact(r3b.Order[0].Value)), "demo:continentalness") {
+		t.Errorf("a = %s", jsonv.Compact(r3b.Order[0].Value))
 	}
 
 	p.SetFile("b.mms", "Namespace demo\nDensityFunction b = a + 1\n")
@@ -147,6 +157,55 @@ DensityFunction dup = 2
 	} {
 		if !strings.Contains(got, want) {
 			t.Errorf("missing %q in output:\n%s", want, got)
+		}
+	}
+}
+
+// TestIncrementalMatchesFresh applies a series of edits and checks that
+// the incrementally analysed project reports exactly what a fresh one does.
+func TestIncrementalMatchesFresh(t *testing.T) {
+	base, err := os.ReadFile("../sema/testdata/density.mms")
+	if err != nil {
+		t.Fatal(err)
+	}
+	src := string(base)
+	edits := []func(string) string{
+		func(s string) string { return "// top\n" + s },
+		func(s string) string { return strings.Replace(s, "Clmp", "Clamp", 1) },
+		func(s string) string { return s + "\nNoise extra = { base_octave = -2, amplitude_modifiers = [1] }\n" },
+		func(s string) string { return strings.Replace(s, "// top\n", "", 1) },
+		func(s string) string { return strings.Replace(s, "Namespace example", "Namespace other", 1) },
+		func(s string) string {
+			return "Noise continentalness = { base_octave = -1, amplitude_modifiers = [1] }\n" + s
+		},
+	}
+	p := New(spec.MustDefault(), DefaultConfig())
+	p.SetFile("main.mms", src)
+	p.Analyze(context.Background())
+	describe := func(r *Result) string {
+		var sb strings.Builder
+		for _, d := range r.Diagnostics("main.mms") {
+			fmt.Fprintf(&sb, "%v %s %s\n", d.Sp, d.Code, d.Message)
+		}
+		sb.WriteString(dumpFiles(r.Emit()))
+		for _, d := range r.Order {
+			for n := range d.Info {
+				if !d.D.Sp.Contains(n.Span().Start) {
+					fmt.Fprintf(&sb, "stale info node %T at %v outside %v\n", n, n.Span(), d.D.Sp)
+				}
+			}
+		}
+		return sb.String()
+	}
+	for i, edit := range edits {
+		src = edit(src)
+		p.SetFile("main.mms", src)
+		got, _ := p.Analyze(context.Background())
+		fresh := New(spec.MustDefault(), DefaultConfig())
+		fresh.SetFile("main.mms", src)
+		want, _ := fresh.Analyze(context.Background())
+		if g, w := describe(got), describe(want); g != w {
+			t.Errorf("edit %d: incremental result differs\n--- incremental\n%s\n--- fresh\n%s", i, g, w)
 		}
 	}
 }

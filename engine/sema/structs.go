@@ -388,7 +388,7 @@ func (c *Checker) callStruct(e syntax.Expr, v tview) jsonv.Value {
 	in := c.info(name)
 	in.Callable, in.Type = cl, v
 	ci := c.info(base)
-	ci.Callable, ci.Fields, ci.Disp, ci.Type = cl, cl.Fields, cl.Disp, v
+	ci.Callable, ci.Fields, ci.Disp = cl, cl.Fields, cl.Disp
 
 	var as []assign
 	slots := c.positional(cl)

@@ -39,6 +39,15 @@ func key(folder, id string) string { return folder + "|" + id }
 // Find returns the symbol of a resource folder ("worldgen/noise") and id.
 func (t *Table) Find(folder, id string) *Symbol { return t.byKey[key(folder, id)] }
 
+func (t *Table) hasNamespace(ns string) bool {
+	for _, s := range t.all {
+		if s.NS == ns {
+			return true
+		}
+	}
+	return false
+}
+
 // All returns every symbol in declaration order.
 func (t *Table) All() []*Symbol { return t.all }
 

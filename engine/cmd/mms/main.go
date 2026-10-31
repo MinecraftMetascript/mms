@@ -13,6 +13,7 @@ commands:
   check   check the project and report problems
   fmt     format .mms files
   init    create mms.json and a starter file
+  lsp     run the language server over stdio
 `
 
 func main() {
@@ -30,6 +31,8 @@ func main() {
 		code = runInit(os.Args[2:], os.Stdout, os.Stderr)
 	case "fmt":
 		code = runFmt(os.Args[2:], os.Stdin, os.Stdout, os.Stderr)
+	case "lsp":
+		code = runLSP(os.Args[2:], os.Stdin, os.Stdout, os.Stderr)
 	case "help", "-h", "--help":
 		fmt.Print(usage)
 	default:

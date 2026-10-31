@@ -20,6 +20,8 @@ type Info struct {
 	Fields   []field // for object bodies and calls: every field in scope
 	Disp     *dispInfo
 	Callable *Callable
+
+	typed bool
 }
 
 // Callable is a resolved call: which struct (and dispatch case) it builds.
@@ -43,6 +45,9 @@ type Checker struct {
 	// Info is filled unless the checker is running a trial for union
 	// narrowing.
 	Info map[syntax.Node]*Info
+	// Deps records every symbol lookup and its outcome, so a cached
+	// result can be reused while the outcomes stay the same.
+	Deps map[string]bool
 
 	trial  bool
 	errs   int
@@ -59,7 +64,34 @@ type memoKey struct {
 
 // NewChecker returns a checker for declarations in namespace ns.
 func NewChecker(p *spec.Pack, kinds *Kinds, syms *Table, ns string) *Checker {
-	return &Checker{Pack: p, Kinds: kinds, Syms: syms, NS: ns, Info: map[syntax.Node]*Info{}, memo: map[memoKey]int{}}
+	return &Checker{Pack: p, Kinds: kinds, Syms: syms, NS: ns, Info: map[syntax.Node]*Info{}, Deps: map[string]bool{}, memo: map[memoKey]int{}}
+}
+
+// find looks up a symbol, recording the lookup in Deps.
+func (c *Checker) find(folder, id string) *Symbol {
+	s := c.Syms.Find(folder, id)
+	if c.Deps != nil {
+		c.Deps["f|"+folder+"|"+id] = s != nil
+	}
+	return s
+}
+
+// DepsHold reports whether every lookup in deps has the same outcome in t.
+func DepsHold(t *Table, deps map[string]bool) bool {
+	for k, found := range deps {
+		var now bool
+		if ns, ok := strings.CutPrefix(k, "n|"); ok {
+			now = t.hasNamespace(ns)
+		} else {
+			rest := k[2:]
+			i := strings.IndexByte(rest, '|')
+			now = t.Find(rest[:i], rest[i+1:]) != nil
+		}
+		if now != found {
+			return false
+		}
+	}
+	return true
 }
 
 func (c *Checker) errorf(code string, sp syntax.Span, format string, args ...any) {
@@ -119,7 +151,11 @@ func (c *Checker) check(e syntax.Expr, v tview) jsonv.Value {
 	}
 	v = c.norm(v)
 	in := c.info(e)
-	in.Type = v
+	// Keep the outermost expected type: completion should offer every
+	// member of a union, not just the one narrowing picked.
+	if !in.typed {
+		in.Type, in.typed = v, true
+	}
 	if p, ok := e.(*syntax.Paren); ok {
 		return c.check(p.X, v)
 	}
@@ -304,7 +340,7 @@ func (c *Checker) trialErrors(e syntax.Expr, v tview) int {
 	if n, ok := root.memo[k]; ok {
 		return n
 	}
-	t := &Checker{Pack: c.Pack, Kinds: c.Kinds, Syms: c.Syms, NS: c.NS, trial: true, depth: c.depth, parent: root}
+	t := &Checker{Pack: c.Pack, Kinds: c.Kinds, Syms: c.Syms, NS: c.NS, trial: true, depth: c.depth, parent: root, Deps: c.Deps}
 	t.check(e, v)
 	root.memo[k] = t.errs
 	return t.errs
@@ -659,7 +695,7 @@ func (c *Checker) resolveID(text string, id idInfo, e syntax.Expr) string {
 	var sym *Symbol
 	if ns == "" {
 		if reg != "" {
-			sym = c.Syms.Find(reg, c.NS+":"+path)
+			sym = c.find(reg, c.NS+":"+path)
 		}
 		if sym != nil {
 			ns = c.NS
@@ -667,7 +703,7 @@ func (c *Checker) resolveID(text string, id idInfo, e syntax.Expr) string {
 			ns = "minecraft"
 		}
 	} else if reg != "" {
-		sym = c.Syms.Find(reg, ns+":"+path)
+		sym = c.find(reg, ns+":"+path)
 	}
 	full := ns + ":" + path
 	in := c.info(e)
@@ -697,14 +733,14 @@ func (c *Checker) resolveTag(text string, id idInfo, e syntax.Expr) string {
 	ns, path := splitID(text)
 	var sym *Symbol
 	if ns == "" {
-		sym = c.Syms.Find("tags/"+reg, c.NS+":"+path)
+		sym = c.find("tags/"+reg, c.NS+":"+path)
 		if sym != nil {
 			ns = c.NS
 		} else {
 			ns = "minecraft"
 		}
 	} else {
-		sym = c.Syms.Find("tags/"+reg, ns+":"+path)
+		sym = c.find("tags/"+reg, ns+":"+path)
 	}
 	full := ns + ":" + path
 	in := c.info(e)
@@ -724,12 +760,11 @@ func (c *Checker) declaresNamespace(ns string) bool {
 	if ns == c.NS {
 		return true
 	}
-	for _, s := range c.Syms.All() {
-		if s.NS == ns {
-			return true
-		}
+	has := c.Syms.hasNamespace(ns)
+	if c.Deps != nil {
+		c.Deps["n|"+ns] = has
 	}
-	return false
+	return has
 }
 
 func contains(xs []string, x string) bool {
