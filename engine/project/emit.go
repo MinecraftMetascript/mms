@@ -60,8 +60,15 @@ func (r *Result) Emit() []OutFile {
 	}
 	objectives := map[string][]string{}
 	globals := map[string][]string{}
-	load := map[string][]string{}
-	tick := map[string][]string{}
+	// hooks holds each namespace's lines for the generated hook
+	// functions, by hook: "load", "tick", "first_join", "respawn".
+	hooks := map[string]map[string][]string{}
+	hook := func(name, ns string, ls []string) {
+		if hooks[name] == nil {
+			hooks[name] = map[string][]string{}
+		}
+		hooks[name][ns] = append(hooks[name][ns], ls...)
+	}
 	consts := map[string]map[int32]bool{}
 	ret := map[string]bool{}
 	used := map[string]bool{} // namespaces whose objective the code uses
@@ -106,13 +113,16 @@ func (r *Result) Emit() []OutFile {
 				f.Pack = sema.ResourcePack
 			}
 			out = append(out, f)
+		case d.Kind.MMS == "OnAdvancement":
+			if d.Fn == nil || d.Value == nil {
+				continue
+			}
+			addFn(d)
+			out = append(out, OutFile{Path: "data/" + ns + "/advancement/" + path + ".json", Data: jsonv.Marshal(d.Value), Unit: d.Unit.Path, Span: d.D.Sp})
 		case d.Fn != nil:
 			addFn(d)
-			switch d.Kind.MMS {
-			case "OnLoad":
-				load[d.NS] = append(load[d.NS], d.Lines...)
-			case "OnTick":
-				tick[d.NS] = append(tick[d.NS], d.Lines...)
+			if h := sema.HookKinds[d.Kind.MMS]; h != "" {
+				hook(h, d.NS, d.Lines)
 			}
 		case d.Kind.MMS == "Objective":
 			objectives[d.NS] = append(objectives[d.NS], d.Lines...)
@@ -123,18 +133,27 @@ func (r *Result) Emit() []OutFile {
 			}
 			globals[gns] = append(globals[gns], d.Lines...)
 			used[gns] = true
-		case d.Kind.MMS == "OnLoad":
-			load[d.NS] = append(load[d.NS], d.Lines...)
-			markUsed(used, d.Lines)
-		case d.Kind.MMS == "OnTick":
-			tick[d.NS] = append(tick[d.NS], d.Lines...)
+		case sema.HookKinds[d.Kind.MMS] != "":
+			hook(sema.HookKinds[d.Kind.MMS], d.NS, d.Lines)
 			markUsed(used, d.Lines)
 		}
+	}
+	// OnFirstJoin runs from an advancement's reward; OnRespawn from the
+	// tick function, for players whose deathCount score is set and who
+	// are alive again (@e skips dead players). Both run at the player.
+	for ns := range hooks["first_join"] {
+		out = append(out, OutFile{Path: "data/" + ns + "/advancement/mms_gen/first_join.json", Data: jsonv.Marshal(sema.FirstJoinAdvancement(ns))})
+	}
+	for ns, ls := range hooks["respawn"] {
+		obj := sema.RespawnObjective(ns)
+		objectives[ns] = append(objectives[ns], "scoreboard objectives add "+obj+" deathCount")
+		hooks["respawn"][ns] = append([]string{"scoreboard players reset @s " + obj}, ls...)
+		hook("tick", ns, []string{"execute as @e[type=player,scores={" + obj + "=1..}] at @s run function " + ns + ":mms_gen/respawn"})
 	}
 	// The load function sets up objectives first, then the backend's
 	// objective and constants, then globals, then OnLoad bodies.
 	nss := map[string]bool{}
-	for _, m := range []map[string][]string{objectives, globals, load} {
+	for _, m := range []map[string][]string{objectives, globals, hooks["load"]} {
 		for ns := range m {
 			nss[ns] = true
 		}
@@ -152,18 +171,18 @@ func (r *Result) Emit() []OutFile {
 			ls = append(ls, fn.Setup(ns, consts[ns])...)
 		}
 		ls = append(ls, globals[ns]...)
-		ls = append(ls, load[ns]...)
+		ls = append(ls, hooks["load"][ns]...)
 		if len(ls) > 0 {
 			fullLoad[ns] = ls
 		}
 	}
-	for _, gen := range []struct {
-		name string
-		fns  map[string][]string
-	}{{"load", fullLoad}, {"tick", tick}} {
-		for ns, ls := range gen.fns {
-			out = append(out, OutFile{Path: "data/" + ns + "/function/mms_gen/" + gen.name + ".mcfunction", Data: lines(ls)})
-			addTag("data/minecraft/tags/function/"+gen.name+".json", jsonv.Array{jsonv.String(ns + ":mms_gen/" + gen.name)}, nil)
+	hooks["load"] = fullLoad
+	for _, name := range []string{"load", "tick", "first_join", "respawn"} {
+		for ns, ls := range hooks[name] {
+			out = append(out, OutFile{Path: "data/" + ns + "/function/mms_gen/" + name + ".mcfunction", Data: lines(ls)})
+			if name == "load" || name == "tick" {
+				addTag("data/minecraft/tags/function/"+name+".json", jsonv.Array{jsonv.String(ns + ":mms_gen/" + name)}, nil)
+			}
 		}
 	}
 	for path, t := range tags {

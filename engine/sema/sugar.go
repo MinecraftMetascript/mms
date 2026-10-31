@@ -313,13 +313,29 @@ func criterionCall(c *Checker, e syntax.Expr, v tview) jsonv.Value {
 		}
 		cond.Items = append(cond.Items, &syntax.FieldStmt{Key: a.Name, Value: a.Value, Sp: a.Sp})
 	}
-	var conditions syntax.Expr
-	if len(cond.Items) > 0 {
-		conditions = &syntax.Object{Body: cond, Sp: call.ArgsSp}
-	}
+	// The conditions are checked even when there are none, so that the
+	// call records their fields for completion; an empty object is then
+	// left out.
+	conditions := &syntax.Object{Body: cond, Sp: call.ArgsSp}
 	in := c.info(name)
 	in.Type = v
-	return c.check(mkObject(call.Sp, "trigger", &syntax.Ident{Name: Snake(name.Name), Sp: name.Sp}, "conditions", conditions), v)
+	out := c.check(mkObject(call.Sp, "trigger", &syntax.Ident{Name: Snake(name.Name), Sp: name.Sp}, "conditions", conditions), v)
+	if ci := c.Info[cond]; ci != nil {
+		callIn := c.info(call)
+		callIn.Fields, callIn.Disp = ci.Fields, ci.Disp
+	}
+	if o, ok := out.(*jsonv.Object); ok && len(cond.Items) == 0 {
+		if co, ok := o.Get("conditions").(*jsonv.Object); ok && len(co.Members) == 0 {
+			kept := o.Members[:0]
+			for _, m := range o.Members {
+				if m.Key != "conditions" {
+					kept = append(kept, m)
+				}
+			}
+			o.Members = kept
+		}
+	}
+	return out
 }
 
 func mkCall(name string, sp syntax.Span, args ...syntax.Expr) *syntax.Call {

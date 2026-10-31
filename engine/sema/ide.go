@@ -351,6 +351,8 @@ func (c *Checker) Hover(in *Info) string {
 	}
 	var parts []string
 	switch {
+	case in.Help != "":
+		parts = append(parts, in.Help)
 	case in.Callable != nil:
 		parts = append(parts, c.helperHover(in.Callable))
 	case in.Field != nil:
@@ -477,9 +479,12 @@ func (k *Kinds) DeclKinds() []Candidate {
 		switch {
 		case name == "Namespace":
 			cand.Insert, cand.Detail = "Namespace ${1:name}", "sets the namespace for the rest of the file"
-		case name == "OnLoad" || name == "OnTick":
+		case HookKinds[name] != "":
 			cand.Insert = name + " {\n\t$0\n}"
-			cand.Detail = "runs on " + strings.ToLower(strings.TrimPrefix(name, "On"))
+			cand.Detail = "runs on " + strings.ReplaceAll(HookKinds[name], "_", " ")
+		case name == "OnAdvancement":
+			cand.Insert = "OnAdvancement ${1:name} = ${2:Tick}($3) {\n\t$0\n}"
+			cand.Detail = "runs when a player earns an advancement"
 		case name == "Function":
 			cand.Insert = "Function ${1:name} {\n\t$0\n}"
 		case name == "Objective":

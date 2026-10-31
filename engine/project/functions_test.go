@@ -404,3 +404,164 @@ func TestExampleFunctions(t *testing.T) {
 		t.Errorf("said:\n%s\nwant:\n%s", strings.Join(vm.Said, "\n"), strings.Join(want, "\n"))
 	}
 }
+
+// TestExecuteBlocks checks execute blocks: inline for one command, a
+// sub-function otherwise, with the chain written as the source has it.
+func TestExecuteBlocks(t *testing.T) {
+	p := New(spec.MustDefault(), Config{Namespace: "demo"})
+	p.SetFile("main.mms", `
+Objective hits
+Function f {
+  let n = 0
+  As(@e[tag=tower, distance=..5]).At(@s) {
+    /particle minecraft:flame ~ ~1 ~
+    n += 1
+    hits[@s] = n
+  }
+  Positioned(~ ~1 ~) {
+    /say one
+  }
+  Positioned(@p).Rotated(90, 0) {
+    /say two
+  }
+  Facing(@p) {
+    /tp @s ^ ^ ^1
+  }
+  Execute("if entity @e[tag=boss]").In(the_nether) {
+    if (n > 2) {
+      /say boss
+    }
+  }
+  As(@a) {
+    let i = 0
+    while (i < 3) {
+      i += 1
+      if (i == 2) {
+        break
+      }
+    }
+  }
+}
+`)
+	r, _ := p.Analyze(context.Background())
+	for _, d := range r.Diagnostics("main.mms") {
+		if d.Severity == syntax.SeverityError {
+			t.Fatalf("%s: %s", d.Code, d.Message)
+		}
+	}
+	got := dumpFiles(r.Emit())
+	for _, want := range []string{
+		"execute as @e[tag=tower, distance=..5] at @s run function demo:f/_exec0\n",
+		"=== data/demo/function/f/_exec0.mcfunction\nparticle minecraft:flame ~ ~1 ~\nscoreboard players add #f.n mms.demo 1\nscoreboard players operation @s hits = #f.n mms.demo\n",
+		"execute positioned ~ ~1 ~ run say one\n",
+		"execute positioned as @p rotated 90 0 run say two\n",
+		"execute facing entity @p eyes run tp @s ^ ^ ^1\n",
+		"execute if entity @e[tag=boss] in the_nether run function demo:f/_exec1\n",
+		"=== data/demo/function/f/_exec1.mcfunction\nexecute if score #f.n mms.demo matches 3.. run say boss\n",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("missing %q in:\n%s", want, got)
+		}
+	}
+}
+
+func TestExecuteErrors(t *testing.T) {
+	cases := map[string]string{
+		"Function f {\n  As(@q) {\n    /say hi\n  }\n}":                            "mms/command",
+		"Function f {\n  Ass(@a) {\n    /say hi\n  }\n}":                           "mms/unknown-helper",
+		"Function f {\n  As(@a).Att(@s) {\n    /say hi\n  }\n}":                    "mms/unknown-helper",
+		"Function f {\n  As() {\n    /say hi\n  }\n}":                              "mms/missing-value",
+		"Function f {\n  As(@a)\n}":                                                "mms/missing-value",
+		"Function f(): int {\n  As(@a) {\n    return 1\n  }\n  return 0\n}":        "mms/misplaced",
+		"Function f {\n  while (true) {\n    As(@a) {\n      break\n    }\n  }\n}": "mms/misplaced",
+		"Function f {\n  In(\"${x}\") {\n    /say hi\n  }\n}":                      "mms/unsupported",
+	}
+	for src, want := range cases {
+		p := New(spec.MustDefault(), Config{Namespace: "demo"})
+		p.SetFile("main.mms", src)
+		r, _ := p.Analyze(context.Background())
+		var codes []string
+		for _, d := range r.Diagnostics("main.mms") {
+			if d.Severity == syntax.SeverityError {
+				codes = append(codes, d.Code)
+			}
+		}
+		if len(codes) == 0 || codes[0] != want {
+			t.Errorf("%q: errors %v, want %s", src, codes, want)
+		}
+	}
+	// A command error inside a helper's argument points at the argument.
+	src := "Function f {\n  As(@e[tag=a, bogus=1]) {\n    /say hi\n  }\n}"
+	p := New(spec.MustDefault(), Config{Namespace: "demo"})
+	p.SetFile("main.mms", src)
+	r, _ := p.Analyze(context.Background())
+	ds := r.Diagnostics("main.mms")
+	if len(ds) == 0 {
+		t.Fatal("no diagnostics")
+	}
+	arg := strings.Index(src, "@e")
+	if ds[0].Sp.Start < arg || ds[0].Sp.End > strings.Index(src, ") {") {
+		t.Errorf("error at %v (%q), want inside the selector", ds[0].Sp, src[ds[0].Sp.Start:ds[0].Sp.End])
+	}
+}
+
+// TestEventHooks checks OnAdvancement, OnFirstJoin and OnRespawn output.
+func TestEventHooks(t *testing.T) {
+	p := New(spec.MustDefault(), Config{Namespace: "demo"})
+	p.SetFile("main.mms", `
+Objective kills
+OnAdvancement killed = PlayerKilledEntity() {
+  kills[@s] += 1
+}
+OnFirstJoin {
+  /give @s minecraft:bread 4
+}
+OnRespawn {
+  /effect give @s minecraft:regeneration 5
+}
+Function grant {
+  /advancement grant @s only demo:killed
+}
+`)
+	r, _ := p.Analyze(context.Background())
+	for _, d := range r.Diagnostics("main.mms") {
+		if d.Severity == syntax.SeverityError {
+			t.Fatalf("%s: %s", d.Code, d.Message)
+		}
+	}
+	got := dumpFiles(r.Emit())
+	for _, want := range []string{
+		"=== data/demo/advancement/killed.json\n{\n  \"criteria\": {\n    \"event\": {\n      \"trigger\": \"minecraft:player_killed_entity\"\n    }\n  },\n  \"rewards\": {\n    \"function\": \"demo:mms_gen/advancement/killed\"\n  }\n}\n",
+		"=== data/demo/function/mms_gen/advancement/killed.mcfunction\nadvancement revoke @s only demo:killed\nscoreboard players add @s kills 1\n",
+		"=== data/demo/advancement/mms_gen/first_join.json\n{\n  \"criteria\": {\n    \"join\": {\n      \"trigger\": \"minecraft:tick\"\n    }\n  },\n  \"rewards\": {\n    \"function\": \"demo:mms_gen/first_join\"\n  }\n}\n",
+		"=== data/demo/function/mms_gen/first_join.mcfunction\ngive @s minecraft:bread 4\n",
+		"scoreboard objectives add mms_respawn.demo deathCount\n",
+		"=== data/demo/function/mms_gen/respawn.mcfunction\nscoreboard players reset @s mms_respawn.demo\neffect give @s minecraft:regeneration 5\n",
+		"=== data/demo/function/mms_gen/tick.mcfunction\nexecute as @e[type=player,scores={mms_respawn.demo=1..}] at @s run function demo:mms_gen/respawn\n",
+		"\"demo:mms_gen/tick\"",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("missing %q in:\n%s", want, got)
+		}
+	}
+
+	errs := map[string]string{
+		"OnAdvancement a {\n  /say hi\n}": "mms/missing-value",
+		"OnAdvancement a = Tick()":        "mms/missing-value",
+		"Advancement a = { criteria = { x = Tick() } }\nOnAdvancement a = Tick() {\n  /say hi\n}": "mms/duplicate",
+	}
+	for src, want := range errs {
+		p := New(spec.MustDefault(), Config{Namespace: "demo"})
+		p.SetFile("main.mms", src)
+		r, _ := p.Analyze(context.Background())
+		var codes []string
+		for _, d := range r.Diagnostics("main.mms") {
+			if d.Severity == syntax.SeverityError {
+				codes = append(codes, d.Code)
+			}
+		}
+		if len(codes) == 0 || codes[0] != want {
+			t.Errorf("%q: errors %v, want %s", src, codes, want)
+		}
+	}
+}

@@ -154,6 +154,12 @@ func (g *gen) op(fr *frame, op Op) []string {
 		return g.ifOp(fr, o)
 	case Loop:
 		return g.loop(fr, o)
+	case Exec:
+		if o.Body == nil || len(o.Body.Ops) == 0 {
+			return nil
+		}
+		cmd, after := g.run(fr, o.Body, "exec")
+		return append([]string{chain(o.Parts, cmd)}, after...)
 	}
 	panic(fmt.Sprintf("fn: unknown op %T", op))
 }

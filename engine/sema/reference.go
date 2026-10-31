@@ -60,12 +60,15 @@ type RefParam struct {
 }
 
 var mmsKindDocs = map[string]string{
-	"Namespace": "Sets the namespace for the declarations after it in the file.",
-	"Function":  "A function: commands, variables and control flow, compiled to .mcfunction files.",
-	"Objective": "A scoreboard objective, created by the generated load function.",
-	"Global":    "A value for the whole pack, set when the pack first loads.",
-	"OnLoad":    "Code that runs when the pack loads, from #minecraft:load.",
-	"OnTick":    "Code that runs every tick, from #minecraft:tick.",
+	"Namespace":     "Sets the namespace for the declarations after it in the file.",
+	"Function":      "A function: commands, variables and control flow, compiled to .mcfunction files.",
+	"Objective":     "A scoreboard objective, created by the generated load function.",
+	"Global":        "A value for the whole pack, set when the pack first loads.",
+	"OnLoad":        "Code that runs when the pack loads, from #minecraft:load.",
+	"OnTick":        "Code that runs every tick, from #minecraft:tick.",
+	"OnFirstJoin":   "Code that runs once for each player, the first time they are in the world with the pack, as and at that player.",
+	"OnRespawn":     "Code that runs as and at a player right after they respawn.",
+	"OnAdvancement": "Code that runs as and at a player each time they meet a trigger: `OnAdvancement name = Trigger(...) { ... }` writes the advancement, its reward function and the revoke.",
 }
 
 // BuildReference walks every type reachable from the pack's resources and
