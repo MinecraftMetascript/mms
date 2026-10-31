@@ -197,6 +197,7 @@ test('the docs render guides and the reference', async ({ page }) => {
 	const nav = page.getByRole('navigation', { name: 'Docs' });
 	await nav.getByRole('link', { name: 'Tutorial: a custom dimension' }).click();
 	await expect(page.getByRole('heading', { level: 1 })).toHaveText('Tutorial: a custom dimension');
+	await expect(page.getByRole('navigation', { name: 'On this page' }).getByRole('link').first()).toBeVisible();
 	await page.getByRole('main').getByRole('link', { name: 'Writing resources' }).click();
 	await expect(page).toHaveURL(/\/docs\/resources#density-functions$/);
 	await expect(page.locator('#density-functions')).toBeVisible();
@@ -205,7 +206,12 @@ test('the docs render guides and the reference', async ({ page }) => {
 	await nav.getByRole('link', { name: 'Reference' }).click();
 	await expect(page.getByRole('cell', { name: 'DensityFunction', exact: true })).toBeVisible();
 	const filter = page.getByRole('searchbox', { name: 'Filter helpers' });
+	const toc = page.getByRole('navigation', { name: 'On this page' });
+	await expect(toc.getByRole('link', { name: 'Loot function', exact: true })).toBeVisible();
 	await filter.fill('gradient');
+	// The page sections follow the filter.
+	await expect(toc.getByRole('link', { name: 'Loot function', exact: true })).toHaveCount(0);
+	await expect(toc.getByRole('link', { name: 'Density function', exact: true })).toBeVisible();
 	await expect(page.getByText(/^Gradient\(axis, /)).toBeVisible();
 	await expect(page.getByRole('region', { name: 'Loot function' })).toHaveCount(0);
 
