@@ -46,6 +46,11 @@ Function f {
 	if got := strings.Join(lintCodes(t, cfg, src2), " "); got != "lint/unused@2" {
 		t.Errorf("configured lint = %s", got)
 	}
+	// A vanilla tag is only replaced when the tag sets replace.
+	src3 := "BlockTag minecraft:logs = [stone]\nBlockTag minecraft:planks = { replace = true, values = [stone] }\n"
+	if got := strings.Join(lintCodes(t, Config{Namespace: "demo"}, src3), " "); got != "lint/overrides-vanilla@2" {
+		t.Errorf("tag lint = %s, want lint/overrides-vanilla@2", got)
+	}
 	if err := (Config{Namespace: "x", Lint: map[string]string{"nope": "off"}}).Validate(); err == nil {
 		t.Error("unknown rule accepted")
 	}
