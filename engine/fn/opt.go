@@ -69,6 +69,11 @@ func countUses(b *Block, uses map[Score]int) {
 			}
 			countUses(o.Body, uses)
 			countUses(o.Post, uses)
+		case Exec:
+			for _, p := range o.Parts {
+				text(p)
+			}
+			countUses(o.Body, uses)
 		case Return:
 			if o.Val != nil {
 				opnd(*o.Val)
@@ -136,6 +141,8 @@ func coalesce(b *Block, uses map[Score]int) {
 		case Loop:
 			coalesce(o.Body, uses)
 			coalesce(o.Post, uses)
+		case Exec:
+			coalesce(o.Body, uses)
 		case Call:
 			args := &Block{Ops: o.Args}
 			coalesce(args, uses)
@@ -284,6 +291,13 @@ func (l *liveness) op(b *Block, i int, live set) set {
 			pass()
 		}
 		live = head
+	case Exec:
+		// The body runs any number of times, like a loop that always
+		// holds and ends after any pass.
+		live = l.op(&Block{Ops: []Op{Loop{Body: o.Body}}}, 0, live)
+		for _, p := range o.Parts {
+			readText(p, live)
+		}
 	case Return:
 		live = set{}
 		if o.Val != nil {
