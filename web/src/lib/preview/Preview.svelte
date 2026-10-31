@@ -45,6 +45,9 @@
 	let box: HTMLDivElement;
 	let worker: Worker | null = null;
 	let view = $state<PreviewView>({ ...defaults.density_function });
+	// The 3D view's own camera: x and y are the world x and z at the centre,
+	// scale is a block's size in pixels (0 until the first render fits it).
+	let isoView = $state<PreviewView>({ x: 0, y: 0, scale: 0 });
 	let seed = $state('0');
 	let error = $state('');
 	let busy = $state(false);
@@ -127,6 +130,7 @@
 			}
 			error = '';
 			last = r;
+			if (r.scale && !isoView.scale) isoView.scale = r.scale;
 			draw();
 		};
 		const ro = new ResizeObserver(() => request());
@@ -174,7 +178,11 @@
 			lock = null;
 		}
 		view.scale = Math.min(view.scale, maxScale);
-		if (m === 'iso') lock = null;
+		if (m === 'iso') {
+			// Start the 3D view over the slice's x, with the slice (z = 0) through the middle.
+			isoView = { x: Math.round(view.x), y: 0, scale: 0 };
+			lock = null;
+		}
 		last = null;
 		request();
 	}
@@ -197,7 +205,7 @@
 				id: info.id,
 				width,
 				height,
-				view: $state.snapshot(view),
+				view: $state.snapshot(mode === 'iso' ? isoView : view),
 				seed,
 				options: { biome, terrain, y: biomeY }
 			} satisfies PreviewRequest);
@@ -252,9 +260,9 @@
 		return { px: ((e.clientX - r.left) / r.width) * (last?.width ?? 1), py: ((e.clientY - r.top) / r.height) * (last?.height ?? 1) };
 	}
 	function down(e: PointerEvent) {
-		if (mode === 'iso') return; // a fixed diagram: no pan, zoom or markers
 		canvas.setPointerCapture(e.pointerId);
-		drag = { x: e.clientX, y: e.clientY, vx: view.x, vy: view.y, moved: false };
+		const v = mode === 'iso' ? isoView : view;
+		drag = { x: e.clientX, y: e.clientY, vx: v.x, vy: v.y, moved: false };
 	}
 	function move(e: PointerEvent) {
 		hover = pointer(e);
@@ -263,12 +271,21 @@
 		const dy = (e.clientY - drag.y) / resolution;
 		if (Math.abs(dx) + Math.abs(dy) > 2) drag.moved = true;
 		if (!drag.moved) return;
+		if (mode === 'iso') {
+			// Undo the projection (screen x = (x - z)·s, screen y = (x + z)·s/2),
+			// so the ground follows the pointer.
+			const s = isoView.scale || 8;
+			isoView.x = drag.vx - (dx / s + (2 * dy) / s) / 2;
+			isoView.y = drag.vy - ((2 * dy) / s - dx / s) / 2;
+			request();
+			return;
+		}
 		view.x = drag.vx - dx * view.scale;
 		view.y = flat ? drag.vy - dy * view.scale : drag.vy + dy * view.scale;
 		request();
 	}
 	function up(e: PointerEvent) {
-		if (drag && !drag.moved) {
+		if (drag && !drag.moved && mode !== 'iso') {
 			const p = pointer(e);
 			const [x, y] = toWorld(p.px, p.py);
 			lock = lock && lock.x === x && lock.y === y ? null : { x, y };
@@ -277,8 +294,14 @@
 		drag = null;
 	}
 	function wheel(e: WheelEvent) {
-		if (mode === 'iso') return;
 		e.preventDefault();
+		if (mode === 'iso') {
+			// Zooming out past a 2×2-chunk area builds more chunks, up to 4×4.
+			const s = isoView.scale || 8;
+			isoView.scale = Math.min(48, Math.max(2, s * Math.exp(-e.deltaY * 0.0015)));
+			request();
+			return;
+		}
 		const p = pointer(e as unknown as PointerEvent);
 		const [wx, wy] = toWorld(p.px, p.py);
 		const f = Math.exp(e.deltaY * 0.0015);
@@ -374,7 +397,8 @@
 			<button
 				class="rounded px-1.5 py-0.5 hover:bg-hover"
 				onclick={() => {
-					view = defaultView(info.kind, mode);
+					if (mode === 'iso') isoView = { x: Math.round(view.x), y: 0, scale: 0 };
+					else view = defaultView(info.kind, mode);
 					request();
 				}}>Reset view</button
 			>

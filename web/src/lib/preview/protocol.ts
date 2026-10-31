@@ -76,6 +76,8 @@ export type PreviewResponse =
 			labels?: string[];
 			/** For biome maps: the biomes in view with their colours, most common first. */
 			legend?: { id: string; color: string }[];
+			/** For the isometric view: the block size in pixels it was drawn at. */
+			scale?: number;
 			/** Something to tell the viewer about an otherwise empty render. */
 			notice?: string;
 			/** For terrain: the sea level and world height. */
