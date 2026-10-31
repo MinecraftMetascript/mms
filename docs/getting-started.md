@@ -49,7 +49,7 @@ Each declaration is `Kind name = value`, or `Kind name { fields }` for an object
 
 - **Kinds** are PascalCase: `LootTable`, `DensityFunction`, `ItemTag`. Every resource folder in a data pack has one. The [reference](https://minecraftmetascript.github.io/mms/docs/reference) lists them all.
 - **Names** become ids in the file's namespace: `chests/gems` in namespace `gems` is `gems:chests/gems`, written to `data/gems/loot_table/chests/gems.json`.
-- **Doc comments** (`/** ... */`) show up on hover wherever the name is used.
+- **Doc comments** (`/** ... */`) describe the declaration right below them. See [Doc comments](#doc-comments).
 
 A `Namespace` line switches the namespace for the rest of the file:
 
@@ -60,6 +60,36 @@ ItemTag swords = [diamond_sword]
 ```
 
 Replacing a vanilla resource like this is allowed. The editor notes that it happens, since vanilla's version is lost.
+
+## Doc comments
+
+A comment that starts with `/**` documents the declaration, `let` or parameter list that follows it. Only blank space may come between the two. The text is Markdown, and it appears on hover over the name, both where it is declared and wherever it is used: in other files, in calls, in `kills[@s]` scores, inside commands such as `/function gems:find`, and in `${...}`. Completion and signature help show it too.
+
+```
+/**
+ * Gives a player their reward and counts it.
+ *
+ * @param count how many diamonds to give
+ * @returns the player's new total
+ * @deprecated use `reward_all`
+ */
+Function reward(count: int): int {
+  /** Rewards before this one. */
+  let before = found[@s]
+  /give @s diamond ${count}
+  found[@s] = before + 1
+  return found[@s]
+}
+```
+
+These JSDoc-style tags are understood:
+
+- `@param name text` documents a parameter. Hovering the parameter shows its text, and so does signature help while typing that argument.
+- `@returns text` (or `@return`) describes the result.
+- `@deprecated [text]` marks the declaration as deprecated. Every use gets a `deprecated` lint warning and is struck through in the editor.
+- `@example` starts a code example, and `@see text` adds a pointer elsewhere.
+
+Other tags are shown as written. The formatter lines doc comments up with a ` * ` on every line and keeps the indentation inside them, so indented code and nested lists survive.
 
 ## Projects with several files
 

@@ -29,6 +29,29 @@ type Config struct {
 	// Lint sets rule severities by rule id: "error", "warning", "info",
 	// "hint" or "off".
 	Lint map[string]string `json:"lint,omitempty"`
+	// Icon is a PNG in the project that becomes pack.png in both packs.
+	Icon string `json:"icon,omitempty"`
+	// ResourcePack configures the resource pack built when the project
+	// uses Texture or Sound.
+	ResourcePack ResourcePackConfig `json:"resourcePack,omitzero"`
+}
+
+// ResourcePackConfig is the "resourcePack" object in mms.json.
+type ResourcePackConfig struct {
+	// Output is the folder `mms build` writes the resource pack to,
+	// relative to the project. The default is the data pack's output
+	// with "-resources" appended.
+	Output string `json:"output,omitempty"`
+	// Description defaults to the data pack's description.
+	Description string `json:"description,omitempty"`
+}
+
+// ResourceOutput is the resource pack's output folder.
+func (c Config) ResourceOutput() string {
+	if c.ResourcePack.Output != "" {
+		return c.ResourcePack.Output
+	}
+	return c.Output + "-resources"
 }
 
 // DefaultConfig is used when there is no mms.json.
@@ -42,6 +65,9 @@ var nsPattern = regexp.MustCompile(`^[a-z0-9_.\-]+$`)
 func (c Config) Validate() error {
 	if !nsPattern.MatchString(c.Namespace) {
 		return fmt.Errorf("mms.json: namespace %q must be lowercase letters, digits, '_', '-' or '.'", c.Namespace)
+	}
+	if c.Icon != "" && !strings.HasSuffix(strings.ToLower(c.Icon), ".png") {
+		return fmt.Errorf("mms.json: icon %q must be a .png file", c.Icon)
 	}
 	for id, sev := range c.Lint {
 		if RuleByID(id) == nil {
@@ -92,7 +118,7 @@ func (c Config) SourceFiles(dir string) ([]string, error) {
 		rel, _ := filepath.Rel(dir, path)
 		rel = filepath.ToSlash(rel)
 		if d.IsDir() {
-			if rel != "." && (rel == c.Output || strings.HasPrefix(d.Name(), ".") || d.Name() == "node_modules") {
+			if rel != "." && (rel == c.Output || rel == c.ResourceOutput() || strings.HasPrefix(d.Name(), ".") || d.Name() == "node_modules") {
 				return filepath.SkipDir
 			}
 			return nil

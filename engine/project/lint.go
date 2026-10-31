@@ -26,6 +26,10 @@ type Rule struct {
 var Rules = []*Rule{
 	{ID: "constant-expression", Severity: syntax.SeverityHint, run: lintConstant,
 		Doc: "An arithmetic expression of number literals can be written as its value."},
+	{ID: "deprecated", Severity: syntax.SeverityWarning, all: lintDeprecated,
+		Doc: "A use of a declaration whose doc comment has a `@deprecated` tag."},
+	{ID: "external-asset", Severity: syntax.SeverityWarning, all: lintExternalAsset,
+		Doc: "An id of a texture, sound or structure in the project's namespace that no Texture, Sound or Structure call in the project provides. The pack still loads, but the file must come from another pack."},
 	{ID: "overrides-vanilla", Severity: syntax.SeverityInfo, run: lintOverrides,
 		Doc: "A declaration in the minecraft namespace replaces the vanilla resource with the same id."},
 	{ID: "quoted-name", Severity: syntax.SeverityHint, run: lintQuoted,
@@ -495,4 +499,55 @@ func (d *Decl) references() []string {
 	}
 	d.refsDone = true
 	return d.refs
+}
+
+// lintDeprecated reports uses of declarations marked @deprecated in their
+// doc comment. It reads the current declarations, so a tag added or
+// removed shows up without rechecking the users.
+func lintDeprecated(l *lintRun) {
+	r := l.r
+	why := map[*sema.Symbol]string{}
+	for _, s := range r.Syms.All() {
+		if s.Decl.Doc == "" {
+			continue
+		}
+		if dep := syntax.ParseDoc(s.Decl.Doc).Deprecated; dep != nil {
+			why[s] = strings.Join(strings.Fields(*dep), " ")
+		}
+	}
+	if len(why) == 0 {
+		return
+	}
+	type use struct {
+		sp  syntax.Span
+		sym *sema.Symbol
+	}
+	for _, d := range r.Order {
+		var uses []use
+		for n, in := range d.Info {
+			if in.Symbol == nil {
+				continue
+			}
+			switch n.(type) {
+			case *syntax.Ident, *syntax.ResLoc, *syntax.Tag, *syntax.String:
+			default:
+				continue
+			}
+			sym := r.Syms.Same(in.Symbol)
+			if _, dep := why[sym]; !dep || sym.Decl == d.D {
+				continue
+			}
+			uses = append(uses, use{n.Span(), sym})
+		}
+		sort.Slice(uses, func(i, j int) bool { return uses[i].sp.Start < uses[j].sp.Start })
+		for _, u := range uses {
+			msg := fmt.Sprintf("%s '%s' is deprecated", u.sym.Kind.Name, u.sym.ID())
+			if w := why[u.sym]; w != "" {
+				msg += ": " + w
+			}
+			l.out[d.Unit.Path] = append(l.out[d.Unit.Path], syntax.Diagnostic{
+				Code: "lint/deprecated", Severity: l.sev, Sp: u.sp, Deprecated: true, Message: msg,
+			})
+		}
+	}
 }

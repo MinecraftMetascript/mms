@@ -245,3 +245,16 @@ test('the Project menu closes on outside click and Escape, and Format formats', 
 	await page.getByRole('button', { name: 'Format', exact: true }).click();
 	await expect(page.locator('.cm-content')).toHaveText('DensityFunction x = Clamp(1, 0, 1)');
 });
+
+test('doc comments show on hover over a use', async ({ page }) => {
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	await replaceText(
+		page,
+		'/**\n * Kills needed for each reward.\n * @deprecated use reward_every\n */\nGlobal every: int = 5\n\nFunction f {\n  /say ${every}\n}\n'
+	);
+	await expect(page.locator('.cm-deprecated')).toHaveCount(1);
+	await page.locator('.cm-deprecated').hover();
+	const tip = page.locator('.cm-tooltip-hover, .cm-tooltip-lint').filter({ hasText: 'Kills needed' });
+	await expect(tip.first()).toContainText('Deprecated.');
+});

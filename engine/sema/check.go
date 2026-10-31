@@ -2,6 +2,7 @@ package sema
 
 import (
 	"fmt"
+	"io/fs"
 	"math"
 	"strconv"
 	"strings"
@@ -20,11 +21,14 @@ type Info struct {
 	Fields   []field // for object bodies and calls: every field in scope
 	Disp     *dispInfo
 	Callable *Callable
+	Local    *Local // a function's parameter or local variable
 	// Bare says how a string literal here could be written unquoted:
 	// BareID for an id (Folder is its registry folder, "tags/..." for a
 	// tag), BareKey for a dispatch key, BareEnum for a string enum name.
 	Bare   BareKind
 	Folder string
+	// Asset is set on an asset helper call such as Texture("a.png").
+	Asset *Asset
 
 	typed bool
 }
@@ -63,6 +67,9 @@ type Checker struct {
 	// Deps records every symbol lookup and its outcome, so a cached
 	// result can be reused while the outcomes stay the same.
 	Deps map[string]bool
+	// Files are the project's files, read by asset helpers; nil when
+	// the host has none.
+	Files fs.FS
 
 	trial  bool
 	errs   int
@@ -95,7 +102,9 @@ func (c *Checker) find(folder, id string) *Symbol {
 func DepsHold(t *Table, deps map[string]bool) bool {
 	for k, found := range deps {
 		var now bool
-		if ns, ok := strings.CutPrefix(k, "n|"); ok {
+		if strings.HasPrefix(k, "a|") {
+			continue // asset files: see AssetDepsHold
+		} else if ns, ok := strings.CutPrefix(k, "n|"); ok {
 			now = t.hasNamespace(ns)
 		} else if rest, ok := strings.CutPrefix(k, "s|"); ok {
 			// s|folder|id|signature: the symbol still has that signature.
@@ -363,7 +372,7 @@ func (c *Checker) trialErrors(e syntax.Expr, v tview) int {
 	if n, ok := root.memo[k]; ok {
 		return n
 	}
-	t := &Checker{Pack: c.Pack, Kinds: c.Kinds, Syms: c.Syms, NS: c.NS, trial: true, depth: c.depth, parent: root, Deps: c.Deps}
+	t := &Checker{Pack: c.Pack, Kinds: c.Kinds, Syms: c.Syms, NS: c.NS, trial: true, depth: c.depth, parent: root, Deps: c.Deps, Files: c.Files}
 	t.check(e, v)
 	root.memo[k] = t.errs
 	return t.errs
@@ -419,6 +428,8 @@ func (c *Checker) fits(e syntax.Expr, v tview) bool {
 		case *syntax.Tag:
 			id := idOf(v.T)
 			return id.Present && id.Tags != ""
+		case *syntax.Call:
+			return c.assetFits(e, idOf(v.T))
 		}
 		return false
 	case "boolean":
@@ -717,6 +728,10 @@ func (c *Checker) stringValue(e syntax.Expr, v tview) jsonv.Value {
 		if r, ok := x.(*syntax.ResLoc); ok && qualified(r) {
 			return jsonv.String(r.Text)
 		}
+	case *syntax.Call:
+		if assetCallName(x) != "" {
+			return c.assetCall(e, v)
+		}
 	case *syntax.Tag:
 		if id.Present && id.Tags != "" {
 			return jsonv.String(c.resolveTag(x.Name, id, e))
@@ -773,6 +788,11 @@ func (c *Checker) resolveID(text string, id idInfo, e syntax.Expr) string {
 			}
 			c.errorf("mms/unknown-id", e.Span(), "%s", msg)
 		}
+		return full
+	}
+	if IsAssetRegistry(reg) {
+		// A file, not a declaration: the external-asset lint rule checks
+		// that something provides it.
 		return full
 	}
 	if c.declaresNamespace(ns) {

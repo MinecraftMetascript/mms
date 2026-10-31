@@ -99,6 +99,7 @@ type (
 		Name  *Name
 		Type  *Name
 		Value Expr
+		Doc   string // text of the /** */ comment right above, if any
 		Sp    Span
 	}
 	IfStmt struct {

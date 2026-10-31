@@ -2,6 +2,7 @@ package project
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -98,5 +99,37 @@ Recipe r = Shapeless(ingredients = [emerald_block], result = emerald * 9)
 	r, _ := p.Analyze(context.Background())
 	if after := dumpFiles(r.Emit()); after != before {
 		t.Errorf("sugar changed the output:\n%s\nwas\n%s", after, before)
+	}
+}
+
+func TestLintDeprecated(t *testing.T) {
+	src := `/**
+ * Old way to reward.
+ * @deprecated use reward
+ */
+Function old_reward {
+  /give @s diamond
+}
+Function reward {
+  old_reward()
+  /function demo:old_reward
+}
+`
+	p := New(spec.MustDefault(), Config{Namespace: "demo"})
+	p.SetFile("a.mms", src)
+	r, _ := p.Analyze(context.Background())
+	var got []string
+	for _, d := range r.Diagnostics("a.mms") {
+		if d.Code == "lint/deprecated" {
+			if !d.Deprecated {
+				t.Error("finding is not tagged deprecated")
+			}
+			line, _ := r.Unit("a.mms").File.LineCol(d.Sp.Start)
+			got = append(got, fmt.Sprint(line)+" "+d.Message)
+		}
+	}
+	want := "9 Function 'demo:old_reward' is deprecated: use reward|10 Function 'demo:old_reward' is deprecated: use reward"
+	if g := strings.Join(got, "|"); g != want {
+		t.Errorf("got %s\nwant %s", g, want)
 	}
 }

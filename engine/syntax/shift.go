@@ -98,7 +98,7 @@ func (s shifter) stmt(st Stmt) Stmt {
 	case *Block:
 		return s.block(x)
 	case *LetStmt:
-		n = &LetStmt{Name: s.name(x.Name), Type: s.name(x.Type), Value: s.expr(x.Value), Sp: s.sp(x.Sp)}
+		n = &LetStmt{Name: s.name(x.Name), Type: s.name(x.Type), Value: s.expr(x.Value), Doc: x.Doc, Sp: s.sp(x.Sp)}
 	case *IfStmt:
 		n = &IfStmt{Cond: s.expr(x.Cond), Then: s.block(x.Then), Else: s.stmt(x.Else), Sp: s.sp(x.Sp)}
 	case *WhileStmt:
@@ -181,4 +181,23 @@ func (s shifter) expr(e Expr) Expr {
 	}
 	s.rec(e, n)
 	return n
+}
+
+// ShiftLeaf returns a copy of a leaf name node (an identifier, resource
+// location, tag or string) moved by delta, or nil for any other node. It
+// moves nodes that are not part of a declaration's tree, such as those
+// parsed from the inside of a command, along with the declaration.
+func ShiftLeaf(n Node, delta int) Node {
+	s := shifter{d: delta}
+	switch n := n.(type) {
+	case *Ident:
+		return &Ident{Name: n.Name, Sp: s.sp(n.Sp)}
+	case *ResLoc:
+		return &ResLoc{Text: n.Text, Sp: s.sp(n.Sp)}
+	case *Tag:
+		return &Tag{Name: n.Name, Sp: s.sp(n.Sp)}
+	case *String:
+		return &String{Value: n.Value, Raw: n.Raw, Sp: s.sp(n.Sp)}
+	}
+	return nil
 }

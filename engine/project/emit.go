@@ -10,6 +10,7 @@ import (
 
 	"github.com/minecraftmetascript/mms/engine/fn"
 	"github.com/minecraftmetascript/mms/engine/jsonv"
+	"github.com/minecraftmetascript/mms/engine/sema"
 	"github.com/minecraftmetascript/mms/engine/syntax"
 )
 
@@ -21,11 +22,19 @@ type OutFile struct {
 	// is "" for generated files such as pack.mcmeta.
 	Unit string
 	Span syntax.Span
+	// Pack is the pack the file belongs to; resource pack files exist
+	// only when the project uses Texture or Sound.
+	Pack sema.PackKind
+	// Asset is the project file a copied asset comes from. Its Data is
+	// nil until ReadAssets.
+	Asset string
 }
 
 // Emit lays out the data pack: one file per resource, merged tags, raw
-// command functions, generated load and tick functions, and pack.mcmeta.
-// Output is sorted by path and byte-identical across runs.
+// command functions, generated load and tick functions, and pack.mcmeta;
+// then the asset files the project uses, and the resource pack when it
+// uses textures or sounds. Output is sorted by pack, then path, and is
+// byte-identical across runs. Copied assets need ReadAssets.
 func (r *Result) Emit() []OutFile {
 	var out []OutFile
 	type tagFile struct {
@@ -165,15 +174,21 @@ func (r *Result) Emit() []OutFile {
 		}
 		out = append(out, f)
 	}
-	out = append(out, OutFile{Path: "pack.mcmeta", Data: r.packMeta()})
-	sort.Slice(out, func(i, j int) bool { return out[i].Path < out[j].Path })
+	out = append(out, OutFile{Path: "pack.mcmeta", Data: packMeta(r.cfg.Description, r.pack.PackFormat)})
+	out = append(out, r.emitAssets()...)
+	sort.SliceStable(out, func(i, j int) bool {
+		if out[i].Pack != out[j].Pack {
+			return out[i].Pack < out[j].Pack
+		}
+		return out[i].Path < out[j].Path
+	})
 	return out
 }
 
-func (r *Result) packMeta() []byte {
-	format := jsonv.Int(r.pack.PackFormat)
+func packMeta(description string, packFormat int) []byte {
+	format := jsonv.Int(packFormat)
 	pack := &jsonv.Object{}
-	pack.Set("description", jsonv.String(r.cfg.Description))
+	pack.Set("description", jsonv.String(description))
 	pack.Set("min_format", format)
 	pack.Set("max_format", format)
 	return jsonv.Marshal(&jsonv.Object{Members: []jsonv.Member{{Key: "pack", Value: pack}}})
@@ -205,11 +220,14 @@ func splitID(id string) (string, string) {
 	return "minecraft", id
 }
 
-// WriteDir writes files under dir, removing what a previous build left
-// there first so deleted declarations do not linger.
+// WriteDir writes one pack's files under dir, removing what a previous
+// build left there first (data/, assets/ and pack.png) so deleted
+// declarations and unused assets do not linger.
 func WriteDir(dir string, files []OutFile) error {
-	if err := os.RemoveAll(filepath.Join(dir, "data")); err != nil {
-		return err
+	for _, old := range []string{"data", "assets", "pack.png"} {
+		if err := os.RemoveAll(filepath.Join(dir, old)); err != nil {
+			return err
+		}
 	}
 	for _, f := range files {
 		p := filepath.Join(dir, filepath.FromSlash(f.Path))
