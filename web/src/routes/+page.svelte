@@ -187,7 +187,7 @@
 		<span class="font-semibold tracking-tight">MMS</span>
 		<span class="hidden text-sm text-muted sm:inline">{project.name}</span>
 		<div class="relative ml-2">
-			<button class="rounded px-2 py-1 text-sm hover:bg-hover" onclick={() => (menu = !menu)} aria-expanded={menu}>Project ▾</button>
+			<button class="rounded px-2 py-1 text-sm whitespace-nowrap hover:bg-hover" onclick={() => (menu = !menu)} aria-expanded={menu}>Project ▾</button>
 			{#if menu}
 				<div class="absolute top-full left-0 z-20 mt-1 w-64 rounded-md border border-line bg-panel p-1 text-sm shadow-lg">
 					<button class="block w-full rounded px-2 py-1.5 text-left hover:bg-hover" onclick={newProject}>New project</button>
@@ -225,12 +225,12 @@
 							? 'bg-red-500'
 							: 'bg-amber-400'}"
 				></span>
-				{statusText}
+				<span class="hidden sm:inline">{statusText}</span>
 			</span>
 			{#if engine?.status === 'failed'}
 				<button class="rounded px-2 py-1 text-accent hover:bg-hover" onclick={() => engine?.restart()} title={engine.statusDetail}>Restart</button>
 			{/if}
-			<button class="rounded bg-accent px-3 py-1 font-medium text-white hover:opacity-90 disabled:opacity-50" disabled={!engine?.output.length} onclick={exportPack}>Download pack</button>
+			<button class="rounded bg-accent px-3 py-1 font-medium text-white hover:opacity-90 disabled:opacity-50" disabled={!engine?.output.length} onclick={exportPack}><span class="sm:hidden">Pack</span><span class="hidden sm:inline">Download pack</span></button>
 		</div>
 	</header>
 
@@ -240,7 +240,14 @@
 				<Sidebar {project} {engine} {selectedOutput} onoutput={selectOutput} onsymbol={(uri: string, s: DocSymbol) => reveal(uri, s.selectionRange)} />
 			{/if}
 		</aside>
-		<section class="min-h-0 border-b border-line md:border-r md:border-b-0">
+		<section class="flex min-h-0 flex-col border-b border-line md:border-r md:border-b-0">
+			<div class="flex items-center gap-2 border-b border-line bg-panel px-2 py-1 md:hidden">
+				<select class="min-w-0 flex-1 rounded border border-line bg-panel px-1 py-0.5 text-sm" bind:value={project.active} aria-label="File">
+					{#each project.files as f (f.path)}<option value={f.path}>{f.path}</option>{/each}
+				</select>
+				<span class="text-xs text-muted">{statusText}</span>
+			</div>
+			<div class="min-h-0 flex-1">
 			{#if engine && loaded && project.activeFile}
 				<Editor
 					{engine}
@@ -256,6 +263,7 @@
 			{:else if loaded}
 				<p class="p-4 text-sm text-muted">No files. Add one from the sidebar.</p>
 			{/if}
+			</div>
 		</section>
 		<section class="flex min-h-0 flex-col bg-panel">
 			<div class="flex border-b border-line text-xs" role="tablist">
