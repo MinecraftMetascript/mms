@@ -46,6 +46,17 @@ const biomeTags = WorldgenRegistries.BIOME.getTagRegistry();
 let userFiles: PreviewFile[] = [];
 let dimensions = new Map<string, unknown>();
 let version = 0; // bumped when the files change, to drop cached terrain
+/**
+ * Bumped only when files that shape the terrain change (noises, density
+ * functions, noise settings and dimensions, ignoring surface rules), so
+ * editing a surface rule reuses the filled chunks.
+ */
+let shapeVersion = 0;
+let shapeSignature = '';
+function shapeOf(files: PreviewFile[]): string {
+	const shaping = files.filter((f) => ['noise', 'density_function', 'noise_settings', 'dimension'].includes(f.kind));
+	return JSON.stringify(shaping, (k, v) => (k === 'surface_rule' ? undefined : v));
+}
 const bundles = new Map<Folder, Record<string, unknown> | null>();
 
 async function fetchBundle(folder: Folder): Promise<boolean> {
@@ -190,6 +201,8 @@ interface Terrain {
 	rule: MaterialRule;
 	rs: RandomState;
 	biomeAt: (x: number, y: number, z: number) => Identifier;
+	/** What the terrain's shape depends on, so filled chunks can be shared across surface rule edits. */
+	shape: string;
 }
 
 function buildChunk(t: Terrain, chunkX: number): Uint16Array {
@@ -225,19 +238,36 @@ function buildChunk(t: Terrain, chunkX: number): Uint16Array {
 
 // ---- Isometric terrain -------------------------------------------------
 
+/** Filled chunks (terrain shape before surface rules), most recently used last. */
+const fills = new Map<string, { chunk: Chunk; noiseChunk: unknown }>();
+const MAX_FILLS = 32;
+
 /** A full 16×16 chunk with surface rules, indexed ((x * 16 + z) * height + y). */
 function buildChunk3D(t: Terrain, cx: number, cz: number): Uint16Array {
 	const { settings } = t;
 	const minY = settings.noise.minY;
 	const height = settings.noise.height;
-	const chunk = new Chunk(minY, height, ChunkPos.create(cx, cz));
 	const gen = new NoiseChunkGenerator(new FixedBiomeSource(Identifier.create('plains')), settings) as unknown as {
 		createNoiseChunk(rs: RandomState, chunk: Chunk, onlyFirstZ: boolean): unknown;
 		doFill(chunk: Chunk, noiseChunk: unknown): void;
 		getWorldgenContext(): unknown;
 	};
-	const noiseChunk = gen.createNoiseChunk(t.rs, chunk, false);
-	gen.doFill(chunk, noiseChunk);
+	// Filling is most of the cost, and it doesn't depend on the surface rule.
+	const fillKey = `${t.shape}|${cx},${cz}`;
+	let fill = fills.get(fillKey);
+	if (fill) {
+		fills.delete(fillKey); // re-inserted below as the most recent
+	} else {
+		const chunk = new Chunk(minY, height, ChunkPos.create(cx, cz));
+		const noiseChunk = gen.createNoiseChunk(t.rs, chunk, false);
+		gen.doFill(chunk, noiseChunk);
+		fill = { chunk, noiseChunk };
+	}
+	fills.set(fillKey, fill);
+	if (fills.size > MAX_FILLS) fills.delete(fills.keys().next().value!);
+	const { chunk, noiseChunk } = fill;
+	// Blocks the surface rule replaces, put back afterwards so the fill can be reused.
+	const replaced: [BlockPos, BlockState][] = [];
 	// Deepslate's MaterialSystem.buildSurface only paints the first z row
 	// (its previews are slices), so this is its loop over the whole chunk.
 	const context = new MaterialRuleContext(
@@ -285,7 +315,10 @@ function buildChunk3D(t: Terrain, cx: number, cz: number): Uint16Array {
 				stoneAbove += 1;
 				context.updateY(stoneAbove, y - nextCeiling + 1, waterHeight, y);
 				const state = rule(bx, y, bz);
-				if (state) chunk.setBlockState(pos, state);
+				if (state) {
+					replaced.push([pos, old]);
+					chunk.setBlockState(pos, state);
+				}
 			}
 		}
 	}
@@ -298,53 +331,52 @@ function buildChunk3D(t: Terrain, cx: number, cz: number): Uint16Array {
 			}
 		}
 	}
+	for (const [pos, old] of replaced) chunk.setBlockState(pos, old);
 	return out;
 }
 
 let isoKey = '';
 const isoChunks = new Map<string, Uint16Array>();
+
 /**
- * Draws the terrain as an isometric block diagram. In this mode the view's
- * x and y are the world x and z at the centre, and its scale is the size of
- * a block in pixels (0 to fit a 2×2-chunk area to the canvas). Zooming out
- * builds more chunks, up to 4×4.
+ * The visible faces of an area of chunks, in back-to-front order. Hidden
+ * blocks are pruned once per area, so a pan or zoom only projects and
+ * fills what can be seen.
  */
-async function renderIso(req: RenderRequest, t: Terrain, key: string): Promise<Rendered> {
-	const { width, height } = req;
-	const h = t.settings.noise.height;
-	if (key !== isoKey) {
-		isoKey = key;
-		isoChunks.clear();
+interface IsoArea {
+	key: string;
+	n: number;
+	/** Lowest and highest drawn y (area-local, 0 = world bottom), or bottom > top when empty. */
+	bottom: number;
+	top: number;
+	/** Per face: block x, y, z and side (0 top, 1 +x, 2 +z). */
+	faces: Int16Array;
+	/** Per face: its fill colour. */
+	fills: string[];
+}
+let isoArea: IsoArea | null = null;
+/** The area drawn at one block size, kept so panning only moves it. */
+let isoImage: { key: string; s: number; image: OffscreenCanvas } | null = null;
+
+const shades = [1, 0.62, 0.8];
+const fillCache = new Map<string, string[]>();
+function fillsOf(id: string): string[] {
+	let f = fillCache.get(id);
+	if (!f) {
+		const c = blockColor(id);
+		f = shades.map((k) => `rgb(${Math.round(c[0] * k)} ${Math.round(c[1] * k)} ${Math.round(c[2] * k)})`);
+		fillCache.set(id, f);
 	}
-	const fit = !(req.view.scale > 0);
-	// Blocks across the area: enough to fill the canvas at this zoom.
-	const across = fit ? 32 : width / (2 * req.view.scale);
-	const chunksAcross = across <= 40 ? 2 : across <= 56 ? 3 : 4;
-	const n = chunksAcross * 16;
-	const cx = req.view.x;
-	const cz = req.view.y;
-	const cx0 = Math.round(cx / 16 - chunksAcross / 2);
-	const cz0 = Math.round(cz / 16 - chunksAcross / 2);
-	const chunks: Uint16Array[][] = [];
-	for (let i = 0; i < chunksAcross; i++) {
-		chunks.push([]);
-		for (let j = 0; j < chunksAcross; j++) {
-			const k = `${cx0 + i},${cz0 + j}`;
-			let c = isoChunks.get(k);
-			if (!c) {
-				await breathe();
-				if (req.seq !== latest) throw new Superseded();
-				c = buildChunk3D(t, cx0 + i, cz0 + j);
-				isoChunks.set(k, c);
-			}
-			chunks[i].push(c);
-		}
-	}
+	return f;
+}
+
+function isoAreaOf(key: string, chunks: (Uint16Array | undefined)[][], n: number, h: number): IsoArea {
 	const air = indexOf('minecraft:air');
 	const caveAir = indexOf('minecraft:cave_air');
 	const at = (x: number, y: number, z: number): number => {
 		if (x < 0 || z < 0 || x >= n || z >= n || y < 0 || y >= h) return air;
-		return chunks[x >> 4][z >> 4][((x & 15) * 16 + (z & 15)) * h + y];
+		const c = chunks[x >> 4][z >> 4];
+		return c ? c[((x & 15) * 16 + (z & 15)) * h + y] : air;
 	};
 	const empty = (b: number) => b === air || b === caveAir;
 
@@ -361,59 +393,159 @@ async function renderIso(req: RenderRequest, t: Terrain, key: string): Promise<R
 			highest = Math.max(highest, y);
 		}
 	}
-	if (lowest > highest) {
-		const pixels = new Uint8ClampedArray(width * height * 4);
-		for (let i = 0; i < width * height; i++) put(pixels, i * 4, SKY);
-		const notice = 'No blocks in these chunks. Drag to pan to some terrain.';
-		return { type: 'rendered', seq: req.seq, width, height, pixels, values: new Float32Array(width * height).fill(NaN), min: Infinity, max: -Infinity, notice };
-	}
 	const bottom = Math.max(0, lowest - 16);
-	const span = highest + 1 - bottom;
-
-	const canvas = new OffscreenCanvas(width, height);
-	const ctx = canvas.getContext('2d')!;
-	ctx.fillStyle = `rgb(${SKY.join(' ')})`;
-	ctx.fillRect(0, 0, width, height);
-	const s = fit ? Math.max(1, Math.min(width / (2 * n), height / (n + span)) * 0.92) : req.view.scale;
-	// Area-local block x, z → screen, with the view's centre (at mid height) in the middle.
-	const lx = cx - cx0 * 16;
-	const lz = cz - cz0 * 16;
-	const yc = bottom + span / 2;
-	const px = (x: number, y: number, z: number): [number, number] => [
-		width / 2 + (x - lx - (z - lz)) * s,
-		height / 2 + ((x - lx + (z - lz)) * s) / 2 - (y - yc) * s
-	];
-	const face = (pts: [number, number][], c: Rgb, shade: number) => {
-		const fill = `rgb(${Math.round(c[0] * shade)} ${Math.round(c[1] * shade)} ${Math.round(c[2] * shade)})`;
-		ctx.fillStyle = fill;
-		ctx.strokeStyle = fill;
-		ctx.beginPath();
-		ctx.moveTo(pts[0][0], pts[0][1]);
-		for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
-		ctx.closePath();
-		ctx.fill();
-		ctx.stroke(); // hides hairline seams between faces
-	};
-	ctx.lineWidth = 0.5;
+	const faces: number[] = [];
+	const fills: string[] = [];
 	// Back to front: every block only hides blocks with smaller x, z or y.
 	for (let x = 0; x < n; x++) {
 		for (let z = 0; z < n; z++) {
 			for (let y = bottom; y <= highest; y++) {
 				const b = at(x, y, z);
 				if (empty(b)) continue;
-				const c = blockColor(palette[b]);
-				const above = y === highest || empty(at(x, y + 1, z));
-				const right = x === n - 1 || empty(at(x + 1, y, z));
-				const front = z === n - 1 || empty(at(x, y, z + 1));
-				if (above) face([px(x, y + 1, z), px(x + 1, y + 1, z), px(x + 1, y + 1, z + 1), px(x, y + 1, z + 1)], c, 1);
-				if (right) face([px(x + 1, y + 1, z), px(x + 1, y + 1, z + 1), px(x + 1, y, z + 1), px(x + 1, y, z)], c, 0.62);
-				if (front) face([px(x, y + 1, z + 1), px(x + 1, y + 1, z + 1), px(x + 1, y, z + 1), px(x, y, z + 1)], c, 0.8);
+				const f = fillsOf(palette[b]);
+				if (y === highest || empty(at(x, y + 1, z))) faces.push(x, y, z, 0), fills.push(f[0]);
+				if (x === n - 1 || empty(at(x + 1, y, z))) faces.push(x, y, z, 1), fills.push(f[1]);
+				if (z === n - 1 || empty(at(x, y, z + 1))) faces.push(x, y, z, 2), fills.push(f[2]);
 			}
 		}
 	}
-	const pixels = new Uint8ClampedArray(ctx.getImageData(0, 0, width, height).data.buffer);
-	const values = new Float32Array(width * height).fill(NaN);
-	return { type: 'rendered', seq: req.seq, width, height, pixels, values, min: Infinity, max: -Infinity, scale: s };
+	return { key, n, bottom, top: highest, faces: Int16Array.from(faces), fills };
+}
+
+/** Fills an area's faces, with block (x, y, z) at screen (ox + (x - z)·s, oy + (x + z)·s/2 - y·s), skipping those outside w × h. */
+function drawFaces(ctx: OffscreenCanvasRenderingContext2D, area: IsoArea, s: number, ox: number, oy: number, w: number, h: number) {
+	const { faces, fills } = area;
+	ctx.lineWidth = 0.5;
+	for (let i = 0, f = 0; i < faces.length; i += 4, f++) {
+		const x = faces[i], y = faces[i + 1], z = faces[i + 2], side = faces[i + 3];
+		// The block's top-back corner; a block spans 2s across and 2s down from it.
+		const bx = ox + (x - z) * s;
+		const by = oy + ((x + z) * s) / 2 - (y + 1) * s;
+		if (bx + s < 0 || bx - s > w || by + 2 * s < 0 || by > h) continue;
+		ctx.fillStyle = ctx.strokeStyle = fills[f];
+		ctx.beginPath();
+		if (side === 0) {
+			ctx.moveTo(bx, by);
+			ctx.lineTo(bx + s, by + s / 2);
+			ctx.lineTo(bx, by + s);
+			ctx.lineTo(bx - s, by + s / 2);
+		} else if (side === 1) {
+			ctx.moveTo(bx + s, by + s / 2);
+			ctx.lineTo(bx, by + s);
+			ctx.lineTo(bx, by + 2 * s);
+			ctx.lineTo(bx + s, by + 1.5 * s);
+		} else {
+			ctx.moveTo(bx - s, by + s / 2);
+			ctx.lineTo(bx, by + s);
+			ctx.lineTo(bx, by + 2 * s);
+			ctx.lineTo(bx - s, by + 1.5 * s);
+		}
+		ctx.closePath();
+		ctx.fill();
+		ctx.stroke(); // hides hairline seams between faces
+	}
+}
+
+/** The largest area image kept for panning, in pixels. */
+const MAX_IMAGE = 4096 * 4096;
+
+/**
+ * Draws the terrain as an isometric block diagram. In this mode the view's
+ * x and y are the world x and z at the centre, and its scale is the size of
+ * a block in pixels (0 to fit a 2×2-chunk area to the canvas). Zooming out
+ * builds more chunks, up to 4×4.
+ *
+ * Built chunks, the pruned face list and the drawn area are each cached, so
+ * a pan only moves an image and a zoom only redraws the visible faces.
+ * While chunks are being built, each one is shown as it finishes.
+ */
+async function renderIso(req: RenderRequest, t: Terrain, key: string): Promise<Rendered> {
+	const { width, height } = req;
+	const h = t.settings.noise.height;
+	if (key !== isoKey) {
+		isoKey = key;
+		isoChunks.clear();
+		isoArea = null;
+		isoImage = null;
+	}
+	const fit = !(req.view.scale > 0);
+	// Blocks across the area: enough to fill the canvas at this zoom.
+	const across = fit ? 32 : width / (2 * req.view.scale);
+	const chunksAcross = across <= 40 ? 2 : across <= 56 ? 3 : 4;
+	const n = chunksAcross * 16;
+	const cx = req.view.x;
+	const cz = req.view.y;
+	const cx0 = Math.round(cx / 16 - chunksAcross / 2);
+	const cz0 = Math.round(cz / 16 - chunksAcross / 2);
+	const chunks: (Uint16Array | undefined)[][] = [];
+	const missing: [number, number][] = [];
+	for (let i = 0; i < chunksAcross; i++) {
+		chunks.push([]);
+		for (let j = 0; j < chunksAcross; j++) {
+			const c = isoChunks.get(`${cx0 + i},${cz0 + j}`);
+			chunks[i].push(c);
+			if (!c) missing.push([i, j]);
+		}
+	}
+
+	const frame = (): Rendered => {
+		const areaKey = `${cx0},${cz0},${chunksAcross},${missing.length}`;
+		if (isoArea?.key !== areaKey) {
+			isoArea = isoAreaOf(areaKey, chunks, n, h);
+			isoImage = null;
+		}
+		const area = isoArea;
+		const canvas = new OffscreenCanvas(width, height);
+		const ctx = canvas.getContext('2d')!;
+		ctx.fillStyle = `rgb(${SKY.join(' ')})`;
+		ctx.fillRect(0, 0, width, height);
+		const empty = area.bottom > area.top;
+		const span = area.top + 1 - area.bottom;
+		const s = fit ? Math.max(1, Math.min(width / (2 * n), height / (n + Math.max(span, 1))) * 0.92) : req.view.scale;
+		if (!empty) {
+			// Screen position of block (x, y, z), area-local, with the view's
+			// centre (at mid height) in the middle of the canvas.
+			const lx = cx - cx0 * 16;
+			const lz = cz - cz0 * 16;
+			const yc = area.bottom + span / 2;
+			const ox = width / 2 - (lx - lz) * s;
+			const oy = height / 2 - ((lx + lz) * s) / 2 + yc * s;
+			const iw = Math.ceil(2 * n * s) + 2;
+			const ih = Math.ceil((n + span) * s) + 2;
+			if (iw * ih <= MAX_IMAGE) {
+				// Draw the whole area once at this size; panning then only moves it.
+				if (!isoImage || isoImage.key !== area.key || isoImage.s !== s) {
+					const image = new OffscreenCanvas(iw, ih);
+					drawFaces(image.getContext('2d')!, area, s, n * s + 1, (area.top + 1) * s + 1, iw, ih);
+					isoImage = { key: area.key, s, image };
+				}
+				ctx.drawImage(isoImage.image, Math.round(ox - n * s - 1), Math.round(oy - (area.top + 1) * s - 1));
+			} else {
+				drawFaces(ctx, area, s, ox, oy, width, height);
+			}
+		}
+		const notice =
+			empty && missing.length === 0 ? 'No blocks in these chunks. Drag to pan to some terrain.' : undefined;
+		const bitmap = canvas.transferToImageBitmap();
+		return {
+			type: 'rendered', seq: req.seq, width, height,
+			pixels: new Uint8ClampedArray(0), values: new Float32Array(0),
+			min: Infinity, max: -Infinity, scale: s, bitmap, notice
+		};
+	};
+
+	while (missing.length > 0) {
+		// Show what is built so far, then build the next chunk.
+		if (isoChunks.size > 0) post({ ...frame(), partial: true });
+		await breathe();
+		if (req.seq !== latest) throw new Superseded();
+		const [i, j] = missing[0];
+		const c = buildChunk3D(t, cx0 + i, cz0 + j);
+		isoChunks.set(`${cx0 + i},${cz0 + j}`, c);
+		chunks[i][j] = c;
+		missing.shift();
+	}
+	return frame();
 }
 
 /**
@@ -541,6 +673,9 @@ async function renderBiomes(req: RenderRequest, dim: Dimension, rs: RandomState)
 
 // ---- Render -----------------------------------------------------------
 
+/** The last terrain set up, so panning doesn't rebuild its random state each frame. */
+let cached: { key: string; t: Terrain } | null = null;
+
 async function render(req: RenderRequest): Promise<PreviewResponse> {
 	const { width, height, view } = req;
 	const seed = seedOf(req.seed);
@@ -558,6 +693,11 @@ async function render(req: RenderRequest): Promise<PreviewResponse> {
 	const fixedBiome = Identifier.parse(req.options.biome || 'minecraft:plains');
 	const terrainKey = (what: string) => [version, req.seed, req.kind, req.id, req.mode, what].join('|');
 
+	if (req.kind === 'dimension' && req.mode !== 'biomes' && cached?.key === terrainKey('')) {
+		const key = terrainKey('');
+		await warm(cached.t, key);
+		return req.mode === 'iso' ? renderIso(req, cached.t, key) : renderTerrain(req, cached.t, key);
+	}
 	if (req.kind === 'dimension') {
 		const { dim, rs } = await withVanilla(() => {
 			const dim = readDimension(req.id);
@@ -567,26 +707,30 @@ async function render(req: RenderRequest): Promise<PreviewResponse> {
 			return { dim, rs };
 		});
 		if (req.mode === 'biomes') return renderBiomes(req, dim, rs);
+		const key = terrainKey('');
 		const terrain: Terrain = {
 			settings: dim.settings,
 			rule: dim.settings.materialRule,
 			rs,
-			biomeAt: (x, y, z) => dim.biomes.getBiome(x >> 2, y >> 2, z >> 2, rs.sampler)
+			biomeAt: (x, y, z) => dim.biomes.getBiome(x >> 2, y >> 2, z >> 2, rs.sampler),
+			shape: [shapeVersion, req.seed, 'dimension', req.id].join('|')
 		};
-		const key = terrainKey('');
+		cached = { key, t: terrain };
 		await warm(terrain, key);
 		return req.mode === 'iso' ? renderIso(req, terrain, key) : renderTerrain(req, terrain, key);
 	}
 
 	if (req.kind === 'material_rule' || (req.kind === 'noise_settings' && req.mode !== 'density')) {
 		const key = terrainKey(`${req.options.terrain}|${fixedBiome}`);
-		const terrain = await withVanilla((): Terrain => {
+		const terrain = cached?.key === key ? cached.t : await withVanilla((): Terrain => {
 			const settingsId = req.kind === 'material_rule' ? Identifier.parse(req.options.terrain || 'minecraft:overworld') : id;
 			const settings = WorldgenRegistries.NOISE_SETTINGS.getOrThrow(settingsId);
 			const rule = req.kind === 'material_rule' ? WorldgenRegistries.MATERIAL_RULE.getOrThrow(id) : settings.materialRule;
 			const rs = new RandomState(settings, seed);
-			return { settings, rule, rs, biomeAt: () => fixedBiome };
+			const shape = [shapeVersion, req.seed, 'noise_settings', settingsId].join('|');
+			return { settings, rule, rs, biomeAt: () => fixedBiome, shape };
 		});
+		cached = { key, t: terrain };
 		await warm(terrain, key);
 		return req.mode === 'iso' ? renderIso(req, terrain, key) : renderTerrain(req, terrain, key);
 	}
@@ -670,6 +814,12 @@ async function render(req: RenderRequest): Promise<PreviewResponse> {
 	return { type: 'rendered', seq: req.seq, width, height, pixels, values, min, max, seaLevel: sea, minY, maxY };
 }
 
+function post(res: Rendered) {
+	const transfer: Transferable[] = [res.pixels.buffer, res.values.buffer];
+	if (res.bitmap) transfer.push(res.bitmap);
+	(self as unknown as Worker).postMessage(res, transfer);
+}
+
 let latest = 0;
 self.onmessage = async (e: MessageEvent<PreviewRequest>) => {
 	const req = e.data;
@@ -677,15 +827,18 @@ self.onmessage = async (e: MessageEvent<PreviewRequest>) => {
 		userFiles = req.files;
 		dimensions = new Map(req.files.filter((f) => f.kind === 'dimension').map((f) => [f.id, f.json]));
 		version++;
+		const shape = shapeOf(req.files);
+		if (shape !== shapeSignature) {
+			shapeSignature = shape;
+			shapeVersion++;
+		}
 		return;
 	}
 	latest = req.seq;
 	try {
 		const res = await render(req);
 		if (res.seq !== latest) return; // superseded while fetching
-		if (res.type === 'rendered') {
-			(self as unknown as Worker).postMessage(res, [res.pixels.buffer, res.values.buffer]);
-		}
+		if (res.type === 'rendered') post(res);
 	} catch (err) {
 		if (err instanceof Superseded || req.seq !== latest) return;
 		(self as unknown as Worker).postMessage({ type: 'error', seq: req.seq, message: String(err instanceof Error ? err.message : err) } satisfies PreviewResponse);
