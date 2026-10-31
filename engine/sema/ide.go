@@ -85,7 +85,7 @@ func (c *Checker) valueCandidates(v tview, depth int) []Candidate {
 				if cl.Case != "" {
 					cand.Detail = "minecraft:" + cl.Case
 				}
-				cand.Doc = c.signature(cl)
+				cand.Doc = "```mms\n" + c.signature(cl) + "\n```\n\n" + c.helperSignatureDoc(cl)
 				if len(c.requiredSlots(cl)) == 0 {
 					cand.Insert = name + "()"
 				}
@@ -317,17 +317,26 @@ func (c *Checker) Signature(in *Info) (label string, params []string, docs []str
 	cl := in.Callable
 	for _, f := range c.positional(cl) {
 		p := f.Key
-		if f.Optional {
-			p += "?"
-		} else if cl.Ov != nil {
-			if _, ok := cl.Ov.defaults[f.Key]; ok {
+		if d := defaultOf(cl, f.Key); d != "" {
+			p += ": " + c.shortType(f.Type) + " = " + d
+		} else {
+			if f.Optional {
 				p += "?"
 			}
+			p += ": " + c.shortType(f.Type)
 		}
-		params = append(params, p+": "+describe(f.Type))
-		docs = append(docs, f.Desc)
+		params = append(params, p)
+		docs = append(docs, c.paramDoc(cl, f))
 	}
 	return cl.Name + "(" + strings.Join(params, ", ") + ")", params, docs
+}
+
+// SignatureDoc is the Markdown signature help shows for a helper call.
+func (c *Checker) SignatureDoc(in *Info) string {
+	if in == nil || in.Callable == nil {
+		return ""
+	}
+	return c.helperSignatureDoc(in.Callable)
 }
 
 func (c *Checker) signature(cl *Callable) string {
@@ -345,14 +354,7 @@ func (c *Checker) Hover(in *Info) string {
 	case in.Help != "":
 		parts = append(parts, in.Help)
 	case in.Callable != nil:
-		cl := in.Callable
-		head := "```mms\n" + c.signature(cl) + "\n```"
-		if cl.Case != "" {
-			head += "\nMakes `minecraft:" + cl.Case + "` (" + describe(cl.Struct) + ")."
-		} else {
-			head += "\nMakes " + describe(cl.Struct) + "."
-		}
-		parts = append(parts, head)
+		parts = append(parts, c.helperHover(in.Callable))
 	case in.Field != nil:
 		parts = append(parts, fmt.Sprintf("```mms\n%s: %s\n```", in.Field.Key, describe(in.Field.Type)))
 		if in.Field.Desc != "" {

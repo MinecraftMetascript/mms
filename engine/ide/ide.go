@@ -529,6 +529,7 @@ func (s *Session) Signature(path string, off int) (SignatureHelp, bool) {
 		}
 		var h SignatureHelp
 		h.Label, h.Params, h.ParamDocs = a.c.Signature(a.info(call))
+		h.Doc = a.c.SignatureDoc(a.info(call))
 		if h.Label == "" {
 			h = s.functionSignature(a.info(call.Fn))
 		}
