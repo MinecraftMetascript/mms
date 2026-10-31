@@ -19,6 +19,11 @@
 === data/treasure/function/found_gem.mcfunction
 tellraw @s "You found your first gem. Four gems craft into a gem block!"
 execute if predicate treasure:stormy_night run loot give @s loot treasure:chests/storm_bonus
+=== data/treasure/function/hide_chest.mcfunction
+execute if block ~ ~-1 ~ #treasure:chest_floors run setblock ~ ~ ~ chest{LootTable:"treasure:chests/buried"}
+execute unless block ~ ~-1 ~ #treasure:chest_floors run tellraw @s "Stand on logs, planks or stone bricks to hide a chest"
+=== data/treasure/function/preview_loot.mcfunction
+loot give @s loot treasure:chests/buried
 === data/treasure/loot_table/chests/buried.json
 {
   "pools": [

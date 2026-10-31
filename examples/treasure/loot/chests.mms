@@ -1,5 +1,12 @@
 // Loot tables. Names can have folders: this is treasure:chests/buried.
+//
+// A loot table does nothing by itself. Something has to roll it:
+// - chests/buried fills the chests that hide_chest places (see chests.mms
+//   at the top level). The chest rolls it the first time a player opens it.
+// - chests/storm_bonus is rolled by found_gem in progress.mms, which gives
+//   its items straight to the player with /loot.
 
+/** Rolled when a player first opens a chest from hide_chest. */
 LootTable chests/buried {
   pools = [
     // One to three entries from the gem tag, each equally likely.
@@ -15,7 +22,7 @@ LootTable chests/buried {
   ]
 }
 
-/** Extra loot only on a stormy night. */
+/** Rolled by found_gem. Gives a trident, but only on a stormy night. */
 LootTable chests/storm_bonus {
   pools = [
     {
