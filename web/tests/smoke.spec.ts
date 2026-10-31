@@ -367,3 +367,40 @@ test('F2 renames inline with a preview of occurrences', async ({ page }) => {
 	await expect(box).toHaveValue('base');
 	await page.keyboard.press('Escape');
 });
+
+test('built-in helpers explain themselves on hover and while typing', async ({ page }) => {
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	await replaceText(page, 'SurfaceRule r = If(StoneDepth(Floor)) { Block(grass_block) }\n');
+	await expect(status(page)).toHaveText(/No problems/);
+
+	// Hover: what it does, each parameter, an example and a reference link.
+	const at = await page.evaluate(() => {
+		const walk = document.createTreeWalker(document.querySelector('.cm-content')!, NodeFilter.SHOW_TEXT);
+		for (let n = walk.nextNode(); n; n = walk.nextNode()) {
+			const i = n.textContent!.indexOf('StoneDepth');
+			if (i < 0) continue;
+			const r = document.createRange();
+			r.setStart(n, i + 2);
+			r.setEnd(n, i + 3);
+			const b = r.getBoundingClientRect();
+			return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
+		}
+		return { x: 0, y: 0 };
+	});
+	await page.mouse.move(at.x, at.y);
+	const hover = page.locator('.cm-lsp-hover-tooltip');
+	await expect(hover).toContainText('True for blocks close to a surface');
+	await expect(hover).toContainText('secondary_depth_range');
+	await expect(hover.locator('a[href*="reference#material_condition-StoneDepth"]')).toHaveCount(1);
+	await page.mouse.move(0, 0);
+
+	// Signature help shows the active parameter's meaning first.
+	await page.locator('.cm-content').click();
+	await page.keyboard.press('ControlOrMeta+End');
+	// Typed key by key, so brackets close as they would for a person.
+	await page.keyboard.type('SurfaceRule s = If(StoneDepth(Floor,');
+	const sig = page.locator('.cm-lsp-signature-tooltip');
+	await expect(sig.locator('.cm-lsp-active-parameter')).toHaveText(/^offset/);
+	await expect(sig).toContainText('Extra depth that still passes');
+});
