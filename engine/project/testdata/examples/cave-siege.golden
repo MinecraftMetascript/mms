@@ -1,0 +1,394 @@
+=== data/minecraft/tags/damage_type/no_knockback.json
+{
+  "values": [
+    "siege:lure_ping"
+  ]
+}
+=== data/minecraft/tags/function/load.json
+{
+  "values": [
+    "siege:mms_gen/load"
+  ]
+}
+=== data/minecraft/tags/function/tick.json
+{
+  "values": [
+    "siege:mms_gen/tick"
+  ]
+}
+=== data/siege/advancement/placed_banner.json
+{
+  "criteria": {
+    "placed": {
+      "trigger": "minecraft:placed_block",
+      "conditions": {
+        "location": {
+          "type": "minecraft:match_tool",
+          "predicate": {
+            "items": [
+              "minecraft:white_banner"
+            ],
+            "predicates": {
+              "minecraft:custom_data": "{siege_banner:1b}"
+            }
+          }
+        }
+      }
+    }
+  },
+  "rewards": {
+    "function": "siege:on_place"
+  }
+}
+=== data/siege/damage_type/lure_ping.json
+{
+  "message_id": "generic",
+  "exhaustion": 0,
+  "scaling": "never"
+}
+=== data/siege/function/arena_maze.mcfunction
+fill ~ ~-1 ~ ~16 ~-1 ~24 minecraft:stone
+fill ~ ~ ~ ~16 ~3 ~24 minecraft:air
+fill ~ ~ ~ ~16 ~2 ~ minecraft:stone
+fill ~ ~ ~24 ~16 ~2 ~24 minecraft:stone
+fill ~ ~ ~ ~ ~2 ~24 minecraft:stone
+fill ~16 ~ ~ ~16 ~2 ~24 minecraft:stone
+fill ~ ~ ~6 ~12 ~2 ~6 minecraft:stone
+fill ~4 ~ ~12 ~16 ~2 ~12 minecraft:stone
+fill ~ ~ ~18 ~12 ~2 ~18 minecraft:stone
+setblock ~2 ~-1 ~3 minecraft:emerald_block
+setblock ~2 ~-1 ~21 minecraft:gold_block
+time set midnight
+tellraw @s "Maze built. Place the banner on the gold block, then spawn enemies on the emerald block."
+=== data/siege/function/banner_falls.mcfunction
+title @a title "The banner has fallen"
+execute at @e[tag=cs_core,limit=1] run playsound minecraft:entity.wither.death master @a ~ ~ ~ 1 0.6
+function siege:reset
+=== data/siege/function/banner_second.mcfunction
+execute at @e[tag=cs_core,limit=1] unless block ~ ~ ~ #minecraft:banners run setblock ~ ~ ~ minecraft:white_banner
+execute store result score #lure_hp cs_tmp run data get entity @e[tag=cs_lure,limit=1] Health
+scoreboard players set #banner_second.lost mms.siege 1024
+scoreboard players operation #banner_second.lost mms.siege -= #lure_hp cs_tmp
+data modify entity @e[tag=cs_lure,limit=1] Health set value 1024f
+execute as @e[tag=cs_lure] at @e[tag=cs_core,limit=1] run tp @s ~ ~ ~
+execute if score #banner_second.lost mms.siege matches 1.. run function siege:banner_second/_if0
+execute if score $banner_hp mms.siege matches ..0 run function siege:banner_second/_if1
+execute if score #cf mms.siege matches 3 run return run function siege:mms_gen/ret
+execute store result storage siege:mms m.a0 int 1 run scoreboard players get $banner_hp mms.siege
+function siege:banner_second/_macro2 with storage siege:mms m
+bossbar set siege:banner players @a
+=== data/siege/function/banner_second/_if0.mcfunction
+scoreboard players operation $banner_hp mms.siege -= #banner_second.lost mms.siege
+execute at @e[tag=cs_core,limit=1] run particle minecraft:damage_indicator ~ ~1 ~ 0.3 0.5 0.3 0 5
+=== data/siege/function/banner_second/_if1.mcfunction
+function siege:banner_falls
+scoreboard players set #cf mms.siege 3
+return 0
+=== data/siege/function/banner_second/_macro2.mcfunction
+$bossbar set siege:banner value $(a0)
+=== data/siege/function/break_at.mcfunction
+execute unless block ~ ~ ~ #siege:walkable run return run function siege:break_block
+execute unless block ~ ~1 ~ #siege:walkable positioned ~ ~1 ~ run return run function siege:break_block
+scoreboard players set @s cs_break 0
+=== data/siege/function/break_block.mcfunction
+execute if block ~ ~ ~ #siege:unbreakable run return 0
+scoreboard players set #need cs_tmp 15
+execute if block ~ ~ ~ #siege:break_fast run scoreboard players set #need cs_tmp 5
+execute if block ~ ~ ~ #siege:break_metal run scoreboard players set #need cs_tmp 30
+execute if block ~ ~ ~ #siege:break_obsidian run scoreboard players set #need cs_tmp 75
+scoreboard players add @s cs_break 1
+particle minecraft:crit ~0.5 ~0.5 ~0.5 0.3 0.3 0.3 0.1 4
+playsound minecraft:block.stone.hit hostile @a ~ ~ ~ 0.6 0.8
+execute if score @s cs_break >= #need cs_tmp run function siege:break_block/_if0
+=== data/siege/function/break_block/_if0.mcfunction
+setblock ~ ~ ~ air destroy
+scoreboard players set @s cs_break 0
+=== data/siege/function/break_step.mcfunction
+execute facing entity @e[tag=cs_lure,limit=1] feet rotated ~ 0 positioned ^ ^ ^0.8 align xyz run function siege:break_at
+=== data/siege/function/create_core.mcfunction
+summon minecraft:marker ~ ~ ~ {Tags:["cs_core"]}
+summon minecraft:villager ~ ~ ~ {Tags:["cs_lure"],NoAI:1b,Silent:1b,PersistenceRequired:1b,Age:-2147483648,CanPickUpLoot:0b,attributes:[{id:"minecraft:max_health",base:1024d},{id:"minecraft:knockback_resistance",base:1d}],Health:1024f,active_effects:[{id:"minecraft:invisibility",duration:-1,show_particles:0b}]}
+team join cs_defenders @e[tag=cs_lure]
+execute store result score #cx cs_tmp run data get entity @e[tag=cs_core,limit=1] Pos[0]
+execute store result score #cy cs_tmp run data get entity @e[tag=cs_core,limit=1] Pos[1]
+execute store result score #cz cs_tmp run data get entity @e[tag=cs_core,limit=1] Pos[2]
+spawnpoint @a[team=cs_defenders] ~ ~ ~
+scoreboard players set $banner_placed mms.siege 1
+scoreboard players operation $banner_hp mms.siege = $banner_max mms.siege
+scoreboard players set $ticks mms.siege 0
+execute store result storage siege:mms m.a0 int 1 run scoreboard players get $banner_max mms.siege
+function siege:create_core/_macro0 with storage siege:mms m
+execute store result storage siege:mms m.a0 int 1 run scoreboard players get $banner_hp mms.siege
+function siege:create_core/_macro1 with storage siege:mms m
+bossbar set siege:banner players @a
+tellraw @a "The Siege Banner is planted. Defend it!"
+=== data/siege/function/create_core/_macro0.mcfunction
+$bossbar set siege:banner max $(a0)
+=== data/siege/function/create_core/_macro1.mcfunction
+$bossbar set siege:banner value $(a0)
+=== data/siege/function/enemy_init.mcfunction
+tag @s remove cs_new
+attribute @s minecraft:follow_range base set 64
+execute store result score @s cs_group run random value 0..3
+scoreboard players set @s cs_age 0
+scoreboard players set @s cs_break 0
+scoreboard players set @s cs_prev 1000000
+scoreboard players set @s cs_stuck 0
+execute if entity @s[tag=cs_sapper] run scoreboard players set @s cs_stuck 1000000
+function siege:retarget
+=== data/siege/function/enemy_update.mcfunction
+scoreboard players add @s cs_age 1
+scoreboard players operation #enemy_update._t0 mms.siege = @s cs_age
+scoreboard players operation #enemy_update._t0 mms.siege %= #c10 mms.siege
+execute if score #enemy_update._t0 mms.siege matches 1 run function siege:retarget
+scoreboard players operation #enemy_update._t1 mms.siege = @s cs_age
+scoreboard players operation #enemy_update._t1 mms.siege %= #c25 mms.siege
+execute if score #enemy_update._t1 mms.siege matches 0 run function siege:stuck_check
+execute if score @s cs_stuck matches 1.. run function siege:enemy_update/_if0
+=== data/siege/function/enemy_update/_if0.mcfunction
+scoreboard players remove @s cs_stuck 1
+function siege:break_step
+=== data/siege/function/find_banner.mcfunction
+execute if block ~ ~ ~ #minecraft:banners run return run function siege:found_banner
+scoreboard players add #ray cs_tmp 1
+execute if score #ray cs_tmp matches ..59 positioned ^ ^ ^0.1 run function siege:find_banner
+=== data/siege/function/found_banner.mcfunction
+execute if score $banner_placed mms.siege matches 1 run function siege:found_banner/_if0
+execute if score #cf mms.siege matches 3 run return run function siege:mms_gen/ret
+execute align xyz positioned ~0.5 ~ ~0.5 run function siege:create_core
+=== data/siege/function/found_banner/_if0.mcfunction
+setblock ~ ~ ~ air
+function siege:give_banner
+tellraw @s "There is already a Siege Banner planted"
+scoreboard players set #cf mms.siege 3
+return 0
+=== data/siege/function/give_banner.mcfunction
+give @s minecraft:white_banner[custom_name="Siege Banner",custom_data={siege_banner:1b},enchantment_glint_override=true,banner_patterns=[{pattern:"minecraft:flower",color:"red"},{pattern:"minecraft:border",color:"black"}]]
+=== data/siege/function/mms_gen/load.mcfunction
+scoreboard objectives add cs_tmp dummy
+scoreboard objectives add cs_group dummy
+scoreboard objectives add cs_age dummy
+scoreboard objectives add cs_prev dummy
+scoreboard objectives add cs_stuck dummy
+scoreboard objectives add cs_break dummy
+scoreboard objectives add mms.siege dummy
+scoreboard players set #cf mms.siege 0
+scoreboard players set #c4 mms.siege 4
+scoreboard players set #c10 mms.siege 10
+scoreboard players set #c20 mms.siege 20
+scoreboard players set #c25 mms.siege 25
+execute unless score $banner_placed mms.siege = $banner_placed mms.siege run scoreboard players set $banner_placed mms.siege 0
+execute unless score $banner_hp mms.siege = $banner_hp mms.siege run scoreboard players set $banner_hp mms.siege 100
+execute unless score $banner_max mms.siege = $banner_max mms.siege run scoreboard players set $banner_max mms.siege 100
+execute unless score $ticks mms.siege = $ticks mms.siege run scoreboard players set $ticks mms.siege 0
+team add cs_defenders "Defenders"
+team modify cs_defenders friendlyFire false
+bossbar add siege:banner "Siege Banner"
+bossbar set siege:banner color red
+bossbar set siege:banner style notched_10
+=== data/siege/function/mms_gen/ret.mcfunction
+scoreboard players set #cf mms.siege 0
+return run scoreboard players get #rv mms.siege
+=== data/siege/function/mms_gen/tick.mcfunction
+function siege:mms_gen/tick/0eb3a519
+=== data/siege/function/mms_gen/tick/0eb3a519.mcfunction
+team join cs_defenders @a[team=]
+execute if score $banner_placed mms.siege matches 1 run function siege:siege_tick
+=== data/siege/function/on_place.mcfunction
+advancement revoke @s only siege:placed_banner
+scoreboard players set #ray cs_tmp 0
+execute at @s anchored eyes positioned ^ ^ ^ run function siege:find_banner
+=== data/siege/function/reset.mcfunction
+kill @e[tag=cs_enemy]
+execute at @e[tag=cs_core] run setblock ~ ~ ~ air
+kill @e[tag=cs_core]
+tp @e[tag=cs_lure] ~ -1000 ~
+kill @e[tag=cs_lure]
+bossbar set siege:banner players
+scoreboard players set $banner_placed mms.siege 0
+scoreboard players operation $banner_hp mms.siege = $banner_max mms.siege
+tellraw @a "Cave Siege reset"
+=== data/siege/function/retarget.mcfunction
+execute unless entity @a[distance=..8,gamemode=!spectator,gamemode=!creative] run damage @s 0.01 siege:lure_ping by @e[tag=cs_lure,limit=1]
+=== data/siege/function/seal_banner.mcfunction
+execute at @e[tag=cs_core,limit=1] run fill ~-2 ~-1 ~-2 ~2 ~2 ~2 minecraft:cobblestone outline
+tellraw @s "Banner sealed in cobblestone. Enemies should get stuck, then dig in."
+=== data/siege/function/seal_banner_obsidian.mcfunction
+execute at @e[tag=cs_core,limit=1] run fill ~-2 ~-1 ~-2 ~2 ~2 ~2 minecraft:obsidian outline
+=== data/siege/function/siege_tick.mcfunction
+scoreboard players add $ticks mms.siege 1
+scoreboard players operation #siege_tick.g mms.siege = $ticks mms.siege
+scoreboard players operation #siege_tick.g mms.siege %= #c4 mms.siege
+scoreboard players set #siege_tick._f0 mms.siege 0
+execute if score #siege_tick.g mms.siege matches 0 run scoreboard players set #siege_tick._f0 mms.siege 1
+execute if score #siege_tick._f0 mms.siege matches 1 as @e[tag=cs_enemy,scores={cs_group=0}] at @s run function siege:enemy_update
+execute unless score #siege_tick._f0 mms.siege matches 1 run function siege:siege_tick/_else1
+scoreboard players operation #siege_tick._t1 mms.siege = $ticks mms.siege
+scoreboard players operation #siege_tick._t1 mms.siege %= #c20 mms.siege
+execute if score #siege_tick._t1 mms.siege matches 0 run function siege:banner_second
+=== data/siege/function/siege_tick/_else1.mcfunction
+scoreboard players set #siege_tick._f2 mms.siege 0
+execute if score #siege_tick.g mms.siege matches 1 run scoreboard players set #siege_tick._f2 mms.siege 1
+execute if score #siege_tick._f2 mms.siege matches 1 as @e[tag=cs_enemy,scores={cs_group=1}] at @s run function siege:enemy_update
+execute unless score #siege_tick._f2 mms.siege matches 1 run function siege:siege_tick/_else3
+=== data/siege/function/siege_tick/_else3.mcfunction
+scoreboard players set #siege_tick._f4 mms.siege 0
+execute if score #siege_tick.g mms.siege matches 2 run scoreboard players set #siege_tick._f4 mms.siege 1
+execute if score #siege_tick._f4 mms.siege matches 1 as @e[tag=cs_enemy,scores={cs_group=2}] at @s run function siege:enemy_update
+execute unless score #siege_tick._f4 mms.siege matches 1 as @e[tag=cs_enemy,scores={cs_group=3}] at @s run function siege:enemy_update
+=== data/siege/function/spawn.mcfunction
+scoreboard players set #spawn.i mms.siege 1
+scoreboard players operation #spawn._t0 mms.siege = #spawn.count mms.siege
+function siege:spawn/_while0
+execute as @e[tag=cs_new] run function siege:enemy_init
+=== data/siege/function/spawn/_macro1.mcfunction
+$summon $(a0) ~ ~ ~ {Tags:["cs_enemy","cs_new"],PersistenceRequired:1b}
+=== data/siege/function/spawn/_while0.mcfunction
+execute unless score #spawn.i mms.siege <= #spawn._t0 mms.siege run return 0
+data modify storage siege:mms m.a0 set from storage siege:mms l."spawn".kind
+function siege:spawn/_macro1 with storage siege:mms m
+scoreboard players add #spawn.i mms.siege 1
+return run function siege:spawn/_while0
+=== data/siege/function/spawn_mixed.mcfunction
+data modify storage siege:mms l."spawn".kind set value "minecraft:zombie"
+scoreboard players set #spawn.count mms.siege 5
+function siege:spawn
+data modify storage siege:mms l."spawn".kind set value "minecraft:skeleton"
+scoreboard players set #spawn.count mms.siege 5
+function siege:spawn
+data modify storage siege:mms l."spawn".kind set value "minecraft:spider"
+scoreboard players set #spawn.count mms.siege 5
+function siege:spawn
+data modify storage siege:mms l."spawn".kind set value "minecraft:creeper"
+scoreboard players set #spawn.count mms.siege 5
+function siege:spawn
+=== data/siege/function/spawn_sappers.mcfunction
+scoreboard players set #spawn_sappers.i mms.siege 1
+function siege:spawn_sappers/_while0
+execute as @e[tag=cs_new] run function siege:enemy_init
+=== data/siege/function/spawn_sappers/_while0.mcfunction
+execute unless score #spawn_sappers.i mms.siege matches ..3 run return 0
+summon minecraft:zombie ~ ~ ~ {Tags:["cs_enemy","cs_new","cs_sapper"],PersistenceRequired:1b,CustomName:"Sapper",equipment:{mainhand:{id:"minecraft:iron_pickaxe",count:1}}}
+scoreboard players add #spawn_sappers.i mms.siege 1
+return run function siege:spawn_sappers/_while0
+=== data/siege/function/spawn_zombies.mcfunction
+data modify storage siege:mms l."spawn".kind set value "minecraft:zombie"
+scoreboard players set #spawn.count mms.siege 20
+function siege:spawn
+=== data/siege/function/status.mcfunction
+execute store result score #enemies cs_tmp if entity @e[tag=cs_enemy]
+scoreboard players operation #status.enemies mms.siege = #enemies cs_tmp
+scoreboard players set #status._f0 mms.siege 0
+execute if score $banner_placed mms.siege matches 1 run scoreboard players set #status._f0 mms.siege 1
+execute if score #status._f0 mms.siege matches 1 run function siege:status/_if1
+execute unless score #status._f0 mms.siege matches 1 run function siege:status/_else3
+=== data/siege/function/status/_else3.mcfunction
+execute store result storage siege:mms m.a0 int 1 run scoreboard players get #status.enemies mms.siege
+function siege:status/_macro4 with storage siege:mms m
+=== data/siege/function/status/_if1.mcfunction
+execute store result storage siege:mms m.a0 int 1 run scoreboard players get $banner_hp mms.siege
+execute store result storage siege:mms m.a1 int 1 run scoreboard players get $banner_max mms.siege
+execute store result storage siege:mms m.a2 int 1 run scoreboard players get #status.enemies mms.siege
+function siege:status/_macro2 with storage siege:mms m
+=== data/siege/function/status/_macro2.mcfunction
+$tellraw @s "Banner: $(a0) / $(a1) health, $(a2) enemies alive"
+=== data/siege/function/status/_macro4.mcfunction
+$tellraw @s "No banner is planted, $(a0) enemies alive"
+=== data/siege/function/stuck_check.mcfunction
+execute store result score #ex cs_tmp run data get entity @s Pos[0]
+execute store result score #ey cs_tmp run data get entity @s Pos[1]
+execute store result score #ez cs_tmp run data get entity @s Pos[2]
+scoreboard players operation #stuck_check.dx mms.siege = #ex cs_tmp
+scoreboard players operation #stuck_check.dx mms.siege -= #cx cs_tmp
+scoreboard players operation #stuck_check.dy mms.siege = #ey cs_tmp
+scoreboard players operation #stuck_check.dy mms.siege -= #cy cs_tmp
+scoreboard players operation #stuck_check.dz mms.siege = #ez cs_tmp
+scoreboard players operation #stuck_check.dz mms.siege -= #cz cs_tmp
+execute if score #stuck_check.dx mms.siege matches ..-1 run function siege:stuck_check/_if0
+execute if score #stuck_check.dy mms.siege matches ..-1 run function siege:stuck_check/_if1
+execute if score #stuck_check.dz mms.siege matches ..-1 run function siege:stuck_check/_if2
+scoreboard players operation #stuck_check._t7 mms.siege = #stuck_check.dx mms.siege
+scoreboard players operation #stuck_check._t7 mms.siege += #stuck_check.dy mms.siege
+scoreboard players operation #stuck_check._t7 mms.siege += #stuck_check.dz mms.siege
+scoreboard players operation #stuck_check.d mms.siege = #stuck_check._t7 mms.siege
+execute store result score #near cs_tmp if entity @a[distance=..8,gamemode=!spectator,gamemode=!creative]
+scoreboard players set #stuck_check._t9 mms.siege 0
+execute if score #stuck_check.d mms.siege matches 3.. run function siege:stuck_check/_if3
+execute if score #stuck_check._t9 mms.siege matches 1 if score @s cs_stuck matches ..0 if score #near cs_tmp matches 0 run scoreboard players set @s cs_stuck 50
+scoreboard players operation @s cs_prev = #stuck_check.d mms.siege
+=== data/siege/function/stuck_check/_if0.mcfunction
+scoreboard players set #stuck_check._t3 mms.siege 0
+scoreboard players operation #stuck_check._t3 mms.siege -= #stuck_check.dx mms.siege
+scoreboard players operation #stuck_check.dx mms.siege = #stuck_check._t3 mms.siege
+=== data/siege/function/stuck_check/_if1.mcfunction
+scoreboard players set #stuck_check._t4 mms.siege 0
+scoreboard players operation #stuck_check._t4 mms.siege -= #stuck_check.dy mms.siege
+scoreboard players operation #stuck_check.dy mms.siege = #stuck_check._t4 mms.siege
+=== data/siege/function/stuck_check/_if2.mcfunction
+scoreboard players set #stuck_check._t5 mms.siege 0
+scoreboard players operation #stuck_check._t5 mms.siege -= #stuck_check.dz mms.siege
+scoreboard players operation #stuck_check.dz mms.siege = #stuck_check._t5 mms.siege
+=== data/siege/function/stuck_check/_if3.mcfunction
+scoreboard players operation #stuck_check._t8 mms.siege = @s cs_prev
+scoreboard players remove #stuck_check._t8 mms.siege 2
+execute if score #stuck_check.d mms.siege > #stuck_check._t8 mms.siege run scoreboard players set #stuck_check._t9 mms.siege 1
+=== data/siege/tags/block/break_fast.json
+{
+  "values": [
+    "#minecraft:mineable/axe",
+    "#minecraft:mineable/shovel",
+    "#minecraft:mineable/hoe",
+    "#minecraft:wool",
+    "#minecraft:impermeable"
+  ]
+}
+=== data/siege/tags/block/break_metal.json
+{
+  "values": [
+    "minecraft:iron_block",
+    "minecraft:iron_door",
+    "minecraft:iron_bars",
+    "minecraft:iron_trapdoor",
+    "#minecraft:anvil"
+  ]
+}
+=== data/siege/tags/block/break_obsidian.json
+{
+  "values": [
+    "minecraft:obsidian",
+    "minecraft:crying_obsidian",
+    "minecraft:respawn_anchor",
+    "minecraft:netherite_block",
+    "minecraft:ancient_debris"
+  ]
+}
+=== data/siege/tags/block/unbreakable.json
+{
+  "values": [
+    "minecraft:bedrock",
+    "minecraft:reinforced_deepslate",
+    "minecraft:end_portal_frame",
+    "minecraft:barrier",
+    "minecraft:command_block",
+    "minecraft:structure_block"
+  ]
+}
+=== data/siege/tags/block/walkable.json
+{
+  "values": [
+    "#minecraft:air",
+    "#minecraft:replaceable",
+    "#minecraft:wall_post_override",
+    "#minecraft:climbable",
+    "#minecraft:banners",
+    "minecraft:light"
+  ]
+}
+=== pack.mcmeta
+{
+  "pack": {
+    "description": "Cave Siege phase 1 prototype: a banner that waves of mobs walk to, damage and dig towards",
+    "min_format": 121,
+    "max_format": 121
+  }
+}

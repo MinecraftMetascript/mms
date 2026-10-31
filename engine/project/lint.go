@@ -267,6 +267,11 @@ func lintOverrides(l *lintRun, d *Decl) {
 	folder := d.Kind.Folder()
 	vanilla := false
 	if d.Kind.TagOf != "" {
+		// A tag without replace adds to vanilla's entries rather than
+		// replacing them.
+		if !d.TagReplace {
+			return
+		}
 		vanilla = contains(l.r.pack.Registries["tag/"+d.Kind.TagOf], path)
 	} else {
 		vanilla = l.r.pack.HasID(folder, path)
