@@ -31,3 +31,14 @@ Set severities in `mms.json`. Each value is `error`, `warning`, `info`, `hint` o
 - `// mms-ignore-file <rule>` applies to the whole file.
 
 Every lint finding offers a quick fix that inserts the comment for you.
+
+## Quick fixes for errors
+
+Some checker errors have a quick fix too. A "missing field" error on an object or a helper call offers **Add missing fields**, which writes every required field with a placeholder value:
+
+```mms
+DensityFunction d = Clamp(1)            // missing fields 'min', 'max'
+DensityFunction d = Clamp(1, min = 0, max = 0)
+```
+
+In an object that spans lines, each field goes on its own line before the closing brace. A placeholder is `0` (or the nearest number the field's range allows), `false`, the first enum value, `[]`, `""` or `{}`. For a value that can take several forms, the simplest form is used, so a loot pool's `rolls` becomes `0`. An inserted `{}` reports its own missing fields, with its own fix. Placeholders are guesses, so these fixes are not safe and "Fix all" leaves them alone.

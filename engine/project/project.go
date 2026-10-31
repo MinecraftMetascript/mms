@@ -339,6 +339,7 @@ func (p *Project) checkDecl(u *sema.Unit, d *syntax.Decl, k sema.Kind, syms *sem
 	dr = &Decl{Unit: u, D: d, Kind: k, NS: ns}
 	c := sema.NewChecker(p.Pack, p.Kinds, syms, ns)
 	c.Files = p.Files
+	c.Src = u.File.Src
 	defer func() {
 		if rec := recover(); rec != nil {
 			dr.Value, dr.Tag, dr.Lines, dr.Fn = nil, nil, nil, nil
