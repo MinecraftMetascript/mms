@@ -69,6 +69,8 @@ type Checker struct {
 	// Files are the project's files, read by asset helpers; nil when
 	// the host has none.
 	Files fs.FS
+	// Src is the checked file's text; quick fixes need it for layout.
+	Src []rune
 
 	trial  bool
 	errs   int
