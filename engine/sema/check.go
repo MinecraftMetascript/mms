@@ -20,9 +20,24 @@ type Info struct {
 	Fields   []field // for object bodies and calls: every field in scope
 	Disp     *dispInfo
 	Callable *Callable
+	// Bare says how a string literal here could be written unquoted:
+	// BareID for an id (Folder is its registry folder, "tags/..." for a
+	// tag), BareKey for a dispatch key, BareEnum for a string enum name.
+	Bare   BareKind
+	Folder string
 
 	typed bool
 }
+
+// BareKind classifies positions where a string literal has a bare form.
+type BareKind uint8
+
+const (
+	BareNone BareKind = iota
+	BareID
+	BareKey
+	BareEnum
+)
 
 // Callable is a resolved call: which struct (and dispatch case) it builds.
 type Callable struct {
@@ -601,6 +616,7 @@ func (c *Checker) enumValue(e syntax.Expr, v tview) jsonv.Value {
 		s := val.String()
 		if strings.TrimPrefix(s, "minecraft:") == got || (isPascal(got) && s == Snake(got)) {
 			if v.T.EnumKind == "string" {
+				c.info(e).Bare = BareEnum
 				if v.RefID && !strings.Contains(s, ":") {
 					s = "minecraft:" + s
 				}
@@ -741,6 +757,7 @@ func (c *Checker) resolveID(text string, id idInfo, e syntax.Expr) string {
 	in := c.info(e)
 	in.ID = full
 	in.Symbol = sym
+	in.Bare, in.Folder = BareID, reg
 	if sym != nil || reg == "" {
 		return full
 	}
@@ -778,6 +795,7 @@ func (c *Checker) resolveTag(text string, id idInfo, e syntax.Expr) string {
 	in := c.info(e)
 	in.ID = "#" + full
 	in.Symbol = sym
+	in.Bare, in.Folder = BareID, "tags/"+reg
 	if sym == nil && ns == "minecraft" {
 		if tags, known := c.Pack.Registries["tag/"+reg]; known && !contains(tags, path) {
 			c.errorf("mms/unknown-id", e.Span(), "unknown %s tag '#%s'", reg, full)

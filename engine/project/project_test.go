@@ -11,6 +11,7 @@ import (
 
 	"github.com/minecraftmetascript/mms/engine/jsonv"
 	"github.com/minecraftmetascript/mms/engine/spec"
+	"github.com/minecraftmetascript/mms/engine/syntax"
 )
 
 var update = os.Getenv("MMS_UPDATE") != ""
@@ -58,7 +59,9 @@ func TestExamples(t *testing.T) {
 			}
 			for _, u := range r.Units {
 				for _, d := range r.Diagnostics(u.Path) {
-					t.Errorf("%s: %s %s", u.Path, d.Code, d.Message)
+					if d.Severity != syntax.SeverityHint {
+						t.Errorf("%s: %s %s", u.Path, d.Code, d.Message)
+					}
 				}
 			}
 			got := dumpFiles(r.Emit())
@@ -143,7 +146,9 @@ DensityFunction dup = 2
 	r, _ := p.Analyze(context.Background())
 	var codes []string
 	for _, d := range r.Diagnostics("a.mms") {
-		codes = append(codes, d.Code)
+		if !strings.HasPrefix(d.Code, "lint/") {
+			codes = append(codes, d.Code)
+		}
 	}
 	if got := strings.Join(codes, " "); got != "mms/invalid-name mms/duplicate" {
 		t.Errorf("diagnostics = %s", got)

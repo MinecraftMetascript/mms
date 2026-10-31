@@ -10,7 +10,8 @@
 	}
 	let { output, target }: Props = $props();
 
-	const info = $derived(previewable(target));
+	// A target the pack no longer has (renamed or deleted) shows nothing.
+	const info = $derived(target && output.some((f) => f.path === target) ? previewable(target) : null);
 	const defaults: Record<PreviewKind, PreviewView> = {
 		noise: { x: 0, y: 0, scale: 4 },
 		density_function: { x: 0, y: 64, scale: 2 },

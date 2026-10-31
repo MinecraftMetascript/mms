@@ -90,6 +90,7 @@ func (c *Checker) caseKeyOf(e syntax.Expr, disp *dispInfo) string {
 	}
 	in := c.info(e)
 	in.ID = "minecraft:" + key
+	in.Bare = BareKey
 	return key
 }
 

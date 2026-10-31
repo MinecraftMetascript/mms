@@ -119,6 +119,33 @@ func TestVanillaRoundTrip(t *testing.T) {
 			}
 		}
 	}
+	// Fixing every lint finding (bare names, folded constants) must not
+	// change the output either.
+	fixed, fixes, err := p.FixAll(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if dir := os.Getenv("MMS_DUMP"); dir != "" {
+		for path, text := range fixed {
+			os.WriteFile(filepath.Join(dir, path), []byte(text), 0o644)
+		}
+	}
+	r2, _ := p.Analyze(context.Background())
+	refixed := 0
+	for _, f := range r2.Emit() {
+		want, ok := originals[f.Path]
+		if !ok || strings.HasPrefix(f.Path, "data/minecraft/wolf_sound_variant/") {
+			continue
+		}
+		got, _ := jsonv.Parse(f.Data)
+		if !reflect.DeepEqual(normalize(got), normalize(want)) {
+			refixed++
+			if refixed <= 5 {
+				t.Errorf("%s differs after fixes:\n got %s\nwant %s", f.Path, jsonv.Compact(got), jsonv.Compact(want))
+			}
+		}
+	}
+	t.Logf("applied %d fixes; %d files differ after fixing", fixes, refixed)
 	missing := 0
 	var missingSamples []string
 	for path := range originals {

@@ -89,7 +89,12 @@ func TestSession(t *testing.T) {
 	var diags []any
 	for _, n := range c.notes {
 		if n["method"] == "textDocument/publishDiagnostics" {
-			diags = n["params"].(map[string]any)["diagnostics"].([]any)
+			diags = nil
+			for _, d := range n["params"].(map[string]any)["diagnostics"].([]any) {
+				if d.(map[string]any)["severity"].(float64) != 4 {
+					diags = append(diags, d)
+				}
+			}
 		}
 	}
 	if len(diags) != 1 || !strings.Contains(diags[0].(map[string]any)["message"].(string), "Clamp") {
@@ -231,7 +236,7 @@ func TestImportPack(t *testing.T) {
 	if len(files) != 1 || res["namespace"] != "gems" || res["description"] != "Gems" {
 		t.Fatalf("import = %v", res)
 	}
-	if text := files[0].(map[string]any)["text"]; text != "ItemTag shiny = [minecraft:diamond]\n" {
+	if text := files[0].(map[string]any)["text"]; text != "ItemTag shiny = [diamond]\n" {
 		t.Errorf("text = %q", text)
 	}
 	if sk := res["skipped"].([]any); len(sk) != 1 {
@@ -240,6 +245,14 @@ func TestImportPack(t *testing.T) {
 	empty := c.result("mms/importPack", map[string]any{"files": []any{}}).(map[string]any)
 	if len(empty["files"].([]any)) != 0 {
 		t.Errorf("empty import = %v", empty)
+	}
+	c.notify("textDocument/didOpen", map[string]any{"textDocument": map[string]any{"uri": "file:///a.mms", "languageId": "mms", "version": 1,
+		"text": "Namespace gems\nNoise ridge = { base_octave = -1, amplitude_modifiers = [1] }\n"}})
+	conv := c.result("mms/convertJSON", map[string]any{"uri": "file:///a.mms", "kind": "DensityFunction", "name": "hill",
+		"text": `{"type":"minecraft:noise","noise":"minecraft:ridge","xz_scale":1,"y_scale":1}`}).(map[string]any)
+	// minecraft:ridge keeps its prefix: the file declares a ridge noise.
+	if want := "DensityFunction hill = {\n  type = noise\n  noise = minecraft:ridge\n  xz_scale = 1\n  y_scale = 1\n}\n"; conv["text"] != want {
+		t.Errorf("convertJSON = %q\nwant %q", conv["text"], want)
 	}
 	kinds := c.result("mms/resourceKinds", map[string]any{}).([]any)
 	found := false
@@ -250,5 +263,34 @@ func TestImportPack(t *testing.T) {
 	}
 	if !found {
 		t.Errorf("LootTable missing from %d kinds", len(kinds))
+	}
+}
+
+func TestCodeActions(t *testing.T) {
+	c := start(t)
+	c.result("initialize", map[string]any{})
+	c.notify("initialized", map[string]any{})
+	uri := "file:///a.mms"
+	src := "LootTable t = { pools = [{ rolls = 1, entries = [{ type = \"minecraft:item\", name = minecraft:diamond }] }] }\n"
+	c.notify("textDocument/didOpen", map[string]any{"textDocument": map[string]any{"uri": uri, "languageId": "mms", "version": 1, "text": src}})
+	rng := func(a, b int) map[string]any {
+		return map[string]any{"start": map[string]any{"line": 0, "character": a}, "end": map[string]any{"line": 0, "character": b}}
+	}
+	acts := c.result("textDocument/codeAction", map[string]any{"textDocument": map[string]any{"uri": uri}, "range": rng(60, 60), "context": map[string]any{"diagnostics": []any{}}}).([]any)
+	var titles []string
+	for _, a := range acts {
+		titles = append(titles, a.(map[string]any)["title"].(string))
+	}
+	if got := strings.Join(titles, "|"); got != "Write item|Ignore quoted-name on this line|Fix all MMS problems" {
+		t.Errorf("actions = %s", got)
+	}
+	all := c.result("textDocument/codeAction", map[string]any{"textDocument": map[string]any{"uri": uri}, "range": rng(0, 0),
+		"context": map[string]any{"diagnostics": []any{}, "only": []string{"source.fixAll"}}}).([]any)
+	if len(all) != 1 {
+		t.Fatalf("fix all = %v", all)
+	}
+	edit := all[0].(map[string]any)["edit"].(map[string]any)["changes"].(map[string]any)[uri].([]any)[0].(map[string]any)
+	if want := "LootTable t = { pools = [{ rolls = 1, entries = [{ type = item, name = diamond }] }] }\n"; edit["newText"] != want {
+		t.Errorf("fix all text = %q", edit["newText"])
 	}
 }

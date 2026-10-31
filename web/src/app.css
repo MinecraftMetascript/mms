@@ -167,3 +167,14 @@ body {
 .json .j-str { color: var(--t-string); }
 .json .j-num { color: var(--t-number); }
 .json .j-lit { color: var(--t-keyword); }
+
+/* Unused code fades; hints get a quiet dotted underline. */
+.editor .cm-unnecessary {
+	opacity: 0.55;
+	background: none;
+}
+.editor .cm-lintRange-hint {
+	background-image: none;
+	text-decoration: underline dotted color-mix(in oklab, var(--color-muted) 70%, transparent);
+	text-underline-offset: 3px;
+}

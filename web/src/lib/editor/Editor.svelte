@@ -3,8 +3,7 @@
 	import { EditorState, Compartment } from '@codemirror/state';
 	import { EditorView, keymap } from '@codemirror/view';
 	import { indentUnit } from '@codemirror/language';
-	import { setDiagnostics } from '@codemirror/lint';
-	import { LSPPlugin } from '@codemirror/lsp-client';
+	import { applyEdits, showDiagnostics } from './diagnostics';
 	import { onMount, untrack } from 'svelte';
 	import type { Engine } from '../engine/engine.svelte';
 	import { uriOf } from '../project/project.svelte';
@@ -24,6 +23,11 @@
 
 	let host: HTMLDivElement;
 	let view: EditorView | null = null;
+
+	/** Applies every safe fix in the open file. */
+	export function fixAll() {
+		if (view) fixAllCommand(view);
+	}
 	let shown = '';
 	const theme = new Compartment();
 
@@ -51,7 +55,8 @@
 				semanticHighlighting((uri) => engine.semanticTokens(uri)),
 				keymap.of([
 					{ key: 'Mod-s', run: formatCommand, preventDefault: true },
-					{ key: 'Shift-Alt-f', run: formatCommand, preventDefault: true }
+					{ key: 'Shift-Alt-f', run: formatCommand, preventDefault: true },
+					{ key: 'Mod-Alt-f', run: fixAllCommand, preventDefault: true }
 				]),
 				theme.of([]),
 				extra,
@@ -64,21 +69,15 @@
 
 	/** Shows diagnostics the server sent while another file was open. */
 	function restoreDiagnostics(v: EditorView) {
-		const plugin = LSPPlugin.get(v);
 		const ds = engine.diagnostics[uriOf(shown)];
-		if (!plugin || !ds) return;
-		const doc = v.state.doc;
-		v.dispatch(
-			setDiagnostics(
-				v.state,
-				ds.map((d) => ({
-					from: Math.min(plugin.fromPosition(d.range.start, doc), doc.length),
-					to: Math.min(plugin.fromPosition(d.range.end, doc), doc.length),
-					severity: d.severity === 1 ? 'error' : d.severity === 2 ? 'warning' : 'info',
-					message: d.message
-				}))
-			)
-		);
+		if (ds) showDiagnostics(v, ds);
+	}
+
+	function fixAllCommand(v: EditorView) {
+		engine.fixAll(uriOf(shown)).then((edits) => {
+			if (edits.length) applyEdits(v, edits);
+		});
+		return true;
 	}
 
 	function show(p: string, doc: string) {

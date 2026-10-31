@@ -55,9 +55,11 @@ func BenchmarkAnalyzeEdit(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		p.SetFile("main.mms", src+fmt.Sprintf("// %d\n", i))
-		if _, err := p.Analyze(context.Background()); err != nil {
+		r, err := p.Analyze(context.Background())
+		if err != nil {
 			b.Fatal(err)
 		}
+		r.Diagnostics("main.mms") // includes lint, as the server publishes
 	}
 }
 

@@ -113,10 +113,13 @@ type Result struct {
 	// Order lists declarations in file and source order.
 	Order []*Decl
 
-	collect map[string][]syntax.Diagnostic
-	symKey  uint64
-	pack    *spec.Pack
-	cfg     Config
+	collect  map[string][]syntax.Diagnostic
+	lintMu   sync.Mutex
+	lintDone bool
+	lints    map[string][]syntax.Diagnostic
+	symKey   uint64
+	pack     *spec.Pack
+	cfg      Config
 }
 
 // Decl is the checked form of one declaration.
@@ -134,6 +137,11 @@ type Decl struct {
 	Diags      []syntax.Diagnostic
 	// Deps are the symbol lookups the check made (see sema.DepsHold).
 	Deps map[string]bool
+
+	lints    []syntax.Diagnostic // cached lint findings, valid for lintKey
+	lintKey  string
+	refs     []string
+	refsDone bool
 }
 
 // ID returns "ns:path" for a named declaration.
@@ -171,8 +179,19 @@ func (r *Result) Diagnostics(path string) []syntax.Diagnostic {
 			out = append(out, d.Diags...)
 		}
 	}
+	out = append(out, r.Lints()[path]...)
 	sort.SliceStable(out, func(i, j int) bool { return out[i].Sp.Start < out[j].Sp.Start })
 	return out
+}
+
+// Lints returns lint findings by file, computed on first use.
+func (r *Result) Lints() map[string][]syntax.Diagnostic {
+	r.lintMu.Lock()
+	defer r.lintMu.Unlock()
+	if !r.lintDone {
+		r.lints, r.lintDone = r.lint(), true
+	}
+	return r.lints
 }
 
 // HasErrors reports whether any file has an error.
@@ -272,9 +291,9 @@ func (r *Result) reuse(u *sema.Unit, d *syntax.Decl, ns string, moved map[*synta
 	}
 	cp.Diags = make([]syntax.Diagnostic, len(old.Diags))
 	for i, dg := range old.Diags {
-		dg.Sp = syntax.Span{Start: dg.Sp.Start + m.Delta, End: dg.Sp.End + m.Delta}
-		cp.Diags[i] = dg
+		cp.Diags[i] = dg.Shift(m.Delta)
 	}
+	cp.lints, cp.lintKey = nil, "" // spans moved; lint again
 	return &cp
 }
 

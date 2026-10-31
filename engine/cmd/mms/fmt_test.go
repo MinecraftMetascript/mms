@@ -48,3 +48,17 @@ func TestFmtStdin(t *testing.T) {
 		t.Errorf("stdin: code %d, out %q, err %q", code, out.String(), errOut.String())
 	}
 }
+
+func TestFix(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "mms.json"), []byte(`{"namespace": "demo"}`), 0o644)
+	os.WriteFile(filepath.Join(dir, "a.mms"), []byte(`ItemTag gems = ["minecraft:diamond", minecraft:emerald]`+"\n"), 0o644)
+	var out, errOut bytes.Buffer
+	if code := runFix([]string{dir}, &out, &errOut); code != 0 {
+		t.Fatalf("fix exit %d: %s", code, errOut.String())
+	}
+	got, _ := os.ReadFile(filepath.Join(dir, "a.mms"))
+	if string(got) != "ItemTag gems = [diamond, emerald]\n" {
+		t.Errorf("fixed = %q (%s)", got, out.String())
+	}
+}

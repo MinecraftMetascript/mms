@@ -190,10 +190,12 @@ func init() {
 		"textDocument/semanticTokens/full": typed((*Server).semanticTokens),
 		"workspace/didChangeWatchedFiles":  typed((*Server).didChangeWatched),
 		"mms/output":                       typed((*Server).output),
+		"textDocument/codeAction":          typed((*Server).codeAction),
 		"mms/setConfig":                    typed((*Server).setConfig),
 		"mms/setFiles":                     typed((*Server).setFiles),
 		"mms/importPack":                   typed((*Server).importPack),
 		"mms/resourceKinds":                typed((*Server).resourceKinds),
+		"mms/convertJSON":                  typed((*Server).convertJSON),
 		"mms/ping":                         func(*Server, context.Context, json.RawMessage) (any, *respError) { return "pong", nil },
 	}
 }
@@ -265,6 +267,7 @@ func (s *Server) initialize(ctx context.Context, p initializeParams) (any, *resp
 			"renameProvider":             map[string]any{"prepareProvider": true},
 			"documentFormattingProvider": true,
 			"documentSymbolProvider":     true,
+			"codeActionProvider":         map[string]any{"codeActionKinds": []string{"quickfix", "source.fixAll.mms"}},
 			"semanticTokensProvider": map[string]any{
 				"legend": map[string]any{"tokenTypes": ide.TokenTypes, "tokenModifiers": ide.TokenModifiers},
 				"full":   true,
@@ -447,6 +450,13 @@ func (s *Server) publish(u *sema.Unit, ds []syntax.Diagnostic) {
 		m := map[string]any{"range": l.rng(d.Sp), "severity": int(d.Severity), "source": "mms", "message": d.Message}
 		if d.Code != "" {
 			m["code"] = d.Code
+		}
+		if d.Unnecessary {
+			m["tags"] = []int{1}
+		}
+		if len(d.Fixes) > 0 {
+			// The web editor applies fixes straight from the diagnostic.
+			m["data"] = map[string]any{"fixes": fixesJSON(l, d.Fixes)}
 		}
 		out = append(out, m)
 	}

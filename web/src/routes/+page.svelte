@@ -27,6 +27,7 @@
 	let menu = $state(false);
 	let fileInput: HTMLInputElement;
 	let pasteJson = $state<ReturnType<typeof PasteJson> | null>(null);
+	let editor = $state<ReturnType<typeof Editor> | null>(null);
 
 	onMount(() => {
 		try {
@@ -228,6 +229,10 @@
 						<span class="block text-xs text-muted">An MMS project or a data pack</span>
 					</button>
 					<button class="block w-full rounded px-2 py-1.5 text-left hover:bg-hover" disabled={!project.activeFile} onclick={() => { menu = false; pasteJson?.open(); }}>Paste JSON as MMS…</button>
+					<button class="block w-full rounded px-2 py-1.5 text-left hover:bg-hover" disabled={!project.activeFile} onclick={() => { menu = false; editor?.fixAll(); }}>
+						<span class="block">Fix all in this file</span>
+						<span class="block text-xs text-muted">Applies safe fixes (Ctrl/⌘+Alt+F)</span>
+					</button>
 					<button class="block w-full rounded px-2 py-1.5 text-left hover:bg-hover" onclick={() => { menu = false; download(`${project.name || 'project'}-source.zip`, projectZip(project.data())); }}>Export project zip</button>
 					<div class="my-1 border-t border-line"></div>
 					<div class="px-2 pt-1 pb-0.5 text-[11px] font-medium tracking-wide text-muted uppercase">Examples</div>
@@ -251,7 +256,7 @@
 		</div>
 		<input type="file" accept=".zip" class="hidden" bind:this={fileInput} onchange={importZip} />
 		{#if engine}
-			<PasteJson bind:this={pasteJson} {engine} namespace={project.config.namespace} oninsert={insertDecl} />
+			<PasteJson bind:this={pasteJson} {engine} uri={uriOf(project.active)} oninsert={insertDecl} />
 		{/if}
 		<div class="ml-auto flex items-center gap-2 text-sm">
 			<span class="flex items-center gap-1.5 text-muted" role="status">
@@ -289,6 +294,7 @@
 			<div class="min-h-0 flex-1">
 			{#if engine && loaded && project.activeFile}
 				<Editor
+					bind:this={editor}
 					{engine}
 					path={project.active}
 					text={project.activeFile.text}

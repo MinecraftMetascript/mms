@@ -1,6 +1,7 @@
 package importer
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io/fs"
@@ -8,7 +9,9 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/minecraftmetascript/mms/engine/format"
 	"github.com/minecraftmetascript/mms/engine/jsonv"
+	"github.com/minecraftmetascript/mms/engine/project"
 	"github.com/minecraftmetascript/mms/engine/sema"
 	"github.com/minecraftmetascript/mms/engine/spec"
 )
@@ -16,7 +19,7 @@ import (
 // File is one generated MMS source file.
 type File struct {
 	Path string // e.g. "worldgen_noise.mms" or "other_ns/recipe.mms"
-	Text string // unformatted; run it through format.Source
+	Text string // unformatted until Tidy
 }
 
 // Result is an imported data pack.
@@ -188,4 +191,51 @@ func SplitFolder(kinds *sema.Kinds, sp *spec.Pack, ns, rel string) (folder, id s
 		return "", ""
 	}
 	return best, ns + ":" + strings.TrimPrefix(rel, best+"/")
+}
+
+// Tidy formats the imported files and applies every safe lint fix (bare
+// names, folded constants), which never changes the generated pack. Files
+// that fail to format are left as they are.
+func (res *Result) Tidy(ctx context.Context, sp *spec.Pack) error {
+	p := project.New(sp, project.Config{Namespace: res.Namespace})
+	for i, f := range res.Files {
+		res.Files[i].Text = formatted(f.Text)
+		p.SetFile(f.Path, res.Files[i].Text)
+	}
+	fixed, _, err := p.FixAll(ctx)
+	if err != nil {
+		return err
+	}
+	for i, f := range res.Files {
+		if text, ok := fixed[f.Path]; ok {
+			res.Files[i].Text = formatted(text)
+		}
+	}
+	return nil
+}
+
+// TidyIn formats and fixes one declaration's source as if it were in
+// namespace ns of the given project, so a shortened name can never be
+// captured by one of the project's own declarations.
+func TidyIn(ctx context.Context, p *project.Project, ns, src string) (string, error) {
+	const scratch = "\x00import.mms" // no real file has this name
+	header := "Namespace " + ns + "\n\n"
+	p.SetFile(scratch, header+formatted(src))
+	defer p.RemoveFile(scratch)
+	fixed, _, err := p.FixAll(ctx, scratch)
+	if err != nil {
+		return "", err
+	}
+	text, ok := fixed[scratch]
+	if !ok {
+		text, _ = p.Text(scratch)
+	}
+	return strings.TrimPrefix(formatted(text), header), nil
+}
+
+func formatted(src string) string {
+	if out, err := format.Source(src); err == nil {
+		return out
+	}
+	return src
 }

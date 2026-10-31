@@ -2,6 +2,7 @@ package main
 
 import (
 	"archive/zip"
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -12,7 +13,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/minecraftmetascript/mms/engine/format"
 	"github.com/minecraftmetascript/mms/engine/importer"
 	"github.com/minecraftmetascript/mms/engine/project"
 	"github.com/minecraftmetascript/mms/engine/sema"
@@ -60,13 +60,12 @@ func runImport(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "mms:", err)
 		return 1
 	}
+	if err := res.Tidy(context.Background(), sp); err != nil {
+		fmt.Fprintln(stderr, "mms:", err)
+		return 1
+	}
 	for _, f := range res.Files {
 		text := f.Text
-		if formatted, err := format.Source(text); err == nil {
-			text = formatted
-		} else {
-			fmt.Fprintf(stderr, "mms: %s: not formatted: %v\n", f.Path, err)
-		}
 		dst := filepath.Join(out, filepath.FromSlash(f.Path))
 		if err := os.MkdirAll(filepath.Dir(dst), 0o755); err == nil {
 			err = os.WriteFile(dst, []byte(text), 0o644)

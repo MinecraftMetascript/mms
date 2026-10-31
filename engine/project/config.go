@@ -25,6 +25,9 @@ type Config struct {
 	// Sources are glob patterns, relative to the project; ** matches any
 	// number of folders. The default is every .mms file.
 	Sources []string `json:"sources,omitempty"`
+	// Lint sets rule severities by rule id: "error", "warning", "info",
+	// "hint" or "off".
+	Lint map[string]string `json:"lint,omitempty"`
 }
 
 // DefaultConfig is used when there is no mms.json.
@@ -38,6 +41,14 @@ var nsPattern = regexp.MustCompile(`^[a-z0-9_.\-]+$`)
 func (c Config) Validate() error {
 	if !nsPattern.MatchString(c.Namespace) {
 		return fmt.Errorf("mms.json: namespace %q must be lowercase letters, digits, '_', '-' or '.'", c.Namespace)
+	}
+	for id, sev := range c.Lint {
+		if RuleByID(id) == nil {
+			return fmt.Errorf("mms.json: lint: unknown rule %q", id)
+		}
+		if _, ok := ParseSeverity(sev); !ok {
+			return fmt.Errorf("mms.json: lint: %s: severity must be error, warning, info, hint or off, not %q", id, sev)
+		}
 	}
 	return nil
 }

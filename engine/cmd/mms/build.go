@@ -40,11 +40,15 @@ func load(dir string) (*project.Project, error) {
 }
 
 // report prints diagnostics like a compiler: path:line:col, the message,
-// and the source line with a caret. It returns the number of errors.
-func report(w io.Writer, r *project.Result) int {
+// and the source line with a caret. Hints are editor suggestions and are
+// printed only when asked for. It returns the number of errors.
+func report(w io.Writer, r *project.Result, hints bool) int {
 	errs := 0
 	for _, u := range r.Units {
 		for _, d := range r.Diagnostics(u.Path) {
+			if d.Severity == syntax.SeverityHint && !hints {
+				continue
+			}
 			line, col := u.File.LineCol(d.Sp.Start)
 			sev := "error"
 			switch d.Severity {
@@ -67,6 +71,7 @@ func report(w io.Writer, r *project.Result) int {
 func runCheck(args []string, stdout, stderr io.Writer) int {
 	fl := flag.NewFlagSet("check", flag.ContinueOnError)
 	fl.SetOutput(stderr)
+	hints := fl.Bool("hints", false, "also print hints (style suggestions `mms fix` can apply)")
 	if err := fl.Parse(args); err != nil {
 		return 2
 	}
@@ -84,7 +89,7 @@ func runCheck(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "mms:", err)
 		return 1
 	}
-	if n := report(stderr, r); n > 0 {
+	if n := report(stderr, r, *hints); n > 0 {
 		fmt.Fprintf(stderr, "%d %s\n", n, pluralize(n, "error"))
 		return 1
 	}
@@ -115,7 +120,7 @@ func runBuild(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "mms:", err)
 		return 1
 	}
-	if n := report(stderr, r); n > 0 {
+	if n := report(stderr, r, false); n > 0 {
 		fmt.Fprintf(stderr, "%d %s; nothing written\n", n, pluralize(n, "error"))
 		return 1
 	}

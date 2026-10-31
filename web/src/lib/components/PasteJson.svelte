@@ -3,10 +3,11 @@
 
 	interface Props {
 		engine: Engine;
-		namespace: string;
+		/** The file the declaration goes into. */
+		uri: string;
 		oninsert: (text: string) => void;
 	}
-	let { engine, namespace, oninsert }: Props = $props();
+	let { engine, uri, oninsert }: Props = $props();
 
 	let dialog: HTMLDialogElement;
 	let kinds = $state<ResourceKind[]>([]);
@@ -40,20 +41,10 @@
 			error = `That is not valid JSON: ${err instanceof Error ? err.message : err}`;
 			return;
 		}
-		const k = kinds.find((k) => k.kind === kind);
-		if (!k || !nameOK) return;
-		const [ns, path] = name.trim().includes(':') ? name.trim().split(':', 2) : [namespace, name.trim()];
+		if (!kinds.some((k) => k.kind === kind) || !nameOK) return;
 		busy = true;
 		try {
-			const res = await engine.importPack([{ path: `data/${ns}/${k.folder}/${path}.json`, text: json }]);
-			if (!res.files.length) {
-				error = res.skipped[0] ?? 'Nothing was imported.';
-				return;
-			}
-			// A file outside the project namespace starts with `Namespace`; the
-			// pasted declaration keeps the name qualified instead.
-			let text = res.files[0].text.replace(/^Namespace [^\n]+\n\n/, '');
-			if (ns !== namespace) text = text.replace(/^(\w+) /, `$1 ${ns}:`);
+			const text = await engine.convertJSON(uri, kind, name.trim(), json);
 			oninsert(text);
 			dialog.close();
 			json = '';

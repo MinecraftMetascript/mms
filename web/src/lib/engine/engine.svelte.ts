@@ -2,12 +2,28 @@ import { LSPClient, languageServerExtensions } from '@codemirror/lsp-client';
 import type { EditorView } from '@codemirror/view';
 import { Supervisor, type EngineStatus } from './supervisor';
 import { ProjectWorkspace } from './workspace';
+import { showDiagnostics } from '../editor/diagnostics';
 
 export interface Diagnostic {
 	range: { start: { line: number; character: number }; end: { line: number; character: number } };
 	severity?: number;
 	message: string;
 	code?: string;
+	/** 1 marks unnecessary code. */
+	tags?: number[];
+	data?: { fixes?: Fix[] };
+}
+
+export interface TextEdit {
+	range: Diagnostic['range'];
+	newText: string;
+}
+
+/** A fix the engine attached to a diagnostic; safe fixes never change the pack. */
+export interface Fix {
+	title: string;
+	edits: TextEdit[];
+	safe: boolean;
 }
 
 export interface OutputFile {
@@ -69,10 +85,13 @@ export class Engine {
 			workspace: (client) => (ws = new ProjectWorkspace(client, hooks)),
 			extensions: languageServerExtensions(),
 			notificationHandlers: {
-				'textDocument/publishDiagnostics': (_client, params: { uri: string; diagnostics: Diagnostic[] }) => {
+				'textDocument/publishDiagnostics': (client, params: { uri: string; diagnostics: Diagnostic[] }) => {
 					this.diagnostics[params.uri] = params.diagnostics;
 					this.scheduleRefresh();
-					return false; // let the editor extension show them too
+					// Shown here rather than by the client so fixes become actions.
+					const view = client.workspace.getFile(params.uri)?.getView();
+					if (view) showDiagnostics(view, params.diagnostics);
+					return true;
 				}
 			}
 		});
@@ -147,10 +166,27 @@ export class Engine {
 		return this.client.request<object, PackImport>('mms/importPack', { files });
 	}
 
+	/** Converts one JSON resource into a declaration for the file uri. */
+	async convertJSON(uri: string, kind: string, name: string, text: string): Promise<string> {
+		await this.client.initializing;
+		const res = await this.client.request<object, { text: string }>('mms/convertJSON', { uri, kind, name, text });
+		return res.text;
+	}
+
 	/** The JSON resource kinds and their data pack folders. */
 	async resourceKinds(): Promise<ResourceKind[]> {
 		await this.client.initializing;
 		return this.client.request<object, ResourceKind[]>('mms/resourceKinds', {});
+	}
+
+	/** The edits that fix every safely fixable problem in a file. */
+	async fixAll(uri: string): Promise<TextEdit[]> {
+		const actions = await this.client.request<object, { edit?: { changes?: Record<string, TextEdit[]> } }[]>('textDocument/codeAction', {
+			textDocument: { uri },
+			range: { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } },
+			context: { diagnostics: [], only: ['source.fixAll'] }
+		});
+		return actions[0]?.edit?.changes?.[uri] ?? [];
 	}
 
 	async format(uri: string): Promise<string | null> {
