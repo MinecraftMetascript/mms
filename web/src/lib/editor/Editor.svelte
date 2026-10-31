@@ -2,6 +2,8 @@
 	import { basicSetup } from 'codemirror';
 	import { EditorState, Compartment } from '@codemirror/state';
 	import { EditorView, keymap } from '@codemirror/view';
+	import { indentWithTab } from '@codemirror/commands';
+	import { acceptCompletion } from '@codemirror/autocomplete';
 	import { indentUnit } from '@codemirror/language';
 	import { applyEdits, showDiagnostics } from './diagnostics';
 	import { onMount, untrack } from 'svelte';
@@ -99,7 +101,11 @@
 				keymap.of([
 					{ key: 'Mod-s', run: formatCommand, preventDefault: true },
 					{ key: 'Shift-Alt-f', run: formatCommand, preventDefault: true },
-					{ key: 'Mod-Alt-f', run: fixAllCommand, preventDefault: true }
+					{ key: 'Mod-Alt-f', run: fixAllCommand, preventDefault: true },
+					// Tab accepts an open completion, otherwise indents; Shift+Tab unindents.
+					// Escape then Tab still moves focus out of the editor.
+					{ key: 'Tab', run: acceptCompletion },
+					indentWithTab
 				]),
 				EditorView.domEventHandlers({ contextmenu: (e, v) => openMenu(v, e) }),
 				theme.of([]),

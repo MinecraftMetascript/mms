@@ -291,3 +291,23 @@ test('right-click opens editor actions with quick fixes', async ({ page }) => {
 	await fix.click();
 	await expect(page.locator('.cm-content')).toContainText('DensityFunction a = 0.5');
 });
+
+test('Tab indents, Shift+Tab unindents, and Tab accepts a completion', async ({ page }) => {
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	await replaceText(page, 'Function f {\n/say hi\n}\n');
+	const line = page.locator('.cm-line').nth(1);
+	await line.click();
+	await page.keyboard.press('Tab');
+	await expect(line).toHaveText('  /say hi');
+	await expect(page.locator('.cm-content')).toBeFocused();
+	await page.keyboard.press('Shift+Tab');
+	await expect(line).toHaveText('/say hi');
+
+	await replaceText(page, 'DensityFunction x = Cl');
+	await page.keyboard.press('ControlOrMeta+Space');
+	await expect(page.locator('.cm-tooltip-autocomplete li[aria-selected]')).toContainText('Clamp');
+	await page.waitForTimeout(300);
+	await page.keyboard.press('Tab');
+	await expect(page.locator('.cm-content')).toContainText('DensityFunction x = Clamp');
+});
