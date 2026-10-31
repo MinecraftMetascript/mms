@@ -213,6 +213,15 @@ type local struct {
 	s    fn.Score
 	path string
 	typ  string
+	info *Local
+}
+
+// Local describes a function parameter, local variable or loop variable,
+// for hovers on its uses.
+type Local struct {
+	Name, Type string
+	What       string // "parameter", "let" or "for"
+	Doc        string // the doc comment, or the function's @param text
 }
 
 // fc compiles one function body.
@@ -228,6 +237,8 @@ type fc struct {
 	temps  int
 	loops  int
 	selfID string
+	// loopVar is set while declaring a for loop's variable.
+	loopVar bool
 	// frame lists the scores the function has used so far; a recursive
 	// call saves and restores them. strings is set once it uses storage.
 	frame   []fn.Score
@@ -257,7 +268,9 @@ func (c *Checker) CompileFunction(d *syntax.Decl, id string, src []rune) *fn.Fun
 				c.errorf("mms/duplicate", p.Name.Sp, "parameter '%s' is already declared", p.Name.Text)
 			}
 			f.names[p.Name.Text]++
-			l := local{s: f.score(fn.Holder(path, p.Name.Text)), typ: t}
+			l := local{s: f.score(fn.Holder(path, p.Name.Text)), typ: t,
+				info: &Local{Name: p.Name.Text, Type: t, What: "parameter", Doc: syntax.ParseDoc(d.Doc).Param(p.Name.Text)}}
+			f.c.info(p.Name).Local = l.info
 			if t == tString {
 				l.path = fn.Storage(ns) + " " + fn.LocalPath(path, p.Name.Text)
 				f.strings = true
@@ -342,7 +355,12 @@ func (f *fc) declare(n *syntax.Name, typ string) local {
 		holder = n.Text + "_" + strconv.Itoa(k)
 	}
 	f.names[n.Text]++
-	l := local{s: f.score(fn.Holder(f.path, holder)), typ: typ}
+	what := "let"
+	if len(f.scopes) > 0 && f.loopVar {
+		what = "for"
+	}
+	l := local{s: f.score(fn.Holder(f.path, holder)), typ: typ, info: &Local{Name: n.Text, Type: typ, What: what}}
+	f.c.info(n).Local = l.info
 	if typ == tString {
 		l.path = fn.Storage(f.ns) + " " + fn.LocalPath(f.path, holder)
 		f.strings = true
@@ -400,6 +418,7 @@ func (f *fc) stmt(out *fn.Block, s syntax.Stmt) {
 			typ = tInt
 		}
 		l := f.declare(s.Name, typ)
+		l.info.Doc = s.Doc
 		if v == nil {
 			if typ == tString {
 				empty := ""
@@ -515,7 +534,9 @@ func (f *fc) forStmt(out *fn.Block, s *syntax.ForStmt) {
 	if lo == nil || hi == nil {
 		return
 	}
+	f.loopVar = true
 	i := f.declare(s.Var, tInt)
+	f.loopVar = false
 	out.Add(fn.Set{Dst: i.s, Src: *lo})
 	var cond fn.Cond
 	if hi.IsConst {
@@ -612,6 +633,9 @@ func (f *fc) variable(e syntax.Expr) *local {
 	switch e := e.(type) {
 	case *syntax.Ident:
 		if l, ok := f.lookup(e.Name); ok {
+			if l.info != nil {
+				f.c.info(e).Local = l.info
+			}
 			return &l
 		}
 		if g := f.global(f.ns+":"+e.Name, e); g != nil {

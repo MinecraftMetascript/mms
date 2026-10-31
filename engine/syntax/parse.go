@@ -230,20 +230,6 @@ func (b *builder) docBefore(tokIndex int) string {
 	return ""
 }
 
-func cleanDoc(text string) string {
-	text = strings.TrimSuffix(strings.TrimPrefix(text, "/**"), "*/")
-	var lines []string
-	for _, l := range strings.Split(text, "\n") {
-		l = strings.TrimSpace(l)
-		l = strings.TrimPrefix(l, "* ")
-		if l == "*" {
-			l = ""
-		}
-		lines = append(lines, l)
-	}
-	return strings.TrimSpace(strings.Join(lines, "\n"))
-}
-
 func (b *builder) typeAnn(c parser.ITypeAnnotationContext) *Name {
 	t := c.(*parser.TypeAnnotationContext).TypeRef()
 	if t == nil {
@@ -296,6 +282,7 @@ func (b *builder) stmt(c parser.IStatementContext) Stmt {
 		if s.ASSIGN() != nil {
 			st.Value = b.expr(s.Expr(), sp)
 		}
+		st.Doc = b.docBefore(s.GetStart().GetTokenIndex())
 		return st
 	case *parser.IfStmtContext:
 		return b.ifChain(sp, s.Expr(), s.AllBlock(), s.IfTail())

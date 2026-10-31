@@ -103,3 +103,23 @@ func spanList(f *File) string {
 	})
 	return sb.String()
 }
+
+// TestChunkMultiLineDoc checks that a doc comment over several lines
+// stays in its declaration's chunk, and that a block comment opened after
+// code never starts a chunk.
+func TestChunkMultiLineDoc(t *testing.T) {
+	src := "DensityFunction a = 1\n\n/**\n * Line one.\n *\n * Line two.\n */\nDensityFunction b = 2 /* trailing\n comment\n*/\nDensityFunction c = 3\n"
+	f, chunks, _ := Reparse(src, nil)
+	if len(chunks) != 3 {
+		t.Fatalf("got %d chunks", len(chunks))
+	}
+	if got := f.Decls[1].Doc; got != "Line one.\n\nLine two." {
+		t.Errorf("doc = %q", got)
+	}
+	if whole := Parse(src); whole.Decls[1].Doc != f.Decls[1].Doc {
+		t.Errorf("chunked doc %q, whole-file doc %q", f.Decls[1].Doc, whole.Decls[1].Doc)
+	}
+	if got := string([]rune(src)[chunks[2].Off:]); !strings.HasPrefix(got, "DensityFunction c") {
+		t.Errorf("third chunk starts at %q", got)
+	}
+}

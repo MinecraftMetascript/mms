@@ -46,6 +46,8 @@ type Diagnostic struct {
 	Sp       Span
 	// Unnecessary marks code that can be removed (editors fade it).
 	Unnecessary bool
+	// Deprecated marks a use of something deprecated (editors strike it out).
+	Deprecated bool
 	// Fixes are edits that resolve the problem, best first.
 	Fixes []Fix
 }

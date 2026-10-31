@@ -184,8 +184,21 @@ func (c *Checker) Command(cmd *syntax.CommandStmt) {
 	}
 	for _, id := range r.IDs {
 		v := strings.TrimPrefix(id.Value, "#")
+		sp := syntax.Span{Start: base + id.Start, End: base + id.End}
+		if id.Registry == "objective" {
+			if sym := c.objective(v); sym != nil {
+				c.recordCommandRef(sp, id.Value, sym)
+			}
+			continue
+		}
 		ns, _ := splitID(v)
 		f := folder(id.Registry)
+		if ns != "" {
+			if sym := c.find(f, v); sym != nil {
+				c.recordCommandRef(sp, id.Value, sym)
+				continue
+			}
+		}
 		if ns == "" || ns == "minecraft" {
 			continue
 		}
@@ -197,7 +210,30 @@ func (c *Checker) Command(cmd *syntax.CommandStmt) {
 			if strings.HasPrefix(f, "tags/") {
 				what += " tag"
 			}
-			c.errorf("mms/unknown-id", syntax.Span{Start: base + id.Start, End: base + id.End}, "no %s named '%s' is declared", what, id.Value)
+			c.errorf("mms/unknown-id", sp, "no %s named '%s' is declared", what, id.Value)
 		}
 	}
+}
+
+// recordCommandRef records a reference written inside a command, so that
+// hover, go to definition, references and rename see it. Commands are raw
+// text, so the reference gets a node of its own.
+func (c *Checker) recordCommandRef(sp syntax.Span, text string, sym *Symbol) {
+	in := c.info(&syntax.ResLoc{Text: text, Sp: sp})
+	in.Symbol = sym
+	in.ID = sym.ID()
+}
+
+// objective finds the Objective a command names. Objective names are
+// global to the world, so one declared in another namespace counts too.
+func (c *Checker) objective(name string) *Symbol {
+	if sym := c.find("Objective", c.NS+":"+name); sym != nil {
+		return sym
+	}
+	for _, s := range c.Syms.All() {
+		if s.Kind.MMS == "Objective" && s.Path == name {
+			return s
+		}
+	}
+	return nil
 }
