@@ -14,8 +14,9 @@ import (
 
 // Value types in function bodies.
 const (
-	tInt  = "int"
-	tBool = "bool"
+	tInt    = "int"
+	tBool   = "bool"
+	tString = "string"
 )
 
 // FuncSig is a function's parameter and return types.
@@ -118,9 +119,12 @@ func IsRaw(b *syntax.Block) bool {
 	return true
 }
 
+// local is a variable: ints and bools live in a score, strings at a
+// storage path.
 type local struct {
-	s   fn.Score
-	typ string
+	s    fn.Score
+	path string
+	typ  string
 }
 
 // fc compiles one function body.
@@ -161,7 +165,11 @@ func (c *Checker) CompileFunction(d *syntax.Decl, id string, src []rune) *fn.Fun
 				c.errorf("mms/duplicate", p.Name.Sp, "parameter '%s' is already declared", p.Name.Text)
 			}
 			f.names[p.Name.Text]++
-			f.scopes[0][p.Name.Text] = local{s: f.score(fn.Holder(path, p.Name.Text)), typ: t}
+			l := local{s: f.score(fn.Holder(path, p.Name.Text)), typ: t}
+			if t == tString {
+				l.path = fn.Storage(ns) + " " + fn.LocalPath(path, p.Name.Text)
+			}
+			f.scopes[0][p.Name.Text] = l
 		}
 	}
 	if f.sig.Ret != "" && !f.valueType(f.sig.Ret, d.Type) {
@@ -177,14 +185,14 @@ func (c *Checker) CompileFunction(d *syntax.Decl, id string, src []rune) *fn.Fun
 
 func (f *fc) valueType(t string, at *syntax.Name) bool {
 	switch t {
-	case tInt, tBool:
+	case tInt, tBool, tString:
 		return true
 	}
 	sp := syntax.Span{}
 	if at != nil {
 		sp = at.Sp
 	}
-	f.c.errorf("mms/unknown-type", sp, "unknown type '%s'; function values are int or bool", t)
+	f.c.errorf("mms/unknown-type", sp, "unknown type '%s'; function values are int, bool or string", t)
 	return false
 }
 
@@ -240,6 +248,9 @@ func (f *fc) declare(n *syntax.Name, typ string) local {
 	}
 	f.names[n.Text]++
 	l := local{s: f.score(fn.Holder(f.path, holder)), typ: typ}
+	if typ == tString {
+		l.path = fn.Storage(f.ns) + " " + fn.LocalPath(f.path, holder)
+	}
 	f.scopes[len(f.scopes)-1][n.Text] = l
 	return l
 }
@@ -262,10 +273,11 @@ func (f *fc) stmt(out *fn.Block, s syntax.Stmt) {
 	c := f.c
 	switch s := s.(type) {
 	case *syntax.CommandStmt:
-		if strings.Contains(s.Text, "${") {
-			c.errorf("mms/unsupported", s.Sp, "${...} interpolation is not supported yet")
-		}
 		c.Command(s)
+		if strings.Contains(s.Text, "${") {
+			f.interpolate(out, s)
+			return
+		}
 		out.Add(fn.Cmd{Text: s.Text})
 	case *syntax.LetStmt:
 		if s.Name == nil {
@@ -290,6 +302,11 @@ func (f *fc) stmt(out *fn.Block, s syntax.Stmt) {
 		}
 		l := f.declare(s.Name, typ)
 		if v == nil {
+			if typ == tString {
+				empty := ""
+				out.Add(f.setString(l.path, &val{typ: tString, str: &empty}))
+				return
+			}
 			out.Add(fn.Set{Dst: l.s, Src: fn.Const(0)})
 			return
 		}
@@ -310,6 +327,15 @@ func (f *fc) stmt(out *fn.Block, s syntax.Stmt) {
 		}
 		if s.Op == "=" {
 			f.store(&out.Ops, *target, f.expr(&out.Ops, s.Value), s.Value)
+			return
+		}
+		if target.typ == tString && s.Op == "+=" {
+			v := f.expr(&out.Ops, s.Value)
+			if v == nil {
+				return
+			}
+			joined := f.concat(&out.Ops, &val{typ: tString, path: target.path}, v)
+			out.Add(f.setString(target.path, joined))
 			return
 		}
 		if target.typ != tInt {
@@ -423,6 +449,10 @@ func (f *fc) returnStmt(out *fn.Block, s *syntax.ReturnStmt) {
 	if v == nil {
 		return
 	}
+	if v.typ == tString {
+		f.c.errorf("mms/unsupported", s.Value.Span(), "functions return int or bool; pass strings back through a Global")
+		return
+	}
 	if v.typ != f.sig.Ret {
 		f.c.errorf("mms/type-mismatch", s.Value.Span(), "this function returns %s, but this is %s", f.sig.Ret, v.typ)
 		return
@@ -437,6 +467,8 @@ type val struct {
 	typ  string
 	op   fn.Operand
 	cond *fn.Cond
+	str  *string // a constant string
+	path string  // a string in storage
 }
 
 // operand stores a value as an operand, turning a condition into 0 or 1.
@@ -463,6 +495,10 @@ func (f *fc) store(pre *[]fn.Op, l local, v *val, e syntax.Expr) {
 	}
 	if v.typ != l.typ {
 		f.c.errorf("mms/type-mismatch", e.Span(), "expected %s, but this is %s", l.typ, v.typ)
+		return
+	}
+	if l.typ == tString {
+		*pre = append(*pre, f.setString(l.path, v))
 		return
 	}
 	if v.cond != nil && !v.cond.Never && !v.cond.Always() {
@@ -507,7 +543,11 @@ func (f *fc) global(id string, e syntax.Expr) *local {
 	in.Symbol = sym
 	in.ID = id
 	typ := symSig(sym)
-	if typ != tInt && typ != tBool {
+	switch typ {
+	case tString:
+		return &local{typ: tString, path: fn.Storage(sym.NS) + " " + fn.GlobalPath(sym.Path)}
+	case tInt, tBool:
+	default:
 		typ = tInt
 	}
 	return &local{s: fn.Score{Holder: "$" + sym.Path, Obj: fn.Objective(sym.NS)}, typ: typ}
@@ -639,7 +679,13 @@ func (f *fc) expr(pre *[]fn.Op, e syntax.Expr) *val {
 		if l == nil {
 			return nil
 		}
+		if l.typ == tString {
+			return &val{typ: tString, path: l.path}
+		}
 		return &val{typ: l.typ, op: fn.Of(l.s)}
+	case *syntax.String:
+		v := e.Value
+		return &val{typ: tString, str: &v}
 	case *syntax.Index:
 		s := f.objScore(e)
 		if s == nil {
@@ -713,16 +759,38 @@ func (f *fc) binary(pre *[]fn.Op, e *syntax.Binary) *val {
 		return f.logic(pre, e)
 	case "<", "<=", ">", ">=", "==", "!=":
 		return f.compare(pre, e)
-	case "+", "-", "*", "/", "%":
+	case "+":
+		l, r := f.expr(pre, e.L), f.expr(pre, e.R)
+		if l == nil || r == nil {
+			return nil
+		}
+		if l.typ == tString || r.typ == tString {
+			return f.concat(pre, l, r)
+		}
+		return f.arith(pre, e, l, r)
+	case "-", "*", "/", "%":
 	default:
 		f.c.errorf("mms/unsupported", e.Sp, "'%s' is not supported in functions", e.Op)
 		return nil
 	}
-	l := f.intExpr(pre, e.L)
-	r := f.intExpr(pre, e.R)
+	l, r := f.expr(pre, e.L), f.expr(pre, e.R)
 	if l == nil || r == nil {
 		return nil
 	}
+	return f.arith(pre, e, l, r)
+}
+
+func (f *fc) arith(pre *[]fn.Op, e *syntax.Binary, lv, rv *val) *val {
+	for _, x := range []struct {
+		v *val
+		e syntax.Expr
+	}{{lv, e.L}, {rv, e.R}} {
+		if x.v.typ != tInt {
+			f.c.errorf("mms/type-mismatch", x.e.Span(), "%s needs ints, but this is %s", e.Op, x.v.typ)
+			return nil
+		}
+	}
+	l, r := &lv.op, &rv.op
 	if l.IsConst && r.IsConst {
 		a, b := int64(l.Const), int64(r.Const)
 		var v int64
@@ -762,9 +830,12 @@ func (f *fc) compare(pre *[]fn.Op, e *syntax.Binary) *val {
 	if l == nil || r == nil {
 		return nil
 	}
-	if l.typ != r.typ || (l.typ == tBool && e.Op != "==" && e.Op != "!=") {
+	if l.typ != r.typ || (l.typ != tInt && e.Op != "==" && e.Op != "!=") {
 		f.c.errorf("mms/type-mismatch", e.Sp, "cannot compare %s with %s using %s", l.typ, r.typ, e.Op)
 		return nil
+	}
+	if l.typ == tString {
+		return f.compareStrings(p, e.Op, l, r)
 	}
 	lo, ro := f.operand(&p, l), f.operand(&p, r)
 	if lo.IsConst && ro.IsConst {
@@ -921,6 +992,10 @@ func (f *fc) call(pre *[]fn.Op, e *syntax.Call, wantValue bool) *val {
 			c.errorf("mms/type-mismatch", a.Value.Span(), "parameter '%s' is %s, but this is %s", sig.Params[i].Name, sig.Params[i].Type, v.typ)
 			return nil
 		}
+		if v.typ == tString {
+			stores = append(stores, f.setString(fn.Storage(calleeNS)+" "+fn.LocalPath(calleePath, sig.Params[i].Name), v))
+			continue
+		}
 		op := f.operand(pre, v)
 		if !op.IsConst && id == f.selfID {
 			t := f.temp()
@@ -952,8 +1027,8 @@ func (c *Checker) Global(d *syntax.Decl) []string {
 	typ := tInt
 	if d.Type != nil {
 		typ = d.Type.Text
-		if typ != tInt && typ != tBool {
-			c.errorf("mms/unknown-type", d.Type.Sp, "unknown type '%s'; globals are int or bool", typ)
+		if typ != tInt && typ != tBool && typ != tString {
+			c.errorf("mms/unknown-type", d.Type.Sp, "unknown type '%s'; globals are int, bool or string", typ)
 			return nil
 		}
 	}
@@ -963,6 +1038,7 @@ func (c *Checker) Global(d *syntax.Decl) []string {
 	}
 	s := fn.Score{Holder: "$" + path, Obj: fn.Objective(ns)}
 	init := int32(0)
+	str := ""
 	if d.Value != nil {
 		f := &fc{c: c, ns: ns, obj: fn.Objective(ns), names: map[string]int{}}
 		f.push()
@@ -975,12 +1051,191 @@ func (c *Checker) Global(d *syntax.Decl) []string {
 			c.errorf("mms/type-mismatch", d.Value.Span(), "expected %s, but this is %s", typ, v.typ)
 			return nil
 		}
-		op := f.operand(&pre, v)
-		if !op.IsConst || len(pre) > 0 {
-			c.errorf("mms/not-constant", d.Value.Span(), "a global's initial value must be a constant")
-			return nil
+		if typ == tString {
+			if v.str == nil || len(pre) > 0 {
+				c.errorf("mms/not-constant", d.Value.Span(), "a global's initial value must be a constant")
+				return nil
+			}
+			str = *v.str
+		} else {
+			op := f.operand(&pre, v)
+			if !op.IsConst || len(pre) > 0 {
+				c.errorf("mms/not-constant", d.Value.Span(), "a global's initial value must be a constant")
+				return nil
+			}
+			init = op.Const
 		}
-		init = op.Const
+	}
+	if typ == tString {
+		loc := fn.Storage(ns) + " " + fn.GlobalPath(path)
+		return []string{fmt.Sprintf("execute unless data storage %s run data modify storage %s set value %s", loc, loc, fn.QuoteSNBT(str))}
 	}
 	return []string{fmt.Sprintf("execute unless score %s = %s run scoreboard players set %s %d", s, s, s, init)}
+}
+
+// setString writes a string value to a storage location.
+func (f *fc) setString(dst string, v *val) fn.Op {
+	if v.str != nil {
+		return fn.Cmd{Text: "data modify storage " + dst + " set value " + fn.QuoteSNBT(*v.str)}
+	}
+	return fn.Cmd{Text: "data modify storage " + dst + " set from storage " + v.path}
+}
+
+func (f *fc) tempPath() string {
+	p := fn.Storage(f.ns) + " " + fn.LocalPath(f.path, "_s"+strconv.Itoa(f.temps))
+	f.temps++
+	return p
+}
+
+// text turns a value into a piece of text: fixed when it is constant,
+// otherwise a macro argument.
+func (f *fc) text(pre *[]fn.Op, v *val, key string) (string, *fn.MacroArg) {
+	switch {
+	case v.str != nil:
+		return *v.str, nil
+	case v.typ == tString:
+		return "", &fn.MacroArg{Key: key, Path: v.path}
+	case v.typ == tBool:
+		cd := f.asCond(nil, v)
+		switch {
+		case cd.Never:
+			*pre = append(*pre, cd.Pre...)
+			return "false", nil
+		case cd.Always():
+			*pre = append(*pre, cd.Pre...)
+			return "true", nil
+		}
+		p := f.tempPath()
+		no, yes := "false", "true"
+		*pre = append(*pre, f.setString(p, &val{str: &no}), fn.If{Cond: cd, Then: &fn.Block{Ops: []fn.Op{f.setString(p, &val{str: &yes})}}})
+		return "", &fn.MacroArg{Key: key, Path: p}
+	}
+	op := f.operand(pre, v)
+	if op.IsConst {
+		return strconv.Itoa(int(op.Const)), nil
+	}
+	s := op.S
+	return "", &fn.MacroArg{Key: key, Score: &s}
+}
+
+// concat joins two values into a string, through a macro when either is
+// only known at run time.
+func (f *fc) concat(pre *[]fn.Op, l, r *val) *val {
+	lt, la := f.text(pre, l, "a0")
+	rt, ra := f.text(pre, r, "a1")
+	if la == nil && ra == nil {
+		s := lt + rt
+		return &val{typ: tString, str: &s}
+	}
+	esc := func(s string) string {
+		q := fn.QuoteSNBT(s)
+		return q[1 : len(q)-1]
+	}
+	var args []fn.MacroArg
+	piece := func(t string, a *fn.MacroArg) string {
+		if a == nil {
+			return esc(t)
+		}
+		args = append(args, *a)
+		return "$(" + a.Key + ")"
+	}
+	dst := f.tempPath()
+	line := "data modify storage " + dst + " set value \"" + piece(lt, la) + piece(rt, ra) + "\""
+	*pre = append(*pre, fn.Macro{Line: line, Args: args})
+	return &val{typ: tString, path: dst}
+}
+
+// compareStrings tests two strings for equality: copying one over a copy
+// of the other only succeeds when they differ.
+func (f *fc) compareStrings(pre []fn.Op, op string, l, r *val) *val {
+	if l.str != nil && r.str != nil {
+		eq := *l.str == *r.str
+		return &val{typ: tBool, cond: &fn.Cond{Pre: pre, Never: eq != (op == "==")}}
+	}
+	if l.str != nil {
+		l, r = r, l
+	}
+	tmp := f.tempPath()
+	t := f.temp()
+	pre = append(pre, f.setString(tmp, l))
+	src := "from storage " + r.path
+	if r.str != nil {
+		src = "value " + fn.QuoteSNBT(*r.str)
+	}
+	pre = append(pre, fn.Cmd{Text: fmt.Sprintf("execute store success score %s run data modify storage %s set %s", t, tmp, src)})
+	kw := "if"
+	if op == "!=" {
+		kw = "unless"
+	}
+	return &val{typ: tBool, cond: &fn.Cond{Pre: pre, Parts: []string{fmt.Sprintf("%s score %s matches 0", kw, t)}}}
+}
+
+// interpolate lowers a command holding ${expr} parts. Constant parts are
+// written into the line; the rest become macro arguments.
+func (f *fc) interpolate(out *fn.Block, cmd *syntax.CommandStmt) {
+	text := []rune(cmd.Text)
+	base := cmd.Sp.Start + 1
+	var line strings.Builder
+	var args []fn.MacroArg
+	var pre []fn.Op
+	for i := 0; i < len(text); i++ {
+		if text[i] != '$' || i+1 >= len(text) || text[i+1] != '{' {
+			line.WriteRune(text[i])
+			continue
+		}
+		depth, j := 0, i+1
+		for ; j < len(text); j++ {
+			if text[j] == '{' {
+				depth++
+			} else if text[j] == '}' {
+				depth--
+				if depth == 0 {
+					break
+				}
+			}
+		}
+		if j >= len(text) {
+			f.c.errorf("mms/syntax", syntax.Span{Start: base + i, End: base + len(text)}, "this ${ is not closed")
+			return
+		}
+		e := f.parseExpr(string(text[i+2:j]), base+i+2)
+		if e == nil {
+			return
+		}
+		v := f.expr(&pre, e)
+		if v == nil {
+			return
+		}
+		t, a := f.text(&pre, v, "a"+strconv.Itoa(len(args)))
+		if a != nil {
+			args = append(args, *a)
+			line.WriteString("$(" + a.Key + ")")
+		} else {
+			line.WriteString(t)
+		}
+		i = j
+	}
+	out.Add(pre...)
+	if len(args) == 0 {
+		out.Add(fn.Cmd{Text: line.String()})
+		return
+	}
+	out.Add(fn.Macro{Line: line.String(), Args: args})
+}
+
+// parseExpr parses an interpolated expression at offset off in the file,
+// so its spans are the file's.
+func (f *fc) parseExpr(text string, off int) syntax.Expr {
+	const head = "X _ = "
+	sp := syntax.Span{Start: off, End: off + len([]rune(text))}
+	if strings.TrimSpace(text) == "" || off < len(head) {
+		f.c.errorf("mms/syntax", sp, "expected an expression inside ${...}")
+		return nil
+	}
+	file := syntax.Parse(strings.Repeat(" ", off-len(head)) + head + text)
+	if len(file.Diags) > 0 || len(file.Decls) != 1 || file.Decls[0].Value == nil {
+		f.c.errorf("mms/syntax", sp, "cannot read this expression")
+		return nil
+	}
+	return file.Decls[0].Value
 }

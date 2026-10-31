@@ -55,6 +55,37 @@ Function on_death {
 
 Constant parts are folded at compile time.
 
+### Strings
+
+`string` values live in command storage (`<namespace>:mms`). They can be joined with `+`, appended with `+=`, and compared with `==` and `!=`. Ints and bools join as their text.
+
+```
+Global motd: string = "Welcome"
+
+Function welcome(name: string) {
+  let line = motd + ", " + name + "!"
+  if (name == "Notch") {
+    line += " Nice to meet you."
+  }
+  /tellraw @a "${line}"
+}
+```
+
+## Interpolation
+
+`${expr}` puts a value into a command:
+
+```
+Function report(points: int) {
+  /say ${points} points, ${points * 2} doubled
+  /scoreboard players set @s kills ${points}
+}
+```
+
+- **Constant values** (literals, constant arithmetic) are written into the command at compile time.
+- **Run-time values** turn the line into a [macro](https://minecraft.wiki/w/Function_(Java_Edition)#Macros): the values are copied into storage, and a one-line macro function runs the command.
+- **Quotes:** a string with a `"` in it will break a command that wraps it in quotes, just as it would in a hand-written macro.
+
 ## Control flow
 
 ```
@@ -90,7 +121,7 @@ A function with a return type must end with `return` on every path.
 
 A call looks like `add(1, 2)`, or `other_ns:add(1, 2)` for a function in another namespace. Arguments are passed by position. A call can stand on its own, or be used as a value when the function has a return type.
 
-Parameters are `int` or `bool`.
+Parameters are `int`, `bool` or `string`. Functions return `int` or `bool`. To hand a string back, assign it to a Global.
 
 ## How it compiles
 
@@ -103,6 +134,8 @@ Values live on one scoreboard objective per namespace, `mms.<namespace>`:
 | `#<function>._t<n>`, `#<function>._f<n>` | temporaries and condition flags |
 | `#c<n>` | the constant `n`, for multiplication, division and comparison |
 | `#cf`, `#rv` | control flow, see below |
+
+String values and macro arguments live in storage `<namespace>:mms`: `g.<name>` for globals, `l."<function>".<name>` for locals, and `m` for the arguments of the macro being called.
 
 **Branches and loops.** `if` with a one-command body becomes `execute if ... run <command>`. Longer bodies become sub-functions next to the function, such as `demo:check/_if0`.
 

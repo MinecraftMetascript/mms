@@ -243,3 +243,41 @@ func TestSignatureDeps(t *testing.T) {
 		t.Fatalf("after adding the parameter, %d errors remain", n)
 	}
 }
+
+func TestStringsAndInterpolation(t *testing.T) {
+	vm := world(t, `
+Global greeting: string = "hello"
+Global n: int = 3
+Objective kills
+
+Function greet(who: string, times: int) {
+  let msg = greeting + ", " + who
+  for i in 1..times {
+    /say ${msg} #${i}
+  }
+  if (who == "steve") {
+    /say hi steve
+  }
+  if (who != greeting) {
+    /say not hello
+  }
+  /say const ${2 * 21} ${true} ${n > 2}
+}
+
+Function run {
+  greet("alex", 2)
+  greet("steve", 1)
+  greeting += "!"
+  greet(greeting, 1)
+}
+`)
+	call(t, vm, "demo:run")
+	want := []string{
+		"hello, alex #1", "hello, alex #2", "not hello", "const 42 true true",
+		"hello, steve #1", "hi steve", "not hello", "const 42 true true",
+		"hello!, hello! #1", "const 42 true true",
+	}
+	if strings.Join(vm.Said, "\n") != strings.Join(want, "\n") {
+		t.Errorf("said:\n%s\nwant:\n%s", strings.Join(vm.Said, "\n"), strings.Join(want, "\n"))
+	}
+}

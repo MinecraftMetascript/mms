@@ -75,6 +75,12 @@ type (
 		Cond       Cond
 		Body, Post *Block
 	}
+	// Macro runs one command line holding $(key) placeholders through a
+	// macro sub-function, with the arguments copied into storage first.
+	Macro struct {
+		Line string
+		Args []MacroArg
+	}
 	// Return leaves the function, with a value when Val is set.
 	Return   struct{ Val *Operand }
 	Break    struct{}
@@ -82,6 +88,7 @@ type (
 )
 
 func (Cmd) op()      {}
+func (Macro) op()    {}
 func (Set) op()      {}
 func (Arith) op()    {}
 func (Call) op()     {}
@@ -90,6 +97,24 @@ func (Loop) op()     {}
 func (Return) op()   {}
 func (Break) op()    {}
 func (Continue) op() {}
+
+// MacroArg is a macro argument: a score, a storage location ("<storage>
+// <path>"), or a fixed text.
+type MacroArg struct {
+	Key   string
+	Score *Score
+	Path  string
+	Text  *string
+}
+
+// Storage is the command storage for a namespace's non-score values.
+func Storage(ns string) string { return ns + ":mms" }
+
+// LocalPath is the storage path of a function's string local.
+func LocalPath(fn, name string) string { return "l.\"" + fn + "\"." + name }
+
+// GlobalPath is the storage path of a string Global.
+func GlobalPath(name string) string { return "g." + name }
 
 // Cond is a condition: Pre runs first, then every part of the execute
 // chain must hold ("if score #a mms.x < #b mms.x", "unless entity @s").

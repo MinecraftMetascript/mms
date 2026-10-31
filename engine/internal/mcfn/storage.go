@@ -263,6 +263,9 @@ func (vm *VM) data(w []string) (result, error) {
 		}
 		switch mode {
 		case "set":
+			if old, err := vm.get(id, path); err == nil && SNBT(old) == SNBT(v) {
+				return result{failed: true}, nil // nothing changed: the command fails
+			}
 			return result{value: 1, ok: true}, vm.put(id, path, v, false)
 		case "append", "prepend":
 			cur, err := vm.get(id, path)

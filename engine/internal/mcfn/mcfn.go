@@ -47,6 +47,7 @@ func (vm *VM) set(holder, obj string, v int32) error {
 type result struct {
 	value    int32
 	ok       bool // the command produced a result
+	failed   bool // the command failed, as when data modify changes nothing
 	returned bool // a return ran: leave the function
 }
 
@@ -344,11 +345,14 @@ func (vm *VM) execute(w []string) (result, error) {
 			if err != nil {
 				return result{}, err
 			}
-			if r.ok {
+			if r.ok || r.failed {
 				for _, s := range stores {
 					v := r.value
 					if s.success {
 						v = 1
+					}
+					if r.failed {
+						v = 0
 					}
 					var err error
 					if s.storage != nil {

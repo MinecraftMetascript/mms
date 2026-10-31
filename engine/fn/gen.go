@@ -138,6 +138,8 @@ func (g *gen) op(fr *frame, op Op) []string {
 			return []string{fmt.Sprintf("execute store result score %s run function %s", *o.Dst, o.Fn)}
 		}
 		return []string{"function " + o.Fn}
+	case Macro:
+		return g.macro(o)
 	case Return:
 		return g.ret(fr, o)
 	case Break:
@@ -404,3 +406,29 @@ func RetHelper(ns string) []string {
 
 // ID returns the id of the function itself.
 func (o *Output) ID() string { return o.Main }
+
+// macro copies the arguments into storage and calls a one-line macro
+// function.
+func (g *gen) macro(o Macro) []string {
+	st := Storage(g.ns)
+	var lines []string
+	for _, a := range o.Args {
+		path := "m." + a.Key
+		switch {
+		case a.Score != nil:
+			lines = append(lines, fmt.Sprintf("execute store result storage %s %s int 1 run scoreboard players get %s", st, path, *a.Score))
+		case a.Text != nil:
+			lines = append(lines, fmt.Sprintf("data modify storage %s %s set value %s", st, path, QuoteSNBT(*a.Text)))
+		default:
+			lines = append(lines, fmt.Sprintf("data modify storage %s %s set from storage %s", st, path, a.Path))
+		}
+	}
+	id := g.next("macro")
+	g.out.Files[id] = []string{"$" + o.Line}
+	return append(lines, fmt.Sprintf("function %s with storage %s m", id, st))
+}
+
+// QuoteSNBT quotes a string for SNBT.
+func QuoteSNBT(s string) string {
+	return `"` + strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(s) + `"`
+}
