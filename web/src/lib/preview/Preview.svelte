@@ -122,8 +122,11 @@
 		worker = new Worker(new URL('./preview.worker.ts', import.meta.url), { type: 'module' });
 		worker.onmessage = (e: MessageEvent<PreviewResponse>) => {
 			const r = e.data;
-			if (r.seq !== seq) return;
-			busy = false;
+			if (r.seq !== seq) {
+				if (r.type === 'rendered') r.bitmap?.close();
+				return;
+			}
+			busy = r.type === 'rendered' && !!r.partial;
 			if (r.type === 'error') {
 				error = r.message;
 				return;
@@ -212,12 +215,20 @@
 		});
 	}
 
+	/** The worker-drawn image on screen, closed once it is replaced. */
+	let shown: ImageBitmap | null = null;
 	function draw() {
 		if (!last || !canvas) return;
 		canvas.width = last.width;
 		canvas.height = last.height;
 		const ctx = canvas.getContext('2d')!;
-		ctx.putImageData(new ImageData(last.pixels, last.width, last.height), 0, 0);
+		if (last.bitmap) {
+			ctx.drawImage(last.bitmap, 0, 0);
+			if (shown && shown !== last.bitmap) shown.close();
+			shown = last.bitmap;
+		} else {
+			ctx.putImageData(new ImageData(last.pixels, last.width, last.height), 0, 0);
+		}
 		if (last.seaLevel !== undefined && mode === 'density') {
 			const py = (view.y - last.seaLevel) / view.scale + last.height / 2;
 			ctx.strokeStyle = 'rgba(30, 80, 160, 0.6)';

@@ -78,6 +78,10 @@ export type PreviewResponse =
 			legend?: { id: string; color: string }[];
 			/** For the isometric view: the block size in pixels it was drawn at. */
 			scale?: number;
+			/** For the isometric view: the image itself, drawn in the worker (pixels is then empty). */
+			bitmap?: ImageBitmap;
+			/** More of this render follows (chunks are still being built). */
+			partial?: boolean;
 			/** Something to tell the viewer about an otherwise empty render. */
 			notice?: string;
 			/** For terrain: the sea level and world height. */
