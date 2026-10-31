@@ -303,10 +303,12 @@ function buildChunk3D(t: Terrain, cx: number, cz: number): Uint16Array {
 
 let isoKey = '';
 const isoChunks = new Map<string, Uint16Array>();
-/** Chunks across the isometric view (it shows ISO_CHUNKS² chunks); even, so it centres on a chunk corner. */
-const ISO_CHUNKS = 2;
-
-/** Draws the terrain around the view's x (and z = 0) as an isometric block diagram. */
+/**
+ * Draws the terrain as an isometric block diagram. In this mode the view's
+ * x and y are the world x and z at the centre, and its scale is the size of
+ * a block in pixels (0 to fit a 2×2-chunk area to the canvas). Zooming out
+ * builds more chunks, up to 4×4.
+ */
 async function renderIso(req: RenderRequest, t: Terrain, key: string): Promise<Rendered> {
 	const { width, height } = req;
 	const h = t.settings.noise.height;
@@ -314,14 +316,19 @@ async function renderIso(req: RenderRequest, t: Terrain, key: string): Promise<R
 		isoKey = key;
 		isoChunks.clear();
 	}
-	const n = ISO_CHUNKS * 16;
-	// Centred on the slice's x, with z = 0 (the slice) running through the middle.
-	const cx0 = Math.round(req.view.x / 16) - ISO_CHUNKS / 2;
-	const cz0 = -ISO_CHUNKS / 2;
+	const fit = !(req.view.scale > 0);
+	// Blocks across the area: enough to fill the canvas at this zoom.
+	const across = fit ? 32 : width / (2 * req.view.scale);
+	const chunksAcross = across <= 40 ? 2 : across <= 56 ? 3 : 4;
+	const n = chunksAcross * 16;
+	const cx = req.view.x;
+	const cz = req.view.y;
+	const cx0 = Math.round(cx / 16 - chunksAcross / 2);
+	const cz0 = Math.round(cz / 16 - chunksAcross / 2);
 	const chunks: Uint16Array[][] = [];
-	for (let i = 0; i < ISO_CHUNKS; i++) {
+	for (let i = 0; i < chunksAcross; i++) {
 		chunks.push([]);
-		for (let j = 0; j < ISO_CHUNKS; j++) {
+		for (let j = 0; j < chunksAcross; j++) {
 			const k = `${cx0 + i},${cz0 + j}`;
 			let c = isoChunks.get(k);
 			if (!c) {
@@ -357,7 +364,7 @@ async function renderIso(req: RenderRequest, t: Terrain, key: string): Promise<R
 	if (lowest > highest) {
 		const pixels = new Uint8ClampedArray(width * height * 4);
 		for (let i = 0; i < width * height; i++) put(pixels, i * 4, SKY);
-		const notice = 'No blocks in these chunks. Pan the Blocks view to some terrain, then switch back.';
+		const notice = 'No blocks in these chunks. Drag to pan to some terrain.';
 		return { type: 'rendered', seq: req.seq, width, height, pixels, values: new Float32Array(width * height).fill(NaN), min: Infinity, max: -Infinity, notice };
 	}
 	const bottom = Math.max(0, lowest - 16);
@@ -367,10 +374,15 @@ async function renderIso(req: RenderRequest, t: Terrain, key: string): Promise<R
 	const ctx = canvas.getContext('2d')!;
 	ctx.fillStyle = `rgb(${SKY.join(' ')})`;
 	ctx.fillRect(0, 0, width, height);
-	const s = Math.max(1, Math.min(width / (2 * n), height / (n + span)) * 0.92);
-	const ox = width / 2;
-	const oy = (height - (n + span) * s) / 2 + span * s;
-	const px = (x: number, y: number, z: number): [number, number] => [ox + (x - z) * s, oy + ((x + z) * s) / 2 - (y - bottom) * s];
+	const s = fit ? Math.max(1, Math.min(width / (2 * n), height / (n + span)) * 0.92) : req.view.scale;
+	// Area-local block x, z → screen, with the view's centre (at mid height) in the middle.
+	const lx = cx - cx0 * 16;
+	const lz = cz - cz0 * 16;
+	const yc = bottom + span / 2;
+	const px = (x: number, y: number, z: number): [number, number] => [
+		width / 2 + (x - lx - (z - lz)) * s,
+		height / 2 + ((x - lx + (z - lz)) * s) / 2 - (y - yc) * s
+	];
 	const face = (pts: [number, number][], c: Rgb, shade: number) => {
 		const fill = `rgb(${Math.round(c[0] * shade)} ${Math.round(c[1] * shade)} ${Math.round(c[2] * shade)})`;
 		ctx.fillStyle = fill;
@@ -401,7 +413,7 @@ async function renderIso(req: RenderRequest, t: Terrain, key: string): Promise<R
 	}
 	const pixels = new Uint8ClampedArray(ctx.getImageData(0, 0, width, height).data.buffer);
 	const values = new Float32Array(width * height).fill(NaN);
-	return { type: 'rendered', seq: req.seq, width, height, pixels, values, min: Infinity, max: -Infinity };
+	return { type: 'rendered', seq: req.seq, width, height, pixels, values, min: Infinity, max: -Infinity, scale: s };
 }
 
 /**

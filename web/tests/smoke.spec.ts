@@ -113,6 +113,16 @@ test('dimensions, noise settings and surface rules preview as terrain', async ({
 	await expect(canvas).toBeVisible({ timeout: 30_000 });
 	await expect(failed).toBeHidden();
 
+	// It pans by dragging and zooms with the wheel.
+	const iso = (await canvas.boundingBox())!;
+	await page.mouse.move(iso.x + iso.width / 2, iso.y + iso.height / 2);
+	await page.mouse.down();
+	await page.mouse.move(iso.x + iso.width / 2 - 120, iso.y + iso.height / 2 - 60, { steps: 5 });
+	await page.mouse.up();
+	await page.mouse.wheel(0, -300);
+	await expect(page.getByText('Rendering…')).toBeHidden({ timeout: 30_000 });
+	await expect(failed).toBeHidden();
+
 	// A rule that tests a biome through a named condition starts on that biome.
 	await page.getByRole('button', { name: /Project/ }).click();
 	await page.getByRole('button', { name: /badlands/ }).click();
