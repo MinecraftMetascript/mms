@@ -11,7 +11,14 @@ import (
 // A biome attribute that only a dimension type can set is an error, with a
 // fix that removes the line.
 func TestNonPositionalAttributeFix(t *testing.T) {
+	for _, nl := range []string{"\n", "\r\n"} {
+		testNonPositionalFix(t, nl)
+	}
+}
+
+func testNonPositionalFix(t *testing.T, nl string) {
 	src := "Biome b = {\n  temperature = 1\n  downfall = 0\n  has_precipitation = false\n  effects = { water_color = 1 }\n  carvers = []\n  features = []\n  attributes = {\n    \"minecraft:gameplay/fast_lava\" = true\n    \"minecraft:visual/fog_color\" = \"#330808\"\n  }\n}\n"
+	src = strings.ReplaceAll(src, "\n", nl)
 	p := New(spec.MustDefault(), Config{Namespace: "demo"})
 	p.SetFile("a.mms", src)
 	r, _ := p.Analyze(context.Background())
@@ -30,7 +37,7 @@ func TestNonPositionalAttributeFix(t *testing.T) {
 		e := d.Fixes[0].Edits[0]
 		rs := []rune(src)
 		got := string(rs[:e.Sp.Start]) + e.Text + string(rs[e.Sp.End:])
-		want := strings.Replace(src, "    \"minecraft:gameplay/fast_lava\" = true\n", "", 1)
+		want := strings.Replace(src, "    \"minecraft:gameplay/fast_lava\" = true"+nl, "", 1)
 		if got != want {
 			t.Errorf("fix:\n got %q\nwant %q", got, want)
 		}

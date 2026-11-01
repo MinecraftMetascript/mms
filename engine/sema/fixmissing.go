@@ -234,10 +234,10 @@ func (c *Checker) removeFix(sp syntax.Span, title string) []syntax.Fix {
 		ls--
 	}
 	le := sp.End
-	for le < len(src) && (src[le] == ' ' || src[le] == '\t' || src[le] == ',') {
-		le++
+	for le < len(src) && (src[le] == ' ' || src[le] == '\t' || src[le] == ',' || src[le] == '\r') {
+		le++ // \r: a CRLF line ending
 	}
-	if !(ls == 0 || src[ls-1] == '\n') || !(le == len(src) || src[le] == '\n') {
+	if (ls > 0 && src[ls-1] != '\n') || (le < len(src) && src[le] != '\n') {
 		return nil // shares its line: removing it could leave stray commas
 	}
 	start, end := ls, le
