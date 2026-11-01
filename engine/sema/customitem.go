@@ -473,13 +473,13 @@ func (c *Checker) idText(e syntax.Expr) string {
 	return text
 }
 
-// isCustomItem reports whether an id expression names a custom item,
-// without recording anything.
+// isCustomItem reports whether an id expression names a custom item.
+// The lookup is recorded, so that adding the item later checks e again.
 func (c *Checker) isCustomItem(e syntax.Expr) bool {
 	if !isID(e) {
 		return false
 	}
-	s := c.Syms.Find("item", c.idText(e))
+	s := c.find("item", c.idText(e))
 	return s != nil && s.Kind.MMS == customItemKind
 }
 

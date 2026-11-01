@@ -139,3 +139,23 @@ func TestCustomItemRecheck(t *testing.T) {
 		}
 	}
 }
+
+// A use checked before its custom item is declared is checked again once
+// it is, as when the web editor opens a project file by file.
+func TestCustomItemDeclaredLater(t *testing.T) {
+	p := New(spec.MustDefault(), Config{Namespace: "demo"})
+	p.SetFile("use.mms", "Function give {\n  /give @s ${a}\n}\nRecipe r = Shapeless([stick], a)\n")
+	if _, err := p.Analyze(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	p.SetFile("items.mms", `CustomItem a = { base = stick, name = "A" }`)
+	r, err := p.Analyze(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{"use.mms", "items.mms"} {
+		for _, d := range r.Diagnostics(path) {
+			t.Errorf("%s: %s: %s", path, d.Code, d.Message)
+		}
+	}
+}
