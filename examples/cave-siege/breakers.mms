@@ -49,7 +49,7 @@ BlockTag break_obsidian = [
 
 /** Runs as and at a breaker: looks at the block in front of it, level with the banner's direction. */
 Function break_step {
-  /execute facing entity @e[tag=cs_lure,limit=1] feet rotated ~ 0 positioned ^ ^ ^0.8 align xyz run function siege:break_at
+  /execute facing entity @e[tag=cs_core,limit=1] feet rotated ~ 0 positioned ^ ^ ^0.8 align xyz run function siege:break_at
 }
 
 /** Runs at the block in front of a breaker's feet: digs the feet block first, then the head block. */
@@ -72,5 +72,7 @@ Function break_block {
   if (cs_break[@s] >= cs_tmp["#need"]) {
     /setblock ~ ~ ~ air destroy
     cs_break[@s] = 0
+    // The opening may be a shorter way in.
+    path_dirty = true
   }
 }

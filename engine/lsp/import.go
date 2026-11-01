@@ -61,7 +61,8 @@ func (s *Server) convertJSON(ctx context.Context, p struct {
 	if err != nil {
 		return nil, &respError{Code: codeRequestFailed, Message: "not valid JSON: " + err.Error()}
 	}
-	ns := s.namespaceAtEnd(p.URI)
+	w := s.projectFor(canonURI(p.URI))
+	ns := namespaceAtEnd(w, canonURI(p.URI))
 	id := p.Name
 	if !strings.Contains(id, ":") {
 		id = ns + ":" + id
@@ -72,7 +73,7 @@ func (s *Server) convertJSON(ctx context.Context, p struct {
 	} else {
 		src = importer.Decl(k, ns, id, v)
 	}
-	text, err := importer.TidyIn(ctx, s.proj, ns, src)
+	text, err := importer.TidyIn(ctx, w.proj, ns, src)
 	if err != nil {
 		return nil, &respError{Code: codeRequestFailed, Message: err.Error()}
 	}
@@ -80,12 +81,12 @@ func (s *Server) convertJSON(ctx context.Context, p struct {
 }
 
 // namespaceAtEnd is the namespace a declaration appended to uri lives in.
-func (s *Server) namespaceAtEnd(uri string) string {
-	ns := s.proj.Config.Namespace
-	if s.res == nil {
+func namespaceAtEnd(w *workspace, uri string) string {
+	ns := w.proj.Config.Namespace
+	if w.res == nil {
 		return ns
 	}
-	if u := s.res.Unit(uri); u != nil {
+	if u := w.res.Unit(uri); u != nil {
 		for _, d := range u.File.Decls {
 			if d.Kind != nil && d.Kind.Name == "Namespace" && d.Name != nil {
 				ns = d.Name.Text
