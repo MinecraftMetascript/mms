@@ -5,7 +5,9 @@
   },
   "comparator_output": 7,
   "length_in_seconds": 8,
-  "sound_event": "embers:embers"
+  "sound_event": {
+    "sound_id": "embers:embers"
+  }
 }
 === data/embers/loot_table/ember_cache.json
 {

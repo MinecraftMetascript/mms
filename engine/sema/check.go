@@ -330,6 +330,9 @@ func exprKind(e syntax.Expr) string {
 // union narrows a union by the expression's shape, then by trial checks,
 // and reports against the closest member when nothing fits.
 func (c *Checker) union(e syntax.Expr, v tview) jsonv.Value {
+	if r, ok := c.inlineSound(e, v); ok {
+		return r
+	}
 	var cands []tview
 	for _, m := range v.T.Members {
 		mv := c.norm(tview{T: m, Env: v.Env})
@@ -928,4 +931,34 @@ func editDistance(a, b string) int {
 		prev, cur = cur, prev
 	}
 	return prev[len(b)]
+}
+
+// inlineSound writes Sound("x.ogg") where a sound event may be given
+// inline (mcdoc's SoundEventRef: an id or { sound_id, range }) as
+// { "sound_id": "ns:x" }. The minecraft:sound_event registry is built
+// into the game, so data packs cannot add to it and a pack's own sound
+// only works inline; the id form fails to load (decision D91).
+func (c *Checker) inlineSound(e syntax.Expr, v tview) (jsonv.Value, bool) {
+	if assetCallName(e) != "Sound" {
+		return nil, false
+	}
+	for _, m := range v.T.Members {
+		mv := c.norm(tview{T: m, Env: v.Env})
+		if mv.T == nil || mv.T.Kind != "struct" {
+			continue
+		}
+		for _, f := range mv.T.Fields {
+			if f.Key != "sound_id" || f.Type == nil || !c.assetFits(e, idOf(f.Type)) {
+				continue
+			}
+			id := c.check(e, c.norm(tview{T: f.Type, Env: mv.Env}))
+			if id == nil {
+				return nil, true // already reported
+			}
+			o := &jsonv.Object{}
+			o.Set("sound_id", id)
+			return o, true
+		}
+	}
+	return nil, false
 }
