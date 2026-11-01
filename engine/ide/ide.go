@@ -676,6 +676,11 @@ func (s *Session) Hover(path string, off int) (string, syntax.Span) {
 			}
 			return "```mms\n" + d.Kind.Name + "\n```\nWrites `" + k.Kind.Dir("<namespace>") + "/<name>.json`" + where, d.Kind.Sp
 		}
+		if k != nil && k.Kind.MMS != "" {
+			if doc := sema.KindDoc(k.Kind.MMS); doc != "" {
+				return "```mms\n" + d.Kind.Name + "\n```\n" + doc, d.Kind.Sp
+			}
+		}
 		return "", syntax.Span{}
 	}
 	if n, in := a.inCommand(off); in != nil {

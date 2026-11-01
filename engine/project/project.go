@@ -123,6 +123,7 @@ type Result struct {
 	assets   []assetUse
 	assetErr map[string][]syntax.Diagnostic
 	orderErr map[string][]syntax.Diagnostic // feature order cycles
+	langErr  map[string][]syntax.Diagnostic // CustomItem names a Lang also has
 	files    fs.FS
 	lintMu   sync.Mutex
 	lintDone bool
@@ -145,7 +146,10 @@ type Decl struct {
 	Lines      []string // raw function commands, or load lines
 	// Fn is a compiled function's output: its files and what the load
 	// function must set up for it.
-	Fn    *fn.Output
+	Fn *fn.Output
+	// Item is a checked CustomItem: the files it writes and the stack
+	// its name stands for.
+	Item  *sema.CustomItemOut
 	Info  map[syntax.Node]*sema.Info
 	Diags []syntax.Diagnostic
 	// Deps are the symbol lookups the check made (see sema.DepsHold).
@@ -189,6 +193,7 @@ func (r *Result) Diagnostics(path string) []syntax.Diagnostic {
 	out = append(out, r.collect[path]...)
 	out = append(out, r.assetErr[path]...)
 	out = append(out, r.orderErr[path]...)
+	out = append(out, r.langErr[path]...)
 	for _, d := range r.Order {
 		if d.Unit == u {
 			out = append(out, d.Diags...)
@@ -276,6 +281,7 @@ func (p *Project) Analyze(ctx context.Context) (*Result, error) {
 	}
 	r.collectAssets()
 	r.checkFeatureOrder()
+	r.checkCustomItemLang()
 	p.mu.Lock()
 	p.last = r
 	p.mu.Unlock()
@@ -345,7 +351,7 @@ func (p *Project) checkDecl(u *sema.Unit, d *syntax.Decl, k sema.Kind, syms *sem
 	c.Src = u.File.Src
 	defer func() {
 		if rec := recover(); rec != nil {
-			dr.Value, dr.Tag, dr.Lines, dr.Fn = nil, nil, nil, nil
+			dr.Value, dr.Tag, dr.Lines, dr.Fn, dr.Item = nil, nil, nil, nil, nil
 			dr.Info = c.Info
 			dr.Diags = append(c.Diags, syntax.Diagnostic{
 				Code: "mms/internal", Severity: syntax.SeverityError, Sp: d.Kind.Sp,
@@ -380,6 +386,8 @@ func (p *Project) checkDecl(u *sema.Unit, d *syntax.Decl, k sema.Kind, syms *sem
 			dr.Fn = fn.Generate(*f)
 			dr.Lines = []string{"function " + id}
 		}
+	case k.MMS == "CustomItem":
+		dr.Item = c.CustomItem(d, dr.ID())
 	case k.MMS == "Objective":
 		dr.Lines = objective(c, d)
 	case k.MMS == "Global":
@@ -401,6 +409,22 @@ func (p *Project) checkDecl(u *sema.Unit, d *syntax.Decl, k sema.Kind, syms *sem
 				Code: "mms/internal", Severity: syntax.SeverityError, Sp: d.Kind.Sp,
 				Message: "internal error: the generated JSON does not match the schema (" + errs[0] + "). Please report this with the declaration's source.",
 			})
+		}
+	}
+	if it := dr.Item; it != nil && !hasErrors(dr.Diags) {
+		for _, f := range []struct {
+			res string
+			v   jsonv.Value
+		}{{"model", it.Model}, {"item_definition", it.ItemModel}} {
+			if f.v == nil {
+				continue
+			}
+			if errs := sema.Validate(p.Pack, p.Kinds, f.res, f.v); len(errs) > 0 {
+				dr.Diags = append(dr.Diags, syntax.Diagnostic{
+					Code: "mms/internal", Severity: syntax.SeverityError, Sp: d.Kind.Sp,
+					Message: "internal error: the generated " + f.res + " JSON does not match the schema (" + errs[0] + "). Please report this with the declaration's source.",
+				})
+			}
 		}
 	}
 	return dr

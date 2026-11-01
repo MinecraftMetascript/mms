@@ -139,12 +139,54 @@ func Collect(units []*Unit, kinds *Kinds, defaultNS string) (*Table, map[string]
 					t.all = append(t.all, sym)
 					continue
 				}
+				if pk := t.DeclKind[prev.Decl]; pk.MMS == customItemKind && prev.Kind.MMS != customItemKind {
+					report(u, "mms/duplicate", d.Name.Sp, d.Kind.Name+" '"+sym.ID()+"' is already made by CustomItem '"+prev.Decl.Name.Text+"' in "+prev.Unit.Path+"; leave this out, or give the CustomItem its own "+customItemField(prev.Kind))
+					continue
+				}
 				report(u, "mms/duplicate", d.Name.Sp, d.Kind.Name+" '"+sym.ID()+"' is already declared in "+prev.Unit.Path)
 				continue
 			}
 			t.byKey[kk] = sym
 			t.all = append(t.all, sym)
+			if k.MMS == customItemKind {
+				t.reserveCustomItem(kinds, sym, func(msg string) { report(u, "mms/duplicate", d.Name.Sp, msg) })
+			}
 		}
 	}
 	return t, diags
+}
+
+// reserveCustomItem claims the names of the files a custom item writes,
+// so that a declaration of the same name is reported and references such
+// as `item_model = ember_shard` resolve.
+func (t *Table) reserveCustomItem(kinds *Kinds, sym *Symbol, report func(string)) {
+	itemModel, model := CustomItemGenerates(sym.Decl)
+	claim := func(kindName, path string) {
+		k, ok := kinds.Lookup(kindName)
+		if !ok {
+			return
+		}
+		gen := &Symbol{NS: sym.NS, Path: path, Kind: k, Decl: sym.Decl, Unit: sym.Unit}
+		kk := key(k.Folder(), gen.ID())
+		if prev, dup := t.byKey[kk]; dup {
+			report("CustomItem '" + sym.ID() + "' makes " + kindName + " '" + gen.ID() + "', which is already declared in " + prev.Unit.Path + "; remove that declaration, or set " + customItemField(k) + " to use it")
+			return
+		}
+		t.byKey[kk] = gen
+	}
+	if itemModel {
+		claim("ItemModel", sym.Path)
+	}
+	if model {
+		claim("Model", "item/"+sym.Path)
+	}
+}
+
+// customItemField is the CustomItem field that names an existing file of
+// kind k instead of generating one.
+func customItemField(k Kind) string {
+	if k.Resource == "model" {
+		return "model"
+	}
+	return "item_model"
 }

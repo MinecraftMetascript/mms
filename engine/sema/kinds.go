@@ -16,8 +16,8 @@ type Kind struct {
 	// TagOf is the registry a tag kind lists ("block", "worldgen/biome").
 	TagOf string
 	// MMS is set for language-level kinds: Namespace, Function, Objective,
-	// Global and the event hooks (OnLoad, OnTick, OnFirstJoin, OnRespawn,
-	// OnAdvancement).
+	// Global, CustomItem and the event hooks (OnLoad, OnTick, OnFirstJoin,
+	// OnRespawn, OnAdvancement).
 	MMS string
 	// Assets is the folder under assets/<ns>/ for resource-pack kinds
 	// ("blockstates", "models"), and "" for data-pack kinds.
@@ -41,6 +41,9 @@ func (k Kind) Folder() string {
 	switch k.MMS {
 	case "Function":
 		return "function"
+	case "CustomItem":
+		// Its name stands for an item where item stacks are expected.
+		return "item"
 	case "OnAdvancement":
 		// It declares an advancement, so commands such as `advancement
 		// grant` find it, and an Advancement of the same name clashes.
@@ -53,6 +56,7 @@ var mmsKinds = map[string]bool{
 	"Namespace": true, "Function": true, "Objective": true, "Global": true,
 	"OnLoad": true, "OnTick": true,
 	"OnFirstJoin": true, "OnRespawn": true, "OnAdvancement": true,
+	"CustomItem": true,
 }
 
 // kindAliases name resource kinds whose MMS names differ from the folder,

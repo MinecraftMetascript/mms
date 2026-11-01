@@ -172,7 +172,9 @@ func (c *Checker) assetCall(e syntax.Expr, v tview) jsonv.Value {
 		c.errorf("mms/asset", srcSp, "%s expects %s file, not '%s'", name, map[string]string{".png": "a .png", ".ogg": "an .ogg", ".nbt": "an .nbt"}[h.ext], path.Base(src))
 		return nil
 	}
-	if idName == "" {
+	if idName == "" && name == "Texture" && c.textureName != "" {
+		idName = c.textureName
+	} else if idName == "" {
 		idName = assetName(src)
 	} else if !assetNamePattern.MatchString(idName) || strings.Contains(idName, "..") {
 		c.errorf("mms/invalid-name", nameSp, "an id name is lowercase letters, digits, '_', '-', '.' and '/'")
