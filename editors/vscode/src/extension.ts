@@ -168,6 +168,7 @@ export function activate(context: vscode.ExtensionContext) {
 		output,
 		previews,
 		vscode.commands.registerCommand('mms.showPreview', () => previews?.show()),
+		vscode.commands.registerCommand('mms.previewDeclaration', (path: string) => previews?.show(path)),
 		vscode.commands.registerCommand('mms.restartServer', () => restart()),
 		vscode.commands.registerCommand('mms.showOutput', () => output?.show(true)),
 		vscode.workspace.onDidChangeConfiguration((e) => {

@@ -1,4 +1,5 @@
-export type PreviewKind = 'noise' | 'density_function' | 'noise_settings' | 'material_rule' | 'dimension';
+import type { PreviewKind, PreviewFileKind } from '../paths';
+export type { PreviewKind } from '../paths';
 
 /**
  * What a render shows:
@@ -41,7 +42,7 @@ export interface PreviewOptions {
 }
 
 export interface PreviewFile {
-	kind: PreviewKind | 'material_condition' | 'tag/worldgen/biome';
+	kind: PreviewFileKind;
 	id: string;
 	json: unknown;
 }
@@ -103,18 +104,4 @@ export type PreviewResponse =
  */
 export const vanillaSummary = 'https://raw.githubusercontent.com/misode/mcmeta/d96c75fec200c4580dd75e033a76341521165461/data';
 
-const pattern = /^data\/([^/]+)\/(worldgen\/(?:noise|density_function|noise_settings|material_rule|material_condition)|dimension|tags\/worldgen\/biome)\/(.+)\.json$/;
-
-/** The registry folder and id of an output path the preview worker reads, or null. */
-export function previewFile(path: string): { kind: PreviewFile['kind']; id: string } | null {
-	const m = pattern.exec(path);
-	if (!m) return null;
-	const kind = m[2] === 'tags/worldgen/biome' ? 'tag/worldgen/biome' : m[2].replace('worldgen/', '');
-	return { kind: kind as PreviewFile['kind'], id: `${m[1]}:${m[3]}` };
-}
-
-/** The preview kind and id of an output path, or null if it has no preview. */
-export function previewable(path: string | null): { kind: PreviewKind; id: string } | null {
-	const f = path ? previewFile(path) : null;
-	return f && f.kind !== 'material_condition' && f.kind !== 'tag/worldgen/biome' ? { kind: f.kind, id: f.id } : null;
-}
+export { previewFile, previewable } from '../paths';
