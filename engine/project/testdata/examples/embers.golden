@@ -1,3 +1,7 @@
+=== data/embers/function/give.mcfunction
+give @s amethyst_shard[item_model="embers:ember_shard",item_name={translate:"item.embers.ember_shard"}] 16
+give @s music_disc_13[item_model="embers:ember_disc",item_name={translate:"item.embers.ember_disc"},jukebox_playable="embers:embers"]
+give @s painting[painting/variant="embers:hearth"]
 === data/embers/jukebox_song/embers.json
 {
   "description": {
@@ -58,12 +62,12 @@
 {
   "type": "minecraft:crafting_shaped",
   "pattern": [
-    " A ",
-    "ADA",
-    " A "
+    " B ",
+    "BDB",
+    " B "
   ],
   "key": {
-    "A": "minecraft:amethyst_shard",
+    "B": "minecraft:blaze_powder",
     "D": "#minecraft:creeper_drop_music_discs"
   },
   "result": {
