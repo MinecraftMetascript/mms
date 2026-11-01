@@ -3144,8 +3144,7 @@ execute positioned ~ ~-1 ~ if function siege:standable run return run function s
   "base_octave": -7,
   "amplitude_modifiers": [
     1
-  ],
-  "octave_count": 1
+  ]
 }
 === data/siege/worldgen/noise/tunnel_path.json
 {

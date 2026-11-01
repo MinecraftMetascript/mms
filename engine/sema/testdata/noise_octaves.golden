@@ -1,3 +1,10 @@
+== worldgen/noise test:single
+{
+  "base_octave": -3,
+  "amplitude_modifiers": [
+    3
+  ]
+}
 == worldgen/noise test:inferred
 {
   "base_octave": -7,
@@ -36,4 +43,4 @@
     1
   ]
 }
-! 6: mms/octave-count octave_count is 1, but amplitude_modifiers has 2 entries; they must match (or leave octave_count out)
+! 8: mms/octave-count octave_count is 1, but amplitude_modifiers has 2 entries; they must match (or leave octave_count out)

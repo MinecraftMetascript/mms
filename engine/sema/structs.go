@@ -714,7 +714,8 @@ func (c *Checker) octaveCount(fs []field, byKey map[string]*assign, o *jsonv.Obj
 	n := strconv.Itoa(len(mods))
 	got := o.Get("octave_count")
 	if got == nil {
-		if _, set := byKey["octave_count"]; !set {
+		// One entry matches the default count, so leave it out as vanilla does.
+		if _, set := byKey["octave_count"]; !set && len(mods) > 1 {
 			o.Set("octave_count", jsonv.Number(n))
 		}
 		return
