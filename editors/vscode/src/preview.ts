@@ -1,21 +1,26 @@
 // The preview panel: the web editor's worldgen previews and inspectors
 // (packages/preview, built into out/webview) in a webview beside the
-// editor. It follows the declaration at the cursor, like the web editor's
-// Preview tab, using the generated pack from the server's `mms/output`.
+// editor. A "Preview" CodeLens above each declaration that has one opens
+// the panel on it, and the panel stays on that declaration while you edit
+// elsewhere, redrawing as the pack changes. The pack comes from the
+// server's `mms/output`.
+import { shows } from '@mms/preview/paths';
 import * as vscode from 'vscode';
 import type { LanguageClient } from 'vscode-languageclient/node';
 import type { OutputFile, ToExtension, ToPanel } from './messages';
 
 export const viewType = 'mms.preview';
 
-export class Previews implements vscode.Disposable {
+export class Previews implements vscode.Disposable, vscode.CodeLensProvider {
 	private panel: vscode.WebviewPanel | undefined;
 	private files: OutputFile[] = [];
-	/** The output at the cursor; kept while the cursor is outside declarations. */
-	private cursor: string | null = null;
-	/** The .mms document last edited or moved in, whose project the panel shows. */
+	/** The output path the panel shows. */
+	private target: string | null = null;
+	/** The .mms document last active, whose project's pack is fetched. */
 	private document: vscode.Uri | undefined;
 	private timer: ReturnType<typeof setTimeout> | undefined;
+	private readonly lenses = new vscode.EventEmitter<void>();
+	readonly onDidChangeCodeLenses = this.lenses.event;
 	private readonly subscriptions: vscode.Disposable[] = [];
 
 	constructor(
@@ -23,39 +28,84 @@ export class Previews implements vscode.Disposable {
 		private readonly client: () => LanguageClient | undefined
 	) {
 		this.subscriptions.push(
-			vscode.window.onDidChangeTextEditorSelection((e) => this.follow(e.textEditor)),
-			vscode.window.onDidChangeActiveTextEditor((e) => e && this.follow(e)),
+			this.lenses,
+			vscode.languages.registerCodeLensProvider({ language: 'mms' }, this),
+			vscode.window.onDidChangeActiveTextEditor((e) => {
+				if (e?.document.languageId !== 'mms' || e.document.uri.toString() === this.document?.toString()) return;
+				// Another file may belong to another project: fetch its pack.
+				this.document = e.document.uri;
+				this.scheduleRefresh();
+			}),
 			vscode.window.registerWebviewPanelSerializer(viewType, {
-				deserializeWebviewPanel: async (panel) => this.adopt(panel)
+				deserializeWebviewPanel: async (panel, state?: { path?: string | null }) => {
+					this.target = state?.path ?? null;
+					this.adopt(panel);
+				}
 			})
 		);
 	}
 
-	/** Opens the panel beside the editor, or brings it forward. */
-	show() {
+	/** Opens the panel on an output path, or on the declaration at the cursor. */
+	show(path?: string) {
+		if (path === undefined) {
+			const editor = vscode.window.activeTextEditor;
+			path = (editor && this.at(editor.document.uri, editor.selection.active.line)?.path) ?? this.target ?? undefined;
+		}
+		if (path !== undefined) this.setTarget(path);
 		if (this.panel) {
 			this.panel.reveal(undefined, true);
 			return;
 		}
-		const panel = vscode.window.createWebviewPanel(
-			viewType,
-			'MMS Preview',
-			{ viewColumn: vscode.ViewColumn.Beside, preserveFocus: true },
-			{}
-		);
+		const panel = vscode.window.createWebviewPanel(viewType, 'MMS Preview', { viewColumn: vscode.ViewColumn.Beside, preserveFocus: true }, {});
 		this.adopt(panel);
 	}
 
 	/** Refreshes the generated pack shortly after the server publishes an analysis. */
 	scheduleRefresh() {
-		if (!this.panel) return;
 		if (this.timer) clearTimeout(this.timer);
 		this.timer = setTimeout(() => void this.refresh(), 150);
+	}
+
+	provideCodeLenses(document: vscode.TextDocument): vscode.CodeLens[] {
+		const here = key(document.uri);
+		const lenses: vscode.CodeLens[] = [];
+		const lines = new Set<number>();
+		for (const f of this.files) {
+			if (!f.uri || !f.range || key(vscode.Uri.parse(f.uri)) !== here) continue;
+			const what = shows(f.path);
+			if (!what || lines.has(f.range.start.line)) continue;
+			lines.add(f.range.start.line);
+			const at = new vscode.Range(f.range.start.line, 0, f.range.start.line, 0);
+			lenses.push(
+				new vscode.CodeLens(at, {
+					title: '$(open-preview) Preview',
+					tooltip: `Show ${what.id} in the MMS preview`,
+					command: 'mms.previewDeclaration',
+					arguments: [f.path]
+				})
+			);
+		}
+		return lenses;
+	}
+
+	private setTarget(path: string | null) {
+		this.target = path;
+		this.post({ type: 'target', path });
+		if (this.panel) this.panel.title = title(path);
+	}
+
+	/** The output declared at a line of a document, if it has a preview. */
+	private at(uri: vscode.Uri, line: number): OutputFile | undefined {
+		const here = key(uri);
+		return this.files.find(
+			(f) => f.uri && f.range && f.range.start.line <= line && line <= f.range.end.line && shows(f.path) && key(vscode.Uri.parse(f.uri)) === here
+		);
 	}
 
 	private adopt(panel: vscode.WebviewPanel) {
 		this.panel = panel;
 		const root = vscode.Uri.joinPath(this.context.extensionUri, 'out', 'webview');
+		panel.title = title(this.target);
 		panel.iconPath = vscode.Uri.joinPath(this.context.extensionUri, 'icons', 'preview.svg');
 		panel.webview.options = { enableScripts: true, localResourceRoots: [root] };
 		panel.webview.html = this.html(panel.webview, root);
@@ -63,14 +113,15 @@ export class Previews implements vscode.Disposable {
 		panel.onDidDispose(() => {
 			if (this.panel === panel) this.panel = undefined;
 		});
-		const editor = vscode.window.activeTextEditor;
-		if (editor) this.follow(editor);
 	}
 
 	private async receive(m: ToExtension) {
 		if (m.type === 'ready') {
-			this.post({ type: 'cursor', path: this.cursor });
+			this.post({ type: 'output', files: this.files });
+			this.setTarget(this.target);
 			await this.refresh();
+		} else if (m.type === 'clear') {
+			this.setTarget(null);
 		} else if (m.type === 'reveal') {
 			const doc = await vscode.workspace.openTextDocument(vscode.Uri.parse(m.uri));
 			const range = new vscode.Range(m.range.start.line, m.range.start.character, m.range.end.line, m.range.end.character);
@@ -83,35 +134,19 @@ export class Previews implements vscode.Disposable {
 
 	private async refresh() {
 		const client = this.client();
-		if (!this.panel || !client?.isRunning()) return;
+		if (!client?.isRunning()) return;
 		try {
 			// The uri picks the project (the nearest mms.json) in a workspace
 			// with several; servers that predate that ignore it.
-			const uri = (this.document ?? vscode.window.activeTextEditor?.document.uri)?.toString();
+			const active = vscode.window.activeTextEditor?.document;
+			const uri = (this.document ?? (active?.languageId === 'mms' ? active.uri : undefined))?.toString();
 			const out = await client.sendRequest<{ files: OutputFile[]; hasErrors: boolean }>('mms/output', uri ? { uri } : {});
 			this.files = out.files;
+			this.lenses.fire();
 			this.post({ type: 'output', files: out.files });
-			const editor = vscode.window.activeTextEditor;
-			if (editor) this.follow(editor);
 		} catch {
 			// A restart or shutdown; the next analysis refreshes again.
 		}
-	}
-
-	/** Points the panel at the declaration under the editor's cursor. */
-	private follow(editor: vscode.TextEditor) {
-		if (!this.panel || editor.document.languageId !== 'mms') return;
-		if (this.document?.toString() !== editor.document.uri.toString()) {
-			// Another file may belong to another project: fetch its pack.
-			this.document = editor.document.uri;
-			this.scheduleRefresh();
-		}
-		const line = editor.selection.active.line;
-		const here = key(editor.document.uri);
-		const f = this.files.find((f) => f.uri && f.range && f.range.start.line <= line && line <= f.range.end.line && key(vscode.Uri.parse(f.uri)) === here);
-		if (!f || f.path === this.cursor) return;
-		this.cursor = f.path;
-		this.post({ type: 'cursor', path: f.path });
 	}
 
 	private post(m: ToPanel) {
@@ -154,6 +189,12 @@ export class Previews implements vscode.Disposable {
 		this.panel?.dispose();
 		for (const s of this.subscriptions) s.dispose();
 	}
+}
+
+/** The panel's tab title: the declaration it shows. */
+function title(path: string | null): string {
+	const id = path ? shows(path)?.id : undefined;
+	return id ? `Preview ${id.replace(/^[^:]+:/, '')}` : 'MMS Preview';
 }
 
 /** A file's identity: its path, ignoring case on Windows. */
