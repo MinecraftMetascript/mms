@@ -8,5 +8,10 @@
   kind: (identifier) @name
   !name) @item
 
+; Build-time loops group the declarations they make.
+(top_for
+  "for" @context
+  name: (identifier) @name) @item
+
 ; Doc comments sit right before declarations.
 (doc_comment) @annotation

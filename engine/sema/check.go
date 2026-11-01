@@ -85,6 +85,13 @@ type Checker struct {
 	// customOf is the custom item this checker expands, to catch an item
 	// that contains itself.
 	customOf string
+	// Env is the declaration's build-time scope: consts, and the loop
+	// variables and lets of the loop that made it.
+	Env *Env
+	// Ctx names the declaration for unlabeled Rand draws.
+	Ctx string
+	bt  map[syntax.Node]syntax.Expr
+	ev  *Evaluator
 
 	trial  bool
 	errs   int
@@ -232,6 +239,7 @@ func (c *Checker) check(e syntax.Expr, v tview) jsonv.Value {
 	if p, ok := e.(*syntax.Paren); ok {
 		return c.check(p.X, v)
 	}
+	e = c.buildTime(e)
 	if _, ok := e.(*syntax.Bad); ok {
 		return nil // already reported by the parser
 	}
@@ -420,7 +428,7 @@ func (c *Checker) trialErrors(e syntax.Expr, v tview) int {
 	if n, ok := root.memo[k]; ok {
 		return n
 	}
-	t := &Checker{Pack: c.Pack, Kinds: c.Kinds, Syms: c.Syms, NS: c.NS, trial: true, depth: c.depth, parent: root, Deps: c.Deps, Files: c.Files}
+	t := &Checker{Pack: c.Pack, Kinds: c.Kinds, Syms: c.Syms, NS: c.NS, trial: true, depth: c.depth, parent: root, Deps: c.Deps, Files: c.Files, Env: c.Env}
 	t.check(e, v)
 	root.memo[k] = t.errs
 	return t.errs

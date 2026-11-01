@@ -13,9 +13,11 @@ import (
 // tag's registry. Declarations of the same tag are merged by the emitter.
 func (c *Checker) Tag(d *syntax.Decl, k Kind) (values jsonv.Array, replace bool) {
 	var elems []syntax.Expr
-	switch x := d.Value.(type) {
+	switch x := c.buildTime(d.Value).(type) {
 	case *syntax.List:
 		elems = x.Elems
+	case *syntax.Bad:
+		return jsonv.Array{}, false
 	case *syntax.Object:
 		// The whole tag file: { replace = true, values = [...] }.
 		for _, it := range x.Body.Items {
@@ -26,7 +28,7 @@ func (c *Checker) Tag(d *syntax.Decl, k Kind) (values jsonv.Array, replace bool)
 			}
 			switch f.Key.Text {
 			case "values":
-				if l, ok := f.Value.(*syntax.List); ok {
+				if l, ok := c.buildTime(f.Value).(*syntax.List); ok {
 					elems = l.Elems
 				} else {
 					c.errorf("mms/type-mismatch", f.Value.Span(), "expected a list of %s ids", k.TagOf)
@@ -70,7 +72,9 @@ func (c *Checker) Tag(d *syntax.Decl, k Kind) (values jsonv.Array, replace bool)
 // { id = ..., required = false }.
 func (c *Checker) tagEntry(e syntax.Expr, k Kind, id idInfo) jsonv.Value {
 	c.info(e).Type = tview{}
-	switch x := e.(type) {
+	switch x := c.buildTime(e).(type) {
+	case *syntax.Bad:
+		return nil
 	case *syntax.Ident:
 		return jsonv.String(c.resolveID(x.Name, id, e))
 	case *syntax.ResLoc:

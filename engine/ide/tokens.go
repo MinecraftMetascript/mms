@@ -3,6 +3,7 @@ package ide
 import (
 	"sort"
 
+	"github.com/minecraftmetascript/mms/engine/sema"
 	"github.com/minecraftmetascript/mms/engine/syntax"
 	"github.com/minecraftmetascript/mms/engine/syntax/parser"
 )
@@ -83,7 +84,7 @@ func (s *Session) SemanticTokens(path string) []SemToken {
 			set(t.Sp, TokKeyword, 0)
 		}
 	}
-	for _, d := range f.Decls {
+	for _, d := range sema.AllDecls(f) {
 		dr := s.R.Decls[d]
 		info := func(n syntax.Node) bool {
 			return dr != nil && dr.Info[n] != nil && dr.Info[n].Symbol != nil

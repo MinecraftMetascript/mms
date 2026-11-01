@@ -17,6 +17,14 @@
 
 (let_statement name: (identifier) @variable)
 (for_statement name: (identifier) @variable)
+(for_statement index: (identifier) @variable)
+
+; Build-time items: `for b in biomes { ... }`, `let r = Rand("key")`.
+(top_let name: (identifier) @variable)
+(top_for name: (identifier) @variable)
+(top_for index: (identifier) @variable)
+((declaration kind: (identifier) @_kind name: (string) @function)
+  (#eq? @_kind "Function"))
 
 ; `key = value` in resource bodies and object literals.
 (assignment left: (identifier) @property)

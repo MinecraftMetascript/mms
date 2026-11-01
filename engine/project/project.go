@@ -67,7 +67,7 @@ func (p *Project) SetFile(path, text string) {
 			moved[d] = syntax.Moved{Old: first.Old, Nodes: nodes, Delta: first.Delta + m.Delta}
 		}
 	}
-	for _, d := range f.Decls {
+	for _, d := range sema.AllDecls(f) {
 		if m, ok := p.moved[d]; ok {
 			if _, again := moved[d]; !again {
 				moved[d] = m // reused in place after an earlier move
@@ -129,8 +129,10 @@ type Result struct {
 	lintDone bool
 	lints    map[string][]syntax.Diagnostic
 	symKey   uint64
-	pack     *spec.Pack
-	cfg      Config
+	// Exp is the build-time expansion: consts and generated declarations.
+	Exp  *sema.Expansion
+	pack *spec.Pack
+	cfg  Config
 }
 
 // Decl is the checked form of one declaration.
@@ -194,13 +196,89 @@ func (r *Result) Diagnostics(path string) []syntax.Diagnostic {
 	out = append(out, r.assetErr[path]...)
 	out = append(out, r.orderErr[path]...)
 	out = append(out, r.langErr[path]...)
-	for _, d := range r.Order {
-		if d.Unit == u {
-			out = append(out, d.Diags...)
-		}
-	}
+	out = append(out, r.loopDiags(u)...)
 	out = append(out, r.Lints()[path]...)
 	sort.SliceStable(out, func(i, j int) bool { return out[i].Sp.Start < out[j].Sp.Start })
+	return dedupe(out)
+}
+
+// loopDiags returns the declarations' diagnostics. Copies made by a
+// build-time loop share their source, so a problem in every copy is
+// reported once, and one in some copies says which: "(when b = "x")".
+func (r *Result) loopDiags(u *sema.Unit) []syntax.Diagnostic {
+	type group struct {
+		d     syntax.Diagnostic
+		whens []string
+	}
+	var out []syntax.Diagnostic
+	byTmpl := map[*syntax.Decl][]*Decl{}
+	var tmpls []*syntax.Decl
+	for _, d := range r.Order {
+		if d.Unit != u {
+			continue
+		}
+		o := u.Origin[d.D]
+		if o == nil {
+			out = append(out, d.Diags...)
+			continue
+		}
+		if _, seen := byTmpl[o.Template]; !seen {
+			tmpls = append(tmpls, o.Template)
+		}
+		byTmpl[o.Template] = append(byTmpl[o.Template], d)
+	}
+	for _, t := range tmpls {
+		copies := byTmpl[t]
+		var groups []*group
+		index := map[string]*group{}
+		for _, d := range copies {
+			seen := map[string]bool{}
+			for _, dg := range d.Diags {
+				k := diagKey(dg)
+				if seen[k] {
+					continue
+				}
+				seen[k] = true
+				g := index[k]
+				if g == nil {
+					g = &group{d: dg}
+					index[k] = g
+					groups = append(groups, g)
+				}
+				g.whens = append(g.whens, u.Origin[d.D].Label())
+			}
+		}
+		for _, g := range groups {
+			d := g.d
+			if len(g.whens) < len(copies) && g.whens[0] != "" {
+				when := g.whens[0]
+				if n := len(g.whens) - 1; n > 0 {
+					when += fmt.Sprintf(", and %d more", n)
+				}
+				d.Message += " (when " + when + ")"
+			}
+			out = append(out, d)
+		}
+	}
+	return out
+}
+
+func diagKey(d syntax.Diagnostic) string {
+	return fmt.Sprintf("%s|%d|%d|%d|%s", d.Code, d.Severity, d.Sp.Start, d.Sp.End, d.Message)
+}
+
+// dedupe drops repeated diagnostics, keeping the first.
+func dedupe(ds []syntax.Diagnostic) []syntax.Diagnostic {
+	seen := map[string]bool{}
+	out := ds[:0]
+	for _, d := range ds {
+		k := diagKey(d)
+		if seen[k] {
+			continue
+		}
+		seen[k] = true
+		out = append(out, d)
+	}
 	return out
 }
 
@@ -246,12 +324,17 @@ func (p *Project) Analyze(ctx context.Context) (*Result, error) {
 	p.mu.Unlock()
 	sort.Slice(units, func(i, j int) bool { return units[i].Path < units[j].Path })
 
+	exp := sema.Expand(units, p.Config.Namespace)
 	syms, collect := sema.Collect(units, p.Kinds, p.Config.Namespace)
-	r := &Result{Syms: syms, Units: units, Decls: map[*syntax.Decl]*Decl{}, collect: collect, pack: p.Pack, cfg: p.Config, files: p.Files}
+	exp.Link(syms)
+	for path, ds := range exp.Diags {
+		collect[path] = append(collect[path], ds...)
+	}
+	r := &Result{Syms: syms, Units: units, Decls: map[*syntax.Decl]*Decl{}, collect: collect, pack: p.Pack, cfg: p.Config, files: p.Files, Exp: exp}
 	r.symKey = symbolKey(syms)
 	sameSyms := prev != nil && prev.symKey == r.symKey
 	for _, u := range units {
-		for _, d := range u.File.Decls {
+		for _, d := range u.AllDecls() {
 			if err := ctx.Err(); err != nil {
 				return nil, err
 			}
@@ -277,6 +360,15 @@ func (p *Project) Analyze(ctx context.Context) (*Result, error) {
 			}
 			r.Decls[d] = dr
 			r.Order = append(r.Order, dr)
+		}
+	}
+	// A template inside a build-time loop stands for its first copy, so
+	// hovers and completion in the loop body work.
+	for tmpl, made := range exp.Templates {
+		if _, ok := r.Decls[tmpl]; !ok && len(made) > 0 {
+			if dr := r.Decls[made[0]]; dr != nil {
+				r.Decls[tmpl] = dr
+			}
 		}
 	}
 	r.collectAssets()
@@ -349,6 +441,8 @@ func (p *Project) checkDecl(u *sema.Unit, d *syntax.Decl, k sema.Kind, syms *sem
 	c := sema.NewChecker(p.Pack, p.Kinds, syms, ns)
 	c.Files = p.Files
 	c.Src = u.File.Src
+	c.Env = u.Env[d]
+	c.Ctx = d.Kind.Name + " " + d.NameText()
 	defer func() {
 		if rec := recover(); rec != nil {
 			dr.Value, dr.Tag, dr.Lines, dr.Fn, dr.Item = nil, nil, nil, nil, nil

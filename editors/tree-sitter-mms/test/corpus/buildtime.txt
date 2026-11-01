@@ -1,0 +1,77 @@
+================================================================================
+Build-time loop, if and let
+================================================================================
+
+Const biomes = ["meadow", "forest"]
+
+for i, b in biomes {
+  let r = Rand("shrine/${b}")
+  Function "shrine/enter_${b}" {
+    /say ${b}
+  }
+  if (b != "forest") {
+    BiomeTag "has/${b}" = [b]
+  } else {
+    OnLoad {
+      /say forest
+    }
+  }
+}
+
+Assert "biomes are unique" = Unique(biomes)
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (declaration
+    (identifier)
+    (identifier)
+    (list
+      (string)
+      (string)))
+  (top_for
+    (identifier)
+    (identifier)
+    (identifier)
+    (top_block
+      (top_let
+        (identifier)
+        (call_expression
+          (identifier)
+          (arguments
+            (argument
+              (string)))))
+      (declaration
+        (identifier)
+        (string)
+        (block
+          (command
+            (command_name)
+            (command_text)
+            (interpolation
+              (identifier)))))
+      (top_if
+        (binary_expression
+          (identifier)
+          (string))
+        (top_block
+          (declaration
+            (identifier)
+            (string)
+            (list
+              (identifier))))
+        (top_block
+          (declaration
+            (identifier)
+            (block
+              (command
+                (command_name)
+                (command_text))))))))
+  (declaration
+    (identifier)
+    (string)
+    (call_expression
+      (identifier)
+      (arguments
+        (argument
+          (identifier))))))

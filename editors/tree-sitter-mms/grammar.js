@@ -43,8 +43,45 @@ module.exports = grammar({
 
   word: ($) => $.identifier,
 
+  // In `for x in xs { OnLoad { ... } }` the first `{` could also start a
+  // trailing block on `xs`; GLR keeps both until the body decides.
+  conflicts: ($) => [[$.top_block, $.block], [$.top_let, $.let_statement], [$.declaration, $._primary]],
+
   rules: {
-    source_file: ($) => repeat($.declaration),
+    source_file: ($) => repeat($._item),
+
+    // A top-level item: a declaration, or a build-time for, if or let
+    // that makes declarations (see MMSParser.g4, item).
+    _item: ($) => choice($.declaration, $.top_for, $.top_if, $.top_let),
+
+    top_block: ($) => seq('{', repeat($._item), '}'),
+
+    top_for: ($) =>
+      prec(
+        PREC.for,
+        seq(
+          'for',
+          optional(seq(field('index', $.identifier), ',')),
+          field('name', $.identifier),
+          'in',
+          field('iterable', $._expression),
+          field('body', $.top_block),
+        ),
+      ),
+
+    top_if: ($) =>
+      prec.right(
+        seq(
+          'if',
+          '(',
+          field('condition', $._expression),
+          ')',
+          field('consequence', $.top_block),
+          optional(seq('else', field('alternative', choice($.top_if, $.top_block)))),
+        ),
+      ),
+
+    top_let: ($) => prec.right(seq('let', field('name', $.identifier), optional(seq('=', field('value', $._expression))))),
 
     // Noise ridges = Noise(-7)
     // LootTable blocks/ruby_ore { pools = [ ... ] }
@@ -56,7 +93,7 @@ module.exports = grammar({
         prec.right(
           seq(
             field('kind', $.identifier),
-            field('name', choice($.identifier, $.resource_location)),
+            field('name', choice($.identifier, $.resource_location, $.string)),
             optional(
               choice(
                 $.type_annotation,
@@ -119,7 +156,17 @@ module.exports = grammar({
     while_statement: ($) => seq('while', '(', field('condition', $._expression), ')', field('body', $.block)),
 
     for_statement: ($) =>
-      prec(PREC.for, seq('for', field('name', $.identifier), 'in', field('iterable', $._expression), field('body', $.block))),
+      prec(
+        PREC.for,
+        seq(
+          'for',
+          optional(seq(field('index', $.identifier), ',')),
+          field('name', $.identifier),
+          'in',
+          field('iterable', $._expression),
+          field('body', $.block),
+        ),
+      ),
 
     return_statement: ($) => prec.right(seq('return', optional($._expression))),
     break_statement: (_) => 'break',

@@ -117,6 +117,8 @@ Function count {
 
 A function with a return type must end with `return` on every path.
 
+A `for` over a list or a `Const` is unrolled at build time instead of running in the game. See [Build-time loops and values](build-time.md#the-same-for-in-functions).
+
 ## Calls
 
 A call looks like `add(1, 2)`, or `other_ns:add(1, 2)` for a function in another namespace. Arguments are passed by position. A call can stand on its own, or be used as a value when the function has a return type.

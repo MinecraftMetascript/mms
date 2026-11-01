@@ -404,6 +404,9 @@ func (c *Checker) Hover(in *Info) string {
 		if md := DocMarkdown(s.Decl.Doc); md != "" {
 			parts = append(parts, md)
 		}
+		if s.Const != nil {
+			parts = append(parts, "Value: `"+short(s.Const.String())+"`")
+		}
 	case in.Local != nil:
 		l := in.Local
 		head := "let " + l.Name + ": " + l.Type

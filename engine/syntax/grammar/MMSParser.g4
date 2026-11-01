@@ -6,7 +6,22 @@ parser grammar MMSParser;
 
 options { tokenVocab = MMSLexer; }
 
-file : declaration* EOF;
+file : item* EOF;
+
+// A top-level item: a declaration, or a build-time statement that makes
+// declarations. `for` and `if` copy or keep their bodies at build time,
+// and `let` binds a build-time value.
+item
+    : declaration
+    | topFor
+    | topIf
+    | topLet
+    ;
+
+topBlock : LBRACE item* RBRACE;
+topFor   : FOR IDENT (COMMA IDENT)? IN expr topBlock;
+topIf    : IF LPAREN expr RPAREN topBlock (ELSE (topIf | topBlock))?;
+topLet   : LET IDENT (ASSIGN expr)?;
 
 // Namespace example
 // Noise ridges = Noise(-7)
@@ -20,7 +35,8 @@ declaration
     | kind=IDENT params? block
     ;
 
-declName : IDENT | RESLOC;
+// A string name is a template inside a build-time loop: "planet_${i}".
+declName : IDENT | RESLOC | STRING;
 
 // The value after '=' is optional to the parser so that `Noise a =`
 // followed by a new declaration on the next line recovers cleanly; the
@@ -48,7 +64,7 @@ statement
     : LET IDENT typeAnnotation? (ASSIGN expr)?                    # letStmt
     | IF LPAREN expr RPAREN block (ELSE (ifTail | block))?        # ifStmt
     | WHILE LPAREN expr RPAREN block                              # whileStmt
-    | FOR IDENT IN expr block                                     # forStmt
+    | FOR IDENT (COMMA IDENT)? IN expr block                      # forStmt
     | RETURN expr?                                                # returnStmt
     | BREAK                                                       # breakStmt
     | CONTINUE                                                    # continueStmt

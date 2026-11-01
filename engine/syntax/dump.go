@@ -2,6 +2,7 @@ package syntax
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -9,8 +10,8 @@ import (
 // debugging.
 func Dump(f *File) string {
 	var d dumper
-	for _, decl := range f.Decls {
-		d.decl(decl)
+	for _, it := range f.Items {
+		d.item(it)
 	}
 	for _, diag := range f.Diags {
 		d.line("! %d-%d %s", diag.Sp.Start, diag.Sp.End, diag.Message)
@@ -31,10 +32,57 @@ func (d *dumper) line(format string, args ...any) {
 
 func (d *dumper) in(f func()) { d.depth++; f(); d.depth-- }
 
+func (d *dumper) item(it Item) {
+	switch x := it.(type) {
+	case *Decl:
+		d.decl(x)
+	case *TopFor:
+		name := "?"
+		if x.Var != nil {
+			name = x.Var.Text
+		}
+		if x.Index != nil {
+			name = x.Index.Text + ", " + name
+		}
+		d.line("TopFor %s", name)
+		d.in(func() { d.expr(x.Iter); d.item(x.Body) })
+	case *TopIf:
+		d.line("TopIf")
+		d.in(func() {
+			d.expr(x.Cond)
+			d.item(x.Then)
+			if x.Else != nil {
+				d.line("Else")
+				d.in(func() { d.item(x.Else) })
+			}
+		})
+	case *TopLet:
+		name := "?"
+		if x.Name != nil {
+			name = x.Name.Text
+		}
+		d.line("TopLet %s", name)
+		if x.Value != nil {
+			d.in(func() { d.expr(x.Value) })
+		}
+	case *TopBlock:
+		d.line("TopBlock")
+		d.in(func() {
+			for _, c := range x.Items {
+				d.item(c)
+			}
+		})
+	}
+}
+
 func (d *dumper) decl(decl *Decl) {
 	head := decl.Kind.Name
 	if decl.Name != nil {
-		head += " " + decl.Name.Text
+		if decl.Name.Quoted {
+			head += " " + strconv.Quote(decl.Name.Text)
+		} else {
+			head += " " + decl.Name.Text
+		}
 	}
 	if decl.Type != nil {
 		head += ": " + decl.Type.Text

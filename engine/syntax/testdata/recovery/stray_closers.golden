@@ -6,4 +6,4 @@ Decl Noise b
   Call
     Ident Noise
     Number 2
-! 19-20 unexpected '}' expecting {end of file, IDENT}
+! 19-20 unexpected '}' expecting {end of file, 'let', 'if', 'for', IDENT}

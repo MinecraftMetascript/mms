@@ -23,7 +23,7 @@ func StartsDeclaration(ts antlr.TokenStream, k int) bool {
 		return false
 	}
 	switch ts.LT(k + 1).GetTokenType() {
-	case MMSLexerIDENT, MMSLexerRESLOC:
+	case MMSLexerIDENT, MMSLexerRESLOC, MMSLexerSTRING:
 		return true
 	}
 	return false
