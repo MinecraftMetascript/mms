@@ -155,7 +155,8 @@
 
 	function selectOutput(path: string) {
 		selectedOutput = path;
-		rightTab = previewable(path) || inspectable(path) ? rightTab : 'json';
+		// A pinned preview stays on screen; otherwise show JSON for outputs with no preview.
+		if (!pinned && !shows(path)) rightTab = 'json';
 	}
 
 	function openExample(id: string) {
@@ -194,7 +195,10 @@
 				return;
 			}
 			const data = readProjectZip(file.name, entries);
-			if (confirm(`Import ${data.files.length} file(s) from ${file.name}? It replaces the current project.`)) project.replace(data);
+			if (confirm(`Import ${data.files.length} file(s) from ${file.name}? It replaces the current project.`)) {
+				pinned = null;
+				project.replace(data);
+			}
 		} catch (err) {
 			alert(`Could not import ${file.name}: ${err instanceof Error ? err.message : err}`);
 		}
