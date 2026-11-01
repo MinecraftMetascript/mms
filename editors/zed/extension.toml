@@ -11,7 +11,7 @@ repository = "https://github.com/MinecraftMetascript/mms"
 # (editors/zed/README.md, "Changing the grammar").
 [grammars.mms]
 repository = "https://github.com/MinecraftMetascript/mms"
-rev = "e067fe0ecf6c2e11ad7e1d745a9db11a9dd69294"
+rev = "0815c34abd5868966a48db3201d0c2816dd9ba49"
 path = "editors/tree-sitter-mms"
 
 [language_servers.mms]
