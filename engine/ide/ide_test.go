@@ -195,3 +195,43 @@ func TestExecuteHover(t *testing.T) {
 		}
 	}
 }
+
+// Item ids and #item tags complete wherever a recipe takes an ingredient,
+// including right after `=` with nothing typed yet and after `#`.
+func TestRecipeIngredientCompletion(t *testing.T) {
+	const result = ", { id = stick })"
+	cases := []struct {
+		name, src, replaced string
+	}{
+		{"shaped key empty", "Recipe r = Shaped([\"A\"], {\n  A = |\n}" + result, ""},
+		{"shaped key after =", "Recipe r = Shaped([\"A\"], {\n  A =|\n}" + result, ""},
+		{"shaped key inline", "Recipe r = Shaped([\"A\"], { A = stick, B = | }" + result, ""},
+		{"shaped key prefix", "Recipe r = Shaped([\"A\"], {\n  A = amethyst|\n}" + result, "amethyst"},
+		{"shaped key tag", "Recipe r = Shaped([\"A\"], {\n  A = #|\n}" + result, "#"},
+		{"shaped key tag prefix", "Recipe r = Shaped([\"A\"], {\n  A = #minecraft:creeper|\n}" + result, "#minecraft:creeper"},
+		{"object key empty", "Recipe r = { type = crafting_shaped, pattern = [\"A\"], key = { A = | }, result = { id = stick } }", ""},
+		{"shapeless empty", "Recipe r = Shapeless([|]" + result, ""},
+		{"shapeless second", "Recipe r = Shapeless([stick, |]" + result, ""},
+		{"shapeless tag", "Recipe r = Shapeless([#|]" + result, "#"},
+		{"smelting empty", "Recipe r = Smelting(ingredient = |, result = { id = stick })", ""},
+		{"smelting tag", "Recipe r = Smelting(ingredient = #|, result = { id = stick })", "#"},
+		{"stonecutting", "Recipe r = Stonecutting(ingredient = |, result = { id = stick })", ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			s, off := session(t, tc.src)
+			items, sp := s.Completion("main.mms", off)
+			got := labels(items)
+			if !has(got, "amethyst_shard", "#planks") {
+				if len(got) > 20 {
+					got = got[:20]
+				}
+				t.Fatalf("want item ids and tags, got %d items: %v", len(items), got)
+			}
+			src := []rune(strings.Replace(tc.src, "|", "", 1))
+			if r := string(src[sp.Start:sp.End]); r != tc.replaced {
+				t.Errorf("replaces %q, want %q", r, tc.replaced)
+			}
+		})
+	}
+}

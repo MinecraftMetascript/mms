@@ -118,11 +118,13 @@ func (s *Session) Completion(path string, off int) ([]Item, syntax.Span) {
 	inner := a.path[len(a.path)-1]
 	switch n := inner.(type) {
 	case *syntax.Ident:
-		replace = n.Sp
+		replace = word(f, n.Sp, off)
 	case *syntax.Name:
 		replace = n.Sp
 	case *syntax.ResLoc:
-		replace = n.Sp
+		replace = word(f, n.Sp, off)
+	case *syntax.Tag:
+		replace = word(f, n.Sp, off)
 	}
 	cands := s.complete(a, off)
 	items := make([]Item, 0, len(cands))
@@ -134,6 +136,24 @@ func (s *Session) Completion(path string, off int) ([]Item, syntax.Span) {
 		items = append(items, it)
 	}
 	return items, replace
+}
+
+// word trims sp, the span of the value at the cursor, to the word being
+// typed. Parse recovery can stretch a missing value over what follows it:
+// `ingredient = |, result = ...` reads `, result` as the value, and
+// replacing that would delete the comma and the next argument's name.
+func word(f *syntax.File, sp syntax.Span, off int) syntax.Span {
+	end := sp.Start
+	for _, t := range f.Tokens {
+		if t.Sp.Start < sp.Start {
+			continue
+		}
+		if t.Sp.End > sp.End || t.Hidden || t.Kind == parser.MMSLexerCOMMA {
+			break
+		}
+		end = t.Sp.End
+	}
+	return syntax.Span{Start: sp.Start, End: max(end, min(off, sp.End))}
 }
 
 // command reports whether off, in token t, is in a raw command, and
@@ -204,8 +224,14 @@ func (s *Session) complete(a *at, off int) []sema.Candidate {
 	// After `=`, `(`, `,` or `[` with nothing typed yet, the value is a
 	// Bad node or missing; find the node that expects it.
 	if prev := prevToken(f, off); prev != nil && (prev.Kind == parser.MMSLexerASSIGN || mathOp(prev.Kind)) {
+		// The missing value's Bad node can start at the next token, such
+		// as the `}` closing `{ A = | }`.
+		to := off
+		if next := nextToken(f, off); next != nil {
+			to = next.Sp.Start
+		}
 		for i := len(a.path) - 1; i >= 0; i-- {
-			if bad := badAfter(a.path[i], prev.Sp.End, off); bad != nil {
+			if bad := badAfter(a.path[i], prev.Sp.End, to); bad != nil {
 				if in := a.info(bad); in.HasType() {
 					return a.c.ValueCandidates(in)
 				}
@@ -230,7 +256,7 @@ func (s *Session) complete(a *at, off int) []sema.Candidate {
 			parent = a.path[i-1]
 		}
 		switch n := n.(type) {
-		case *syntax.Ident, *syntax.ResLoc, *syntax.Bad:
+		case *syntax.Ident, *syntax.ResLoc, *syntax.Tag, *syntax.Bad:
 			// A word starting a statement in function code, or a helper
 			// of an execute chain.
 			if a.code() && startsStatement(a.path, i) {
@@ -411,6 +437,17 @@ func mathOp(k syntax.TokenKind) bool {
 		return true
 	}
 	return false
+}
+
+// nextToken returns the first visible token starting at or after off.
+func nextToken(f *syntax.File, off int) *syntax.Token {
+	for i := range f.Tokens {
+		t := &f.Tokens[i]
+		if t.Sp.Start >= off && !t.Hidden && !t.Synthetic {
+			return t
+		}
+	}
+	return nil
 }
 
 func prevToken(f *syntax.File, off int) *syntax.Token {
