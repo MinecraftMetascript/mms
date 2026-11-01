@@ -247,3 +247,14 @@ func AssetDepsHold(fsys fs.FS, deps map[string]bool) bool {
 	}
 	return true
 }
+
+// AssetFileType returns the file extension an asset helper takes and a
+// short description of the file, such as ".png" and "a PNG image"; ok is
+// false when helper is not an asset helper.
+func AssetFileType(helper string) (ext, what string, ok bool) {
+	h := assetHelpers[helper]
+	if h == nil {
+		return "", "", false
+	}
+	return h.ext, h.what, true
+}
