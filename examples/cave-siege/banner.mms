@@ -47,16 +47,9 @@ Function found_banner {
   /execute align xyz positioned ~0.5 ~ ~0.5 run function siege:create_core
 }
 
-/**
- * Summons the core at the banner: a marker that holds its position, and the
- * lure, a hidden baby villager that enemies are told to attack. Damage the
- * lure takes is the banner's damage.
- */
+/** Runs at the centre of the placed banner's cell: the core marker holds the banner's position. */
 Function create_core {
   /summon minecraft:marker ~ ~ ~ {Tags:["cs_core"]}
-  /summon minecraft:villager ~ ~ ~ {Tags:["cs_lure"],NoAI:1b,Silent:1b,PersistenceRequired:1b,Age:-2147483648,CanPickUpLoot:0b,attributes:[{id:"minecraft:max_health",base:1024d},{id:"minecraft:knockback_resistance",base:1d}],Health:1024f,active_effects:[{id:"minecraft:invisibility",duration:-1,show_particles:0b}]}
-  // On the players' team, so players cannot hurt it; enemies are on no team.
-  /team join cs_defenders @e[tag=cs_lure]
   /execute store result score #cx cs_tmp run data get entity @e[tag=cs_core,limit=1] Pos[0]
   /execute store result score #cy cs_tmp run data get entity @e[tag=cs_core,limit=1] Pos[1]
   /execute store result score #cz cs_tmp run data get entity @e[tag=cs_core,limit=1] Pos[2]
@@ -64,6 +57,7 @@ Function create_core {
   banner_placed = true
   banner_hp = banner_max
   ticks = 0
+  repath()
   /bossbar set siege:banner max ${banner_max}
   /bossbar set siege:banner value ${banner_hp}
   /bossbar set siege:banner players @a
@@ -72,15 +66,18 @@ Function create_core {
 
 /** Runs once a second while the banner is planted. */
 Function banner_second {
-  // A missing banner block (broken, burned, pushed) is put back.
-  /execute at @e[tag=cs_core,limit=1] unless block ~ ~ ~ #minecraft:banners run setblock ~ ~ ~ minecraft:white_banner
-  // Damage the lure took this second comes off the banner; then the lure heals.
-  // A lure that is not loaded (or was killed) counts as no damage, not a lost banner.
-  /execute unless entity @e[tag=cs_lure] run return 0
-  /execute store result score #lure_hp cs_tmp run data get entity @e[tag=cs_lure,limit=1] Health
-  let lost = 1024 - cs_tmp["#lure_hp"]
-  /data modify entity @e[tag=cs_lure,limit=1] Health set value 1024f
-  /execute as @e[tag=cs_lure] at @e[tag=cs_core,limit=1] run tp @s ~ ~ ~
+  // A missing banner block (broken, burned, pushed) is put back as it was, and the banner it dropped is removed.
+  /execute at @e[tag=cs_core,limit=1] unless block ~ ~ ~ #minecraft:banners run function siege:restore_banner
+  /execute at @e[tag=cs_core,limit=1] run kill @e[type=minecraft:item,distance=..3,nbt={Item:{id:"minecraft:white_banner"}}]
+  // Rebuild the field after a breaker opened a wall, and every 10 seconds for blocks players placed or broke.
+  if (path_phase == 0 && (path_dirty || ticks % 200 == 0)) {
+    repath()
+  }
+  carrot_second()
+  // Damage taken by waypoints parked at the banner this second comes off the banner.
+  cs_tmp["#lost"] = 0
+  /execute as @e[tag=cs_parked] run function siege:parked_damage
+  let lost = cs_tmp["#lost"]
   if (lost > 0) {
     banner_hp -= lost
     /execute at @e[tag=cs_core,limit=1] run particle minecraft:damage_indicator ~ ~1 ~ 0.3 0.5 0.3 0 5
@@ -91,6 +88,27 @@ Function banner_second {
   }
   /bossbar set siege:banner value ${banner_hp}
   /bossbar set siege:banner players @a
+}
+
+/** Runs as each parked waypoint: adds the health it lost to #lost. */
+Function parked_damage {
+  /execute store result score #hp cs_tmp run data get entity @s Health
+  cs_tmp["#lost"] += 1024 - cs_tmp["#hp"]
+  /data modify entity @s Health set value 1024f
+  /execute at @e[tag=cs_core,limit=1] run tp @s ~ ~ ~
+}
+
+/** Waypoint upkeep, once a second: heal them all, and remove ones no enemy has chased for 5 seconds. */
+Function carrot_second {
+  /execute as @e[tag=cs_carrot,tag=!cs_parked] run data modify entity @s Health set value 1024f
+  /scoreboard players add @e[tag=cs_carrot] cs_age 1
+  /execute as @e[tag=cs_carrot,scores={cs_age=6..}] run function siege:remove_carrot
+}
+
+/** Removes a waypoint without a death animation or drops. */
+Function remove_carrot {
+  /execute at @s run tp @s ~ -1000 ~
+  /kill @s
 }
 
 /** The banner reached 0 health: the siege is lost. */
