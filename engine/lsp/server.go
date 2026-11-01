@@ -21,17 +21,22 @@ import (
 )
 
 // Server is one language server connection. Project files are keyed by
-// document URI.
+// document URI. Each folder holding mms.json is its own project, and a
+// file belongs to the nearest one above it; files under no mms.json share
+// the default project.
 type Server struct {
 	tr   Transport
 	pack *spec.Pack
 	// Log receives internal errors; nil discards them.
 	Log io.Writer
 
-	proj *project.Project
-	res  *project.Result
-	root string // project folder on disk, "" in the browser
-	open map[string]bool
+	roots []string // the editor's folders on disk; none in the browser
+	// projects are keyed by the folder holding mms.json; "" is the
+	// default project. nil until initialize.
+	projects map[string]*workspace
+	owners   map[string]*workspace // the project each file is in
+	last     *workspace            // the project of the last edited file
+	open     map[string]bool
 	// managed files were given by mms/setFiles: closing their editor
 	// keeps them in the project (the browser has no disk to fall back on).
 	managed   map[string]bool
@@ -112,7 +117,7 @@ func (s *Server) dispatch(ctx context.Context, m message) (result any, rerr *res
 			result, rerr = nil, &respError{Code: codeInternal, Message: fmt.Sprintf("internal error: %v", r)}
 		}
 	}()
-	if s.proj == nil && m.Method != "initialize" {
+	if s.projects == nil && m.Method != "initialize" {
 		if m.ID == nil {
 			return nil, nil
 		}
@@ -224,37 +229,21 @@ type initializeParams struct {
 }
 
 func (s *Server) initialize(ctx context.Context, p initializeParams) (any, *respError) {
-	root := p.RootURI
-	if root == "" && len(p.WorkspaceFolders) > 0 {
-		root = p.WorkspaceFolders[0].URI
-	}
-	if root != "" {
-		s.root = uriPath(root)
-	} else {
-		s.root = p.RootPath
-	}
-	cfg := project.DefaultConfig()
-	if s.root != "" {
-		if c, err := project.LoadConfig(s.root); err == nil {
-			cfg = c
-		} else {
-			s.logf("%v", err)
+	s.roots = nil
+	for _, f := range p.WorkspaceFolders {
+		if path := uriPath(f.URI); path != "" {
+			s.roots = append(s.roots, path)
 		}
 	}
-	s.proj = project.New(s.pack, cfg)
-	if s.root != "" {
-		// Asset helpers such as Texture("a.png") read project files.
-		s.proj.Files = os.DirFS(s.root)
-		if paths, err := cfg.SourceFiles(s.root); err == nil {
-			for _, rel := range paths {
-				full := filepath.Join(s.root, rel)
-				if b, err := os.ReadFile(full); err == nil {
-					s.proj.SetFile(pathURI(full), string(b))
-				}
-			}
+	if len(s.roots) == 0 {
+		if path := uriPath(p.RootURI); path != "" {
+			s.roots = []string{path}
+		} else if p.RootPath != "" {
+			s.roots = []string{p.RootPath}
 		}
 	}
-	s.analyze(ctx)
+	s.discover(project.DefaultConfig())
+	s.analyzeAll(ctx)
 	return map[string]any{
 		"capabilities": map[string]any{
 			"positionEncoding": "utf-16",
@@ -308,8 +297,9 @@ func (s *Server) didOpen(ctx context.Context, p struct {
 	TextDocument textDocumentItem `json:"textDocument"`
 }) (any, *respError) {
 	s.open[p.TextDocument.URI] = true
-	s.proj.SetFile(p.TextDocument.URI, p.TextDocument.Text)
-	s.analyze(ctx)
+	w := s.setFile(p.TextDocument.URI, p.TextDocument.Text)
+	s.last = w
+	s.analyze(ctx, w)
 	return nil, nil
 }
 
@@ -320,7 +310,10 @@ func (s *Server) didChange(ctx context.Context, p struct {
 		Text  string `json:"text"`
 	} `json:"contentChanges"`
 }) (any, *respError) {
-	text, _ := s.proj.Text(p.TextDocument.URI)
+	var text string
+	if w := s.at(p.TextDocument.URI); w != nil {
+		text, _ = w.proj.Text(p.TextDocument.URI)
+	}
 	for _, c := range p.ContentChanges {
 		if c.Range == nil {
 			text = c.Text
@@ -332,8 +325,9 @@ func (s *Server) didChange(ctx context.Context, p struct {
 		src := []rune(text)
 		text = string(src[:start]) + c.Text + string(src[end:])
 	}
-	s.proj.SetFile(p.TextDocument.URI, text)
-	s.analyze(ctx)
+	w := s.setFile(p.TextDocument.URI, text)
+	s.last = w
+	s.analyze(ctx, w)
 	return nil, nil
 }
 
@@ -345,17 +339,21 @@ func (s *Server) didClose(ctx context.Context, p struct {
 	if s.managed[uri] {
 		return nil, nil
 	}
+	w := s.at(uri)
+	if w == nil {
+		return nil, nil
+	}
 	// A file that belongs to the project on disk stays, with its saved
 	// text; anything else leaves the project.
-	if path := uriPath(uri); path != "" && s.inProject(path) {
+	if path := uriPath(uri); path != "" && w.contains(path) {
 		if b, err := os.ReadFile(path); err == nil {
-			s.proj.SetFile(uri, string(b))
-			s.analyze(ctx)
+			w.proj.SetFile(uri, string(b))
+			s.analyze(ctx, w)
 			return nil, nil
 		}
 	}
-	s.proj.RemoveFile(uri)
-	s.analyze(ctx)
+	s.removeFile(uri)
+	s.analyze(ctx, w)
 	return nil, nil
 }
 
@@ -365,28 +363,42 @@ func (s *Server) didChangeWatched(ctx context.Context, p struct {
 		Type int    `json:"type"` // 1 created, 2 changed, 3 deleted
 	} `json:"changes"`
 }) (any, *respError) {
+	configChanged := false
 	for _, c := range p.Changes {
 		c.URI = canonURI(c.URI)
+		path := uriPath(c.URI)
+		if filepath.Base(path) == project.ConfigFile {
+			configChanged = true
+			continue
+		}
 		if s.open[c.URI] {
 			continue
 		}
-		path := uriPath(c.URI)
 		if c.Type == 3 {
-			s.proj.RemoveFile(c.URI)
+			s.removeFile(c.URI)
 			continue
 		}
-		if path != "" && s.inProject(path) {
-			if b, err := os.ReadFile(path); err == nil {
-				s.proj.SetFile(c.URI, string(b))
+		if path != "" && strings.HasSuffix(path, ".mms") {
+			if w := s.projectFor(c.URI); w.contains(path) {
+				if b, err := os.ReadFile(path); err == nil {
+					w.proj.SetFile(c.URI, string(b))
+					s.owners[c.URI] = w
+				}
 			}
 		}
 	}
-	s.analyze(ctx)
+	if configChanged {
+		// Files may move between projects, so start over.
+		s.reload(ctx)
+		return nil, nil
+	}
+	// Assets changed too, so every project is checked again.
+	s.analyzeAll(ctx)
 	return nil, nil
 }
 
-// setConfig replaces the project configuration; the browser editor sends
-// it when mms.json changes, since it has no disk to read.
+// setConfig replaces the default project's configuration; the browser
+// editor sends it when mms.json changes, since it has no disk to read.
 func (s *Server) setConfig(ctx context.Context, cfg project.Config) (any, *respError) {
 	if cfg.Namespace == "" {
 		cfg.Namespace = project.DefaultConfig().Namespace
@@ -394,14 +406,15 @@ func (s *Server) setConfig(ctx context.Context, cfg project.Config) (any, *respE
 	if err := cfg.Validate(); err != nil {
 		return nil, &respError{Code: codeInvalidParams, Message: err.Error()}
 	}
+	w := s.projects[""]
 	np := project.New(s.pack, cfg)
-	np.Files = s.proj.Files
-	for _, path := range s.proj.Paths() {
-		t, _ := s.proj.Text(path)
+	np.Files = w.proj.Files
+	for _, path := range w.proj.Paths() {
+		t, _ := w.proj.Text(path)
 		np.SetFile(path, t)
 	}
-	s.proj = np
-	s.analyze(ctx)
+	w.proj = np
+	s.analyze(ctx, w)
 	return nil, nil
 }
 
@@ -417,33 +430,25 @@ func (s *Server) setFiles(ctx context.Context, p struct {
 	for _, f := range p.Files {
 		s.managed[f.URI] = true
 		if !s.open[f.URI] {
-			s.proj.SetFile(f.URI, f.Text)
+			s.setFile(f.URI, f.Text)
 		}
 	}
 	for _, uri := range p.Remove {
 		delete(s.managed, uri)
 		delete(s.open, uri)
-		s.proj.RemoveFile(uri)
+		s.removeFile(uri)
 	}
-	s.analyze(ctx)
+	s.analyzeAll(ctx)
 	return nil, nil
 }
 
-func (s *Server) inProject(path string) bool {
-	if s.root == "" || !strings.HasSuffix(path, ".mms") {
-		return false
-	}
-	rel, err := filepath.Rel(s.root, path)
-	return err == nil && !strings.HasPrefix(rel, "..")
-}
-
-// analyze re-checks the project and publishes diagnostics for every file.
-func (s *Server) analyze(ctx context.Context) {
-	r, err := s.proj.Analyze(ctx)
+// analyze re-checks project w and publishes diagnostics for its files.
+func (s *Server) analyze(ctx context.Context, w *workspace) {
+	r, err := w.proj.Analyze(ctx)
 	if err != nil {
 		return
 	}
-	s.res = r
+	w.res = r
 	seen := map[string]bool{}
 	for _, u := range r.Units {
 		seen[u.Path] = true
@@ -454,7 +459,8 @@ func (s *Server) analyze(ctx context.Context) {
 		s.publish(u, ds)
 	}
 	for uri := range s.published {
-		if !seen[uri] {
+		// Files that left every project are cleared too.
+		if o := s.owners[uri]; (o == w || o == nil) && !seen[uri] {
 			s.notify("textDocument/publishDiagnostics", map[string]any{"uri": uri, "diagnostics": []any{}})
 			delete(s.published, uri)
 		}
@@ -492,20 +498,34 @@ type posParams struct {
 	Position     Position `json:"position"`
 }
 
-// locate returns the session, the file's line index and the rune offset.
+// locate returns the session of the file's project, the file's line index
+// and the rune offset.
 func (s *Server) locate(p posParams) (*ide.Session, *lines, int, bool) {
-	u := s.res.Unit(p.TextDocument.URI)
+	w := s.at(p.TextDocument.URI)
+	if w == nil || w.res == nil {
+		return nil, nil, 0, false
+	}
+	u := w.res.Unit(p.TextDocument.URI)
 	if u == nil {
 		return nil, nil, 0, false
 	}
 	l := newLines(string(u.File.Src))
-	return s.session(), l, l.offset(p.Position), true
+	return w.session(), l, l.offset(p.Position), true
 }
 
-func (s *Server) session() *ide.Session { return &ide.Session{P: s.proj, R: s.res} }
+func (w *workspace) session() *ide.Session { return &ide.Session{P: w.proj, R: w.res} }
+
+// unit is the analyzed file uri, or nil.
+func (s *Server) unit(uri string) (*workspace, *sema.Unit) {
+	w := s.at(uri)
+	if w == nil || w.res == nil {
+		return nil, nil
+	}
+	return w, w.res.Unit(uri)
+}
 
 func (s *Server) lines(uri string) *lines {
-	if u := s.res.Unit(uri); u != nil {
+	if _, u := s.unit(uri); u != nil {
 		return newLines(string(u.File.Src))
 	}
 	return newLines("")
@@ -666,7 +686,11 @@ func (s *Server) rename(_ context.Context, p struct {
 func (s *Server) formatting(_ context.Context, p struct {
 	TextDocument docID `json:"textDocument"`
 }) (any, *respError) {
-	text, ok := s.proj.Text(p.TextDocument.URI)
+	w := s.at(p.TextDocument.URI)
+	if w == nil {
+		return nil, nil
+	}
+	text, ok := w.proj.Text(p.TextDocument.URI)
 	if !ok {
 		return nil, nil
 	}
@@ -687,8 +711,12 @@ var symbolKinds = map[string]int{"resource": 23, "function": 12, "namespace": 3,
 func (s *Server) documentSymbol(_ context.Context, p struct {
 	TextDocument docID `json:"textDocument"`
 }) (any, *respError) {
+	w := s.at(p.TextDocument.URI)
+	if w == nil || w.res == nil {
+		return []any{}, nil
+	}
 	l := s.lines(p.TextDocument.URI)
-	syms := s.session().Symbols(p.TextDocument.URI)
+	syms := w.session().Symbols(p.TextDocument.URI)
 	out := make([]map[string]any, 0, len(syms))
 	for _, sym := range syms {
 		out = append(out, map[string]any{
@@ -702,8 +730,12 @@ func (s *Server) documentSymbol(_ context.Context, p struct {
 func (s *Server) semanticTokens(_ context.Context, p struct {
 	TextDocument docID `json:"textDocument"`
 }) (any, *respError) {
+	w := s.at(p.TextDocument.URI)
+	if w == nil || w.res == nil {
+		return map[string]any{"data": []int{}}, nil
+	}
 	l := s.lines(p.TextDocument.URI)
-	toks := s.session().SemanticTokens(p.TextDocument.URI)
+	toks := w.session().SemanticTokens(p.TextDocument.URI)
 	return map[string]any{"data": encodeTokens(l, toks)}, nil
 }
 
@@ -754,9 +786,22 @@ func lineEnd(l *lines, line int) int {
 }
 
 // output returns the generated pack for previews: every file's path and
-// text, with the declaration it came from.
-func (s *Server) output(_ context.Context, _ struct{}) (any, *respError) {
-	files := s.res.Emit()
+// text, with the declaration it came from. It is the pack of the project
+// holding uri, or without one of the last edited file's project.
+func (s *Server) output(_ context.Context, p struct {
+	URI string `json:"uri"`
+}) (any, *respError) {
+	w := s.at(canonURI(p.URI))
+	if w == nil {
+		w = s.last
+	}
+	if w == nil || w.res == nil {
+		w = s.projects[""]
+	}
+	if w.res == nil {
+		return map[string]any{"files": []any{}, "hasErrors": false}, nil
+	}
+	files := w.res.Emit()
 	out := make([]map[string]any, 0, len(files))
 	idx := map[string]*lines{}
 	for _, f := range files {
@@ -778,7 +823,7 @@ func (s *Server) output(_ context.Context, _ struct{}) (any, *respError) {
 		out = append(out, m)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i]["path"].(string) < out[j]["path"].(string) })
-	return map[string]any{"files": out, "hasErrors": s.res.HasErrors()}, nil
+	return map[string]any{"files": out, "hasErrors": w.res.HasErrors()}, nil
 }
 
 // ---- URIs

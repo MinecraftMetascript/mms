@@ -33,7 +33,7 @@ func (s *Server) codeAction(ctx context.Context, p struct {
 	} `json:"context"`
 }) (any, *respError) {
 	uri := p.TextDocument.URI
-	u := s.res.Unit(uri)
+	w, u := s.unit(uri)
 	if u == nil {
 		return []any{}, nil
 	}
@@ -50,7 +50,7 @@ func (s *Server) codeAction(ctx context.Context, p struct {
 		}
 		return false
 	}
-	ds := s.res.Diagnostics(uri)
+	ds := w.res.Diagnostics(uri)
 	out := []any{}
 	if want("quickfix") {
 		for _, d := range ds {
@@ -72,8 +72,8 @@ func (s *Server) codeAction(ctx context.Context, p struct {
 		// Fixes can expose more (an object inside one that became a call),
 		// so fix in rounds on the project, then put the text back.
 		orig := string(u.File.Src)
-		files, n, err := s.proj.FixAll(ctx, uri)
-		s.proj.SetFile(uri, orig)
+		files, n, err := w.proj.FixAll(ctx, uri)
+		w.proj.SetFile(uri, orig)
 		if err != nil {
 			return nil, &respError{Code: codeRequestFailed, Message: err.Error()}
 		}

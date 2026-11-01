@@ -347,3 +347,70 @@ func TestURIs(t *testing.T) {
 		t.Errorf("canonURI changed a mem URI: %q", got)
 	}
 }
+
+// TestProjects checks that each mms.json folder in the workspace is its
+// own project: the same names in two examples do not collide, and lookups
+// stay inside the file's project.
+func TestProjects(t *testing.T) {
+	dir := t.TempDir()
+	write := func(rel, text string) string {
+		full := filepath.Join(dir, rel)
+		os.MkdirAll(filepath.Dir(full), 0o755)
+		os.WriteFile(full, []byte(text), 0o644)
+		return pathURI(full)
+	}
+	write("a/mms.json", `{"namespace": "a"}`)
+	write("b/mms.json", `{"namespace": "b"}`)
+	aBase := write("a/base.mms", "DensityFunction base = 1\n")
+	bBase := write("b/base.mms", "DensityFunction base = 2\n")
+	aMain := write("a/main.mms", "DensityFunction top = base * 2\n")
+	loose := write("scratch.mms", "DensityFunction base = 3\n")
+
+	c := start(t)
+	c.result("initialize", map[string]any{"rootUri": pathURI(dir)})
+	c.notify("textDocument/didOpen", map[string]any{"textDocument": map[string]any{"uri": aMain, "languageId": "mms", "version": 1, "text": "DensityFunction top = base * 2\n"}})
+
+	def := c.result("textDocument/definition", pos(aMain, 0, 23)).([]any)
+	if len(def) != 1 || def[0].(map[string]any)["uri"] != aBase {
+		t.Fatalf("definition = %v, want only %s", def, aBase)
+	}
+	refs := c.result("textDocument/references", map[string]any{"textDocument": map[string]any{"uri": aBase}, "position": map[string]any{"line": 0, "character": 17}, "context": map[string]any{"includeDeclaration": true}}).([]any)
+	for _, r := range refs {
+		if u := r.(map[string]any)["uri"]; u != aBase && u != aMain {
+			t.Errorf("reference in another project: %v", u)
+		}
+	}
+	c.result("mms/ping", nil)
+	for _, n := range c.notes {
+		if n["method"] != "textDocument/publishDiagnostics" {
+			continue
+		}
+		p := n["params"].(map[string]any)
+		for _, d := range p["diagnostics"].([]any) {
+			if sev := d.(map[string]any)["severity"].(float64); sev <= 2 {
+				t.Errorf("problem in %v: %v", p["uri"], d)
+			}
+		}
+	}
+	out := c.result("mms/output", map[string]any{"uri": bBase}).(map[string]any)
+	for _, f := range out["files"].([]any) {
+		if u, ok := f.(map[string]any)["uri"]; ok && u != bBase {
+			t.Errorf("output of b has a file from %v", u)
+		}
+	}
+
+	// A new mms.json at the top takes in the loose file, and only it: the
+	// examples keep their own projects.
+	write("mms.json", `{"namespace": "top"}`)
+	c.notify("workspace/didChangeWatchedFiles", map[string]any{"changes": []any{map[string]any{"uri": pathURI(filepath.Join(dir, "mms.json")), "type": 1}}})
+	out = c.result("mms/output", map[string]any{"uri": loose}).(map[string]any)
+	for _, f := range out["files"].([]any) {
+		if u, ok := f.(map[string]any)["uri"]; ok && u != loose {
+			t.Errorf("top project has a file from %v", u)
+		}
+	}
+	def = c.result("textDocument/definition", pos(aMain, 0, 23)).([]any)
+	if len(def) != 1 || def[0].(map[string]any)["uri"] != aBase {
+		t.Errorf("after reload definition = %v, want %s", def, aBase)
+	}
+}

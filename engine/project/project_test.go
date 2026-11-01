@@ -253,7 +253,7 @@ FunctionTag hooks = [demo:b]
 // TestSourceFiles checks which files make up a project.
 func TestSourceFiles(t *testing.T) {
 	dir := t.TempDir()
-	for _, f := range []string{"a.mms", "src/b.mms", "src/.old/c.mms", ".git/d.mms", "build/e.mms", "web/node_modules/f.mms", "notes.txt"} {
+	for _, f := range []string{"a.mms", "src/b.mms", "src/.old/c.mms", ".git/d.mms", "build/e.mms", "web/node_modules/f.mms", "notes.txt", "sub/mms.json", "sub/g.mms"} {
 		os.MkdirAll(filepath.Join(dir, filepath.Dir(f)), 0o755)
 		os.WriteFile(filepath.Join(dir, f), nil, 0o644)
 	}
