@@ -36,6 +36,7 @@ type Server struct {
 	projects map[string]*workspace
 	owners   map[string]*workspace // the project each file is in
 	last     *workspace            // the project of the last edited file
+	lastURI  string                // the last edited file
 	open     map[string]bool
 	// managed files were given by mms/setFiles: closing their editor
 	// keeps them in the project (the browser has no disk to fall back on).
@@ -298,7 +299,7 @@ func (s *Server) didOpen(ctx context.Context, p struct {
 }) (any, *respError) {
 	s.open[p.TextDocument.URI] = true
 	w := s.setFile(p.TextDocument.URI, p.TextDocument.Text)
-	s.last = w
+	s.last, s.lastURI = w, p.TextDocument.URI
 	s.analyze(ctx, w)
 	return nil, nil
 }
@@ -326,7 +327,7 @@ func (s *Server) didChange(ctx context.Context, p struct {
 		text = string(src[:start]) + c.Text + string(src[end:])
 	}
 	w := s.setFile(p.TextDocument.URI, text)
-	s.last = w
+	s.last, s.lastURI = w, p.TextDocument.URI
 	s.analyze(ctx, w)
 	return nil, nil
 }

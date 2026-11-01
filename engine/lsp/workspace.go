@@ -20,17 +20,27 @@ type workspace struct {
 	// default project the editor's folder if it has no mms.json ("" in
 	// the browser).
 	root string
-	proj *project.Project
-	res  *project.Result
+	// extra are more folders whose loose files the default project holds.
+	extra []string
+	proj  *project.Project
+	res   *project.Result
 }
 
 // contains reports whether the .mms file at path belongs to w on disk.
 func (w *workspace) contains(path string) bool {
-	if w.root == "" || !strings.HasSuffix(path, ".mms") {
+	if !strings.HasSuffix(path, ".mms") {
 		return false
 	}
-	rel, err := filepath.Rel(w.root, path)
-	return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
+	for _, root := range append([]string{w.root}, w.extra...) {
+		if root == "" {
+			continue
+		}
+		rel, err := filepath.Rel(root, path)
+		if err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+			return true
+		}
+	}
+	return false
 }
 
 // configDir is the nearest folder from dir upward that holds mms.json, or
@@ -82,7 +92,7 @@ func (s *Server) discover(defCfg project.Config) {
 	}
 	if len(loose) > 0 {
 		// Asset helpers in loose files read from the first such folder.
-		def.root = loose[0]
+		def.root, def.extra = loose[0], loose[1:]
 		def.proj.Files = os.DirFS(def.root)
 	}
 	for _, root := range loose {
@@ -189,7 +199,7 @@ func (s *Server) reload(ctx context.Context) {
 	for uri, t := range texts {
 		s.setFile(uri, t)
 	}
-	s.last = nil
+	s.last = s.owners[s.lastURI]
 	s.analyzeAll(ctx)
 }
 

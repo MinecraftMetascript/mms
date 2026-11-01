@@ -413,4 +413,29 @@ func TestProjects(t *testing.T) {
 	if len(def) != 1 || def[0].(map[string]any)["uri"] != aBase {
 		t.Errorf("after reload definition = %v, want %s", def, aBase)
 	}
+	// Without a uri, output is still the last edited file's project.
+	out = c.result("mms/output", map[string]any{}).(map[string]any)
+	for _, f := range out["files"].([]any) {
+		if u, ok := f.(map[string]any)["uri"]; ok && u != aBase && u != aMain {
+			t.Errorf("after reload output has a file from %v, want project a", u)
+		}
+	}
+}
+
+// TestLooseFolders checks that files in every folder no mms.json covers
+// stay in the default project when their editor closes.
+func TestLooseFolders(t *testing.T) {
+	one, two := t.TempDir(), t.TempDir()
+	os.WriteFile(filepath.Join(one, "a.mms"), []byte("DensityFunction a = 1\n"), 0o644)
+	os.WriteFile(filepath.Join(two, "b.mms"), []byte("DensityFunction b = a * 2\n"), 0o644)
+	a, b := pathURI(filepath.Join(one, "a.mms")), pathURI(filepath.Join(two, "b.mms"))
+
+	c := start(t)
+	c.result("initialize", map[string]any{"workspaceFolders": []any{map[string]any{"uri": pathURI(one)}, map[string]any{"uri": pathURI(two)}}})
+	c.notify("textDocument/didOpen", map[string]any{"textDocument": map[string]any{"uri": b, "languageId": "mms", "version": 1, "text": "DensityFunction b = a * 2\n"}})
+	c.notify("textDocument/didClose", map[string]any{"textDocument": map[string]any{"uri": b}})
+	refs := c.result("textDocument/references", map[string]any{"textDocument": map[string]any{"uri": a}, "position": map[string]any{"line": 0, "character": 16}, "context": map[string]any{"includeDeclaration": false}}).([]any)
+	if len(refs) != 1 || refs[0].(map[string]any)["uri"] != b {
+		t.Errorf("references = %v, want the use in %s", refs, b)
+	}
 }
