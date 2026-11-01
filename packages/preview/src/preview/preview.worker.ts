@@ -6,11 +6,13 @@ import {
 	ChunkPos,
 	DensityFunction,
 	BlockState,
+	DensityVolume,
 	FixedBiomeSource,
 	MaterialRuleContext,
 	Holder,
 	HolderSet,
 	Identifier,
+	NoiseChunk,
 	NoiseChunkGenerator,
 	NoiseGeneratorSettings,
 	NoiseRouter,
@@ -20,7 +22,7 @@ import {
 } from 'deepslate';
 import { biomeColor, blockColor, CAVE, SKY, VOID, type Rgb } from './colors';
 import { speedUp } from './fastDensity';
-import { vanillaSummary, type PreviewFile, type PreviewRequest, type PreviewResponse } from './protocol';
+import { screenAxes, vanillaSummary, type PreviewFile, type PreviewRequest, type PreviewResponse, type PreviewView } from './protocol';
 
 // Renders previews with Deepslate. User files are registered under their
 // ids; minecraft: ids the pack references but does not define come from
@@ -193,9 +195,16 @@ function indexOf(id: string): number {
 	return i;
 }
 
-/** Built chunks (block palette indices, x-major then y) for the last terrain rendered. */
+/**
+ * Built strips of the slice for the last terrain rendered: 16 blocks along
+ * the slice (one chunk's width) by the world height, keyed by stripKey.
+ * Indexed (along * height + y), along counting up the world axis.
+ */
 let terrainKey = '';
-const terrainChunks = new Map<number, Uint16Array>();
+const terrainStrips = new Map<string, Uint16Array>();
+function stripKey(alongX: boolean, depth: number, chunk: number): string {
+	return `${alongX ? 'x' : 'z'}|${depth}|${chunk}`;
+}
 
 interface Terrain {
 	settings: NoiseGeneratorSettings;
@@ -206,35 +215,99 @@ interface Terrain {
 	shape: string;
 }
 
-function buildChunk(t: Terrain, chunkX: number): Uint16Array {
+type Generator = { globalFluidPicker: unknown; getWorldgenContext(): unknown };
+
+/**
+ * Builds 16 blocks of a vertical slice: along x at z = depth, or along z
+ * at x = depth, for the chunk `chunk` along that axis. Only the slice is
+ * filled and painted, so it costs about what one row of a chunk does.
+ */
+function buildStrip(t: Terrain, alongX: boolean, depth: number, chunk: number): Uint16Array {
 	const { settings } = t;
 	const minY = settings.noise.minY;
 	const height = settings.noise.height;
-	const chunk = new Chunk(minY, height, ChunkPos.create(chunkX, 0));
-	// buildTerrain takes one biome per chunk; doing its steps here lets the
-	// surface rules see the biome at each block.
-	const gen = new NoiseChunkGenerator(new FixedBiomeSource(Identifier.create('plains')), settings) as unknown as {
-		createNoiseChunk(rs: RandomState, chunk: Chunk, onlyFirstZ: boolean): unknown;
-		doFill(chunk: Chunk, noiseChunk: unknown): void;
-		getWorldgenContext(): unknown;
-	};
-	const noiseChunk = gen.createNoiseChunk(t.rs, chunk, true);
-	gen.doFill(chunk, noiseChunk);
-	(t.rs.surfaceSystem as unknown as { buildSurface(...a: unknown[]): void }).buildSurface(
-		chunk,
-		noiseChunk,
-		t.rule,
-		gen.getWorldgenContext(),
-		(pos: BlockPos) => t.biomeAt(pos[0], pos[1], pos[2])
-	);
-	const out = new Uint16Array(16 * height);
-	const x0 = chunkX * 16;
-	for (let x = 0; x < 16; x++) {
+	const at = chunk * 16;
+	const pos = alongX ? ChunkPos.create(chunk, Math.floor(depth / 16)) : ChunkPos.create(Math.floor(depth / 16), chunk);
+	const blocks = new Chunk(minY, height, pos);
+	const gen = new NoiseChunkGenerator(new FixedBiomeSource(Identifier.create('plains')), settings) as unknown as Generator;
+	const volume = alongX ? new DensityVolume(16, height, 1, at, minY, depth) : new DensityVolume(1, height, 16, depth, minY, at);
+	const noiseChunk = new NoiseChunk(t.rs, settings, gen.globalFluidPicker as never, volume);
+	const density = t.rs.router.finalDensity.computeVolume(volume);
+	for (let i = 0; i < 16; i++) {
+		const [ix, iz] = alongX ? [i, 0] : [0, i];
+		const bx = volume.blockX(ix);
+		const bz = volume.blockZ(iz);
 		for (let y = 0; y < height; y++) {
-			out[x * height + y] = indexOf(chunk.getBlockState(BlockPos.create(x0 + x, minY + y, 0)).getName().toString());
+			const by = minY + y;
+			const state = noiseChunk.aquifer.computeSubstance(bx, by, bz, density[volume.indexUnchecked(ix, y, iz)]) ?? settings.defaultBlock;
+			blocks.setBlockState(BlockPos.create(bx, by, bz), state);
 		}
 	}
+	const columns: [number, number][] = [];
+	for (let i = 0; i < 16; i++) columns.push(alongX ? [at + i, depth] : [depth, at + i]);
+	paintSurface(t, blocks, noiseChunk, gen.getWorldgenContext(), columns);
+	const out = new Uint16Array(16 * height);
+	for (let i = 0; i < 16; i++) {
+		const [bx, bz] = columns[i];
+		for (let y = 0; y < height; y++) out[i * height + y] = stateIndex(blocks.getBlockState(BlockPos.create(bx, minY + y, bz)));
+	}
 	return out;
+}
+
+/**
+ * Runs the surface rule down each of the given block columns of a filled
+ * chunk. Deepslate's MaterialSystem.buildSurface only paints the first z
+ * row of a chunk (its previews are slices along x), so this is its loop
+ * for any columns. Blocks it replaces are pushed to `replaced`.
+ */
+function paintSurface(t: Terrain, chunk: Chunk, noiseChunk: unknown, worldgen: unknown, columns: Iterable<[number, number]>, replaced?: [BlockPos, BlockState][]) {
+	const minY = t.settings.noise.minY;
+	const maxY = minY + t.settings.noise.height - 1;
+	const context = new MaterialRuleContext(
+		t.rs.surfaceSystem,
+		t.rs,
+		chunk,
+		noiseChunk as never,
+		worldgen as never,
+		(pos: BlockPos) => t.biomeAt(pos[0], pos[1], pos[2])
+	);
+	const rule = t.rule.compile(context);
+	for (const [bx, bz] of columns) {
+		context.updateXZ(bx, bz);
+		let stoneAbove = 0;
+		let waterHeight = Number.MIN_SAFE_INTEGER;
+		let nextCeiling = Number.MAX_SAFE_INTEGER;
+		for (let y = maxY; y >= minY; y--) {
+			const pos = BlockPos.create(bx, y, bz);
+			const old = chunk.getBlockState(pos);
+			if (old.equals(BlockState.AIR)) {
+				stoneAbove = 0;
+				waterHeight = Number.MIN_SAFE_INTEGER;
+				continue;
+			}
+			if (old.isFluid()) {
+				if (waterHeight === Number.MIN_SAFE_INTEGER) waterHeight = y + 1;
+				continue;
+			}
+			if (nextCeiling >= y) {
+				nextCeiling = Number.MIN_SAFE_INTEGER;
+				for (let ly = y - 1; ly >= minY; ly--) {
+					const next = chunk.getBlockState(BlockPos.create(bx, ly, bz));
+					if (next.equals(BlockState.AIR) || next.isFluid()) {
+						nextCeiling = ly + 1;
+						break;
+					}
+				}
+			}
+			stoneAbove += 1;
+			context.updateY(stoneAbove, y - nextCeiling + 1, waterHeight, y);
+			const state = rule(bx, y, bz);
+			if (state) {
+				replaced?.push([pos, old]);
+				chunk.setBlockState(pos, state);
+			}
+		}
+	}
 }
 
 // ---- Isometric terrain -------------------------------------------------
@@ -282,60 +355,11 @@ function buildChunk3D(t: Terrain, cx: number, cz: number): Uint16Array<ArrayBuff
 	// Blocks the surface rule replaces, put back afterwards so the fill can be reused.
 	const replaced: [BlockPos, BlockState][] = [];
 	try {
-		// Deepslate's MaterialSystem.buildSurface only paints the first z row
-		// (its previews are slices), so this is its loop over the whole chunk.
-		const context = new MaterialRuleContext(
-			t.rs.surfaceSystem,
-			t.rs,
-			chunk,
-			noiseChunk as never,
-			gen.getWorldgenContext() as never,
-			(pos: BlockPos) => t.biomeAt(pos[0], pos[1], pos[2])
-		);
-		const rule = t.rule.compile(context);
 		const x0 = cx * 16;
 		const z0 = cz * 16;
-		const maxY = minY + height - 1;
-		for (let x = 0; x < 16; x++) {
-			for (let z = 0; z < 16; z++) {
-				const bx = x0 + x;
-				const bz = z0 + z;
-				context.updateXZ(bx, bz);
-				let stoneAbove = 0;
-				let waterHeight = Number.MIN_SAFE_INTEGER;
-				let nextCeiling = Number.MAX_SAFE_INTEGER;
-				for (let y = maxY; y >= minY; y--) {
-					const pos = BlockPos.create(bx, y, bz);
-					const old = chunk.getBlockState(pos);
-					if (old.equals(BlockState.AIR)) {
-						stoneAbove = 0;
-						waterHeight = Number.MIN_SAFE_INTEGER;
-						continue;
-					}
-					if (old.isFluid()) {
-						if (waterHeight === Number.MIN_SAFE_INTEGER) waterHeight = y + 1;
-						continue;
-					}
-					if (nextCeiling >= y) {
-						nextCeiling = Number.MIN_SAFE_INTEGER;
-						for (let ly = y - 1; ly >= minY; ly--) {
-							const next = chunk.getBlockState(BlockPos.create(bx, ly, bz));
-							if (next.equals(BlockState.AIR) || next.isFluid()) {
-								nextCeiling = ly + 1;
-								break;
-							}
-						}
-					}
-					stoneAbove += 1;
-					context.updateY(stoneAbove, y - nextCeiling + 1, waterHeight, y);
-					const state = rule(bx, y, bz);
-					if (state) {
-						replaced.push([pos, old]);
-						chunk.setBlockState(pos, state);
-					}
-				}
-			}
-		}
+		const columns: [number, number][] = [];
+		for (let x = 0; x < 16; x++) for (let z = 0; z < 16; z++) columns.push([x0 + x, z0 + z]);
+		paintSurface(t, chunk, noiseChunk, gen.getWorldgenContext(), columns, replaced);
 		const out = new Uint16Array(16 * 16 * height);
 		for (let x = 0; x < 16; x++) {
 			for (let z = 0; z < 16; z++) {
@@ -962,16 +986,47 @@ function isoImageFor(view: Rect, around: Rect, s: number, h: number): (Rect & { 
 }
 
 /**
- * Builds the chunk at the view's centre inside withVanilla, so entries the
+ * A 2D view's pixel geometry, from the camera at the image centre and the
+ * screen axes of its facing. Pixels are sampled at their centres, so a
+ * view facing south (x decreasing to the right) lines up like north.
+ */
+function planeOf(width: number, height: number, view: PreviewView) {
+	const axes = screenAxes(view.facing);
+	const alongX = axes.rx !== 0;
+	const sign = alongX ? axes.rx : axes.rz;
+	const across = (px: number) => (px + 0.5 - width / 2) * view.scale;
+	const down = (py: number) => (py + 0.5 - height / 2) * view.scale;
+	return {
+		...axes,
+		/** For side views: whether the slice runs along x, and the other coordinate it is at. */
+		alongX,
+		depth: Math.floor(alongX ? view.z : view.x),
+		/** For side views: the world coordinate along the slice at a pixel column. */
+		along: (px: number) => (alongX ? view.x : view.z) + sign * across(px),
+		/** For side views: the world y at a pixel row. */
+		y: (py: number) => view.y - down(py),
+		/** For top-down views: the world x and z at a pixel. */
+		x: (px: number, py: number) => view.x + axes.rx * across(px) + axes.dx * down(py),
+		z: (px: number, py: number) => view.z + axes.rz * across(px) + axes.dz * down(py),
+		/** For side views: the world x and z of a point along the slice. */
+		at: (u: number): [number, number] => (alongX ? [u, view.z] : [view.x, u])
+	};
+}
+
+/**
+ * Builds the strip at the view's centre inside withVanilla, so entries the
  * surface rules reference are fetched before the full pass.
  */
-async function warm(t: Terrain, key: string): Promise<Terrain> {
+async function warm(req: RenderRequest, t: Terrain, key: string): Promise<Terrain> {
 	if (key !== terrainKey) {
 		terrainKey = key;
-		terrainChunks.clear();
+		terrainStrips.clear();
 	}
-	if (terrainChunks.size === 0) {
-		await withVanilla(() => terrainChunks.set(0, buildChunk(t, 0)));
+	const plane = planeOf(req.width, req.height, req.view);
+	const chunk = Math.floor(Math.floor(plane.along(req.width / 2)) / 16);
+	const k = stripKey(plane.alongX, plane.depth, chunk);
+	if (!terrainStrips.has(k)) {
+		await withVanilla(() => terrainStrips.set(k, buildStrip(t, plane.alongX, plane.depth, chunk)));
 	}
 	return t;
 }
@@ -983,38 +1038,41 @@ async function renderTerrain(req: RenderRequest, t: Terrain, key: string): Promi
 	const sea = t.settings.seaLevel;
 	if (key !== terrainKey) {
 		terrainKey = key;
-		terrainChunks.clear();
+		terrainStrips.clear();
 	}
-	const x0 = view.x - (width / 2) * view.scale;
-	const yTop = view.y + (height / 2) * view.scale;
+	const plane = planeOf(width, height, view);
 	const values = new Float32Array(width * height).fill(NaN);
 	const pixels = new Uint8ClampedArray(width * height * 4);
+	const h = t.settings.noise.height;
+	const inView = new Set<string>();
 	let started = performance.now();
 	for (let px = 0; px < width; px++) {
-		const x = Math.floor(x0 + px * view.scale);
-		const cx = Math.floor(x / 16);
-		let col = terrainChunks.get(cx);
-		if (!col) {
+		const u = Math.floor(plane.along(px));
+		const chunk = Math.floor(u / 16);
+		const k = stripKey(plane.alongX, plane.depth, chunk);
+		inView.add(k);
+		let strip = terrainStrips.get(k);
+		if (!strip) {
 			if (performance.now() - started > 40) {
 				await breathe();
 				if (req.seq !== latest) throw new Superseded();
 				started = performance.now();
 			}
-			col = buildChunk(t, cx);
-			terrainChunks.set(cx, col);
+			strip = buildStrip(t, plane.alongX, plane.depth, chunk);
+			terrainStrips.set(k, strip);
 		}
-		const lx = x - cx * 16;
-		const h = t.settings.noise.height;
+		const local = u - chunk * 16;
+		const [x, z] = plane.at(u);
 		// Air below the router's estimate of the surface is cave, drawn darker than sky.
-		const surface = t.rs.router.chunkSurfaceLevel.compute(DensityFunction.context(x, 0, 0));
+		const surface = t.rs.router.chunkSurfaceLevel.compute(DensityFunction.context(x, 0, z));
 		for (let py = 0; py < height; py++) {
-			const y = Math.floor(yTop - py * view.scale);
+			const y = Math.floor(plane.y(py));
 			const i = py * width + px;
 			if (y < minY || y >= maxY) {
 				put(pixels, i * 4, VOID);
 				continue;
 			}
-			const b = col[lx * h + (y - minY)];
+			const b = strip[local * h + (y - minY)];
 			const id = palette[b];
 			values[i] = b;
 			if (id === 'minecraft:air') {
@@ -1024,11 +1082,9 @@ async function renderTerrain(req: RenderRequest, t: Terrain, key: string): Promi
 			}
 		}
 	}
-	// Keep the cache from growing without bound while panning.
-	if (terrainChunks.size > 512) {
-		const keep = new Set<number>();
-		for (let px = 0; px < width; px++) keep.add(Math.floor(Math.floor(x0 + px * view.scale) / 16));
-		for (const k of terrainChunks.keys()) if (!keep.has(k)) terrainChunks.delete(k);
+	// Keep the cache from growing without bound while panning and turning.
+	if (terrainStrips.size > 512) {
+		for (const k of terrainStrips.keys()) if (!inView.has(k)) terrainStrips.delete(k);
 	}
 	return { type: 'rendered', seq: req.seq, width, height, pixels, values, min: Infinity, max: -Infinity, labels: palette.slice(), seaLevel: sea, minY, maxY };
 }
@@ -1039,9 +1095,8 @@ async function renderBiomes(req: RenderRequest, dim: Dimension, rs: RandomState)
 	const { width, height, view } = req;
 	const values = new Float32Array(width * height);
 	const pixels = new Uint8ClampedArray(width * height * 4);
-	const x0 = view.x - (width / 2) * view.scale;
-	const z0 = view.y - (height / 2) * view.scale;
-	const qy = Math.floor(req.options.y) >> 2;
+	const plane = planeOf(width, height, view);
+	const qy = Math.floor(view.y) >> 2;
 	const counts = new Map<number, number>();
 	// Biomes are stored per 4×4×4 cell, so neighbouring pixels in one cell share a lookup.
 	const cache = new Map<string, number>();
@@ -1052,9 +1107,9 @@ async function renderBiomes(req: RenderRequest, dim: Dimension, rs: RandomState)
 			if (req.seq !== latest) throw new Superseded();
 			started = performance.now();
 		}
-		const qz = Math.floor(z0 + py * view.scale) >> 2;
 		for (let px = 0; px < width; px++) {
-			const qx = Math.floor(x0 + px * view.scale) >> 2;
+			const qx = Math.floor(plane.x(px, py)) >> 2;
+			const qz = Math.floor(plane.z(px, py)) >> 2;
 			const k = `${qx},${qz}`;
 			let b = cache.get(k);
 			if (b === undefined) {
@@ -1128,8 +1183,7 @@ async function render(req: RenderRequest): Promise<PreviewResponse> {
 	const id = Identifier.parse(req.id);
 	const values = new Float32Array(width * height);
 	const pixels = new Uint8ClampedArray(width * height * 4);
-	const x0 = view.x - (width / 2) * view.scale;
-	const yTop = view.y + (height / 2) * view.scale;
+	const plane = planeOf(width, height, view);
 	let min = Infinity;
 	let max = -Infinity;
 	const track = (v: number) => {
@@ -1150,20 +1204,19 @@ async function render(req: RenderRequest): Promise<PreviewResponse> {
 	if (req.kind === 'dimension' || req.kind === 'material_rule' || (req.kind === 'noise_settings' && req.mode !== 'density')) {
 		const { terrain, key } = await terrainOf(req);
 		if (req.mode === 'iso') return renderIso(req, terrain, key);
-		await warm(terrain, key);
+		await warm(req, terrain, key);
 		return renderTerrain(req, terrain, key);
 	}
 
 	if (req.kind === 'noise') {
-		// Top-down: x across, z down, at y = 0.
+		// Top-down, at the camera's y.
 		const noise = await withVanilla(() => {
 			const rs = new RandomState(NoiseGeneratorSettings.create({}), seed);
 			return rs.getOrCreateNoise(id);
 		});
-		const z0 = view.y - (height / 2) * view.scale;
 		for (let py = 0; py < height; py++) {
 			for (let px = 0; px < width; px++) {
-				const v = noise.get3D(x0 + px * view.scale, 0, z0 + py * view.scale);
+				const v = noise.get3D(plane.x(px, py), view.y, plane.z(px, py));
 				values[py * width + px] = v;
 				track(v);
 			}
@@ -1177,7 +1230,7 @@ async function render(req: RenderRequest): Promise<PreviewResponse> {
 	}
 
 	if (req.kind === 'density_function') {
-		// Side view: x across, y up, at z = 0.
+		// Side view: the slice through the camera, y up.
 		const fn = await withVanilla(() => {
 			const rs = new RandomState(NoiseGeneratorSettings.create({}), seed);
 			// A reference holder, so the visitor binds noises and caches by id.
@@ -1185,9 +1238,10 @@ async function render(req: RenderRequest): Promise<PreviewResponse> {
 			return df.mapAll(rs.createVisitor(false));
 		});
 		for (let py = 0; py < height; py++) {
-			const y = yTop - py * view.scale;
+			const y = plane.y(py);
 			for (let px = 0; px < width; px++) {
-				const v = fn.compute(DensityFunction.context(x0 + px * view.scale, y, 0));
+				const [x, z] = plane.at(plane.along(px));
+				const v = fn.compute(DensityFunction.context(x, y, z));
 				values[py * width + px] = v;
 				track(v);
 			}
@@ -1197,7 +1251,7 @@ async function render(req: RenderRequest): Promise<PreviewResponse> {
 		return { type: 'rendered', seq: req.seq, width, height, pixels, values, min, max };
 	}
 
-	// Noise settings, density mode: the terrain's final density, side view at z = 0.
+	// Noise settings, density mode: the terrain's final density, a side view.
 	const { settings, router } = await withVanilla(() => {
 		const settings = WorldgenRegistries.NOISE_SETTINGS.getOrThrow(id);
 		const rs = speedUp(new RandomState(settings, seed));
@@ -1207,13 +1261,14 @@ async function render(req: RenderRequest): Promise<PreviewResponse> {
 	const maxY = minY + settings.noise.height;
 	const sea = settings.seaLevel;
 	for (let py = 0; py < height; py++) {
-		const y = yTop - py * view.scale;
+		const y = plane.y(py);
 		for (let px = 0; px < width; px++) {
 			const i = py * width + px;
 			const o = i * 4;
 			let v = NaN;
 			if (y >= minY && y < maxY) {
-				v = router.finalDensity.compute(DensityFunction.context(x0 + px * view.scale, y, 0));
+				const [x, z] = plane.at(plane.along(px));
+				v = router.finalDensity.compute(DensityFunction.context(x, y, z));
 				track(v);
 			}
 			values[i] = v;

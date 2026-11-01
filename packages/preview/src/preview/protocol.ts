@@ -19,16 +19,48 @@ export const modesOf: Record<PreviewKind, PreviewMode[]> = {
 	dimension: ['biomes', 'blocks', 'iso']
 };
 
-/** Whether a view looks down on x/z (otherwise it is a side view of x/y at z = 0). */
+/** Whether a view looks down on x/z (otherwise it is a side view: a vertical slice through the camera). */
 export function topDown(kind: PreviewKind, mode: PreviewMode): boolean {
 	return kind === 'noise' || mode === 'biomes';
 }
 
+/** The way a 2D view's camera faces. Always along an axis, so a side view slices along x or z. */
+export type Facing = 'north' | 'east' | 'south' | 'west';
+export const facings: Facing[] = ['north', 'east', 'south', 'west'];
+
+/**
+ * The world directions of a 2D view's screen axes, as unit x/z steps:
+ * right is the screen's right, and down is the screen's down in a
+ * top-down view (the way behind the camera). A side view's slice runs
+ * along right, through the camera, so north and south slice along x
+ * (at the camera's z), east and west along z (at the camera's x).
+ */
+export function screenAxes(facing: Facing): { rx: number; rz: number; dx: number; dz: number } {
+	switch (facing) {
+		case 'north':
+			return { rx: 1, rz: 0, dx: 0, dz: 1 };
+		case 'east':
+			return { rx: 0, rz: 1, dx: -1, dz: 0 };
+		case 'south':
+			return { rx: -1, rz: 0, dx: 0, dz: -1 };
+		case 'west':
+			return { rx: 0, rz: -1, dx: 1, dz: 0 };
+	}
+}
+
+/**
+ * Where a view looks. For the 2D views this is the camera: the world
+ * point at the centre of the image and the way it faces. A side view
+ * shows the slice through it; a top-down view samples at its y (a biome
+ * map's height). The isometric view uses x and y as the world x and z
+ * at the centre, and ignores z and facing.
+ */
 export interface PreviewView {
-	/** World coordinate at the centre of the image. */
 	x: number;
 	y: number;
-	/** Blocks per pixel. */
+	z: number;
+	facing: Facing;
+	/** Blocks per pixel (for the isometric view, a block's size in pixels). */
 	scale: number;
 }
 
@@ -37,8 +69,6 @@ export interface PreviewOptions {
 	biome: string;
 	/** The noise settings a surface rule is drawn on. */
 	terrain: string;
-	/** The height a biome map is sampled at. */
-	y: number;
 }
 
 export interface PreviewFile {
