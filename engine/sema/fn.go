@@ -67,7 +67,7 @@ func SigOf(d *syntax.Decl) FuncSig {
 // SymSig is the signature part of a symbol that other declarations
 // depend on; it is "" for most kinds.
 func SymSig(s *Symbol) string {
-	if s.Kind.MMS == "Function" || s.Kind.MMS == "Global" || s.Kind.MMS == customItemKind {
+	if s.Kind.MMS == "Function" || s.Kind.MMS == "Global" || s.Kind.MMS == customItemKind || s.Kind.MMS == "Const" {
 		return symSig(s)
 	}
 	return ""
@@ -81,6 +81,12 @@ func symSig(s *Symbol) string {
 	}
 	if s.Kind.MMS == customItemKind {
 		return customItemSig(s)
+	}
+	if s.Kind.MMS == "Const" {
+		if s.Const == nil {
+			return "?"
+		}
+		return s.Const.String()
 	}
 	if s.Kind.MMS == "Global" {
 		if s.Decl.Type == nil {
@@ -246,6 +252,13 @@ type fc struct {
 	selfID string
 	// loopVar is set while declaring a for loop's variable.
 	loopVar bool
+	// env is the build-time scope: consts, the loop variables of the
+	// build-time loop that made the declaration, and the variables of
+	// unrolled loops in this body.
+	env *Env
+	// unroll holds, per enclosing loop from the outside in, the flag a
+	// break in an unrolled loop sets; nil for a scoreboard loop.
+	unroll []*unrolled
 	// frame lists the scores the function has used so far; a recursive
 	// call saves and restores them. strings is set once it uses storage.
 	frame   []fn.Score
@@ -260,7 +273,7 @@ func (c *Checker) CompileFunction(d *syntax.Decl, id string, src []rune) *fn.Fun
 		return nil
 	}
 	ns, path, _ := strings.Cut(id, ":")
-	f := &fc{c: c, src: src, ns: ns, path: path, obj: fn.Objective(ns), sig: SigOf(d), names: map[string]int{}, selfID: id}
+	f := &fc{c: c, src: src, ns: ns, path: path, obj: fn.Objective(ns), sig: SigOf(d), names: map[string]int{}, selfID: id, env: c.Env}
 	f.push()
 	if d.Params != nil {
 		for i, p := range d.Params.Params {
@@ -404,7 +417,7 @@ func (f *fc) stmt(out *fn.Block, s syntax.Stmt) {
 		}
 		out.Add(fn.Cmd{Text: s.Text})
 	case *syntax.LetStmt:
-		if s.Name == nil {
+		if s.Name == nil || f.buildLet(s) {
 			return
 		}
 		typ := ""
@@ -478,10 +491,15 @@ func (f *fc) stmt(out *fn.Block, s syntax.Stmt) {
 		cond := f.cond(s.Cond)
 		body := &fn.Block{}
 		f.loops++
+		f.unroll = append(f.unroll, nil)
 		f.block(body, s.Body)
+		f.unroll = f.unroll[:len(f.unroll)-1]
 		f.loops--
 		out.Add(fn.Loop{Cond: cond, Body: body})
 	case *syntax.ForStmt:
+		if f.unrollFor(out, s) {
+			return
+		}
 		f.forStmt(out, s)
 	case *syntax.ReturnStmt:
 		f.returnStmt(out, s)
@@ -494,6 +512,9 @@ func (f *fc) stmt(out *fn.Block, s syntax.Stmt) {
 			c.errorf("mms/misplaced", s.Sp, "break is only allowed inside a loop")
 			return
 		}
+		if u := f.innerUnrolled(); u != nil {
+			out.Add(fn.Set{Dst: *u.flag, Src: fn.Const(1)})
+		}
 		out.Add(fn.Break{})
 	case *syntax.ContinueStmt:
 		if f.loops == 0 && f.exec > 0 {
@@ -502,6 +523,12 @@ func (f *fc) stmt(out *fn.Block, s syntax.Stmt) {
 		}
 		if f.loops == 0 {
 			c.errorf("mms/misplaced", s.Sp, "continue is only allowed inside a loop")
+			return
+		}
+		if len(f.unroll) > 0 && f.unroll[len(f.unroll)-1] != nil {
+			// The iteration runs as a loop of its own; leaving it goes on
+			// to the next one.
+			out.Add(fn.Break{})
 			return
 		}
 		out.Add(fn.Continue{})
@@ -572,7 +599,9 @@ func (f *fc) forStmt(out *fn.Block, s *syntax.ForStmt) {
 	}
 	body := &fn.Block{}
 	f.loops++
+	f.unroll = append(f.unroll, nil)
 	f.block(body, s.Body)
+	f.unroll = f.unroll[:len(f.unroll)-1]
 	f.loops--
 	out.Add(fn.Loop{Cond: cond, Body: body, Post: &fn.Block{Ops: []fn.Op{fn.Arith{Dst: i.s, Op: "+=", Src: fn.Const(1)}}}})
 }
@@ -826,6 +855,9 @@ func wrap(v int64) int32 { return int32(uint32(v)) }
 
 func (f *fc) expr(pre *[]fn.Op, e syntax.Expr) *val {
 	c := f.c
+	if v, ok := f.buildTime(e); ok {
+		return v
+	}
 	switch e := e.(type) {
 	case *syntax.Number:
 		n, err := strconv.ParseInt(e.Text, 10, 64)

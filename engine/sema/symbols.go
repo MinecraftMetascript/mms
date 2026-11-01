@@ -11,6 +11,23 @@ import (
 type Unit struct {
 	Path string
 	File *syntax.File
+	// Decls are the file's declarations after build-time expansion (see
+	// Expand); nil before it runs, which means File.Decls.
+	Decls []*syntax.Decl
+	// Env is each declaration's build-time scope.
+	Env map[*syntax.Decl]*Env
+	// Origin is set for declarations made by a build-time loop or if.
+	Origin map[*syntax.Decl]*Origin
+	gen    map[genKey]*syntax.Decl
+}
+
+// AllDecls returns the expanded declarations, or the parsed ones before
+// expansion.
+func (u *Unit) AllDecls() []*syntax.Decl {
+	if u.Decls != nil || u.Env != nil {
+		return u.Decls
+	}
+	return u.File.Decls
 }
 
 // Symbol is a declared resource or MMS entity.
@@ -19,6 +36,8 @@ type Symbol struct {
 	Kind     Kind
 	Decl     *syntax.Decl
 	Unit     *Unit
+	// Const is a Const declaration's value.
+	Const *Value
 }
 
 // ID returns "ns:path".
@@ -98,7 +117,7 @@ func Collect(units []*Unit, kinds *Kinds, defaultNS string) (*Table, map[string]
 	}
 	for _, u := range units {
 		ns := defaultNS
-		for _, d := range u.File.Decls {
+		for _, d := range u.AllDecls() {
 			k, ok := kinds.Lookup(d.Kind.Name)
 			if !ok {
 				report(u, "mms/unknown-kind", d.Kind.Sp, "unknown declaration kind '"+d.Kind.Name+"'")
@@ -130,7 +149,7 @@ func Collect(units []*Unit, kinds *Kinds, defaultNS string) (*Table, map[string]
 			}
 			sym := &Symbol{NS: sns, Path: path, Kind: k, Decl: d, Unit: u}
 			kk := key(k.Folder(), sym.ID())
-			if k.MMS == "Objective" || k.MMS == "Global" {
+			if k.MMS == "Objective" || k.MMS == "Global" || k.MMS == "Const" {
 				kk = key(k.MMS, sym.ID())
 			}
 			if prev, dup := t.byKey[kk]; dup {
@@ -143,7 +162,16 @@ func Collect(units []*Unit, kinds *Kinds, defaultNS string) (*Table, map[string]
 					report(u, "mms/duplicate", d.Name.Sp, d.Kind.Name+" '"+sym.ID()+"' is already made by CustomItem '"+prev.Decl.Name.Text+"' in "+prev.Unit.Path+"; leave this out, or give the CustomItem its own "+customItemField(prev.Kind))
 					continue
 				}
-				report(u, "mms/duplicate", d.Name.Sp, d.Kind.Name+" '"+sym.ID()+"' is already declared in "+prev.Unit.Path)
+				msg := d.Kind.Name + " '" + sym.ID() + "' is already declared in " + prev.Unit.Path
+				if o := u.Origin[d]; o != nil {
+					msg = d.Kind.Name + " '" + sym.ID() + "' is made twice (when " + o.Label() + ")"
+					if po := prev.Unit.Origin[prev.Decl]; po != nil {
+						msg += "; it was already made when " + po.Label()
+					} else {
+						msg += "; it is already declared in " + prev.Unit.Path
+					}
+				}
+				report(u, "mms/duplicate", d.Name.Sp, msg)
 				continue
 			}
 			t.byKey[kk] = sym

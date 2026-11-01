@@ -7,7 +7,14 @@ const raw = import.meta.glob('../../../../docs/*.md', {
 	eager: true
 }) as Record<string, string>;
 
-const order = ['getting-started', 'resources', 'functions', 'lint', 'tutorial-dimension'];
+const order = [
+	'getting-started',
+	'resources',
+	'functions',
+	'build-time',
+	'lint',
+	'tutorial-dimension'
+];
 
 export interface Guide {
 	slug: string;

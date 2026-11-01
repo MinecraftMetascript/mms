@@ -373,12 +373,12 @@ func (f *fc) unknownExec(name string, sp syntax.Span) {
 func (f *fc) execBlock(out *fn.Block, t *syntax.Trailing) {
 	parts, ok := f.execParts(t.X)
 	body := &fn.Block{}
-	loops := f.loops
-	f.loops = 0
+	loops, unroll := f.loops, f.unroll
+	f.loops, f.unroll = 0, nil
 	f.exec++
 	f.block(body, t.Block)
 	f.exec--
-	f.loops = loops
+	f.loops, f.unroll = loops, unroll
 	if ok {
 		out.Add(fn.Exec{Parts: parts, Body: body})
 	}

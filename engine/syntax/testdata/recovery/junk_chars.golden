@@ -8,4 +8,4 @@ Decl Noise b
     Number 2
 ! 19-20 unexpected character "$"
 ! 20-21 unexpected character "$"
-! 19-20 unexpected '$' expecting {end of file, IDENT}
+! 19-20 unexpected '$' expecting {end of file, 'let', 'if', 'for', IDENT}

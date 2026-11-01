@@ -57,6 +57,7 @@ var mmsKinds = map[string]bool{
 	"OnLoad": true, "OnTick": true,
 	"OnFirstJoin": true, "OnRespawn": true, "OnAdvancement": true,
 	"CustomItem": true,
+	"Const":      true, "Assert": true,
 }
 
 // kindAliases name resource kinds whose MMS names differ from the folder,

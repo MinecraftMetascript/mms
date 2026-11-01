@@ -382,6 +382,9 @@ func clip(s string) string {
 // lintConstant reports the largest arithmetic subtrees whose leaves are
 // all number literals.
 func lintConstant(l *lintRun, d *Decl) {
+	if d.Kind.MMS == "Const" {
+		return // a Const is the place to spell a computation out
+	}
 	syntax.Walk(d.D, func(n syntax.Node) bool {
 		e, ok := n.(syntax.Expr)
 		if !ok || !hasBinary(e) {

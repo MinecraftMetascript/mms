@@ -1,3 +1,4 @@
+(top_block "}" @end) @indent
 (block "}" @end) @indent
 (parameters ")" @end) @indent
 (arguments ")" @end) @indent

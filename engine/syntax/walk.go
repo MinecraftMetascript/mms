@@ -58,7 +58,34 @@ func Children(n Node) []Node {
 	case *WhileStmt:
 		add(n.Cond, n.Body)
 	case *ForStmt:
+		if n.Index != nil {
+			add(n.Index)
+		}
 		add(n.Var, n.Iter, n.Body)
+	case *TopFor:
+		if n.Index != nil {
+			add(n.Index)
+		}
+		if n.Var != nil {
+			add(n.Var)
+		}
+		add(n.Iter, n.Body)
+	case *TopIf:
+		add(n.Cond, n.Then)
+		if n.Else != nil {
+			add(n.Else)
+		}
+	case *TopLet:
+		if n.Name != nil {
+			add(n.Name)
+		}
+		if n.Value != nil {
+			add(n.Value)
+		}
+	case *TopBlock:
+		for _, it := range n.Items {
+			add(it)
+		}
 	case *ReturnStmt:
 		if n.Value != nil {
 			add(n.Value)
@@ -122,6 +149,8 @@ func isNilNode(n Node) bool {
 		return n == nil
 	case *Block:
 		return n == nil
+	case *TopBlock:
+		return n == nil
 	}
 	return false
 }
@@ -136,8 +165,8 @@ func Walk(n Node, fn func(Node) bool) {
 		return
 	}
 	if f, ok := n.(*File); ok {
-		for _, d := range f.Decls {
-			Walk(d, fn)
+		for _, it := range f.Items {
+			Walk(it, fn)
 		}
 		return
 	}
@@ -156,8 +185,8 @@ func PathAt(f *File, off int) []Node {
 		path = append(path, n)
 		var kids []Node
 		if file, ok := n.(*File); ok {
-			for _, d := range file.Decls {
-				kids = append(kids, d)
+			for _, it := range file.Items {
+				kids = append(kids, it)
 			}
 		} else {
 			kids = Children(n)

@@ -4,7 +4,7 @@ package syntax
 // old-to-new nodes in nodes when it is not nil.
 func shiftFile(f *File, delta int, nodes map[Node]Node) *File {
 	s := shifter{d: delta, m: nodes}
-	out := &File{Src: f.Src, Decls: make([]*Decl, len(f.Decls)), Tokens: make([]Token, len(f.Tokens)), Diags: make([]Diagnostic, len(f.Diags))}
+	out := &File{Src: f.Src, Tokens: make([]Token, len(f.Tokens)), Diags: make([]Diagnostic, len(f.Diags))}
 	for i, t := range f.Tokens {
 		t.Sp = s.sp(t.Sp)
 		out.Tokens[i] = t
@@ -13,10 +13,48 @@ func shiftFile(f *File, delta int, nodes map[Node]Node) *File {
 		d.Sp = s.sp(d.Sp)
 		out.Diags[i] = d
 	}
-	for i, d := range f.Decls {
-		out.Decls[i] = s.decl(d)
+	for _, it := range f.Items {
+		n := s.item(it)
+		out.Items = append(out.Items, n)
+		if d, ok := n.(*Decl); ok {
+			out.Decls = append(out.Decls, d)
+		}
 	}
 	return out
+}
+
+func (s shifter) item(it Item) Item {
+	var n Item
+	switch x := it.(type) {
+	case nil:
+		return nil
+	case *Decl:
+		return s.decl(x)
+	case *TopBlock:
+		return s.topBlock(x)
+	case *TopFor:
+		n = &TopFor{Index: s.name(x.Index), Var: s.name(x.Var), Iter: s.expr(x.Iter), Body: s.topBlock(x.Body), Sp: s.sp(x.Sp)}
+	case *TopIf:
+		n = &TopIf{Cond: s.expr(x.Cond), Then: s.topBlock(x.Then), Else: s.item(x.Else), Sp: s.sp(x.Sp)}
+	case *TopLet:
+		n = &TopLet{Name: s.name(x.Name), Value: s.expr(x.Value), Doc: x.Doc, Sp: s.sp(x.Sp)}
+	default:
+		panic("syntax: shift: unknown item")
+	}
+	s.rec(it, n)
+	return n
+}
+
+func (s shifter) topBlock(b *TopBlock) *TopBlock {
+	if b == nil {
+		return nil
+	}
+	n := &TopBlock{Closed: b.Closed, Sp: s.sp(b.Sp)}
+	for _, it := range b.Items {
+		n.Items = append(n.Items, s.item(it))
+	}
+	s.rec(b, n)
+	return n
 }
 
 type shifter struct {
@@ -60,7 +98,7 @@ func (s shifter) name(x *Name) *Name {
 	if x == nil {
 		return nil
 	}
-	n := &Name{Text: x.Text, Sp: s.sp(x.Sp)}
+	n := &Name{Text: x.Text, Quoted: x.Quoted, Sp: s.sp(x.Sp)}
 	s.rec(x, n)
 	return n
 }
@@ -104,7 +142,7 @@ func (s shifter) stmt(st Stmt) Stmt {
 	case *WhileStmt:
 		n = &WhileStmt{Cond: s.expr(x.Cond), Body: s.block(x.Body), Sp: s.sp(x.Sp)}
 	case *ForStmt:
-		n = &ForStmt{Var: s.name(x.Var), Iter: s.expr(x.Iter), Body: s.block(x.Body), Sp: s.sp(x.Sp)}
+		n = &ForStmt{Index: s.name(x.Index), Var: s.name(x.Var), Iter: s.expr(x.Iter), Body: s.block(x.Body), Sp: s.sp(x.Sp)}
 	case *ReturnStmt:
 		n = &ReturnStmt{Value: s.expr(x.Value), Sp: s.sp(x.Sp)}
 	case *BreakStmt:

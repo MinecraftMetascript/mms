@@ -46,19 +46,9 @@ func Source(src string) (string, error) {
 // the result; File assumes the file has no syntax errors.
 func File(f *syntax.File) string {
 	p := newPrinter(f)
-	var parts []doc
-	for i, d := range f.Decls {
-		lead := p.leading(d.Span().Start, i == 0)
-		if i > 0 {
-			parts = append(parts, hard)
-			if p.blankBefore(lead, d.Span().Start) || multiLine(f, f.Decls[i-1]) || multiLine(f, d) {
-				parts = append(parts, hard)
-			}
-		}
-		parts = append(parts, lead.doc, p.decl(d), p.trailing(d.Span().End))
-	}
-	rest := p.leading(len(f.Src)+1, len(f.Decls) == 0)
-	if len(f.Decls) > 0 && len(rest.comments) > 0 {
+	parts := p.items(f.Items)
+	rest := p.leading(len(f.Src)+1, len(f.Items) == 0)
+	if len(f.Items) > 0 && len(rest.comments) > 0 {
 		parts = append(parts, hard)
 		if rest.blank {
 			parts = append(parts, hard)
@@ -72,14 +62,86 @@ func File(f *syntax.File) string {
 	return out + "\n"
 }
 
-func multiLine(f *syntax.File, d *syntax.Decl) bool {
+// items prints top-level items, one per line, with a blank line kept
+// where the source has one and always around multi-line items.
+func (p *printer) items(its []syntax.Item) []doc {
+	var parts []doc
+	for i, it := range its {
+		lead := p.leading(it.Span().Start, i == 0)
+		if i > 0 {
+			parts = append(parts, hard)
+			if p.blankBefore(lead, it.Span().Start) || multiLine(p.f, its[i-1]) || multiLine(p.f, it) {
+				parts = append(parts, hard)
+			}
+		}
+		parts = append(parts, lead.doc, p.topItem(it), p.trailing(it.Span().End))
+	}
+	return parts
+}
+
+func (p *printer) topItem(it syntax.Item) doc {
+	switch x := it.(type) {
+	case *syntax.Decl:
+		return p.decl(x)
+	case *syntax.TopFor:
+		return cat(txt("for "+forNames(x.Index, x.Var)+" in "), p.expr(x.Iter), txt(" "), p.topBlock(x.Body))
+	case *syntax.TopIf:
+		parts := []doc{txt("if ("), p.expr(x.Cond), txt(") "), p.topBlock(x.Then)}
+		switch e := x.Else.(type) {
+		case *syntax.TopIf:
+			parts = append(parts, txt(" else "), p.topItem(e))
+		case *syntax.TopBlock:
+			parts = append(parts, txt(" else "), p.topBlock(e))
+		}
+		return concat(parts)
+	case *syntax.TopLet:
+		parts := []doc{txt("let " + x.Name.Text)}
+		if x.Value != nil {
+			parts = append(parts, txt(" = "), p.expr(x.Value))
+		}
+		return concat(parts)
+	case *syntax.TopBlock:
+		return p.topBlock(x)
+	}
+	return nil
+}
+
+func (p *printer) topBlock(b *syntax.TopBlock) doc {
+	if len(b.Items) == 0 {
+		inner := p.dangling(b.Span().End)
+		if inner == nil {
+			return txt("{}")
+		}
+		return cat(txt("{"), ind(hard, inner), hard, txt("}"))
+	}
+	items := p.items(b.Items)
+	if tail := p.dangling(b.Span().End); tail != nil {
+		items = append(items, hard, tail)
+	}
+	return cat(txt("{"), ind(append([]doc{hard}, items...)...), hard, txt("}"))
+}
+
+func forNames(index, v *syntax.Name) string {
+	if index != nil {
+		return index.Text + ", " + v.Text
+	}
+	return v.Text
+}
+
+func multiLine(f *syntax.File, d syntax.Node) bool {
 	sp := d.Span()
 	for _, r := range f.Src[sp.Start:min(sp.End, len(f.Src))] {
 		if r == '\n' {
 			return true
 		}
 	}
-	return d.Body != nil && len(d.Body.Items) > 0
+	switch d := d.(type) {
+	case *syntax.Decl:
+		return d.Body != nil && len(d.Body.Items) > 0
+	case *syntax.TopFor, *syntax.TopIf:
+		return true
+	}
+	return false
 }
 
 type printer struct {
@@ -284,7 +346,11 @@ func (p *printer) lineStart(off int) int {
 func (p *printer) decl(d *syntax.Decl) doc {
 	parts := []doc{txt(d.Kind.Name)}
 	if d.Name != nil {
-		parts = append(parts, txt(" "+d.Name.Text))
+		name := d.Name.Text
+		if d.Name.Quoted {
+			name = string(p.f.Src[d.Name.Sp.Start:d.Name.Sp.End])
+		}
+		parts = append(parts, txt(" "+name))
 	}
 	if d.Params != nil {
 		parts = append(parts, p.params(d.Params))
@@ -381,7 +447,7 @@ func (p *printer) stmt(s syntax.Stmt) doc {
 	case *syntax.WhileStmt:
 		return cat(txt("while ("), p.expr(s.Cond), txt(") "), p.block(s.Body, true))
 	case *syntax.ForStmt:
-		return cat(txt("for "+s.Var.Text+" in "), p.expr(s.Iter), txt(" "), p.block(s.Body, true))
+		return cat(txt("for "+forNames(s.Index, s.Var)+" in "), p.expr(s.Iter), txt(" "), p.block(s.Body, true))
 	case *syntax.ReturnStmt:
 		if s.Value == nil {
 			return txt("return")

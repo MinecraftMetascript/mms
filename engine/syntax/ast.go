@@ -27,7 +27,13 @@ type Node interface{ Span() Span }
 
 // File is one parsed source file.
 type File struct {
-	Decls  []*Decl
+	// Decls are the declarations at the top level, outside any
+	// build-time `for` or `if`.
+	Decls []*Decl
+	// Items are every top-level item in order: the Decls, and build-time
+	// statements (TopFor, TopIf, TopLet) with the declarations
+	// inside them.
+	Items  []Item
 	Tokens []Token // every token, hidden channel included, in order
 	Diags  []Diagnostic
 	Src    []rune
@@ -57,10 +63,64 @@ func (d *Decl) NameText() string {
 }
 
 // Name is an identifier or a resource location used as a name or type.
+// A declaration name may also be a string, a template such as
+// "planet_${i}" inside a build-time loop; Quoted is then set and Text is
+// the unquoted value.
 type Name struct {
-	Text string
-	Sp   Span
+	Text   string
+	Quoted bool
+	Sp     Span
 }
+
+// Item is a top-level item: a *Decl or a build-time statement.
+type Item interface {
+	Node
+	item()
+}
+
+type (
+	// TopFor is a build-time loop at the top level: its body is copied
+	// once per value, with Var bound to the value and Index, if any, to
+	// its position from 0.
+	TopFor struct {
+		Index *Name // `i` in `for i, x in xs`; nil without one
+		Var   *Name
+		Iter  Expr
+		Body  *TopBlock
+		Sp    Span
+	}
+	// TopIf keeps its Then or Else items depending on a build-time
+	// condition.
+	TopIf struct {
+		Cond Expr
+		Then *TopBlock
+		Else Item // *TopIf, *TopBlock or nil
+		Sp   Span
+	}
+	// TopLet binds a build-time value for the rest of its block.
+	TopLet struct {
+		Name  *Name
+		Value Expr
+		Doc   string
+		Sp    Span
+	}
+	// TopBlock is the `{ items }` body of a TopFor or TopIf.
+	TopBlock struct {
+		Items  []Item
+		Closed bool
+		Sp     Span
+	}
+)
+
+func (d *Decl) item()          {}
+func (*TopFor) item()          {}
+func (*TopIf) item()           {}
+func (*TopLet) item()          {}
+func (*TopBlock) item()        {}
+func (s *TopFor) Span() Span   { return s.Sp }
+func (s *TopIf) Span() Span    { return s.Sp }
+func (s *TopLet) Span() Span   { return s.Sp }
+func (s *TopBlock) Span() Span { return s.Sp }
 
 func (n *Name) Span() Span { return n.Sp }
 
@@ -114,10 +174,11 @@ type (
 		Sp   Span
 	}
 	ForStmt struct {
-		Var  *Name
-		Iter Expr
-		Body *Block
-		Sp   Span
+		Index *Name // `i` in `for i, x in xs`; nil without one
+		Var   *Name
+		Iter  Expr
+		Body  *Block
+		Sp    Span
 	}
 	ReturnStmt struct {
 		Value Expr

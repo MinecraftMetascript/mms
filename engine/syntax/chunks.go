@@ -50,6 +50,7 @@ func Reparse(src string, prev []Chunk) (*File, []Chunk, map[*Decl]Moved) {
 		}
 		chunks = append(chunks, Chunk{Text: text, Off: start, File: cf})
 		f.Decls = append(f.Decls, cf.Decls...)
+		f.Items = append(f.Items, cf.Items...)
 		f.Tokens = append(f.Tokens, cf.Tokens...)
 		f.Diags = append(f.Diags, cf.Diags...)
 	}

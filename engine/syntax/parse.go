@@ -63,12 +63,96 @@ func Parse(src string) *File {
 	f.Diags = append(f.Diags, errs...)
 
 	b := builder{file: f}
-	for _, d := range tree.AllDeclaration() {
-		if decl := b.decl(d); decl != nil {
-			f.Decls = append(f.Decls, decl)
+	for _, it := range tree.AllItem() {
+		if item := b.item(it); item != nil {
+			f.Items = append(f.Items, item)
+			if d, ok := item.(*Decl); ok {
+				f.Decls = append(f.Decls, d)
+			}
 		}
 	}
 	return f
+}
+
+func (b *builder) item(c parser.IItemContext) Item {
+	ctx := c.(*parser.ItemContext)
+	switch {
+	case ctx.Declaration() != nil:
+		if d := b.decl(ctx.Declaration()); d != nil {
+			return d
+		}
+	case ctx.TopFor() != nil:
+		fc := ctx.TopFor().(*parser.TopForContext)
+		sp := span(fc)
+		st := &TopFor{Iter: b.expr(fc.Expr(), sp), Body: b.topBlock(fc.TopBlock(), sp), Sp: sp}
+		st.Index, st.Var = forNames(fc.AllIDENT())
+		return st
+	case ctx.TopIf() != nil:
+		return b.topIf(ctx.TopIf().(*parser.TopIfContext))
+	case ctx.TopLet() != nil:
+		lc := ctx.TopLet().(*parser.TopLetContext)
+		sp := span(lc)
+		st := &TopLet{Sp: sp}
+		if real(lc.IDENT()) {
+			st.Name = &Name{Text: lc.IDENT().GetText(), Sp: nodeSpan(lc.IDENT())}
+		}
+		if lc.ASSIGN() != nil {
+			st.Value = b.expr(lc.Expr(), sp)
+		}
+		st.Doc = b.docBefore(lc.GetStart().GetTokenIndex())
+		return st
+	}
+	return nil
+}
+
+// forNames splits a for loop's names: `for x` or `for i, x`.
+func forNames(ids []antlr.TerminalNode) (index, v *Name) {
+	var names []*Name
+	for _, id := range ids {
+		if real(id) {
+			names = append(names, &Name{Text: id.GetText(), Sp: nodeSpan(id)})
+		} else {
+			names = append(names, nil)
+		}
+	}
+	switch len(names) {
+	case 1:
+		return nil, names[0]
+	case 2:
+		return names[0], names[1]
+	}
+	return nil, nil
+}
+
+func (b *builder) topIf(c *parser.TopIfContext) *TopIf {
+	sp := span(c)
+	blocks := c.AllTopBlock()
+	st := &TopIf{Cond: b.expr(c.Expr(), sp), Sp: sp}
+	if len(blocks) > 0 {
+		st.Then = b.topBlock(blocks[0], sp)
+	} else {
+		st.Then = &TopBlock{Sp: Span{sp.End, sp.End}}
+	}
+	if t := c.TopIf(); t != nil {
+		st.Else = b.topIf(t.(*parser.TopIfContext))
+	} else if len(blocks) > 1 {
+		st.Else = b.topBlock(blocks[1], sp)
+	}
+	return st
+}
+
+func (b *builder) topBlock(c parser.ITopBlockContext, around Span) *TopBlock {
+	if c == nil {
+		return &TopBlock{Sp: Span{around.End, around.End}}
+	}
+	ctx := c.(*parser.TopBlockContext)
+	blk := &TopBlock{Sp: span(ctx), Closed: real(ctx.RBRACE())}
+	for _, it := range ctx.AllItem() {
+		if item := b.item(it); item != nil {
+			blk.Items = append(blk.Items, item)
+		}
+	}
+	return blk
 }
 
 func parseWith(stream *antlr.CommonTokenStream, mode int, synthetic map[antlr.Token]bool) (parser.IFileContext, []Diagnostic) {
@@ -181,6 +265,9 @@ func (b *builder) decl(c parser.IDeclarationContext) *Decl {
 	}
 	if n := ctx.DeclName(); n != nil {
 		d.Name = &Name{Text: n.GetText(), Sp: span(n.(antlr.ParserRuleContext))}
+		if n.(*parser.DeclNameContext).STRING() != nil {
+			d.Name.Text, d.Name.Quoted = unquote(d.Name.Text), true
+		}
 	}
 	if t := ctx.TypeAnnotation(); t != nil {
 		d.Type = b.typeAnn(t)
@@ -290,9 +377,7 @@ func (b *builder) stmt(c parser.IStatementContext) Stmt {
 		return &WhileStmt{Cond: b.expr(s.Expr(), sp), Body: b.blockOrEmpty(s.Block(), sp), Sp: sp}
 	case *parser.ForStmtContext:
 		st := &ForStmt{Iter: b.expr(s.Expr(), sp), Body: b.blockOrEmpty(s.Block(), sp), Sp: sp}
-		if real(s.IDENT()) {
-			st.Var = &Name{Text: s.IDENT().GetText(), Sp: nodeSpan(s.IDENT())}
-		}
+		st.Index, st.Var = forNames(s.AllIDENT())
 		return st
 	case *parser.ReturnStmtContext:
 		st := &ReturnStmt{Sp: sp}

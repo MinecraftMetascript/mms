@@ -32,6 +32,10 @@ type Location struct {
 type at struct {
 	u    *sema.Unit
 	path []syntax.Node
+	// top holds the build-time items (for, if, let) around the cursor,
+	// outermost first; path skips them, so path[1] is still the
+	// declaration.
+	top  []syntax.Node
 	decl *project.Decl
 	c    *sema.Checker
 }
@@ -56,6 +60,7 @@ func (s *Session) at(path string, off int) *at {
 			}
 		}
 	}
+	a.path, a.top = splitTop(a.path)
 	if len(a.path) > 1 {
 		if d, ok := a.path[1].(*syntax.Decl); ok {
 			a.decl = s.R.Decls[d]
@@ -67,6 +72,25 @@ func (s *Session) at(path string, off int) *at {
 		a.c = sema.NewChecker(s.P.Pack, s.P.Kinds, s.R.Syms, s.P.Config.Namespace)
 	}
 	return a
+}
+
+// splitTop takes the build-time items between the file and the
+// declaration out of a path.
+func splitTop(path []syntax.Node) (inner, top []syntax.Node) {
+	if len(path) < 2 {
+		return path, nil
+	}
+	for i := 1; i < len(path); i++ {
+		switch path[i].(type) {
+		case *syntax.Decl:
+			return append([]syntax.Node{path[0]}, path[i:]...), path[1:i]
+		case *syntax.TopFor, *syntax.TopIf, *syntax.TopBlock, *syntax.TopLet:
+			continue
+		}
+		// Inside a loop header or a let: no declaration.
+		return path[:1], path[1:]
+	}
+	return path[:1], path[1:]
 }
 
 func (a *at) info(n syntax.Node) *sema.Info {
@@ -659,6 +683,17 @@ func commaBetween(f *syntax.File, from, to int) bool {
 // Hover returns Markdown for the node at off and the span it describes.
 func (s *Session) Hover(path string, off int) (string, syntax.Span) {
 	a := s.at(path, off)
+	if a != nil && len(a.path) < 2 && len(a.top) > 0 && s.R.Exp != nil {
+		// A build-time loop header or let.
+		for i := len(a.top) - 1; i >= 0; i-- {
+			if in := s.R.Exp.Info[a.top[i]]; in != nil {
+				if md := a.c.Hover(in); md != "" {
+					return md, a.top[i].Span()
+				}
+			}
+		}
+		return "", syntax.Span{}
+	}
 	if a == nil || len(a.path) < 2 {
 		return "", syntax.Span{}
 	}
@@ -981,7 +1016,7 @@ func (s *Session) Symbols(path string) []Symbol {
 		return nil
 	}
 	var out []Symbol
-	for _, d := range u.File.Decls {
+	for _, d := range sema.AllDecls(u.File) {
 		sym := Symbol{Detail: d.Kind.Name, Span: d.Sp, Sel: d.Kind.Sp, Kind: "resource"}
 		if d.Name != nil {
 			sym.Name, sym.Sel = d.Name.Text, d.Name.Sp
