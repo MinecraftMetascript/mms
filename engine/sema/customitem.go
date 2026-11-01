@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"regexp"
 	"sort"
 	"strings"
@@ -373,7 +374,9 @@ func (c *Checker) customStack(s *Symbol, at syntax.Span) *jsonv.Object {
 		}
 	}
 	sub := NewChecker(c.Pack, c.Kinds, c.Syms, s.NS)
-	sub.Files, sub.Deps, sub.parent, sub.customOf = c.Files, nil, c, s.ID()
+	// The use depends on everything the item's check looks up, such as
+	// another custom item in its components.
+	sub.Files, sub.Deps, sub.parent, sub.customOf = c.Files, c.Deps, c, s.ID()
 	if s.Unit != nil && s.Unit.File != nil {
 		sub.Src = s.Unit.File.Src
 	}
@@ -622,6 +625,27 @@ func writeSNBT(sb *strings.Builder, v jsonv.Value) {
 	}
 }
 
+// quoteSNBT quotes a string for SNBT, escaping control characters so
+// that a newline in a name cannot split the command line.
 func quoteSNBT(s string) string {
-	return `"` + strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(s) + `"`
+	var b strings.Builder
+	b.WriteByte('"')
+	for _, r := range s {
+		switch {
+		case r == '\\':
+			b.WriteString(`\\`)
+		case r == '"':
+			b.WriteString(`\"`)
+		case r == '\n':
+			b.WriteString(`\n`)
+		case r == '\t':
+			b.WriteString(`\t`)
+		case r < 0x20 || (r >= 0x7f && r <= 0x9f):
+			fmt.Fprintf(&b, `\u%04x`, r)
+		default:
+			b.WriteRune(r)
+		}
+	}
+	b.WriteByte('"')
+	return b.String()
 }

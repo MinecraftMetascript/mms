@@ -159,3 +159,37 @@ func TestCustomItemDeclaredLater(t *testing.T) {
 		}
 	}
 }
+
+// A use of a custom item that holds another one is checked again when
+// the inner item changes.
+func TestCustomItemNestedRecheck(t *testing.T) {
+	p := New(spec.MustDefault(), Config{Namespace: "demo"})
+	p.SetFile("inner.mms", `CustomItem b = { base = paper, name = "B" }`)
+	p.SetFile("outer.mms", `CustomItem a = { base = bundle, components = { bundle_contents = [b] } }`)
+	p.SetFile("use.mms", "Function give {\n  /give @s ${a}\n}\n")
+	if _, err := p.Analyze(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	p.SetFile("inner.mms", `CustomItem b = { base = paper, name = "C" }`)
+	r, err := p.Analyze(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range r.Emit() {
+		if strings.HasSuffix(f.Path, "give.mcfunction") && !strings.Contains(string(f.Data), `fallback:"C"`) {
+			t.Errorf("give was not rechecked:\n%s", f.Data)
+		}
+	}
+}
+
+// A newline in a name stays on the command's line.
+func TestCustomItemNameEscapes(t *testing.T) {
+	_, r := assetProject(t, fstest.MapFS{}, "CustomItem a = { base = paper, name = \"A\\nB\" }\nFunction give {\n  /give @s ${a}\n}\n")
+	for _, f := range r.Emit() {
+		if strings.HasSuffix(f.Path, "give.mcfunction") {
+			if got := strings.TrimSpace(string(f.Data)); strings.Contains(got, "\n") || !strings.Contains(got, `fallback:"A\nB"`) {
+				t.Errorf("give.mcfunction:\n%s", got)
+			}
+		}
+	}
+}
