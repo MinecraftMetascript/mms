@@ -1,0 +1,131 @@
+========================================
+Namespace and value declarations
+========================================
+
+Namespace example
+
+/** Ridges. */
+Noise ridges = Noise(-7).Amplitudes(1, 1, 0.5)
+
+----------------------------------------
+
+(source_file
+  (declaration
+    (identifier)
+    (identifier))
+  (doc_comment)
+  (declaration
+    (identifier)
+    (identifier)
+    (call_expression
+      (member_expression
+        (call_expression
+          (identifier)
+          (arguments
+            (argument
+              (unary_expression
+                (number)))))
+        (identifier))
+      (arguments
+        (argument
+          (number))
+        (argument
+          (number))
+        (argument
+          (number))))))
+
+========================================
+Resource with a path name and a block body
+========================================
+
+LootTable blocks/ruby_ore {
+  pools = [
+    Pool { rolls = 1 }
+  ]
+}
+
+----------------------------------------
+
+(source_file
+  (declaration
+    (identifier)
+    (resource_location)
+    (block
+      (assignment
+        (identifier)
+        (list
+          (block_call_expression
+            (identifier)
+            (block
+              (assignment
+                (identifier)
+                (number)))))))))
+
+========================================
+Global with a type
+========================================
+
+Global deaths: int = 0
+
+----------------------------------------
+
+(source_file
+  (declaration
+    (identifier)
+    (identifier)
+    (type_annotation
+      (type
+        (identifier)))
+    (number)))
+
+========================================
+Function with parameters and return type
+========================================
+
+Function add(a: int, b: int): int {
+  return a + b
+}
+
+----------------------------------------
+
+(source_file
+  (declaration
+    (identifier)
+    (identifier)
+    (parameters
+      (parameter
+        (identifier)
+        (type_annotation
+          (type
+            (identifier))))
+      (parameter
+        (identifier)
+        (type_annotation
+          (type
+            (identifier)))))
+    (type_annotation
+      (type
+        (identifier)))
+    (block
+      (return_statement
+        (binary_expression
+          (identifier)
+          (identifier))))))
+
+========================================
+Event block
+========================================
+
+OnLoad {
+  /say loaded
+}
+
+----------------------------------------
+
+(source_file
+  (declaration
+    (identifier)
+    (block
+      (command
+        (command_name)
+        (command_text)))))

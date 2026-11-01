@@ -1,0 +1,60 @@
+name: zed
+
+# The tree-sitter grammar (editors/tree-sitter-mms) and the Zed extension
+# (editors/zed) that uses it.
+on:
+  push:
+    branches: [main]
+    paths: ["editors/tree-sitter-mms/**", "editors/zed/**", "examples/**", ".github/workflows/zed.yml"]
+  pull_request:
+    paths: ["editors/tree-sitter-mms/**", "editors/zed/**", "examples/**", ".github/workflows/zed.yml"]
+
+jobs:
+  grammar:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: editors/tree-sitter-mms
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: editors/tree-sitter-mms/package-lock.json
+      - run: npm ci
+      # Corpus tests, generated sources up to date, every example parses,
+      # Zed queries compile, highlights.scm copies match.
+      - run: npm test
+      # Build the grammar the way Zed does: wasi-sdk clang to a wasm module.
+      - name: Build for Zed (wasm)
+        run: |
+          curl -sSLf https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-25/wasi-sdk-25.0-x86_64-linux.tar.gz | tar xz -C "$RUNNER_TEMP"
+          "$RUNNER_TEMP/wasi-sdk-25.0-x86_64-linux/bin/clang" -fPIC -shared -Os \
+            -Wl,--export=tree_sitter_mms -o mms.wasm -I src src/parser.c src/scanner.c
+          ls -l mms.wasm
+
+  extension:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: editors/zed
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: rustup target add wasm32-wasip2 && rustup component add clippy rustfmt
+      - run: cargo fmt --check
+      - run: cargo clippy --release --target wasm32-wasip2 -- -D warnings
+      - run: cargo build --release --target wasm32-wasip2
+      # Zed builds the grammar from the commit named in extension.toml, so
+      # that commit must hold the grammar as it is now.
+      - name: Grammar rev is current
+        run: |
+          rev=$(sed -n 's/^rev = "\(.*\)"/\1/p' extension.toml)
+          git cat-file -e "$rev^{commit}" || { echo "extension.toml rev $rev is not a commit in this repository"; exit 1; }
+          if ! git diff --quiet "$rev" HEAD -- ../tree-sitter-mms/grammar.js ../tree-sitter-mms/src; then
+            echo "The grammar changed since $rev. Commit the grammar, then set rev in editors/zed/extension.toml to that commit."
+            git --no-pager diff --stat "$rev" HEAD -- ../tree-sitter-mms/grammar.js ../tree-sitter-mms/src
+            exit 1
+          fi

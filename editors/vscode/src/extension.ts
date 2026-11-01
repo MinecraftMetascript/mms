@@ -129,14 +129,8 @@ async function start() {
 	const clientOptions: LanguageClientOptions = {
 		documentSelector: [{ scheme: 'file', language: 'mms' }],
 		outputChannel: output,
-		synchronize: {
-			// mms.json changes the namespace and lint settings; asset files
-			// used by Texture, Sound and Structure are checked on change.
-			fileEvents: [
-				vscode.workspace.createFileSystemWatcher('**/mms.json'),
-				vscode.workspace.createFileSystemWatcher('**/*.{png,ogg,nbt}')
-			]
-		},
+		// The server registers its own file watchers (mms.json, sources
+		// and asset files), so no synchronize.fileEvents here.
 		middleware: {
 			// Each analysis ends with diagnostics; the preview then fetches the new pack.
 			handleDiagnostics(uri, diagnostics, next) {
