@@ -23,6 +23,7 @@ func loadDir(t *testing.T, dir string) *Project {
 		t.Fatal(err)
 	}
 	p := New(spec.MustDefault(), cfg)
+	p.Files = os.DirFS(dir) // for asset helpers such as Texture("art/a.png")
 	paths, err := cfg.SourceFiles(dir)
 	if err != nil {
 		t.Fatal(err)
@@ -37,6 +38,10 @@ func loadDir(t *testing.T, dir string) *Project {
 func dumpFiles(files []OutFile) string {
 	var sb strings.Builder
 	for _, f := range files {
+		if f.Asset != "" && f.Data == nil {
+			fmt.Fprintf(&sb, "=== %s\n(copy of %s)\n", f.Path, f.Asset)
+			continue
+		}
 		fmt.Fprintf(&sb, "=== %s\n%s", f.Path, f.Data)
 	}
 	return sb.String()

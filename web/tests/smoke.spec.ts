@@ -73,6 +73,43 @@ test('an example with several files in folders builds as one project', async ({ 
 	await expect(page.getByText('buried.json')).toBeVisible();
 });
 
+test('an example with textures and a sound checks and exports both packs', async ({ page }) => {
+	page.on('dialog', (d) => d.accept());
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	await page.getByRole('button', { name: /Project/ }).click();
+	await page.getByRole('button', { name: /embers/ }).click();
+	await expect(page.getByText('art/ember_shard.png', { exact: true })).toBeVisible();
+	await expect(page.getByText('sounds/embers.ogg', { exact: true })).toBeVisible();
+	await expect(status(page)).toHaveText(/No problems/);
+
+	const { unzipSync } = await import('fflate');
+	const { readFileSync } = await import('node:fs');
+	const zipped = async (button: string) => {
+		const download = page.waitForEvent('download');
+		await page.getByRole('button', { name: button }).click();
+		const d = await download;
+		return { name: d.suggestedFilename(), files: Object.keys(unzipSync(new Uint8Array(readFileSync(await d.path())))) };
+	};
+	// The resource pack downloads on its own, with the copied files.
+	const res = await zipped('Download resources');
+	expect(res.name).toBe('embers-resources.zip');
+	expect(res.files).toContain('assets/embers/textures/item/ember_shard.png');
+	expect(res.files).toContain('assets/embers/textures/painting/hearth.png');
+	expect(res.files).toContain('assets/embers/sounds/embers.ogg');
+	expect(res.files).toContain('assets/embers/sounds.json');
+	expect(res.files).toContain('pack.mcmeta');
+	const data = await zipped('Download pack');
+	expect(data.name).toBe('embers.zip');
+	expect(data.files).toContain('data/embers/painting_variant/hearth.json');
+	expect(data.files.some((f) => f.startsWith('assets/'))).toBe(false);
+
+	// Removing a texture breaks the code that names it.
+	await page.getByRole('listitem').filter({ hasText: 'art/hearth.png' }).hover();
+	await page.getByRole('button', { name: 'Delete art/hearth.png' }).click();
+	await expect(status(page)).toHaveText(/1 error/);
+});
+
 test('dimensions, noise settings and surface rules preview as terrain', async ({ page }) => {
 	const errors: string[] = [];
 	page.on('pageerror', (e) => errors.push(e.message));
@@ -445,9 +482,14 @@ test('built-in helpers explain themselves on hover and while typing', async ({ p
 		}
 		return { x: 0, y: 0 };
 	});
-	await page.mouse.move(at.x, at.y);
+	// "No problems" already showed before the edit, so the server may not
+	// have the new text yet; hover again until it answers.
 	const hover = page.locator('.cm-lsp-hover-tooltip');
-	await expect(hover).toContainText('True for blocks close to a surface');
+	await expect(async () => {
+		await page.mouse.move(0, 0);
+		await page.mouse.move(at.x, at.y);
+		await expect(hover).toContainText('True for blocks close to a surface', { timeout: 1500 });
+	}).toPass({ timeout: 15_000 });
 	await expect(hover).toContainText('secondary_depth_range');
 	await expect(hover.locator('a[href*="reference#material_condition-StoneDepth"]')).toHaveCount(1);
 	await page.mouse.move(0, 0);

@@ -10,7 +10,7 @@
 	import { Engine, type Diagnostic, type DocSymbol, type OutputFile } from '#lib/engine/engine.svelte.ts';
 	import { Project, pathOf, uriOf, starter } from '#lib/project/project.svelte.ts';
 	import { examples } from '#lib/project/examples.ts';
-	import { download, isDataPack, packZip, projectZip, readProjectZip, readZip } from '#lib/project/zip.ts';
+	import { download, hasResourcePack, isDataPack, packZip, projectZip, readProjectZip, readZip, readZipAssets } from '#lib/project/zip.ts';
 	import PasteJson from '#lib/components/PasteJson.svelte';
 	import { PinButton, PreviewPane, shows } from '@mms/preview';
 	import PreviewWorker from '@mms/preview/worker?worker';
@@ -72,11 +72,13 @@
 		if (!engine) return;
 		engine.setConfig($state.snapshot(project.config));
 		engine.workspace.setFiles(project.files.map((f) => ({ uri: uriOf(f.path), text: f.text })));
+		engine.setAssets($state.snapshot(project.assets));
 		engine.scheduleRefresh();
 	}
 	$effect(() => {
 		// Track the set of paths (not their text, which the editor syncs).
 		void project.files.map((f) => f.path).join('\n');
+		void project.assets.map((f) => f.path + ':' + f.data.length).join('\n');
 		void project.config.namespace;
 		void project.config.description;
 		if (loaded) syncEngine();
@@ -172,7 +174,8 @@
 		(e.target as HTMLInputElement).value = '';
 		if (!file) return;
 		try {
-			const entries = readZip(new Uint8Array(await file.arrayBuffer()));
+			const bytes = new Uint8Array(await file.arrayBuffer());
+			const entries = readZip(bytes);
 			if (isDataPack(entries)) {
 				if (!engine) return;
 				const res = await engine.importPack([...entries].map(([path, text]) => ({ path, text })));
@@ -188,7 +191,7 @@
 				});
 				return;
 			}
-			const data = readProjectZip(file.name, entries);
+			const data = readProjectZip(file.name, entries, readZipAssets(bytes));
 			if (confirm(`Import ${data.files.length} file(s) from ${file.name}? It replaces the current project.`)) {
 				pinned = null;
 				project.replace(data);
@@ -211,10 +214,14 @@
 			project.setText(f.path, f.text + sep + text);
 		}
 	}
-	function exportPack() {
+	// The game loads a resource pack from its own zip, like `mms build --zip`,
+	// so it gets its own button (browsers block a second download per click).
+	const resourcePack = $derived(!!engine && hasResourcePack(engine.output, engine.outputAssets));
+	function exportPack(resources = false) {
 		if (!engine) return;
 		if (engine.hasErrors && !confirm('The project has errors, so the pack is incomplete. Download it anyway?')) return;
-		download(`${project.name || 'pack'}.zip`, packZip(engine.output));
+		const name = (project.name || 'pack') + (resources ? '-resources' : '');
+		download(`${name}.zip`, packZip(engine.output, engine.outputAssets, $state.snapshot(project.assets), resources));
 	}
 
 	const totals = $derived.by(() => {
@@ -313,7 +320,10 @@
 			{#if engine?.status === 'failed'}
 				<button class="rounded px-2 py-1 text-accent hover:bg-hover" onclick={() => engine?.restart()} title={engine.statusDetail}>Restart</button>
 			{/if}
-			<button class="rounded bg-accent px-3 py-1 font-medium text-white hover:opacity-90 disabled:opacity-50" disabled={!engine?.output.length} onclick={exportPack}><span class="sm:hidden">Pack</span><span class="hidden sm:inline">Download pack</span></button>
+			{#if resourcePack}
+				<button class="rounded border border-accent px-3 py-1 font-medium text-accent hover:bg-hover" title="The textures, sounds, models and translations, for the world's resources.zip" onclick={() => exportPack(true)}><span class="sm:hidden">Resources</span><span class="hidden sm:inline">Download resources</span></button>
+			{/if}
+			<button class="rounded bg-accent px-3 py-1 font-medium text-white hover:opacity-90 disabled:opacity-50" disabled={!engine?.output.length} onclick={() => exportPack()}><span class="sm:hidden">Pack</span><span class="hidden sm:inline">Download pack</span></button>
 		</div>
 	</header>
 

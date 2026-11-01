@@ -225,6 +225,40 @@ func TestManagedFiles(t *testing.T) {
 	}
 }
 
+func TestSetAssets(t *testing.T) {
+	c := start(t)
+	c.result("initialize", map[string]any{})
+	a := "mem:///a.mms"
+	c.notify("mms/setFiles", map[string]any{"files": []any{
+		map[string]any{"uri": a, "text": "PaintingVariant p = { width = 1, height = 1, asset_id = Texture(\"art/p.png\") }\n"},
+	}})
+	assets := func() []any {
+		out := c.result("mms/output", map[string]any{}).(map[string]any)
+		if out["hasErrors"] == true {
+			return nil
+		}
+		return out["assets"].([]any)
+	}
+	if got := assets(); got != nil {
+		t.Fatalf("built without the file: %v", got)
+	}
+	png := []byte("\x89PNG\r\n\x1a\nrest")
+	// JSON carries the bytes as base64.
+	c.notify("mms/setAssets", map[string]any{"files": []any{map[string]any{"path": "art/p.png", "data": png}}})
+	got := assets()
+	if len(got) != 1 {
+		t.Fatalf("assets = %v", got)
+	}
+	m := got[0].(map[string]any)
+	if m["path"] != "assets/mms/textures/painting/p.png" || m["src"] != "art/p.png" || m["pack"] != "resources" {
+		t.Errorf("asset = %v", m)
+	}
+	c.notify("mms/setAssets", map[string]any{"remove": []any{"art/p.png"}})
+	if got := assets(); got != nil {
+		t.Errorf("still built after removing the file: %v", got)
+	}
+}
+
 func TestImportPack(t *testing.T) {
 	c := start(t)
 	c.result("initialize", map[string]any{})
