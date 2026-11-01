@@ -231,7 +231,10 @@ function buildStrip(t: Terrain, alongX: boolean, depth: number, chunk: number): 
 	const blocks = new Chunk(minY, height, pos);
 	const gen = new NoiseChunkGenerator(new FixedBiomeSource(Identifier.create('plains')), settings) as unknown as Generator;
 	const volume = alongX ? new DensityVolume(16, height, 1, at, minY, depth) : new DensityVolume(1, height, 16, depth, minY, at);
-	const noiseChunk = new NoiseChunk(t.rs, settings, gen.globalFluidPicker as never, volume);
+	// The aquifer gets the whole chunk, as in the game: it scans the chunk's
+	// surface level to pick the height above which it skips sampling.
+	const whole = new DensityVolume(16, height, 16, ChunkPos.minBlockX(pos), minY, ChunkPos.minBlockZ(pos));
+	const noiseChunk = new NoiseChunk(t.rs, settings, gen.globalFluidPicker as never, whole);
 	const density = t.rs.router.finalDensity.computeVolume(volume);
 	for (let i = 0; i < 16; i++) {
 		const [ix, iz] = alongX ? [i, 0] : [0, i];
