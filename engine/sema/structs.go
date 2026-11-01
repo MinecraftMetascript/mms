@@ -3,6 +3,7 @@ package sema
 import (
 	"encoding/json"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/minecraftmetascript/mms/engine/jsonv"
@@ -191,6 +192,7 @@ func (c *Checker) buildStruct(fs []field, disp *dispInfo, caseKey string, as []a
 		}
 		c.errorf("mms/unknown-field", a.sp, "%s", msg)
 	}
+	c.octaveCount(fs, byKey, o)
 	if len(missing) > 0 {
 		if disp != nil && caseKey == "" && contains(missing, disp.KeyField) {
 			c.errorf("mms/missing-field", at, "%s needs a '%s' field (or use a helper like %s(...))", describe(v), disp.KeyField, exampleCallable(c, disp))
@@ -686,4 +688,48 @@ func blockExpr(b *syntax.Block) syntax.Expr {
 		return exprs[0]
 	}
 	return &syntax.List{Elems: exprs, Sp: b.Sp}
+}
+
+// octaveCount handles noise parameters, where a non-empty
+// amplitude_modifiers must have exactly octave_count entries and
+// octave_count defaults to 1. MMS fills in octave_count from the list when
+// it is left out, and reports a count that does not match the list.
+func (c *Checker) octaveCount(fs []field, byKey map[string]*assign, o *jsonv.Object) {
+	var hasBase, hasCount bool
+	for _, f := range fs {
+		switch f.Key {
+		case "base_octave":
+			hasBase = true
+		case "octave_count":
+			hasCount = true
+		}
+	}
+	if !hasBase || !hasCount {
+		return
+	}
+	mods, ok := o.Get("amplitude_modifiers").(jsonv.Array)
+	if !ok || len(mods) == 0 {
+		return
+	}
+	n := strconv.Itoa(len(mods))
+	got := o.Get("octave_count")
+	if got == nil {
+		// One entry matches the default count, so leave it out as vanilla does.
+		if _, set := byKey["octave_count"]; !set && len(mods) > 1 {
+			o.Set("octave_count", jsonv.Number(n))
+		}
+		return
+	}
+	num, ok := got.(jsonv.Number)
+	if !ok {
+		return
+	}
+	if f, err := strconv.ParseFloat(string(num), 64); err != nil || f == float64(len(mods)) {
+		return
+	}
+	sp := byKey["octave_count"].sp
+	if a := byKey["octave_count"]; a.expr != nil {
+		sp = a.expr.Span()
+	}
+	c.errorf("mms/octave-count", sp, "octave_count is %s, but amplitude_modifiers has %s entries; they must match (or leave octave_count out)", num, n)
 }
