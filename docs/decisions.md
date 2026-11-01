@@ -2,6 +2,8 @@
 
 Judgement calls made while building the rewrite without stopping for input. Each entry says what was chosen and why, so any of them can be revisited. Newest last.
 
+> **This log is frozen as of 2026-11-01 (D1 to D94).** Do not add new entries. Parallel pull requests kept conflicting over the next D-number. Put the rationale for a judgement call in the pull request description and the commit message instead. Existing entries stay so that code comments citing a D-number still resolve.
+
 Decisions Brian made directly are recorded in the plan ([docs/plan.md](plan.md)) and are not repeated here.
 
 | # | Date | Area | Decision | Why |
