@@ -1,0 +1,86 @@
+== worldgen/biome test:hell
+{
+  "attributes": {
+    "minecraft:visual/fog_color": "#330808",
+    "minecraft:gameplay/fast_lava": true,
+    "gameplay/sky_light_level": 4
+  },
+  "temperature": 2,
+  "downfall": 0,
+  "has_precipitation": false,
+  "effects": {
+    "water_color": "#905957"
+  },
+  "carvers": [],
+  "features": []
+}
+== dimension_type test:deep
+{
+  "attributes": {
+    "minecraft:gameplay/fast_lava": true
+  },
+  "has_skylight": false,
+  "has_ceiling": true,
+  "has_ender_dragon_fight": false,
+  "coordinate_scale": 1,
+  "ambient_light": 0,
+  "has_fixed_time": false,
+  "logical_height": 256,
+  "infiniburn": "#minecraft:infiniburn_overworld",
+  "min_y": -64,
+  "height": 256,
+  "monster_spawn_light_level": 0,
+  "monster_spawn_block_light_limit": 0
+}
+== recipe test:nothing
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    "minecraft:stick"
+  ],
+  "result": "minecraft:air"
+}
+== loot_table test:empty
+{
+  "pools": [
+    {
+      "rolls": 1,
+      "entries": [
+        {
+          "type": "minecraft:item",
+          "name": "minecraft:air"
+        }
+      ]
+    }
+  ]
+}
+== block_definition test:minecraft:stone
+{
+  "variants": {
+    "": {
+      "model": "minecraft:builtin/entity"
+    }
+  }
+}
+== dimension_type test:short
+{
+  "has_skylight": false,
+  "has_ceiling": true,
+  "has_ender_dragon_fight": false,
+  "coordinate_scale": 1,
+  "ambient_light": 0,
+  "has_fixed_time": false,
+  "logical_height": 100,
+  "infiniburn": "#minecraft:infiniburn_overworld",
+  "min_y": -8,
+  "height": 100,
+  "monster_spawn_light_level": 0,
+  "monster_spawn_block_light_limit": 0
+}
+! 11: mms/not-allowed-here 'minecraft:gameplay/fast_lava' cannot be set on a biome: Minecraft reads it only from a dimension type's attributes; set it there instead
+! 12: mms/not-allowed-here 'minecraft:gameplay/sky_light_level' cannot be set on a biome: Minecraft reads it only from a dimension type's attributes; set it there instead
+! 36: mms/not-allowed-here 'minecraft:air' is not allowed here: it is an empty item, and the game rejects it
+! 39: mms/not-allowed-here 'minecraft:air' is not allowed here: it is an empty item, and the game rejects it
+! 44: mms/not-allowed-here model 'minecraft:builtin/entity' is not allowed here
+! 51: mms/out-of-range value must be a multiple of 16, got -8
+! 49: mms/out-of-range value must be a multiple of 16, got 100
