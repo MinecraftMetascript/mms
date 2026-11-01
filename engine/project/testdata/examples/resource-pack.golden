@@ -131,6 +131,9 @@
   "pack": {
     "description": "Resource pack: weighted block variants, multipart block states, models, an item model and translations",
     "min_format": 97,
-    "max_format": 97
+    "max_format": [
+      97,
+      1
+    ]
   }
 }

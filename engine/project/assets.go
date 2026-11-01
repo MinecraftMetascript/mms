@@ -104,7 +104,7 @@ func (r *Result) emitAssets(hasResources bool) []OutFile {
 		if desc == "" {
 			desc = r.cfg.Description
 		}
-		out = append(out, OutFile{Path: "pack.mcmeta", Data: packMeta(desc, r.pack.ResourcePackFormat), Pack: sema.ResourcePack})
+		out = append(out, OutFile{Path: "pack.mcmeta", Data: packMeta(desc, r.pack.ResourcePackFormat, r.pack.ResourcePackMinor), Pack: sema.ResourcePack})
 	}
 	return out
 }

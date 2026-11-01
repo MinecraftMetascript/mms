@@ -197,7 +197,7 @@ func (r *Result) Emit() []OutFile {
 		}
 		out = append(out, f)
 	}
-	out = append(out, OutFile{Path: "pack.mcmeta", Data: packMeta(r.cfg.Description, r.pack.PackFormat)})
+	out = append(out, OutFile{Path: "pack.mcmeta", Data: packMeta(r.cfg.Description, r.pack.PackFormat, 0)})
 	hasResources := false
 	for _, f := range out {
 		hasResources = hasResources || f.Pack == sema.ResourcePack
@@ -212,12 +212,18 @@ func (r *Result) Emit() []OutFile {
 	return out
 }
 
-func packMeta(description string, packFormat int) []byte {
+// packMeta writes pack.mcmeta for one format. A bare number means minor
+// 0, so a format with a minor version gets max_format [major, minor].
+func packMeta(description string, packFormat, minor int) []byte {
 	format := jsonv.Int(packFormat)
+	var max jsonv.Value = format
+	if minor > 0 {
+		max = jsonv.Array{format, jsonv.Int(minor)}
+	}
 	pack := &jsonv.Object{}
 	pack.Set("description", jsonv.String(description))
 	pack.Set("min_format", format)
-	pack.Set("max_format", format)
+	pack.Set("max_format", max)
 	return jsonv.Marshal(&jsonv.Object{Members: []jsonv.Member{{Key: "pack", Value: pack}}})
 }
 
