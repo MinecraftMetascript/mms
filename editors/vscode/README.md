@@ -11,6 +11,7 @@ Language support for [Minecraft Metascript](https://github.com/MinecraftMetascri
   - "Fix all" (`source.fixAll.mms`)
 - **Formatting** with the opinionated formatter (format on save is on by default for `.mms`).
 - **Semantic highlighting.**
+- **`mms.json` support:** completion, hover docs and validation for the project file, including every lint rule id and severity. This works without the language server.
 
 ## Setup
 

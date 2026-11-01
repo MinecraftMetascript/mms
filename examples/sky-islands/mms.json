@@ -1,4 +1,5 @@
 {
+  "$schema": "https://minecraftmetascript.github.io/mms/mms.schema.json",
   "namespace": "sky",
   "description": "A custom dimension of floating islands, from the tutorial"
 }

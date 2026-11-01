@@ -224,7 +224,7 @@ func runInit(args []string, stdout, stderr io.Writer) int {
 		abs, _ := filepath.Abs(dir)
 		*ns = sanitizeNS(filepath.Base(abs))
 	}
-	cfg := fmt.Sprintf("{\n  \"namespace\": %q,\n  \"description\": \"A data pack built with MMS\",\n  \"output\": \"build\"\n}\n", *ns)
+	cfg := fmt.Sprintf("{\n  \"$schema\": %q,\n  \"namespace\": %q,\n  \"description\": \"A data pack built with MMS\",\n  \"output\": \"build\"\n}\n", project.SchemaURL, *ns)
 	src := fmt.Sprintf("Namespace %s\n\n/** A gentle hill shape. */\nDensityFunction hills = Noise(minecraft:ridge, 0.25, 0) * 0.5\n\nOnLoad {\n  /say %s loaded\n}\n", *ns, *ns)
 	if err := os.WriteFile(filepath.Join(dir, project.ConfigFile), []byte(cfg), 0o644); err != nil {
 		fmt.Fprintln(stderr, "mms:", err)
