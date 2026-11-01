@@ -106,6 +106,23 @@ func (c *Checker) find(folder, id string) *Symbol {
 	return s
 }
 
+// otherKind looks up a declaration of id in a folder other than folder,
+// recording the lookup for incremental checking.
+func (c *Checker) otherKind(folder, id string) *Symbol {
+	s := c.Syms.OtherKind(folder, id)
+	if c.Deps != nil {
+		c.Deps["o|"+folder+"|"+id+"|"+otherFolder(s)] = true
+	}
+	return s
+}
+
+func otherFolder(s *Symbol) string {
+	if s == nil {
+		return ""
+	}
+	return s.Kind.Folder()
+}
+
 // DepsHold reports whether every lookup in deps has the same outcome in t.
 func DepsHold(t *Table, deps map[string]bool) bool {
 	for k, found := range deps {
@@ -114,6 +131,10 @@ func DepsHold(t *Table, deps map[string]bool) bool {
 			continue // asset files: see AssetDepsHold
 		} else if ns, ok := strings.CutPrefix(k, "n|"); ok {
 			now = t.hasNamespace(ns)
+		} else if rest, ok := strings.CutPrefix(k, "o|"); ok {
+			// o|folder|id|other: the other-kind declaration is in that folder.
+			parts := strings.SplitN(rest, "|", 3)
+			now = len(parts) == 3 && otherFolder(t.OtherKind(parts[0], parts[1])) == parts[2]
 		} else if rest, ok := strings.CutPrefix(k, "s|"); ok {
 			// s|folder|id|signature: the symbol still has that signature.
 			parts := strings.SplitN(rest, "|", 3)
@@ -816,6 +837,14 @@ func (c *Checker) resolveID(text string, id idInfo, e syntax.Expr) string {
 	}
 	if ns == "minecraft" {
 		if _, known := c.Pack.Registries[reg]; known && !c.Pack.HasID(reg, id.Path+path) && !builtinIDs[reg+"|"+path] {
+			if text == path && id.Path == "" {
+				// A bare name that matches a local declaration of another
+				// kind: say so instead of blaming minecraft:<name>.
+				if other := c.otherKind(reg, c.NS+":"+path); other != nil {
+					c.errorf("mms/type-mismatch", e.Span(), "%s", c.wrongKindMessage(path, other, reg))
+					return c.NS + ":" + path
+				}
+			}
 			msg := fmt.Sprintf("unknown %s '%s'", reg, full)
 			if s := closest(path, withPrefix(c.Pack.Registries[reg], id.Path)); s != "" {
 				msg += fmt.Sprintf("; did you mean '%s'?", s)
@@ -839,6 +868,20 @@ func (c *Checker) resolveID(text string, id idInfo, e syntax.Expr) string {
 		c.errorf("mms/unknown-id", e.Span(), "no %s named '%s' is declared", reg, full)
 	}
 	return full
+}
+
+// wrongKindMessage explains that name is declared, but as other's kind
+// rather than one whose files live in folder.
+func (c *Checker) wrongKindMessage(name string, other *Symbol, folder string) string {
+	want := folder
+	if k, ok := c.Kinds.ForFolder(folder); ok {
+		want = k.Name
+	}
+	msg := fmt.Sprintf("'%s' is a %s, not a %s", name, other.Kind.Name, want)
+	if other.Kind.Folder() == "worldgen/noise" && folder == "worldgen/density_function" {
+		msg += fmt.Sprintf("; sample it with Noise(%s, 1, 1)", name)
+	}
+	return msg
 }
 
 // excludedID reports an id the game rejects at this spot although it is in
