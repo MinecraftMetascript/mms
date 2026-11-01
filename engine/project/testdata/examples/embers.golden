@@ -174,10 +174,7 @@ give @s painting[painting/variant="embers:hearth"]
   "pack": {
     "description": "Custom assets: original textures, a painting, a music disc with its own song, item models and translations",
     "min_format": 97,
-    "max_format": [
-      97,
-      1
-    ]
+    "max_format": 97
   }
 }
 === pack.png

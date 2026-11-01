@@ -35,7 +35,8 @@ Recipe ember_shard = Shapeless(
 )
 
 /**
- * Blaze powder around any music disc makes the Embers disc, which plays the
+ * Blaze powder around a music disc that creepers drop (#creeper_drop_music_discs,
+ * most of the vanilla discs) makes the Embers disc, which plays the
  * song in music.mms. Recipe ingredients match by item id only, so a recipe
  * cannot ask for an Ember Shard: any amethyst shard would do. This one uses
  * plain vanilla items instead.

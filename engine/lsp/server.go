@@ -257,7 +257,8 @@ func (s *Server) initialize(ctx context.Context, p initializeParams) (any, *resp
 			"positionEncoding": "utf-16",
 			"textDocumentSync": map[string]any{"openClose": true, "change": 2, "save": map[string]any{"includeText": false}},
 			"completionProvider": map[string]any{
-				"triggerCharacters": []string{".", "(", ",", "=", "[", "#", ":"},
+				// '"' and '/' start and continue asset file paths.
+				"triggerCharacters": []string{".", "(", ",", "=", "[", "#", ":", "\"", "/"},
 			},
 			"hoverProvider":              true,
 			"signatureHelpProvider":      map[string]any{"triggerCharacters": []string{"(", ","}, "retriggerCharacters": []string{","}},
@@ -569,13 +570,24 @@ func (s *Server) lines(uri string) *lines {
 
 var completionKinds = map[sema.CandidateKind]int{
 	sema.CandField: 10, sema.CandCallable: 3, sema.CandMethod: 2, sema.CandID: 18,
-	sema.CandEnum: 20, sema.CandKeyword: 14, sema.CandKind: 7,
+	sema.CandEnum: 20, sema.CandKeyword: 14, sema.CandKind: 7, sema.CandFile: 17,
 }
 
-func (s *Server) completion(_ context.Context, p posParams) (any, *respError) {
-	sess, l, off, ok := s.locate(p)
+type completionParams struct {
+	posParams
+	Context *struct {
+		TriggerKind      int    `json:"triggerKind"`
+		TriggerCharacter string `json:"triggerCharacter"`
+	} `json:"context"`
+}
+
+func (s *Server) completion(_ context.Context, p completionParams) (any, *respError) {
+	sess, l, off, ok := s.locate(p.posParams)
 	if !ok {
 		return nil, nil
+	}
+	if c := p.Context; c != nil && c.TriggerKind == 2 && !sess.TriggerApplies(p.TextDocument.URI, off, c.TriggerCharacter) {
+		return map[string]any{"isIncomplete": false, "items": []any{}}, nil
 	}
 	items, replace := sess.Completion(p.TextDocument.URI, off)
 	rng := l.rng(replace)

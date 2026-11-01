@@ -126,6 +126,8 @@ Each call stands for the id the file gets in your namespace: its base name, lowe
 | `Sound` | `.ogg` | `assets/<ns>/sounds/<name>.ogg`, plus an entry in a generated `sounds.json` |
 | `Structure` | `.nbt` | `data/<ns>/structure/<name>.nbt` |
 
+Inside the quotes, completion lists the project's files of the helper's type, in VS Code, Zed and the web editor. A path to a file that is not there is an error.
+
 Textures, sounds and [resource pack declarations](#resource-packs) go into a resource pack built next to the data pack: `build-resources/` (set `resourcePack.output` in `mms.json` to change it), `<name>-resources.zip` with `mms build --zip`, and `<world>/resources.zip` with `mms build --world`, which Minecraft loads as that world's resource pack. `"icon": "art/icon.png"` in `mms.json` becomes `pack.png` in both packs.
 
 Where the game takes a sound event either by id or inline, as a jukebox song's `sound_event` does, `Sound(...)` writes it inline, `{ "sound_id": "my_pack:tune" }`: the game's sound event registry is fixed, so a pack's own sound cannot be named there by id.

@@ -104,10 +104,27 @@ test('an example with textures and a sound checks and exports both packs', async
 	expect(data.files).toContain('data/embers/painting_variant/hearth.json');
 	expect(data.files.some((f) => f.startsWith('assets/'))).toBe(false);
 
-	// Removing a texture breaks the code that names it.
+	// Typing a texture path lists the project's images.
+	await page.locator('.cm-content').click();
+	await page.keyboard.press('ControlOrMeta+End');
+	await page.keyboard.press('Enter');
+	await page.keyboard.insertText('PaintingVariant extra = { width = 1, height = 1, asset_id = Texture(');
+	await page.keyboard.type('"art/h');
+	const popup = page.locator('.cm-tooltip-autocomplete');
+	await expect(popup).toContainText('art/hearth.png');
+	await expect(popup).not.toContainText('embers.ogg');
+	await page.waitForTimeout(300);
+	await page.keyboard.press('Enter');
+	// The closing quote was typed for us; the path goes inside it.
+	await expect(page.locator('.cm-content')).toContainText('Texture("art/hearth.png"');
+	await page.keyboard.press('End');
+	await page.keyboard.insertText(') }');
+	await expect(status(page)).toHaveText(/No problems/);
+
+	// Removing a texture breaks the code that names it, in both paintings.
 	await page.getByRole('listitem').filter({ hasText: 'art/hearth.png' }).hover();
 	await page.getByRole('button', { name: 'Delete art/hearth.png' }).click();
-	await expect(status(page)).toHaveText(/1 error/);
+	await expect(status(page)).toHaveText(/2 errors/);
 });
 
 test('dimensions, noise settings and surface rules preview as terrain', async ({ page }) => {

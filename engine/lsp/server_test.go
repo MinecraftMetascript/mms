@@ -473,3 +473,65 @@ func TestLooseFolders(t *testing.T) {
 		t.Errorf("references = %v, want the use in %s", refs, b)
 	}
 }
+
+// TestAssetPathCompletion checks that Texture("|") lists image files: the
+// browser's uploaded assets, and on disk only the file's own project.
+func TestAssetPathCompletion(t *testing.T) {
+	paths := func(res any) []string {
+		var out []string
+		for _, it := range res.(map[string]any)["items"].([]any) {
+			out = append(out, it.(map[string]any)["label"].(string))
+		}
+		return out
+	}
+	const text = "PaintingVariant p = { width = 1, height = 1, asset_id = Texture(\"\") }\n"
+	at := strings.Index(text, `""`) + 1
+	withTrigger := func(uri, ch string) map[string]any {
+		p := pos(uri, 0, at)
+		p["context"] = map[string]any{"triggerKind": 2, "triggerCharacter": ch}
+		return p
+	}
+
+	c := start(t)
+	c.result("initialize", map[string]any{})
+	a := "mem:///a.mms"
+	c.notify("mms/setFiles", map[string]any{"files": []any{map[string]any{"uri": a, "text": text}}})
+	c.notify("mms/setAssets", map[string]any{"files": []any{
+		map[string]any{"path": "art/p.png", "data": []byte("\x89PNG\r\n\x1a\n")},
+		map[string]any{"path": "music/m.ogg", "data": []byte("OggS")},
+	}})
+	if got := paths(c.result("textDocument/completion", withTrigger(a, `"`))); strings.Join(got, ",") != "art/p.png" {
+		t.Errorf("web completion = %v", got)
+	}
+
+	dir := t.TempDir()
+	write := func(rel, text string) string {
+		full := filepath.Join(dir, rel)
+		os.MkdirAll(filepath.Dir(full), 0o755)
+		os.WriteFile(full, []byte(text), 0o644)
+		return pathURI(full)
+	}
+	write("a/mms.json", `{"namespace": "a"}`)
+	write("b/mms.json", `{"namespace": "b"}`)
+	write("a/art/mine.png", "\x89PNG\r\n\x1a\n")
+	write("b/art/theirs.png", "\x89PNG\r\n\x1a\n")
+	aMain := write("a/main.mms", text)
+	c = start(t)
+	c.result("initialize", map[string]any{"rootUri": pathURI(dir)})
+	c.notify("textDocument/didOpen", map[string]any{"textDocument": map[string]any{"uri": aMain, "languageId": "mms", "version": 1, "text": text}})
+	res := c.result("textDocument/completion", pos(aMain, 0, at))
+	if got := paths(res); strings.Join(got, ",") != "art/mine.png" {
+		t.Errorf("disk completion = %v", got)
+	}
+	if kind := res.(map[string]any)["items"].([]any)[0].(map[string]any)["kind"]; kind != float64(17) {
+		t.Errorf("kind = %v, want File", kind)
+	}
+	// A quote typed outside an asset helper opens nothing.
+	other := write("a/other.mms", "Global g = \"\"\n")
+	c.notify("textDocument/didOpen", map[string]any{"textDocument": map[string]any{"uri": other, "languageId": "mms", "version": 1, "text": "Global g = \"\"\n"}})
+	p := pos(other, 0, 12)
+	p["context"] = map[string]any{"triggerKind": 2, "triggerCharacter": `"`}
+	if got := paths(c.result("textDocument/completion", p)); len(got) != 0 {
+		t.Errorf("quote elsewhere = %v", got)
+	}
+}
