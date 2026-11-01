@@ -233,7 +233,25 @@ func (c *Checker) checkKey(a *assign, kt tview) {
 	if kt.T == nil || kt.T.Kind != "string" {
 		return
 	}
-	if id := idOf(kt.T); id.Present && id.Registry != "" && a.node != nil {
+	id := idOf(kt.T)
+	if len(id.Exclude) > 0 {
+		full := a.key
+		if !strings.Contains(full, ":") {
+			full = "minecraft:" + full
+		}
+		if id.excluded(full) {
+			c.excludedID(full, id, a.sp)
+			if !c.trial {
+				sp := a.sp
+				if a.expr != nil {
+					sp = sp.Join(a.expr.Span())
+				}
+				c.Diags[len(c.Diags)-1].Fixes = c.removeFix(sp, "Remove '"+a.key+"'")
+			}
+			return
+		}
+	}
+	if id.Present && id.Registry != "" && a.node != nil {
 		if n, ok := a.node.(*syntax.Name); ok {
 			c.resolveID(a.key, id, &syntax.Ident{Name: a.key, Sp: n.Sp})
 		}

@@ -3,6 +3,7 @@ package sema
 import (
 	"encoding/json"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/minecraftmetascript/mms/engine/spec"
@@ -261,6 +262,10 @@ type idInfo struct {
 	// #[texture_slot(kind="value")] rather than #[id]: a texture id, or
 	// "#name" for another slot of the same model.
 	Slot bool
+	// Exclude lists ids of the registry that the game rejects here, such
+	// as `air` as a recipe result or `gameplay/fast_lava` in a biome's
+	// attributes. Unqualified entries are in the minecraft namespace.
+	Exclude []string
 }
 
 func idOf(t *spec.Type) idInfo {
@@ -288,8 +293,40 @@ func idOf(t *spec.Type) idInfo {
 		if pa := a.Value.Tree["path"]; pa != nil && pa.Literal != nil {
 			info.Path = pa.Literal.String()
 		}
+		if ex := a.Value.Tree["exclude"]; ex != nil {
+			info.Exclude = treeStrings(ex)
+		}
 	}
 	return info
+}
+
+// treeStrings reads an attribute list such as `exclude=["a", "b"]`, which
+// symbols.json writes as a tree keyed "0", "1", ...
+func treeStrings(t *spec.Type) []string {
+	if t.Literal != nil {
+		return []string{t.Literal.String()}
+	}
+	var out []string
+	for i := 0; ; i++ {
+		v := t.Tree[strconv.Itoa(i)]
+		if v == nil || v.Literal == nil {
+			return out
+		}
+		out = append(out, v.Literal.String())
+	}
+}
+
+// excluded reports whether the full id full is one of id's excluded ids.
+func (id idInfo) excluded(full string) bool {
+	for _, x := range id.Exclude {
+		if !strings.Contains(x, ":") {
+			x = "minecraft:" + x
+		}
+		if x == full {
+			return true
+		}
+	}
+	return false
 }
 
 // idRegistry finds the id registry of a string type, looking through

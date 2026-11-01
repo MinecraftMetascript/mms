@@ -585,6 +585,13 @@ func (c *Checker) number(e syntax.Expr, v tview) jsonv.Value {
 	if !inRange(f, v.T.ValueRange) {
 		c.errorf("mms/out-of-range", e.Span(), "value must be%s, got %s", rangeText(v.T.ValueRange), text)
 	}
+	if a, ok := v.T.Attr("divisible_by"); ok && a.Value != nil && a.Value.Literal != nil {
+		// e.g. a dimension type's min_y and height: the game will not load
+		// a world whose height is not a whole number of 16-block sections.
+		if n, err := strconv.ParseFloat(a.Value.Literal.String(), 64); err == nil && n != 0 && math.Mod(f, n) != 0 {
+			c.errorf("mms/out-of-range", e.Span(), "value must be a multiple of %s, got %s", a.Value.Literal.String(), text)
+		}
+	}
 	return jsonv.Number(text)
 }
 
@@ -821,6 +828,10 @@ func (c *Checker) resolveID(text string, id idInfo, e syntax.Expr) string {
 	in.ID = full
 	in.Symbol = sym
 	in.Bare, in.Folder = BareID, reg
+	if id.excluded(full) {
+		c.excludedID(full, id, e.Span())
+		return full
+	}
 	if sym != nil || reg == "" {
 		return full
 	}
@@ -871,6 +882,22 @@ func (c *Checker) wrongKindMessage(name string, other *Symbol, folder string) st
 		msg += fmt.Sprintf("; sample it with Noise(%s, 1, 1)", name)
 	}
 	return msg
+}
+
+// excludedID reports an id the game rejects at this spot although it is in
+// the registry (mcdoc's #[id(exclude=[...])]).
+func (c *Checker) excludedID(full string, id idInfo, sp syntax.Span) {
+	reg := c.registryName(id.Registry)
+	switch {
+	case reg == "environment_attribute":
+		// Biomes take only positional attributes; the game fails to load
+		// the biome with "The following attributes cannot be positional".
+		c.errorf("mms/not-allowed-here", sp, "'%s' cannot be set on a biome: Minecraft reads it only from a dimension type's attributes; set it there instead", full)
+	case full == "minecraft:air":
+		c.errorf("mms/not-allowed-here", sp, "'%s' is not allowed here: it is an empty item, and the game rejects it", full)
+	default:
+		c.errorf("mms/not-allowed-here", sp, "%s '%s' is not allowed here", reg, full)
+	}
 }
 
 // builtinIDs are ids the game knows that are not in its registries.
