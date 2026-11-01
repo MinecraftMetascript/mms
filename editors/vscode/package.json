@@ -15,7 +15,8 @@
   "categories": ["Programming Languages", "Formatters", "Linters"],
   "main": "./out/extension.js",
   "activationEvents": [
-    "workspaceContains:**/mms.json"
+    "workspaceContains:**/mms.json",
+    "onLanguage:mms"
   ],
   "contributes": {
     "languages": [
@@ -39,7 +40,7 @@
         "mms.path": {
           "type": "string",
           "default": "",
-          "description": "Path to the mms executable. Empty means `mms` on your PATH."
+          "markdownDescription": "Path to the `mms` executable, for example `/Users/you/mms/engine/mms`. `~` and `${workspaceFolder}` are expanded. Empty means `mms` on your `PATH`, then `~/go/bin/mms` (where `go install` puts it)."
         },
         "mms.trace.server": {
           "type": "string",
@@ -53,6 +54,10 @@
       {
         "command": "mms.restartServer",
         "title": "MMS: Restart Language Server"
+      },
+      {
+        "command": "mms.showOutput",
+        "title": "MMS: Show Language Server Output"
       }
     ],
     "configurationDefaults": {
