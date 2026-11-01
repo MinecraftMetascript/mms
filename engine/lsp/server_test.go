@@ -535,3 +535,27 @@ func TestAssetPathCompletion(t *testing.T) {
 		t.Errorf("quote elsewhere = %v", got)
 	}
 }
+
+// TestKindCompletionRange checks that a declaration kind typed at the top
+// level is replaced by the chosen item: with an empty range, editors
+// filter by nothing and insert after the typed word.
+func TestKindCompletionRange(t *testing.T) {
+	c := start(t)
+	c.result("initialize", map[string]any{})
+	a := "mem:///a.mms"
+	c.notify("mms/setFiles", map[string]any{"files": []any{map[string]any{"uri": a, "text": "Feature f = {}\nFe"}}})
+	res := c.result("textDocument/completion", pos(a, 1, 2)).(map[string]any)
+	for _, it := range res["items"].([]any) {
+		m := it.(map[string]any)
+		if m["label"] != "Feature" {
+			continue
+		}
+		rng := m["textEdit"].(map[string]any)["range"].(map[string]any)
+		st, en := rng["start"].(map[string]any), rng["end"].(map[string]any)
+		if st["line"] != float64(1) || st["character"] != float64(0) || en["character"] != float64(2) {
+			t.Errorf("range = %v", rng)
+		}
+		return
+	}
+	t.Errorf("Feature not offered: %v", res["items"])
+}

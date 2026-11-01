@@ -126,6 +126,15 @@ func (s *Session) Completion(path string, off int) ([]Item, syntax.Span) {
 	case *syntax.Tag:
 		replace = word(f, n.Sp, off)
 	}
+	// A word the tree has no node for, such as a lone `Fe` at the top
+	// level (the parser drops a declaration with no name), is still
+	// what the chosen item replaces; an empty span would leave it in
+	// place and the editor would filter by nothing.
+	if replace.Len() == 0 {
+		if sp, ok := wordAt(f, off); ok {
+			replace = sp
+		}
+	}
 	cands := s.complete(a, off)
 	items := make([]Item, 0, len(cands))
 	for i, c := range cands {
@@ -154,6 +163,31 @@ func word(f *syntax.File, sp syntax.Span, off int) syntax.Span {
 		end = t.Sp.End
 	}
 	return syntax.Span{Start: sp.Start, End: max(end, min(off, sp.End))}
+}
+
+// wordAt returns the span of the identifier or keyword token that off is
+// in or right after.
+func wordAt(f *syntax.File, off int) (syntax.Span, bool) {
+	i := f.TokenAt(off)
+	if i < 0 {
+		return syntax.Span{}, false
+	}
+	t := f.Tokens[i]
+	if t.Sp.Start == off || t.Synthetic {
+		return syntax.Span{}, false
+	}
+	switch {
+	case t.Kind == parser.MMSLexerAT:
+		// A selector being typed: `@` alone, or `@a` below.
+		return t.Sp, true
+	case t.Kind == parser.MMSLexerIDENT || (t.Kind >= parser.MMSLexerLET && t.Kind <= parser.MMSLexerFALSE):
+		sp := t.Sp
+		if i > 0 && f.Tokens[i-1].Kind == parser.MMSLexerAT && f.Tokens[i-1].Sp.End == sp.Start {
+			sp.Start = f.Tokens[i-1].Sp.Start
+		}
+		return sp, true
+	}
+	return syntax.Span{}, false
 }
 
 // command reports whether off, in token t, is in a raw command, and
@@ -209,6 +243,14 @@ func (s *Session) complete(a *at, off int) []sema.Candidate {
 	f := a.u.File
 	// Top level, or typing a declaration kind.
 	if len(a.path) == 1 {
+		// After a kind on the same line, `Feature |`, a name comes next.
+		start := off
+		if sp, ok := wordAt(f, off); ok {
+			start = sp.Start
+		}
+		if prev := prevToken(f, start); prev != nil && prev.Kind == parser.MMSLexerIDENT && lineOf(f, prev.Sp.End) == lineOf(f, off) {
+			return nil
+		}
 		return s.P.Kinds.DeclKinds()
 	}
 	d, _ := a.path[1].(*syntax.Decl)
@@ -216,10 +258,19 @@ func (s *Session) complete(a *at, off int) []sema.Candidate {
 		return s.P.Kinds.DeclKinds()
 	}
 	if d != nil && d.Name != nil && d.Name.Sp.Contains(off) {
+		// A name on a later line than its kind is a new declaration's
+		// kind: in `X x = foo` + newline + `Fe|`, the value `foo` reads
+		// as the kind of a declaration named `Fe`.
+		if l1, _ := f.LineCol(d.Kind.Sp.End); l1 != lineOf(f, off) {
+			return s.P.Kinds.DeclKinds()
+		}
 		return nil
 	}
 	if a.decl == nil {
 		return nil
+	}
+	if cs, ok := s.mmsComplete(a, off); ok {
+		return cs
 	}
 	// After `=`, `(`, `,` or `[` with nothing typed yet, the value is a
 	// Bad node or missing; find the node that expects it.
@@ -260,7 +311,7 @@ func (s *Session) complete(a *at, off int) []sema.Candidate {
 			// A word starting a statement in function code, or a helper
 			// of an execute chain.
 			if a.code() && startsStatement(a.path, i) {
-				return statementCandidates()
+				return s.statementCandidates(a, off)
 			}
 			// A bare word in an object body is a field being typed.
 			if _, ok := parent.(*syntax.ExprStmt); ok && i >= 2 {
@@ -339,7 +390,7 @@ func (s *Session) complete(a *at, off int) []sema.Candidate {
 			// An empty statement position in function code, such as a
 			// blank line asked for with Ctrl+Space.
 			if a.code() && i == len(a.path)-1 && off > n.Sp.Start && off < n.Sp.End {
-				return statementCandidates()
+				return s.statementCandidates(a, off)
 			}
 		}
 	}
@@ -347,13 +398,24 @@ func (s *Session) complete(a *at, off int) []sema.Candidate {
 }
 
 // statementCandidates lists what can start a statement in function code:
-// the execute helpers, then the statement keywords.
-func statementCandidates() []sema.Candidate {
-	out := sema.ExecCandidates(true)
+// the variables in scope, the execute helpers, the statement keywords,
+// then the Globals, objectives and functions.
+func (s *Session) statementCandidates(a *at, off int) []sema.Candidate {
+	out := locals(a.u.File, a.decl.D, off)
+	out = append(out, sema.ExecCandidates(true)...)
 	for i, kw := range []string{"let", "if", "while", "for", "return"} {
 		out = append(out, sema.Candidate{Label: kw, Kind: sema.CandKeyword, Rank: 100 + i})
 	}
+	for _, c := range s.projectNames(a) {
+		c.Rank += 100
+		out = append(out, c)
+	}
 	return out
+}
+
+func lineOf(f *syntax.File, off int) int {
+	l, _ := f.LineCol(off)
+	return l
 }
 
 // lineStart reports whether only blanks precede off on its line.
@@ -530,6 +592,12 @@ func (a *at) callArgs(call *syntax.Call, off int) []sema.Candidate {
 		return nil
 	}
 	in := a.info(call)
+	// A surface rule's If(cond) { rule } takes a condition first.
+	if id, ok := call.Fn.(*syntax.Ident); ok && id.Name == "If" {
+		if ai := a.c.IfArgInfo(in, argIndex(a.u.File, call, off)); ai != nil {
+			return a.c.ValueCandidates(ai)
+		}
+	}
 	if in == nil || in.Callable == nil {
 		// Sugar such as a criterion helper records the fields its named
 		// arguments set.
@@ -549,15 +617,11 @@ func (a *at) callArgs(call *syntax.Call, off int) []sema.Candidate {
 		}
 		return nil
 	}
-	index := 0
+	index := argIndex(a.u.File, call, off)
 	named := map[string]bool{}
 	for _, arg := range call.Args {
 		if arg.Name != nil {
 			named[arg.Name.Text] = true
-			continue
-		}
-		if arg.Sp.End < off && commaBetween(a.u.File, arg.Sp.End, off) {
-			index++
 		}
 	}
 	var out []sema.Candidate
@@ -570,6 +634,17 @@ func (a *at) callArgs(call *syntax.Call, off int) []sema.Candidate {
 		out = append(out, c)
 	}
 	return out
+}
+
+// argIndex counts the positional arguments before off.
+func argIndex(f *syntax.File, call *syntax.Call, off int) int {
+	index := 0
+	for _, arg := range call.Args {
+		if arg.Name == nil && arg.Sp.End < off && commaBetween(f, arg.Sp.End, off) {
+			index++
+		}
+	}
+	return index
 }
 
 func commaBetween(f *syntax.File, from, to int) bool {
