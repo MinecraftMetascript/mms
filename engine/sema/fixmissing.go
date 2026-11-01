@@ -222,3 +222,27 @@ func enumText(s string) string {
 	}
 	return strconv.Quote(s)
 }
+
+// removeFix deletes the line holding sp, when nothing else is on it.
+func (c *Checker) removeFix(sp syntax.Span, title string) []syntax.Fix {
+	src := c.Src
+	if src == nil || sp.Start < 0 || sp.End > len(src) || sp.Start >= sp.End {
+		return nil
+	}
+	ls := sp.Start
+	for ls > 0 && (src[ls-1] == ' ' || src[ls-1] == '\t') {
+		ls--
+	}
+	le := sp.End
+	for le < len(src) && (src[le] == ' ' || src[le] == '\t' || src[le] == ',' || src[le] == '\r') {
+		le++ // \r: a CRLF line ending
+	}
+	if (ls > 0 && src[ls-1] != '\n') || (le < len(src) && src[le] != '\n') {
+		return nil // shares its line: removing it could leave stray commas
+	}
+	start, end := ls, le
+	if end < len(src) {
+		end++ // the newline
+	}
+	return []syntax.Fix{{Title: title, Edits: []syntax.TextEdit{{Sp: syntax.Span{Start: start, End: end}, Text: ""}}}}
+}
