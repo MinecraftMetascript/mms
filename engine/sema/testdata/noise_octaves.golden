@@ -1,0 +1,39 @@
+== worldgen/noise test:inferred
+{
+  "base_octave": -7,
+  "amplitude_modifiers": [
+    1,
+    0.6,
+    0.3,
+    0.15
+  ],
+  "octave_count": 4
+}
+== worldgen/noise test:matching
+{
+  "base_octave": -7,
+  "octave_count": 2,
+  "amplitude_modifiers": [
+    1,
+    1
+  ]
+}
+== worldgen/noise test:empty
+{
+  "base_octave": -7,
+  "amplitude_modifiers": []
+}
+== worldgen/noise test:plain
+{
+  "base_octave": -7
+}
+== worldgen/noise test:wrong
+{
+  "base_octave": -7,
+  "octave_count": 1,
+  "amplitude_modifiers": [
+    1,
+    1
+  ]
+}
+! 6: mms/octave-count octave_count is 1, but amplitude_modifiers has 2 entries; they must match (or leave octave_count out)

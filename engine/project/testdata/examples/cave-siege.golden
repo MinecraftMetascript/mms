@@ -2535,7 +2535,7 @@ execute positioned ~ ~-1 ~ if function siege:standable run return run function s
   "direction": "up",
   "allowed_placement": {
     "type": "minecraft:matching_block_tag",
-    "tag": "#minecraft:air"
+    "tag": "minecraft:air"
   },
   "prioritize_tip": true,
   "layers": [
@@ -2575,7 +2575,7 @@ execute positioned ~ ~-1 ~ if function siege:standable run return run function s
   ],
   "can_replace": {
     "type": "minecraft:matching_block_tag",
-    "tag": "#minecraft:air"
+    "tag": "minecraft:air"
   },
   "attempts": 400,
   "xz_offset": {
@@ -2604,7 +2604,7 @@ execute positioned ~ ~-1 ~ if function siege:standable run return run function s
   ],
   "can_replace": {
     "type": "minecraft:matching_block_tag",
-    "tag": "#minecraft:air"
+    "tag": "minecraft:air"
   },
   "attempts": 60,
   "xz_offset": {
@@ -2664,7 +2664,7 @@ execute positioned ~ ~-1 ~ if function siege:standable run return run function s
   ],
   "can_replace": {
     "type": "minecraft:matching_block_tag",
-    "tag": "#minecraft:air"
+    "tag": "minecraft:air"
   },
   "attempts": 60,
   "xz_offset": {
@@ -2695,14 +2695,14 @@ execute positioned ~ ~-1 ~ if function siege:standable run return run function s
     "type": "minecraft:not",
     "predicate": {
       "type": "minecraft:matching_block_tag",
-      "tag": "#minecraft:features_cannot_replace"
+      "tag": "minecraft:features_cannot_replace"
     }
   },
   "can_replace_with_barrier": {
     "type": "minecraft:not",
     "predicate": {
       "type": "minecraft:matching_block_tag",
-      "tag": "#minecraft:lava_pool_stone_cannot_replace"
+      "tag": "minecraft:lava_pool_stone_cannot_replace"
     }
   }
 }
@@ -3089,7 +3089,8 @@ execute positioned ~ ~-1 ~ if function siege:standable run return run function s
     0.6,
     0.3,
     0.15
-  ]
+  ],
+  "octave_count": 4
 }
 === data/siege/worldgen/noise/chamber_field.json
 {
@@ -3097,7 +3098,8 @@ execute positioned ~ ~-1 ~ if function siege:standable run return run function s
   "amplitude_modifiers": [
     1,
     0.5
-  ]
+  ],
+  "octave_count": 2
 }
 === data/siege/worldgen/noise/climate_continents.json
 {
@@ -3105,7 +3107,8 @@ execute positioned ~ ~-1 ~ if function siege:standable run return run function s
   "amplitude_modifiers": [
     1,
     0.5
-  ]
+  ],
+  "octave_count": 2
 }
 === data/siege/worldgen/noise/climate_erosion.json
 {
@@ -3113,7 +3116,8 @@ execute positioned ~ ~-1 ~ if function siege:standable run return run function s
   "amplitude_modifiers": [
     1,
     0.5
-  ]
+  ],
+  "octave_count": 2
 }
 === data/siege/worldgen/noise/climate_humidity.json
 {
@@ -3122,7 +3126,8 @@ execute positioned ~ ~-1 ~ if function siege:standable run return run function s
     1,
     1,
     0.5
-  ]
+  ],
+  "octave_count": 3
 }
 === data/siege/worldgen/noise/climate_temperature.json
 {
@@ -3131,14 +3136,16 @@ execute positioned ~ ~-1 ~ if function siege:standable run return run function s
     1,
     1,
     0.5
-  ]
+  ],
+  "octave_count": 3
 }
 === data/siege/worldgen/noise/tunnel_height.json
 {
   "base_octave": -7,
   "amplitude_modifiers": [
     1
-  ]
+  ],
+  "octave_count": 1
 }
 === data/siege/worldgen/noise/tunnel_path.json
 {
@@ -3146,7 +3153,8 @@ execute positioned ~ ~-1 ~ if function siege:standable run return run function s
   "amplitude_modifiers": [
     1,
     0.5
-  ]
+  ],
+  "octave_count": 2
 }
 === data/siege/worldgen/noise/wall_roughness.json
 {
@@ -3154,7 +3162,8 @@ execute positioned ~ ~-1 ~ if function siege:standable run return run function s
   "amplitude_modifiers": [
     1,
     0.5
-  ]
+  ],
+  "octave_count": 2
 }
 === data/siege/worldgen/noise_settings/caves.json
 {
@@ -3236,7 +3245,7 @@ execute positioned ~ ~-1 ~ if function siege:standable run return run function s
         "predicates": [
           {
             "type": "minecraft:matching_block_tag",
-            "tag": "#minecraft:air"
+            "tag": "minecraft:air"
           },
           {
             "type": "minecraft:would_survive",
@@ -3267,7 +3276,7 @@ execute positioned ~ ~-1 ~ if function siege:standable run return run function s
         "predicates": [
           {
             "type": "minecraft:matching_block_tag",
-            "tag": "#minecraft:air"
+            "tag": "minecraft:air"
           },
           {
             "type": "minecraft:would_survive",
@@ -3298,7 +3307,7 @@ execute positioned ~ ~-1 ~ if function siege:standable run return run function s
         "predicates": [
           {
             "type": "minecraft:matching_block_tag",
-            "tag": "#minecraft:air"
+            "tag": "minecraft:air"
           },
           {
             "type": "minecraft:would_survive",
@@ -3333,7 +3342,7 @@ execute positioned ~ ~-1 ~ if function siege:standable run return run function s
         "predicates": [
           {
             "type": "minecraft:matching_block_tag",
-            "tag": "#minecraft:air"
+            "tag": "minecraft:air"
           },
           {
             "type": "minecraft:matching_blocks",
@@ -3370,7 +3379,7 @@ execute positioned ~ ~-1 ~ if function siege:standable run return run function s
         "predicates": [
           {
             "type": "minecraft:matching_block_tag",
-            "tag": "#minecraft:air"
+            "tag": "minecraft:air"
           },
           {
             "type": "minecraft:would_survive",
@@ -3405,7 +3414,7 @@ execute positioned ~ ~-1 ~ if function siege:standable run return run function s
         "predicates": [
           {
             "type": "minecraft:matching_block_tag",
-            "tag": "#minecraft:air"
+            "tag": "minecraft:air"
           },
           {
             "type": "minecraft:matching_blocks",
@@ -3439,7 +3448,7 @@ execute positioned ~ ~-1 ~ if function siege:standable run return run function s
         "predicates": [
           {
             "type": "minecraft:matching_block_tag",
-            "tag": "#minecraft:air"
+            "tag": "minecraft:air"
           },
           {
             "type": "minecraft:would_survive",
@@ -3470,7 +3479,7 @@ execute positioned ~ ~-1 ~ if function siege:standable run return run function s
         "predicates": [
           {
             "type": "minecraft:matching_block_tag",
-            "tag": "#minecraft:air"
+            "tag": "minecraft:air"
           },
           {
             "type": "minecraft:would_survive",
@@ -3610,7 +3619,7 @@ execute positioned ~ ~-1 ~ if function siege:standable run return run function s
       },
       "allowed_search_condition": {
         "type": "minecraft:matching_block_tag",
-        "tag": "#minecraft:air"
+        "tag": "minecraft:air"
       }
     },
     {
@@ -3650,7 +3659,7 @@ execute positioned ~ ~-1 ~ if function siege:standable run return run function s
       },
       "allowed_search_condition": {
         "type": "minecraft:matching_block_tag",
-        "tag": "#minecraft:air"
+        "tag": "minecraft:air"
       }
     },
     {
@@ -3700,7 +3709,7 @@ execute positioned ~ ~-1 ~ if function siege:standable run return run function s
       },
       "allowed_search_condition": {
         "type": "minecraft:matching_block_tag",
-        "tag": "#minecraft:air"
+        "tag": "minecraft:air"
       }
     },
     {
@@ -3750,7 +3759,7 @@ execute positioned ~ ~-1 ~ if function siege:standable run return run function s
       },
       "allowed_search_condition": {
         "type": "minecraft:matching_block_tag",
-        "tag": "#minecraft:air"
+        "tag": "minecraft:air"
       }
     },
     {
@@ -3801,7 +3810,7 @@ execute positioned ~ ~-1 ~ if function siege:standable run return run function s
         "predicates": [
           {
             "type": "minecraft:matching_block_tag",
-            "tag": "#minecraft:air"
+            "tag": "minecraft:air"
           },
           {
             "type": "minecraft:would_survive",
@@ -3860,7 +3869,7 @@ execute positioned ~ ~-1 ~ if function siege:standable run return run function s
       },
       "allowed_search_condition": {
         "type": "minecraft:matching_block_tag",
-        "tag": "#minecraft:air"
+        "tag": "minecraft:air"
       }
     },
     {
@@ -3903,7 +3912,7 @@ execute positioned ~ ~-1 ~ if function siege:standable run return run function s
       },
       "allowed_search_condition": {
         "type": "minecraft:matching_block_tag",
-        "tag": "#minecraft:air"
+        "tag": "minecraft:air"
       }
     },
     {
@@ -3949,7 +3958,7 @@ execute positioned ~ ~-1 ~ if function siege:standable run return run function s
       },
       "allowed_search_condition": {
         "type": "minecraft:matching_block_tag",
-        "tag": "#minecraft:air"
+        "tag": "minecraft:air"
       }
     },
     {

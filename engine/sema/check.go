@@ -754,7 +754,7 @@ func (c *Checker) stringValue(e syntax.Expr, v tview) jsonv.Value {
 		}
 		if id.Present && id.Registry != "" && x.Value != "" {
 			if strings.HasPrefix(x.Value, "#") {
-				return jsonv.String(c.resolveTag(x.Value[1:], id, e))
+				return jsonv.String(c.tagValue(x.Value[1:], id, e))
 			}
 			return jsonv.String(c.resolveID(x.Value, id, e))
 		}
@@ -785,7 +785,7 @@ func (c *Checker) stringValue(e syntax.Expr, v tview) jsonv.Value {
 		}
 	case *syntax.Tag:
 		if id.Present && id.Tags != "" {
-			return jsonv.String(c.resolveTag(x.Name, id, e))
+			return jsonv.String(c.tagValue(x.Name, id, e))
 		}
 		if id.Present {
 			c.errorf("mms/type-mismatch", e.Span(), "a tag is not allowed here; expected a single %s id", id.Registry)
@@ -932,6 +932,16 @@ func (c *Checker) resolveTag(text string, id idInfo, e syntax.Expr) string {
 		c.errorf("mms/unknown-id", e.Span(), "no %s tag named '#%s' is declared", reg, full)
 	}
 	return "#" + full
+}
+
+// tagValue resolves a #tag and writes it the way the field expects: fields
+// marked tags="implicit" always hold a tag, so the game wants it without '#'.
+func (c *Checker) tagValue(text string, id idInfo, e syntax.Expr) string {
+	full := c.resolveTag(text, id, e)
+	if id.Tags == "implicit" {
+		return strings.TrimPrefix(full, "#")
+	}
+	return full
 }
 
 func (c *Checker) declaresNamespace(ns string) bool {

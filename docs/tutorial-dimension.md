@@ -74,7 +74,11 @@ Noise island_noise = {
   base_octave = -6
   amplitude_modifiers = [1, 1, 0.5]
 }
+```
 
+Each entry in `amplitude_modifiers` is one octave. Minecraft also needs `octave_count`, which must match the length of the list. MMS fills it in for you when you leave it out, and reports an error if you set it to a different number.
+
+```
 // 0 at y = 128, rising to 1 at y = 32 and y = 224.
 DensityFunction height = Gradient(
   axis = y,

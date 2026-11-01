@@ -113,7 +113,8 @@ tellraw @s "Welcome to the sky islands"
     1,
     1,
     0.5
-  ]
+  ],
+  "octave_count": 3
 }
 === data/sky/worldgen/noise_settings/islands.json
 {
