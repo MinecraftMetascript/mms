@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { shows } from './pin';
+	import { shows } from './paths';
 
 	interface Props {
 		/** The pinned output path, or null when the preview follows the cursor. */

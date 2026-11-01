@@ -11,7 +11,7 @@ Language support for [Minecraft Metascript](https://github.com/MinecraftMetascri
   - "Fix all" (`source.fixAll.mms`)
 - **Formatting** with the opinionated formatter (format on save is on by default for `.mms`).
 - **Semantic highlighting.**
-- **Previews:** **MMS: Open Preview to the Side** (the preview button in the editor title, or `Ctrl+K V`) opens the web editor's previews beside the editor. Put the cursor in a noise, density function, noise settings, surface rule or dimension to see it rendered (density, blocks, 3D, biome map), or in a loot table, recipe or biome to inspect it. Pin keeps one declaration on screen while you edit others. Vanilla worldgen the pack refers to is fetched from GitHub (mcmeta).
+- **Previews:** click **Preview** above a noise, density function, noise settings, surface rule or dimension to see it rendered beside the editor (density, blocks, 3D, biome map), or above a loot table, recipe or biome to inspect it. The panel stays on that declaration while you edit elsewhere and redraws as you type; click another **Preview** to switch. **MMS: Open Preview to the Side** (the button in the editor title, or `Ctrl+K V`) opens it on the declaration at the cursor. Vanilla worldgen the pack refers to is fetched from GitHub (mcmeta).
 - **`mms.json` support:** completion, hover docs and validation for the project file, including every lint rule id and severity. This works without the language server.
 
 ## Setup

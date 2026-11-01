@@ -1,14 +1,4 @@
-/** Which inspector, if any, shows a generated file. */
-export type InspectKind = 'loot_table' | 'recipe' | 'biome';
-
-const pattern = /^data\/([^/]+)\/(loot_table|recipe|worldgen\/biome)\/(.+)\.json$/;
-
-export function inspectable(path: string | null): { kind: InspectKind; id: string } | null {
-	const m = path ? pattern.exec(path) : null;
-	if (!m) return null;
-	const kind = (m[2] === 'worldgen/biome' ? 'biome' : m[2]) as InspectKind;
-	return { kind, id: `${m[1]}:${m[3]}` };
-}
+export { inspectable, type InspectKind } from '../paths';
 
 /** `minecraft:golden_apple` → `Golden Apple`; other namespaces are kept. */
 export function label(id: string): string {

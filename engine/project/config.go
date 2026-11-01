@@ -101,6 +101,7 @@ func LoadConfig(dir string) (Config, error) {
 }
 
 // SourceFiles lists the project's .mms files, sorted, relative to dir.
+// Folders holding their own mms.json are other projects and left out.
 func (c Config) SourceFiles(dir string) ([]string, error) {
 	patterns := c.Sources
 	if len(patterns) == 0 {
@@ -120,6 +121,12 @@ func (c Config) SourceFiles(dir string) ([]string, error) {
 		if d.IsDir() {
 			if rel != "." && (rel == c.Output || rel == c.ResourceOutput() || strings.HasPrefix(d.Name(), ".") || d.Name() == "node_modules") {
 				return filepath.SkipDir
+			}
+			if rel != "." {
+				// A folder with its own mms.json is a separate project.
+				if st, err := os.Stat(filepath.Join(path, ConfigFile)); err == nil && !st.IsDir() {
+					return filepath.SkipDir
+				}
 			}
 			return nil
 		}
