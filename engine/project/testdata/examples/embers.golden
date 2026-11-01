@@ -1,6 +1,6 @@
 === data/embers/function/give.mcfunction
-give @s amethyst_shard[item_model="embers:ember_shard",item_name={translate:"item.embers.ember_shard"}] 16
-give @s music_disc_13[item_model="embers:ember_disc",item_name={translate:"item.embers.ember_disc"},jukebox_playable="embers:embers"]
+give @s amethyst_shard[item_model="embers:ember_shard",item_name={translate:"item.embers.ember_shard",fallback:"Ember Shard"}] 16
+give @s music_disc_13[item_model="embers:ember_disc",item_name={translate:"item.embers.ember_disc",fallback:"Music Disc"},jukebox_playable="embers:embers"]
 give @s painting[painting/variant="embers:hearth"]
 === data/embers/jukebox_song/embers.json
 {
@@ -24,20 +24,21 @@ give @s painting[painting/variant="embers:hearth"]
           "name": "minecraft:amethyst_shard",
           "modifier": [
             {
+              "type": "minecraft:set_components",
+              "components": {
+                "item_model": "embers:ember_shard",
+                "item_name": {
+                  "translate": "item.embers.ember_shard",
+                  "fallback": "Ember Shard"
+                }
+              }
+            },
+            {
               "type": "minecraft:set_count",
               "count": {
                 "type": "minecraft:uniform",
                 "min": 2,
                 "max": 5
-              }
-            },
-            {
-              "type": "minecraft:set_components",
-              "components": {
-                "item_model": "embers:ember_shard",
-                "item_name": {
-                  "translate": "item.embers.ember_shard"
-                }
               }
             }
           ]
@@ -75,7 +76,8 @@ give @s painting[painting/variant="embers:hearth"]
     "components": {
       "item_model": "embers:ember_disc",
       "item_name": {
-        "translate": "item.embers.ember_disc"
+        "translate": "item.embers.ember_disc",
+        "fallback": "Music Disc"
       },
       "jukebox_playable": "embers:embers"
     }
@@ -90,13 +92,14 @@ give @s painting[painting/variant="embers:hearth"]
   ],
   "result": {
     "id": "minecraft:amethyst_shard",
+    "count": 2,
     "components": {
       "item_model": "embers:ember_shard",
       "item_name": {
-        "translate": "item.embers.ember_shard"
+        "translate": "item.embers.ember_shard",
+        "fallback": "Ember Shard"
       }
-    },
-    "count": 2
+    }
   }
 }
 === data/minecraft/tags/painting_variant/placeable.json
@@ -131,11 +134,11 @@ give @s painting[painting/variant="embers:hearth"]
 }
 === assets/embers/lang/en_us.json
 {
-  "item.embers.ember_shard": "Ember Shard",
-  "item.embers.ember_disc": "Music Disc",
   "jukebox_song.embers.embers": "MMS - Embers",
   "painting.embers.hearth.title": "Hearth",
-  "painting.embers.hearth.author": "MMS Examples"
+  "painting.embers.hearth.author": "MMS Examples",
+  "item.embers.ember_shard": "Ember Shard",
+  "item.embers.ember_disc": "Music Disc"
 }
 === assets/embers/models/item/ember_disc.json
 {

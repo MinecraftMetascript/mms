@@ -172,6 +172,9 @@ func (c *Checker) sugar(e syntax.Expr, v tview) *sugarRule {
 			}
 		}
 	case tLootEntry:
+		if c.isCustomItem(e) || c.usesCustomField(e, "name") {
+			return &sugarRule{customEntryRule}
+		}
 		switch e.(type) {
 		case *syntax.Ident, *syntax.ResLoc:
 			return &sugarRule{entryItem}
@@ -187,6 +190,9 @@ func (c *Checker) sugar(e syntax.Expr, v tview) *sugarRule {
 			return &sugarRule{boundsRange}
 		}
 	case tItemStack:
+		if c.isCustomItem(e) || c.usesCustomField(e, "id") {
+			return &sugarRule{customStackRule}
+		}
 		if b, ok := e.(*syntax.Binary); ok && b.Op == "*" && isID(b.L) && isNumber(b.R) {
 			return &sugarRule{stackCount}
 		}

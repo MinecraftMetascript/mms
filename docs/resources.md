@@ -136,7 +136,7 @@ Once a file is included, its id can also be written plainly elsewhere, with its 
 
 The web editor holds asset files too: **+ Add texture or sound** under the sources adds `.png`, `.ogg` and `.nbt` files, which keep their file name as their path. **Download resources** appears next to **Download pack** once there is a resource pack. Project zips carry the asset files both ways.
 
-The [`embers`](../examples/embers/) example ships its own art: item textures used through models, item models and the `item_model` component, a painting, a music disc with its own song, translations and a pack icon.
+The [`embers`](../examples/embers/) example ships its own art: [custom items](#custom-items) with their own textures, a painting, a music disc with its own song, translations and a pack icon.
 
 ## Resource packs
 
@@ -169,3 +169,46 @@ A block state is named after the block it replaces, such as `minecraft:glowstone
 In a model's `textures`, a value is a texture id, `"#name"` for another slot, or `Texture("file.png", "block/name")`, which copies the file to `textures/block/name.png`. A texture id can name a vanilla texture, such as `block/stone`.
 
 `sounds.json` is still generated from `Sound(...)`, and textures cannot have `.png.mcmeta` animation yet. The [`resource-pack`](../examples/resource-pack/) example shows each kind with vanilla textures; [`embers`](../examples/embers/) uses files of its own.
+
+## Custom items
+
+Data packs cannot add items, but they can give a vanilla item a new look and name with its `item_model` and `item_name` components. That takes a model, an item model, a translation and the same components at every use. `CustomItem` writes all of it from one declaration:
+
+```
+CustomItem ember_shard = {
+  base = amethyst_shard
+  name = "Ember Shard"
+  texture = Texture("art/ember_shard.png")
+  components = { rarity = rare }
+}
+```
+
+This writes `models/item/ember_shard.json` (a flat `item/generated` model of the texture), `items/ember_shard.json`, and `"item.embers.ember_shard": "Ember Shard"` in `lang/en_us.json`, merged with any `Lang en_us` declaration in the namespace. `Texture("...")` copies the file to `textures/item/ember_shard.png`.
+
+| Field | |
+| --- | --- |
+| `base` | the vanilla item it is made from, which decides how it behaves |
+| `name` | its name in English, or one per language: `{ en_us = "Ember Shard", de_de = "Glutsplitter" }`. The `item_name` component also carries the English text as a fallback, so the name shows without the resource pack |
+| `texture` | the picture for a flat item model |
+| `parent` | the generated model's parent: `item/generated` by default, `item/handheld` for tools |
+| `model` | an existing model to show instead of one made from `texture` |
+| `item_model` | an `ItemModel` id, or an item model body such as `{ model = Select(...) }`, instead of the generated one |
+| `components` | more item components, given to every use |
+
+Without `texture`, `model` or `item_model`, the item keeps its base item's look and only gets its name and components.
+
+The item's name stands for the base item with its components:
+
+```
+Recipe ember_shard = Shapeless([blaze_powder, amethyst_shard], ember_shard * 2)
+LootTable cache { pools = [Pool(1, [Item(name = ember_shard, modifier = [SetCount(2..5)])])] }
+Function give {
+  /give @s ${ember_shard} 16
+}
+```
+
+- **Item stacks**, such as recipe results: `ember_shard`, `ember_shard * 2`, or `{ id = ember_shard, count = 2, components = { ... } }`, whose components are added to the item's own.
+- **Loot entries**: `ember_shard` or `Item(name = ember_shard, ...)` drop the base item with a `set_components` modifier ahead of the others.
+- **Commands**: `${ember_shard}` writes `amethyst_shard[item_model="embers:ember_shard",item_name={...}]`.
+
+Anywhere else that takes an item id, such as a recipe ingredient or an item tag, a custom item is an error: the game matches those by item id only, so they need the base item. A `Model`, `ItemModel` or `Lang` entry that the custom item also writes is reported as a duplicate.

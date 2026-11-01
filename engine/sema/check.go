@@ -79,6 +79,13 @@ type Checker struct {
 	// Src is the checked file's text; quick fixes need it for layout.
 	Src []rune
 
+	// textureName is the id name Texture("...") gets when the call
+	// gives none; a CustomItem sets it to item/<name>.
+	textureName string
+	// customOf is the custom item this checker expands, to catch an item
+	// that contains itself.
+	customOf string
+
 	trial  bool
 	errs   int
 	depth  int
@@ -828,6 +835,10 @@ func (c *Checker) resolveID(text string, id idInfo, e syntax.Expr) string {
 	in.ID = full
 	in.Symbol = sym
 	in.Bare, in.Folder = BareID, reg
+	if sym != nil && sym.Kind.MMS == customItemKind {
+		c.errorf("mms/custom-item", e.Span(), "'%s' is a CustomItem, which is its base item with extra components; this field takes a plain item id, so use the base item. Custom items work in item stacks, loot entries and ${...} in commands", text)
+		return full
+	}
 	if id.excluded(full) {
 		c.excludedID(full, id, e.Span())
 		return full

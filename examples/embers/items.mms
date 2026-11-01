@@ -1,45 +1,37 @@
-// Two new-looking items, built on vanilla ones. The item_model component
-// points a stack at our item model; item_name gives it our translated name.
+// Two new-looking items, built on vanilla ones. Each CustomItem writes a
+// flat item model drawn from its texture, the item model definition that
+// the item_model component names, and its name in the lang file. Its
+// name then stands for the base item with those components, wherever an
+// item stack goes: recipe results here, loot entries in loot.mms and
+// /give in give.mms.
 //
-// Texture("art/ember_shard.png", "item/ember_shard") copies the file to
+// Texture("art/ember_shard.png") copies the file to
 // assets/embers/textures/item/ember_shard.png in the resource pack. Only
 // files that code names are copied, so art/ can hold drafts too.
 
-/** A flat item model drawn from one texture, like most vanilla items. */
-Model item/ember_shard = {
-  parent = item/generated
-  textures = { layer0 = Texture("art/ember_shard.png", "item/ember_shard") }
+/** An amethyst shard that glows like a coal. */
+CustomItem ember_shard = {
+  base = amethyst_shard
+  name = "Ember Shard"
+  texture = Texture("art/ember_shard.png")
 }
 
-Model item/ember_disc = {
-  parent = item/generated
-  textures = { layer0 = Texture("art/ember_disc.png", "item/ember_disc") }
+/** A music disc that plays the song in music.mms. */
+CustomItem ember_disc = {
+  base = music_disc_13
+  name = "Music Disc"
+  texture = Texture("art/ember_disc.png")
+  components = { jukebox_playable = embers }
 }
-
-/** The item models the item_model component names. */
-ItemModel ember_shard = { model = Model(model = item/ember_shard) }
-
-ItemModel ember_disc = { model = Model(model = item/ember_disc) }
 
 /** Blaze powder and an amethyst shard make two ember shards. */
-Recipe ember_shard = Shapeless(
-  [blaze_powder, amethyst_shard],
-  {
-    id = amethyst_shard
-    count = 2
-    components = {
-      item_model = ember_shard
-      item_name = { translate = "item.embers.ember_shard" }
-    }
-  },
-)
+Recipe ember_shard = Shapeless([blaze_powder, amethyst_shard], ember_shard * 2)
 
 /**
  * Blaze powder around a music disc that creepers drop (#creeper_drop_music_discs,
- * most of the vanilla discs) makes the Embers disc, which plays the
- * song in music.mms. Recipe ingredients match by item id only, so a recipe
- * cannot ask for an Ember Shard: any amethyst shard would do. This one uses
- * plain vanilla items instead.
+ * most of the vanilla discs) makes the Embers disc. Recipe ingredients
+ * match by item id only, so a recipe cannot ask for an Ember Shard: any
+ * amethyst shard would do. This one uses plain vanilla items instead.
  */
 Recipe ember_disc = Shaped(
   [" B ", "BDB", " B "],
@@ -47,12 +39,5 @@ Recipe ember_disc = Shaped(
     B = blaze_powder
     D = #creeper_drop_music_discs
   },
-  {
-    id = music_disc_13
-    components = {
-      item_model = ember_disc
-      item_name = { translate = "item.embers.ember_disc" }
-      jukebox_playable = embers
-    }
-  },
+  ember_disc,
 )

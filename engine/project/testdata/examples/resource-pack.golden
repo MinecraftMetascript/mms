@@ -10,7 +10,8 @@
     "components": {
       "item_model": "glow:lantern_charm",
       "item_name": {
-        "translate": "item.glow.lantern_charm"
+        "translate": "item.glow.lantern_charm",
+        "fallback": "Lantern Charm"
       }
     }
   }

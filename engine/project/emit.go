@@ -94,10 +94,56 @@ func (r *Result) Emit() []OutFile {
 			ret[ns] = true
 		}
 	}
+	// langs holds each lang file, so CustomItem names join the Lang
+	// declaration of their language.
+	type langFile struct {
+		o    *jsonv.Object
+		decl *Decl
+	}
+	langs := map[string]*langFile{}
+	lang := func(path string, d *Decl) *langFile {
+		l := langs[path]
+		if l == nil {
+			l = &langFile{o: &jsonv.Object{}, decl: d}
+			langs[path] = l
+		}
+		return l
+	}
 	for _, d := range r.Order {
 		id := d.ID()
 		ns, path := splitID(id)
 		switch {
+		case d.Kind.Resource == "lang" && d.Kind.Assets != "":
+			if o, ok := d.Value.(*jsonv.Object); ok {
+				l := lang(d.Kind.Dir(ns)+"/"+path+".json", d)
+				l.decl = d
+				// The Lang's own entries come first; a CustomItem key it
+				// also has is reported by checkCustomItemLang.
+				ms := append([]jsonv.Member(nil), o.Members...)
+				for _, m := range l.o.Members {
+					if o.Get(m.Key) == nil {
+						ms = append(ms, m)
+					}
+				}
+				l.o.Members = ms
+			}
+		case d.Kind.MMS == "CustomItem":
+			it := d.Item
+			if it == nil {
+				continue
+			}
+			if it.Model != nil {
+				out = append(out, OutFile{Path: "assets/" + ns + "/models/" + it.ModelPath + ".json", Data: jsonv.Marshal(it.Model), Unit: d.Unit.Path, Span: d.D.Sp, Pack: sema.ResourcePack})
+			}
+			if it.ItemModel != nil {
+				out = append(out, OutFile{Path: "assets/" + ns + "/items/" + path + ".json", Data: jsonv.Marshal(it.ItemModel), Unit: d.Unit.Path, Span: d.D.Sp, Pack: sema.ResourcePack})
+			}
+			for _, lc := range it.Languages() {
+				l := lang("assets/"+ns+"/lang/"+lc+".json", d)
+				if l.o.Get(it.LangKey) == nil {
+					l.o.Set(it.LangKey, jsonv.String(it.Names[lc]))
+				}
+			}
 		case d.Kind.TagOf != "":
 			p := "data/" + ns + "/" + d.Kind.Resource + "/" + path + ".json"
 			addTag(p, d.Tag, d)
@@ -184,6 +230,9 @@ func (r *Result) Emit() []OutFile {
 				addTag("data/minecraft/tags/function/"+name+".json", jsonv.Array{jsonv.String(ns + ":mms_gen/" + name)}, nil)
 			}
 		}
+	}
+	for path, l := range langs {
+		out = append(out, OutFile{Path: path, Data: jsonv.Marshal(l.o), Unit: l.decl.Unit.Path, Span: l.decl.D.Sp, Pack: sema.ResourcePack})
 	}
 	for path, t := range tags {
 		o := &jsonv.Object{}
