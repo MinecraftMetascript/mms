@@ -24,6 +24,7 @@ const (
 	CandEnum
 	CandKeyword
 	CandKind
+	CandFile // a project file path, inside a string
 )
 
 // Candidate is one completion item.

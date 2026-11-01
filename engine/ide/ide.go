@@ -97,6 +97,11 @@ func (s *Session) Completion(path string, off int) ([]Item, syntax.Span) {
 		return nil, syntax.Span{Start: off, End: off}
 	}
 	f := a.u.File
+	// The path of Texture("..."), Sound("...") or Structure("...") lists
+	// the project's files of that type.
+	if items, replace, ok := s.assetPathCompletion(f, off); ok {
+		return items, replace
+	}
 	// No completion inside comments or strings (old issue #17).
 	if i := f.TokenAt(off); i >= 0 {
 		t := f.Tokens[i]
@@ -105,13 +110,8 @@ func (s *Session) Completion(path string, off int) ([]Item, syntax.Span) {
 		if (t.IsComment() || t.Kind == parser.MMSLexerSTRING) && (inside || atEnd) {
 			return nil, syntax.Span{Start: off, End: off}
 		}
-		if t.Kind == parser.MMSLexerCOMMAND && off > t.Sp.Start {
-			return s.commandCompletion(a, t.Sp, off)
-		}
-		// A lone `/` starting a line of function code is a command whose
-		// name is not typed yet; it lexes as SLASH until a letter follows.
-		if t.Kind == parser.MMSLexerSLASH && off == t.Sp.End && a.code() && lineStart(f.Src, t.Sp.Start) {
-			return s.commandCompletion(a, t.Sp, off)
+		if sp, ok := a.command(t, off); ok {
+			return s.commandCompletion(a, sp, off)
 		}
 	}
 	replace := syntax.Span{Start: off, End: off}
@@ -134,6 +134,45 @@ func (s *Session) Completion(path string, off int) ([]Item, syntax.Span) {
 		items = append(items, it)
 	}
 	return items, replace
+}
+
+// command reports whether off, in token t, is in a raw command, and
+// returns the command's span.
+func (a *at) command(t syntax.Token, off int) (syntax.Span, bool) {
+	if t.Kind == parser.MMSLexerCOMMAND && off > t.Sp.Start {
+		return t.Sp, true
+	}
+	// A lone `/` starting a line of function code is a command whose
+	// name is not typed yet; it lexes as SLASH until a letter follows.
+	if t.Kind == parser.MMSLexerSLASH && off == t.Sp.End && a.code() && lineStart(a.u.File.Src, t.Sp.Start) {
+		return t.Sp, true
+	}
+	return syntax.Span{}, false
+}
+
+// TriggerApplies reports whether completion should open when ch, one of
+// the trigger characters only some places use, was just typed at off:
+// '"' and '/' complete asset file paths, and '/' also starts a command.
+// Elsewhere, such as after the '/' of a division, they open nothing.
+func (s *Session) TriggerApplies(path string, off int, ch string) bool {
+	if ch != `"` && ch != "/" {
+		return true
+	}
+	a := s.at(path, off)
+	if a == nil {
+		return false
+	}
+	f := a.u.File
+	if start, _, ok := assetPathString(f, off); ok {
+		if _, _, ok := sema.AssetFileType(assetHelperBefore(f, start-1)); ok {
+			return true
+		}
+	}
+	if i := f.TokenAt(off); ch == "/" && i >= 0 {
+		_, ok := a.command(f.Tokens[i], off)
+		return ok
+	}
+	return false
 }
 
 func sortKey(i int) string {
