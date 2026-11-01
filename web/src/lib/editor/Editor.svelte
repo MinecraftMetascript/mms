@@ -3,7 +3,7 @@
 	import { EditorState, Compartment } from '@codemirror/state';
 	import { EditorView, keymap } from '@codemirror/view';
 	import { indentWithTab } from '@codemirror/commands';
-	import { acceptCompletion } from '@codemirror/autocomplete';
+	import { acceptCompletion, startCompletion } from '@codemirror/autocomplete';
 	import { indentUnit } from '@codemirror/language';
 	import { applyEdits, showDiagnostics } from './diagnostics';
 	import { onMount, untrack } from 'svelte';
@@ -104,6 +104,11 @@
 					{ key: 'Mod-s', run: formatCommand, preventDefault: true },
 					{ key: 'Shift-Alt-f', run: formatCommand, preventDefault: true },
 					{ key: 'Mod-Alt-f', run: fixAllCommand, preventDefault: true },
+					// Ctrl+Space (from basicSetup) is taken by the OS on macOS (input
+					// source switching) and by some IMEs elsewhere, so offer the
+					// VS Code and Zed alternatives too: Cmd/Ctrl+I and Alt/Option+Space.
+					{ key: 'Mod-i', run: startCompletion, preventDefault: true },
+					{ key: 'Alt-Space', run: startCompletion, preventDefault: true },
 					// Tab accepts an open completion, otherwise indents; Shift+Tab unindents.
 					// Escape then Tab still moves focus out of the editor.
 					{ key: 'Tab', run: acceptCompletion },

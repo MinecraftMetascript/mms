@@ -334,6 +334,28 @@ test('Tab indents, Shift+Tab unindents, and Tab accepts a completion', async ({ 
 	await expect(page.locator('.cm-content')).toContainText('DensityFunction x = Clamp');
 });
 
+test('completion opens on request with Ctrl+Space, Cmd/Ctrl+I and Alt+Space', async ({ page }) => {
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	const popup = page.locator('.cm-tooltip-autocomplete');
+	// A blank line in a function offers execute helpers and keywords.
+	await replaceText(page, 'Function f {\n  /say hi\n  \n}\n');
+	await page.locator('.cm-line').nth(2).click();
+	await page.keyboard.press('End');
+	for (const key of ['Control+Space', 'ControlOrMeta+i', 'Alt+Space']) {
+		await page.keyboard.press(key);
+		await expect(popup).toContainText('Positioned');
+		await expect(popup).toContainText('let');
+		await page.keyboard.press('Escape');
+		await expect(popup).toHaveCount(0);
+	}
+	await expect(page.locator('.cm-line').nth(2)).toHaveText('  ');
+	// After an operator with nothing typed yet.
+	await replaceText(page, 'DensityFunction x = 1 / ');
+	await page.keyboard.press('Control+Space');
+	await expect(popup).toContainText('Clamp');
+});
+
 test('F2 renames inline with a preview of occurrences', async ({ page }) => {
 	await page.goto('./');
 	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });

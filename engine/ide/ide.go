@@ -47,6 +47,13 @@ func (s *Session) at(path string, off int) *at {
 	if len(a.path) == 1 {
 		if prev := prevToken(u.File, off); prev != nil && continues(u.File, prev, off) {
 			a.path = syntax.PathAt(u.File, prev.Sp.End)
+			// `x = 1 + |` can leave the dangling operator outside the
+			// declaration; the operand before it still belongs.
+			if len(a.path) == 1 && mathOp(prev.Kind) {
+				if before := prevToken(u.File, prev.Sp.Start); before != nil {
+					a.path = syntax.PathAt(u.File, before.Sp.End)
+				}
+			}
 		}
 	}
 	if len(a.path) > 1 {
@@ -101,6 +108,11 @@ func (s *Session) Completion(path string, off int) ([]Item, syntax.Span) {
 		if t.Kind == parser.MMSLexerCOMMAND && off > t.Sp.Start {
 			return s.commandCompletion(a, t.Sp, off)
 		}
+		// A lone `/` starting a line of function code is a command whose
+		// name is not typed yet; it lexes as SLASH until a letter follows.
+		if t.Kind == parser.MMSLexerSLASH && off == t.Sp.End && a.code() && lineStart(f.Src, t.Sp.Start) {
+			return s.commandCompletion(a, t.Sp, off)
+		}
 	}
 	replace := syntax.Span{Start: off, End: off}
 	inner := a.path[len(a.path)-1]
@@ -152,11 +164,22 @@ func (s *Session) complete(a *at, off int) []sema.Candidate {
 	}
 	// After `=`, `(`, `,` or `[` with nothing typed yet, the value is a
 	// Bad node or missing; find the node that expects it.
-	if prev := prevToken(f, off); prev != nil && prev.Kind == parser.MMSLexerASSIGN {
+	if prev := prevToken(f, off); prev != nil && (prev.Kind == parser.MMSLexerASSIGN || mathOp(prev.Kind)) {
 		for i := len(a.path) - 1; i >= 0; i-- {
 			if bad := badAfter(a.path[i], prev.Sp.End, off); bad != nil {
 				if in := a.info(bad); in.HasType() {
 					return a.c.ValueCandidates(in)
+				}
+			}
+		}
+		// The right operand of `a + |` has the type of the left one (or
+		// of the whole sum).
+		if mathOp(prev.Kind) {
+			for i := len(a.path) - 1; i >= 2; i-- {
+				if x, ok := a.path[i].(syntax.Expr); ok {
+					if in := a.info(x); in.HasType() {
+						return a.c.ValueCandidates(in)
+					}
 				}
 			}
 		}
@@ -172,7 +195,7 @@ func (s *Session) complete(a *at, off int) []sema.Candidate {
 			// A word starting a statement in function code, or a helper
 			// of an execute chain.
 			if a.code() && startsStatement(a.path, i) {
-				return sema.ExecCandidates(true)
+				return statementCandidates()
 			}
 			// A bare word in an object body is a field being typed.
 			if _, ok := parent.(*syntax.ExprStmt); ok && i >= 2 {
@@ -248,9 +271,34 @@ func (s *Session) complete(a *at, off int) []sema.Candidate {
 			if cs := a.blockFields(n); cs != nil {
 				return cs
 			}
+			// An empty statement position in function code, such as a
+			// blank line asked for with Ctrl+Space.
+			if a.code() && i == len(a.path)-1 && off > n.Sp.Start && off < n.Sp.End {
+				return statementCandidates()
+			}
 		}
 	}
 	return nil
+}
+
+// statementCandidates lists what can start a statement in function code:
+// the execute helpers, then the statement keywords.
+func statementCandidates() []sema.Candidate {
+	out := sema.ExecCandidates(true)
+	for i, kw := range []string{"let", "if", "while", "for", "return"} {
+		out = append(out, sema.Candidate{Label: kw, Kind: sema.CandKeyword, Rank: 100 + i})
+	}
+	return out
+}
+
+// lineStart reports whether only blanks precede off on its line.
+func lineStart(src []rune, off int) bool {
+	for i := off - 1; i >= 0 && src[i] != '\n'; i-- {
+		if src[i] != ' ' && src[i] != '\t' {
+			return false
+		}
+	}
+	return true
 }
 
 // code reports whether the cursor's declaration holds function code.
@@ -308,9 +356,22 @@ func continues(f *syntax.File, prev *syntax.Token, off int) bool {
 	case parser.MMSLexerASSIGN, parser.MMSLexerCOMMA, parser.MMSLexerLPAREN, parser.MMSLexerLBRACK, parser.MMSLexerDOT:
 		return true
 	}
+	if mathOp(prev.Kind) {
+		return true
+	}
 	l1, _ := f.LineCol(prev.Sp.End)
 	l2, _ := f.LineCol(off)
 	return l1 == l2
+}
+
+// mathOp reports whether k is an arithmetic operator, which needs a
+// right-hand operand.
+func mathOp(k syntax.TokenKind) bool {
+	switch k {
+	case parser.MMSLexerPLUS, parser.MMSLexerMINUS, parser.MMSLexerSTAR, parser.MMSLexerSLASH, parser.MMSLexerPERCENT:
+		return true
+	}
+	return false
 }
 
 func prevToken(f *syntax.File, off int) *syntax.Token {
