@@ -122,6 +122,7 @@ type Result struct {
 	collect  map[string][]syntax.Diagnostic
 	assets   []assetUse
 	assetErr map[string][]syntax.Diagnostic
+	orderErr map[string][]syntax.Diagnostic // feature order cycles
 	files    fs.FS
 	lintMu   sync.Mutex
 	lintDone bool
@@ -187,6 +188,7 @@ func (r *Result) Diagnostics(path string) []syntax.Diagnostic {
 	out = append(out, u.File.Diags...)
 	out = append(out, r.collect[path]...)
 	out = append(out, r.assetErr[path]...)
+	out = append(out, r.orderErr[path]...)
 	for _, d := range r.Order {
 		if d.Unit == u {
 			out = append(out, d.Diags...)
@@ -273,6 +275,7 @@ func (p *Project) Analyze(ctx context.Context) (*Result, error) {
 		}
 	}
 	r.collectAssets()
+	r.checkFeatureOrder()
 	p.mu.Lock()
 	p.last = r
 	p.mu.Unlock()
