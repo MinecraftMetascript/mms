@@ -5,6 +5,16 @@ export interface SourceFile {
 	text: string;
 }
 
+/** A binary project file, such as a texture or sound, as base64. */
+export interface AssetFile {
+	path: string;
+	data: string;
+}
+
+/** The binary files asset helpers read: Texture, Sound and Structure. */
+export const assetExtensions = ['.png', '.ogg', '.nbt'];
+export const isAssetPath = (p: string) => assetExtensions.some((e) => p.toLowerCase().endsWith(e));
+
 export interface Config {
 	namespace: string;
 	description: string;
@@ -14,6 +24,8 @@ export interface ProjectData {
 	name: string;
 	config: Config;
 	files: SourceFile[];
+	/** Textures, sounds and structures; older saves have none. */
+	assets?: AssetFile[];
 	active: string;
 }
 
@@ -53,6 +65,7 @@ export class Project {
 	name = $state(starter.name);
 	config = $state<Config>({ ...starter.config });
 	files = $state<SourceFile[]>([]);
+	assets = $state<AssetFile[]>([]);
 	active = $state('');
 	private saveTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -73,6 +86,7 @@ export class Project {
 			name: this.name,
 			config: $state.snapshot(this.config),
 			files: $state.snapshot(this.files),
+			assets: $state.snapshot(this.assets),
 			active: this.active
 		};
 	}
@@ -81,6 +95,7 @@ export class Project {
 		this.name = data.name;
 		this.config = { ...data.config };
 		this.files = data.files.map((f) => ({ ...f }));
+		this.assets = (data.assets ?? []).map((f) => ({ ...f }));
 		this.active = this.files.some((f) => f.path === data.active) ? data.active : (this.files[0]?.path ?? '');
 		if (save) this.save();
 	}
@@ -120,6 +135,23 @@ export class Project {
 	remove(path: string) {
 		this.files = this.files.filter((f) => f.path !== path);
 		if (this.active === path) this.active = this.files[0]?.path ?? '';
+		this.save();
+	}
+
+	/** Adds or replaces a binary file. */
+	setAsset(path: string, data: string) {
+		path = path.trim().replace(/\\/g, '/').replace(/^\/+/, '');
+		const f = this.assets.find((f) => f.path === path);
+		if (f) f.data = data;
+		else {
+			this.assets.push({ path, data });
+			this.assets.sort((a, b) => a.path.localeCompare(b.path));
+		}
+		this.save();
+	}
+
+	removeAsset(path: string) {
+		this.assets = this.assets.filter((f) => f.path !== path);
 		this.save();
 	}
 

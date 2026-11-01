@@ -8,9 +8,12 @@ import (
 	"io"
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
+	"testing/fstest"
+	"time"
 
 	"github.com/minecraftmetascript/mms/engine/format"
 	"github.com/minecraftmetascript/mms/engine/ide"
@@ -36,7 +39,10 @@ type Server struct {
 	// keeps them in the project (the browser has no disk to fall back on).
 	managed   map[string]bool
 	published map[string]bool
-	shutdown  bool
+	// assets holds binary project files (textures, sounds) the browser
+	// sent with mms/setAssets, since it has no disk for Texture() to read.
+	assets   fstest.MapFS
+	shutdown bool
 }
 
 // NewServer returns a server over tr checking against pack.
@@ -193,6 +199,7 @@ func init() {
 		"textDocument/codeAction":          typed((*Server).codeAction),
 		"mms/setConfig":                    typed((*Server).setConfig),
 		"mms/setFiles":                     typed((*Server).setFiles),
+		"mms/setAssets":                    typed((*Server).setAssets),
 		"mms/importPack":                   typed((*Server).importPack),
 		"mms/resourceKinds":                typed((*Server).resourceKinds),
 		"mms/convertJSON":                  typed((*Server).convertJSON),
@@ -425,6 +432,32 @@ func (s *Server) setFiles(ctx context.Context, p struct {
 		delete(s.open, uri)
 		s.proj.RemoveFile(uri)
 	}
+	s.analyze(ctx)
+	return nil, nil
+}
+
+// setAssets adds, replaces and removes binary project files, by path
+// relative to the project; data is base64 in JSON. The browser sends them
+// because it has no disk; asset helpers such as Texture("a.png") read them.
+func (s *Server) setAssets(ctx context.Context, p struct {
+	Files []struct {
+		Path string `json:"path"`
+		Data []byte `json:"data"`
+	} `json:"files"`
+	Remove []string `json:"remove"`
+}) (any, *respError) {
+	if s.assets == nil {
+		s.assets = fstest.MapFS{}
+	}
+	now := time.Now()
+	for _, f := range p.Files {
+		s.assets[path.Clean(f.Path)] = &fstest.MapFile{Data: f.Data, ModTime: now}
+	}
+	for _, rel := range p.Remove {
+		delete(s.assets, path.Clean(rel))
+	}
+	// Checks cached against the old files see the new times and re-run.
+	s.proj.Files = s.assets
 	s.analyze(ctx)
 	return nil, nil
 }
@@ -754,14 +787,22 @@ func lineEnd(l *lines, line int) int {
 }
 
 // output returns the generated pack for previews: every file's path and
-// text, with the declaration it came from.
+// text, with the declaration it came from. Copied binary files have no
+// text; they are listed in assets with the project file they copy, so the
+// browser can put its own copy in a download.
 func (s *Server) output(_ context.Context, _ struct{}) (any, *respError) {
 	files := s.res.Emit()
 	out := make([]map[string]any, 0, len(files))
+	assets := []map[string]any{}
 	idx := map[string]*lines{}
 	for _, f := range files {
 		if f.Asset != "" {
-			continue // copied binary files have no text to preview
+			a := map[string]any{"path": f.Path, "src": f.Asset}
+			if f.Pack == sema.ResourcePack {
+				a["pack"] = "resources"
+			}
+			assets = append(assets, a)
+			continue
 		}
 		m := map[string]any{"path": f.Path, "text": string(f.Data)}
 		if f.Pack == sema.ResourcePack {
@@ -778,7 +819,7 @@ func (s *Server) output(_ context.Context, _ struct{}) (any, *respError) {
 		out = append(out, m)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i]["path"].(string) < out[j]["path"].(string) })
-	return map[string]any{"files": out, "hasErrors": s.res.HasErrors()}, nil
+	return map[string]any{"files": out, "assets": assets, "hasErrors": s.res.HasErrors()}, nil
 }
 
 // ---- URIs
