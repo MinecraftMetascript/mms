@@ -1,0 +1,27 @@
+== worldgen/noise test:ridges
+{
+  "base_octave": -7,
+  "octave_count": 2
+}
+== worldgen/density_function test:terrain
+{
+  "type": "minecraft:abs",
+  "input": "test:ridges"
+}
+== worldgen/density_function test:sampled
+{
+  "type": "minecraft:abs",
+  "input": {
+    "type": "minecraft:noise",
+    "noise": "test:ridges",
+    "xz_scale": 1,
+    "y_scale": 1
+  }
+}
+== worldgen/density_function test:missing
+{
+  "type": "minecraft:abs",
+  "input": "minecraft:nowhere"
+}
+! 5: mms/type-mismatch 'ridges' is a Noise, not a DensityFunction; sample it with Noise(ridges, 1, 1)
+! 10: mms/unknown-id unknown worldgen/density_function 'minecraft:nowhere'

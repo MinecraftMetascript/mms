@@ -57,6 +57,18 @@ func (t *Table) hasNamespace(ns string) bool {
 	return false
 }
 
+// OtherKind returns the first resource declaration with this id whose files
+// live in a folder other than folder, or nil. It explains a bare reference
+// that names a local declaration of the wrong kind.
+func (t *Table) OtherKind(folder, id string) *Symbol {
+	for _, s := range t.all {
+		if s.ID() == id && s.Kind.MMS == "" && s.Kind.Folder() != "" && s.Kind.Folder() != folder {
+			return s
+		}
+	}
+	return nil
+}
+
 // All returns every symbol in declaration order.
 func (t *Table) All() []*Symbol { return t.all }
 
