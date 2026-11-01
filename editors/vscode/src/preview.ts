@@ -13,6 +13,8 @@ export class Previews implements vscode.Disposable {
 	private files: OutputFile[] = [];
 	/** The output at the cursor; kept while the cursor is outside declarations. */
 	private cursor: string | null = null;
+	/** The .mms document last edited or moved in, whose project the panel shows. */
+	private document: vscode.Uri | undefined;
 	private timer: ReturnType<typeof setTimeout> | undefined;
 	private readonly subscriptions: vscode.Disposable[] = [];
 
@@ -83,7 +85,10 @@ export class Previews implements vscode.Disposable {
 		const client = this.client();
 		if (!this.panel || !client?.isRunning()) return;
 		try {
-			const out = await client.sendRequest<{ files: OutputFile[]; hasErrors: boolean }>('mms/output', {});
+			// The uri picks the project (the nearest mms.json) in a workspace
+			// with several; servers that predate that ignore it.
+			const uri = (this.document ?? vscode.window.activeTextEditor?.document.uri)?.toString();
+			const out = await client.sendRequest<{ files: OutputFile[]; hasErrors: boolean }>('mms/output', uri ? { uri } : {});
 			this.files = out.files;
 			this.post({ type: 'output', files: out.files });
 			const editor = vscode.window.activeTextEditor;
@@ -96,6 +101,11 @@ export class Previews implements vscode.Disposable {
 	/** Points the panel at the declaration under the editor's cursor. */
 	private follow(editor: vscode.TextEditor) {
 		if (!this.panel || editor.document.languageId !== 'mms') return;
+		if (this.document?.toString() !== editor.document.uri.toString()) {
+			// Another file may belong to another project: fetch its pack.
+			this.document = editor.document.uri;
+			this.scheduleRefresh();
+		}
 		const line = editor.selection.active.line;
 		const here = key(editor.document.uri);
 		const f = this.files.find((f) => f.uri && f.range && f.range.start.line <= line && line <= f.range.end.line && key(vscode.Uri.parse(f.uri)) === here);
