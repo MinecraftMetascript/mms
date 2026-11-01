@@ -1,0 +1,6 @@
+{
+  "$schema": "https://minecraftmetascript.github.io/mms/mms.schema.json",
+  "namespace": "embers",
+  "description": "Custom assets: original textures, a painting, a music disc with its own song, item models and translations",
+  "icon": "art/icon.png"
+}

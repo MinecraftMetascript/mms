@@ -7,15 +7,13 @@
 	import Editor from '#lib/editor/Editor.svelte';
 	import Sidebar from '#lib/components/Sidebar.svelte';
 	import JsonView from '#lib/components/JsonView.svelte';
-	import Preview from '#lib/preview/Preview.svelte';
 	import { Engine, type Diagnostic, type DocSymbol, type OutputFile } from '#lib/engine/engine.svelte.ts';
 	import { Project, pathOf, uriOf, starter } from '#lib/project/project.svelte.ts';
 	import { examples } from '#lib/project/examples.ts';
-	import { download, isDataPack, packZip, projectZip, readProjectZip, readZip } from '#lib/project/zip.ts';
+	import { download, hasResourcePack, isDataPack, packZip, projectZip, readProjectZip, readZip, readZipAssets } from '#lib/project/zip.ts';
 	import PasteJson from '#lib/components/PasteJson.svelte';
-	import { previewable } from '#lib/preview/protocol.ts';
-	import Inspect from '#lib/inspect/Inspect.svelte';
-	import { inspectable } from '#lib/inspect/common.ts';
+	import { PinButton, PreviewPane, shows } from '@mms/preview';
+	import PreviewWorker from '@mms/preview/worker?worker';
 
 	const project = new Project();
 	let engine = $state<Engine | null>(null);
@@ -74,11 +72,13 @@
 		if (!engine) return;
 		engine.setConfig($state.snapshot(project.config));
 		engine.workspace.setFiles(project.files.map((f) => ({ uri: uriOf(f.path), text: f.text })));
+		engine.setAssets($state.snapshot(project.assets));
 		engine.scheduleRefresh();
 	}
 	$effect(() => {
 		// Track the set of paths (not their text, which the editor syncs).
 		void project.files.map((f) => f.path).join('\n');
+		void project.assets.map((f) => f.path + ':' + f.data.length).join('\n');
 		void project.config.namespace;
 		void project.config.description;
 		if (loaded) syncEngine();
@@ -121,6 +121,16 @@
 	});
 	const selectedFile = $derived(engine?.output.find((f) => f.path === selectedOutput) ?? null);
 
+	// A pinned output keeps the Preview tab on one declaration while the
+	// cursor moves elsewhere; it still redraws as the pack changes. The JSON
+	// tab keeps following the cursor.
+	let pinned = $state<string | null>(null);
+	const previewPath = $derived(pinned ?? selectedOutput);
+	const pinnable = $derived(shows(previewPath));
+	function togglePin() {
+		pinned = pinned ? null : previewPath && shows(previewPath) ? previewPath : null;
+	}
+
 	async function reveal(uri: string, range: Diagnostic['range']) {
 		const path = pathOf(uri);
 		if (project.active !== path) {
@@ -141,7 +151,8 @@
 
 	function selectOutput(path: string) {
 		selectedOutput = path;
-		rightTab = previewable(path) || inspectable(path) ? rightTab : 'json';
+		// A pinned preview stays on screen; otherwise show JSON for outputs with no preview.
+		if (!pinned && !shows(path)) rightTab = 'json';
 	}
 
 	function openExample(id: string) {
@@ -149,18 +160,22 @@
 		menu = false;
 		if (!ex) return;
 		if (!confirm(`Open the ${ex.id} example? It replaces the current project; export it first to keep a copy.`)) return;
+		pinned = null;
 		project.replace(structuredClone(ex.data));
 	}
 	function newProject() {
 		menu = false;
-		if (confirm('Start a new project? It replaces the current one; export it first to keep a copy.')) project.replace(structuredClone(starter));
+		if (!confirm('Start a new project? It replaces the current one; export it first to keep a copy.')) return;
+		pinned = null;
+		project.replace(structuredClone(starter));
 	}
 	async function importZip(e: Event) {
 		const file = (e.target as HTMLInputElement).files?.[0];
 		(e.target as HTMLInputElement).value = '';
 		if (!file) return;
 		try {
-			const entries = readZip(new Uint8Array(await file.arrayBuffer()));
+			const bytes = new Uint8Array(await file.arrayBuffer());
+			const entries = readZip(bytes);
 			if (isDataPack(entries)) {
 				if (!engine) return;
 				const res = await engine.importPack([...entries].map(([path, text]) => ({ path, text })));
@@ -176,8 +191,11 @@
 				});
 				return;
 			}
-			const data = readProjectZip(file.name, entries);
-			if (confirm(`Import ${data.files.length} file(s) from ${file.name}? It replaces the current project.`)) project.replace(data);
+			const data = readProjectZip(file.name, entries, readZipAssets(bytes));
+			if (confirm(`Import ${data.files.length} file(s) from ${file.name}? It replaces the current project.`)) {
+				pinned = null;
+				project.replace(data);
+			}
 		} catch (err) {
 			alert(`Could not import ${file.name}: ${err instanceof Error ? err.message : err}`);
 		}
@@ -196,10 +214,14 @@
 			project.setText(f.path, f.text + sep + text);
 		}
 	}
-	function exportPack() {
+	// The game loads a resource pack from its own zip, like `mms build --zip`,
+	// so it gets its own button (browsers block a second download per click).
+	const resourcePack = $derived(!!engine && hasResourcePack(engine.output, engine.outputAssets));
+	function exportPack(resources = false) {
 		if (!engine) return;
 		if (engine.hasErrors && !confirm('The project has errors, so the pack is incomplete. Download it anyway?')) return;
-		download(`${project.name || 'pack'}.zip`, packZip(engine.output));
+		const name = (project.name || 'pack') + (resources ? '-resources' : '');
+		download(`${name}.zip`, packZip(engine.output, engine.outputAssets, $state.snapshot(project.assets), resources));
 	}
 
 	const totals = $derived.by(() => {
@@ -298,7 +320,10 @@
 			{#if engine?.status === 'failed'}
 				<button class="rounded px-2 py-1 text-accent hover:bg-hover" onclick={() => engine?.restart()} title={engine.statusDetail}>Restart</button>
 			{/if}
-			<button class="rounded bg-accent px-3 py-1 font-medium text-white hover:opacity-90 disabled:opacity-50" disabled={!engine?.output.length} onclick={exportPack}><span class="sm:hidden">Pack</span><span class="hidden sm:inline">Download pack</span></button>
+			{#if resourcePack}
+				<button class="rounded border border-accent px-3 py-1 font-medium text-accent hover:bg-hover" title="The textures, sounds, models and translations, for the world's resources.zip" onclick={() => exportPack(true)}><span class="sm:hidden">Resources</span><span class="hidden sm:inline">Download resources</span></button>
+			{/if}
+			<button class="rounded bg-accent px-3 py-1 font-medium text-white hover:opacity-90 disabled:opacity-50" disabled={!engine?.output.length} onclick={() => exportPack()}><span class="sm:hidden">Pack</span><span class="hidden sm:inline">Download pack</span></button>
 		</div>
 	</header>
 
@@ -344,15 +369,20 @@
 						onclick={() => (rightTab = id as typeof rightTab)}>{label}</button
 					>
 				{/each}
+				{#if rightTab === 'preview' && (pinned || pinnable)}
+					<PinButton class="ml-auto" {pinned} onclick={togglePin} />
+				{/if}
 			</div>
 			<div class="min-h-0 flex-1">
 				{#if engine}
 					<div class="h-full" class:hidden={rightTab !== 'preview'}>
-						{#if selectedFile && inspectable(selectedFile.path)}
-							<Inspect file={selectedFile} />
-						{:else}
-							<Preview output={engine.output} target={selectedOutput} />
-						{/if}
+						<PreviewPane
+							output={engine.output}
+							path={previewPath}
+							{pinned}
+							onunpin={() => (pinned = null)}
+							createWorker={() => new PreviewWorker()}
+						/>
 					</div>
 					<div class="h-full" class:hidden={rightTab !== 'json'}>
 						<JsonView file={selectedFile} onsource={(f: OutputFile) => f.uri && f.range && reveal(f.uri, f.range)} />

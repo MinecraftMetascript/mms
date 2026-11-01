@@ -1,4 +1,5 @@
 {
+  "$schema": "https://minecraftmetascript.github.io/mms/mms.schema.json",
   "namespace": "badlands_demo",
   "description": "Port of the old overworld badlands surface rules"
 }

@@ -225,6 +225,40 @@ func TestManagedFiles(t *testing.T) {
 	}
 }
 
+func TestSetAssets(t *testing.T) {
+	c := start(t)
+	c.result("initialize", map[string]any{})
+	a := "mem:///a.mms"
+	c.notify("mms/setFiles", map[string]any{"files": []any{
+		map[string]any{"uri": a, "text": "PaintingVariant p = { width = 1, height = 1, asset_id = Texture(\"art/p.png\") }\n"},
+	}})
+	assets := func() []any {
+		out := c.result("mms/output", map[string]any{}).(map[string]any)
+		if out["hasErrors"] == true {
+			return nil
+		}
+		return out["assets"].([]any)
+	}
+	if got := assets(); got != nil {
+		t.Fatalf("built without the file: %v", got)
+	}
+	png := []byte("\x89PNG\r\n\x1a\nrest")
+	// JSON carries the bytes as base64.
+	c.notify("mms/setAssets", map[string]any{"files": []any{map[string]any{"path": "art/p.png", "data": png}}})
+	got := assets()
+	if len(got) != 1 {
+		t.Fatalf("assets = %v", got)
+	}
+	m := got[0].(map[string]any)
+	if m["path"] != "assets/mms/textures/painting/p.png" || m["src"] != "art/p.png" || m["pack"] != "resources" {
+		t.Errorf("asset = %v", m)
+	}
+	c.notify("mms/setAssets", map[string]any{"remove": []any{"art/p.png"}})
+	if got := assets(); got != nil {
+		t.Errorf("still built after removing the file: %v", got)
+	}
+}
+
 func TestImportPack(t *testing.T) {
 	c := start(t)
 	c.result("initialize", map[string]any{})
@@ -379,5 +413,159 @@ func TestRegistersWatchers(t *testing.T) {
 		if n["method"] == "client/registerCapability" {
 			t.Fatal("registered watchers for a client without dynamic registration")
 		}
+	}
+}
+
+// TestProjects checks that each mms.json folder in the workspace is its
+// own project: the same names in two examples do not collide, and lookups
+// stay inside the file's project.
+func TestProjects(t *testing.T) {
+	dir := t.TempDir()
+	write := func(rel, text string) string {
+		full := filepath.Join(dir, rel)
+		os.MkdirAll(filepath.Dir(full), 0o755)
+		os.WriteFile(full, []byte(text), 0o644)
+		return pathURI(full)
+	}
+	write("a/mms.json", `{"namespace": "a"}`)
+	write("b/mms.json", `{"namespace": "b"}`)
+	aBase := write("a/base.mms", "DensityFunction base = 1\n")
+	bBase := write("b/base.mms", "DensityFunction base = 2\n")
+	aMain := write("a/main.mms", "DensityFunction top = base * 2\n")
+	loose := write("scratch.mms", "DensityFunction base = 3\n")
+
+	c := start(t)
+	c.result("initialize", map[string]any{"rootUri": pathURI(dir)})
+	c.notify("textDocument/didOpen", map[string]any{"textDocument": map[string]any{"uri": aMain, "languageId": "mms", "version": 1, "text": "DensityFunction top = base * 2\n"}})
+
+	def := c.result("textDocument/definition", pos(aMain, 0, 23)).([]any)
+	if len(def) != 1 || def[0].(map[string]any)["uri"] != aBase {
+		t.Fatalf("definition = %v, want only %s", def, aBase)
+	}
+	refs := c.result("textDocument/references", map[string]any{"textDocument": map[string]any{"uri": aBase}, "position": map[string]any{"line": 0, "character": 17}, "context": map[string]any{"includeDeclaration": true}}).([]any)
+	for _, r := range refs {
+		if u := r.(map[string]any)["uri"]; u != aBase && u != aMain {
+			t.Errorf("reference in another project: %v", u)
+		}
+	}
+	c.result("mms/ping", nil)
+	for _, n := range c.notes {
+		if n["method"] != "textDocument/publishDiagnostics" {
+			continue
+		}
+		p := n["params"].(map[string]any)
+		for _, d := range p["diagnostics"].([]any) {
+			if sev := d.(map[string]any)["severity"].(float64); sev <= 2 {
+				t.Errorf("problem in %v: %v", p["uri"], d)
+			}
+		}
+	}
+	out := c.result("mms/output", map[string]any{"uri": bBase}).(map[string]any)
+	for _, f := range out["files"].([]any) {
+		if u, ok := f.(map[string]any)["uri"]; ok && u != bBase {
+			t.Errorf("output of b has a file from %v", u)
+		}
+	}
+
+	// A new mms.json at the top takes in the loose file, and only it: the
+	// examples keep their own projects.
+	write("mms.json", `{"namespace": "top"}`)
+	c.notify("workspace/didChangeWatchedFiles", map[string]any{"changes": []any{map[string]any{"uri": pathURI(filepath.Join(dir, "mms.json")), "type": 1}}})
+	out = c.result("mms/output", map[string]any{"uri": loose}).(map[string]any)
+	for _, f := range out["files"].([]any) {
+		if u, ok := f.(map[string]any)["uri"]; ok && u != loose {
+			t.Errorf("top project has a file from %v", u)
+		}
+	}
+	def = c.result("textDocument/definition", pos(aMain, 0, 23)).([]any)
+	if len(def) != 1 || def[0].(map[string]any)["uri"] != aBase {
+		t.Errorf("after reload definition = %v, want %s", def, aBase)
+	}
+	// Without a uri, output is still the last edited file's project.
+	out = c.result("mms/output", map[string]any{}).(map[string]any)
+	for _, f := range out["files"].([]any) {
+		if u, ok := f.(map[string]any)["uri"]; ok && u != aBase && u != aMain {
+			t.Errorf("after reload output has a file from %v, want project a", u)
+		}
+	}
+}
+
+// TestLooseFolders checks that files in every folder no mms.json covers
+// stay in the default project when their editor closes.
+func TestLooseFolders(t *testing.T) {
+	one, two := t.TempDir(), t.TempDir()
+	os.WriteFile(filepath.Join(one, "a.mms"), []byte("DensityFunction a = 1\n"), 0o644)
+	os.WriteFile(filepath.Join(two, "b.mms"), []byte("DensityFunction b = a * 2\n"), 0o644)
+	a, b := pathURI(filepath.Join(one, "a.mms")), pathURI(filepath.Join(two, "b.mms"))
+
+	c := start(t)
+	c.result("initialize", map[string]any{"workspaceFolders": []any{map[string]any{"uri": pathURI(one)}, map[string]any{"uri": pathURI(two)}}})
+	c.notify("textDocument/didOpen", map[string]any{"textDocument": map[string]any{"uri": b, "languageId": "mms", "version": 1, "text": "DensityFunction b = a * 2\n"}})
+	c.notify("textDocument/didClose", map[string]any{"textDocument": map[string]any{"uri": b}})
+	refs := c.result("textDocument/references", map[string]any{"textDocument": map[string]any{"uri": a}, "position": map[string]any{"line": 0, "character": 16}, "context": map[string]any{"includeDeclaration": false}}).([]any)
+	if len(refs) != 1 || refs[0].(map[string]any)["uri"] != b {
+		t.Errorf("references = %v, want the use in %s", refs, b)
+	}
+}
+
+// TestAssetPathCompletion checks that Texture("|") lists image files: the
+// browser's uploaded assets, and on disk only the file's own project.
+func TestAssetPathCompletion(t *testing.T) {
+	paths := func(res any) []string {
+		var out []string
+		for _, it := range res.(map[string]any)["items"].([]any) {
+			out = append(out, it.(map[string]any)["label"].(string))
+		}
+		return out
+	}
+	const text = "PaintingVariant p = { width = 1, height = 1, asset_id = Texture(\"\") }\n"
+	at := strings.Index(text, `""`) + 1
+	withTrigger := func(uri, ch string) map[string]any {
+		p := pos(uri, 0, at)
+		p["context"] = map[string]any{"triggerKind": 2, "triggerCharacter": ch}
+		return p
+	}
+
+	c := start(t)
+	c.result("initialize", map[string]any{})
+	a := "mem:///a.mms"
+	c.notify("mms/setFiles", map[string]any{"files": []any{map[string]any{"uri": a, "text": text}}})
+	c.notify("mms/setAssets", map[string]any{"files": []any{
+		map[string]any{"path": "art/p.png", "data": []byte("\x89PNG\r\n\x1a\n")},
+		map[string]any{"path": "music/m.ogg", "data": []byte("OggS")},
+	}})
+	if got := paths(c.result("textDocument/completion", withTrigger(a, `"`))); strings.Join(got, ",") != "art/p.png" {
+		t.Errorf("web completion = %v", got)
+	}
+
+	dir := t.TempDir()
+	write := func(rel, text string) string {
+		full := filepath.Join(dir, rel)
+		os.MkdirAll(filepath.Dir(full), 0o755)
+		os.WriteFile(full, []byte(text), 0o644)
+		return pathURI(full)
+	}
+	write("a/mms.json", `{"namespace": "a"}`)
+	write("b/mms.json", `{"namespace": "b"}`)
+	write("a/art/mine.png", "\x89PNG\r\n\x1a\n")
+	write("b/art/theirs.png", "\x89PNG\r\n\x1a\n")
+	aMain := write("a/main.mms", text)
+	c = start(t)
+	c.result("initialize", map[string]any{"rootUri": pathURI(dir)})
+	c.notify("textDocument/didOpen", map[string]any{"textDocument": map[string]any{"uri": aMain, "languageId": "mms", "version": 1, "text": text}})
+	res := c.result("textDocument/completion", pos(aMain, 0, at))
+	if got := paths(res); strings.Join(got, ",") != "art/mine.png" {
+		t.Errorf("disk completion = %v", got)
+	}
+	if kind := res.(map[string]any)["items"].([]any)[0].(map[string]any)["kind"]; kind != float64(17) {
+		t.Errorf("kind = %v, want File", kind)
+	}
+	// A quote typed outside an asset helper opens nothing.
+	other := write("a/other.mms", "Global g = \"\"\n")
+	c.notify("textDocument/didOpen", map[string]any{"textDocument": map[string]any{"uri": other, "languageId": "mms", "version": 1, "text": "Global g = \"\"\n"}})
+	p := pos(other, 0, 12)
+	p["context"] = map[string]any{"triggerKind": 2, "triggerCharacter": `"`}
+	if got := paths(c.result("textDocument/completion", p)); len(got) != 0 {
+		t.Errorf("quote elsewhere = %v", got)
 	}
 }

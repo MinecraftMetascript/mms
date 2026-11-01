@@ -1,4 +1,6 @@
 @import 'tailwindcss';
+/* The colour tokens below as Tailwind colours, and the shared previews' classes. */
+@import '@mms/preview/theme.css';
 
 @custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
 
@@ -39,20 +41,6 @@
 	--c-accent: #6ea2ff;
 	--c-canvas: #0d1013;
 	color-scheme: dark;
-}
-
-@theme inline {
-	--color-bg: var(--c-bg);
-	--color-panel: var(--c-panel);
-	--color-ink: var(--c-ink);
-	--color-muted: var(--c-muted);
-	--color-line: var(--c-line);
-	--color-hover: var(--c-hover);
-	--color-selected: var(--c-selected);
-	--color-accent: var(--c-accent);
-	--color-canvas: var(--c-canvas);
-	--font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
-	--font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 html,

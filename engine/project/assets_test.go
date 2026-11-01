@@ -95,6 +95,12 @@ res pack.png <- art/icon.png`
 			if !strings.Contains(string(f.Data), `"asset_id": "demo:sunset"`) {
 				t.Errorf("sunset: %s", f.Data)
 			}
+		case "data/demo/jukebox_song/tune.json":
+			// The game's sound_event registry is fixed; a pack's own sound
+			// only loads written inline.
+			if s := strings.Join(strings.Fields(string(f.Data)), ""); !strings.Contains(s, `"sound_event":{"sound_id":"demo:tune"}`) {
+				t.Errorf("tune: %s", s)
+			}
 		case "data/demo/worldgen/template_pool/houses.json":
 			if !strings.Contains(string(f.Data), `"location": "demo:house"`) {
 				t.Errorf("houses: %s", f.Data)

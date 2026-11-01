@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { DocSymbol, Diagnostic, Engine, OutputFile } from '../engine/engine.svelte';
-	import { uriOf, type Project } from '../project/project.svelte';
+	import { assetExtensions, isAssetPath, uriOf, type Project } from '../project/project.svelte';
+	import { toBase64 } from '../project/base64';
 	import Tree from './Tree.svelte';
 	import { buildTree } from './tree';
 
@@ -45,6 +46,19 @@
 	}
 	function remove(path: string) {
 		if (confirm(`Delete ${path}? This cannot be undone.`)) project.remove(path);
+	}
+	let assetInput = $state<HTMLInputElement>();
+	async function addAssets(e: Event) {
+		const input = e.target as HTMLInputElement;
+		for (const file of input.files ?? []) {
+			if (!isAssetPath(file.name)) continue;
+			if (project.assets.some((a) => a.path === file.name) && !confirm(`Replace ${file.name}?`)) continue;
+			project.setAsset(file.name, toBase64(new Uint8Array(await file.arrayBuffer())));
+		}
+		input.value = '';
+	}
+	function removeAsset(path: string) {
+		if (confirm(`Delete ${path}? This cannot be undone.`)) project.removeAsset(path);
 	}
 	const symbolKind: Record<number, string> = { 3: 'ns', 12: 'fn', 13: 'obj', 18: 'tag', 23: 'res' };
 </script>
@@ -91,6 +105,26 @@
 				{/each}
 			</ul>
 			<button class="mt-1 w-full rounded px-2 py-1 text-left text-[13px] text-accent hover:bg-hover" onclick={newFile}>+ New file</button>
+			{#if project.assets.length}
+				<div class="px-2 pt-3 pb-0.5 text-[11px] font-medium tracking-wide text-muted uppercase">Assets</div>
+				<ul class="text-[13px]">
+					{#each project.assets as a (a.path)}
+						<li class="group flex items-center rounded hover:bg-hover" title="Use it with Texture(&quot;{a.path}&quot;) or Sound(&quot;{a.path}&quot;)">
+							<span class="flex min-w-0 flex-1 items-center gap-1.5 px-2 py-0.5">
+								{#if a.path.endsWith('.png')}
+									<img class="size-4 shrink-0 [image-rendering:pixelated]" src="data:image/png;base64,{a.data}" alt="" />
+								{:else}
+									<span class="w-4 shrink-0 text-center text-[10px] text-muted">{a.path.endsWith('.ogg') ? '♪' : '▦'}</span>
+								{/if}
+								<span class="truncate">{a.path}</span>
+							</span>
+							<button class="hidden px-1.5 text-muted group-hover:block hover:text-red-600" title="Delete" aria-label="Delete {a.path}" onclick={() => removeAsset(a.path)}>×</button>
+						</li>
+					{/each}
+				</ul>
+			{/if}
+			<button class="w-full rounded px-2 py-1 text-left text-[13px] text-accent hover:bg-hover" onclick={() => assetInput?.click()}>+ Add texture or sound</button>
+			<input type="file" multiple accept={assetExtensions.join(',')} class="hidden" bind:this={assetInput} onchange={addAssets} />
 		{:else if tab === 'pack'}
 			{#if engine.output.length}
 				<Tree nodes={packTree} selected={selectedOutput} onselect={onoutput} />

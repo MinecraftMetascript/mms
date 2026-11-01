@@ -23,6 +23,7 @@ func loadDir(t *testing.T, dir string) *Project {
 		t.Fatal(err)
 	}
 	p := New(spec.MustDefault(), cfg)
+	p.Files = os.DirFS(dir) // for asset helpers such as Texture("art/a.png")
 	paths, err := cfg.SourceFiles(dir)
 	if err != nil {
 		t.Fatal(err)
@@ -37,6 +38,10 @@ func loadDir(t *testing.T, dir string) *Project {
 func dumpFiles(files []OutFile) string {
 	var sb strings.Builder
 	for _, f := range files {
+		if f.Asset != "" && f.Data == nil {
+			fmt.Fprintf(&sb, "=== %s\n(copy of %s)\n", f.Path, f.Asset)
+			continue
+		}
 		fmt.Fprintf(&sb, "=== %s\n%s", f.Path, f.Data)
 	}
 	return sb.String()
@@ -253,7 +258,7 @@ FunctionTag hooks = [demo:b]
 // TestSourceFiles checks which files make up a project.
 func TestSourceFiles(t *testing.T) {
 	dir := t.TempDir()
-	for _, f := range []string{"a.mms", "src/b.mms", "src/.old/c.mms", ".git/d.mms", "build/e.mms", "web/node_modules/f.mms", "notes.txt"} {
+	for _, f := range []string{"a.mms", "src/b.mms", "src/.old/c.mms", ".git/d.mms", "build/e.mms", "web/node_modules/f.mms", "notes.txt", "sub/mms.json", "sub/g.mms"} {
 		os.MkdirAll(filepath.Join(dir, filepath.Dir(f)), 0o755)
 		os.WriteFile(filepath.Join(dir, f), nil, 0o644)
 	}

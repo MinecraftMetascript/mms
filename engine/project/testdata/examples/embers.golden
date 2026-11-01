@@ -1,0 +1,181 @@
+=== data/embers/function/give.mcfunction
+give @s amethyst_shard[item_model="embers:ember_shard",item_name={translate:"item.embers.ember_shard"}] 16
+give @s music_disc_13[item_model="embers:ember_disc",item_name={translate:"item.embers.ember_disc"},jukebox_playable="embers:embers"]
+give @s painting[painting/variant="embers:hearth"]
+=== data/embers/jukebox_song/embers.json
+{
+  "description": {
+    "translate": "jukebox_song.embers.embers"
+  },
+  "comparator_output": 7,
+  "length_in_seconds": 8,
+  "sound_event": {
+    "sound_id": "embers:embers"
+  }
+}
+=== data/embers/loot_table/ember_cache.json
+{
+  "pools": [
+    {
+      "rolls": 1,
+      "entries": [
+        {
+          "type": "minecraft:item",
+          "name": "minecraft:amethyst_shard",
+          "modifier": [
+            {
+              "type": "minecraft:set_count",
+              "count": {
+                "type": "minecraft:uniform",
+                "min": 2,
+                "max": 5
+              }
+            },
+            {
+              "type": "minecraft:set_components",
+              "components": {
+                "item_model": "embers:ember_shard",
+                "item_name": {
+                  "translate": "item.embers.ember_shard"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+=== data/embers/painting_variant/hearth.json
+{
+  "asset_id": "embers:hearth",
+  "width": 2,
+  "height": 1,
+  "title": {
+    "translate": "painting.embers.hearth.title"
+  },
+  "author": {
+    "translate": "painting.embers.hearth.author"
+  }
+}
+=== data/embers/recipe/ember_disc.json
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    " B ",
+    "BDB",
+    " B "
+  ],
+  "key": {
+    "B": "minecraft:blaze_powder",
+    "D": "#minecraft:creeper_drop_music_discs"
+  },
+  "result": {
+    "id": "minecraft:music_disc_13",
+    "components": {
+      "item_model": "embers:ember_disc",
+      "item_name": {
+        "translate": "item.embers.ember_disc"
+      },
+      "jukebox_playable": "embers:embers"
+    }
+  }
+}
+=== data/embers/recipe/ember_shard.json
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    "minecraft:blaze_powder",
+    "minecraft:amethyst_shard"
+  ],
+  "result": {
+    "id": "minecraft:amethyst_shard",
+    "components": {
+      "item_model": "embers:ember_shard",
+      "item_name": {
+        "translate": "item.embers.ember_shard"
+      }
+    },
+    "count": 2
+  }
+}
+=== data/minecraft/tags/painting_variant/placeable.json
+{
+  "values": [
+    "embers:hearth"
+  ]
+}
+=== pack.mcmeta
+{
+  "pack": {
+    "description": "Custom assets: original textures, a painting, a music disc with its own song, item models and translations",
+    "min_format": 121,
+    "max_format": 121
+  }
+}
+=== pack.png
+(copy of art/icon.png)
+=== assets/embers/items/ember_disc.json
+{
+  "model": {
+    "type": "minecraft:model",
+    "model": "embers:item/ember_disc"
+  }
+}
+=== assets/embers/items/ember_shard.json
+{
+  "model": {
+    "type": "minecraft:model",
+    "model": "embers:item/ember_shard"
+  }
+}
+=== assets/embers/lang/en_us.json
+{
+  "item.embers.ember_shard": "Ember Shard",
+  "item.embers.ember_disc": "Music Disc",
+  "jukebox_song.embers.embers": "MMS - Embers",
+  "painting.embers.hearth.title": "Hearth",
+  "painting.embers.hearth.author": "MMS Examples"
+}
+=== assets/embers/models/item/ember_disc.json
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "embers:item/ember_disc"
+  }
+}
+=== assets/embers/models/item/ember_shard.json
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "embers:item/ember_shard"
+  }
+}
+=== assets/embers/sounds.json
+{
+  "embers": {
+    "sounds": [
+      {
+        "name": "embers:embers"
+      }
+    ]
+  }
+}
+=== assets/embers/sounds/embers.ogg
+(copy of sounds/embers.ogg)
+=== assets/embers/textures/item/ember_disc.png
+(copy of art/ember_disc.png)
+=== assets/embers/textures/item/ember_shard.png
+(copy of art/ember_shard.png)
+=== assets/embers/textures/painting/hearth.png
+(copy of art/hearth.png)
+=== pack.mcmeta
+{
+  "pack": {
+    "description": "Custom assets: original textures, a painting, a music disc with its own song, item models and translations",
+    "min_format": 97,
+    "max_format": 97
+  }
+}
+=== pack.png
+(copy of art/icon.png)

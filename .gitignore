@@ -26,3 +26,13 @@
 /editors/zed/target/
 /editors/zed/grammars/
 /editors/zed/extension.wasm
+
+# Shared packages
+/packages/*/node_modules/
+
+# VS Code extension
+/editors/vscode/node_modules/
+/editors/vscode/out/
+/editors/vscode/*.vsix
+
+bin

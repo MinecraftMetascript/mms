@@ -2,13 +2,13 @@
 
 MMS is a small language that compiles to Minecraft data packs. One MMS file can stand in for the many JSON files a feature needs (noise, density functions, surface rules, loot tables, recipes, functions and more). It also gives functions helpers for globals, variables and scoreboards.
 
-This branch is a full rewrite. The plan is in [docs/plan.md](docs/plan.md), progress is in [docs/tasks.md](docs/tasks.md), and every judgement call is logged in [docs/decisions.md](docs/decisions.md).
+This branch is a full rewrite. The plan is in [docs/plan.md](docs/plan.md), progress is in [docs/tasks.md](docs/tasks.md). Judgement calls are explained in pull request descriptions and commit messages. The older [decision log](docs/decisions.md) (D1 to D94) is frozen and kept for reference.
 
 | Folder | Contents |
 | --- | --- |
 | `engine/` | Go module: spec pack, parser, analysis engine, compiler, language server, CLI and WASM entry |
 | `web/` | Browser editor (SvelteKit, CodeMirror 6, Deepslate previews), deployed to GitHub Pages |
-| `docs/` | Guides, plan, task list, decision log |
+| `docs/` | Guides, plan, task list, frozen decision log |
 | `editors/vscode/` | VS Code extension (a client for `mms lsp`) |
 | `editors/zed/` | Zed extension (a client for `mms lsp`, highlighting from `editors/tree-sitter-mms`) |
 | `editors/tree-sitter-mms/` | Tree-sitter grammar, for Zed and other tree-sitter editors |

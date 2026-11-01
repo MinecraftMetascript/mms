@@ -1,4 +1,5 @@
 {
+  "$schema": "https://minecraftmetascript.github.io/mms/mms.schema.json",
   "namespace": "siege",
   "description": "Cave Siege phase 1 prototype: a banner that waves of mobs walk to, damage and dig towards"
 }

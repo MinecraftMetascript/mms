@@ -1,4 +1,5 @@
 {
+  "$schema": "https://minecraftmetascript.github.io/mms/mms.schema.json",
   "namespace": "adv",
   "description": "Functions: parameters, return values, recursion, loops and strings"
 }

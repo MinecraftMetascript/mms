@@ -29,8 +29,17 @@ export interface Fix {
 export interface OutputFile {
 	path: string;
 	text: string;
+	/** "resources" for a resource pack file. */
+	pack?: string;
 	uri?: string;
 	range?: Diagnostic['range'];
+}
+
+/** A project file the pack copies, such as a texture: its output path and source. */
+export interface OutputAsset {
+	path: string;
+	src: string;
+	pack?: string;
 }
 
 export interface DocSymbol {
@@ -69,6 +78,7 @@ export class Engine {
 	statusDetail = $state('');
 	diagnostics = $state<Record<string, Diagnostic[]>>({});
 	output = $state<OutputFile[]>([]);
+	outputAssets = $state<OutputAsset[]>([]);
 	hasErrors = $state(false);
 	symbols = $state<Record<string, DocSymbol[]>>({});
 
@@ -77,6 +87,8 @@ export class Engine {
 	private supervisor: Supervisor;
 	private config: { namespace: string; description: string } = { namespace: 'mms', description: '' };
 	private refreshTimer: ReturnType<typeof setTimeout> | null = null;
+	/** The binary files the server holds, path to base64. */
+	private assets = new Map<string, string>();
 
 	constructor(workerURL: string, hooks: EngineHooks) {
 		let ws: ProjectWorkspace | null = null;
@@ -111,6 +123,10 @@ export class Engine {
 		this.client.connect(this.supervisor.transport);
 		this.client.initializing.then(() => {
 			this.client.notification('mms/setConfig', this.config);
+			if (this.assets.size) {
+				const files = [...this.assets].map(([path, data]) => ({ path, data }));
+				this.client.notification('mms/setAssets', { files });
+			}
 			this.scheduleRefresh();
 		});
 	}
@@ -130,6 +146,17 @@ export class Engine {
 		if (this.client.connected) this.client.notification('mms/setConfig', this.config);
 	}
 
+	/** Replaces the binary files the server reads, sending only changes. */
+	setAssets(files: { path: string; data: string }[]) {
+		const want = new Map(files.map((f) => [f.path, f.data]));
+		const changed = files.filter((f) => this.assets.get(f.path) !== f.data);
+		const remove = [...this.assets.keys()].filter((p) => !want.has(p));
+		this.assets = want;
+		if ((changed.length || remove.length) && this.client.connected) {
+			this.client.notification('mms/setAssets', { files: changed, remove });
+		}
+	}
+
 	/** Refreshes the generated pack and symbols shortly after analysis. */
 	scheduleRefresh() {
 		if (this.refreshTimer) clearTimeout(this.refreshTimer);
@@ -141,8 +168,9 @@ export class Engine {
 		try {
 			await this.client.initializing;
 			this.client.sync();
-			const out = await this.client.request<object, { files: OutputFile[]; hasErrors: boolean }>('mms/output', {});
+			const out = await this.client.request<object, { files: OutputFile[]; assets?: OutputAsset[]; hasErrors: boolean }>('mms/output', {});
 			this.output = out.files;
+			this.outputAssets = out.assets ?? [];
 			this.hasErrors = out.hasErrors;
 			const syms: Record<string, DocSymbol[]> = {};
 			await Promise.all(

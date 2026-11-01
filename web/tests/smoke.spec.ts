@@ -73,6 +73,60 @@ test('an example with several files in folders builds as one project', async ({ 
 	await expect(page.getByText('buried.json')).toBeVisible();
 });
 
+test('an example with textures and a sound checks and exports both packs', async ({ page }) => {
+	page.on('dialog', (d) => d.accept());
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	await page.getByRole('button', { name: /Project/ }).click();
+	await page.getByRole('button', { name: /embers/ }).click();
+	await expect(page.getByText('art/ember_shard.png', { exact: true })).toBeVisible();
+	await expect(page.getByText('sounds/embers.ogg', { exact: true })).toBeVisible();
+	await expect(status(page)).toHaveText(/No problems/);
+
+	const { unzipSync } = await import('fflate');
+	const { readFileSync } = await import('node:fs');
+	const zipped = async (button: string) => {
+		const download = page.waitForEvent('download');
+		await page.getByRole('button', { name: button }).click();
+		const d = await download;
+		return { name: d.suggestedFilename(), files: Object.keys(unzipSync(new Uint8Array(readFileSync(await d.path())))) };
+	};
+	// The resource pack downloads on its own, with the copied files.
+	const res = await zipped('Download resources');
+	expect(res.name).toBe('embers-resources.zip');
+	expect(res.files).toContain('assets/embers/textures/item/ember_shard.png');
+	expect(res.files).toContain('assets/embers/textures/painting/hearth.png');
+	expect(res.files).toContain('assets/embers/sounds/embers.ogg');
+	expect(res.files).toContain('assets/embers/sounds.json');
+	expect(res.files).toContain('pack.mcmeta');
+	const data = await zipped('Download pack');
+	expect(data.name).toBe('embers.zip');
+	expect(data.files).toContain('data/embers/painting_variant/hearth.json');
+	expect(data.files.some((f) => f.startsWith('assets/'))).toBe(false);
+
+	// Typing a texture path lists the project's images.
+	await page.locator('.cm-content').click();
+	await page.keyboard.press('ControlOrMeta+End');
+	await page.keyboard.press('Enter');
+	await page.keyboard.insertText('PaintingVariant extra = { width = 1, height = 1, asset_id = Texture(');
+	await page.keyboard.type('"art/h');
+	const popup = page.locator('.cm-tooltip-autocomplete');
+	await expect(popup).toContainText('art/hearth.png');
+	await expect(popup).not.toContainText('embers.ogg');
+	await page.waitForTimeout(300);
+	await page.keyboard.press('Enter');
+	// The closing quote was typed for us; the path goes inside it.
+	await expect(page.locator('.cm-content')).toContainText('Texture("art/hearth.png"');
+	await page.keyboard.press('End');
+	await page.keyboard.insertText(') }');
+	await expect(status(page)).toHaveText(/No problems/);
+
+	// Removing a texture breaks the code that names it, in both paintings.
+	await page.getByRole('listitem').filter({ hasText: 'art/hearth.png' }).hover();
+	await page.getByRole('button', { name: 'Delete art/hearth.png' }).click();
+	await expect(status(page)).toHaveText(/2 errors/);
+});
+
 test('dimensions, noise settings and surface rules preview as terrain', async ({ page }) => {
 	const errors: string[] = [];
 	page.on('pageerror', (e) => errors.push(e.message));
@@ -128,6 +182,41 @@ test('dimensions, noise settings and surface rules preview as terrain', async ({
 	await page.getByRole('button', { name: /badlands/ }).click();
 	await page.locator('.cm-line', { hasText: 'SurfaceRule badlands' }).click();
 	await expect(page.getByRole('combobox', { name: 'Biome' })).toHaveValue('minecraft:badlands');
+	expect(errors).toEqual([]);
+});
+
+test('a pinned preview stays put while the cursor moves to another declaration', async ({ page }) => {
+	const errors: string[] = [];
+	page.on('pageerror', (e) => errors.push(e.message));
+	page.on('dialog', (d) => d.accept());
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	await page.getByRole('button', { name: /Project/ }).click();
+	await page.getByRole('button', { name: /sky-islands/ }).click();
+	await expect(status(page)).toHaveText(/No problems/);
+
+	// Pin the dimension, then go edit the surface rule in another file.
+	await page.getByRole('button', { name: 'dimension.mms' }).click();
+	await page.locator('.cm-line', { hasText: 'Dimension islands' }).click();
+	await expect(page.getByText('sky:islands', { exact: true })).toBeVisible();
+	const pin = page.getByRole('button', { name: /^Pin/ });
+	await pin.click();
+	await expect(pin).toHaveAttribute('aria-pressed', 'true');
+	await expect(pin).toContainText('Pinned sky:islands');
+
+	await page.getByRole('button', { name: 'terrain.mms' }).click();
+	await page.locator('.cm-line', { hasText: 'SurfaceRule surface' }).click();
+	await expect(page.getByText('sky:islands', { exact: true })).toBeVisible();
+	await expect(page.getByText('surface rule', { exact: true })).toBeHidden();
+	// The JSON tab still follows the cursor.
+	await page.getByRole('tab', { name: 'JSON' }).click();
+	await expect(page.locator('pre.json')).not.toContainText('"biome_source"');
+	await page.getByRole('tab', { name: 'Preview' }).click();
+
+	// Unpinning goes back to following the cursor.
+	await pin.click();
+	await expect(pin).toHaveAttribute('aria-pressed', 'false');
+	await expect(page.getByText('surface rule', { exact: true })).toBeVisible();
 	expect(errors).toEqual([]);
 });
 
@@ -334,6 +423,28 @@ test('Tab indents, Shift+Tab unindents, and Tab accepts a completion', async ({ 
 	await expect(page.locator('.cm-content')).toContainText('DensityFunction x = Clamp');
 });
 
+test('completion opens on request with Ctrl+Space, Cmd/Ctrl+I and Alt+Space', async ({ page }) => {
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	const popup = page.locator('.cm-tooltip-autocomplete');
+	// A blank line in a function offers execute helpers and keywords.
+	await replaceText(page, 'Function f {\n  /say hi\n  \n}\n');
+	await page.locator('.cm-line').nth(2).click();
+	await page.keyboard.press('End');
+	for (const key of ['Control+Space', 'ControlOrMeta+i', 'Alt+Space']) {
+		await page.keyboard.press(key);
+		await expect(popup).toContainText('Positioned');
+		await expect(popup).toContainText('let');
+		await page.keyboard.press('Escape');
+		await expect(popup).toHaveCount(0);
+	}
+	await expect(page.locator('.cm-line').nth(2)).toHaveText('  ');
+	// After an operator with nothing typed yet.
+	await replaceText(page, 'DensityFunction x = 1 / ');
+	await page.keyboard.press('Control+Space');
+	await expect(popup).toContainText('Clamp');
+});
+
 test('F2 renames inline with a preview of occurrences', async ({ page }) => {
 	await page.goto('./');
 	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
@@ -388,9 +499,14 @@ test('built-in helpers explain themselves on hover and while typing', async ({ p
 		}
 		return { x: 0, y: 0 };
 	});
-	await page.mouse.move(at.x, at.y);
+	// "No problems" already showed before the edit, so the server may not
+	// have the new text yet; hover again until it answers.
 	const hover = page.locator('.cm-lsp-hover-tooltip');
-	await expect(hover).toContainText('True for blocks close to a surface');
+	await expect(async () => {
+		await page.mouse.move(0, 0);
+		await page.mouse.move(at.x, at.y);
+		await expect(hover).toContainText('True for blocks close to a surface', { timeout: 1500 });
+	}).toPass({ timeout: 15_000 });
 	await expect(hover).toContainText('secondary_depth_range');
 	await expect(hover.locator('a[href*="reference#material_condition-StoneDepth"]')).toHaveCount(1);
 	await page.mouse.move(0, 0);
@@ -403,4 +519,64 @@ test('built-in helpers explain themselves on hover and while typing', async ({ p
 	const sig = page.locator('.cm-lsp-signature-tooltip');
 	await expect(sig.locator('.cm-lsp-active-parameter')).toHaveText(/^offset/);
 	await expect(sig).toContainText('Extra depth that still passes');
+});
+
+test.describe('on a phone', () => {
+	test.use({ viewport: { width: 390, height: 664 }, hasTouch: true, isMobile: true });
+
+	test('the 3D preview pans with a finger and zooms with a pinch about the pinch', async ({ page, context }) => {
+		page.on('dialog', (d) => d.accept());
+		await page.goto('./');
+		await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+		await page.getByRole('button', { name: /Project/ }).click();
+		await page.getByRole('button', { name: /badlands/ }).click();
+		const rule = page.locator('.cm-line', { hasText: 'SurfaceRule badlands' });
+		// The editor only renders lines near the viewport; scroll until the rule is there.
+		for (let i = 0; i < 20 && (await rule.count()) === 0; i++) {
+			await page.locator('.cm-scroller').evaluate((s) => (s.scrollTop += 300));
+		}
+		await rule.tap();
+		await page.getByRole('button', { name: '3D', exact: true }).tap();
+		const canvas = page.locator('canvas');
+		await expect(canvas).toBeVisible({ timeout: 30_000 });
+		await expect(canvas).toHaveAttribute('data-view', /"scale":[1-9]/);
+
+		const box = (await canvas.boundingBox())!;
+		const x = box.x + box.width * 0.65;
+		const y = box.y + Math.min(box.height / 2, 50);
+		const view = async () => JSON.parse((await canvas.getAttribute('data-view'))!);
+		/** The world x/z under a client point, by the view's projection. */
+		const worldAt = async () => {
+			const v = await view();
+			return canvas.evaluate((c: HTMLCanvasElement, [x, y, v]) => {
+				const r = c.getBoundingClientRect();
+				const dx = ((x - r.left) / r.width) * c.width - c.width / 2;
+				const dy = ((y - r.top) / r.height) * c.height - c.height / 2;
+				return [v.x + (dx / v.scale + (2 * dy) / v.scale) / 2, v.y + ((2 * dy) / v.scale - dx / v.scale) / 2];
+			}, [x, y, v] as const);
+		};
+		const cdp = await context.newCDPSession(page);
+		const touch = (type: string, points: [number, number][]) =>
+			cdp.send('Input.dispatchTouchEvent', { type: type as 'touchStart', touchPoints: points.map(([x, y], id) => ({ x, y, id })) });
+
+		// Spreading two fingers zooms in and keeps the ground under them in place.
+		const before = await view();
+		const ground = await worldAt();
+		await touch('touchStart', [[x - 20, y], [x + 20, y]]);
+		for (let i = 1; i <= 10; i++) await touch('touchMove', [[x - 20 - i * 6, y], [x + 20 + i * 6, y]]);
+		await touch('touchEnd', []);
+		await expect.poll(async () => (await view()).scale).toBeCloseTo(before.scale * 4, 5);
+		const after = await worldAt();
+		expect(after[0]).toBeCloseTo(ground[0], 5);
+		expect(after[1]).toBeCloseTo(ground[1], 5);
+
+		// One finger pans; the page itself neither zooms nor scrolls.
+		const zoomed = await view();
+		await touch('touchStart', [[x, y]]);
+		for (let i = 1; i <= 8; i++) await touch('touchMove', [[x - i * 10, y]]);
+		await touch('touchEnd', []);
+		await expect.poll(async () => (await view()).x).toBeGreaterThan(zoomed.x);
+		expect(await page.evaluate(() => [visualViewport!.scale, scrollX, scrollY])).toEqual([1, 0, 0]);
+		await expect(page.getByText(/Preview failed/)).toBeHidden();
+	});
 });

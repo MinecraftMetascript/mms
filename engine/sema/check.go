@@ -330,6 +330,9 @@ func exprKind(e syntax.Expr) string {
 // union narrows a union by the expression's shape, then by trial checks,
 // and reports against the closest member when nothing fits.
 func (c *Checker) union(e syntax.Expr, v tview) jsonv.Value {
+	if r, ok := c.inlineSound(e, v); ok {
+		return r
+	}
 	var cands []tview
 	for _, m := range v.T.Members {
 		mv := c.norm(tview{T: m, Env: v.Env})
@@ -560,6 +563,13 @@ func (c *Checker) number(e syntax.Expr, v tview) jsonv.Value {
 	}
 	if !inRange(f, v.T.ValueRange) {
 		c.errorf("mms/out-of-range", e.Span(), "value must be%s, got %s", rangeText(v.T.ValueRange), text)
+	}
+	if a, ok := v.T.Attr("divisible_by"); ok && a.Value != nil && a.Value.Literal != nil {
+		// e.g. a dimension type's min_y and height: the game will not load
+		// a world whose height is not a whole number of 16-block sections.
+		if n, err := strconv.ParseFloat(a.Value.Literal.String(), 64); err == nil && n != 0 && math.Mod(f, n) != 0 {
+			c.errorf("mms/out-of-range", e.Span(), "value must be a multiple of %s, got %s", a.Value.Literal.String(), text)
+		}
 	}
 	return jsonv.Number(text)
 }
@@ -797,6 +807,10 @@ func (c *Checker) resolveID(text string, id idInfo, e syntax.Expr) string {
 	in.ID = full
 	in.Symbol = sym
 	in.Bare, in.Folder = BareID, reg
+	if id.excluded(full) {
+		c.excludedID(full, id, e.Span())
+		return full
+	}
 	if sym != nil || reg == "" {
 		return full
 	}
@@ -825,6 +839,22 @@ func (c *Checker) resolveID(text string, id idInfo, e syntax.Expr) string {
 		c.errorf("mms/unknown-id", e.Span(), "no %s named '%s' is declared", reg, full)
 	}
 	return full
+}
+
+// excludedID reports an id the game rejects at this spot although it is in
+// the registry (mcdoc's #[id(exclude=[...])]).
+func (c *Checker) excludedID(full string, id idInfo, sp syntax.Span) {
+	reg := c.registryName(id.Registry)
+	switch {
+	case reg == "environment_attribute":
+		// Biomes take only positional attributes; the game fails to load
+		// the biome with "The following attributes cannot be positional".
+		c.errorf("mms/not-allowed-here", sp, "'%s' cannot be set on a biome: Minecraft reads it only from a dimension type's attributes; set it there instead", full)
+	case full == "minecraft:air":
+		c.errorf("mms/not-allowed-here", sp, "'%s' is not allowed here: it is an empty item, and the game rejects it", full)
+	default:
+		c.errorf("mms/not-allowed-here", sp, "%s '%s' is not allowed here", reg, full)
+	}
 }
 
 // builtinIDs are ids the game knows that are not in its registries.
@@ -928,4 +958,34 @@ func editDistance(a, b string) int {
 		prev, cur = cur, prev
 	}
 	return prev[len(b)]
+}
+
+// inlineSound writes Sound("x.ogg") where a sound event may be given
+// inline (mcdoc's SoundEventRef: an id or { sound_id, range }) as
+// { "sound_id": "ns:x" }. The minecraft:sound_event registry is built
+// into the game, so data packs cannot add to it and a pack's own sound
+// only works inline; the id form fails to load (decision D91).
+func (c *Checker) inlineSound(e syntax.Expr, v tview) (jsonv.Value, bool) {
+	if assetCallName(e) != "Sound" {
+		return nil, false
+	}
+	for _, m := range v.T.Members {
+		mv := c.norm(tview{T: m, Env: v.Env})
+		if mv.T == nil || mv.T.Kind != "struct" {
+			continue
+		}
+		for _, f := range mv.T.Fields {
+			if f.Key != "sound_id" || f.Type == nil || !c.assetFits(e, idOf(f.Type)) {
+				continue
+			}
+			id := c.check(e, c.norm(tview{T: f.Type, Env: mv.Env}))
+			if id == nil {
+				return nil, true // already reported
+			}
+			o := &jsonv.Object{}
+			o.Set("sound_id", id)
+			return o, true
+		}
+	}
+	return nil, false
 }

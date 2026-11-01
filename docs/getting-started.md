@@ -16,7 +16,7 @@ mkdir gems && cd gems
 mms init -namespace gems
 ```
 
-`mms init` writes `mms.json` (the namespace, the pack description, the output folder) and a starter file. Every `.mms` file in the folder belongs to the project. Put this in `gems.mms`:
+`mms init` writes `mms.json` (the namespace, the pack description, the output folder) and a starter file. Its `$schema` line points at the [mms.json schema](https://minecraftmetascript.github.io/mms/mms.schema.json), so editors with JSON Schema support (VS Code, Zed, JetBrains) complete, describe and check every field. The VS Code extension knows the schema even without that line. Every `.mms` file in the folder belongs to the project. Put this in `gems.mms`:
 
 ```
 /** Gems that drop from the gem chest. */

@@ -22,7 +22,7 @@ Global ticks: int = 0
 
 // Objective names are global to the world, so they carry a cs_ prefix.
 
-/** Scratch values: #cx #cy #cz (core position), #ex #ey #ez, #lure_hp, #need, #near. */
+/** Scratch values: #cx #cy #cz (core position), #ex #ey #ez, #lost, #hp, #tgt, #need, #near. */
 Objective cs_tmp = dummy
 /** Which of the 4 update groups an enemy is in, 0 to 3. */
 Objective cs_group = dummy
@@ -64,6 +64,9 @@ Function siege_tick {
   } else {
     /execute as @e[tag=cs_enemy,scores={cs_group=3}] at @s run function siege:enemy_update
   }
+  if (path_phase > 0) {
+    path_tick()
+  }
   if (ticks % 20 == 0) {
     banner_second()
   }
@@ -80,13 +83,16 @@ Function status {
   }
 }
 
-/** Removes the banner, the core and every enemy. */
+/** Removes the banner, the core, the waypoints and every enemy. */
 Function reset {
   /kill @e[tag=cs_enemy]
   /execute at @e[tag=cs_core] run setblock ~ ~ ~ air
+  /execute as @e[tag=cs_carrot] run function siege:remove_carrot
+  // Forget the saved banner and unload the scratch area.
+  /execute at @e[tag=cs_core,limit=1] in siege:scratch run setblock ~ 319 ~ minecraft:air
+  /execute in siege:scratch run forceload remove all
+  path_phase = 0
   /kill @e[tag=cs_core]
-  /tp @e[tag=cs_lure] ~ -1000 ~
-  /kill @e[tag=cs_lure]
   /bossbar set siege:banner players
   banner_placed = false
   banner_hp = banner_max
