@@ -1,0 +1,150 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://minecraftmetascript.github.io/mms/mms.schema.json",
+  "title": "MMS project (mms.json)",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "description": "The JSON Schema for this file.",
+      "type": "string",
+      "default": "https://minecraftmetascript.github.io/mms/mms.schema.json"
+    },
+    "description": {
+      "description": "The data pack's description, shown in the game's pack list (`pack.mcmeta`).",
+      "markdownDescription": "The data pack's description, shown in the game's pack list (`pack.mcmeta`).",
+      "type": "string",
+      "default": "Built with MMS"
+    },
+    "icon": {
+      "description": "A PNG in the project that becomes `pack.png` in both the data pack and the resource pack.",
+      "markdownDescription": "A PNG in the project that becomes `pack.png` in both the data pack and the resource pack.",
+      "type": "string",
+      "pattern": "\\.[pP][nN][gG]$",
+      "patternErrorMessage": "The icon must be a .png file.",
+      "examples": [
+        "icon.png"
+      ]
+    },
+    "lint": {
+      "description": "Lint rule severities by rule id. Each rule can be `error`, `warning`, `info`, `hint` or `off`.",
+      "markdownDescription": "Lint rule severities by rule id. Each rule can be `error`, `warning`, `info`, `hint` or `off`.",
+      "type": "object",
+      "properties": {
+        "constant-expression": {
+          "description": "An arithmetic expression of number literals can be written as its value.\n\nDefault: `hint`.",
+          "markdownDescription": "An arithmetic expression of number literals can be written as its value.\n\nDefault: `hint`.",
+          "$ref": "#/definitions/severity"
+        },
+        "deprecated": {
+          "description": "A use of a declaration whose doc comment has a `@deprecated` tag.\n\nDefault: `warning`.",
+          "markdownDescription": "A use of a declaration whose doc comment has a `@deprecated` tag.\n\nDefault: `warning`.",
+          "$ref": "#/definitions/severity"
+        },
+        "external-asset": {
+          "description": "An id of a texture, sound or structure in the project's namespace that no Texture, Sound or Structure call in the project provides. The pack still loads, but the file must come from another pack.\n\nDefault: `warning`.",
+          "markdownDescription": "An id of a texture, sound or structure in the project's namespace that no Texture, Sound or Structure call in the project provides. The pack still loads, but the file must come from another pack.\n\nDefault: `warning`.",
+          "$ref": "#/definitions/severity"
+        },
+        "overrides-vanilla": {
+          "description": "A declaration in the minecraft namespace replaces the vanilla resource with the same id.\n\nDefault: `info`.",
+          "markdownDescription": "A declaration in the minecraft namespace replaces the vanilla resource with the same id.\n\nDefault: `info`.",
+          "$ref": "#/definitions/severity"
+        },
+        "quoted-name": {
+          "description": "An id or enum name in quotes can be written bare: `minecraft:stone` or `stone` rather than \"minecraft:stone\".\n\nDefault: `hint`.",
+          "markdownDescription": "An id or enum name in quotes can be written bare: `minecraft:stone` or `stone` rather than \"minecraft:stone\".\n\nDefault: `hint`.",
+          "$ref": "#/definitions/severity"
+        },
+        "redundant-namespace": {
+          "description": "A `minecraft:` prefix that can be dropped: `stone` means `minecraft:stone` unless the project declares its own `stone`.\n\nDefault: `hint`.",
+          "markdownDescription": "A `minecraft:` prefix that can be dropped: `stone` means `minecraft:stone` unless the project declares its own `stone`.\n\nDefault: `hint`.",
+          "$ref": "#/definitions/severity"
+        },
+        "unused": {
+          "description": "A worldgen piece, predicate or item modifier that nothing in the project references, so the game never uses it.\n\nDefault: `hint`.",
+          "markdownDescription": "A worldgen piece, predicate or item modifier that nothing in the project references, so the game never uses it.\n\nDefault: `hint`.",
+          "$ref": "#/definitions/severity"
+        },
+        "use-sugar": {
+          "description": "An object literal that has a shorter MMS form: an item entry as its id, `1..3` for a uniform provider or bounds, `diamond * 4` for a stack, a trigger call for a criterion, and `\u0026\u0026`, `||` and `!` for conditions.\n\nDefault: `hint`.",
+          "markdownDescription": "An object literal that has a shorter MMS form: an item entry as its id, `1..3` for a uniform provider or bounds, `diamond * 4` for a stack, a trigger call for a criterion, and `\u0026\u0026`, `||` and `!` for conditions.\n\nDefault: `hint`.",
+          "$ref": "#/definitions/severity"
+        }
+      },
+      "additionalProperties": false
+    },
+    "namespace": {
+      "description": "The default namespace for files without a `Namespace` declaration.",
+      "markdownDescription": "The default namespace for files without a `Namespace` declaration.",
+      "type": "string",
+      "pattern": "^[a-z0-9_.\\-]+$",
+      "patternErrorMessage": "A namespace is lowercase letters, digits, '_', '-' or '.'.",
+      "default": "mms"
+    },
+    "output": {
+      "description": "The folder `mms build` writes the data pack to, relative to the project.",
+      "markdownDescription": "The folder `mms build` writes the data pack to, relative to the project.",
+      "type": "string",
+      "default": "build"
+    },
+    "resourcePack": {
+      "description": "Settings for the resource pack `mms build` writes when the project uses `Texture`, `Sound` or other resource pack declarations.",
+      "markdownDescription": "Settings for the resource pack `mms build` writes when the project uses `Texture`, `Sound` or other resource pack declarations.",
+      "type": "object",
+      "properties": {
+        "description": {
+          "description": "The resource pack's description. The default is the data pack's `description`.",
+          "markdownDescription": "The resource pack's description. The default is the data pack's `description`.",
+          "type": "string"
+        },
+        "output": {
+          "description": "The folder `mms build` writes the resource pack to, relative to the project. The default is the data pack's `output` with `-resources` appended.",
+          "markdownDescription": "The folder `mms build` writes the resource pack to, relative to the project. The default is the data pack's `output` with `-resources` appended.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "sources": {
+      "description": "Glob patterns for the project's .mms files, relative to the project; `**` matches any number of folders. The default is every .mms file (`**/*.mms`), skipping the output folders, hidden folders and `node_modules`.",
+      "markdownDescription": "Glob patterns for the project's .mms files, relative to the project; `**` matches any number of folders. The default is every .mms file (`**/*.mms`), skipping the output folders, hidden folders and `node_modules`.",
+      "type": "array",
+      "examples": [
+        [
+          "src/**/*.mms"
+        ]
+      ],
+      "items": {
+        "description": "A glob relative to the project: `*` matches within a folder, `**` any number of folders and `?` one character.",
+        "markdownDescription": "A glob relative to the project: `*` matches within a folder, `**` any number of folders and `?` one character.",
+        "type": "string",
+        "examples": [
+          "src/**/*.mms"
+        ]
+      }
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "severity": {
+      "description": "A lint severity.",
+      "type": "string",
+      "enum": [
+        "error",
+        "warning",
+        "info",
+        "hint",
+        "off",
+        "warn"
+      ],
+      "enumDescriptions": [
+        "Report as an error; `mms build` fails.",
+        "Report as a warning.",
+        "Report as information.",
+        "Report as a hint (shown faintly in editors).",
+        "Turn the rule off.",
+        "Same as `warning`."
+      ]
+    }
+  }
+}

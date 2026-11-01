@@ -14,7 +14,7 @@ export function packZip(files: OutputFile[]): Uint8Array {
 /** The project's sources and mms.json as a zip, the layout `mms build` reads. */
 export function projectZip(p: ProjectData): Uint8Array {
 	const z: Zippable = {};
-	z['mms.json'] = [strToU8(JSON.stringify({ namespace: p.config.namespace, description: p.config.description }, null, 2) + '\n'), { mtime: fixed }];
+	z['mms.json'] = [strToU8(JSON.stringify({ $schema: 'https://minecraftmetascript.github.io/mms/mms.schema.json', namespace: p.config.namespace, description: p.config.description }, null, 2) + '\n'), { mtime: fixed }];
 	for (const f of p.files) z[f.path] = [strToU8(f.text), { mtime: fixed }];
 	return zipSync(z, { level: 6 });
 }

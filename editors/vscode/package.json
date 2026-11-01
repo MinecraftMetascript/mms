@@ -26,6 +26,12 @@
         "configuration": "./language-configuration.json"
       }
     ],
+    "jsonValidation": [
+      {
+        "fileMatch": "mms.json",
+        "url": "./schemas/mms.schema.json"
+      }
+    ],
     "grammars": [
       {
         "language": "mms",
