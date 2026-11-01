@@ -70,6 +70,10 @@
         "command": "mms.showPreview",
         "title": "MMS: Open Preview to the Side",
         "icon": "$(open-preview)"
+      },
+      {
+        "command": "mms.previewDeclaration",
+        "title": "MMS: Preview Declaration"
       }
     ],
     "menus": {
@@ -77,7 +81,8 @@
         { "command": "mms.showPreview", "when": "editorLangId == mms", "group": "navigation" }
       ],
       "commandPalette": [
-        { "command": "mms.showPreview", "when": "editorLangId == mms" }
+        { "command": "mms.showPreview", "when": "editorLangId == mms" },
+        { "command": "mms.previewDeclaration", "when": "false" }
       ]
     },
     "keybindings": [

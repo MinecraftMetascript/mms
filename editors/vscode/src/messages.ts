@@ -15,11 +15,13 @@ export interface OutputFile {
 export type ToPanel =
 	/** The generated pack, refreshed after each analysis. */
 	| { type: 'output'; files: OutputFile[] }
-	/** The output path of the declaration at the cursor (kept when the cursor leaves declarations). */
-	| { type: 'cursor'; path: string | null };
+	/** The output path to show, chosen with a Preview CodeLens or the open-preview command. */
+	| { type: 'target'; path: string | null };
 
 export type ToExtension =
 	/** The page has loaded and wants the current state. */
 	| { type: 'ready' }
+	/** Show nothing (the shown declaration left the pack and the user cleared it). */
+	| { type: 'clear' }
 	/** Go to a declaration's source. */
 	| { type: 'reveal'; uri: string; range: Range };

@@ -12,6 +12,7 @@
 			"default": "./src/index.ts"
 		},
 		"./worker": "./src/preview/preview.worker.ts",
+		"./paths": "./src/paths.ts",
 		"./theme.css": "./theme.css"
 	},
 	"scripts": {

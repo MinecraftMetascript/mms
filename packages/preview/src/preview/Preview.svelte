@@ -24,8 +24,15 @@
 		 * webview can only start workers from blob URLs.
 		 */
 		createWorker: () => Worker;
+		/** What to say when there is nothing to preview. */
+		hint?: string;
 	}
-	let { output, target, createWorker }: Props = $props();
+	let {
+		output,
+		target,
+		createWorker,
+		hint = 'Put the cursor in a noise, density function, noise settings, surface rule or dimension declaration to preview it.'
+	}: Props = $props();
 
 	// A target the pack no longer has (renamed or deleted) shows nothing.
 	const info = $derived(target && output.some((f) => f.path === target) ? previewable(target) : null);
@@ -518,7 +525,7 @@
 				}}>Reset view</button
 			>
 		{:else}
-			<span>Put the cursor in a noise, density function, noise settings, surface rule or dimension declaration to preview it.</span>
+			<span>{hint}</span>
 		{/if}
 	</div>
 	<div class="relative min-h-0 flex-1 bg-canvas" bind:this={box}>
