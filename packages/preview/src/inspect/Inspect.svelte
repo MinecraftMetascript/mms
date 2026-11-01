@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { OutputFile } from '../engine/engine.svelte';
+	import type { OutputFile } from '../types';
 	import { inspectable, label, type Json } from './common';
 	import { analyseLoot } from './loot';
 	import { analyseRecipe } from './recipe';

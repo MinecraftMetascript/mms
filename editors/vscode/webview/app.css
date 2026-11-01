@@ -1,0 +1,34 @@
+@import 'tailwindcss';
+@import '@mms/preview/theme.css';
+
+/* VS Code marks the body with the theme kind. */
+@custom-variant dark (&:where(.vscode-dark, .vscode-dark *, .vscode-high-contrast:not(.vscode-high-contrast-light), .vscode-high-contrast:not(.vscode-high-contrast-light) *));
+
+/* The shared components' colours, from the editor theme. */
+:root {
+	--c-bg: var(--vscode-editor-background);
+	--c-panel: var(--vscode-editor-background);
+	--c-ink: var(--vscode-foreground);
+	--c-muted: var(--vscode-descriptionForeground);
+	--c-line: var(--vscode-panel-border, var(--vscode-widget-border, transparent));
+	--c-hover: var(--vscode-toolbar-hoverBackground, var(--vscode-list-hoverBackground));
+	--c-selected: var(--vscode-list-activeSelectionBackground);
+	--c-accent: var(--vscode-button-background);
+	--c-canvas: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+}
+
+html,
+body,
+#app {
+	height: 100%;
+	margin: 0;
+	padding: 0;
+	background: var(--c-bg);
+	color: var(--c-ink);
+	font-family: var(--vscode-font-family);
+}
+select,
+input {
+	color: var(--vscode-input-foreground);
+	background: var(--vscode-input-background);
+}

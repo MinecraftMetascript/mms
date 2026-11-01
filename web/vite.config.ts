@@ -17,5 +17,9 @@ export default defineConfig({
 			paths: { base: (process.env.BASE_PATH ?? '') as '' | `/${string}` }
 		})
 	],
+	// The previews live in packages/preview (shared with the VS Code
+	// extension); the host's own Svelte and Deepslate serve it.
+	resolve: { dedupe: ['svelte', 'deepslate'] },
+	server: { fs: { allow: ['../packages'] } },
 	worker: { format: 'es' }
 });

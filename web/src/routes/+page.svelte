@@ -7,15 +7,13 @@
 	import Editor from '#lib/editor/Editor.svelte';
 	import Sidebar from '#lib/components/Sidebar.svelte';
 	import JsonView from '#lib/components/JsonView.svelte';
-	import Preview from '#lib/preview/Preview.svelte';
 	import { Engine, type Diagnostic, type DocSymbol, type OutputFile } from '#lib/engine/engine.svelte.ts';
 	import { Project, pathOf, uriOf, starter } from '#lib/project/project.svelte.ts';
 	import { examples } from '#lib/project/examples.ts';
 	import { download, isDataPack, packZip, projectZip, readProjectZip, readZip } from '#lib/project/zip.ts';
 	import PasteJson from '#lib/components/PasteJson.svelte';
-	import { previewable } from '#lib/preview/protocol.ts';
-	import Inspect from '#lib/inspect/Inspect.svelte';
-	import { inspectable } from '#lib/inspect/common.ts';
+	import { PinButton, PreviewPane, shows } from '@mms/preview';
+	import PreviewWorker from '@mms/preview/worker?worker';
 
 	const project = new Project();
 	let engine = $state<Engine | null>(null);
@@ -126,11 +124,7 @@
 	// tab keeps following the cursor.
 	let pinned = $state<string | null>(null);
 	const previewPath = $derived(pinned ?? selectedOutput);
-	const previewFile = $derived(engine?.output.find((f) => f.path === previewPath) ?? null);
-	const shows = (path: string | null) => previewable(path) ?? inspectable(path);
 	const pinnable = $derived(shows(previewPath));
-	// A pinned output that has left the pack (renamed, deleted or broken).
-	const pinMissing = $derived(pinned !== null && !previewFile);
 	function togglePin() {
 		pinned = pinned ? null : previewPath && shows(previewPath) ? previewPath : null;
 	}
@@ -366,42 +360,19 @@
 					>
 				{/each}
 				{#if rightTab === 'preview' && (pinned || pinnable)}
-					<button
-						class="ml-auto flex min-w-0 items-center gap-1 px-3 py-1 {pinned ? 'text-accent' : 'text-muted hover:text-ink'}"
-						aria-pressed={pinned !== null}
-						title={pinned
-							? 'Unpin: the preview follows the cursor again'
-							: 'Pin: keep previewing this declaration while you edit others'}
-						onclick={togglePin}
-					>
-						<svg viewBox="0 0 16 16" class="h-3.5 w-3.5 shrink-0" fill={pinned ? 'currentColor' : 'none'} stroke="currentColor" stroke-width="1.4" aria-hidden="true">
-							<path d="M6 1.5h4l-.5 4 2.5 2.5v1.5H4V8l2.5-2.5z" stroke-linejoin="round" />
-							<path d="M8 9.5v5" stroke-linecap="round" />
-						</svg>
-						{#if pinned}
-							<span class="truncate">Pinned {shows(pinned)?.id}</span>
-						{:else}
-							<span>Pin</span>
-						{/if}
-					</button>
+					<PinButton class="ml-auto" {pinned} onclick={togglePin} />
 				{/if}
 			</div>
 			<div class="min-h-0 flex-1">
 				{#if engine}
-					<div class="flex h-full flex-col" class:hidden={rightTab !== 'preview'}>
-						{#if pinMissing}
-							<p class="border-b border-line px-3 py-1.5 text-xs text-muted">
-								{shows(pinned)?.id} isn't in the pack right now. It shows again once it builds, or
-								<button class="text-accent hover:underline" onclick={() => (pinned = null)}>unpin it</button>.
-							</p>
-						{/if}
-						<div class="min-h-0 flex-1">
-							{#if previewFile && inspectable(previewFile.path)}
-								<Inspect file={previewFile} />
-							{:else}
-								<Preview output={engine.output} target={previewPath} />
-							{/if}
-						</div>
+					<div class="h-full" class:hidden={rightTab !== 'preview'}>
+						<PreviewPane
+							output={engine.output}
+							path={previewPath}
+							{pinned}
+							onunpin={() => (pinned = null)}
+							createWorker={() => new PreviewWorker()}
+						/>
 					</div>
 					<div class="h-full" class:hidden={rightTab !== 'json'}>
 						<JsonView file={selectedFile} onsource={(f: OutputFile) => f.uri && f.range && reveal(f.uri, f.range)} />
