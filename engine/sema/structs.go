@@ -721,7 +721,10 @@ func (c *Checker) octaveCount(fs []field, byKey map[string]*assign, o *jsonv.Obj
 		return
 	}
 	num, ok := got.(jsonv.Number)
-	if !ok || string(num) == n {
+	if !ok {
+		return
+	}
+	if f, err := strconv.ParseFloat(string(num), 64); err != nil || f == float64(len(mods)) {
 		return
 	}
 	sp := byKey["octave_count"].sp

@@ -25,6 +25,15 @@
     1
   ]
 }
+== worldgen/noise test:float_count
+{
+  "base_octave": -7,
+  "octave_count": 2.0,
+  "amplitude_modifiers": [
+    1,
+    1
+  ]
+}
 == worldgen/noise test:empty
 {
   "base_octave": -7,
@@ -43,4 +52,4 @@
     1
   ]
 }
-! 8: mms/octave-count octave_count is 1, but amplitude_modifiers has 2 entries; they must match (or leave octave_count out)
+! 9: mms/octave-count octave_count is 1, but amplitude_modifiers has 2 entries; they must match (or leave octave_count out)
