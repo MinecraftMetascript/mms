@@ -18,3 +18,11 @@
 .DS_Store
 .idea/
 .vscode/
+
+# Shared packages
+/packages/*/node_modules/
+
+# VS Code extension
+/editors/vscode/node_modules/
+/editors/vscode/out/
+/editors/vscode/*.vsix

@@ -1,0 +1,21 @@
+/*
+ * Tailwind setup shared by every host of the previews. A host defines the
+ * --c-* colours (the web app from its light and dark palettes, VS Code
+ * from the editor theme) and a `dark` variant, then imports this file
+ * after tailwindcss so the classes the shared components use are built.
+ */
+@source './src';
+
+@theme inline {
+	--color-bg: var(--c-bg);
+	--color-panel: var(--c-panel);
+	--color-ink: var(--c-ink);
+	--color-muted: var(--c-muted);
+	--color-line: var(--c-line);
+	--color-hover: var(--c-hover);
+	--color-selected: var(--c-selected);
+	--color-accent: var(--c-accent);
+	--color-canvas: var(--c-canvas);
+	--font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+	--font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+}

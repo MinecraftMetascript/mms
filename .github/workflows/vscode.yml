@@ -3,9 +3,9 @@ name: vscode
 on:
   push:
     branches: [main]
-    paths: ["editors/vscode/**", ".github/workflows/vscode.yml"]
+    paths: ["editors/vscode/**", "packages/**", ".github/workflows/vscode.yml"]
   pull_request:
-    paths: ["editors/vscode/**", ".github/workflows/vscode.yml"]
+    paths: ["editors/vscode/**", "packages/**", ".github/workflows/vscode.yml"]
 
 defaults:
   run:
@@ -18,7 +18,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
           cache-dependency-path: editors/vscode/package-lock.json
       - run: npm ci

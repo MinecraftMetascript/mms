@@ -5,17 +5,21 @@
 // Activation never waits on the server: the commands are registered first,
 // and a server that cannot start is reported with a notification that names
 // the fix, while "MMS: Restart Language Server" keeps working.
+//
+// The preview panel (preview.ts) shows the web editor's worldgen previews.
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { LanguageClient, type LanguageClientOptions, type ServerOptions } from 'vscode-languageclient/node';
+import { Previews } from './preview';
 
 const releasesUrl = 'https://github.com/MinecraftMetascript/mms/releases';
 const exe = process.platform === 'win32' ? 'mms.exe' : 'mms';
 
 let client: LanguageClient | undefined;
 let output: vscode.OutputChannel | undefined;
+let previews: Previews | undefined;
 // Starts and restarts run one at a time, so a restart pressed while the
 // server is still starting does not race it.
 let queue: Promise<void> = Promise.resolve();
@@ -132,6 +136,13 @@ async function start() {
 				vscode.workspace.createFileSystemWatcher('**/mms.json'),
 				vscode.workspace.createFileSystemWatcher('**/*.{png,ogg,nbt}')
 			]
+		},
+		middleware: {
+			// Each analysis ends with diagnostics; the preview then fetches the new pack.
+			handleDiagnostics(uri, diagnostics, next) {
+				next(uri, diagnostics);
+				previews?.scheduleRefresh();
+			}
 		}
 	};
 	const c = new LanguageClient('mms', 'MMS Language Server', serverOptions, clientOptions);
@@ -152,8 +163,11 @@ function restart(): Promise<void> {
 
 export function activate(context: vscode.ExtensionContext) {
 	output = vscode.window.createOutputChannel('MMS Language Server');
+	previews = new Previews(context, () => client);
 	context.subscriptions.push(
 		output,
+		previews,
+		vscode.commands.registerCommand('mms.showPreview', () => previews?.show()),
 		vscode.commands.registerCommand('mms.restartServer', () => restart()),
 		vscode.commands.registerCommand('mms.showOutput', () => output?.show(true)),
 		vscode.workspace.onDidChangeConfiguration((e) => {
