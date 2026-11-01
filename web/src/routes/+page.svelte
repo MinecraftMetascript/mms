@@ -121,6 +121,20 @@
 	});
 	const selectedFile = $derived(engine?.output.find((f) => f.path === selectedOutput) ?? null);
 
+	// A pinned output keeps the Preview tab on one declaration while the
+	// cursor moves elsewhere; it still redraws as the pack changes. The JSON
+	// tab keeps following the cursor.
+	let pinned = $state<string | null>(null);
+	const previewPath = $derived(pinned ?? selectedOutput);
+	const previewFile = $derived(engine?.output.find((f) => f.path === previewPath) ?? null);
+	const shows = (path: string | null) => previewable(path) ?? inspectable(path);
+	const pinnable = $derived(shows(previewPath));
+	// A pinned output that has left the pack (renamed, deleted or broken).
+	const pinMissing = $derived(pinned !== null && !previewFile);
+	function togglePin() {
+		pinned = pinned ? null : previewPath && shows(previewPath) ? previewPath : null;
+	}
+
 	async function reveal(uri: string, range: Diagnostic['range']) {
 		const path = pathOf(uri);
 		if (project.active !== path) {
@@ -141,7 +155,8 @@
 
 	function selectOutput(path: string) {
 		selectedOutput = path;
-		rightTab = previewable(path) || inspectable(path) ? rightTab : 'json';
+		// A pinned preview stays on screen; otherwise show JSON for outputs with no preview.
+		if (!pinned && !shows(path)) rightTab = 'json';
 	}
 
 	function openExample(id: string) {
@@ -149,11 +164,14 @@
 		menu = false;
 		if (!ex) return;
 		if (!confirm(`Open the ${ex.id} example? It replaces the current project; export it first to keep a copy.`)) return;
+		pinned = null;
 		project.replace(structuredClone(ex.data));
 	}
 	function newProject() {
 		menu = false;
-		if (confirm('Start a new project? It replaces the current one; export it first to keep a copy.')) project.replace(structuredClone(starter));
+		if (!confirm('Start a new project? It replaces the current one; export it first to keep a copy.')) return;
+		pinned = null;
+		project.replace(structuredClone(starter));
 	}
 	async function importZip(e: Event) {
 		const file = (e.target as HTMLInputElement).files?.[0];
@@ -177,7 +195,10 @@
 				return;
 			}
 			const data = readProjectZip(file.name, entries);
-			if (confirm(`Import ${data.files.length} file(s) from ${file.name}? It replaces the current project.`)) project.replace(data);
+			if (confirm(`Import ${data.files.length} file(s) from ${file.name}? It replaces the current project.`)) {
+				pinned = null;
+				project.replace(data);
+			}
 		} catch (err) {
 			alert(`Could not import ${file.name}: ${err instanceof Error ? err.message : err}`);
 		}
@@ -344,15 +365,43 @@
 						onclick={() => (rightTab = id as typeof rightTab)}>{label}</button
 					>
 				{/each}
+				{#if rightTab === 'preview' && (pinned || pinnable)}
+					<button
+						class="ml-auto flex min-w-0 items-center gap-1 px-3 py-1 {pinned ? 'text-accent' : 'text-muted hover:text-ink'}"
+						aria-pressed={pinned !== null}
+						title={pinned
+							? 'Unpin: the preview follows the cursor again'
+							: 'Pin: keep previewing this declaration while you edit others'}
+						onclick={togglePin}
+					>
+						<svg viewBox="0 0 16 16" class="h-3.5 w-3.5 shrink-0" fill={pinned ? 'currentColor' : 'none'} stroke="currentColor" stroke-width="1.4" aria-hidden="true">
+							<path d="M6 1.5h4l-.5 4 2.5 2.5v1.5H4V8l2.5-2.5z" stroke-linejoin="round" />
+							<path d="M8 9.5v5" stroke-linecap="round" />
+						</svg>
+						{#if pinned}
+							<span class="truncate">Pinned {shows(pinned)?.id}</span>
+						{:else}
+							<span>Pin</span>
+						{/if}
+					</button>
+				{/if}
 			</div>
 			<div class="min-h-0 flex-1">
 				{#if engine}
-					<div class="h-full" class:hidden={rightTab !== 'preview'}>
-						{#if selectedFile && inspectable(selectedFile.path)}
-							<Inspect file={selectedFile} />
-						{:else}
-							<Preview output={engine.output} target={selectedOutput} />
+					<div class="flex h-full flex-col" class:hidden={rightTab !== 'preview'}>
+						{#if pinMissing}
+							<p class="border-b border-line px-3 py-1.5 text-xs text-muted">
+								{shows(pinned)?.id} isn't in the pack right now. It shows again once it builds, or
+								<button class="text-accent hover:underline" onclick={() => (pinned = null)}>unpin it</button>.
+							</p>
 						{/if}
+						<div class="min-h-0 flex-1">
+							{#if previewFile && inspectable(previewFile.path)}
+								<Inspect file={previewFile} />
+							{:else}
+								<Preview output={engine.output} target={previewPath} />
+							{/if}
+						</div>
 					</div>
 					<div class="h-full" class:hidden={rightTab !== 'json'}>
 						<JsonView file={selectedFile} onsource={(f: OutputFile) => f.uri && f.range && reveal(f.uri, f.range)} />

@@ -4,6 +4,7 @@ The browser editor for MMS: SvelteKit 3, Tailwind CSS 4 and CodeMirror 6, built 
 
 - The engine runs as WASM in a Web Worker (`static/mms-worker.js`) and speaks LSP to the editor through `@codemirror/lsp-client`. A supervisor restarts it if it crashes or hangs.
 - Previews render with Deepslate in a second worker: noises and density functions as sampled values, noise settings and dimensions as block terrain slices (aquifers and surface rules included), surface rules drawn on a terrain, and dimensions as biome maps. Vanilla worldgen that a pack references is fetched from mcmeta's 26.3 summary, one bundle per registry.
+- The preview follows the declaration under the cursor. Pin it (the button by the Preview tab) to keep one declaration in view while you edit others, such as a dimension while you tweak its surface rule; it still redraws on every change.
 - Projects are kept in IndexedDB and can be imported and exported as zips. Importing a data pack zip, or pasting one JSON file, converts it to MMS through the engine (`mms/importPack`).
 
 ## Develop
