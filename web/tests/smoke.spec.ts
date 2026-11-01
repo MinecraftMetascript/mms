@@ -482,9 +482,14 @@ test('built-in helpers explain themselves on hover and while typing', async ({ p
 		}
 		return { x: 0, y: 0 };
 	});
-	await page.mouse.move(at.x, at.y);
+	// "No problems" already showed before the edit, so the server may not
+	// have the new text yet; hover again until it answers.
 	const hover = page.locator('.cm-lsp-hover-tooltip');
-	await expect(hover).toContainText('True for blocks close to a surface');
+	await expect(async () => {
+		await page.mouse.move(0, 0);
+		await page.mouse.move(at.x, at.y);
+		await expect(hover).toContainText('True for blocks close to a surface', { timeout: 1500 });
+	}).toPass({ timeout: 15_000 });
 	await expect(hover).toContainText('secondary_depth_range');
 	await expect(hover.locator('a[href*="reference#material_condition-StoneDepth"]')).toHaveCount(1);
 	await page.mouse.move(0, 0);
