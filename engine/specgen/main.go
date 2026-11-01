@@ -24,11 +24,10 @@ import (
 const (
 	version    = "26.3"
 	packFormat = 121
-	// From mcmeta's version.json for 26.3: resource_pack_version 97 with
-	// resource_pack_version_minor 1, and data_version. A bare max_format
-	// of 97 means 97.0, so the minor is pinned too.
+	// From mcmeta's version.json for 26.3: resource_pack_version 97.1
+	// (the minor part needs no pin; max_format 97 covers it) and
+	// data_version.
 	resourcePackFormat = 97
-	resourcePackMinor  = 1
 	dataVersion        = 5023
 
 	mcdocRepo   = "SpyglassMC/vanilla-mcdoc"
@@ -111,7 +110,6 @@ func run(out, cache string) error {
 		Version:            version,
 		PackFormat:         packFormat,
 		ResourcePackFormat: resourcePackFormat,
-		ResourcePackMinor:  resourcePackMinor,
 		DataVersion:        dataVersion,
 		Sources: map[string]string{
 			mcdocRepo:  mcdocCommit,

@@ -18,9 +18,6 @@ type Pack struct {
 	PackFormat int    `json:"packFormat"`
 	// ResourcePackFormat is the resource pack format of the same version.
 	ResourcePackFormat int `json:"resourcePackFormat"`
-	// ResourcePackMinor is that format's minor version (97.1 is 1). A
-	// bare max_format of 97 means 97.0, which the game counts as older.
-	ResourcePackMinor int `json:"resourcePackMinor"`
 	// DataVersion is the version's world data version, which structure
 	// files record.
 	DataVersion int `json:"dataVersion"`
