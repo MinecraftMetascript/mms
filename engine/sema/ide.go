@@ -102,30 +102,8 @@ func (c *Checker) valueCandidates(v tview, depth int) []Candidate {
 			}
 		}
 	case "string":
-		id := idOf(v.T)
-		if !id.Present {
-			break
-		}
-		reg := c.registryName(id.Registry)
-		if id.Tags != "required" {
-			for _, s := range c.Syms.All() {
-				if s.Kind.Folder() == reg {
-					out = append(out, Candidate{Label: c.shortID(s.ID()), Kind: CandID, Detail: s.Kind.Name, Doc: DocMarkdown(s.Decl.Doc), Deprecated: Deprecated(s.Decl), Rank: 0})
-				}
-			}
-			for _, x := range c.Pack.Registries[reg] {
-				out = append(out, Candidate{Label: x, Kind: CandID, Detail: reg, Rank: 2})
-			}
-		}
-		if id.Tags != "" {
-			for _, s := range c.Syms.All() {
-				if s.Kind.TagOf == reg {
-					out = append(out, Candidate{Label: "#" + c.shortID(s.ID()), Kind: CandID, Detail: reg + " tag", Doc: DocMarkdown(s.Decl.Doc), Deprecated: Deprecated(s.Decl), Rank: 1})
-				}
-			}
-			for _, x := range c.Pack.Registries["tag/"+reg] {
-				out = append(out, Candidate{Label: "#" + x, Kind: CandID, Detail: reg + " tag", Rank: 3})
-			}
+		if id := idOf(v.T); id.Present {
+			out = append(out, c.idCandidates(id)...)
 		}
 	case "enum":
 		for _, e := range v.T.Values {
@@ -139,6 +117,45 @@ func (c *Checker) valueCandidates(v tview, depth int) []Candidate {
 		}
 	}
 	return out
+}
+
+// idCandidates lists the ids, and tags when allowed, of id's registry:
+// the project's own first, then vanilla's.
+func (c *Checker) idCandidates(id idInfo) []Candidate {
+	var out []Candidate
+	reg := c.registryName(id.Registry)
+	if id.Tags != "required" {
+		for _, s := range c.Syms.All() {
+			if s.Kind.Folder() == reg {
+				out = append(out, Candidate{Label: c.shortID(s.ID()), Kind: CandID, Detail: s.Kind.Name, Doc: DocMarkdown(s.Decl.Doc), Deprecated: Deprecated(s.Decl), Rank: 0})
+			}
+		}
+		for _, x := range c.Pack.Registries[reg] {
+			out = append(out, Candidate{Label: x, Kind: CandID, Detail: reg, Rank: 2})
+		}
+	}
+	if id.Tags != "" {
+		for _, s := range c.Syms.All() {
+			if s.Kind.TagOf == reg {
+				out = append(out, Candidate{Label: "#" + c.shortID(s.ID()), Kind: CandID, Detail: reg + " tag", Doc: DocMarkdown(s.Decl.Doc), Deprecated: Deprecated(s.Decl), Rank: 1})
+			}
+		}
+		for _, x := range c.Pack.Registries["tag/"+reg] {
+			out = append(out, Candidate{Label: "#" + x, Kind: CandID, Detail: reg + " tag", Rank: 3})
+		}
+	}
+	return out
+}
+
+// TagEntryCandidates lists what a tag of kind k can hold: ids and tags of
+// its registry, and Optional(...).
+func (c *Checker) TagEntryCandidates(k Kind) []Candidate {
+	if k.TagOf == "" {
+		return nil
+	}
+	out := c.idCandidates(idInfo{Registry: k.TagOf, Tags: "allowed", Present: true})
+	out = append(out, Candidate{Label: "Optional", Kind: CandCallable, Insert: "Optional($1)", Detail: "an entry the tag can do without", Rank: 4})
+	return dedupe(out)
 }
 
 func (c *Checker) shortID(id string) string {
@@ -197,6 +214,26 @@ func (c *Checker) FieldCandidates(in *Info, present map[string]bool, call bool) 
 			rank = 2
 		}
 		out = append(out, Candidate{Label: f.Key, Kind: CandField, Insert: f.Key + " = $1", Detail: describe(f.Type), Doc: f.Desc, Rank: rank})
+	}
+	// A map's keys, such as an enchantment's effect components or a
+	// biome's attributes, when the key type lists them.
+	if !call {
+		for i := range fs {
+			f := &fs[i]
+			if f.KeyType == nil {
+				continue
+			}
+			for _, k := range c.valueCandidates(*f.KeyType, 0) {
+				if (k.Kind != CandID && k.Kind != CandEnum) || strings.HasPrefix(k.Label, "#") || present[k.Label] || present["minecraft:"+k.Label] {
+					continue
+				}
+				detail := k.Detail
+				if vt := c.mapValueType(f, k.Label); vt.T != nil {
+					detail = describe(vt)
+				}
+				out = append(out, Candidate{Label: k.Label, Kind: CandField, Insert: k.Label + " = $1", Detail: detail, Doc: k.Doc, Rank: 3 + k.Rank})
+			}
+		}
 	}
 	return dedupe(out)
 }
@@ -534,4 +571,18 @@ func (c *Checker) CallInfo(call *syntax.Call, in *Info) *Info {
 		return nil
 	}
 	return &Info{Type: found.Struct, Callable: found, Fields: found.Fields, Disp: found.Disp, typed: true}
+}
+
+// IfArgInfo is the expected type of a surface rule If(cond, rule)'s
+// argument at index, for completion: a condition, then a rule. in is the
+// Info of the If call.
+func (c *Checker) IfArgInfo(in *Info, index int) *Info {
+	if in == nil || in.Type.Name != tMaterialRule {
+		return nil
+	}
+	name := tMaterialCond
+	if index > 0 {
+		name = tMaterialRule
+	}
+	return &Info{Type: c.norm(tview{T: &spec.Type{Kind: "reference", Path: name}}), typed: true}
 }

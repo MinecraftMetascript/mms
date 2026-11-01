@@ -27,6 +27,11 @@ var parserNames = map[string]string{
 	"team_color": "colour", "slot_source": "slot source",
 }
 
+// Criteria are the single-word scoreboard criteria. Compound criteria
+// such as `minecraft.mined:minecraft.stone` and `teamkill.red` are valid
+// too, but are not listed.
+var Criteria = []string{"dummy", "trigger", "deathCount", "playerKillCount", "totalKillCount", "health", "xp", "level", "food", "air", "armor"}
+
 // Enumerated word arguments.
 var enums = map[string][]string{
 	"gamemode":          {"adventure", "creative", "spectator", "survival"},

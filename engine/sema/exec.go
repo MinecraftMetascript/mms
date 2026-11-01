@@ -383,3 +383,47 @@ func (f *fc) execBlock(out *fn.Block, t *syntax.Trailing) {
 		out.Add(fn.Exec{Parts: parts, Body: body})
 	}
 }
+
+// Selectors are the target selectors, for completion.
+var Selectors = []string{"@a", "@e", "@n", "@p", "@r", "@s"}
+
+func words(kind CandidateKind, ws ...string) []Candidate {
+	out := make([]Candidate, len(ws))
+	for i, w := range ws {
+		out[i] = Candidate{Label: w, Kind: kind, Rank: i}
+	}
+	return out
+}
+
+// ExecArgCandidates lists values for argument index of the execute helper
+// name, such as the selectors of As(|), or nil when it has no list.
+func (c *Checker) ExecArgCandidates(name string, index int) []Candidate {
+	sel := words(CandKeyword, Selectors...)
+	switch name {
+	case "As", "At":
+		return sel
+	case "Positioned":
+		return append(words(CandKeyword, "~ ~ ~", "^ ^ ^"), sel...)
+	case "Rotated":
+		return append(words(CandKeyword, "~ ~"), sel...)
+	case "Facing":
+		if index > 0 {
+			return words(CandEnum, "eyes", "feet")
+		}
+		return append(words(CandKeyword, "~ ~ ~"), sel...)
+	case "Anchored":
+		return words(CandEnum, "eyes", "feet")
+	case "Align":
+		return words(CandEnum, "xyz", "xz", "x", "y", "z")
+	case "On":
+		return words(CandEnum, "attacker", "controller", "leasher", "origin", "owner", "passengers", "target", "vehicle")
+	case "In":
+		return dedupe(c.idCandidates(idInfo{Registry: "dimension", Present: true}))
+	case "Summon":
+		return dedupe(c.idCandidates(idInfo{Registry: "entity_type", Present: true}))
+	}
+	return nil
+}
+
+// ExecHelper looks up an execute helper by name.
+func ExecHelperNamed(name string) *ExecHelper { return execByName[name] }

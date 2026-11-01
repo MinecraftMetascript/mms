@@ -1,6 +1,7 @@
 package sema
 
 import (
+	"encoding/json"
 	"sort"
 	"strings"
 
@@ -149,7 +150,7 @@ func (c *Checker) buildStruct(fs []field, disp *dispInfo, caseKey string, as []a
 			o.Set(f.Key, a.val)
 			continue
 		}
-		if val := c.check(a.expr, f.Type); val != nil {
+		if val := c.check(a.expr, c.siblingCase(f.Type, byKey)); val != nil {
 			o.Set(f.Key, val)
 		}
 	}
@@ -201,6 +202,35 @@ func (c *Checker) buildStruct(fs []field, disp *dispInfo, caseKey string, as []a
 		}
 	}
 	return o
+}
+
+// siblingCase resolves a value that dispatches on a sibling field, such
+// as an advancement's `display`, which is `advancement_display[[parent]]`:
+// the case is the sibling's value, %unknown for one that has no case of
+// its own, or %none when the sibling is not set.
+func (c *Checker) siblingCase(v tview, byKey map[string]*assign) tview {
+	t := v.T
+	if t == nil || t.Kind != "dispatcher" || len(t.ParallelIndices) != 1 || t.ParallelIndices[0].Kind != "dynamic" {
+		return v
+	}
+	acc := t.ParallelIndices[0].Accessor
+	if len(acc) != 1 {
+		return v
+	}
+	var sib string
+	if json.Unmarshal(acc[0], &sib) != nil || sib == "" {
+		return v
+	}
+	keys := []string{"%none"}
+	if a := byKey[sib]; a != nil {
+		keys = []string{keyText(a.expr), "%unknown"}
+	}
+	for _, k := range keys {
+		if cs, ok := c.Pack.Dispatch(t.Registry, k); ok && k != "" {
+			return tview{T: cs, Env: v.Env}
+		}
+	}
+	return v
 }
 
 func exampleCallable(c *Checker, d *dispInfo) string {

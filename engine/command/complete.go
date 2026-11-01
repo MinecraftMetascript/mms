@@ -123,6 +123,8 @@ func (c *Checker) values(n *spec.CommandNode, ids func(string) []string) []Sugge
 		return words("~ ~ ~", "^ ^ ^")
 	case "column_pos", "vec2", "rotation":
 		return words("~ ~")
+	case "objective_criteria":
+		return words(Criteria...)
 	case "scoreboard_slot":
 		return words("below_name", "list", "sidebar")
 	case "objective", "team":
