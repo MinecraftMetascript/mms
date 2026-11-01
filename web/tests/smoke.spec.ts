@@ -131,6 +131,41 @@ test('dimensions, noise settings and surface rules preview as terrain', async ({
 	expect(errors).toEqual([]);
 });
 
+test('a pinned preview stays put while the cursor moves to another declaration', async ({ page }) => {
+	const errors: string[] = [];
+	page.on('pageerror', (e) => errors.push(e.message));
+	page.on('dialog', (d) => d.accept());
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	await page.getByRole('button', { name: /Project/ }).click();
+	await page.getByRole('button', { name: /sky-islands/ }).click();
+	await expect(status(page)).toHaveText(/No problems/);
+
+	// Pin the dimension, then go edit the surface rule in another file.
+	await page.getByRole('button', { name: 'dimension.mms' }).click();
+	await page.locator('.cm-line', { hasText: 'Dimension islands' }).click();
+	await expect(page.getByText('sky:islands', { exact: true })).toBeVisible();
+	const pin = page.getByRole('button', { name: /^Pin/ });
+	await pin.click();
+	await expect(pin).toHaveAttribute('aria-pressed', 'true');
+	await expect(pin).toContainText('Pinned sky:islands');
+
+	await page.getByRole('button', { name: 'terrain.mms' }).click();
+	await page.locator('.cm-line', { hasText: 'SurfaceRule surface' }).click();
+	await expect(page.getByText('sky:islands', { exact: true })).toBeVisible();
+	await expect(page.getByText('surface rule', { exact: true })).toBeHidden();
+	// The JSON tab still follows the cursor.
+	await page.getByRole('tab', { name: 'JSON' }).click();
+	await expect(page.locator('pre.json')).not.toContainText('"biome_source"');
+	await page.getByRole('tab', { name: 'Preview' }).click();
+
+	// Unpinning goes back to following the cursor.
+	await pin.click();
+	await expect(pin).toHaveAttribute('aria-pressed', 'false');
+	await expect(page.getByText('surface rule', { exact: true })).toBeVisible();
+	expect(errors).toEqual([]);
+});
+
 test('data packs and pasted JSON import as MMS', async ({ page }) => {
 	page.on('dialog', (d) => d.accept());
 	await page.goto('./');
