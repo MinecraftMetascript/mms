@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import type { OutputFile } from '../engine/engine.svelte';
+	import type { OutputFile } from '../types';
 	import {
 		modesOf,
 		previewable,
@@ -18,8 +18,14 @@
 		output: OutputFile[];
 		/** The output path to preview. */
 		target: string | null;
+		/**
+		 * Starts a preview worker (preview.worker.ts). The host bundles it:
+		 * the web app as a worker file, VS Code's webview inline, since a
+		 * webview can only start workers from blob URLs.
+		 */
+		createWorker: () => Worker;
 	}
-	let { output, target }: Props = $props();
+	let { output, target, createWorker }: Props = $props();
 
 	// A target the pack no longer has (renamed or deleted) shows nothing.
 	const info = $derived(target && output.some((f) => f.path === target) ? previewable(target) : null);
@@ -119,7 +125,7 @@
 	const terrainChoices = $derived(['minecraft:overworld', ...parsed.filter((f) => f.kind === 'noise_settings').map((f) => f.id)]);
 
 	onMount(() => {
-		worker = new Worker(new URL('./preview.worker.ts', import.meta.url), { type: 'module' });
+		worker = createWorker();
 		worker.onmessage = (e: MessageEvent<PreviewResponse>) => {
 			const r = e.data;
 			if (r.seq !== seq) {
@@ -202,7 +208,7 @@
 		const count = Math.max(1, Math.min(6, (navigator.hardwareConcurrency || 4) - 1));
 		const ports: MessagePort[] = [];
 		for (let i = 0; i < count; i++) {
-			const helper = new Worker(new URL('./preview.worker.ts', import.meta.url), { type: 'module' });
+			const helper = createWorker();
 			const channel = new MessageChannel();
 			helper.postMessage({ type: 'serve', port: channel.port2 } satisfies PreviewRequest, [channel.port2]);
 			ports.push(channel.port1);

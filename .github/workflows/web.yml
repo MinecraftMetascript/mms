@@ -3,9 +3,9 @@ name: web
 on:
   push:
     branches: [main]
-    paths: ['web/**', 'engine/**', 'examples/**', '.github/workflows/web.yml']
+    paths: ['web/**', 'packages/**', 'engine/**', 'examples/**', '.github/workflows/web.yml']
   pull_request:
-    paths: ['web/**', 'engine/**', 'examples/**', '.github/workflows/web.yml']
+    paths: ['web/**', 'packages/**', 'engine/**', 'examples/**', '.github/workflows/web.yml']
   workflow_dispatch:
 
 permissions:
@@ -28,7 +28,12 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: web/package-lock.json
+          cache-dependency-path: |
+            web/package-lock.json
+            packages/preview/package-lock.json
+      - name: Check the shared previews (packages/preview)
+        working-directory: packages/preview
+        run: npm ci && npm run check
       - run: npm ci
       - run: npm run wasm
       - run: npm run check
