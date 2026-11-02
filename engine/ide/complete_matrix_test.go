@@ -65,6 +65,9 @@ func TestCompletionMatrix(t *testing.T) {
 		{name: "map value", src: "Enchantment e = {\n  effects = {\n    minecraft:damage = [|]\n  }\n}", want: []string{"DamageEnchantmentEffect"}},
 		{name: "function reference", src: "Function g {}\nAdvancement a = { rewards = { function = |} }", want: []string{"g"}},
 
+		{name: "custom item fields", src: "CustomItem w = {\n  base = stick\n  |\n}", want: []string{"durability", "components", "texture"}},
+		{name: "custom item components", src: "CustomItem w = {\n  base = stick\n  components = {\n    |\n  }\n}", want: []string{"max_damage", "damage", "unbreakable", "tool", "equippable", "food"}, not: []string{"additional_trade_cost", "creative_slot_lock", "map_post_processing"}},
+
 		// Tags.
 		{name: "tag entries", src: "ItemTag gems = [|]", want: []string{"diamond", "#logs", "Optional"}, not: []string{"#gems"}},
 		{name: "tag entry prefix", src: "ItemTag gems = [dia|]", want: []string{"diamond"}, replace: "dia"},

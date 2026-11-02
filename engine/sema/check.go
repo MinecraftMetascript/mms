@@ -886,7 +886,9 @@ func (c *Checker) resolveID(text string, id idInfo, e syntax.Expr) string {
 				}
 			}
 			msg := fmt.Sprintf("unknown %s '%s'", reg, full)
-			if s := closest(path, withPrefix(c.Pack.Registries[reg], id.Path)); s != "" {
+			if j, ok := bedrockComponents[path]; ok && reg == "data_component_type" {
+				msg += "; that is a Bedrock Edition component. In Java Edition use " + j
+			} else if s := closest(path, withPrefix(c.Pack.Registries[reg], id.Path)); s != "" {
 				msg += fmt.Sprintf("; did you mean '%s'?", s)
 			}
 			if id.Slot {

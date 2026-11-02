@@ -131,6 +131,11 @@ func (c *Checker) idCandidates(id idInfo) []Candidate {
 			}
 		}
 		for _, x := range c.Pack.Registries[reg] {
+			if id.excluded("minecraft:" + strings.TrimPrefix(x, "minecraft:")) {
+				// The game rejects it here, such as the components that
+				// item stacks cannot keep.
+				continue
+			}
 			out = append(out, Candidate{Label: x, Kind: CandID, Detail: reg, Rank: 2})
 		}
 	}

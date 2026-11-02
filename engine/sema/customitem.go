@@ -176,10 +176,12 @@ func customItemType(p *spec.Pack) *spec.Type {
 	one := 1.0
 	positive := &spec.Type{Kind: "int", ValueRange: &spec.Range{Min: &one}}
 	t.Fields = append(t.Fields,
+		&spec.Field{Kind: "pair", Key: "durability", Optional: true, Type: positive,
+			Desc: "How many uses the item has before it breaks: its `max_damage` component. A damageable item cannot stack, so the item also gets `max_stack_size = 1` unless it sets one. Make it unbreakable with `components = { unbreakable = {} }` instead."},
 		&spec.Field{Kind: "pair", Key: "consume_on_use", Optional: true, Type: positive,
 			Desc: "How many of the item each right-click use takes from the stack, paid once per press by on_right_click, on_use_on_block or on_right_click_entity."},
 		&spec.Field{Kind: "pair", Key: "damage_on_use", Optional: true, Type: positive,
-			Desc: "How much durability each right-click use costs, paid like consume_on_use. The item needs a `max_damage` component, and gets `max_stack_size = 1` unless it sets one. When the durability runs out the item breaks, and on_break runs."})
+			Desc: "How much durability each right-click use costs, paid like consume_on_use. The item needs durability, such as `durability = 32`. When the durability runs out the item breaks, and on_break runs."})
 	for _, h := range itemHookFields() {
 		t.Fields = append(t.Fields, &spec.Field{Kind: "pair", Key: h.key, Optional: true, Type: idType("function"), Desc: h.desc})
 	}
@@ -322,6 +324,14 @@ func (c *Checker) CustomItem(d *syntax.Decl, id string) *CustomItemOut {
 	if user != nil {
 		comps.Members = append(comps.Members, user.Members...)
 	}
+	if n, ok := o.Get("durability").(jsonv.Number); ok {
+		if hasComponent(user, "max_damage") {
+			c.errorf("mms/custom-item", fields["durability"].Span(), "durability sets the max_damage component, which components also sets; keep one of them")
+		} else {
+			comps.Set("max_damage", n)
+		}
+	}
+	c.checkStackable(fields, comps)
 	out.Hooks = c.checkItemHooks(d, o, comps, id, out)
 	stack := &jsonv.Object{}
 	if b := str("base"); b != "" {
@@ -330,6 +340,23 @@ func (c *Checker) CustomItem(d *syntax.Decl, id string) *CustomItemOut {
 	stack.Set("components", comps)
 	out.Stack = stack
 	return out
+}
+
+// checkStackable gives an item with durability a stack size of 1, as
+// the game requires: an item stack with max_damage and a max_stack_size
+// above 1 fails to load.
+func (c *Checker) checkStackable(fields map[string]syntax.Expr, comps *jsonv.Object) {
+	if componentValue(comps, "max_damage") == nil {
+		return
+	}
+	switch n := componentValue(comps, "max_stack_size").(type) {
+	case nil:
+		comps.Set("max_stack_size", jsonv.Number("1"))
+	case jsonv.Number:
+		if n != "1" {
+			c.errorf("mms/custom-item", fields["components"].Span(), "an item with durability cannot stack: the game requires max_stack_size = 1 with max_damage")
+		}
+	}
 }
 
 var langCode = regexp.MustCompile(`^[a-z]{2,3}_[a-z0-9]{2,3}$`)
@@ -672,4 +699,19 @@ func quoteSNBT(s string) string {
 	}
 	b.WriteByte('"')
 	return b.String()
+}
+
+// bedrockComponents maps Bedrock Edition item components, which some
+// wiki pages list next to Java's, to what does the job in a data pack.
+var bedrockComponents = map[string]string{
+	"durability":       "max_damage, or durability = n on a CustomItem",
+	"digger":           "tool, such as tool = { rules = [{ blocks = #mineable/pickaxe, speed = 8, correct_for_drops = true }] }",
+	"wearable":         "equippable",
+	"display_name":     "item_name or custom_name",
+	"icon":             "item_model",
+	"cooldown":         "use_cooldown",
+	"hand_equipped":    "a CustomItem's parent = item/handheld",
+	"repairable_items": "repairable",
+	"interact_button":  "a CustomItem's on_right_click",
+	"use_modifiers":    "consumable or use_effects",
 }

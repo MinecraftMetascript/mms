@@ -216,8 +216,19 @@ This writes `models/item/ember_shard.json` (a flat `item/generated` model of the
 | `parent` | the generated model's parent: `item/generated` by default, `item/handheld` for tools |
 | `model` | an existing model to show instead of one made from `texture` |
 | `item_model` | an `ItemModel` id, or an item model body such as `{ model = Select(...) }`, instead of the generated one |
+| `durability` | how many uses it has before it breaks. It sets the `max_damage` component, and `max_stack_size = 1` unless `components` sets a stack size, because the game will not load an item that has durability and stacks |
 | `on_right_click`, `on_hit`, ... | functions to run when a player uses the item; see [item hooks](functions.md#item-hooks) |
 | `components` | more item components, given to every use |
+
+`components` takes any Java Edition item component. Some pages list Bedrock Edition item components, which data packs cannot use. Their Java counterparts are:
+
+| Bedrock | Java |
+| --- | --- |
+| `minecraft:durability` | `durability = n` here, or the `max_damage`, `damage` and `unbreakable` components |
+| `minecraft:digger` | `tool`, such as `tool = { rules = [{ blocks = #mineable/pickaxe, speed = 8, correct_for_drops = true }] }` |
+| `minecraft:wearable` | `equippable` |
+| `minecraft:food` | `food` and `consumable` |
+| `minecraft:max_stack_size` | `max_stack_size` |
 
 Without `texture`, `model` or `item_model`, the item keeps its base item's look and only gets its name and components.
 

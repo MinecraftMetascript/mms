@@ -222,7 +222,7 @@ Function light_block {
 | `on_kill` | kills an entity while holding the item in their main hand |
 | `on_consume` | finishes eating or drinking the item. It needs a `consumable` component, or a base item that is food or a potion |
 | `on_pickup` | picks the item up from the ground |
-| `on_break` | uses up the item's durability, so it breaks. It needs a base with durability, or a `max_damage` component |
+| `on_break` | uses up the item's durability, so it breaks. It needs a base with durability, or `durability = n` |
 
 Every hook marks the item with `mms_item: "<namespace>:<name>"` in its `custom_data`, wherever it is used: in `/give`, recipes and loot. A `custom_data` of your own keeps its keys and gains the marker. Each hook is an advancement, `<namespace>:mms_gen/item_hook/<name>/<hook>`, whose trigger matches the base item with that marker, and a reward function of the same name that revokes it and calls your function.
 
@@ -239,13 +239,13 @@ Every hook marks the item with `mms_item: "<namespace>:<name>"` in its `custom_d
 CustomItem ember_wand = {
   base = blaze_rod
   on_use_on_block = kindle
+  durability = 32
   damage_on_use = 1
-  components = { max_damage = 32 }
 }
 ```
 
 - `consume_on_use = n` takes `n` of the item from the stack.
-- `damage_on_use = n` costs `n` points of durability. When the durability runs out, the item breaks with the break sound, and `on_break` runs. The item needs a `max_damage` component. MMS doesn't know vanilla items' durability, so a base item's own durability is not enough. A damageable item cannot stack, so the item gets `max_stack_size = 1` unless it sets one, and any other stack size is an error.
+- `damage_on_use = n` costs `n` points of durability. When the durability runs out, the item breaks with the break sound, and `on_break` runs. The item needs `durability = n` (or a `max_damage` component). MMS doesn't know vanilla items' durability, so a base item's own durability is not enough.
 
 The cost is paid once per press, from the hand that holds the item. With `on_right_click` it is paid on every press. Otherwise it is paid only when `on_use_on_block` or `on_right_click_entity` runs, so a click at the air costs nothing. `on_hold_right_click` alone pays no cost.
 

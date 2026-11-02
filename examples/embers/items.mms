@@ -30,8 +30,8 @@ CustomItem ember_wand = {
   base = blaze_rod
   name = "Ember Wand"
   on_use_on_block = kindle
+  durability = 32
   damage_on_use = 1
-  components = { max_damage = 32 }
 }
 
 /** A music disc that plays the song in music.mms. */
