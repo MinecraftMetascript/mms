@@ -25,7 +25,9 @@ import (
 // A function id takes a block of commands, compiled as a Function with
 // no parameters:
 //
-//	rewards = { function = { say found it } }
+//	rewards = { function = {
+//	  /say found it
+//	} }
 
 // Hoisted is an inline value written out as its own resource.
 type Hoisted struct {
@@ -125,6 +127,7 @@ func (c *Checker) hoistFunction(e syntax.Expr, k Kind) jsonv.Value {
 	if c.trial {
 		return jsonv.String(c.NS + ":mms_gen/inline")
 	}
+	c.info(e).InlineFn = true
 	hid := c.hoistID(k)
 	d := &syntax.Decl{Kind: &syntax.Ident{Name: k.Name, Sp: obj.Sp}, Body: obj.Body, Sp: obj.Sp}
 	f := c.CompileFunction(d, hid, c.Src)

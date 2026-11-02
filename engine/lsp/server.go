@@ -17,6 +17,7 @@ import (
 
 	"github.com/minecraftmetascript/mms/engine/format"
 	"github.com/minecraftmetascript/mms/engine/ide"
+	"github.com/minecraftmetascript/mms/engine/jsonv"
 	"github.com/minecraftmetascript/mms/engine/project"
 	"github.com/minecraftmetascript/mms/engine/sema"
 	"github.com/minecraftmetascript/mms/engine/spec"
@@ -946,7 +947,30 @@ func (s *Server) output(_ context.Context, p struct {
 		out = append(out, m)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i]["path"].(string) < out[j]["path"].(string) })
-	return map[string]any{"files": out, "assets": assets, "hasErrors": w.res.HasErrors()}, nil
+	// A CustomItem is not a file of its own: its name stands for an item
+	// stack wherever it is used, and it writes files only for its look
+	// and name. Listing the stack lets an editor show every custom item,
+	// including one with just components.
+	items := []map[string]any{}
+	for _, d := range w.res.Order {
+		if d.Item == nil || d.Item.Stack == nil || d.Unit == nil {
+			continue
+		}
+		l := idx[d.Unit.Path]
+		if l == nil {
+			l = s.lines(d.Unit.Path)
+			idx[d.Unit.Path] = l
+		}
+		items = append(items, map[string]any{
+			"id":    d.ID(),
+			"text":  string(jsonv.Marshal(d.Item.Stack)),
+			"snbt":  sema.StackSNBT(d.Item.Stack),
+			"uri":   d.Unit.Path,
+			"range": l.rng(d.D.Sp),
+		})
+	}
+	sort.Slice(items, func(i, j int) bool { return items[i]["id"].(string) < items[j]["id"].(string) })
+	return map[string]any{"files": out, "assets": assets, "items": items, "hasErrors": w.res.HasErrors()}, nil
 }
 
 // ---- URIs

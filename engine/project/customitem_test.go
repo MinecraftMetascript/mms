@@ -416,3 +416,38 @@ func TestRightClickIncremental(t *testing.T) {
 		t.Fatalf("%d errors after declaring the function again", n)
 	}
 }
+
+// TestItemHookInline checks an inline { ... } block in an on_* field:
+// hoisting compiles it as a Function and the hook calls it.
+func TestItemHookInline(t *testing.T) {
+	p := New(spec.MustDefault(), Config{Namespace: "demo"})
+	p.SetFile("main.mms", `
+CustomItem staff = {
+  base = stick
+  on_right_click = {
+    /say hi
+  }
+  on_hit = {
+    /say hit
+  }
+}
+Function give {
+  /give @s ${staff}
+}
+`)
+	r, _ := p.Analyze(context.Background())
+	if d := diagText(r); d != "" {
+		t.Fatalf("unexpected diagnostics:\n%s", d)
+	}
+	got := dumpFiles(r.Emit())
+	for _, want := range []string{
+		"=== data/demo/function/mms_gen/staff/function.mcfunction\nsay hi\n",
+		"=== data/demo/function/mms_gen/staff/function_2.mcfunction\nsay hit\n",
+		"scoreboard players set @s mms_click.demo 2\nfunction demo:mms_gen/staff/function\n",
+		"advancement revoke @s only demo:mms_gen/item_hook/staff/hit\nfunction demo:mms_gen/staff/function_2\n",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("missing %q in:\n%s", want, got)
+		}
+	}
+}

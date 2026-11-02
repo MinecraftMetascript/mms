@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="branding/logo-dark.svg">
+    <img src="branding/logo-light.svg" alt="MMS Metascript" height="80">
+  </picture>
+</p>
+
 # Minecraft Metascript (MMS)
 
 MMS is a small language that compiles to Minecraft data packs. One MMS file can stand in for the many JSON files a feature needs (noise, density functions, surface rules, loot tables, recipes, functions and more). It also gives functions helpers for globals, variables and scoreboards.
@@ -12,6 +19,7 @@ This branch is a full rewrite. The plan is in [docs/plan.md](docs/plan.md), prog
 | `editors/vscode/` | VS Code extension (a client for `mms lsp`) |
 | `editors/zed/` | Zed extension (a client for `mms lsp`, highlighting from `editors/tree-sitter-mms`) |
 | `editors/tree-sitter-mms/` | Tree-sitter grammar, for Zed and other tree-sitter editors |
+| `branding/` | Logo, mark and favicon (SVG sources and the script that builds them) |
 | `examples/` | Example projects, built by the tests and listed in the web editor |
 
 Target: Minecraft Java Edition 26.3 (data pack format 121).

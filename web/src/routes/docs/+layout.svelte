@@ -2,6 +2,7 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { guides } from '#lib/docs/docs.ts';
+	import Logo from '#lib/components/Logo.svelte';
 	import OnThisPage from '#lib/docs/OnThisPage.svelte';
 	import type { LayoutProps } from './$types';
 
@@ -17,7 +18,7 @@
 
 <div class="min-h-dvh bg-bg">
 	<header class="sticky top-0 z-10 flex items-center gap-3 border-b border-line bg-panel px-4 py-2">
-		<a class="font-semibold tracking-tight" href={resolve('/docs')}>MMS docs</a>
+		<a class="flex items-center gap-2 font-semibold tracking-tight" href={resolve('/docs')}><Logo class="h-6 w-auto" /><span class="text-muted">docs</span></a>
 		<button class="ml-auto rounded px-2 py-1 text-sm hover:bg-hover md:hidden" onclick={() => (open = !open)} aria-expanded={open}>Contents</button>
 		<a class="rounded px-2 py-1 text-sm text-accent hover:bg-hover md:ml-auto" href={resolve('/')}>Open the editor</a>
 	</header>

@@ -629,3 +629,33 @@ func TestBookFiles(t *testing.T) {
 		t.Errorf("formatting a book file = %v", f)
 	}
 }
+
+// A CustomItem with only components writes no file; the output still
+// lists it with the stack its name stands for.
+func TestOutputCustomItems(t *testing.T) {
+	c := start(t)
+	c.result("initialize", map[string]any{})
+	a := "mem:///a.mms"
+	c.notify("mms/setFiles", map[string]any{"files": []any{
+		map[string]any{"uri": a, "text": "\nCustomItem ruby = {\n  base = stick\n  components = { max_stack_size = 1 }\n}\n"},
+	}})
+	out := c.result("mms/output", map[string]any{}).(map[string]any)
+	items := out["items"].([]any)
+	if len(items) != 1 {
+		t.Fatalf("items = %v", items)
+	}
+	it := items[0].(map[string]any)
+	if it["id"] != "mms:ruby" || it["uri"] != a {
+		t.Errorf("item = %v", it)
+	}
+	if text := it["text"].(string); !strings.Contains(text, `"id": "minecraft:stick"`) || !strings.Contains(text, `"max_stack_size": 1`) {
+		t.Errorf("stack = %s", text)
+	}
+	if it["snbt"] != "stick[max_stack_size=1]" {
+		t.Errorf("snbt = %v", it["snbt"])
+	}
+	r := it["range"].(map[string]any)
+	if r["start"].(map[string]any)["line"] != float64(1) || r["end"].(map[string]any)["line"] != float64(4) {
+		t.Errorf("range = %v", r)
+	}
+}

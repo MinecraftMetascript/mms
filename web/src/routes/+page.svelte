@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Logo from '#lib/components/Logo.svelte';
 	import { onMount, tick } from 'svelte';
 	import { asset, resolve } from '$app/paths';
 	import { LSPPlugin } from '@codemirror/lsp-client';
@@ -7,7 +8,7 @@
 	import Editor from '#lib/editor/Editor.svelte';
 	import Sidebar from '#lib/components/Sidebar.svelte';
 	import JsonView from '#lib/components/JsonView.svelte';
-	import { Engine, type Diagnostic, type DocSymbol, type OutputFile } from '#lib/engine/engine.svelte.ts';
+	import { Engine, itemKey, outputKey, type Diagnostic, type DocSymbol, type OutputFile } from '#lib/engine/engine.svelte.ts';
 	import { Project, pathOf, uriOf, starter, type ProjectData } from '#lib/project/project.svelte.ts';
 	import { examples } from '#lib/project/examples.ts';
 	import { download, hasResourcePack, isDataPack, packZip, projectZip, readProjectZip, readZip, readZipAssets } from '#lib/project/zip.ts';
@@ -120,12 +121,23 @@
 		const c = cursor;
 		// Files hoisted from inline values share their declaration's lines;
 		// the declaration's own file is the one to show.
-		return engine.output.find((f) => f.uri === c.uri && f.range && !f.implicit && within(f.range, c.line)) ?? null;
+		// A custom item shows the item stack its name stands for: it may
+		// write no file at all, and its files are only its look and name.
+		const it = engine.outputItems.find((it) => it.uri === c.uri && within(it.range, c.line));
+		if (it) return itemKey(it);
+		const f = engine.output.find((f) => f.uri === c.uri && f.range && !f.implicit && within(f.range, c.line));
+		return f ? outputKey(f) : null;
 	});
 	$effect(() => {
-		if (cursorOutput) selectedOutput = cursorOutput.path;
+		if (cursorOutput) selectedOutput = cursorOutput;
 	});
-	const selectedFile = $derived(engine?.output.find((f) => f.path === selectedOutput) ?? null);
+	const selectedFile = $derived.by((): OutputFile | null => {
+		if (!engine || !selectedOutput) return null;
+		const f = engine.output.find((f) => outputKey(f) === selectedOutput);
+		if (f) return f;
+		const it = engine.outputItems.find((it) => itemKey(it) === selectedOutput);
+		return it ? { path: it.id, text: it.text, uri: it.uri, range: it.range, item: it } : null;
+	});
 
 	// A pinned output keeps the Preview tab on one declaration while the
 	// cursor moves elsewhere; it still redraws as the pack changes. The JSON
@@ -262,7 +274,7 @@
 
 <div class="flex h-dvh flex-col">
 	<header class="flex items-center gap-2 border-b border-line bg-panel px-3 py-2">
-		<span class="font-semibold tracking-tight">MMS</span>
+		<span class="flex shrink-0 items-center"><Logo class="h-6 w-auto sm:hidden" wordmark={false} /><Logo class="hidden h-6 w-auto sm:block" /></span>
 		<button class="hidden max-w-48 truncate rounded px-2 py-1 text-sm text-muted hover:bg-hover hover:text-ink sm:inline" onclick={() => projects?.open()} title="Switch, rename or delete saved projects" aria-label="{project.name} (switch project)">{project.name}</button>
 		<div class="flex items-center sm:ml-2">
 			<Dropdown label="Project">

@@ -4,6 +4,7 @@
   "description": "Language support for Minecraft Metascript (.mms): diagnostics, completion, formatting, quick fixes and worldgen previews from the MMS language server.",
   "version": "1.0.0",
   "publisher": "minecraftmetascript",
+  "icon": "icons/mms.png",
   "license": "SEE LICENSE IN README.md",
   "repository": {
     "type": "git",
@@ -26,7 +27,11 @@
         "id": "mms",
         "aliases": ["Minecraft Metascript", "MMS"],
         "extensions": [".mms"],
-        "configuration": "./language-configuration.json"
+        "configuration": "./language-configuration.json",
+        "icon": {
+          "light": "./icons/mms-file.svg",
+          "dark": "./icons/mms-file.svg"
+        }
       },
       {
         "id": "mmsbook",

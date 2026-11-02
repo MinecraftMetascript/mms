@@ -626,6 +626,10 @@ test.describe('on a phone', () => {
 		page.on('dialog', (d) => d.accept());
 		await page.goto('./');
 		await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+		// Nothing is wider than the phone. If something were, the browser would widen
+		// the page and pan the screen over it, and the touches below would land off
+		// from where the canvas's box says they are.
+		expect(await page.evaluate(() => [innerWidth, document.documentElement.scrollWidth])).toEqual([390, 390]);
 		await page.getByRole('button', { name: /Examples/ }).click();
 		await page.getByRole('button', { name: /badlands/ }).click();
 		const rule = page.locator('.cm-line', { hasText: 'SurfaceRule badlands' });
@@ -775,4 +779,22 @@ test('a book file in an example is checked and completed in place', async ({ pag
 	await page.keyboard.insertText('go');
 	await page.keyboard.press('ControlOrMeta+Space');
 	await expect(page.locator('.cm-tooltip-autocomplete')).toContainText('gold');
+});
+
+test('the Pack tab lists custom items and splits the two packs', async ({ page }) => {
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	await replaceText(page, 'CustomItem ruby = {\n  base = stick\n  components = { max_stack_size = 1 }\n}\nCustomItem charm = {\n  base = torch\n  name = "Charm"\n}\n');
+	await expect(status(page)).toHaveText(/No problems/);
+	await page.getByRole('tab', { name: 'Pack' }).click();
+	// ruby writes no file, but is listed with the stack its name stands for.
+	await expect(page.getByText('Custom items')).toBeVisible();
+	await page.getByRole('button', { name: 'my_pack:ruby' }).click();
+	await page.getByRole('tab', { name: 'JSON' }).click();
+	await expect(page.locator('pre.json')).toContainText('"max_stack_size": 1');
+	await expect(page.getByText('stick[max_stack_size=1]')).toBeVisible();
+	// Both packs have a pack.mcmeta; each one opens its own.
+	await expect(page.getByText('Resource pack')).toBeVisible();
+	await page.getByRole('button', { name: 'pack.mcmeta' }).last().click();
+	await expect(page.locator('pre.json')).toContainText('"min_format": 97');
 });

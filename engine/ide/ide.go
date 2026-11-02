@@ -34,6 +34,10 @@ type at struct {
 	path []syntax.Node
 	decl *project.Decl
 	c    *sema.Checker
+	// fn is the function code at the cursor: the declaration of a
+	// Function or hook, or an inline `{ ... }` function block (as a Decl
+	// with only a body) in any declaration. nil outside function code.
+	fn *syntax.Decl
 }
 
 func (s *Session) at(path string, off int) *at {
@@ -61,6 +65,7 @@ func (s *Session) at(path string, off int) *at {
 			a.decl = s.R.Decls[d]
 		}
 	}
+	a.fn = a.codeRoot()
 	if a.decl != nil {
 		a.c = sema.NewChecker(s.P.Pack, s.P.Kinds, s.R.Syms, a.decl.NS)
 	} else {
@@ -409,7 +414,7 @@ func (s *Session) complete(a *at, off int) []sema.Candidate {
 // the variables in scope, the execute helpers, the statement keywords,
 // then the Globals, objectives and functions.
 func (s *Session) statementCandidates(a *at, off int) []sema.Candidate {
-	out := locals(a.u.File, a.decl.D, off)
+	out := locals(a.u.File, a.fn, off)
 	out = append(out, sema.ExecCandidates(true)...)
 	for i, kw := range []string{"let", "if", "while", "for", "return"} {
 		out = append(out, sema.Candidate{Label: kw, Kind: sema.CandKeyword, Rank: 100 + i})
@@ -436,8 +441,27 @@ func lineStart(src []rune, off int) bool {
 	return true
 }
 
-// code reports whether the cursor's declaration holds function code.
-func (a *at) code() bool { return a.decl != nil && sema.IsCodeKind(a.decl.Kind) }
+// code reports whether the cursor is in function code.
+func (a *at) code() bool { return a.fn != nil }
+
+// codeRoot finds the function code holding the cursor: the innermost
+// inline function block on the path, such as CustomItem's
+// `on_right_click = { ... }` or an advancement's `function = { ... }`,
+// else the declaration when its kind holds code.
+func (a *at) codeRoot() *syntax.Decl {
+	if a.decl == nil {
+		return nil
+	}
+	for i := len(a.path) - 1; i >= 2; i-- {
+		if o, ok := a.path[i].(*syntax.Object); ok && o.Body != nil && a.info(o) != nil && a.info(o).InlineFn {
+			return &syntax.Decl{Body: o.Body, Sp: o.Sp}
+		}
+	}
+	if sema.IsCodeKind(a.decl.Kind) {
+		return a.decl.D
+	}
+	return nil
+}
 
 // startsStatement reports whether path[i] is the head word of a statement:
 // the word itself, or the first helper name of a call chain such as
@@ -1023,6 +1047,9 @@ func (s *Session) Symbols(path string) []Symbol {
 // functions, objectives and resources.
 func (s *Session) commandCompletion(a *at, sp syntax.Span, off int) ([]Item, syntax.Span) {
 	base := sp.Start + 1
+	if items, replace, ok := s.interpolationCompletion(a, base, off); ok {
+		return items, replace
+	}
 	items, ws := s.commandItems(string(a.u.File.Src[base:sp.End]), off-base)
 	return items, syntax.Span{Start: base + ws, End: off}
 }
