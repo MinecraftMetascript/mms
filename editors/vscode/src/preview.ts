@@ -3,47 +3,37 @@
 // editor. A "Preview" CodeLens above each declaration that has one opens
 // the panel on it, and the panel stays on that declaration while you edit
 // elsewhere, redrawing as the pack changes. The pack comes from the
-// server's `mms/output`. A Book previews as its pages: its declaration
+// server's `mms/output` (output.ts). A Book previews as its pages: its declaration
 // has a lens, and so does each page of its .mmsbook file.
 import { bookPageAt, itemPath, shows } from '@mms/preview/paths';
 import * as vscode from 'vscode';
-import type { LanguageClient } from 'vscode-languageclient/node';
-import type { OutputFile, OutputItem, ToExtension, ToPanel } from './messages';
+import type { OutputItem, ToExtension, ToPanel } from './messages';
+import { isSource, key, type PackOutput } from './output';
 
 export const viewType = 'mms.preview';
 
 export class Previews implements vscode.Disposable, vscode.CodeLensProvider {
 	private panel: vscode.WebviewPanel | undefined;
-	private files: OutputFile[] = [];
-	private items: OutputItem[] = [];
 	/** The output path the panel shows. */
 	private target: string | null = null;
 	/** The book page the panel opens on, from 0. */
 	private page = 0;
-	/** The .mms document last active, whose project's pack is fetched. */
-	private document: vscode.Uri | undefined;
-	private timer: ReturnType<typeof setTimeout> | undefined;
 	private readonly lenses = new vscode.EventEmitter<void>();
 	readonly onDidChangeCodeLenses = this.lenses.event;
 	private readonly subscriptions: vscode.Disposable[] = [];
 
 	constructor(
 		private readonly context: vscode.ExtensionContext,
-		private readonly client: () => LanguageClient | undefined
+		private readonly output: PackOutput
 	) {
 		this.subscriptions.push(
 			this.lenses,
 			vscode.languages.registerCodeLensProvider([{ language: 'mms' }, { language: 'mmsbook' }], this),
-			vscode.window.onDidChangeActiveTextEditor((e) => {
-				if (!e || !isSource(e.document) || e.document.uri.toString() === this.document?.toString()) return;
-				// Another file may belong to another project: fetch its pack.
-				this.document = e.document.uri;
-				this.scheduleRefresh();
+			output.onDidChange(() => {
+				this.lenses.fire();
+				this.post({ type: 'output', files: this.files, items: this.items });
+				if (this.panel) this.panel.title = title(this.target, this.items);
 			}),
-			// A project with no problems publishes no diagnostics, so edits
-			// refresh the pack (and the lenses) too.
-			vscode.workspace.onDidOpenTextDocument((d) => isSource(d) && this.scheduleRefresh()),
-			vscode.workspace.onDidChangeTextDocument((e) => isSource(e.document) && this.scheduleRefresh()),
 			vscode.window.registerWebviewPanelSerializer(viewType, {
 				deserializeWebviewPanel: async (panel, state?: { path?: string | null; page?: number }) => {
 					this.target = state?.path ?? null;
@@ -74,10 +64,11 @@ export class Previews implements vscode.Disposable, vscode.CodeLensProvider {
 		this.adopt(panel);
 	}
 
-	/** Refreshes the generated pack shortly after the server publishes an analysis. */
-	scheduleRefresh() {
-		if (this.timer) clearTimeout(this.timer);
-		this.timer = setTimeout(() => void this.refresh(), 150);
+	private get files() {
+		return this.output.files;
+	}
+	private get items() {
+		return this.output.items;
 	}
 
 	provideCodeLenses(document: vscode.TextDocument): vscode.CodeLens[] {
@@ -171,7 +162,7 @@ export class Previews implements vscode.Disposable, vscode.CodeLensProvider {
 		if (m.type === 'ready') {
 			this.post({ type: 'output', files: this.files, items: this.items });
 			this.setTarget(this.target, this.page);
-			await this.refresh();
+			await this.output.refresh();
 		} else if (m.type === 'clear') {
 			this.setTarget(null);
 		} else if (m.type === 'reveal') {
@@ -181,25 +172,6 @@ export class Previews implements vscode.Disposable, vscode.CodeLensProvider {
 			const column = vscode.window.visibleTextEditors.find((e) => isSource(e.document))?.viewColumn ?? vscode.ViewColumn.One;
 			const editor = await vscode.window.showTextDocument(doc, { viewColumn: column, selection: new vscode.Range(range.start, range.start) });
 			editor.revealRange(range, vscode.TextEditorRevealType.InCenterIfOutsideViewport);
-		}
-	}
-
-	private async refresh() {
-		const client = this.client();
-		if (!client?.isRunning()) return;
-		try {
-			// The uri picks the project (the nearest mms.json) in a workspace
-			// with several; servers that predate that ignore it.
-			const active = vscode.window.activeTextEditor?.document;
-			const uri = (this.document ?? (isSource(active) ? active!.uri : undefined))?.toString();
-			const out = await client.sendRequest<{ files: OutputFile[]; items?: OutputItem[]; hasErrors: boolean }>('mms/output', uri ? { uri } : {});
-			this.files = out.files;
-			this.items = out.items ?? [];
-			this.lenses.fire();
-			this.post({ type: 'output', files: out.files, items: this.items });
-			if (this.panel) this.panel.title = title(this.target, this.items);
-		} catch {
-			// A restart or shutdown; the next analysis refreshes again.
 		}
 	}
 
@@ -240,7 +212,6 @@ export class Previews implements vscode.Disposable, vscode.CodeLensProvider {
 	}
 
 	dispose() {
-		if (this.timer) clearTimeout(this.timer);
 		this.panel?.dispose();
 		for (const s of this.subscriptions) s.dispose();
 	}
@@ -250,14 +221,4 @@ export class Previews implements vscode.Disposable, vscode.CodeLensProvider {
 function title(path: string | null, items: OutputItem[]): string {
 	const id = path ? shows(path, items)?.id : undefined;
 	return id ? `Preview ${id.replace(/^[^:]+:/, '')}` : 'MMS Preview';
-}
-
-/** Whether a document is MMS source: a .mms file or a .mmsbook book text. */
-function isSource(doc: vscode.TextDocument | undefined): boolean {
-	return doc?.languageId === 'mms' || doc?.languageId === 'mmsbook';
-}
-
-/** A file's identity: its path, ignoring case on Windows. */
-function key(uri: vscode.Uri): string {
-	return process.platform === 'win32' ? uri.fsPath.toLowerCase() : uri.fsPath;
 }

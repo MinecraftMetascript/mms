@@ -1,6 +1,6 @@
 <script lang="ts">
 	import Tree from './Tree.svelte';
-	import type { Node } from './tree';
+	import type { Node } from '@mms/preview/tree';
 	interface Props {
 		nodes: Node[];
 		selected: string | null;

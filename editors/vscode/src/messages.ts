@@ -12,6 +12,18 @@ export interface OutputFile {
 	range?: Range;
 	/** Written for an inline value where an id is required; range is that value's. */
 	implicit?: boolean;
+	/** "resources" for a resource pack file. */
+	pack?: string;
+}
+
+/** A project file the pack copies, such as a texture. */
+export interface OutputAsset {
+	/** Its path in the pack. */
+	path: string;
+	/** Its path in the project, relative to the mms.json folder. */
+	src: string;
+	/** "resources" for a resource pack file. */
+	pack?: string;
 }
 
 /** A CustomItem or Book: the item stack its name stands for, which is not a file. */

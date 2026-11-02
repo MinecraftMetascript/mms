@@ -7,19 +7,25 @@
 // the fix, while "MMS: Restart Language Server" keeps working.
 //
 // The preview panel (preview.ts) shows the web editor's worldgen previews.
+// The MMS side bar has the World view (world.ts), which builds the pack
+// into a Minecraft world, and the Pack view (packView.ts), which lists the
+// generated files. Both panels read the pack from output.ts.
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { LanguageClient, type LanguageClientOptions, type ServerOptions } from 'vscode-languageclient/node';
+import { PackOutput } from './output';
+import { PackView } from './packView';
 import { Previews } from './preview';
+import { WorldView } from './world';
 
 const releasesUrl = 'https://github.com/MinecraftMetascript/mms/releases';
 const exe = process.platform === 'win32' ? 'mms.exe' : 'mms';
 
 let client: LanguageClient | undefined;
 let output: vscode.OutputChannel | undefined;
-let previews: Previews | undefined;
+let pack: PackOutput | undefined;
 // Starts and restarts run one at a time, so a restart pressed while the
 // server is still starting does not race it.
 let queue: Promise<void> = Promise.resolve();
@@ -138,7 +144,7 @@ async function start() {
 			// Each analysis ends with diagnostics; the preview then fetches the new pack.
 			handleDiagnostics(uri, diagnostics, next) {
 				next(uri, diagnostics);
-				previews?.scheduleRefresh();
+				pack?.scheduleRefresh();
 			}
 		}
 	};
@@ -147,7 +153,7 @@ async function start() {
 	try {
 		await c.start();
 		log('server started');
-		previews?.scheduleRefresh();
+		pack?.scheduleRefresh();
 	} catch (e) {
 		const msg = e instanceof Error ? e.message : String(e);
 		reportStartFailure(`Running ${resolved.command} failed (${msg}).`);
@@ -161,12 +167,17 @@ function restart(): Promise<void> {
 
 export function activate(context: vscode.ExtensionContext) {
 	output = vscode.window.createOutputChannel('MMS Language Server');
-	previews = new Previews(context, () => client);
+	pack = new PackOutput(() => client);
+	const previews = new Previews(context, pack);
+	const world = new WorldView(context, pack, resolveServer, (line) => log(line));
 	context.subscriptions.push(
 		output,
+		pack,
 		previews,
-		vscode.commands.registerCommand('mms.showPreview', () => previews?.show()),
-		vscode.commands.registerCommand('mms.previewDeclaration', (path: string, page?: number) => previews?.show(path, page)),
+		world,
+		new PackView(pack, () => world.project()),
+		vscode.commands.registerCommand('mms.showPreview', () => previews.show()),
+		vscode.commands.registerCommand('mms.previewDeclaration', (path: string, page?: number) => previews.show(path, page)),
 		vscode.commands.registerCommand('mms.restartServer', () => restart()),
 		vscode.commands.registerCommand('mms.showOutput', () => output?.show(true)),
 		vscode.workspace.onDidChangeConfiguration((e) => {
