@@ -294,4 +294,12 @@ The book's name stands for the book wherever a [custom item](#custom-items) name
 
 A book page shows 14 lines of about 19 characters. Text past the last line is cut off in game, so the [`book-overflow`](lint.md) warning marks where a page runs over, measured with the vanilla font. Add a `---` line there.
 
+### Previewing a book
+
+The web editor's Preview tab shows a book as the game does: the open book texture, the page in the vanilla font with its colors and styles, scrambled `||obfuscated||` text, inline sprites and heads, and the page arrows. Click a page link or the arrows to turn pages, and point at a link to see its hover text. Clicking a command, copy or web link says what it would do. Scores, Globals and selectors are filled in when the reader first opens the book, so the preview lists them with sample values to try. The preview opens on the page the cursor is in, including in a `.mmsbook` file.
+
+In VS Code, the Preview lens above a `Book` opens it in the preview panel, and each page of a `.mmsbook` file has a "Preview page N" lens.
+
+The font, book texture and English translations come from the game's 26.3 assets, downloaded on first use. Project fonts that use their own textures, project textures in sprites, and real player skins are not drawn: those show as boxes, the missing-texture square and the default skin.
+
 The [`library`](../examples/library/) example has a guide given on first join and diaries in a chest loot table.

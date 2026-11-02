@@ -52,6 +52,8 @@ export interface OutputItem {
 	snbt: string;
 	uri: string;
 	range: Diagnostic['range'];
+	/** For a Book: where each page of its text starts, maybe in a .mmsbook file. */
+	pages?: { uri: string; range: Diagnostic['range'] }[];
 }
 
 /**

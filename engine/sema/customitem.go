@@ -55,6 +55,9 @@ type CustomItemOut struct {
 	Overflows []BookOverflow
 	// Use is what each right-click use takes from the item.
 	Use UseCost
+	// PageStarts are where each page of a Book's text starts, so an
+	// editor can open its preview on the page at the cursor.
+	PageStarts []BookPageStart
 }
 
 // Languages lists the item's languages, sorted.

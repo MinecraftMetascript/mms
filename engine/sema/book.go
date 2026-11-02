@@ -38,6 +38,13 @@ const bookKind = "Book"
 // stack: a CustomItem or a Book.
 func isItemKind(k string) bool { return k == customItemKind || k == bookKind }
 
+// BookPageStart is where a page of a Book's text starts: File is the
+// .mmsbook unit it is in, empty for the declaring file.
+type BookPageStart struct {
+	File string
+	Sp   syntax.Span
+}
+
 // BookOverflow is a page that runs past the bottom of the book screen.
 type BookOverflow struct {
 	Page, Lines int
@@ -207,6 +214,11 @@ func (c *Checker) Book(d *syntax.Decl, id string) *CustomItemOut {
 	if fields["text"] != nil {
 		for i, pg := range p.pages {
 			pages = append(pages, pg.json())
+			if pg.src != nil {
+				out.PageStarts = append(out.PageStarts, BookPageStart{File: pg.src.extern, Sp: pg.src.at(pg.off, pg.off+1)})
+			} else {
+				out.PageStarts = append(out.PageStarts, BookPageStart{Sp: fields["text"].Span()})
+			}
 			lines, cut := layoutPage(pg.glyphs())
 			if lines <= bookLines {
 				continue

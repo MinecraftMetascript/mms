@@ -14,11 +14,24 @@ export interface OutputFile {
 	implicit?: boolean;
 }
 
+/** A CustomItem or Book: the item stack its name stands for, which is not a file. */
+export interface OutputItem {
+	id: string;
+	text: string;
+	uri: string;
+	range: Range;
+	/** For a Book: where each page of its text starts. */
+	pages?: { uri: string; range: Range }[];
+}
+
 export type ToPanel =
-	/** The generated pack, refreshed after each analysis. */
-	| { type: 'output'; files: OutputFile[] }
-	/** The output path to show, chosen with a Preview CodeLens or the open-preview command. */
-	| { type: 'target'; path: string | null };
+	/** The generated pack and custom items, refreshed after each analysis. */
+	| { type: 'output'; files: OutputFile[]; items: OutputItem[] }
+	/**
+	 * The output path to show, chosen with a Preview CodeLens or the
+	 * open-preview command; for a book, item:<id> and the page to open.
+	 */
+	| { type: 'target'; path: string | null; page?: number };
 
 export type ToExtension =
 	/** The page has loaded and wants the current state. */

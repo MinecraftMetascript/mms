@@ -628,6 +628,25 @@ func TestBookFiles(t *testing.T) {
 	if f := c.result("textDocument/formatting", map[string]any{"textDocument": map[string]any{"uri": b}, "options": map[string]any{}}); f != nil {
 		t.Errorf("formatting a book file = %v", f)
 	}
+
+	// The output lists where each page starts in the book file.
+	c.notify("textDocument/didChange", map[string]any{"textDocument": map[string]any{"uri": b, "version": 2},
+		"contentChanges": []any{map[string]any{"text": "# Hello\n---\nPage two\n"}}})
+	out := c.result("mms/output", map[string]any{"uri": m}).(map[string]any)
+	items := out["items"].([]any)
+	if len(items) != 1 {
+		t.Fatalf("items = %v", items)
+	}
+	pages, _ := items[0].(map[string]any)["pages"].([]any)
+	if len(pages) != 2 {
+		t.Fatalf("pages = %v", pages)
+	}
+	for i, line := range []float64{0, 1} {
+		pg := pages[i].(map[string]any)
+		if pg["uri"] != b || pg["range"].(map[string]any)["start"].(map[string]any)["line"] != line {
+			t.Errorf("page %d = %v", i+1, pg)
+		}
+	}
 }
 
 // A CustomItem with only components writes no file; the output still

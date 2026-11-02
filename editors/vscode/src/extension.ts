@@ -147,6 +147,7 @@ async function start() {
 	try {
 		await c.start();
 		log('server started');
+		previews?.scheduleRefresh();
 	} catch (e) {
 		const msg = e instanceof Error ? e.message : String(e);
 		reportStartFailure(`Running ${resolved.command} failed (${msg}).`);
@@ -165,7 +166,7 @@ export function activate(context: vscode.ExtensionContext) {
 		output,
 		previews,
 		vscode.commands.registerCommand('mms.showPreview', () => previews?.show()),
-		vscode.commands.registerCommand('mms.previewDeclaration', (path: string) => previews?.show(path)),
+		vscode.commands.registerCommand('mms.previewDeclaration', (path: string, page?: number) => previews?.show(path, page)),
 		vscode.commands.registerCommand('mms.restartServer', () => restart()),
 		vscode.commands.registerCommand('mms.showOutput', () => output?.show(true)),
 		vscode.workspace.onDidChangeConfiguration((e) => {

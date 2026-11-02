@@ -95,15 +95,15 @@
     ],
     "menus": {
       "editor/title": [
-        { "command": "mms.showPreview", "when": "editorLangId == mms", "group": "navigation" }
+        { "command": "mms.showPreview", "when": "editorLangId == mms || editorLangId == mmsbook", "group": "navigation" }
       ],
       "commandPalette": [
-        { "command": "mms.showPreview", "when": "editorLangId == mms" },
+        { "command": "mms.showPreview", "when": "editorLangId == mms || editorLangId == mmsbook" },
         { "command": "mms.previewDeclaration", "when": "false" }
       ]
     },
     "keybindings": [
-      { "command": "mms.showPreview", "key": "ctrl+k v", "mac": "cmd+k v", "when": "editorLangId == mms" }
+      { "command": "mms.showPreview", "key": "ctrl+k v", "mac": "cmd+k v", "when": "editorLangId == mms || editorLangId == mmsbook" }
     ],
     "configurationDefaults": {
       "[mms]": {

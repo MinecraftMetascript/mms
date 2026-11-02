@@ -17,7 +17,7 @@
 	import { requestPersistence } from '#lib/project/store.ts';
 	import Dropdown from '#lib/components/Dropdown.svelte';
 	import { fixAllKeys, formatKeys, mod, quickFixKeys } from '#lib/editor/shortcuts.ts';
-	import { PinButton, PreviewPane, shows } from '@mms/preview';
+	import { bookPageAt, PinButton, PreviewPane, shows } from '@mms/preview';
 	import PreviewWorker from '@mms/preview/worker?worker';
 
 	const project = new Project();
@@ -123,7 +123,8 @@
 		// the declaration's own file is the one to show.
 		// A custom item shows the item stack its name stands for: it may
 		// write no file at all, and its files are only its look and name.
-		const it = engine.outputItems.find((it) => it.uri === c.uri && within(it.range, c.line));
+		// A book's .mmsbook file shows the book that reads it.
+		const it = engine.outputItems.find((it) => (it.uri === c.uri && within(it.range, c.line)) || bookPageAt(it.pages, c.uri, c.line) !== null);
 		if (it) return itemKey(it);
 		const f = engine.output.find((f) => f.uri === c.uri && f.range && !f.implicit && within(f.range, c.line));
 		return f ? outputKey(f) : null;
@@ -144,10 +145,18 @@
 	// tab keeps following the cursor.
 	let pinned = $state<string | null>(null);
 	const previewPath = $derived(pinned ?? selectedOutput);
-	const pinnable = $derived(shows(previewPath));
+	const pinnable = $derived(shows(previewPath, engine?.outputItems));
 	function togglePin() {
-		pinned = pinned ? null : previewPath && shows(previewPath) ? previewPath : null;
+		pinned = pinned ? null : previewPath && shows(previewPath, engine?.outputItems) ? previewPath : null;
 	}
+	// A book opens on the page the cursor is in, and stays there while
+	// the cursor is outside its text.
+	let bookPage = $state(0);
+	$effect(() => {
+		const it = engine?.outputItems.find((it) => itemKey(it) === previewPath);
+		const at = it && cursor ? bookPageAt(it.pages, cursor.uri, cursor.line) : null;
+		if (at !== null) bookPage = at;
+	});
 
 	async function reveal(uri: string, range: Diagnostic['range']) {
 		const path = pathOf(uri);
@@ -170,7 +179,7 @@
 	function selectOutput(path: string) {
 		selectedOutput = path;
 		// A pinned preview stays on screen; otherwise show JSON for outputs with no preview.
-		if (!pinned && !shows(path)) rightTab = 'json';
+		if (!pinned && !shows(path, engine?.outputItems)) rightTab = 'json';
 	}
 
 	// Opens data as a new saved project; the open one stays saved.
@@ -412,6 +421,8 @@
 					<div class="h-full" class:hidden={rightTab !== 'preview'}>
 						<PreviewPane
 							output={engine.output}
+							items={engine.outputItems}
+							page={bookPage}
 							path={previewPath}
 							{pinned}
 							onunpin={() => (pinned = null)}
