@@ -123,6 +123,21 @@ async function stop() {
 	}
 }
 
+/**
+ * Puts the cursor on a name and opens the rename box, as after an
+ * "Extract to ... declaration" action: the server picks a default name and
+ * this lets the user type a better one straight away.
+ */
+async function renameAt(uri: string, position: { line: number; character: number }) {
+	const doc = await vscode.workspace.openTextDocument(vscode.Uri.parse(uri));
+	const shown = vscode.window.visibleTextEditors.find((e) => e.document === doc);
+	const editor = await vscode.window.showTextDocument(doc, { viewColumn: shown?.viewColumn });
+	const at = new vscode.Position(position.line, position.character);
+	editor.selection = new vscode.Selection(at, at);
+	editor.revealRange(new vscode.Range(at, at));
+	await vscode.commands.executeCommand('editor.action.rename');
+}
+
 async function start() {
 	await stop();
 	const resolved = resolveServer();
@@ -138,6 +153,8 @@ async function start() {
 			{ scheme: 'file', language: 'mmsbook' }
 		],
 		outputChannel: output,
+		// Extract-to-declaration actions then call mms.renameAt on the new name.
+		initializationOptions: { renameAfterExtract: true },
 		// The server registers its own file watchers (mms.json, sources
 		// and asset files), so no synchronize.fileEvents here.
 		middleware: {
@@ -178,6 +195,7 @@ export function activate(context: vscode.ExtensionContext) {
 		new PackView(pack, () => world.project()),
 		vscode.commands.registerCommand('mms.showPreview', () => previews.show()),
 		vscode.commands.registerCommand('mms.previewDeclaration', (path: string, page?: number) => previews.show(path, page)),
+		vscode.commands.registerCommand('mms.renameAt', renameAt),
 		vscode.commands.registerCommand('mms.restartServer', () => restart()),
 		vscode.commands.registerCommand('mms.showOutput', () => output?.show(true)),
 		vscode.workspace.onDidChangeConfiguration((e) => {

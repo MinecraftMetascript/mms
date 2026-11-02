@@ -20,6 +20,16 @@ export interface TextEdit {
 	newText: string;
 }
 
+/**
+ * A refactoring such as "Extract { ... } to a Noise declaration": its
+ * edits, and the default name it picked (renamed after applying).
+ */
+export interface Refactor {
+	title: string;
+	edits: TextEdit[];
+	name?: string;
+}
+
 /** A fix the engine attached to a diagnostic; safe fixes never change the pack. */
 export interface Fix {
 	title: string;
@@ -236,6 +246,16 @@ export class Engine {
 	async resourceKinds(): Promise<ResourceKind[]> {
 		await this.client.initializing;
 		return this.client.request<object, ResourceKind[]>('mms/resourceKinds', {});
+	}
+
+	/** Refactorings for a range of a file, such as extracting an inline value to a declaration. */
+	async refactors(uri: string, range: Diagnostic['range']): Promise<Refactor[]> {
+		this.client.sync();
+		const actions = await this.client.request<
+			object,
+			{ title: string; edit?: { changes?: Record<string, TextEdit[]> }; data?: { rename?: { name: string } } }[]
+		>('textDocument/codeAction', { textDocument: { uri }, range, context: { diagnostics: [], only: ['refactor'] } });
+		return (actions ?? []).map((a) => ({ title: a.title, edits: a.edit?.changes?.[uri] ?? [], name: a.data?.rename?.name }));
 	}
 
 	/** The edits that fix every safely fixable problem in a file. */

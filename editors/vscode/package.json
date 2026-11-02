@@ -137,7 +137,8 @@
       { "command": "mms.forgetWorld", "title": "Forget This World" },
       { "command": "mms.openOutput", "title": "Open" },
       { "command": "mms.previewOutput", "title": "Open Preview", "icon": "$(open-preview)" },
-      { "command": "mms.revealOutputSource", "title": "Go to Source", "icon": "$(go-to-file)" }
+      { "command": "mms.revealOutputSource", "title": "Go to Source", "icon": "$(go-to-file)" },
+      { "command": "mms.renameAt", "title": "MMS: Rename Extracted Declaration" }
     ],
     "menus": {
       "editor/title": [
@@ -159,6 +160,7 @@
       "commandPalette": [
         { "command": "mms.showPreview", "when": "editorLangId == mms || editorLangId == mmsbook" },
         { "command": "mms.previewDeclaration", "when": "false" },
+        { "command": "mms.renameAt", "when": "false" },
         { "command": "mms.buildToWorld", "when": "mms.hasProject" },
         { "command": "mms.chooseWorld", "when": "mms.hasProject" },
         { "command": "mms.chooseProject", "when": "mms.hasProject" },

@@ -9,6 +9,7 @@ Language support for [Minecraft Metascript](https://github.com/MinecraftMetascri
 - **Fixes:**
   - quick fixes
   - "Fix all" (`source.fixAll.mms`)
+  - "Extract to a declaration" for inline values (`refactor.extract`), which then opens the rename box on the new name
 - **Formatting** with the opinionated formatter (format on save is on by default for `.mms`).
 - **Semantic highlighting.**
 - **Previews:** click **Preview** above a noise, density function, noise settings, surface rule or dimension to see it rendered beside the editor (density, blocks, 3D, biome map), or above a loot table, recipe or biome to inspect it. The panel stays on that declaration while you edit elsewhere and redraws as you type; click another **Preview** to switch. **MMS: Open Preview to the Side** (the button in the editor title, or `Ctrl+K V`) opens it on the declaration at the cursor. Vanilla worldgen the pack refers to is fetched from GitHub (mcmeta).
