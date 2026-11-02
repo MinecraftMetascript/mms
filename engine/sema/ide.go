@@ -320,6 +320,16 @@ func (c *Checker) ListItemInfo(in *Info) *Info {
 				break
 			}
 		}
+		// A surface rule field (an id or an inline rule) takes a list as
+		// Sequence sugar.
+		if v.T != nil && v.T.Kind == "union" {
+			for _, m := range v.T.Members {
+				if mv := c.norm(tview{T: m, Env: v.Env}); mv.Name == tMaterialRule {
+					v = mv
+					break
+				}
+			}
+		}
 	}
 	if v.T == nil || v.T.Kind != "list" {
 		if v.Name == tMaterialRule {

@@ -1,0 +1,36 @@
+Decl NoiseSettings ns
+  Object
+    Block
+      Field default_block
+        Bad 38-38
+      Field default_fluid
+        Ident water
+      Field sea_level
+        Number 0
+      Field noise
+        Object
+          Block
+            Field min_y
+              Bad 102-102
+            Field height
+              Number 0
+      Field spawn_target
+        List
+          Call
+            Ident Point
+            Arg x =
+              Bad 149-149
+            Arg y =
+              Number 0
+Decl Function f
+  Block
+    Let x
+      Number 1
+    Field x
+      Bad 192-192
+    Field x
+      Number 2
+! 37-38 expected a value after '='
+! 101-102 expected a value after '='
+! 148-149 expected a value after '='
+! 191-192 expected a value after '='
