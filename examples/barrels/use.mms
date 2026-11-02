@@ -162,6 +162,13 @@ Function absorb(slot: string) {
 /** Takes a stack, or one item when sneaking, and drops it at the player's feet. */
 Function take_out {
   if (count == 0) {
+    // Punching an empty barrel breaks it, since the interaction entity
+    // stops the front from being mined. In survival the block drops a
+    // plain barrel, which the tick function swaps for a Storage Barrel;
+    // in creative nothing drops. Either way the tick function then
+    // removes the front.
+    /execute if entity @s[gamemode=!creative] at @e[type=interaction,tag=barrels.this,limit=1] positioned ^ ^0.375 ^-0.5 run setblock ~ ~ ~ air destroy
+    /execute if entity @s[gamemode=creative] at @e[type=interaction,tag=barrels.this,limit=1] positioned ^ ^0.375 ^-0.5 run setblock ~ ~ ~ air
     return
   }
   amount = stack
