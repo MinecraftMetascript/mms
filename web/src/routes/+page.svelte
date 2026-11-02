@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Logo from '#lib/components/Logo.svelte';
 	import { onMount, tick } from 'svelte';
 	import { asset, resolve } from '$app/paths';
 	import { LSPPlugin } from '@codemirror/lsp-client';
@@ -262,7 +263,7 @@
 
 <div class="flex h-dvh flex-col">
 	<header class="flex items-center gap-2 border-b border-line bg-panel px-3 py-2">
-		<span class="font-semibold tracking-tight">MMS</span>
+		<span class="flex shrink-0 items-center"><Logo class="h-6 w-auto" /></span>
 		<button class="hidden max-w-48 truncate rounded px-2 py-1 text-sm text-muted hover:bg-hover hover:text-ink sm:inline" onclick={() => projects?.open()} title="Switch, rename or delete saved projects" aria-label="{project.name} (switch project)">{project.name}</button>
 		<div class="flex items-center sm:ml-2">
 			<Dropdown label="Project">
