@@ -227,3 +227,16 @@ mms/asset-extension: texture ids leave out the file extension, which the game ad
 		}
 	}
 }
+
+// TestAssetsExtensionDeclName: a declaration named with its file's
+// extension would be written as ruby.json.json, so it is an error.
+func TestAssetsExtensionDeclName(t *testing.T) {
+	_, r := assetProject(t, fstest.MapFS{"art/icon.png": {Data: pngBytes}}, "Model item/ruby.json = { parent = \"item/generated\" }\n")
+	ds := r.Diagnostics("main.mms")
+	if len(ds) == 0 || ds[0].Code != "mms/invalid-name" || !strings.Contains(ds[0].Message, "use 'item/ruby'") || len(ds[0].Fixes) != 1 {
+		t.Fatalf("diagnostics: %+v", ds)
+	}
+	if e := ds[0].Fixes[0].Edits[0]; e.Sp.End-e.Sp.Start != len(".json") {
+		t.Errorf("fix edit %+v", e)
+	}
+}

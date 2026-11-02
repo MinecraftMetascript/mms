@@ -266,15 +266,23 @@ func AssetFileType(helper string) (ext, what string, ok bool) {
 // adds them itself, so "item/ruby.png" names textures/item/ruby.png.png.
 var assetFileExts = []string{".png.mcmeta", ".png", ".ogg", ".nbt", ".json", ".mcmeta"}
 
+// fileExt returns the file extension p ends in, from assetFileExts or
+// .mcfunction, or "".
+func fileExt(p string) string {
+	for _, ext := range append(assetFileExts, ".mcfunction") {
+		if len(p) > len(ext) && strings.HasSuffix(p, ext) {
+			return ext
+		}
+	}
+	return ""
+}
+
 // stripAssetExt drops a file extension from the path of an asset id (a
 // texture, sound, model and so on), warning with a fix that removes it
 // from the source. e is the string or resource location written.
 func (c *Checker) stripAssetExt(p, reg string, e syntax.Expr) string {
-	for _, ext := range assetFileExts {
-		bare, ok := strings.CutSuffix(p, ext)
-		if !ok || bare == "" {
-			continue
-		}
+	if ext := fileExt(p); ext != "" && ext != ".mcfunction" {
+		bare := strings.TrimSuffix(p, ext)
 		if c.trial {
 			return bare
 		}
