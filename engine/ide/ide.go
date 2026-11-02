@@ -389,6 +389,8 @@ func (s *Session) complete(a *at, off int) []sema.Candidate {
 				if in := a.c.ListItemInfo(a.info(n)); in != nil {
 					return a.c.ValueCandidates(in)
 				}
+				// Inside a list, the enclosing object's fields never fit.
+				return nil
 			}
 		case *syntax.Trailing:
 			if n.Block.Sp.Contains(off) && off > n.Block.Sp.Start {
