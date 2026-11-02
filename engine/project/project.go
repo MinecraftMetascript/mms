@@ -376,6 +376,11 @@ func (p *Project) checkDecl(u *sema.Unit, d *syntax.Decl, k sema.Kind, syms *sem
 		if f != nil {
 			dr.Value, dr.Fn = adv, fn.Generate(*f)
 		}
+	case k.MMS == "OnRightClick":
+		adv, f := c.OnRightClick(d, dr.ID(), u.File.Src)
+		if f != nil {
+			dr.Value, dr.Fn = adv, fn.Generate(*f)
+		}
 	case sema.HookKinds[k.MMS] != "":
 		if sema.IsRaw(d.Body) {
 			dr.Lines = c.Function(d)
@@ -401,7 +406,7 @@ func (p *Project) checkDecl(u *sema.Unit, d *syntax.Decl, k sema.Kind, syms *sem
 	// rather than written as bad JSON.
 	if dr.Value != nil && !hasErrors(dr.Diags) {
 		res := k.Resource
-		if k.MMS == "OnAdvancement" {
+		if k.MMS == "OnAdvancement" || k.MMS == "OnRightClick" {
 			res = "advancement"
 		}
 		if errs := sema.Validate(p.Pack, p.Kinds, res, dr.Value); len(errs) > 0 {

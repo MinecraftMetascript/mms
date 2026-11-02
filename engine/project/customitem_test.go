@@ -7,6 +7,7 @@ import (
 	"testing/fstest"
 
 	"github.com/minecraftmetascript/mms/engine/spec"
+	"github.com/minecraftmetascript/mms/engine/syntax"
 )
 
 const customItemSrc = `CustomItem ruby = {
@@ -191,5 +192,96 @@ func TestCustomItemNameEscapes(t *testing.T) {
 				t.Errorf("give.mcfunction:\n%s", got)
 			}
 		}
+	}
+}
+
+// TestOnRightClick checks the right-click hook: the item's consumable,
+// use_effects and marker, the using_item advancement, the once-per-press
+// reward function and the objective's setup.
+func TestOnRightClick(t *testing.T) {
+	p := New(spec.MustDefault(), Config{Namespace: "demo"})
+	p.SetFile("main.mms", `
+CustomItem wand = {
+  base = stick
+  name = "Wand"
+  components = { custom_data = { kind = "wand" } }
+}
+OnRightClick wand {
+  /say zap
+}
+Function give {
+  /give @s ${wand}
+}
+`)
+	r, _ := p.Analyze(context.Background())
+	if d := diagText(r); d != "" {
+		t.Fatalf("unexpected diagnostics:\n%s", d)
+	}
+	got := dumpFiles(r.Emit())
+	for _, want := range []string{
+		`give @s stick[item_name={translate:"item.demo.wand",fallback:"Wand"},custom_data={kind:"wand",mms_item:"demo:wand"},consumable={consume_seconds:1000000,animation:"none",has_consume_particles:false},use_effects={can_sprint:true,speed_multiplier:1,interact_vibrations:false}]`,
+		"=== data/demo/advancement/mms_gen/right_click/wand.json\n",
+		`"trigger": "minecraft:using_item"`,
+		`"items": "minecraft:stick"`,
+		`"mms_item": "demo:wand"`,
+		`"function": "demo:mms_gen/right_click/wand"`,
+		"=== data/demo/function/mms_gen/right_click/wand.mcfunction\nadvancement revoke @s only demo:mms_gen/right_click/wand\nexecute if score @s mms_click.demo matches 1.. run return run scoreboard players set @s mms_click.demo 2\nscoreboard players set @s mms_click.demo 2\nsay zap\n",
+		"scoreboard objectives add mms_click.demo dummy\n",
+		"scoreboard players remove @a[scores={mms_click.demo=1..}] mms_click.demo 1\n",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("missing %q in:\n%s", want, got)
+		}
+	}
+
+	errs := map[string]string{
+		"OnRightClick stick {\n  /say hi\n}":                                                                        "mms/unknown-id",
+		"Function f {\n}\nOnRightClick f {\n  /say hi\n}":                                                           "mms/unknown-id",
+		"CustomItem w = { base = stick }\nOnRightClick w":                                                           "mms/missing-value",
+		"CustomItem w = { base = stick, components = { custom_data = \"{a:1}\" } }\nOnRightClick w {\n  /say hi\n}": "mms/custom-item",
+		"CustomItem w = { base = stick }\nOnRightClick w {\n  /say a\n}\nOnRightClick w {\n  /say b\n}":             "mms/duplicate",
+	}
+	for src, want := range errs {
+		p := New(spec.MustDefault(), Config{Namespace: "demo"})
+		p.SetFile("main.mms", src)
+		r, _ := p.Analyze(context.Background())
+		var codes []string
+		for _, d := range r.Diagnostics("main.mms") {
+			if d.Severity == syntax.SeverityError {
+				codes = append(codes, d.Code)
+			}
+		}
+		if len(codes) == 0 || codes[0] != want {
+			t.Errorf("%q: errors %v, want %s", src, codes, want)
+		}
+	}
+}
+
+// TestOnRightClickIncremental checks that adding and removing an
+// OnRightClick in another file changes the uses of the item.
+func TestOnRightClickIncremental(t *testing.T) {
+	p := New(spec.MustDefault(), Config{Namespace: "demo"})
+	p.SetFile("item.mms", "CustomItem wand = { base = stick }\n")
+	p.SetFile("give.mms", "Function give {\n  /give @s ${wand}\n}\n")
+	give := func() string {
+		r, _ := p.Analyze(context.Background())
+		for _, f := range r.Emit() {
+			if f.Path == "data/demo/function/give.mcfunction" {
+				return string(f.Data)
+			}
+		}
+		t.Fatal("no give function")
+		return ""
+	}
+	if g := give(); strings.Contains(g, "consumable") {
+		t.Fatalf("consumable before the hook: %s", g)
+	}
+	p.SetFile("click.mms", "OnRightClick wand {\n  /say zap\n}\n")
+	if g := give(); !strings.Contains(g, "consumable") || !strings.Contains(g, `mms_item:"demo:wand"`) {
+		t.Fatalf("no consumable after adding the hook: %s", g)
+	}
+	p.SetFile("click.mms", "")
+	if g := give(); strings.Contains(g, "consumable") {
+		t.Fatalf("consumable after removing the hook: %s", g)
 	}
 }

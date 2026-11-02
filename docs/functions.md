@@ -1,6 +1,6 @@
 # Functions
 
-`Function` bodies and event hooks (`OnLoad`, `OnTick`, `OnFirstJoin`, `OnRespawn`, `OnAdvancement`) compile to `.mcfunction` files.
+`Function` bodies and event hooks (`OnLoad`, `OnTick`, `OnFirstJoin`, `OnRespawn`, `OnAdvancement`, `OnRightClick`) compile to `.mcfunction` files.
 
 ## Raw commands
 
@@ -190,6 +190,30 @@ OnRespawn {
 - **`OnAdvancement name = Trigger(...) { ... }`** runs each time a player meets a trigger. The trigger is one of the criterion helpers, such as `PlacedBlock`, `PlayerKilledEntity`, `InventoryChanged` or `Tick`, and its named arguments are the conditions. It writes the advancement `<namespace>:<name>` and a reward function, `<namespace>:mms_gen/advancement/<name>`, which revokes the advancement and then runs the body, so it fires again next time. Commands can refer to it, as in `/advancement grant @s only demo:placed_banner`.
 - **`OnFirstJoin { ... }`** runs once per player, the first time they are in the world with the pack. It uses a tick advancement, `<namespace>:mms_gen/first_join`, that is never revoked; `/advancement revoke @s only <namespace>:mms_gen/first_join` makes it run again.
 - **`OnRespawn { ... }`** runs right after a player respawns. A `deathCount` objective, `mms_respawn.<namespace>`, notes the death, and the tick function runs the body once the player is alive again.
+
+### Right-click
+
+`OnRightClick` runs its body when a player right-clicks with a [custom item](resources.md), as and at that player:
+
+```
+CustomItem ember_wand = {
+  base = stick
+  name = "Ember Wand"
+}
+
+OnRightClick ember_wand {
+  /particle flame ^ ^1.5 ^1 0.2 0.2 0.2 0.05 20
+  /effect give @s fire_resistance 5
+}
+```
+
+It runs once per press: holding the button down does not repeat it. It uses the consumable method from the [datapack.wiki guide](https://datapack.wiki/guide/right-click/consumable_component):
+
+- The item gets three more components wherever it is used, in `/give`, recipes and loot: a `consumable` that takes about eleven days to eat, with no animation, sound or particles, so right click "uses" it without using it up; `use_effects`, so the player is not slowed down while holding the button; and `mms_item: "<namespace>:<name>"` in its `custom_data`. Set `consumable` or `use_effects` in the item's `components` to use your own instead. A `custom_data` of your own keeps its keys and gains the marker.
+- A `using_item` advancement, `<namespace>:mms_gen/right_click/<name>`, matches the base item with that marker. Its reward function revokes it and runs the body.
+- `using_item` fires on every tick the button is held, so a score, `mms_click.<namespace>`, notes that the player is still holding it. The tick function counts it down, and the body runs only once it has reached 0.
+
+A base item that already does something on right click keeps doing it: a block is still placed and a bow still draws. Pick a base such as `stick`, `paper` or `amethyst_shard` that does nothing on its own. A `use_cooldown` component has no effect, because the item is never finished being used; keep a cooldown in a score instead.
 
 ## How it compiles
 

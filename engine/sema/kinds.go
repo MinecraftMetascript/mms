@@ -17,7 +17,7 @@ type Kind struct {
 	TagOf string
 	// MMS is set for language-level kinds: Namespace, Function, Objective,
 	// Global, CustomItem and the event hooks (OnLoad, OnTick, OnFirstJoin,
-	// OnRespawn, OnAdvancement).
+	// OnRespawn, OnAdvancement, OnRightClick).
 	MMS string
 	// Assets is the folder under assets/<ns>/ for resource-pack kinds
 	// ("blockstates", "models"), and "" for data-pack kinds.
@@ -44,6 +44,9 @@ func (k Kind) Folder() string {
 	case "CustomItem":
 		// Its name stands for an item where item stacks are expected.
 		return "item"
+	case rightClickKind:
+		// Not a pack folder: it keeps one OnRightClick per custom item.
+		return rightClickKindFolder
 	case "OnAdvancement":
 		// It declares an advancement, so commands such as `advancement
 		// grant` find it, and an Advancement of the same name clashes.
@@ -56,7 +59,7 @@ var mmsKinds = map[string]bool{
 	"Namespace": true, "Function": true, "Objective": true, "Global": true,
 	"OnLoad": true, "OnTick": true,
 	"OnFirstJoin": true, "OnRespawn": true, "OnAdvancement": true,
-	"CustomItem": true,
+	"CustomItem": true, rightClickKind: true,
 }
 
 // kindAliases name resource kinds whose MMS names differ from the folder,

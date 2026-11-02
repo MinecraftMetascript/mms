@@ -69,6 +69,7 @@ func (r *Result) Emit() []OutFile {
 		}
 		hooks[name][ns] = append(hooks[name][ns], ls...)
 	}
+	clicks := map[string]bool{} // namespaces with an OnRightClick
 	consts := map[string]map[int32]bool{}
 	ret := map[string]bool{}
 	used := map[string]bool{} // namespaces whose objective the code uses
@@ -165,6 +166,14 @@ func (r *Result) Emit() []OutFile {
 			}
 			addFn(d)
 			out = append(out, OutFile{Path: "data/" + ns + "/advancement/" + path + ".json", Data: jsonv.Marshal(d.Value), Unit: d.Unit.Path, Span: d.D.Sp})
+		case d.Kind.MMS == "OnRightClick":
+			if d.Fn == nil || d.Value == nil {
+				continue
+			}
+			addFn(d)
+			advNS, advPath := splitID(sema.RightClickID(d.ID()))
+			out = append(out, OutFile{Path: "data/" + advNS + "/advancement/" + advPath + ".json", Data: jsonv.Marshal(d.Value), Unit: d.Unit.Path, Span: d.D.Sp})
+			clicks[advNS] = true
 		case d.Fn != nil:
 			addFn(d)
 			if h := sema.HookKinds[d.Kind.MMS]; h != "" {
@@ -189,6 +198,11 @@ func (r *Result) Emit() []OutFile {
 	// are alive again (@e skips dead players). Both run at the player.
 	for ns := range hooks["first_join"] {
 		out = append(out, OutFile{Path: "data/" + ns + "/advancement/mms_gen/first_join.json", Data: jsonv.Marshal(sema.FirstJoinAdvancement(ns))})
+	}
+	for ns := range clicks {
+		load, tick := sema.RightClickSetup(ns)
+		objectives[ns] = append(objectives[ns], load...)
+		hook("tick", ns, tick)
 	}
 	for ns, ls := range hooks["respawn"] {
 		obj := sema.RespawnObjective(ns)

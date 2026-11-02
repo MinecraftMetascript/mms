@@ -523,6 +523,9 @@ func (k *Kinds) DeclKinds() []Candidate {
 		case name == "OnAdvancement":
 			cand.Insert = "OnAdvancement ${1:name} = ${2:Tick}($3) {\n\t$0\n}"
 			cand.Detail = "runs when a player earns an advancement"
+		case name == rightClickKind:
+			cand.Insert = "OnRightClick ${1:item} {\n\t$0\n}"
+			cand.Detail = "runs when a player right-clicks with a custom item"
 		case name == "Function":
 			cand.Insert = "Function ${1:name} {\n\t$0\n}"
 		case name == "Objective":

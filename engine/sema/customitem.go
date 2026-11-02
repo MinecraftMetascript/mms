@@ -305,6 +305,13 @@ func (c *Checker) CustomItem(d *syntax.Decl, id string) *CustomItemOut {
 	if user != nil {
 		comps.Members = append(comps.Members, user.Members...)
 	}
+	if rc := c.find(rightClickKindFolder, id); rc != nil && rc.Kind.MMS == rightClickKind {
+		sp := d.Name.Sp
+		if e := fields["components"]; e != nil {
+			sp = e.Span()
+		}
+		c.rightClickComponents(comps, id, sp)
+	}
 	stack := &jsonv.Object{}
 	if b := str("base"); b != "" {
 		stack.Set("id", jsonv.String(b))

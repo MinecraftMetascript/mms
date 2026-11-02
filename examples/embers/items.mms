@@ -41,3 +41,14 @@ Recipe ember_disc = Shaped(
   },
   ember_disc,
 )
+
+/**
+ * Right-clicking with an Ember Shard puffs out flames and keeps the
+ * player safe from fire for a few seconds. It runs once per press, as
+ * and at the player; holding the button down does not repeat it.
+ */
+OnRightClick ember_shard {
+  /particle flame ^ ^1.5 ^1 0.2 0.2 0.2 0.05 20
+  /playsound item.firecharge.use player @a
+  /effect give @s fire_resistance 5
+}

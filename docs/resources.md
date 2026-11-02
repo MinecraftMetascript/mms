@@ -212,3 +212,5 @@ Function give {
 - **Commands**: `${ember_shard}` writes `amethyst_shard[item_model="embers:ember_shard",item_name={...}]`.
 
 Anywhere else that takes an item id, such as a recipe ingredient or an item tag, a custom item is an error: the game matches those by item id only, so they need the base item. A `Model`, `ItemModel` or `Lang` entry that the custom item also writes is reported as a duplicate.
+
+To run code when a player right-clicks with the item, add `OnRightClick ember_shard { ... }`; see [right-click](functions.md#right-click).
