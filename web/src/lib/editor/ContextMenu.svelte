@@ -80,7 +80,7 @@
 		role="menu"
 		tabindex="-1"
 		aria-label="Editor actions"
-		class="fixed z-50 min-w-56 rounded-md border border-line bg-panel p-1 text-sm shadow-lg"
+		class="fixed z-[200] min-w-56 rounded-md border border-line bg-panel p-1 text-sm shadow-lg"
 		style="left: {x}px; top: {y}px"
 		{onkeydown}
 		oncontextmenu={(e) => e.preventDefault()}

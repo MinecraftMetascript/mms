@@ -12,6 +12,7 @@
 	import { examples } from '#lib/project/examples.ts';
 	import { download, hasResourcePack, isDataPack, packZip, projectZip, readProjectZip, readZip, readZipAssets } from '#lib/project/zip.ts';
 	import PasteJson from '#lib/components/PasteJson.svelte';
+	import Dropdown from '#lib/components/Dropdown.svelte';
 	import { PinButton, PreviewPane, shows } from '@mms/preview';
 	import PreviewWorker from '@mms/preview/worker?worker';
 
@@ -24,19 +25,9 @@
 	let rightTab = $state<'preview' | 'json'>('preview');
 	let cursor = $state<{ uri: string; line: number } | null>(null);
 	let theme = $state<'system' | 'light' | 'dark'>('system');
-	let menu = $state(false);
-	let menuRoot: HTMLDivElement | undefined = $state();
-	let menuButton: HTMLButtonElement | undefined = $state();
-
-	// Close the Project menu on a click outside it, or on Escape.
-	function onWindowPointerDown(e: PointerEvent) {
-		if (menu && menuRoot && !menuRoot.contains(e.target as Node)) menu = false;
-	}
-	function onWindowKeydown(e: KeyboardEvent) {
-		if (menu && e.key === 'Escape') {
-			menu = false;
-			menuButton?.focus();
-		}
+	const themes = { system: 'System', light: 'Light', dark: 'Dark' } as const;
+	function nextTheme() {
+		theme = theme === 'system' ? 'light' : theme === 'light' ? 'dark' : 'system';
 	}
 	let fileInput: HTMLInputElement;
 	let pasteJson = $state<ReturnType<typeof PasteJson> | null>(null);
@@ -157,14 +148,12 @@
 
 	function openExample(id: string) {
 		const ex = examples.find((e) => e.id === id);
-		menu = false;
 		if (!ex) return;
 		if (!confirm(`Open the ${ex.id} example? It replaces the current project; export it first to keep a copy.`)) return;
 		pinned = null;
 		project.replace(structuredClone(ex.data));
 	}
 	function newProject() {
-		menu = false;
 		if (!confirm('Start a new project? It replaces the current one; export it first to keep a copy.')) return;
 		pinned = null;
 		project.replace(structuredClone(starter));
@@ -252,59 +241,38 @@
 	);
 </script>
 
-<svelte:window onpointerdown={onWindowPointerDown} onkeydown={onWindowKeydown} />
-
 <div class="flex h-dvh flex-col">
-	<header class="flex items-center gap-3 border-b border-line bg-panel px-3 py-2">
+	<header class="flex items-center gap-2 border-b border-line bg-panel px-3 py-2">
 		<span class="font-semibold tracking-tight">MMS</span>
 		<span class="hidden text-sm text-muted sm:inline">{project.name}</span>
-		<div class="relative ml-2" bind:this={menuRoot}>
-			<button class="rounded px-2 py-1 text-sm whitespace-nowrap hover:bg-hover" bind:this={menuButton} onclick={() => (menu = !menu)} aria-expanded={menu}>Project ▾</button>
-			{#if menu}
-				<div class="absolute top-full left-0 z-20 mt-1 w-64 rounded-md border border-line bg-panel p-1 text-sm shadow-lg">
-					<button class="block w-full rounded px-2 py-1.5 text-left hover:bg-hover" onclick={newProject}>New project</button>
-					<button class="block w-full rounded px-2 py-1.5 text-left hover:bg-hover" onclick={() => { menu = false; fileInput.click(); }}>
+		<div class="flex items-center sm:ml-2">
+			<Dropdown label="Project">
+				{#snippet children(close)}
+					<button class="block w-full rounded px-2 py-1.5 text-left hover:bg-hover" onclick={() => { close(); newProject(); }}>New project</button>
+					<button class="block w-full rounded px-2 py-1.5 text-left hover:bg-hover" onclick={() => { close(); fileInput.click(); }}>
 						<span class="block">Import zip…</span>
 						<span class="block text-xs text-muted">An MMS project or a data pack</span>
 					</button>
-					<button class="block w-full rounded px-2 py-1.5 text-left hover:bg-hover" disabled={!project.activeFile} onclick={() => { menu = false; pasteJson?.open(); }}>Paste JSON as MMS…</button>
-					<button class="block w-full rounded px-2 py-1.5 text-left hover:bg-hover" disabled={!project.activeFile} onclick={() => { menu = false; editor?.fixAll(); }}>
-						<span class="block">Fix all in this file</span>
-						<span class="block text-xs text-muted">Applies safe fixes (Ctrl/⌘+Alt+F)</span>
-					</button>
-					<button class="block w-full rounded px-2 py-1.5 text-left hover:bg-hover" onclick={() => { menu = false; download(`${project.name || 'project'}-source.zip`, projectZip(project.data())); }}>Export project zip</button>
-					<div class="my-1 border-t border-line"></div>
-					<div class="px-2 pt-1 pb-0.5 text-[11px] font-medium tracking-wide text-muted uppercase">Examples</div>
+					<button class="block w-full rounded px-2 py-1.5 text-left hover:bg-hover" onclick={() => { close(); download(`${project.name || 'project'}-source.zip`, projectZip(project.data())); }}>Export project zip</button>
+				{/snippet}
+			</Dropdown>
+			<Dropdown label="Examples" panelClass="w-72">
+				{#snippet children(close)}
 					{#each examples as ex (ex.id)}
-						<button class="block w-full rounded px-2 py-1.5 text-left hover:bg-hover" onclick={() => openExample(ex.id)}>
+						<button class="block w-full rounded px-2 py-1.5 text-left hover:bg-hover" onclick={() => { close(); openExample(ex.id); }}>
 							<span class="block">{ex.id}</span>
 							<span class="block text-xs text-muted">{ex.description}</span>
 						</button>
 					{/each}
-					<div class="my-1 border-t border-line"></div>
-					<label class="flex items-center justify-between px-2 py-1.5">
-						Theme
-						<select class="rounded border border-line bg-panel px-1 py-0.5 text-sm" bind:value={theme}>
-							<option value="system">System</option>
-							<option value="light">Light</option>
-							<option value="dark">Dark</option>
-						</select>
-					</label>
-				</div>
-			{/if}
+				{/snippet}
+			</Dropdown>
 		</div>
-		<button
-			class="rounded px-2 py-1 text-sm whitespace-nowrap hover:bg-hover disabled:opacity-50"
-			disabled={!editor || !project.activeFile}
-			onclick={() => editor?.format()}
-			title="Format this file (Ctrl/⌘+S or Shift+Alt+F)">Format</button
-		>
 		<input type="file" accept=".zip" class="hidden" bind:this={fileInput} onchange={importZip} />
 		{#if engine}
 			<PasteJson bind:this={pasteJson} {engine} uri={uriOf(project.active)} oninsert={insertDecl} />
 		{/if}
-		<div class="ml-auto flex items-center gap-2 text-sm">
-			<span class="flex items-center gap-1.5 text-muted" role="status">
+		<div class="ml-auto flex items-center gap-1 text-sm sm:gap-2">
+			<span class="flex items-center gap-1.5 text-muted" role="status" title={statusText}>
 				<span
 					class="inline-block size-2 rounded-full {engine?.status === 'ready'
 						? totals.errors
@@ -316,7 +284,22 @@
 				></span>
 				<span class="hidden sm:inline">{statusText}</span>
 			</span>
-			<a class="rounded px-2 py-1 hover:bg-hover" href={resolve('/docs')}>Docs</a>
+			<a class="rounded px-1.5 py-1 hover:bg-hover sm:px-2" href={resolve('/docs')}>Docs</a>
+			<button
+				class="rounded p-1.5 hover:bg-hover"
+				onclick={nextTheme}
+				aria-label="Theme: {themes[theme]}"
+				title="Theme: {themes[theme]} (click to change)"
+				><svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+					{#if theme === 'light'}
+						<circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
+					{:else if theme === 'dark'}
+						<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" />
+					{:else}
+						<circle cx="12" cy="12" r="9" /><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor" />
+					{/if}
+				</svg></button
+			>
 			{#if engine?.status === 'failed'}
 				<button class="rounded px-2 py-1 text-accent hover:bg-hover" onclick={() => engine?.restart()} title={engine.statusDetail}>Restart</button>
 			{/if}
@@ -334,11 +317,29 @@
 			{/if}
 		</aside>
 		<section class="flex min-h-0 flex-col border-b border-line md:border-r md:border-b-0">
-			<div class="flex items-center gap-2 border-b border-line bg-panel px-2 py-1 md:hidden">
-				<select class="min-w-0 flex-1 rounded border border-line bg-panel px-1 py-0.5 text-sm" bind:value={project.active} aria-label="File">
+			<div class="flex items-center gap-1 border-b border-line bg-panel px-2 py-1 text-sm">
+				<select class="min-w-0 flex-1 rounded border border-line bg-panel px-1 py-0.5 md:hidden" bind:value={project.active} aria-label="File">
 					{#each project.files as f (f.path)}<option value={f.path}>{f.path}</option>{/each}
 				</select>
-				<span class="text-xs text-muted">{statusText}</span>
+				<span class="hidden min-w-0 flex-1 truncate text-xs text-muted md:block" title={project.active}>{project.active}</span>
+				<button
+					class="rounded px-2 py-0.5 whitespace-nowrap hover:bg-hover disabled:opacity-50"
+					disabled={!engine || !project.activeFile}
+					onclick={() => pasteJson?.open()}
+					title="Convert vanilla JSON to an MMS declaration and add it to this file"><span class="sm:hidden">JSON…</span><span class="hidden sm:inline">Paste JSON…</span></button
+				>
+				<button
+					class="rounded px-2 py-0.5 whitespace-nowrap hover:bg-hover disabled:opacity-50"
+					disabled={!editor || !project.activeFile}
+					onclick={() => editor?.fixAll()}
+					title="Apply every safe fix in this file (Ctrl/⌘+Alt+F). Ctrl/⌘+. shows the fixes at the cursor.">Fix all</button
+				>
+				<button
+					class="rounded px-2 py-0.5 whitespace-nowrap hover:bg-hover disabled:opacity-50"
+					disabled={!editor || !project.activeFile}
+					onclick={() => editor?.format()}
+					title="Format this file (Ctrl/⌘+S or Shift+Alt+F)">Format</button
+				>
 			</div>
 			<div class="min-h-0 flex-1">
 			{#if engine && loaded && project.activeFile}

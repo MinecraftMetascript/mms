@@ -1,6 +1,6 @@
 # Lint rules
 
-The engine lints every declaration that checks without errors. Findings appear in the editor, in `mms check` (hints only with `-hints`), and as LSP diagnostics with quick fixes. `mms fix` and the editor's "Fix all" (Ctrl/⌘+Alt+F) apply every *safe* fix. A safe fix never changes the generated pack.
+The engine lints every declaration that checks without errors. Findings appear in the editor, in `mms check` (hints only with `-hints`), and as LSP diagnostics with quick fixes. `mms fix` and the editor's "Fix all" (Ctrl/⌘+Alt+F) apply every *safe* fix. In the web editor, Ctrl/⌘+. lists the quick fixes at the cursor. A safe fix never changes the generated pack.
 
 | Rule | Default | Fix | What it reports |
 | --- | --- | --- | --- |
