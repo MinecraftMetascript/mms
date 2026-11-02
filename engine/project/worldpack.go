@@ -88,6 +88,9 @@ type WorldPackResult struct {
 // <world>/datapacks.
 func MergeWorldPack(old []byte, owner string, files []OutFile) (*WorldPackResult, error) {
 	entries := map[string][]byte{}
+	// Zip writes every entry with a zero (1980) timestamp; archivers
+	// and file managers stamp the time the file was added.
+	zeroTimes := true
 	if len(old) > 0 {
 		zr, err := zip.NewReader(bytes.NewReader(old), int64(len(old)))
 		if err != nil {
@@ -96,6 +99,9 @@ func MergeWorldPack(old []byte, owner string, files []OutFile) (*WorldPackResult
 		for _, f := range zr.File {
 			if f.FileInfo().IsDir() {
 				continue
+			}
+			if f.ModifiedDate != 0 || f.ModifiedTime != 0 {
+				zeroTimes = false
 			}
 			rc, err := f.Open()
 			if err != nil {
@@ -122,7 +128,7 @@ func MergeWorldPack(old []byte, owner string, files []OutFile) (*WorldPackResult
 	} else if len(entries) > 0 {
 		// A zip MMS has not merged into: an older MMS build (which wrote
 		// the whole zip) or a pack from elsewhere.
-		if ownEarlierBuild(entries, owner, files) {
+		if zeroTimes && ownEarlierBuild(entries, owner, files) {
 			res.Adopted = true
 			entries = map[string][]byte{}
 		} else {
@@ -261,6 +267,10 @@ func WriteWorldPack(path, owner string, files []OutFile) (*WorldPackResult, erro
 	if cerr := tmp.Close(); err == nil {
 		err = cerr
 	}
+	// CreateTemp makes the file 0600; the game may run as another user.
+	if err == nil {
+		err = os.Chmod(tmp.Name(), 0o644)
+	}
 	if err == nil {
 		err = os.Rename(tmp.Name(), path)
 	}
@@ -271,8 +281,10 @@ func WriteWorldPack(path, owner string, files []OutFile) (*WorldPackResult, erro
 	return res, nil
 }
 
-// ownEarlierBuild says a zip without a manifest is most likely this
-// project's output from an MMS that overwrote the whole zip: it has
+// ownEarlierBuild says a zip without a manifest, whose entries all carry
+// the zero timestamp Zip writes, is most likely this project's output
+// from an MMS that overwrote the whole zip: its pack.mcmeta has the keys
+// packMeta writes and nothing else, it has
 // files in the project's namespace, and every other namespace in it,
 // apart from minecraft, is one the build writes too.
 func ownEarlierBuild(entries map[string][]byte, owner string, files []OutFile) bool {
@@ -280,6 +292,15 @@ func ownEarlierBuild(entries map[string][]byte, owner string, files []OutFile) b
 	for _, f := range files {
 		if ns := assetNS(f.Path); ns != "" {
 			ours[ns] = true
+		}
+	}
+	var meta map[string]map[string]json.RawMessage
+	if json.Unmarshal(entries["pack.mcmeta"], &meta) != nil || len(meta) != 1 || len(meta["pack"]) != 3 {
+		return false
+	}
+	for _, k := range []string{"description", "min_format", "max_format"} {
+		if _, ok := meta["pack"][k]; !ok {
+			return false
 		}
 	}
 	seen := false

@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 	"testing"
+	"time"
 )
 
 func unzip(t *testing.T, b []byte) map[string]string {
@@ -145,6 +146,33 @@ func TestMergeWorldPackReplacesOlderMMSBuild(t *testing.T) {
 		t.Errorf("adopted=%v others=%v", r.Adopted, r.Others)
 	}
 	if got := names(unzip(t, r.Zip)); got != "assets/embers/textures/new.png mms-world-pack.json pack.mcmeta" {
+		t.Errorf("files: %s", got)
+	}
+}
+
+func TestMergeWorldPackKeepsHandMadePackInProjectNamespace(t *testing.T) {
+	var buf bytes.Buffer
+	zw := zip.NewWriter(&buf)
+	for _, f := range []OutFile{meta("Hand made"), {Path: "assets/embers/textures/x.png", Data: []byte("x")}} {
+		// Archivers stamp the time a file was added.
+		w, _ := zw.CreateHeader(&zip.FileHeader{Name: f.Path, Method: zip.Deflate, Modified: time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC)})
+		w.Write(f.Data)
+	}
+	zw.Close()
+	r := merge(t, buf.Bytes(), "embers", meta("Embers"), OutFile{Path: "assets/embers/textures/y.png", Data: []byte("y")})
+	if r.Adopted {
+		t.Error("a hand-made pack was taken for an earlier build")
+	}
+	if z := unzip(t, r.Zip); z["assets/embers/textures/x.png"] != "x" {
+		t.Errorf("hand-made file lost: %s", names(z))
+	}
+}
+
+func TestMergeWorldPackEmptyBuildRemovesOwnFiles(t *testing.T) {
+	a := merge(t, nil, "one", meta("One"), OutFile{Path: "assets/one/x.png", Data: []byte("x")})
+	a = merge(t, a.Zip, "two", meta("Two"), OutFile{Path: "assets/two/y.png", Data: []byte("y")})
+	b := merge(t, a.Zip, "one")
+	if got := names(unzip(t, b.Zip)); got != "assets/two/y.png mms-world-pack.json pack.mcmeta" {
 		t.Errorf("files: %s", got)
 	}
 }

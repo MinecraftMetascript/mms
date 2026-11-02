@@ -171,13 +171,23 @@ func runBuild(args []string, stdout, stderr io.Writer) int {
 			return fail(err)
 		}
 		fmt.Fprintf(stdout, "wrote %d files to %s\n", len(data), target)
-		if len(res) > 0 {
-			rz, note := worldResourcePack(*world)
+		rz, note := worldResourcePack(*world)
+		_, statErr := os.Stat(rz)
+		if statErr != nil && !os.IsNotExist(statErr) {
+			return fail(statErr)
+		}
+		// With no resources, a pack already there still loses the files
+		// this project put in it last time.
+		if len(res) > 0 || statErr == nil {
 			m, err := project.WriteWorldPack(rz, p.Config.Namespace, res)
 			if err != nil {
 				return fail(err)
 			}
-			fmt.Fprintf(stdout, "wrote resource pack %s (%d files)\n", rz, len(res))
+			if len(res) == 0 {
+				fmt.Fprintf(stdout, "%s has no resources now; removed what it had in %s\n", p.Config.Namespace, rz)
+			} else {
+				fmt.Fprintf(stdout, "wrote resource pack %s (%d files)\n", rz, len(res))
+			}
 			if m.Adopted {
 				fmt.Fprintln(stdout, "replaced the resource pack an earlier mms build left there")
 			}
