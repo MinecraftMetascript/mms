@@ -1,0 +1,460 @@
+=== data/barrels/advancement/punch_barrel.json
+{
+  "criteria": {
+    "event": {
+      "trigger": "minecraft:player_hurt_entity",
+      "conditions": {
+        "entity": {
+          "type": "minecraft:entity_properties",
+          "entity": "this",
+          "predicate": {
+            "entity_type": "minecraft:interaction",
+            "entity_tags": {
+              "all_of": [
+                "barrels.hit"
+              ]
+            }
+          }
+        }
+      }
+    }
+  },
+  "rewards": {
+    "function": "barrels:mms_gen/advancement/punch_barrel"
+  }
+}
+=== data/barrels/advancement/use_barrel.json
+{
+  "criteria": {
+    "event": {
+      "trigger": "minecraft:player_interacted_with_entity",
+      "conditions": {
+        "entity": {
+          "type": "minecraft:entity_properties",
+          "entity": "this",
+          "predicate": {
+            "entity_type": "minecraft:interaction",
+            "entity_tags": {
+              "all_of": [
+                "barrels.hit"
+              ]
+            }
+          }
+        }
+      }
+    }
+  },
+  "rewards": {
+    "function": "barrels:mms_gen/advancement/use_barrel"
+  }
+}
+=== data/barrels/function/absorb.mcfunction
+scoreboard players set $diff mms.barrels 0
+scoreboard players set $held mms.barrels 0
+data modify storage barrels:mms m.a0 set from storage barrels:mms l."absorb".slot
+function barrels:absorb/_macro0 with storage barrels:mms m
+execute store result score $held mms.barrels run data get entity @e[type=item_display,tag=barrels.tmp,limit=1] item.count
+execute if score $held mms.barrels matches 0 run return 0
+item modify entity @e[type=item_display,tag=barrels.tmp,limit=1] contents barrels:one
+execute store success score $diff mms.barrels run data modify entity @e[type=item_display,tag=barrels.tmp,limit=1] item set from entity @e[type=item_display,tag=barrels.this,limit=1] item
+execute if score $diff mms.barrels matches 1 run return 0
+execute store result score #absorb._t0 mms.barrels run function barrels:capacity
+scoreboard players operation #absorb.take mms.barrels = #absorb._t0 mms.barrels
+scoreboard players operation #absorb.take mms.barrels -= $count mms.barrels
+execute if score #absorb.take mms.barrels matches ..0 run function barrels:absorb/_if1
+execute if score #cf mms.barrels matches 3 run return run function barrels:mms_gen/ret
+execute if score #absorb.take mms.barrels > $held mms.barrels run scoreboard players operation #absorb.take mms.barrels = $held mms.barrels
+scoreboard players operation $count mms.barrels += #absorb.take mms.barrels
+scoreboard players set $minus mms.barrels 0
+scoreboard players operation $minus mms.barrels -= #absorb.take mms.barrels
+data modify storage barrels:mms m.a0 set from storage barrels:mms l."absorb".slot
+function barrels:absorb/_macro2 with storage barrels:mms m
+playsound minecraft:item.bundle.insert player @a
+=== data/barrels/function/absorb/_if1.mcfunction
+title @s actionbar {text:"This barrel is full",color:"gold"}
+scoreboard players set #cf mms.barrels 3
+return 0
+=== data/barrels/function/absorb/_macro0.mcfunction
+$item replace entity @e[type=item_display,tag=barrels.tmp,limit=1] contents from entity @s $(a0)
+=== data/barrels/function/absorb/_macro2.mcfunction
+$item modify entity @s $(a0) barrels:remove_amount
+=== data/barrels/function/broken.mcfunction
+tag @s add barrels.this
+scoreboard players operation $id mms.barrels = @s barrel_id
+scoreboard players operation $count mms.barrels = @s barrel_count
+scoreboard players operation $stack mms.barrels = @s barrel_stack
+execute as @e[tag=barrels.part, distance=..2] run function barrels:broken/_exec0
+function barrels:broken/_while1
+execute as @e[type=item,distance=..1,limit=1,sort=nearest] if items entity @s contents minecraft:barrel at @s run function barrels:swap_drop
+kill @e[tag=barrels.this]
+=== data/barrels/function/broken/_exec0.mcfunction
+execute if score @s barrel_id = $id mms.barrels run tag @s add barrels.this
+=== data/barrels/function/broken/_while1.mcfunction
+execute unless score $count mms.barrels matches 1.. run return 0
+scoreboard players operation $amount mms.barrels = $stack mms.barrels
+execute if score $amount mms.barrels > $count mms.barrels run scoreboard players operation $amount mms.barrels = $count mms.barrels
+scoreboard players operation $count mms.barrels -= $amount mms.barrels
+summon item ~ ~ ~ {Item:{id:"minecraft:stone"},Tags:["barrels.drop"]}
+function barrels:give_drop
+return run function barrels:broken/_while1
+=== data/barrels/function/build.mcfunction
+scoreboard players set #build._f0 mms.barrels 0
+execute if score $dir mms.barrels matches 2 run scoreboard players set #build._f0 mms.barrels 1
+execute if score #build._f0 mms.barrels matches 1 run function barrels:build/_if1
+execute unless score #build._f0 mms.barrels matches 1 run function barrels:build/_else2
+playsound minecraft:block.barrel.close block @a
+=== data/barrels/function/build/_else2.mcfunction
+scoreboard players set #build._f3 mms.barrels 0
+execute if score $dir mms.barrels matches 3 run scoreboard players set #build._f3 mms.barrels 1
+execute if score #build._f3 mms.barrels matches 1 run function barrels:build/_if4
+execute unless score #build._f3 mms.barrels matches 1 run function barrels:build/_else5
+=== data/barrels/function/build/_else5.mcfunction
+scoreboard players set #build._f6 mms.barrels 0
+execute if score $dir mms.barrels matches 4 run scoreboard players set #build._f6 mms.barrels 1
+execute if score #build._f6 mms.barrels matches 1 run function barrels:build/_if7
+execute unless score #build._f6 mms.barrels matches 1 run function barrels:build/_else8
+=== data/barrels/function/build/_else8.mcfunction
+setblock ~ ~ ~ barrel[facing=east]{lock:{items:"minecraft:structure_void",components:{"minecraft:custom_data":{barrels:"key"}}}}
+scoreboard players set #parts.yaw mms.barrels -90
+function barrels:parts
+=== data/barrels/function/build/_if1.mcfunction
+setblock ~ ~ ~ barrel[facing=north]{lock:{items:"minecraft:structure_void",components:{"minecraft:custom_data":{barrels:"key"}}}}
+scoreboard players set #parts.yaw mms.barrels 180
+function barrels:parts
+=== data/barrels/function/build/_if4.mcfunction
+setblock ~ ~ ~ barrel[facing=south]{lock:{items:"minecraft:structure_void",components:{"minecraft:custom_data":{barrels:"key"}}}}
+scoreboard players set #parts.yaw mms.barrels 0
+function barrels:parts
+=== data/barrels/function/build/_if7.mcfunction
+setblock ~ ~ ~ barrel[facing=west]{lock:{items:"minecraft:structure_void",components:{"minecraft:custom_data":{barrels:"key"}}}}
+scoreboard players set #parts.yaw mms.barrels 90
+function barrels:parts
+=== data/barrels/function/capacity.mcfunction
+scoreboard players operation #capacity._t0 mms.barrels = $stack mms.barrels
+scoreboard players operation #capacity._t0 mms.barrels *= #c32 mms.barrels
+return run scoreboard players get #capacity._t0 mms.barrels
+=== data/barrels/function/claim.mcfunction
+execute if items entity @s weapon.mainhand *[max_stack_size=64] run scoreboard players set $stack mms.barrels 64
+execute if items entity @s weapon.mainhand *[max_stack_size=16] run scoreboard players set $stack mms.barrels 16
+execute if score $stack mms.barrels matches 0 run function barrels:claim/_if0
+execute if score #cf mms.barrels matches 3 run return run function barrels:mms_gen/ret
+item replace entity @e[type=item_display,tag=barrels.this,limit=1] contents from entity @s weapon.mainhand
+item modify entity @e[type=item_display,tag=barrels.this,limit=1] contents barrels:one
+=== data/barrels/function/claim/_if0.mcfunction
+title @s actionbar {text:"Only items that stack to 16 or 64 fit in a barrel",color:"red"}
+scoreboard players set #cf mms.barrels 3
+return 0
+=== data/barrels/function/close.mcfunction
+execute if score $count mms.barrels matches 0 run scoreboard players set $stack mms.barrels 0
+scoreboard players operation @e[type=interaction,tag=barrels.this,limit=1] barrel_count = $count mms.barrels
+scoreboard players operation @e[type=interaction,tag=barrels.this,limit=1] barrel_stack = $stack mms.barrels
+scoreboard players set #close._f0 mms.barrels 0
+execute if score $count mms.barrels matches 0 run scoreboard players set #close._f0 mms.barrels 1
+execute if score #close._f0 mms.barrels matches 1 run function barrels:close/_if1
+execute unless score #close._f0 mms.barrels matches 1 run function barrels:close/_else2
+tag @e[tag=barrels.this] remove barrels.this
+=== data/barrels/function/close/_else2.mcfunction
+execute store result score #close._t0 mms.barrels run function barrels:capacity
+scoreboard players set #close._f3 mms.barrels 0
+execute if score $count mms.barrels >= #close._t0 mms.barrels run scoreboard players set #close._f3 mms.barrels 1
+execute if score #close._f3 mms.barrels matches 1 run function barrels:close/_if4
+execute unless score #close._f3 mms.barrels matches 1 run function barrels:close/_else6
+=== data/barrels/function/close/_else6.mcfunction
+execute store result storage barrels:mms m.a0 int 1 run scoreboard players get $count mms.barrels
+function barrels:close/_macro7 with storage barrels:mms m
+=== data/barrels/function/close/_if1.mcfunction
+item replace entity @e[type=item_display,tag=barrels.this,limit=1] contents with air
+data modify entity @e[type=text_display,tag=barrels.this,limit=1] text set value {text:"Empty",color:"gray"}
+=== data/barrels/function/close/_if4.mcfunction
+execute store result storage barrels:mms m.a0 int 1 run scoreboard players get $count mms.barrels
+function barrels:close/_macro5 with storage barrels:mms m
+=== data/barrels/function/close/_macro5.mcfunction
+$data modify entity @e[type=text_display,tag=barrels.this,limit=1] text set value {text:"$(a0)",color:"gold"}
+=== data/barrels/function/close/_macro7.mcfunction
+$data modify entity @e[type=text_display,tag=barrels.this,limit=1] text set value {text:"$(a0)",color:"white"}
+=== data/barrels/function/give.mcfunction
+give @s item_frame[item_name={translate:"item.barrels.storage_barrel",fallback:"Storage Barrel"},item_model="minecraft:barrel",entity_data={id:"minecraft:item_frame",Tags:["barrels.place"],Invisible:true}] 4
+=== data/barrels/function/give_drop.mcfunction
+item replace entity @e[type=item,tag=barrels.drop,limit=1] contents from entity @e[type=item_display,tag=barrels.this,limit=1] contents
+item modify entity @e[type=item,tag=barrels.drop,limit=1] contents barrels:take_amount
+tag @e[type=item,tag=barrels.drop] remove barrels.drop
+=== data/barrels/function/insert_all.mcfunction
+execute if score $stack mms.barrels matches 0 run function barrels:insert_all/_if0
+execute if score #cf mms.barrels matches 3 run return run function barrels:mms_gen/ret
+scoreboard players operation #insert_all.before mms.barrels = $count mms.barrels
+scoreboard players set #insert_all.i mms.barrels 0
+function barrels:insert_all/_while1
+scoreboard players set #insert_all.i_1 mms.barrels 0
+function barrels:insert_all/_while3
+execute if score $count mms.barrels = #insert_all.before mms.barrels run title @s actionbar {text:"Nothing in your inventory matches",color:"gray"}
+=== data/barrels/function/insert_all/_if0.mcfunction
+title @s actionbar {text:"Right-click with an item to choose what this barrel holds",color:"gray"}
+scoreboard players set #cf mms.barrels 3
+return 0
+=== data/barrels/function/insert_all/_macro2.mcfunction
+$data modify storage barrels:mms l."insert_all"._s0 set value "hotbar.$(a1)"
+=== data/barrels/function/insert_all/_macro4.mcfunction
+$data modify storage barrels:mms l."insert_all"._s1 set value "inventory.$(a1)"
+=== data/barrels/function/insert_all/_while1.mcfunction
+execute unless score #insert_all.i mms.barrels matches ..8 run return 0
+execute store result storage barrels:mms m.a1 int 1 run scoreboard players get #insert_all.i mms.barrels
+function barrels:insert_all/_macro2 with storage barrels:mms m
+data modify storage barrels:mms l."absorb".slot set from storage barrels:mms l."insert_all"._s0
+function barrels:absorb
+scoreboard players add #insert_all.i mms.barrels 1
+return run function barrels:insert_all/_while1
+=== data/barrels/function/insert_all/_while3.mcfunction
+execute unless score #insert_all.i_1 mms.barrels matches ..26 run return 0
+execute store result storage barrels:mms m.a1 int 1 run scoreboard players get #insert_all.i_1 mms.barrels
+function barrels:insert_all/_macro4 with storage barrels:mms m
+data modify storage barrels:mms l."absorb".slot set from storage barrels:mms l."insert_all"._s1
+function barrels:absorb
+scoreboard players add #insert_all.i_1 mms.barrels 1
+return run function barrels:insert_all/_while3
+=== data/barrels/function/insert_held.mcfunction
+execute if score $stack mms.barrels matches 0 run function barrels:claim
+execute if score $stack mms.barrels matches 1.. run function barrels:insert_held/_if0
+=== data/barrels/function/insert_held/_if0.mcfunction
+data modify storage barrels:mms l."absorb".slot set value "weapon.mainhand"
+function barrels:absorb
+execute if score $diff mms.barrels matches 1 run title @s actionbar {text:"This barrel holds something else",color:"red"}
+=== data/barrels/function/mms_gen/advancement/punch_barrel.mcfunction
+advancement revoke @s only barrels:punch_barrel
+tag @s add barrels.user
+execute as @e[type=interaction,tag=barrels.hit,distance=..12] if data entity @s attack if function barrels:punched_by_user run tag @s add barrels.this
+execute as @e[type=interaction,tag=barrels.this] run data remove entity @s attack
+execute if entity @e[type=interaction,tag=barrels.this] run function barrels:mms_gen/advancement/punch_barrel/_exec0
+tag @s remove barrels.user
+=== data/barrels/function/mms_gen/advancement/punch_barrel/_exec0.mcfunction
+function barrels:open
+function barrels:take_out
+function barrels:close
+=== data/barrels/function/mms_gen/advancement/use_barrel.mcfunction
+advancement revoke @s only barrels:use_barrel
+tag @s add barrels.user
+execute as @e[type=interaction,tag=barrels.hit,distance=..12] if data entity @s interaction if function barrels:used_by_user run tag @s add barrels.this
+execute as @e[type=interaction,tag=barrels.this] run data remove entity @s interaction
+execute if entity @e[type=interaction,tag=barrels.this] run function barrels:mms_gen/advancement/use_barrel/_exec0
+tag @s remove barrels.user
+=== data/barrels/function/mms_gen/advancement/use_barrel/_exec0.mcfunction
+function barrels:open
+execute at @s run summon item_display ~ ~ ~ {Tags:["barrels.tmp"]}
+execute if items entity @s weapon.mainhand * run function barrels:insert_held
+execute unless items entity @s weapon.mainhand * run function barrels:insert_all
+kill @e[type=item_display,tag=barrels.tmp]
+function barrels:close
+=== data/barrels/function/mms_gen/load.mcfunction
+scoreboard objectives add barrel_id dummy
+scoreboard objectives add barrel_count dummy
+scoreboard objectives add barrel_stack dummy
+scoreboard objectives add mms.barrels dummy
+scoreboard players set #cf mms.barrels 0
+scoreboard players set #c32 mms.barrels 32
+execute unless score $dir mms.barrels = $dir mms.barrels run scoreboard players set $dir mms.barrels 0
+execute unless score $next_id mms.barrels = $next_id mms.barrels run scoreboard players set $next_id mms.barrels 0
+execute unless score $id mms.barrels = $id mms.barrels run scoreboard players set $id mms.barrels 0
+execute unless score $count mms.barrels = $count mms.barrels run scoreboard players set $count mms.barrels 0
+execute unless score $stack mms.barrels = $stack mms.barrels run scoreboard players set $stack mms.barrels 0
+execute unless score $held mms.barrels = $held mms.barrels run scoreboard players set $held mms.barrels 0
+execute unless score $diff mms.barrels = $diff mms.barrels run scoreboard players set $diff mms.barrels 0
+execute unless score $amount mms.barrels = $amount mms.barrels run scoreboard players set $amount mms.barrels 0
+execute unless score $minus mms.barrels = $minus mms.barrels run scoreboard players set $minus mms.barrels 0
+=== data/barrels/function/mms_gen/ret.mcfunction
+scoreboard players set #cf mms.barrels 0
+return run scoreboard players get #rv mms.barrels
+=== data/barrels/function/mms_gen/tick.mcfunction
+execute as @e[type=item_frame,tag=barrels.place] at @s run function barrels:place
+execute as @e[type=interaction,tag=barrels.hit] at @s positioned ^ ^0.375 ^-0.5 unless block ~ ~ ~ minecraft:barrel run function barrels:broken
+=== data/barrels/function/open.mcfunction
+scoreboard players operation $id mms.barrels = @e[type=interaction,tag=barrels.this,limit=1] barrel_id
+scoreboard players operation $count mms.barrels = @e[type=interaction,tag=barrels.this,limit=1] barrel_count
+scoreboard players operation $stack mms.barrels = @e[type=interaction,tag=barrels.this,limit=1] barrel_stack
+execute as @e[tag=barrels.part, distance=..12] run function barrels:open/_exec0
+=== data/barrels/function/open/_exec0.mcfunction
+execute if score @s barrel_id = $id mms.barrels run tag @s add barrels.this
+=== data/barrels/function/parts.mcfunction
+scoreboard players add $next_id mms.barrels 1
+execute store result storage barrels:mms m.a0 int 1 run scoreboard players get #parts.yaw mms.barrels
+execute store result storage barrels:mms m.a1 int 1 run scoreboard players get #parts.yaw mms.barrels
+function barrels:parts/_macro0 with storage barrels:mms m
+execute store result storage barrels:mms m.a0 int 1 run scoreboard players get #parts.yaw mms.barrels
+execute store result storage barrels:mms m.a1 int 1 run scoreboard players get #parts.yaw mms.barrels
+function barrels:parts/_macro1 with storage barrels:mms m
+execute store result storage barrels:mms m.a0 int 1 run scoreboard players get #parts.yaw mms.barrels
+execute store result storage barrels:mms m.a1 int 1 run scoreboard players get #parts.yaw mms.barrels
+function barrels:parts/_macro2 with storage barrels:mms m
+scoreboard players operation @e[tag=barrels.new] barrel_id = $next_id mms.barrels
+scoreboard players set @e[tag=barrels.new] barrel_count 0
+scoreboard players set @e[tag=barrels.new] barrel_stack 0
+tag @e[tag=barrels.new] remove barrels.new
+=== data/barrels/function/parts/_macro0.mcfunction
+$execute rotated $(a0) 0 run summon interaction ^ ^-0.375 ^0.5 {Tags:["barrels.part","barrels.hit","barrels.new"],width:0.75f,height:0.75f,response:true,Rotation:[$(a1)f,0f]}
+=== data/barrels/function/parts/_macro1.mcfunction
+$execute rotated $(a0) 0 run summon item_display ^ ^0.08 ^0.52 {Tags:["barrels.part","barrels.face","barrels.new"],item_display:"fixed",Rotation:[$(a1)f,0f],transformation:{left_rotation:[0f,0f,0f,1f],right_rotation:[0f,0f,0f,1f],translation:[0f,0f,0f],scale:[0.45f,0.45f,0.02f]}}
+=== data/barrels/function/parts/_macro2.mcfunction
+$execute rotated $(a0) 0 run summon text_display ^ ^-0.42 ^0.52 {Tags:["barrels.part","barrels.label","barrels.new"],text:{text:"Empty",color:"gray"},billboard:"fixed",background:0,Rotation:[$(a1)f,0f],transformation:{left_rotation:[0f,0f,0f,1f],right_rotation:[0f,0f,0f,1f],translation:[0f,0f,0f],scale:[0.5f,0.5f,0.5f]}}
+=== data/barrels/function/place.mcfunction
+execute store result score $dir mms.barrels run data get entity @s Facing
+execute if score $dir mms.barrels matches ..1 run function barrels:place/_if0
+execute align xyz positioned ~0.5 ~0.5 ~0.5 run function barrels:place/_exec1
+kill @s
+=== data/barrels/function/place/_exec1.mcfunction
+execute if block ~ ~ ~ #minecraft:replaceable run function barrels:build
+execute unless block ~ ~ ~ #minecraft:replaceable run loot spawn ~ ~ ~ loot barrels:storage_barrel
+=== data/barrels/function/place/_if0.mcfunction
+scoreboard players set $dir mms.barrels 3
+execute as @p if entity @s[y_rotation=-45..45] run scoreboard players set $dir mms.barrels 2
+execute as @p if entity @s[y_rotation=45..135] run scoreboard players set $dir mms.barrels 5
+execute as @p if entity @s[y_rotation=-135..-45] run scoreboard players set $dir mms.barrels 4
+=== data/barrels/function/punched_by_user.mcfunction
+return run execute on attacker if entity @s[tag=barrels.user]
+=== data/barrels/function/swap_drop.mcfunction
+loot spawn ~ ~ ~ loot barrels:storage_barrel
+kill @s
+=== data/barrels/function/take_out.mcfunction
+execute if score $count mms.barrels matches 0 run return 0
+scoreboard players operation $amount mms.barrels = $stack mms.barrels
+execute if predicate barrels:sneaking run scoreboard players set $amount mms.barrels 1
+execute if score $amount mms.barrels > $count mms.barrels run scoreboard players operation $amount mms.barrels = $count mms.barrels
+scoreboard players operation $count mms.barrels -= $amount mms.barrels
+execute if score $count mms.barrels matches 0 run scoreboard players set $stack mms.barrels 0
+execute at @s run summon item ~ ~ ~ {Item:{id:"minecraft:stone"},PickupDelay:0s,Tags:["barrels.drop"]}
+function barrels:give_drop
+playsound minecraft:item.bundle.remove_one player @a
+=== data/barrels/function/used_by_user.mcfunction
+return run execute on target if entity @s[tag=barrels.user]
+=== data/barrels/item_modifier/one.json
+{
+  "type": "minecraft:set_count",
+  "count": 1
+}
+=== data/barrels/item_modifier/remove_amount.json
+{
+  "type": "minecraft:set_count",
+  "count": {
+    "type": "minecraft:score",
+    "target": {
+      "type": "minecraft:fixed",
+      "name": "$minus"
+    },
+    "score": "mms.barrels"
+  },
+  "add": true
+}
+=== data/barrels/item_modifier/take_amount.json
+{
+  "type": "minecraft:set_count",
+  "count": {
+    "type": "minecraft:score",
+    "target": {
+      "type": "minecraft:fixed",
+      "name": "$amount"
+    },
+    "score": "mms.barrels"
+  }
+}
+=== data/barrels/loot_table/storage_barrel.json
+{
+  "pools": [
+    {
+      "rolls": 1,
+      "entries": [
+        {
+          "type": "minecraft:item",
+          "name": "minecraft:item_frame",
+          "modifier": [
+            {
+              "type": "minecraft:set_components",
+              "components": {
+                "item_name": {
+                  "translate": "item.barrels.storage_barrel",
+                  "fallback": "Storage Barrel"
+                },
+                "item_model": "minecraft:barrel",
+                "entity_data": {
+                  "id": "minecraft:item_frame",
+                  "Tags": [
+                    "barrels.place"
+                  ],
+                  "Invisible": true
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+=== data/barrels/predicate/sneaking.json
+{
+  "type": "minecraft:entity_properties",
+  "entity": "this",
+  "predicate": {
+    "flags": {
+      "is_sneaking": true
+    }
+  }
+}
+=== data/barrels/recipe/storage_barrel.json
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    " C ",
+    "CBC",
+    " C "
+  ],
+  "key": {
+    "C": "minecraft:chest",
+    "B": "minecraft:barrel"
+  },
+  "result": {
+    "id": "minecraft:item_frame",
+    "components": {
+      "item_name": {
+        "translate": "item.barrels.storage_barrel",
+        "fallback": "Storage Barrel"
+      },
+      "item_model": "minecraft:barrel",
+      "entity_data": {
+        "id": "minecraft:item_frame",
+        "Tags": [
+          "barrels.place"
+        ],
+        "Invisible": true
+      }
+    }
+  }
+}
+=== data/minecraft/tags/function/load.json
+{
+  "values": [
+    "barrels:mms_gen/load"
+  ]
+}
+=== data/minecraft/tags/function/tick.json
+{
+  "values": [
+    "barrels:mms_gen/tick"
+  ]
+}
+=== pack.mcmeta
+{
+  "pack": {
+    "description": "Storage barrels: one kind of item, up to 32 stacks, with the item and the count shown on the front",
+    "min_format": 121,
+    "max_format": 121
+  }
+}
+=== assets/barrels/lang/en_us.json
+{
+  "item.barrels.storage_barrel": "Storage Barrel"
+}
+=== pack.mcmeta
+{
+  "pack": {
+    "description": "Storage barrels: one kind of item, up to 32 stacks, with the item and the count shown on the front",
+    "min_format": 97,
+    "max_format": 97
+  }
+}

@@ -763,13 +763,16 @@ func (f *fc) objScore(ix *syntax.Index) *fn.Score {
 	case *syntax.String:
 		holder = h.Value
 	case *syntax.Selector, *syntax.Index:
+		// The formatter writes selector arguments as [type=zombie, limit=1],
+		// so drop the spaces between arguments. The game reads the selector
+		// either way, but other parts of the command it lands in might not.
 		sp := h.Span()
-		holder = string(f.src[sp.Start:sp.End])
+		holder = compactSelector(string(f.src[sp.Start:sp.End]))
 	default:
 		f.c.errorf("mms/type-mismatch", h.Span(), "expected a selector such as @s, or a name in quotes")
 		return nil
 	}
-	if holder == "" || strings.ContainsAny(holder, " \t") {
+	if holder == "" || isString(ix.Args[0].Value) && strings.ContainsAny(holder, " \t") {
 		f.c.errorf("mms/type-mismatch", ix.Args[0].Value.Span(), "a score holder cannot contain spaces")
 		return nil
 	}
@@ -1431,4 +1434,38 @@ func (f *fc) parseExpr(text string, off int) syntax.Expr {
 		return nil
 	}
 	return file.Decls[0].Value
+}
+
+// compactSelector removes whitespace from selector text, except inside
+// quoted strings: `@e[type=zombie, name="Big Bob"]` becomes
+// `@e[type=zombie,name="Big Bob"]`.
+func compactSelector(s string) string {
+	var b strings.Builder
+	var quote rune
+	escaped := false
+	for _, r := range s {
+		switch {
+		case quote != 0:
+			b.WriteRune(r)
+			if escaped {
+				escaped = false
+			} else if r == '\\' {
+				escaped = true
+			} else if r == quote {
+				quote = 0
+			}
+			continue
+		case r == '"' || r == '\'':
+			quote = r
+		case r == ' ' || r == '\t' || r == '\n' || r == '\r':
+			continue
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
+}
+
+func isString(e syntax.Expr) bool {
+	_, ok := e.(*syntax.String)
+	return ok
 }
