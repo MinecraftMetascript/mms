@@ -128,22 +128,6 @@ function seedOf(s: string): bigint {
 	}
 }
 
-// Diverging palette for density values: blue below zero, orange above.
-function diverging(v: number, out: Uint8ClampedArray, i: number) {
-	const t = Math.max(-1, Math.min(1, v));
-	if (t < 0) {
-		const a = -t;
-		out[i] = 245 - 200 * a;
-		out[i + 1] = 245 - 140 * a;
-		out[i + 2] = 245 - 30 * a;
-	} else {
-		out[i] = 245 - 10 * t;
-		out[i + 1] = 245 - 120 * t;
-		out[i + 2] = 245 - 200 * t;
-	}
-	out[i + 3] = 255;
-}
-
 function put(out: Uint8ClampedArray, i: number, c: Rgb, shade = 1) {
 	out[i] = c[0] * shade;
 	out[i + 1] = c[1] * shade;
@@ -1224,11 +1208,7 @@ async function render(req: RenderRequest): Promise<PreviewResponse> {
 				track(v);
 			}
 		}
-		for (let i = 0; i < values.length; i++) {
-			const g = Math.max(0, Math.min(255, (values[i] + 1) * 127.5));
-			pixels[i * 4] = pixels[i * 4 + 1] = pixels[i * 4 + 2] = g;
-			pixels[i * 4 + 3] = 255;
-		}
+		// Values only: the viewer colours them with the palette and range picked.
 		return { type: 'rendered', seq: req.seq, width, height, pixels, values, min, max };
 	}
 
@@ -1249,8 +1229,6 @@ async function render(req: RenderRequest): Promise<PreviewResponse> {
 				track(v);
 			}
 		}
-		const range = Math.max(Math.abs(min), Math.abs(max), 1e-9);
-		for (let i = 0; i < values.length; i++) diverging(values[i] / range, pixels, i * 4);
 		return { type: 'rendered', seq: req.seq, width, height, pixels, values, min, max };
 	}
 
@@ -1267,7 +1245,6 @@ async function render(req: RenderRequest): Promise<PreviewResponse> {
 		const y = plane.y(py);
 		for (let px = 0; px < width; px++) {
 			const i = py * width + px;
-			const o = i * 4;
 			let v = NaN;
 			if (y >= minY && y < maxY) {
 				const [x, z] = plane.at(plane.along(px));
@@ -1275,10 +1252,22 @@ async function render(req: RenderRequest): Promise<PreviewResponse> {
 				track(v);
 			}
 			values[i] = v;
+		}
+	}
+	// The "solid / air" look: stone where the density is positive (shaded
+	// over the positive values in view), water below sea level, sky above.
+	// The viewer draws the other palettes from the values.
+	const solidMax = Math.max(max, 1e-9);
+	for (let py = 0; py < height; py++) {
+		const y = plane.y(py);
+		for (let px = 0; px < width; px++) {
+			const i = py * width + px;
+			const o = i * 4;
+			const v = values[i];
 			if (Number.isNaN(v)) {
 				put(pixels, o, VOID);
 			} else if (v > 0) {
-				const shade = 120 + Math.min(1, v) * 40;
+				const shade = 110 + Math.min(1, v / solidMax) * 70;
 				pixels[o] = shade; pixels[o + 1] = shade; pixels[o + 2] = shade + 6;
 			} else if (y < sea) {
 				pixels[o] = 52; pixels[o + 1] = 104; pixels[o + 2] = 196;
