@@ -626,6 +626,10 @@ test.describe('on a phone', () => {
 		page.on('dialog', (d) => d.accept());
 		await page.goto('./');
 		await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+		// Nothing is wider than the phone. If something were, the browser would widen
+		// the page and pan the screen over it, and the touches below would land off
+		// from where the canvas's box says they are.
+		expect(await page.evaluate(() => [innerWidth, document.documentElement.scrollWidth])).toEqual([390, 390]);
 		await page.getByRole('button', { name: /Examples/ }).click();
 		await page.getByRole('button', { name: /badlands/ }).click();
 		const rule = page.locator('.cm-line', { hasText: 'SurfaceRule badlands' });
