@@ -753,3 +753,21 @@ test.describe('on macOS', () => {
 		await expect(menu.getByRole('menuitem', { name: /Fix all/ })).toContainText('⌘+⌥+F');
 	});
 });
+
+test('the Pack tab lists custom items and splits the two packs', async ({ page }) => {
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	await replaceText(page, 'CustomItem ruby = {\n  base = stick\n  components = { max_stack_size = 1 }\n}\nCustomItem charm = {\n  base = torch\n  name = "Charm"\n}\n');
+	await expect(status(page)).toHaveText(/No problems/);
+	await page.getByRole('tab', { name: 'Pack' }).click();
+	// ruby writes no file, but is listed with the stack its name stands for.
+	await expect(page.getByText('Custom items')).toBeVisible();
+	await page.getByRole('button', { name: 'my_pack:ruby' }).click();
+	await page.getByRole('tab', { name: 'JSON' }).click();
+	await expect(page.locator('pre.json')).toContainText('"max_stack_size": 1');
+	await expect(page.getByText('stick[max_stack_size=1]')).toBeVisible();
+	// Both packs have a pack.mcmeta; each one opens its own.
+	await expect(page.getByText('Resource pack')).toBeVisible();
+	await page.getByRole('button', { name: 'pack.mcmeta' }).last().click();
+	await expect(page.locator('pre.json')).toContainText('"min_format": 97');
+});
