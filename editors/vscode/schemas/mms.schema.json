@@ -55,6 +55,16 @@
           "markdownDescription": "An id of a texture, sound or structure in the project's namespace that no Texture, Sound or Structure call in the project provides. The pack still loads, but the file must come from another pack.\n\nDefault: `warning`.",
           "$ref": "#/definitions/severity"
         },
+        "jigsaw-pool": {
+          "description": "A jigsaw block in a structure file that Structure(\"...\") includes draws from a pool in the project's namespace that no TemplatePool declares. The game skips the jigsaw, so the structure stops growing there. The quick fix declares the pool.\n\nDefault: `warning`.",
+          "markdownDescription": "A jigsaw block in a structure file that Structure(\"...\") includes draws from a pool in the project's namespace that no TemplatePool declares. The game skips the jigsaw, so the structure stops growing there. The quick fix declares the pool.\n\nDefault: `warning`.",
+          "$ref": "#/definitions/severity"
+        },
+        "jigsaw-target": {
+          "description": "A jigsaw block whose target no piece of its pool can join: none of the pool's structure files has a jigsaw block with that name, or the pool has no pieces. Only pools whose pieces are all the project's own structure files are checked.\n\nDefault: `warning`.",
+          "markdownDescription": "A jigsaw block whose target no piece of its pool can join: none of the pool's structure files has a jigsaw block with that name, or the pool has no pieces. Only pools whose pieces are all the project's own structure files are checked.\n\nDefault: `warning`.",
+          "$ref": "#/definitions/severity"
+        },
         "overrides-vanilla": {
           "description": "A declaration in the minecraft namespace replaces the vanilla resource with the same id.\n\nDefault: `info`.",
           "markdownDescription": "A declaration in the minecraft namespace replaces the vanilla resource with the same id.\n\nDefault: `info`.",

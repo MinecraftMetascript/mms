@@ -4,6 +4,7 @@
 package ide
 
 import (
+	"fmt"
 	"slices"
 	"sort"
 	"strings"
@@ -780,6 +781,9 @@ func (s *Session) Hover(path string, off int) (string, syntax.Span) {
 		n := a.path[i]
 		if in := a.info(n); in != nil {
 			if md := a.c.Hover(in); md != "" {
+				if in.Asset != nil && in.Asset.Helper == "Structure" {
+					md += s.jigsawHover(in.Asset.Src)
+				}
 				return md, n.Span()
 			}
 		}
@@ -789,6 +793,21 @@ func (s *Session) Hover(path string, off int) (string, syntax.Span) {
 		}
 	}
 	return "", syntax.Span{}
+}
+
+// jigsawHover lists a structure file's jigsaw blocks, for the hover of
+// its Structure("...") call.
+func (s *Session) jigsawHover(src string) string {
+	js, ok := project.StructureJigsaws(s.P.Files, src)
+	if !ok || len(js) == 0 {
+		return ""
+	}
+	var sb strings.Builder
+	sb.WriteString("\n\n**Jigsaw blocks**\n\n| At | Name | Pool | Target |\n|---|---|---|---|\n")
+	for _, j := range js {
+		fmt.Fprintf(&sb, "| %d %d %d | `%s` | `%s` | `%s` |\n", j.Pos[0], j.Pos[1], j.Pos[2], j.Name, j.Pool, j.Target)
+	}
+	return sb.String()
 }
 
 func (s *Session) declHover(d *project.Decl) string {
