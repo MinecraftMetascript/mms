@@ -1,7 +1,9 @@
 package sema
 
 import (
+	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/minecraftmetascript/mms/engine/jsonv"
@@ -93,7 +95,7 @@ func ClickObjective(ns string) string { return "mms_click." + ns }
 // checkItemHooks checks a custom item's on_* fields, which name
 // Functions without parameters, and adds the components they need. It
 // returns the hooks by field.
-func (c *Checker) checkItemHooks(d *syntax.Decl, o *jsonv.Object, comps *jsonv.Object, id string) map[string]string {
+func (c *Checker) checkItemHooks(d *syntax.Decl, o *jsonv.Object, comps *jsonv.Object, id string, out *CustomItemOut) map[string]string {
 	fields := customItemFields(d)
 	hooks := map[string]string{}
 	press := ""
@@ -105,6 +107,7 @@ func (c *Checker) checkItemHooks(d *syntax.Decl, o *jsonv.Object, comps *jsonv.O
 			}
 		}
 	}
+	c.checkUseCost(fields, o, comps, press, out)
 	if len(hooks) == 0 {
 		return nil
 	}
@@ -152,6 +155,54 @@ func (c *Checker) checkItemHooks(d *syntax.Decl, o *jsonv.Object, comps *jsonv.O
 	return hooks
 }
 
+// checkUseCost checks consume_on_use and damage_on_use, which need a
+// right-click hook to pay them, and damage_on_use a max_damage component.
+// It gives a damageable item a stack size of 1, as the game requires.
+func (c *Checker) checkUseCost(fields map[string]syntax.Expr, o, comps *jsonv.Object, press string, out *CustomItemOut) {
+	num := func(key string) int {
+		n, _ := o.Get(key).(jsonv.Number)
+		v, _ := strconv.Atoi(string(n))
+		return v
+	}
+	count, damage := num("consume_on_use"), num("damage_on_use")
+	for _, k := range []string{"consume_on_use", "damage_on_use"} {
+		if num(k) > 0 && press == "" {
+			c.errorf("mms/custom-item", fields[k].Span(), "%s is paid on each right-click use; add on_right_click, on_use_on_block or on_right_click_entity", k)
+			return
+		}
+	}
+	if damage > 0 {
+		max := 0
+		for _, k := range []string{"max_damage", "minecraft:max_damage"} {
+			if n, ok := comps.Get(k).(jsonv.Number); ok {
+				max, _ = strconv.Atoi(string(n))
+			}
+		}
+		if max <= 0 {
+			c.errorf("mms/custom-item", fields["damage_on_use"].Span(), "damage_on_use needs the item's durability: add max_damage to its components, such as components = { max_damage = 32 }")
+			return
+		}
+		switch n := componentValue(comps, "max_stack_size").(type) {
+		case nil:
+			comps.Set("max_stack_size", jsonv.Number("1"))
+		case jsonv.Number:
+			if n != "1" {
+				c.errorf("mms/custom-item", fields["components"].Span(), "an item with durability cannot stack: the game requires max_stack_size = 1 with max_damage")
+				return
+			}
+		}
+		out.Use.MaxDamage = max
+	}
+	out.Use.Count, out.Use.Damage = count, damage
+}
+
+func componentValue(comps *jsonv.Object, name string) jsonv.Value {
+	if v := comps.Get(name); v != nil {
+		return v
+	}
+	return comps.Get("minecraft:" + name)
+}
+
 // checkHookFunction checks an on_* field, which names a Function
 // without parameters or holds an inline { ... } block that hoisting has
 // compiled as one, and returns the function's id.
@@ -186,13 +237,13 @@ type ItemHookFiles struct {
 	Click        bool
 }
 
-// ItemHookOutput builds the files for a custom item's hooks. st is its
-// item stack; hooks maps each on_* field to its function.
-func ItemHookOutput(id string, st *jsonv.Object, hooks map[string]string) ItemHookFiles {
+// ItemHookOutput builds the files for a custom item's hooks.
+func ItemHookOutput(id string, it *CustomItemOut) ItemHookFiles {
 	out := ItemHookFiles{Advancements: map[string]jsonv.Value{}, Functions: map[string][]string{}}
-	if len(hooks) == 0 {
+	if it == nil || len(it.Hooks) == 0 {
 		return out
 	}
+	st, hooks := it.Stack, it.Hooks
 	base, _ := st.Get("id").(jsonv.String)
 	itemPred := func() *jsonv.Object {
 		marker := &jsonv.Object{}
@@ -286,6 +337,23 @@ func ItemHookOutput(id string, st *jsonv.Object, hooks map[string]string) ItemHo
 			body = append(body, "function "+click)
 		}
 	}
+	// The use cost is paid once per press: after on_right_click, which
+	// runs on every press, or else after the block or entity hook.
+	cost := ""
+	if it.Use.Count > 0 || it.Use.Damage > 0 {
+		cost = "function " + press + "/cost"
+		out.Functions[press+"/cost"] = costLines(id, string(base), press+"/cost")
+		for _, hand := range []string{"mainhand", "offhand"} {
+			out.Functions[press+"/cost/"+hand] = costHandLines(hand, press+"/cost", it.Use)
+			if it.Use.Damage > 0 {
+				out.Functions[press+"/cost/"+hand+"/break"] = breakLines(hand, hooks["on_break"])
+			}
+		}
+		if click != "" {
+			body = append(body, cost)
+			cost = ""
+		}
+	}
 	if block != "" || entity != "" {
 		ray := press + "/ray"
 		body = append(body,
@@ -296,19 +364,81 @@ func ItemHookOutput(id string, st *jsonv.Object, hooks map[string]string) ItemHo
 			// Back to feet anchoring, or each step would add the eye height.
 			"execute anchored eyes positioned ^ ^ ^ anchored feet run function "+ray,
 			"tag @s remove mms_clicker")
-		out.Functions[ray] = rayLines(obj, ray, block, entity)
+		blockFn := block
+		if block != "" && cost != "" {
+			blockFn = ray + "/block"
+			out.Functions[blockFn] = []string{"function " + block, cost}
+		}
+		out.Functions[ray] = rayLines(obj, ray, blockFn, entity)
 		if entity != "" {
-			out.Functions[ray+"/entity"] = []string{
+			ls := []string{
 				"tag @s add " + ItemHookTarget,
 				"execute at @s as @p[tag=mms_clicker] run function " + entity,
-				"tag @s remove " + ItemHookTarget,
 			}
+			if cost != "" {
+				ls = append(ls, "execute as @p[tag=mms_clicker] run "+cost)
+			}
+			out.Functions[ray+"/entity"] = append(ls, "tag @s remove "+ItemHookTarget)
 		}
 	}
 	conds := &jsonv.Object{}
 	conds.Set("item", itemPred())
 	add("press", "using_item", conds, body)
 	return out
+}
+
+// UseCost is what each use of a custom item with right-click hooks
+// takes from it: items from the stack, and durability.
+type UseCost struct {
+	Count, Damage int
+	// MaxDamage is the item's max_damage component, which turns Damage
+	// into the fraction set_damage takes.
+	MaxDamage int
+}
+
+// costLines pays the use cost from the hand that holds the item: the
+// main hand when it does, otherwise the off hand.
+func costLines(id, base, cost string) []string {
+	pred := strings.TrimPrefix(base, "minecraft:") + "[custom_data~{" + ItemHookMarker + ":" + quoteSNBT(id) + "}]"
+	return []string{
+		"execute if items entity @s weapon.mainhand " + pred + " run return run function " + cost + "/mainhand",
+		"execute if items entity @s weapon.offhand " + pred + " run function " + cost + "/offhand",
+	}
+}
+
+// costHandLines pays the use cost from one hand.
+func costHandLines(hand, cost string, u UseCost) []string {
+	slot := "weapon." + hand
+	var ls []string
+	if u.Count > 0 {
+		ls = append(ls, fmt.Sprintf("item modify entity @s %s {type:\"minecraft:set_count\",count:%d,add:true}", slot, -u.Count))
+	}
+	if u.Damage > 0 && u.MaxDamage > 0 {
+		// set_damage works in fractions of max_damage and rounds the new
+		// damage down, so half a point more keeps float error from
+		// costing one point less.
+		f := (float64(u.Damage) + 0.5) / float64(u.MaxDamage)
+		if f > 1 {
+			f = 1
+		}
+		ls = append(ls,
+			fmt.Sprintf("item modify entity @s %s {type:\"minecraft:set_damage\",damage:%s,add:true}", slot, strconv.FormatFloat(-f, 'f', -1, 64)),
+			"execute if items entity @s "+slot+" *[damage~{durability:{max:0}}] run function "+cost+"/"+hand+"/break")
+	}
+	return ls
+}
+
+// breakLines breaks an item whose durability a use took to 0, as the
+// game does: it is gone, with the break sound, and on_break runs.
+func breakLines(hand, onBreak string) []string {
+	ls := []string{
+		"item replace entity @s weapon." + hand + " with air",
+		"playsound entity.item.break player @a",
+	}
+	if onBreak != "" {
+		ls = append(ls, "function "+onBreak)
+	}
+	return ls
 }
 
 // notTargeted lists the blocks a player's crosshair passes through.

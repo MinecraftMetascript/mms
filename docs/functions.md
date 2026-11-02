@@ -233,6 +233,22 @@ Every hook marks the item with `mms_item: "<namespace>:<name>"` in its `custom_d
 - `on_use_on_block` and `on_right_click_entity` step a ray from the player's eyes, 0.1 blocks at a time, out to their `block_interaction_range` and `entity_interaction_range`. It stops at the first block or entity it meets. The ray counts a whole block as solid, so it can stop short of a slab or a flower's actual shape, and it skips items, arrows, markers and display entities.
 - `on_right_click` runs on every press, whether or not the player is looking at a block or entity.
 
+**Use cost.** Two more fields make each right-click use cost something:
+
+```
+CustomItem ember_wand = {
+  base = blaze_rod
+  on_use_on_block = kindle
+  damage_on_use = 1
+  components = { max_damage = 32 }
+}
+```
+
+- `consume_on_use = n` takes `n` of the item from the stack.
+- `damage_on_use = n` costs `n` points of durability. When the durability runs out, the item breaks with the break sound, and `on_break` runs. The item needs a `max_damage` component. MMS doesn't know vanilla items' durability, so a base item's own durability is not enough. A damageable item cannot stack, so the item gets `max_stack_size = 1` unless it sets one, and any other stack size is an error.
+
+The cost is paid once per press, from the hand that holds the item. With `on_right_click` it is paid on every press. Otherwise it is paid only when `on_use_on_block` or `on_right_click_entity` runs, so a click at the air costs nothing. `on_hold_right_click` alone pays no cost.
+
 A base item that already does something on right click keeps doing it, and then none of the right-click hooks runs. A block is still placed and a bow still draws, and a chest still opens when clicked. Pick a base such as `stick`, `paper` or `amethyst_shard` that does nothing on its own. A `use_cooldown` component has no effect, because the item is never finished being used. Keep a cooldown in a score instead. `on_consume` cannot be combined with the right-click hooks, because they stop the item from ever being finished.
 
 ## How it compiles

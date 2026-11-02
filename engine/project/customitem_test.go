@@ -290,11 +290,14 @@ Function give {
 	}
 
 	errs := map[string]string{
-		"CustomItem w = { base = stick, on_right_click = nope }":                                                                    "mms/unknown-id",
-		"CustomItem w = { base = stick, on_hit = f }\nObjective f":                                                                  "mms/unknown-id",
-		"CustomItem w = { base = stick, on_kill = f }\nFunction f(n: int) {\n  /say hi\n}":                                          "mms/custom-item",
-		"CustomItem w = { base = apple, on_consume = f, on_hold_right_click = f }\nFunction f {\n}":                                 "mms/custom-item",
-		"CustomItem w = { base = stick, on_right_click = f, components = { custom_data = \"{a:1}\" } }\nFunction f {\n  /say hi\n}": "mms/custom-item",
+		"CustomItem w = { base = stick, on_right_click = nope }":                                                                                       "mms/unknown-id",
+		"CustomItem w = { base = stick, on_hit = f }\nObjective f":                                                                                     "mms/unknown-id",
+		"CustomItem w = { base = stick, on_kill = f }\nFunction f(n: int) {\n  /say hi\n}":                                                             "mms/custom-item",
+		"CustomItem w = { base = apple, on_consume = f, on_hold_right_click = f }\nFunction f {\n}":                                                    "mms/custom-item",
+		"CustomItem w = { base = stick, on_hit = f, consume_on_use = 1 }\nFunction f {\n}":                                                             "mms/custom-item",
+		"CustomItem w = { base = stick, on_right_click = f, damage_on_use = 1 }\nFunction f {\n}":                                                      "mms/custom-item",
+		"CustomItem w = { base = stick, on_right_click = f, damage_on_use = 1, components = { max_damage = 5, max_stack_size = 4 } }\nFunction f {\n}": "mms/custom-item",
+		"CustomItem w = { base = stick, on_right_click = f, components = { custom_data = \"{a:1}\" } }\nFunction f {\n  /say hi\n}":                    "mms/custom-item",
 	}
 	for src, want := range errs {
 		p := New(spec.MustDefault(), Config{Namespace: "demo"})
@@ -331,6 +334,18 @@ CustomItem staff = {
   on_break = f
 }
 CustomItem pie = { base = pumpkin_pie, on_consume = f }
+CustomItem wand = {
+  base = blaze_rod
+  on_right_click_entity = f
+  on_use_on_block = f
+  on_break = f
+  consume_on_use = 1
+  damage_on_use = 2
+  components = { max_damage = 10 }
+}
+Function g {
+  /give @s ${wand}
+}
 Function f {
   /say hi
 }
@@ -366,6 +381,23 @@ Function f {
 	}
 	if !strings.Contains(files["data/demo/function/mms_gen/item_hook/staff/press.mcfunction"], "function demo:f\nexecute if score") {
 		t.Errorf("hold should run before the press check:\n%s", files["data/demo/function/mms_gen/item_hook/staff/press.mcfunction"])
+	}
+	wand := func(f string) string {
+		return files["data/demo/function/mms_gen/item_hook/wand/press/"+f+".mcfunction"]
+	}
+	for f, want := range map[string]string{
+		"ray/block":           "function demo:f\nfunction demo:mms_gen/item_hook/wand/press/cost\n",
+		"ray/entity":          "execute as @p[tag=mms_clicker] run function demo:mms_gen/item_hook/wand/press/cost\n",
+		"cost":                "execute if items entity @s weapon.mainhand blaze_rod[custom_data~{mms_item:\"demo:wand\"}] run return run function demo:mms_gen/item_hook/wand/press/cost/mainhand\n",
+		"cost/offhand":        "item modify entity @s weapon.offhand {type:\"minecraft:set_count\",count:-1,add:true}\nitem modify entity @s weapon.offhand {type:\"minecraft:set_damage\",damage:-0.25,add:true}\n",
+		"cost/mainhand/break": "item replace entity @s weapon.mainhand with air\nplaysound entity.item.break player @a\nfunction demo:f\n",
+	} {
+		if !strings.Contains(wand(f), want) {
+			t.Errorf("press/%s lacks %q:\n%s", f, want, wand(f))
+		}
+	}
+	if g := files["data/demo/function/g.mcfunction"]; !strings.Contains(g, "max_damage=10,max_stack_size=1") {
+		t.Errorf("a wand with durability should not stack: %s", g)
 	}
 	cc := command.New(pack)
 	for path, data := range files {

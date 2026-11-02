@@ -152,7 +152,7 @@ func (r *Result) Emit() []OutFile {
 			if it.ItemModel != nil {
 				out = append(out, OutFile{Path: "assets/" + ns + "/items/" + path + ".json", Data: jsonv.Marshal(it.ItemModel), Unit: d.Unit.Path, Span: d.D.Sp, Pack: sema.ResourcePack})
 			}
-			hf := sema.ItemHookOutput(d.ID(), it.Stack, it.Hooks)
+			hf := sema.ItemHookOutput(d.ID(), it)
 			for hid, adv := range hf.Advancements {
 				hns, hpath := splitID(hid)
 				out = append(out, OutFile{Path: "data/" + hns + "/advancement/" + hpath + ".json", Data: jsonv.Marshal(adv), Unit: d.Unit.Path, Span: d.D.Sp})

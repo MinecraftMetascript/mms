@@ -51,6 +51,8 @@ type CustomItemOut struct {
 	Stack *jsonv.Object
 	// Hooks maps each on_* field to the function it names.
 	Hooks map[string]string
+	// Use is what each right-click use takes from the item.
+	Use UseCost
 }
 
 // Languages lists the item's languages, sorted.
@@ -171,6 +173,13 @@ func customItemType(p *spec.Pack) *spec.Type {
 		{Kind: "pair", Key: "components", Optional: true, Type: &spec.Type{Kind: "reference", Path: "::java::world::component::DataComponentPatch"},
 			Desc: "More item components, such as `max_stack_size` or `rarity`. Every use of the item gets them."},
 	}}
+	one := 1.0
+	positive := &spec.Type{Kind: "int", ValueRange: &spec.Range{Min: &one}}
+	t.Fields = append(t.Fields,
+		&spec.Field{Kind: "pair", Key: "consume_on_use", Optional: true, Type: positive,
+			Desc: "How many of the item each right-click use takes from the stack, paid once per press by on_right_click, on_use_on_block or on_right_click_entity."},
+		&spec.Field{Kind: "pair", Key: "damage_on_use", Optional: true, Type: positive,
+			Desc: "How much durability each right-click use costs, paid like consume_on_use. The item needs a `max_damage` component, and gets `max_stack_size = 1` unless it sets one. When the durability runs out the item breaks, and on_break runs."})
 	for _, h := range itemHookFields() {
 		t.Fields = append(t.Fields, &spec.Field{Kind: "pair", Key: h.key, Optional: true, Type: idType("function"), Desc: h.desc})
 	}
@@ -313,7 +322,7 @@ func (c *Checker) CustomItem(d *syntax.Decl, id string) *CustomItemOut {
 	if user != nil {
 		comps.Members = append(comps.Members, user.Members...)
 	}
-	out.Hooks = c.checkItemHooks(d, o, comps, id)
+	out.Hooks = c.checkItemHooks(d, o, comps, id, out)
 	stack := &jsonv.Object{}
 	if b := str("base"); b != "" {
 		stack.Set("id", jsonv.String(b))

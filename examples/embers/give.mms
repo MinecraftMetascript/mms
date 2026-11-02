@@ -4,6 +4,7 @@
  */
 Function give {
   /give @s ${ember_shard} 16
+  /give @s ${ember_wand}
   /give @s ${ember_disc}
   /give @s painting[painting/variant="embers:hearth"]
 }
