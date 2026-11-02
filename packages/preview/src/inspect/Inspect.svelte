@@ -1,5 +1,7 @@
 <script lang="ts">
+	import { setContext } from 'svelte';
 	import type { OutputFile } from '../types';
+	import { emptyItems, itemsKey, type ItemContext } from './items';
 	import { inspectable, label, type Json } from './common';
 	import { analyseLoot } from './loot';
 	import { analyseRecipe } from './recipe';
@@ -8,7 +10,13 @@
 	import RecipeView from './RecipeView.svelte';
 	import BiomeView from './BiomeView.svelte';
 
-	let { file }: { file: OutputFile } = $props();
+	interface Props {
+		file: OutputFile;
+		/** The pack's custom items, lang lines and textures, for item names and icons. */
+		items?: ItemContext;
+	}
+	let { file, items = emptyItems }: Props = $props();
+	setContext(itemsKey, () => items);
 	const info = $derived(inspectable(file.path));
 	const json = $derived.by((): Json | undefined => {
 		try {

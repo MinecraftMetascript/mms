@@ -6,9 +6,12 @@
 // server's `mms/output` (output.ts). A Book previews as its pages: its declaration
 // has a lens, and so does each page of its .mmsbook file.
 import { bookPageAt, itemPath, shows } from '@mms/preview/paths';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import * as vscode from 'vscode';
 import type { OutputItem, ToExtension, ToPanel } from './messages';
 import { isSource, key, type PackOutput } from './output';
+import { configDir } from './world';
 
 export const viewType = 'mms.preview';
 
@@ -31,7 +34,7 @@ export class Previews implements vscode.Disposable, vscode.CodeLensProvider {
 			vscode.languages.registerCodeLensProvider([{ language: 'mms' }, { language: 'mmsbook' }], this),
 			output.onDidChange(() => {
 				this.lenses.fire();
-				this.post({ type: 'output', files: this.files, items: this.items, assets: this.output.assets });
+				this.post({ type: 'output', files: this.files, items: this.items, assets: this.output.assets, textures: this.textures() });
 				if (this.panel) this.panel.title = title(this.target, this.items);
 			}),
 			vscode.window.registerWebviewPanelSerializer(viewType, {
@@ -69,6 +72,36 @@ export class Previews implements vscode.Disposable, vscode.CodeLensProvider {
 	}
 	private get items() {
 		return this.output.items;
+	}
+
+	/** Data URLs read for textures, by file path, with the mtime they were read at. */
+	private readonly textureCache = new Map<string, { mtime: number; url: string }>();
+
+	/**
+	 * The pack's copied .png textures as data URLs, by pack path, read from
+	 * the project folder, so the recipe inspector can draw custom item icons.
+	 */
+	private textures(): Record<string, string> {
+		const out: Record<string, string> = {};
+		const source = this.output.source;
+		const project = source && configDir(path.dirname(source.fsPath));
+		if (!project) return out;
+		for (const a of this.output.assets) {
+			if (!/^assets\/[^/]+\/textures\/.+\.png$/.test(a.path)) continue;
+			const file = path.join(project, a.src);
+			try {
+				const mtime = fs.statSync(file).mtimeMs;
+				let hit = this.textureCache.get(file);
+				if (!hit || hit.mtime !== mtime) {
+					hit = { mtime, url: 'data:image/png;base64,' + fs.readFileSync(file).toString('base64') };
+					this.textureCache.set(file, hit);
+				}
+				out[a.path] = hit.url;
+			} catch {
+				// A missing file has no icon; the tile shows the name.
+			}
+		}
+		return out;
 	}
 
 	provideCodeLenses(document: vscode.TextDocument): vscode.CodeLens[] {
@@ -162,7 +195,7 @@ export class Previews implements vscode.Disposable, vscode.CodeLensProvider {
 
 	private async receive(m: ToExtension) {
 		if (m.type === 'ready') {
-			this.post({ type: 'output', files: this.files, items: this.items, assets: this.output.assets });
+			this.post({ type: 'output', files: this.files, items: this.items, assets: this.output.assets, textures: this.textures() });
 			this.setTarget(this.target, this.page);
 			await this.output.refresh();
 		} else if (m.type === 'clear') {

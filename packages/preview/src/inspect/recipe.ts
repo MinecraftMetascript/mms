@@ -1,4 +1,4 @@
-import { isObj, strip, type Json } from './common';
+import { isObj, strip, type Json, type Obj } from './common';
 
 /** One ingredient slot: the items or tags that fit it. */
 export type Slot = string[] | null;
@@ -18,7 +18,8 @@ export interface RecipeInfo {
 	brewing?: { input: Slot; reagent: Slot };
 	/** Potion names or a trim pattern, shown under the slots. */
 	notes?: { input?: string; result?: string };
-	result: { id: string; count: number } | null;
+	/** The result stack, with its components (a custom item's name and look). */
+	result: { id: string; count: number; components?: Obj } | null;
 	cookingTime?: number;
 	experience?: number;
 	group?: string;
@@ -43,7 +44,8 @@ function result(v: Json | undefined): RecipeInfo['result'] {
 	if (!isObj(v)) return null;
 	const id = v.id ?? v.item;
 	if (typeof id !== 'string') return null;
-	return { id, count: typeof v.count === 'number' ? v.count : 1 };
+	const components = isObj(v.components) ? v.components : undefined;
+	return { id, count: typeof v.count === 'number' ? v.count : 1, ...(components ? { components } : {}) };
 }
 
 const cooking: Record<string, number> = { smelting: 200, blasting: 100, smoking: 100, campfire_cooking: 600 };

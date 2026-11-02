@@ -248,6 +248,18 @@
 	// The game loads a resource pack from its own zip, like `mms build --zip`,
 	// so it gets its own button (browsers block a second download per click).
 	const resourcePack = $derived(!!engine && hasResourcePack(engine.output, engine.outputAssets));
+	// The pack's copied textures as data URLs, by pack path, so the recipe
+	// inspector can draw a custom item's icon.
+	const textures = $derived.by(() => {
+		const out: Record<string, string> = {};
+		if (!engine) return out;
+		for (const a of engine.outputAssets) {
+			if (!/^assets\/[^/]+\/textures\/.+\.png$/.test(a.path)) continue;
+			const f = project.assets.find((x) => x.path === a.src);
+			if (f) out[a.path] = `data:image/png;base64,${f.data}`;
+		}
+		return out;
+	});
 	function exportPack(resources = false) {
 		if (!engine) return;
 		if (engine.hasErrors && !confirm('The project has errors, so the pack is incomplete. Download it anyway?')) return;
@@ -431,6 +443,7 @@
 							output={engine.output}
 							items={engine.outputItems}
 							assets={engine.outputAssets}
+							{textures}
 							page={bookPage}
 							path={previewPath}
 							{pinned}

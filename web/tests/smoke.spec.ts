@@ -383,6 +383,34 @@ test('a custom item in a recipe ingredient shows its base item', async ({ page }
 	await page.screenshot({ path: 'test-results/custom-item-base.png' });
 });
 
+test('a recipe making a custom item shows its name and texture', async ({ page }) => {
+	const errors: string[] = [];
+	page.on('pageerror', (e) => errors.push(e.message));
+	page.on('dialog', (d) => d.accept());
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	await page.getByRole('button', { name: /Examples/ }).click();
+	await page.getByRole('button', { name: /embers/ }).click();
+	await expect(status(page)).toHaveText(/No problems/);
+	await page.getByRole('button', { name: 'items.mms' }).click();
+	await page.locator('.cm-line', { hasText: 'Recipe ember_shard' }).click();
+	const inspector = page.getByLabel('Inspector');
+	await expect(inspector.getByLabel('Result')).toHaveText('2 × Ember Shard');
+	const result = inspector.getByRole('img', { name: 'Ember Shard' });
+	await expect(result).toHaveAttribute('title', /Custom item embers:ember_shard\nBase: Amethyst Shard \(minecraft:amethyst_shard\)/);
+	await expect(result.locator('img')).toHaveAttribute('src', /^data:image\/png;base64,/);
+	// The ingredient is the base id, which the custom item also fits.
+	const shard = page.getByLabel('Crafting grid').getByRole('img', { name: 'Amethyst Shard' });
+	await expect(shard).toHaveAttribute('title', /including the custom item Ember Shard/);
+	await page.screenshot({ path: 'test-results/recipe-custom-item.png' });
+
+	// A custom item that keeps its base's look shows its name as text.
+	await page.locator('.cm-line', { hasText: 'Recipe ember_disc' }).click();
+	await expect(inspector.getByLabel('Result')).toHaveText('Music Disc');
+	await expect(inspector.getByRole('img', { name: 'Music Disc' }).locator('img')).toHaveCount(1);
+	expect(errors).toEqual([]);
+});
+
 test('loot tables, recipes and biomes show in the inspector', async ({ page }) => {
 	const errors: string[] = [];
 	page.on('pageerror', (e) => errors.push(e.message));
