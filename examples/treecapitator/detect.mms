@@ -23,21 +23,27 @@ Objective chop_warped = minecraft.mined:minecraft.warped_stem
 Predicate sneaking = EntityProperties(entity = this, predicate = { flags = { is_sneaking = true } })
 
 OnTick {
-  /execute as @a[scores={chop_oak=1..}] at @s run function treecap:chopped
-  /execute as @a[scores={chop_spruce=1..}] at @s run function treecap:chopped
-  /execute as @a[scores={chop_birch=1..}] at @s run function treecap:chopped
-  /execute as @a[scores={chop_jungle=1..}] at @s run function treecap:chopped
-  /execute as @a[scores={chop_acacia=1..}] at @s run function treecap:chopped
-  /execute as @a[scores={chop_dark_oak=1..}] at @s run function treecap:chopped
-  /execute as @a[scores={chop_mangrove=1..}] at @s run function treecap:chopped
-  /execute as @a[scores={chop_cherry=1..}] at @s run function treecap:chopped
-  /execute as @a[scores={chop_pale_oak=1..}] at @s run function treecap:chopped
-  /execute as @a[scores={chop_crimson=1..}] at @s run function treecap:chopped
-  /execute as @a[scores={chop_warped=1..}] at @s run function treecap:chopped
+  // Each kind of log passes on its block tag, so that only logs of the
+  // same wood fall: an oak growing into a birch leaves the birch alone.
+  As(@a[scores={ chop_oak = 1.. }]).At(@s) { chopped("minecraft:oak_logs", false) }
+  As(@a[scores={ chop_spruce = 1.. }]).At(@s) { chopped("minecraft:spruce_logs", false) }
+  As(@a[scores={ chop_birch = 1.. }]).At(@s) { chopped("minecraft:birch_logs", false) }
+  As(@a[scores={ chop_jungle = 1.. }]).At(@s) { chopped("minecraft:jungle_logs", false) }
+  As(@a[scores={ chop_acacia = 1.. }]).At(@s) { chopped("minecraft:acacia_logs", false) }
+  As(@a[scores={ chop_dark_oak = 1.. }]).At(@s) { chopped("minecraft:dark_oak_logs", false) }
+  As(@a[scores={ chop_mangrove = 1.. }]).At(@s) { chopped("minecraft:mangrove_logs", false) }
+  As(@a[scores={ chop_cherry = 1.. }]).At(@s) { chopped("minecraft:cherry_logs", false) }
+  As(@a[scores={ chop_pale_oak = 1.. }]).At(@s) { chopped("minecraft:pale_oak_logs", false) }
+  As(@a[scores={ chop_crimson = 1.. }]).At(@s) { chopped("minecraft:crimson_stems", true) }
+  As(@a[scores={ chop_warped = 1.. }]).At(@s) { chopped("minecraft:warped_stems", true) }
 }
 
-/** Runs as and at a player who mined a log since the last tick. */
-Function chopped {
+/**
+ * Runs as and at a player who mined a log since the last tick. wood is the
+ * block tag of that kind of log, such as minecraft:oak_logs, and nether
+ * is true for the stems of huge fungi.
+ */
+Function chopped(wood: string, nether_tree: bool) {
   // Reset every count, so a player who mined two kinds of log in one
   // tick is handled once.
   /scoreboard players reset @s chop_oak
@@ -56,7 +62,9 @@ Function chopped {
   // durability.
   /execute unless items entity @s weapon.mainhand #minecraft:axes run return 0
   // The log's drop is a brand new item (Age 0) near the player.
-  /execute as @e[type=item,distance=..8,nbt={Age:0s}] if items entity @s contents #minecraft:logs run tag @s add treecap.drop
+  kind = wood
+  nether = nether_tree
+  /execute as @e[type=item,distance=..8,nbt={Age:0s}] if items entity @s contents #${kind} run tag @s add treecap.drop
   At(@e[type=item, tag=treecap.drop, limit=1, sort=nearest])
     .Align(xyz)
     .Positioned(~0.5 ~0.5 ~0.5) { fell() }

@@ -1,20 +1,38 @@
-// Felling the tree. A flood fill from the chopped log finds every log
-// joined to it at its height or above, marking each with a marker entity
-// so it is visited once, and counts the natural leaves touching them.
-// Only when the logs look like a tree does anything break.
+// Felling the tree. A flood fill from the chopped log finds every log of
+// the same wood joined to it at its height or above, marking each with a
+// marker entity so it is visited once, and notes which sides of the logs
+// touch natural leaves. Only when the logs look like a tree does anything
+// break: then a second fill finds the tree's own leaves, and logs and
+// leaves break together.
 
 /** The most logs one chop can fell. A bigger group of logs is left alone. */
 Global max_logs: int = 256
-/** How many natural leaves (or nether wart blocks) must touch the logs for them to count as a tree. */
-Global min_leaves: int = 3
+/** Whether the tree's leaves break with it. Otherwise they decay on their own. */
+Global break_leaves: bool = true
+/** The most leaves one chop breaks. Leaves past this decay on their own. */
+Global max_leaves: int = 600
+
+/** The block tag of the wood being felled, such as minecraft:oak_logs. */
+Global kind: string = ""
+/** Whether the tree is a huge fungus, whose cap is wart blocks instead of leaves. */
+Global nether: bool = false
 
 // Working values for the tree being felled. Raw commands below write some
 // of them as the scores $<name> on mms.treecap.
 Global logs: int = 0
-Global leaves: int = 0
+Global leaf_count: int = 0
+/** Set to 1 when a log has natural leaves to its east, west, south, north or top. */
+Global east: int = 0
+Global west: int = 0
+Global south: int = 0
+Global north: int = 0
+Global top: int = 0
 Global unbreaking: int = 0
 Global roll: int = 0
 Global damage: int = 0
+
+/** The distance value of the leaf block under each leaf marker, 1 to 7. */
+Objective leaf_dist
 
 /**
  * Leaves a player has placed are persistent and never decay, so only
@@ -29,51 +47,76 @@ BlockTag caps = [nether_wart_block, warped_wart_block, shroomlight]
  */
 Function fell {
   logs = 0
-  leaves = 0
+  leaf_count = 0
+  east = 0
+  west = 0
+  south = 0
+  north = 0
+  top = 0
   /summon marker ~ ~ ~ {Tags:["treecap.node","treecap.origin"]}
   spread()
   if (logs > max_logs) {
     /title @s actionbar {text:"That is too big to fell at once",color:"gray"}
-  } else if (logs > 0 && leaves >= min_leaves) {
+  } else if (logs > 0 && is_tree()) {
+    if (break_leaves && !nether) {
+      /execute as @e[type=marker,tag=treecap.node] at @s run function treecap:leaves_by_log
+    }
     /execute as @e[type=marker,tag=treecap.node,tag=!treecap.origin] at @s run setblock ~ ~ ~ air destroy
+    /execute as @e[type=marker,tag=treecap.leaf] at @s run setblock ~ ~ ~ air destroy
     // Gather the drops where the chopped log was, so they do not land
     // all over the canopy.
     /execute as @e[type=marker,tag=treecap.node,tag=!treecap.origin] at @s as @e[type=item,distance=..1,nbt={Age:0s}] run tp @s @e[type=marker,tag=treecap.origin,limit=1]
+    /execute as @e[type=marker,tag=treecap.leaf] at @s as @e[type=item,distance=..1,nbt={Age:0s}] run tp @s @e[type=marker,tag=treecap.origin,limit=1]
     wear_axe()
   }
   /kill @e[type=marker,tag=treecap.node]
+  /kill @e[type=marker,tag=treecap.leaf]
+}
+
+/**
+ * Whether the logs look like a tree: natural leaves on at least 4 of
+ * their 5 open sides (east, west, south, north and top, counted over all
+ * the logs), or for a huge fungus, any cap block beside or above them.
+ */
+Function is_tree(): bool {
+  let sides = east + west + south + north + top
+  if (nether) {
+    return sides >= 1
+  }
+  return sides >= 4
 }
 
 /**
  * Runs at the centre of a log, or of the chopped log's space. Visits the
- * logs beside it and above it: the 8 around it and the 9 above, but never
- * below, so the stump stays when a trunk is chopped part way up.
+ * logs of the same wood beside it and above it: the 8 around it and the
+ * 9 above, but never below, so the stump stays when a trunk is chopped
+ * part way up.
  */
 Function spread {
-  /execute positioned ~1 ~ ~ if block ~ ~ ~ #minecraft:logs unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
-  /execute positioned ~-1 ~ ~ if block ~ ~ ~ #minecraft:logs unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
-  /execute positioned ~ ~ ~1 if block ~ ~ ~ #minecraft:logs unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
-  /execute positioned ~ ~ ~-1 if block ~ ~ ~ #minecraft:logs unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
-  /execute positioned ~1 ~ ~1 if block ~ ~ ~ #minecraft:logs unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
-  /execute positioned ~1 ~ ~-1 if block ~ ~ ~ #minecraft:logs unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
-  /execute positioned ~-1 ~ ~1 if block ~ ~ ~ #minecraft:logs unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
-  /execute positioned ~-1 ~ ~-1 if block ~ ~ ~ #minecraft:logs unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
-  /execute positioned ~ ~1 ~ if block ~ ~ ~ #minecraft:logs unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
-  /execute positioned ~1 ~1 ~ if block ~ ~ ~ #minecraft:logs unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
-  /execute positioned ~-1 ~1 ~ if block ~ ~ ~ #minecraft:logs unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
-  /execute positioned ~ ~1 ~1 if block ~ ~ ~ #minecraft:logs unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
-  /execute positioned ~ ~1 ~-1 if block ~ ~ ~ #minecraft:logs unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
-  /execute positioned ~1 ~1 ~1 if block ~ ~ ~ #minecraft:logs unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
-  /execute positioned ~1 ~1 ~-1 if block ~ ~ ~ #minecraft:logs unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
-  /execute positioned ~-1 ~1 ~1 if block ~ ~ ~ #minecraft:logs unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
-  /execute positioned ~-1 ~1 ~-1 if block ~ ~ ~ #minecraft:logs unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
+  /execute positioned ~1 ~ ~ if block ~ ~ ~ #${kind} unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
+  /execute positioned ~-1 ~ ~ if block ~ ~ ~ #${kind} unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
+  /execute positioned ~ ~ ~1 if block ~ ~ ~ #${kind} unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
+  /execute positioned ~ ~ ~-1 if block ~ ~ ~ #${kind} unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
+  /execute positioned ~1 ~ ~1 if block ~ ~ ~ #${kind} unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
+  /execute positioned ~1 ~ ~-1 if block ~ ~ ~ #${kind} unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
+  /execute positioned ~-1 ~ ~1 if block ~ ~ ~ #${kind} unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
+  /execute positioned ~-1 ~ ~-1 if block ~ ~ ~ #${kind} unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
+  /execute positioned ~ ~1 ~ if block ~ ~ ~ #${kind} unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
+  /execute positioned ~1 ~1 ~ if block ~ ~ ~ #${kind} unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
+  /execute positioned ~-1 ~1 ~ if block ~ ~ ~ #${kind} unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
+  /execute positioned ~ ~1 ~1 if block ~ ~ ~ #${kind} unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
+  /execute positioned ~ ~1 ~-1 if block ~ ~ ~ #${kind} unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
+  /execute positioned ~1 ~1 ~1 if block ~ ~ ~ #${kind} unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
+  /execute positioned ~1 ~1 ~-1 if block ~ ~ ~ #${kind} unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
+  /execute positioned ~-1 ~1 ~1 if block ~ ~ ~ #${kind} unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
+  /execute positioned ~-1 ~1 ~-1 if block ~ ~ ~ #${kind} unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
 }
 
 /**
  * Runs at the centre of a log that has not been visited yet: marks it,
- * counts the leaves on its six faces and carries on from it. The calls go
- * through raw /function commands, so the flood fill keeps no stack: the
- * counts are Globals that every visit shares.
+ * notes which of its sides touch leaves and carries on from it. The calls
+ * go through raw /function commands, so the flood fill keeps no stack:
+ * the counts are Globals that every visit shares.
  */
 Function visit {
   /summon marker ~ ~ ~ {Tags:["treecap.node"]}
@@ -81,25 +124,88 @@ Function visit {
   if (logs > max_logs) {
     return
   }
-  /execute if block ~1 ~ ~ #minecraft:leaves[persistent=false] run scoreboard players add $leaves mms.treecap 1
-  /execute if block ~-1 ~ ~ #minecraft:leaves[persistent=false] run scoreboard players add $leaves mms.treecap 1
-  /execute if block ~ ~1 ~ #minecraft:leaves[persistent=false] run scoreboard players add $leaves mms.treecap 1
-  /execute if block ~ ~-1 ~ #minecraft:leaves[persistent=false] run scoreboard players add $leaves mms.treecap 1
-  /execute if block ~ ~ ~1 #minecraft:leaves[persistent=false] run scoreboard players add $leaves mms.treecap 1
-  /execute if block ~ ~ ~-1 #minecraft:leaves[persistent=false] run scoreboard players add $leaves mms.treecap 1
-  /execute if block ~1 ~ ~ #treecap:caps run scoreboard players add $leaves mms.treecap 1
-  /execute if block ~-1 ~ ~ #treecap:caps run scoreboard players add $leaves mms.treecap 1
-  /execute if block ~ ~1 ~ #treecap:caps run scoreboard players add $leaves mms.treecap 1
-  /execute if block ~ ~-1 ~ #treecap:caps run scoreboard players add $leaves mms.treecap 1
-  /execute if block ~ ~ ~1 #treecap:caps run scoreboard players add $leaves mms.treecap 1
-  /execute if block ~ ~ ~-1 #treecap:caps run scoreboard players add $leaves mms.treecap 1
+  if (nether) {
+    // One cap block is enough for a fungus, so the checks at the
+    // stem's corners, where wart blocks also grow, just set top.
+    /execute if block ~1 ~ ~ #treecap:caps run scoreboard players set $east mms.treecap 1
+    /execute if block ~-1 ~ ~ #treecap:caps run scoreboard players set $west mms.treecap 1
+    /execute if block ~ ~ ~1 #treecap:caps run scoreboard players set $south mms.treecap 1
+    /execute if block ~ ~ ~-1 #treecap:caps run scoreboard players set $north mms.treecap 1
+    /execute if block ~ ~1 ~ #treecap:caps run scoreboard players set $top mms.treecap 1
+    /execute if block ~1 ~ ~1 #treecap:caps run scoreboard players set $top mms.treecap 1
+    /execute if block ~1 ~ ~-1 #treecap:caps run scoreboard players set $top mms.treecap 1
+    /execute if block ~-1 ~ ~1 #treecap:caps run scoreboard players set $top mms.treecap 1
+    /execute if block ~-1 ~ ~-1 #treecap:caps run scoreboard players set $top mms.treecap 1
+  } else {
+    /execute if block ~1 ~ ~ #minecraft:leaves[persistent=false] run scoreboard players set $east mms.treecap 1
+    /execute if block ~-1 ~ ~ #minecraft:leaves[persistent=false] run scoreboard players set $west mms.treecap 1
+    /execute if block ~ ~ ~1 #minecraft:leaves[persistent=false] run scoreboard players set $south mms.treecap 1
+    /execute if block ~ ~ ~-1 #minecraft:leaves[persistent=false] run scoreboard players set $north mms.treecap 1
+    /execute if block ~ ~1 ~ #minecraft:leaves[persistent=false] run scoreboard players set $top mms.treecap 1
+  }
   /function treecap:spread
+}
+
+// The tree's own leaves. A natural leaf block's distance is how many
+// steps it is from the nearest log, up to 7. Starting from leaves at
+// distance 1 next to the felled logs and only stepping to leaves exactly
+// one further away keeps to this tree's leaves, and stops at a
+// neighbouring tree's, whose distances fall again toward its own logs.
+
+/** Runs as and at a log's marker: starts a leaf fill from each of its six faces. */
+Function leaves_by_log {
+  /execute positioned ~1 ~ ~ if block ~ ~ ~ #minecraft:leaves[persistent=false,distance=1] unless entity @e[type=marker,tag=treecap.leaf,distance=..0.5] summon marker run function treecap:leaf
+  /execute positioned ~-1 ~ ~ if block ~ ~ ~ #minecraft:leaves[persistent=false,distance=1] unless entity @e[type=marker,tag=treecap.leaf,distance=..0.5] summon marker run function treecap:leaf
+  /execute positioned ~ ~1 ~ if block ~ ~ ~ #minecraft:leaves[persistent=false,distance=1] unless entity @e[type=marker,tag=treecap.leaf,distance=..0.5] summon marker run function treecap:leaf
+  /execute positioned ~ ~-1 ~ if block ~ ~ ~ #minecraft:leaves[persistent=false,distance=1] unless entity @e[type=marker,tag=treecap.leaf,distance=..0.5] summon marker run function treecap:leaf
+  /execute positioned ~ ~ ~1 if block ~ ~ ~ #minecraft:leaves[persistent=false,distance=1] unless entity @e[type=marker,tag=treecap.leaf,distance=..0.5] summon marker run function treecap:leaf
+  /execute positioned ~ ~ ~-1 if block ~ ~ ~ #minecraft:leaves[persistent=false,distance=1] unless entity @e[type=marker,tag=treecap.leaf,distance=..0.5] summon marker run function treecap:leaf
+}
+
+/**
+ * Runs as a new marker at the centre of a leaf block of this tree: marks
+ * it, notes its distance and carries on to the leaves one step further.
+ */
+Function leaf {
+  /tag @s add treecap.leaf
+  leaf_count += 1
+  if (leaf_count > max_leaves) {
+    return
+  }
+  /execute if block ~ ~ ~ #minecraft:leaves[distance=1] run scoreboard players set @s leaf_dist 1
+  /execute if block ~ ~ ~ #minecraft:leaves[distance=2] run scoreboard players set @s leaf_dist 2
+  /execute if block ~ ~ ~ #minecraft:leaves[distance=3] run scoreboard players set @s leaf_dist 3
+  /execute if block ~ ~ ~ #minecraft:leaves[distance=4] run scoreboard players set @s leaf_dist 4
+  /execute if block ~ ~ ~ #minecraft:leaves[distance=5] run scoreboard players set @s leaf_dist 5
+  /execute if block ~ ~ ~ #minecraft:leaves[distance=6] run scoreboard players set @s leaf_dist 6
+  /execute if block ~ ~ ~ #minecraft:leaves[distance=7] run return 0
+  /execute positioned ~1 ~ ~ if block ~ ~ ~ #minecraft:leaves[persistent=false] unless entity @e[type=marker,tag=treecap.leaf,distance=..0.5] if function treecap:farther summon marker run function treecap:leaf
+  /execute positioned ~-1 ~ ~ if block ~ ~ ~ #minecraft:leaves[persistent=false] unless entity @e[type=marker,tag=treecap.leaf,distance=..0.5] if function treecap:farther summon marker run function treecap:leaf
+  /execute positioned ~ ~1 ~ if block ~ ~ ~ #minecraft:leaves[persistent=false] unless entity @e[type=marker,tag=treecap.leaf,distance=..0.5] if function treecap:farther summon marker run function treecap:leaf
+  /execute positioned ~ ~-1 ~ if block ~ ~ ~ #minecraft:leaves[persistent=false] unless entity @e[type=marker,tag=treecap.leaf,distance=..0.5] if function treecap:farther summon marker run function treecap:leaf
+  /execute positioned ~ ~ ~1 if block ~ ~ ~ #minecraft:leaves[persistent=false] unless entity @e[type=marker,tag=treecap.leaf,distance=..0.5] if function treecap:farther summon marker run function treecap:leaf
+  /execute positioned ~ ~ ~-1 if block ~ ~ ~ #minecraft:leaves[persistent=false] unless entity @e[type=marker,tag=treecap.leaf,distance=..0.5] if function treecap:farther summon marker run function treecap:leaf
+}
+
+/**
+ * Runs as a leaf marker, positioned at a neighbouring leaf block: whether
+ * that block is exactly one step further from the logs.
+ */
+Function farther {
+  /execute if score @s leaf_dist matches 1 if block ~ ~ ~ #minecraft:leaves[distance=2] run return 1
+  /execute if score @s leaf_dist matches 2 if block ~ ~ ~ #minecraft:leaves[distance=3] run return 1
+  /execute if score @s leaf_dist matches 3 if block ~ ~ ~ #minecraft:leaves[distance=4] run return 1
+  /execute if score @s leaf_dist matches 4 if block ~ ~ ~ #minecraft:leaves[distance=5] run return 1
+  /execute if score @s leaf_dist matches 5 if block ~ ~ ~ #minecraft:leaves[distance=6] run return 1
+  /execute if score @s leaf_dist matches 6 if block ~ ~ ~ #minecraft:leaves[distance=7] run return 1
+  /return fail
 }
 
 /**
  * Takes a point of durability from the held axe for each extra log, as if
- * each had been chopped by hand. Unbreaking skips each point with the
- * same odds it would in vanilla: 1 in (level + 1) points is taken.
+ * each had been chopped by hand. Leaves cost nothing. Unbreaking skips
+ * each point with the same odds it would in vanilla: 1 in (level + 1)
+ * points is taken.
  */
 Function wear_axe {
   /execute if items entity @s weapon.mainhand *[minecraft:unbreakable] run return 0

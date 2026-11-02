@@ -27,12 +27,30 @@ scoreboard players reset @s chop_crimson
 scoreboard players reset @s chop_warped
 execute if predicate treecap:sneaking run return 0
 execute unless items entity @s weapon.mainhand #minecraft:axes run return 0
-execute as @e[type=item,distance=..8,nbt={Age:0s}] if items entity @s contents #minecraft:logs run tag @s add treecap.drop
+data modify storage treecap:mms g.kind set from storage treecap:mms l."chopped".wood
+scoreboard players operation $nether mms.treecap = #chopped.nether_tree mms.treecap
+data modify storage treecap:mms m.a0 set from storage treecap:mms g.kind
+function treecap:chopped/_macro0 with storage treecap:mms m
 execute at @e[type=item, tag=treecap.drop, limit=1, sort=nearest] align xyz positioned ~0.5 ~0.5 ~0.5 run function treecap:fell
 tag @e[type=item,tag=treecap.drop] remove treecap.drop
+=== data/treecap/function/chopped/_macro0.mcfunction
+$execute as @e[type=item,distance=..8,nbt={Age:0s}] if items entity @s contents #$(a0) run tag @s add treecap.drop
+=== data/treecap/function/farther.mcfunction
+execute if score @s leaf_dist matches 1 if block ~ ~ ~ #minecraft:leaves[distance=2] run return 1
+execute if score @s leaf_dist matches 2 if block ~ ~ ~ #minecraft:leaves[distance=3] run return 1
+execute if score @s leaf_dist matches 3 if block ~ ~ ~ #minecraft:leaves[distance=4] run return 1
+execute if score @s leaf_dist matches 4 if block ~ ~ ~ #minecraft:leaves[distance=5] run return 1
+execute if score @s leaf_dist matches 5 if block ~ ~ ~ #minecraft:leaves[distance=6] run return 1
+execute if score @s leaf_dist matches 6 if block ~ ~ ~ #minecraft:leaves[distance=7] run return 1
+return fail
 === data/treecap/function/fell.mcfunction
 scoreboard players set $logs mms.treecap 0
-scoreboard players set $leaves mms.treecap 0
+scoreboard players set $leaf_count mms.treecap 0
+scoreboard players set $east mms.treecap 0
+scoreboard players set $west mms.treecap 0
+scoreboard players set $south mms.treecap 0
+scoreboard players set $north mms.treecap 0
+scoreboard players set $top mms.treecap 0
 summon marker ~ ~ ~ {Tags:["treecap.node","treecap.origin"]}
 function treecap:spread
 scoreboard players set #fell._f0 mms.treecap 0
@@ -40,12 +58,64 @@ execute if score $logs mms.treecap > $max_logs mms.treecap run scoreboard player
 execute if score #fell._f0 mms.treecap matches 1 run title @s actionbar {text:"That is too big to fell at once",color:"gray"}
 execute unless score #fell._f0 mms.treecap matches 1 run function treecap:fell/_else1
 kill @e[type=marker,tag=treecap.node]
+kill @e[type=marker,tag=treecap.leaf]
 === data/treecap/function/fell/_else1.mcfunction
-execute if score $logs mms.treecap matches 1.. if score $leaves mms.treecap >= $min_leaves mms.treecap run function treecap:fell/_if2
+scoreboard players set #fell._t1 mms.treecap 0
+execute if score $logs mms.treecap matches 1.. run function treecap:fell/_if2
+execute if score #fell._t1 mms.treecap matches 1 run function treecap:fell/_if3
 === data/treecap/function/fell/_if2.mcfunction
+execute store result score #fell._t0 mms.treecap run function treecap:is_tree
+execute if score #fell._t0 mms.treecap matches 1 run scoreboard players set #fell._t1 mms.treecap 1
+=== data/treecap/function/fell/_if3.mcfunction
+execute if score $break_leaves mms.treecap matches 1 unless score $nether mms.treecap matches 1 as @e[type=marker,tag=treecap.node] at @s run function treecap:leaves_by_log
 execute as @e[type=marker,tag=treecap.node,tag=!treecap.origin] at @s run setblock ~ ~ ~ air destroy
+execute as @e[type=marker,tag=treecap.leaf] at @s run setblock ~ ~ ~ air destroy
 execute as @e[type=marker,tag=treecap.node,tag=!treecap.origin] at @s as @e[type=item,distance=..1,nbt={Age:0s}] run tp @s @e[type=marker,tag=treecap.origin,limit=1]
+execute as @e[type=marker,tag=treecap.leaf] at @s as @e[type=item,distance=..1,nbt={Age:0s}] run tp @s @e[type=marker,tag=treecap.origin,limit=1]
 function treecap:wear_axe
+=== data/treecap/function/is_tree.mcfunction
+scoreboard players operation #is_tree._t1 mms.treecap = $east mms.treecap
+scoreboard players operation #is_tree._t1 mms.treecap += $west mms.treecap
+scoreboard players operation #is_tree._t1 mms.treecap += $south mms.treecap
+scoreboard players operation #is_tree._t3 mms.treecap = #is_tree._t1 mms.treecap
+scoreboard players operation #is_tree._t3 mms.treecap += $north mms.treecap
+scoreboard players operation #is_tree._t3 mms.treecap += $top mms.treecap
+scoreboard players operation #is_tree.sides mms.treecap = #is_tree._t3 mms.treecap
+execute if score $nether mms.treecap matches 1 run function treecap:is_tree/_if0
+execute if score #cf mms.treecap matches 3 run return run function treecap:mms_gen/ret
+scoreboard players set #is_tree._t5 mms.treecap 0
+execute if score #is_tree.sides mms.treecap matches 4.. run scoreboard players set #is_tree._t5 mms.treecap 1
+return run scoreboard players get #is_tree._t5 mms.treecap
+=== data/treecap/function/is_tree/_if0.mcfunction
+scoreboard players set #is_tree._t4 mms.treecap 0
+execute if score #is_tree.sides mms.treecap matches 1.. run scoreboard players set #is_tree._t4 mms.treecap 1
+scoreboard players operation #rv mms.treecap = #is_tree._t4 mms.treecap
+scoreboard players set #cf mms.treecap 3
+return 0
+=== data/treecap/function/leaf.mcfunction
+tag @s add treecap.leaf
+scoreboard players add $leaf_count mms.treecap 1
+execute if score $leaf_count mms.treecap > $max_leaves mms.treecap run return 0
+execute if block ~ ~ ~ #minecraft:leaves[distance=1] run scoreboard players set @s leaf_dist 1
+execute if block ~ ~ ~ #minecraft:leaves[distance=2] run scoreboard players set @s leaf_dist 2
+execute if block ~ ~ ~ #minecraft:leaves[distance=3] run scoreboard players set @s leaf_dist 3
+execute if block ~ ~ ~ #minecraft:leaves[distance=4] run scoreboard players set @s leaf_dist 4
+execute if block ~ ~ ~ #minecraft:leaves[distance=5] run scoreboard players set @s leaf_dist 5
+execute if block ~ ~ ~ #minecraft:leaves[distance=6] run scoreboard players set @s leaf_dist 6
+execute if block ~ ~ ~ #minecraft:leaves[distance=7] run return 0
+execute positioned ~1 ~ ~ if block ~ ~ ~ #minecraft:leaves[persistent=false] unless entity @e[type=marker,tag=treecap.leaf,distance=..0.5] if function treecap:farther summon marker run function treecap:leaf
+execute positioned ~-1 ~ ~ if block ~ ~ ~ #minecraft:leaves[persistent=false] unless entity @e[type=marker,tag=treecap.leaf,distance=..0.5] if function treecap:farther summon marker run function treecap:leaf
+execute positioned ~ ~1 ~ if block ~ ~ ~ #minecraft:leaves[persistent=false] unless entity @e[type=marker,tag=treecap.leaf,distance=..0.5] if function treecap:farther summon marker run function treecap:leaf
+execute positioned ~ ~-1 ~ if block ~ ~ ~ #minecraft:leaves[persistent=false] unless entity @e[type=marker,tag=treecap.leaf,distance=..0.5] if function treecap:farther summon marker run function treecap:leaf
+execute positioned ~ ~ ~1 if block ~ ~ ~ #minecraft:leaves[persistent=false] unless entity @e[type=marker,tag=treecap.leaf,distance=..0.5] if function treecap:farther summon marker run function treecap:leaf
+execute positioned ~ ~ ~-1 if block ~ ~ ~ #minecraft:leaves[persistent=false] unless entity @e[type=marker,tag=treecap.leaf,distance=..0.5] if function treecap:farther summon marker run function treecap:leaf
+=== data/treecap/function/leaves_by_log.mcfunction
+execute positioned ~1 ~ ~ if block ~ ~ ~ #minecraft:leaves[persistent=false,distance=1] unless entity @e[type=marker,tag=treecap.leaf,distance=..0.5] summon marker run function treecap:leaf
+execute positioned ~-1 ~ ~ if block ~ ~ ~ #minecraft:leaves[persistent=false,distance=1] unless entity @e[type=marker,tag=treecap.leaf,distance=..0.5] summon marker run function treecap:leaf
+execute positioned ~ ~1 ~ if block ~ ~ ~ #minecraft:leaves[persistent=false,distance=1] unless entity @e[type=marker,tag=treecap.leaf,distance=..0.5] summon marker run function treecap:leaf
+execute positioned ~ ~-1 ~ if block ~ ~ ~ #minecraft:leaves[persistent=false,distance=1] unless entity @e[type=marker,tag=treecap.leaf,distance=..0.5] summon marker run function treecap:leaf
+execute positioned ~ ~ ~1 if block ~ ~ ~ #minecraft:leaves[persistent=false,distance=1] unless entity @e[type=marker,tag=treecap.leaf,distance=..0.5] summon marker run function treecap:leaf
+execute positioned ~ ~ ~-1 if block ~ ~ ~ #minecraft:leaves[persistent=false,distance=1] unless entity @e[type=marker,tag=treecap.leaf,distance=..0.5] summon marker run function treecap:leaf
 === data/treecap/function/mms_gen/load.mcfunction
 scoreboard objectives add chop_oak minecraft.mined:minecraft.oak_log
 scoreboard objectives add chop_spruce minecraft.mined:minecraft.spruce_log
@@ -58,62 +128,179 @@ scoreboard objectives add chop_cherry minecraft.mined:minecraft.cherry_log
 scoreboard objectives add chop_pale_oak minecraft.mined:minecraft.pale_oak_log
 scoreboard objectives add chop_crimson minecraft.mined:minecraft.crimson_stem
 scoreboard objectives add chop_warped minecraft.mined:minecraft.warped_stem
+scoreboard objectives add leaf_dist dummy
 scoreboard objectives add mms.treecap dummy
 scoreboard players set #cf mms.treecap 0
 execute unless score $max_logs mms.treecap = $max_logs mms.treecap run scoreboard players set $max_logs mms.treecap 256
-execute unless score $min_leaves mms.treecap = $min_leaves mms.treecap run scoreboard players set $min_leaves mms.treecap 3
+execute unless score $break_leaves mms.treecap = $break_leaves mms.treecap run scoreboard players set $break_leaves mms.treecap 1
+execute unless score $max_leaves mms.treecap = $max_leaves mms.treecap run scoreboard players set $max_leaves mms.treecap 600
+execute unless data storage treecap:mms g.kind run data modify storage treecap:mms g.kind set value ""
+execute unless score $nether mms.treecap = $nether mms.treecap run scoreboard players set $nether mms.treecap 0
 execute unless score $logs mms.treecap = $logs mms.treecap run scoreboard players set $logs mms.treecap 0
-execute unless score $leaves mms.treecap = $leaves mms.treecap run scoreboard players set $leaves mms.treecap 0
+execute unless score $leaf_count mms.treecap = $leaf_count mms.treecap run scoreboard players set $leaf_count mms.treecap 0
+execute unless score $east mms.treecap = $east mms.treecap run scoreboard players set $east mms.treecap 0
+execute unless score $west mms.treecap = $west mms.treecap run scoreboard players set $west mms.treecap 0
+execute unless score $south mms.treecap = $south mms.treecap run scoreboard players set $south mms.treecap 0
+execute unless score $north mms.treecap = $north mms.treecap run scoreboard players set $north mms.treecap 0
+execute unless score $top mms.treecap = $top mms.treecap run scoreboard players set $top mms.treecap 0
 execute unless score $unbreaking mms.treecap = $unbreaking mms.treecap run scoreboard players set $unbreaking mms.treecap 0
 execute unless score $roll mms.treecap = $roll mms.treecap run scoreboard players set $roll mms.treecap 0
 execute unless score $damage mms.treecap = $damage mms.treecap run scoreboard players set $damage mms.treecap 0
+=== data/treecap/function/mms_gen/ret.mcfunction
+scoreboard players set #cf mms.treecap 0
+return run scoreboard players get #rv mms.treecap
 === data/treecap/function/mms_gen/tick.mcfunction
-execute as @a[scores={chop_oak=1..}] at @s run function treecap:chopped
-execute as @a[scores={chop_spruce=1..}] at @s run function treecap:chopped
-execute as @a[scores={chop_birch=1..}] at @s run function treecap:chopped
-execute as @a[scores={chop_jungle=1..}] at @s run function treecap:chopped
-execute as @a[scores={chop_acacia=1..}] at @s run function treecap:chopped
-execute as @a[scores={chop_dark_oak=1..}] at @s run function treecap:chopped
-execute as @a[scores={chop_mangrove=1..}] at @s run function treecap:chopped
-execute as @a[scores={chop_cherry=1..}] at @s run function treecap:chopped
-execute as @a[scores={chop_pale_oak=1..}] at @s run function treecap:chopped
-execute as @a[scores={chop_crimson=1..}] at @s run function treecap:chopped
-execute as @a[scores={chop_warped=1..}] at @s run function treecap:chopped
+function treecap:mms_gen/tick/bb87e52b
+=== data/treecap/function/mms_gen/tick/bb87e52b.mcfunction
+execute as @a[scores={ chop_oak = 1.. }] at @s run function treecap:mms_gen/tick/bb87e52b/_exec0
+execute as @a[scores={ chop_spruce = 1.. }] at @s run function treecap:mms_gen/tick/bb87e52b/_exec1
+execute as @a[scores={ chop_birch = 1.. }] at @s run function treecap:mms_gen/tick/bb87e52b/_exec2
+execute as @a[scores={ chop_jungle = 1.. }] at @s run function treecap:mms_gen/tick/bb87e52b/_exec3
+execute as @a[scores={ chop_acacia = 1.. }] at @s run function treecap:mms_gen/tick/bb87e52b/_exec4
+execute as @a[scores={ chop_dark_oak = 1.. }] at @s run function treecap:mms_gen/tick/bb87e52b/_exec5
+execute as @a[scores={ chop_mangrove = 1.. }] at @s run function treecap:mms_gen/tick/bb87e52b/_exec6
+execute as @a[scores={ chop_cherry = 1.. }] at @s run function treecap:mms_gen/tick/bb87e52b/_exec7
+execute as @a[scores={ chop_pale_oak = 1.. }] at @s run function treecap:mms_gen/tick/bb87e52b/_exec8
+execute as @a[scores={ chop_crimson = 1.. }] at @s run function treecap:mms_gen/tick/bb87e52b/_exec9
+execute as @a[scores={ chop_warped = 1.. }] at @s run function treecap:mms_gen/tick/bb87e52b/_exec10
+=== data/treecap/function/mms_gen/tick/bb87e52b/_exec0.mcfunction
+data modify storage treecap:mms l."chopped".wood set value "minecraft:oak_logs"
+scoreboard players set #chopped.nether_tree mms.treecap 0
+function treecap:chopped
+=== data/treecap/function/mms_gen/tick/bb87e52b/_exec1.mcfunction
+data modify storage treecap:mms l."chopped".wood set value "minecraft:spruce_logs"
+scoreboard players set #chopped.nether_tree mms.treecap 0
+function treecap:chopped
+=== data/treecap/function/mms_gen/tick/bb87e52b/_exec10.mcfunction
+data modify storage treecap:mms l."chopped".wood set value "minecraft:warped_stems"
+scoreboard players set #chopped.nether_tree mms.treecap 1
+function treecap:chopped
+=== data/treecap/function/mms_gen/tick/bb87e52b/_exec2.mcfunction
+data modify storage treecap:mms l."chopped".wood set value "minecraft:birch_logs"
+scoreboard players set #chopped.nether_tree mms.treecap 0
+function treecap:chopped
+=== data/treecap/function/mms_gen/tick/bb87e52b/_exec3.mcfunction
+data modify storage treecap:mms l."chopped".wood set value "minecraft:jungle_logs"
+scoreboard players set #chopped.nether_tree mms.treecap 0
+function treecap:chopped
+=== data/treecap/function/mms_gen/tick/bb87e52b/_exec4.mcfunction
+data modify storage treecap:mms l."chopped".wood set value "minecraft:acacia_logs"
+scoreboard players set #chopped.nether_tree mms.treecap 0
+function treecap:chopped
+=== data/treecap/function/mms_gen/tick/bb87e52b/_exec5.mcfunction
+data modify storage treecap:mms l."chopped".wood set value "minecraft:dark_oak_logs"
+scoreboard players set #chopped.nether_tree mms.treecap 0
+function treecap:chopped
+=== data/treecap/function/mms_gen/tick/bb87e52b/_exec6.mcfunction
+data modify storage treecap:mms l."chopped".wood set value "minecraft:mangrove_logs"
+scoreboard players set #chopped.nether_tree mms.treecap 0
+function treecap:chopped
+=== data/treecap/function/mms_gen/tick/bb87e52b/_exec7.mcfunction
+data modify storage treecap:mms l."chopped".wood set value "minecraft:cherry_logs"
+scoreboard players set #chopped.nether_tree mms.treecap 0
+function treecap:chopped
+=== data/treecap/function/mms_gen/tick/bb87e52b/_exec8.mcfunction
+data modify storage treecap:mms l."chopped".wood set value "minecraft:pale_oak_logs"
+scoreboard players set #chopped.nether_tree mms.treecap 0
+function treecap:chopped
+=== data/treecap/function/mms_gen/tick/bb87e52b/_exec9.mcfunction
+data modify storage treecap:mms l."chopped".wood set value "minecraft:crimson_stems"
+scoreboard players set #chopped.nether_tree mms.treecap 1
+function treecap:chopped
 === data/treecap/function/spread.mcfunction
-execute positioned ~1 ~ ~ if block ~ ~ ~ #minecraft:logs unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
-execute positioned ~-1 ~ ~ if block ~ ~ ~ #minecraft:logs unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
-execute positioned ~ ~ ~1 if block ~ ~ ~ #minecraft:logs unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
-execute positioned ~ ~ ~-1 if block ~ ~ ~ #minecraft:logs unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
-execute positioned ~1 ~ ~1 if block ~ ~ ~ #minecraft:logs unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
-execute positioned ~1 ~ ~-1 if block ~ ~ ~ #minecraft:logs unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
-execute positioned ~-1 ~ ~1 if block ~ ~ ~ #minecraft:logs unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
-execute positioned ~-1 ~ ~-1 if block ~ ~ ~ #minecraft:logs unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
-execute positioned ~ ~1 ~ if block ~ ~ ~ #minecraft:logs unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
-execute positioned ~1 ~1 ~ if block ~ ~ ~ #minecraft:logs unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
-execute positioned ~-1 ~1 ~ if block ~ ~ ~ #minecraft:logs unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
-execute positioned ~ ~1 ~1 if block ~ ~ ~ #minecraft:logs unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
-execute positioned ~ ~1 ~-1 if block ~ ~ ~ #minecraft:logs unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
-execute positioned ~1 ~1 ~1 if block ~ ~ ~ #minecraft:logs unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
-execute positioned ~1 ~1 ~-1 if block ~ ~ ~ #minecraft:logs unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
-execute positioned ~-1 ~1 ~1 if block ~ ~ ~ #minecraft:logs unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
-execute positioned ~-1 ~1 ~-1 if block ~ ~ ~ #minecraft:logs unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
+data modify storage treecap:mms m.a0 set from storage treecap:mms g.kind
+function treecap:spread/_macro0 with storage treecap:mms m
+data modify storage treecap:mms m.a0 set from storage treecap:mms g.kind
+function treecap:spread/_macro1 with storage treecap:mms m
+data modify storage treecap:mms m.a0 set from storage treecap:mms g.kind
+function treecap:spread/_macro2 with storage treecap:mms m
+data modify storage treecap:mms m.a0 set from storage treecap:mms g.kind
+function treecap:spread/_macro3 with storage treecap:mms m
+data modify storage treecap:mms m.a0 set from storage treecap:mms g.kind
+function treecap:spread/_macro4 with storage treecap:mms m
+data modify storage treecap:mms m.a0 set from storage treecap:mms g.kind
+function treecap:spread/_macro5 with storage treecap:mms m
+data modify storage treecap:mms m.a0 set from storage treecap:mms g.kind
+function treecap:spread/_macro6 with storage treecap:mms m
+data modify storage treecap:mms m.a0 set from storage treecap:mms g.kind
+function treecap:spread/_macro7 with storage treecap:mms m
+data modify storage treecap:mms m.a0 set from storage treecap:mms g.kind
+function treecap:spread/_macro8 with storage treecap:mms m
+data modify storage treecap:mms m.a0 set from storage treecap:mms g.kind
+function treecap:spread/_macro9 with storage treecap:mms m
+data modify storage treecap:mms m.a0 set from storage treecap:mms g.kind
+function treecap:spread/_macro10 with storage treecap:mms m
+data modify storage treecap:mms m.a0 set from storage treecap:mms g.kind
+function treecap:spread/_macro11 with storage treecap:mms m
+data modify storage treecap:mms m.a0 set from storage treecap:mms g.kind
+function treecap:spread/_macro12 with storage treecap:mms m
+data modify storage treecap:mms m.a0 set from storage treecap:mms g.kind
+function treecap:spread/_macro13 with storage treecap:mms m
+data modify storage treecap:mms m.a0 set from storage treecap:mms g.kind
+function treecap:spread/_macro14 with storage treecap:mms m
+data modify storage treecap:mms m.a0 set from storage treecap:mms g.kind
+function treecap:spread/_macro15 with storage treecap:mms m
+data modify storage treecap:mms m.a0 set from storage treecap:mms g.kind
+function treecap:spread/_macro16 with storage treecap:mms m
+=== data/treecap/function/spread/_macro0.mcfunction
+$execute positioned ~1 ~ ~ if block ~ ~ ~ #$(a0) unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
+=== data/treecap/function/spread/_macro1.mcfunction
+$execute positioned ~-1 ~ ~ if block ~ ~ ~ #$(a0) unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
+=== data/treecap/function/spread/_macro10.mcfunction
+$execute positioned ~-1 ~1 ~ if block ~ ~ ~ #$(a0) unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
+=== data/treecap/function/spread/_macro11.mcfunction
+$execute positioned ~ ~1 ~1 if block ~ ~ ~ #$(a0) unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
+=== data/treecap/function/spread/_macro12.mcfunction
+$execute positioned ~ ~1 ~-1 if block ~ ~ ~ #$(a0) unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
+=== data/treecap/function/spread/_macro13.mcfunction
+$execute positioned ~1 ~1 ~1 if block ~ ~ ~ #$(a0) unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
+=== data/treecap/function/spread/_macro14.mcfunction
+$execute positioned ~1 ~1 ~-1 if block ~ ~ ~ #$(a0) unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
+=== data/treecap/function/spread/_macro15.mcfunction
+$execute positioned ~-1 ~1 ~1 if block ~ ~ ~ #$(a0) unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
+=== data/treecap/function/spread/_macro16.mcfunction
+$execute positioned ~-1 ~1 ~-1 if block ~ ~ ~ #$(a0) unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
+=== data/treecap/function/spread/_macro2.mcfunction
+$execute positioned ~ ~ ~1 if block ~ ~ ~ #$(a0) unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
+=== data/treecap/function/spread/_macro3.mcfunction
+$execute positioned ~ ~ ~-1 if block ~ ~ ~ #$(a0) unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
+=== data/treecap/function/spread/_macro4.mcfunction
+$execute positioned ~1 ~ ~1 if block ~ ~ ~ #$(a0) unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
+=== data/treecap/function/spread/_macro5.mcfunction
+$execute positioned ~1 ~ ~-1 if block ~ ~ ~ #$(a0) unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
+=== data/treecap/function/spread/_macro6.mcfunction
+$execute positioned ~-1 ~ ~1 if block ~ ~ ~ #$(a0) unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
+=== data/treecap/function/spread/_macro7.mcfunction
+$execute positioned ~-1 ~ ~-1 if block ~ ~ ~ #$(a0) unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
+=== data/treecap/function/spread/_macro8.mcfunction
+$execute positioned ~ ~1 ~ if block ~ ~ ~ #$(a0) unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
+=== data/treecap/function/spread/_macro9.mcfunction
+$execute positioned ~1 ~1 ~ if block ~ ~ ~ #$(a0) unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
 === data/treecap/function/visit.mcfunction
 summon marker ~ ~ ~ {Tags:["treecap.node"]}
 scoreboard players add $logs mms.treecap 1
 execute if score $logs mms.treecap > $max_logs mms.treecap run return 0
-execute if block ~1 ~ ~ #minecraft:leaves[persistent=false] run scoreboard players add $leaves mms.treecap 1
-execute if block ~-1 ~ ~ #minecraft:leaves[persistent=false] run scoreboard players add $leaves mms.treecap 1
-execute if block ~ ~1 ~ #minecraft:leaves[persistent=false] run scoreboard players add $leaves mms.treecap 1
-execute if block ~ ~-1 ~ #minecraft:leaves[persistent=false] run scoreboard players add $leaves mms.treecap 1
-execute if block ~ ~ ~1 #minecraft:leaves[persistent=false] run scoreboard players add $leaves mms.treecap 1
-execute if block ~ ~ ~-1 #minecraft:leaves[persistent=false] run scoreboard players add $leaves mms.treecap 1
-execute if block ~1 ~ ~ #treecap:caps run scoreboard players add $leaves mms.treecap 1
-execute if block ~-1 ~ ~ #treecap:caps run scoreboard players add $leaves mms.treecap 1
-execute if block ~ ~1 ~ #treecap:caps run scoreboard players add $leaves mms.treecap 1
-execute if block ~ ~-1 ~ #treecap:caps run scoreboard players add $leaves mms.treecap 1
-execute if block ~ ~ ~1 #treecap:caps run scoreboard players add $leaves mms.treecap 1
-execute if block ~ ~ ~-1 #treecap:caps run scoreboard players add $leaves mms.treecap 1
+scoreboard players set #visit._f0 mms.treecap 0
+execute if score $nether mms.treecap matches 1 run scoreboard players set #visit._f0 mms.treecap 1
+execute if score #visit._f0 mms.treecap matches 1 run function treecap:visit/_if1
+execute unless score #visit._f0 mms.treecap matches 1 run function treecap:visit/_else2
 function treecap:spread
+=== data/treecap/function/visit/_else2.mcfunction
+execute if block ~1 ~ ~ #minecraft:leaves[persistent=false] run scoreboard players set $east mms.treecap 1
+execute if block ~-1 ~ ~ #minecraft:leaves[persistent=false] run scoreboard players set $west mms.treecap 1
+execute if block ~ ~ ~1 #minecraft:leaves[persistent=false] run scoreboard players set $south mms.treecap 1
+execute if block ~ ~ ~-1 #minecraft:leaves[persistent=false] run scoreboard players set $north mms.treecap 1
+execute if block ~ ~1 ~ #minecraft:leaves[persistent=false] run scoreboard players set $top mms.treecap 1
+=== data/treecap/function/visit/_if1.mcfunction
+execute if block ~1 ~ ~ #treecap:caps run scoreboard players set $east mms.treecap 1
+execute if block ~-1 ~ ~ #treecap:caps run scoreboard players set $west mms.treecap 1
+execute if block ~ ~ ~1 #treecap:caps run scoreboard players set $south mms.treecap 1
+execute if block ~ ~ ~-1 #treecap:caps run scoreboard players set $north mms.treecap 1
+execute if block ~ ~1 ~ #treecap:caps run scoreboard players set $top mms.treecap 1
+execute if block ~1 ~ ~1 #treecap:caps run scoreboard players set $top mms.treecap 1
+execute if block ~1 ~ ~-1 #treecap:caps run scoreboard players set $top mms.treecap 1
+execute if block ~-1 ~ ~1 #treecap:caps run scoreboard players set $top mms.treecap 1
+execute if block ~-1 ~ ~-1 #treecap:caps run scoreboard players set $top mms.treecap 1
 === data/treecap/function/wear_axe.mcfunction
 execute if items entity @s weapon.mainhand *[minecraft:unbreakable] run return 0
 scoreboard players set $unbreaking mms.treecap 0
