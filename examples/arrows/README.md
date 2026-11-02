@@ -27,7 +27,7 @@ The arrows work from bows, crossbows and dispensers.
 | --- | --- |
 | `items.mms` | The custom items and their recipes. |
 | `effects.mms` | What the Explosive and Ender arrows and the Thunder Bow do where an arrow hits. |
-| `launch.mms` | The Cow Wand, and a `launch` function that throws an entity the way it faces. |
+| `launch.mms` | The Cow Wand, and a `launch` function that summons an entity already flying the way the player looks. |
 | `lang.mms` | Names for the arrows. |
 
 **Effects in the arrow** (Arrow of Levitation). A tipped arrow applies its `potion_contents` to what it hits, and `custom_effects` can be any effects at all. No commands run. `potion_duration_scale = 1` makes the effect last as long as written; tipped arrows normally give an eighth.
@@ -46,7 +46,7 @@ The custom arrows are tipped arrows on purpose. Their colour shows on the item a
 - The marker is killed once read. Without that every shot leaves one behind.
 - `launch` reads `^ ^ ^` with `anchored feet`. Under `anchored eyes`, local coordinates start at the eyes of whoever runs the command, which tilts the vector up.
 
-`launch` runs as the entity being thrown (`execute summon cow run ...`), so it never has to find it again by tag. It also turns the entity to face the way it flies.
+`launch` then summons the entity with that vector as its `Motion`, through a macro, and faced the way the player looks. Setting `Motion` with `/data` after summoning also works on the server, but players were told about the entity when it appeared standing still, so it seems to hang for a moment before it moves.
 
 ## Limits
 

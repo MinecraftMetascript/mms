@@ -175,12 +175,19 @@ tp @s ~ ~ ~
 particle portal ~ ~1 ~ 0.3 0.6 0.3 0.5 40
 playsound entity.player.teleport player @a
 === data/arrows/function/launch.mcfunction
-rotate @s ~ ~
 data modify storage arrows:mms m.a0 set from storage arrows:mms l."launch".speed
 function arrows:launch/_macro0 with storage arrows:mms m
-data modify entity @s Motion set from storage arrows:launch motion
+data modify storage arrows:mms g.launch_yaw set from entity @s Rotation[0]
+execute anchored eyes positioned ^ ^-0.7 ^1.5 run function arrows:launch/_exec1
+=== data/arrows/function/launch/_exec1.mcfunction
+data modify storage arrows:mms m.a0 set from storage arrows:mms l."launch".entity
+data modify storage arrows:mms m.a1 set from storage arrows:mms g.launch_motion
+data modify storage arrows:mms m.a2 set from storage arrows:mms g.launch_yaw
+function arrows:launch/_macro2 with storage arrows:mms m
 === data/arrows/function/launch/_macro0.mcfunction
 $execute anchored feet in minecraft:overworld positioned 0.0 0.0 0.0 positioned ^ ^ ^$(a0) summon marker run function arrows:read_vector
+=== data/arrows/function/launch/_macro2.mcfunction
+$summon $(a0) ~ ~ ~ {Motion:$(a1),Rotation:[$(a2),0.0]}
 === data/arrows/function/mms_gen/item_hook/blast_potion/land.mcfunction
 tag @s add mms_new
 execute at @s summon marker run function arrows:mms_gen/item_hook/blast_potion/land/mount
@@ -206,6 +213,10 @@ execute unless data entity @s weapon run data modify entity @s weapon set value 
 data modify entity @s weapon.components."minecraft:enchantments"."arrows:mms_gen/item_hook/thunder_bow/projectile" set value 1
 === data/arrows/function/mms_gen/load.mcfunction
 scoreboard objectives add mms_click.arrows dummy
+scoreboard objectives add mms.arrows dummy
+scoreboard players set #cf mms.arrows 0
+execute unless data storage arrows:mms g.launch_motion run data modify storage arrows:mms g.launch_motion set value ""
+execute unless data storage arrows:mms g.launch_yaw run data modify storage arrows:mms g.launch_yaw set value ""
 execute in minecraft:overworld run forceload add 0 0
 === data/arrows/function/mms_gen/projectile/land.mcfunction
 function arrows:mms_gen/projectile/land/run with entity @s data
@@ -225,14 +236,13 @@ execute as @e[type=lingering_potion,tag=!mms_shot.arrows] run function arrows:mm
 execute as @e[type=marker,tag=mms_land.arrows,predicate=!arrows:mms_gen/projectile/riding] at @s run function arrows:mms_gen/projectile/land
 scoreboard players remove @a[scores={mms_click.arrows=1..}] mms_click.arrows 1
 === data/arrows/function/read_vector.mcfunction
-data modify storage arrows:launch motion set from entity @s Pos
+data modify storage arrows:mms g.launch_motion set from entity @s Pos
 kill @s
 === data/arrows/function/shoot_cow.mcfunction
-execute anchored eyes positioned ^ ^-0.7 ^1.5 summon cow run function arrows:shoot_cow/_exec0
-playsound entity.cow.ambient neutral @a
-=== data/arrows/function/shoot_cow/_exec0.mcfunction
+data modify storage arrows:mms l."launch".entity set value "cow"
 data modify storage arrows:mms l."launch".speed set value "1.5"
 function arrows:launch
+playsound entity.cow.ambient neutral @a
 === data/arrows/function/strike.mcfunction
 summon lightning_bolt
 === data/arrows/predicate/mms_gen/projectile/riding.json
