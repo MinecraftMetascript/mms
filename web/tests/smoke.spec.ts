@@ -151,7 +151,18 @@ test('dimensions, noise settings and surface rules preview as terrain', async ({
 	await expect(failed).toBeHidden();
 	const box = (await canvas.boundingBox())!;
 	await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-	await expect(page.getByText(/x -?\d+, y -?\d+ · \w+/)).toBeVisible();
+	await expect(page.getByText(/x -?\d+, y -?\d+, z 0 · \w+/)).toBeVisible();
+
+	// The camera moves and turns: facing east, the slice runs along z at the camera's x.
+	await page.getByLabel('Camera x').fill('100');
+	await page.getByRole('button', { name: 'Face east' }).click();
+	await expect(page.getByRole('button', { name: 'Face east' })).toHaveAttribute('aria-pressed', 'true');
+	await expect(page.getByLabel('Camera facing')).toContainText('Facing east · ← N S →');
+	await page.mouse.move(box.x + box.width / 2 + 40, box.y + box.height / 2);
+	await expect(page.getByText(/x 100, y -?\d+, z [1-9]\d* · \w+/)).toBeVisible({ timeout: 20_000 });
+	await page.getByRole('button', { name: 'Turn right' }).click();
+	await expect(page.getByLabel('Camera facing')).toContainText('Facing south · ← E W →');
+	await expect(failed).toBeHidden();
 
 	// A surface rule is drawn on the noise settings that use it.
 	await page.getByRole('button', { name: 'terrain.mms' }).click();

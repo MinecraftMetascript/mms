@@ -2,10 +2,13 @@
 	import { onMount } from 'svelte';
 	import type { OutputFile } from '../types';
 	import {
+		facings,
 		modesOf,
 		previewable,
 		previewFile,
+		screenAxes,
 		topDown,
+		type Facing,
 		type PreviewFile,
 		type PreviewKind,
 		type PreviewMode,
@@ -36,14 +39,18 @@
 
 	// A target the pack no longer has (renamed or deleted) shows nothing.
 	const info = $derived(target && output.some((f) => f.path === target) ? previewable(target) : null);
+	// Each view starts with the camera at the origin facing north (x to the right).
 	const defaults: Record<PreviewKind | 'biomes', PreviewView> = {
-		noise: { x: 0, y: 0, scale: 4 },
-		density_function: { x: 0, y: 64, scale: 2 },
-		noise_settings: { x: 0, y: 64, scale: 2 },
-		material_rule: { x: 0, y: 64, scale: 0.5 },
-		dimension: { x: 0, y: 64, scale: 2 },
-		biomes: { x: 0, y: 0, scale: 8 }
+		noise: { x: 0, y: 0, z: 0, facing: 'north', scale: 4 },
+		density_function: { x: 0, y: 64, z: 0, facing: 'north', scale: 2 },
+		noise_settings: { x: 0, y: 64, z: 0, facing: 'north', scale: 2 },
+		material_rule: { x: 0, y: 64, z: 0, facing: 'north', scale: 0.5 },
+		dimension: { x: 0, y: 64, z: 0, facing: 'north', scale: 2 },
+		biomes: { x: 0, y: 64, z: 0, facing: 'north', scale: 8 }
 	};
+	const facingLetters: Record<Facing, string> = { north: 'N', east: 'E', south: 'S', west: 'W' };
+	/** The compass letter of the way a world x/z step points. */
+	const compass = (dx: number, dz: number) => (dx > 0 ? 'E' : dx < 0 ? 'W' : dz > 0 ? 'S' : 'N');
 	const modeNames: Record<PreviewMode, string> = { density: 'Density', blocks: 'Blocks', biomes: 'Biomes', iso: '3D' };
 	const kindNames: Record<PreviewKind, string> = {
 		noise: 'noise',
@@ -60,19 +67,20 @@
 	let view = $state<PreviewView>({ ...defaults.density_function });
 	// The 3D view's own camera: x and y are the world x and z at the centre,
 	// scale is a block's size in pixels (0 until the first render fits it).
-	let isoView = $state<PreviewView>({ x: 0, y: 0, scale: 0 });
+	let isoView = $state<PreviewView>({ x: 0, y: 0, z: 0, facing: 'north', scale: 0 });
+	const isoAt = (v: PreviewView): PreviewView => ({ x: Math.round(v.x), y: Math.round(v.z), z: 0, facing: 'north', scale: 0 });
 	let seed = $state('0');
 	let error = $state('');
 	let busy = $state(false);
 	let last: Extract<PreviewResponse, { type: 'rendered' }> | null = $state(null);
 	let hover = $state<{ px: number; py: number } | null>(null);
-	let lock = $state<{ x: number; y: number } | null>(null);
+	type Point = { x: number; y: number; z: number };
+	let lock = $state<Point | null>(null);
 	let seq = 0;
 	let lastTarget: string | null = null;
 	let mode = $state<PreviewMode>('density');
 	let biome = $state('minecraft:plains');
 	let terrain = $state('minecraft:overworld');
-	let biomeY = $state(64);
 	const flat = $derived(info ? topDown(info.kind, mode) : false);
 	// CSS pixels per rendered pixel; terrain is costly to sample, so coarser.
 	// The isometric view is drawn with polygons, so it renders at device pixels.
@@ -192,13 +200,14 @@
 		const wasFlat = flat;
 		mode = m;
 		if (topDown(info.kind, m) !== wasFlat) {
-			view = defaultView(info.kind, m);
+			// Keep the camera where it is, at the new view's zoom.
+			view = { ...view, scale: defaultView(info.kind, m).scale };
 			lock = null;
 		}
 		view.scale = Math.min(view.scale, maxScale);
 		if (m === 'iso') {
-			// Start the 3D view over the slice's x, with the slice (z = 0) through the middle.
-			isoView = { x: Math.round(view.x), y: 0, scale: 0 };
+			// Start the 3D view over the camera.
+			isoView = isoAt(view);
 			lock = null;
 		}
 		last = null;
@@ -245,7 +254,7 @@
 				height,
 				view: $state.snapshot(mode === 'iso' ? isoView : view),
 				seed,
-				options: { biome, terrain, y: biomeY }
+				options: { biome, terrain }
 			} satisfies PreviewRequest);
 		});
 	}
@@ -274,8 +283,8 @@
 			ctx.stroke();
 			ctx.setLineDash([]);
 		}
-		if (lock) {
-			const [px, py] = toPixel(lock.x, lock.y);
+		if (lock && inView(lock)) {
+			const [px, py] = toPixel(lock);
 			ctx.strokeStyle = '#ef4444';
 			ctx.lineWidth = 1.5;
 			ctx.beginPath();
@@ -284,20 +293,75 @@
 		}
 	}
 
-	function toWorld(px: number, py: number): [number, number] {
-		const w = last?.width ?? 0;
-		const h = last?.height ?? 0;
-		const x = view.x + (px - w / 2) * view.scale;
-		// Side views have y up; the noise view has z down.
-		const y = flat ? view.y + (py - h / 2) * view.scale : view.y - (py - h / 2) * view.scale;
-		return [Math.floor(x), Math.floor(y)];
+	/**
+	 * The interaction code works in the screen's plane: u along the screen's
+	 * right and v down it (top-down) or up it (side views, where v is y).
+	 * These map the camera and world points into it and back.
+	 */
+	function planeOf(c: { x: number; y: number; z: number }, facing = view.facing): [number, number] {
+		const a = screenAxes(facing);
+		const u = c.x * a.rx + c.z * a.rz;
+		return [u, flat ? c.x * a.dx + c.z * a.dz : c.y];
 	}
-	function toPixel(x: number, y: number): [number, number] {
+	/** Moves the camera to plane point (u, v), keeping the slice's depth (or a top-down view's y). */
+	function setPlane(u: number, v: number) {
+		const a = screenAxes(view.facing);
+		if (flat) {
+			view.x = u * a.rx + v * a.dx;
+			view.z = u * a.rz + v * a.dz;
+		} else {
+			if (a.rx) view.x = u * a.rx;
+			else view.z = u * a.rz;
+			view.y = v;
+		}
+	}
+	/** The world block under a canvas point. */
+	function toWorld(px: number, py: number): Point {
+		const [u, v] = flatWorld(px, py, view.scale, ...planeOf(view));
+		const a = screenAxes(view.facing);
+		if (flat) return { x: Math.floor(u * a.rx + v * a.dx), y: Math.floor(view.y), z: Math.floor(u * a.rz + v * a.dz) };
+		return a.rx
+			? { x: Math.floor(u * a.rx), y: Math.floor(v), z: Math.floor(view.z) }
+			: { x: Math.floor(view.x), y: Math.floor(v), z: Math.floor(u * a.rz) };
+	}
+	/** The canvas point at the middle of a world block. */
+	function toPixel(p: Point): [number, number] {
 		const w = last?.width ?? 0;
 		const h = last?.height ?? 0;
-		const px = (x - view.x) / view.scale + w / 2;
-		const py = flat ? (y - view.y) / view.scale + h / 2 : (view.y - y) / view.scale + h / 2;
-		return [px, py];
+		const [u, v] = planeOf({ x: p.x + 0.5, y: p.y + 0.5, z: p.z + 0.5 });
+		const [cu, cv] = planeOf(view);
+		return [(u - cu) / view.scale + w / 2, flat ? (v - cv) / view.scale + h / 2 : (cv - v) / view.scale + h / 2];
+	}
+	/** Whether a world block is in the slice or map shown (a side view shows one depth, a map one y). */
+	function inView(p: Point): boolean {
+		const a = screenAxes(view.facing);
+		if (flat) return true;
+		return a.rx ? p.z === Math.floor(view.z) : p.x === Math.floor(view.x);
+	}
+	function coords(p: Point): string {
+		return flat ? `x ${p.x}, z ${p.z}` : `x ${p.x}, y ${p.y}, z ${p.z}`;
+	}
+	const axes = $derived(screenAxes(view.facing));
+	function coordTitle(axis: 'x' | 'y' | 'z'): string {
+		if (axis === 'y') return flat ? 'The height the map is sampled at' : 'The height at the middle of the view';
+		if (flat) return `The ${axis} at the middle of the map`;
+		const depth = axes.rx ? 'z' : 'x';
+		return axis === depth ? `The slice is at this ${axis} (turn to slice along the other axis)` : `The ${axis} at the middle of the slice`;
+	}
+	/** Turns the camera a quarter turn (1 clockwise, -1 anticlockwise) or to a facing, about its own position. */
+	function face(to: Facing | 1 | -1) {
+		const next = typeof to === 'string' ? to : facings[(facings.indexOf(view.facing) + to + 4) % 4];
+		if (next === view.facing) return;
+		view.facing = next;
+		request();
+		draw();
+	}
+	/** Sets one camera coordinate from an input, ignoring what isn't a number yet. */
+	function setCoord(axis: 'x' | 'y' | 'z', value: string) {
+		const n = Number(value);
+		if (value.trim() === '' || !Number.isFinite(n)) return;
+		view[axis] = n;
+		request();
 	}
 
 	let drag: { x: number; y: number; vx: number; vy: number; moved: boolean } | null = null;
@@ -338,31 +402,30 @@
 			const s = Math.min(48, Math.max(last?.minScale ?? 2, start.scale * factor));
 			const [wx, wz] = isoWorld(from.px, from.py, start.scale, start.vx, start.vy);
 			const [ox, oz] = isoWorld(to.px, to.py, s, 0, 0);
-			isoView = { x: wx - ox, y: wz - oz, scale: s };
+			isoView = { ...isoView, x: wx - ox, y: wz - oz, scale: s };
 		} else {
 			const scale = Math.min(maxScale, Math.max(1 / 16, start.scale / factor));
 			const [wx, wy] = flatWorld(from.px, from.py, start.scale, start.vx, start.vy);
 			const [ox, oy] = flatWorld(to.px, to.py, scale, 0, 0);
 			view.scale = scale;
-			view.x = wx - ox;
-			view.y = wy - oy;
+			setPlane(wx - ox, wy - oy);
 		}
 		request();
 	}
 	function startDrag(at: { x: number; y: number }) {
-		const v = mode === 'iso' ? isoView : view;
-		drag = { x: at.x, y: at.y, vx: v.x, vy: v.y, moved: pinched };
+		const [vx, vy] = mode === 'iso' ? [isoView.x, isoView.y] : planeOf(view);
+		drag = { x: at.x, y: at.y, vx, vy, moved: pinched };
 	}
 	function startPinch() {
 		const [a, b] = [...pointers.values()];
 		const pa = pointer({ clientX: a.x, clientY: a.y });
 		const pb = pointer({ clientX: b.x, clientY: b.y });
-		const v = mode === 'iso' ? isoView : view;
+		const [vx, vy] = mode === 'iso' ? [isoView.x, isoView.y] : planeOf(view);
 		pinch = {
 			dist: Math.hypot(pa.px - pb.px, pa.py - pb.py) || 1,
 			mid: { px: (pa.px + pb.px) / 2, py: (pa.py + pb.py) / 2 },
-			vx: v.x,
-			vy: v.y,
+			vx,
+			vy,
 			scale: mode === 'iso' ? isoScale() : view.scale
 		};
 		pinched = true;
@@ -401,8 +464,7 @@
 			request();
 			return;
 		}
-		view.x = drag.vx - dx * view.scale;
-		view.y = flat ? drag.vy - dy * view.scale : drag.vy + dy * view.scale;
+		setPlane(drag.vx - dx * view.scale, flat ? drag.vy - dy * view.scale : drag.vy + dy * view.scale);
 		request();
 	}
 	function up(e: PointerEvent) {
@@ -422,8 +484,8 @@
 		}
 		if (e.type === 'pointerup' && drag && !drag.moved && !pinched && mode !== 'iso') {
 			const p = pointer(e);
-			const [x, y] = toWorld(p.px, p.py);
-			lock = lock && lock.x === x && lock.y === y ? null : { x, y };
+			const at = toWorld(p.px, p.py);
+			lock = lock && lock.x === at.x && lock.y === at.y && lock.z === at.z ? null : at;
 			draw();
 		}
 		drag = null;
@@ -433,8 +495,8 @@
 		const p = pointer(e);
 		// Trackpad pinches arrive as ctrl+wheel with small deltas; scale them up to match.
 		const f = Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0015));
-		const v = mode === 'iso' ? isoView : view;
-		zoomTo(p, p, { vx: v.x, vy: v.y, scale: mode === 'iso' ? isoScale() : view.scale }, f);
+		const [vx, vy] = mode === 'iso' ? [isoView.x, isoView.y] : planeOf(view);
+		zoomTo(p, p, { vx, vy, scale: mode === 'iso' ? isoScale() : view.scale }, f);
 	}
 
 	/** A sampled value, or the block or biome it indexes. */
@@ -450,18 +512,17 @@
 		const iy = Math.floor(at.py);
 		if (ix < 0 || iy < 0 || ix >= last.width || iy >= last.height) return '';
 		const v = last.values[iy * last.width + ix];
-		const [x, y] = toWorld(at.px, at.py);
-		const coord = flat ? `x ${x}, z ${y}` : `x ${x}, y ${y}`;
+		const coord = coords(toWorld(at.px, at.py));
 		return Number.isNaN(v) ? coord : `${coord} · ${show(v)}`;
 	});
 	const lockValue = $derived.by(() => {
 		if (!lock || !last) return '';
-		const [px, py] = toPixel(lock.x, lock.y);
+		const [px, py] = toPixel(lock);
 		const ix = Math.floor(px);
 		const iy = Math.floor(py);
-		if (ix < 0 || iy < 0 || ix >= last.width || iy >= last.height) return `${lock.x}, ${lock.y}`;
+		if (!inView(lock) || ix < 0 || iy < 0 || ix >= last.width || iy >= last.height) return coords(lock);
 		const v = last.values[iy * last.width + ix];
-		return `${lock.x}, ${lock.y} · ${Number.isNaN(v) ? '–' : show(v)}`;
+		return `${coords(lock)} · ${Number.isNaN(v) ? '–' : show(v)}`;
 	});
 </script>
 
@@ -497,16 +558,36 @@
 					</select>
 				</label>
 			{/if}
-			{#if mode === 'biomes'}
-				<label class="flex items-center gap-1">
-					Y
-					<input
-						type="number"
-						class="w-16 rounded border border-line bg-panel px-1.5 py-0.5 text-ink"
-						bind:value={biomeY}
-						oninput={() => request()}
-					/>
-				</label>
+			{#if mode !== 'iso'}
+				<div class="flex items-center gap-1" role="group" aria-label="Camera">
+					{#each ['x', 'y', 'z'] as const as axis (axis)}
+						<label class="flex items-center gap-1" title={coordTitle(axis)}>
+							{axis.toUpperCase()}
+							<input
+								type="number"
+								aria-label="Camera {axis}"
+								class="w-16 rounded border border-line bg-panel px-1.5 py-0.5 text-ink"
+								value={Math.round(view[axis])}
+								oninput={(e) => setCoord(axis, e.currentTarget.value)}
+							/>
+						</label>
+					{/each}
+				</div>
+				<div class="flex items-center gap-0.5" role="group" aria-label="Facing">
+					<button class="rounded px-1 py-0.5 hover:bg-hover" title="Turn left" aria-label="Turn left" onclick={() => face(-1)}>⟲</button>
+					<div class="flex overflow-hidden rounded border border-line">
+						{#each facings as f (f)}
+							<button
+								class="px-1.5 py-0.5 {view.facing === f ? 'bg-accent text-white' : 'hover:bg-hover'}"
+								title="Face {f}"
+								aria-label="Face {f}"
+								aria-pressed={view.facing === f}
+								onclick={() => face(f)}>{facingLetters[f]}</button
+							>
+						{/each}
+					</div>
+					<button class="rounded px-1 py-0.5 hover:bg-hover" title="Turn right" aria-label="Turn right" onclick={() => face(1)}>⟳</button>
+				</div>
 			{/if}
 			<label class="ml-auto flex items-center gap-1">
 				Seed
@@ -519,8 +600,11 @@
 			<button
 				class="rounded px-1.5 py-0.5 hover:bg-hover"
 				onclick={() => {
-					if (mode === 'iso') isoView = { x: Math.round(view.x), y: 0, scale: 0 };
-					else view = defaultView(info.kind, mode);
+					if (mode === 'iso') isoView = isoAt(view);
+					else {
+						view = defaultView(info.kind, mode);
+						lock = null;
+					}
 					request();
 				}}>Reset view</button
 			>
@@ -551,6 +635,11 @@
 				{#if readout}<span>{readout}</span>{/if}
 				{#if lockValue}<span class="text-red-300">● {lockValue}</span>{/if}
 				{#if busy && (!last || mode !== 'density')}<span>Rendering…</span>{/if}
+			</div>
+		{/if}
+		{#if info && last && mode !== 'iso'}
+			<div class="pointer-events-none absolute top-2 left-2 rounded bg-black/60 px-2 py-1 font-mono text-[11px] text-white" aria-label="Camera facing">
+				Facing {view.facing} · ← {compass(-axes.rx, -axes.rz)} {compass(axes.rx, axes.rz)} →
 			</div>
 		{/if}
 		{#if info && last?.notice}
