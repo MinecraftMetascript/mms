@@ -116,14 +116,19 @@
 				<div class="px-2 pt-3 pb-0.5 text-[11px] font-medium tracking-wide text-muted uppercase">Assets</div>
 				<ul class="text-[13px]">
 					{#each project.assets as a (a.path)}
-						<li class="group flex items-center rounded hover:bg-hover" title="Use it with Texture(&quot;{a.path}&quot;) or Sound(&quot;{a.path}&quot;)">
+						{@const unused = engine.unusedAssets.includes(a.path)}
+						<li
+							class="group flex items-center rounded hover:bg-hover"
+							title="{unused ? 'Not used, so the pack leaves it out. ' : ''}Use it with {a.path.endsWith('.nbt') ? 'Structure' : a.path.endsWith('.ogg') ? 'Sound' : 'Texture'}(&quot;{a.path}&quot;)"
+						>
 							<span class="flex min-w-0 flex-1 items-center gap-1.5 px-2 py-0.5">
 								{#if a.path.endsWith('.png')}
 									<img class="size-4 shrink-0 [image-rendering:pixelated]" src="data:image/png;base64,{a.data}" alt="" />
 								{:else}
 									<span class="w-4 shrink-0 text-center text-[10px] text-muted">{a.path.endsWith('.ogg') ? '♪' : '▦'}</span>
 								{/if}
-								<span class="truncate">{a.path}</span>
+								<span class="truncate {unused ? 'text-muted' : ''}">{a.path}</span>
+								{#if unused}<span class="shrink-0 rounded bg-hover px-1 text-[10px] text-muted">unused</span>{/if}
 							</span>
 							<button class="hidden px-1.5 text-muted group-hover:block hover:text-red-600" title="Delete" aria-label="Delete {a.path}" onclick={() => removeAsset(a.path)}>×</button>
 						</li>

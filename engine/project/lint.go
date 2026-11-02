@@ -47,7 +47,9 @@ var Rules = []*Rule{
 	{ID: "use-sugar", Severity: syntax.SeverityHint, run: lintSugar,
 		Doc: "An object literal that has a shorter MMS form: an item entry as its id, `1..3` for a uniform provider or bounds, `diamond * 4` for a stack, a trigger call for a criterion, and `&&`, `||` and `!` for conditions."},
 	{ID: "unused", Severity: syntax.SeverityHint, all: lintUnused,
-		Doc: "A worldgen piece, predicate or item modifier that nothing in the project references, so the game never uses it."},
+		Doc: "A worldgen piece, predicate or item modifier that nothing in the project references, so the game never uses it. A TemplatePool counts as used when a jigsaw block in one of the project's structure files draws from it."},
+	{ID: "unused-asset", Severity: syntax.SeverityInfo,
+		Doc: "A .png, .ogg or .nbt file in the project that no Texture, Sound or Structure call and no `icon` uses, so the packs leave it out. It is reported on the file itself (in VS Code's Problems panel, by `mms check`, and in the web editor's asset list), and not while the project has errors."},
 }
 
 // RuleByID returns a rule, or nil.
@@ -93,6 +95,7 @@ var unusedFolders = map[string]bool{
 	"predicate":                                        true,
 	"item_modifier":                                    true,
 	"worldgen/multi_noise_biome_source_parameter_list": true,
+	"worldgen/template_pool":                           true,
 }
 
 type lintRun struct {
@@ -488,6 +491,12 @@ func lintUnused(l *lintRun) {
 	for _, d := range r.Order {
 		for _, ref := range d.references() {
 			used[ref] = true
+		}
+	}
+	// A jigsaw block in a structure file draws from a pool by id.
+	for _, s := range l.jigsaws().uses {
+		for _, j := range s.jigsaws {
+			used["worldgen/template_pool|"+j.Pool] = true
 		}
 	}
 	var unused []*sema.Symbol
