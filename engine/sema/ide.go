@@ -333,15 +333,9 @@ func (c *Checker) ListItemInfo(in *Info) *Info {
 func (c *Checker) requiredSlots(cl *Callable) []field {
 	var out []field
 	for _, f := range c.positional(cl) {
-		if f.Optional {
-			continue
+		if !isOptionalParam(cl, f) {
+			out = append(out, f)
 		}
-		if cl.Ov != nil {
-			if _, ok := cl.Ov.defaults[f.Key]; ok {
-				continue
-			}
-		}
-		out = append(out, f)
 	}
 	return out
 }

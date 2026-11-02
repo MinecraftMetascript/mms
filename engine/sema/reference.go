@@ -202,12 +202,7 @@ func (c *Checker) refHelper(rt *refTypes, cl *Callable) RefHelper {
 		h.Case = "minecraft:" + strings.TrimPrefix(cl.Case, "minecraft:")
 	}
 	for _, f := range c.positional(cl) {
-		opt := f.Optional
-		if cl.Ov != nil {
-			if _, ok := cl.Ov.defaults[f.Key]; ok {
-				opt = true
-			}
-		}
+		opt := isOptionalParam(cl, f)
 		parts := rt.format(f.Type, 0)
 		h.Params = append(h.Params, RefParam{Name: f.Key, Type: plainParts(parts), TypeParts: parts, Optional: opt, Default: defaultOf(cl, f.Key), Doc: f.Desc})
 	}

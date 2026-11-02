@@ -94,7 +94,7 @@ A structure that generates in new chunks takes four resources, each naming the n
 
 | Kind | Says |
 | --- | --- |
-| `StructureSet` | how far apart structures start, with `RandomSpread(spacing, separation, salt)` |
+| `StructureSet` | how far apart structures start, with `RandomSpread(spacing = 24, separation = 8, salt = 1)` |
 | `Structure` | the biomes, the height, and for `Jigsaw(...)` the pool to start from |
 | `TemplatePool` | the templates (`.nbt` files) to place, with their processors |
 | `ProcessorList` | rules that change blocks as a template is placed |
