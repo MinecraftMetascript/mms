@@ -182,3 +182,48 @@ func TestAssetsIncremental(t *testing.T) {
 		t.Fatalf("want no diagnostics after fixing the file, got:\n%s", d)
 	}
 }
+
+// TestAssetsExtension: ids of files leave the extension out, since the
+// game adds it. One written with it is fixed in the output and warned
+// about, with a fix that removes it from the source.
+func TestAssetsExtension(t *testing.T) {
+	files := fstest.MapFS{"art/a.png": {Data: pngBytes}, "art/icon.png": {Data: pngBytes}}
+	src := `PaintingVariant a = { width = 1, height = 1, asset_id = Texture("art/a.png", "sun.png") }
+PaintingVariant b = { width = 1, height = 1, asset_id = "demo:sun.png" }
+Model item/ruby = { parent = "item/generated.json", textures = { layer0 = demo:sun.png, layer1 = "item/diamond.png" } }
+`
+	_, r := assetProject(t, files, src)
+	want := `mms/asset-extension: texture ids leave out the file extension, which the game adds itself; MMS writes 'sun'
+mms/asset-extension: texture ids leave out the file extension, which the game adds itself; MMS writes 'sun'
+mms/asset-extension: model ids leave out the file extension, which the game adds itself; MMS writes 'item/generated'
+mms/asset-extension: texture ids leave out the file extension, which the game adds itself; MMS writes 'sun'
+mms/asset-extension: texture ids leave out the file extension, which the game adds itself; MMS writes 'item/diamond'
+`
+	if got := diagText(r); got != want {
+		t.Errorf("got:\n%s\nwant:\n%s", got, want)
+	}
+	fixed := src
+	ds := r.Diagnostics("main.mms")
+	for i := len(ds) - 1; i >= 0; i-- {
+		if ds[i].Code != "mms/asset-extension" {
+			continue
+		}
+		if len(ds[i].Fixes) != 1 {
+			t.Fatalf("%s: fixes %v", ds[i].Message, ds[i].Fixes)
+		}
+		e := ds[i].Fixes[0].Edits[0]
+		rs := []rune(fixed)
+		fixed = string(rs[:e.Sp.Start]) + e.Text + string(rs[e.Sp.End:])
+	}
+	if want := strings.NewReplacer(`"sun.png"`, `"sun"`, ":sun.png", ":sun", "generated.json", "generated", "diamond.png", "diamond").Replace(src); fixed != want {
+		t.Errorf("fixed source:\n%s", fixed)
+	}
+	for _, f := range r.Emit() {
+		if strings.Contains(string(f.Data), ".png") || strings.Contains(string(f.Data), ".json") {
+			t.Errorf("%s holds an extension: %s", f.Path, f.Data)
+		}
+		if strings.HasSuffix(f.Path, ".png.png") {
+			t.Errorf("output path %s", f.Path)
+		}
+	}
+}

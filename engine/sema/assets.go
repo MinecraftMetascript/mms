@@ -2,6 +2,7 @@ package sema
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"io/fs"
 	"path"
@@ -176,7 +177,7 @@ func (c *Checker) assetCall(e syntax.Expr, v tview) jsonv.Value {
 		idName = c.textureName
 	} else if idName == "" {
 		idName = assetName(src)
-	} else if !assetNamePattern.MatchString(idName) || strings.Contains(idName, "..") {
+	} else if idName = c.stripAssetExt(idName, h.registries[0], call.Args[1].Value); !assetNamePattern.MatchString(idName) || strings.Contains(idName, "..") {
 		c.errorf("mms/invalid-name", nameSp, "an id name is lowercase letters, digits, '_', '-', '.' and '/'")
 		return nil
 	}
@@ -259,4 +260,44 @@ func AssetFileType(helper string) (ext, what string, ok bool) {
 		return "", "", false
 	}
 	return h.ext, h.what, true
+}
+
+// assetFileExts are file extensions that never belong in an id: the game
+// adds them itself, so "item/ruby.png" names textures/item/ruby.png.png.
+var assetFileExts = []string{".png.mcmeta", ".png", ".ogg", ".nbt", ".json", ".mcmeta"}
+
+// stripAssetExt drops a file extension from the path of an asset id (a
+// texture, sound, model and so on), warning with a fix that removes it
+// from the source. e is the string or resource location written.
+func (c *Checker) stripAssetExt(p, reg string, e syntax.Expr) string {
+	for _, ext := range assetFileExts {
+		bare, ok := strings.CutSuffix(p, ext)
+		if !ok || bare == "" {
+			continue
+		}
+		if c.trial {
+			return bare
+		}
+		d := syntax.Diagnostic{
+			Code: "mms/asset-extension", Severity: syntax.SeverityWarning, Sp: e.Span(),
+			Message: fmt.Sprintf("%s ids leave out the file extension, which the game adds itself; MMS writes '%s'", strings.ReplaceAll(reg, "_", " "), bare),
+		}
+		end := -1
+		switch x := e.(type) {
+		case *syntax.String:
+			if strings.HasSuffix(x.Raw, ext+x.Raw[:1]) {
+				end = x.Sp.End - 1 // before the closing quote
+			}
+		case *syntax.ResLoc:
+			if strings.HasSuffix(x.Text, ext) {
+				end = x.Sp.End
+			}
+		}
+		if end >= 0 {
+			d.Fixes = []syntax.Fix{{Title: "Remove '" + ext + "'", Safe: true, Edits: []syntax.TextEdit{{Sp: syntax.Span{Start: end - len(ext), End: end}}}}}
+		}
+		c.Diags = append(c.Diags, d)
+		return bare
+	}
+	return p
 }

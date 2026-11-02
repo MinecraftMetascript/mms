@@ -817,6 +817,9 @@ func (c *Checker) resolveID(text string, id idInfo, e syntax.Expr) string {
 		c.errorf("mms/invalid-name", e.Span(), "resource ids are lowercase: did you mean '%s'?", Snake(path))
 		return text
 	}
+	if IsAssetRegistry(reg) {
+		path = c.stripAssetExt(path, reg, e)
+	}
 	var sym *Symbol
 	if ns == "" {
 		if reg != "" {

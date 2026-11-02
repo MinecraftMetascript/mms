@@ -132,7 +132,7 @@ Textures, sounds and [resource pack declarations](#resource-packs) go into a res
 
 Where the game takes a sound event either by id or inline, as a jukebox song's `sound_event` does, `Sound(...)` writes it inline, `{ "sound_id": "my_pack:tune" }`: the game's sound event registry is fixed, so a pack's own sound cannot be named there by id.
 
-Once a file is included, its id can also be written plainly elsewhere, with its namespace, such as `asset_id = my_pack:sunset`. An id in your namespace that nothing provides is reported by the [`external-asset`](lint.md) lint rule.
+Once a file is included, its id can also be written plainly elsewhere, with its namespace, such as `asset_id = my_pack:sunset`. An id in your namespace that nothing provides is reported by the [`external-asset`](lint.md) lint rule. Ids never include the file extension: the game adds `.png`, `.ogg`, `.nbt` or `.json` itself, so `my_pack:sunset.png` would name `sunset.png.png`. MMS warns about an id written with one (`mms/asset-extension`, with a quick fix) and leaves it out of the output.
 
 The web editor holds asset files too: **+ Add texture or sound** under the sources adds `.png`, `.ogg` and `.nbt` files, which keep their file name as their path. **Download resources** appears next to **Download pack** once there is a resource pack. Project zips carry the asset files both ways.
 
