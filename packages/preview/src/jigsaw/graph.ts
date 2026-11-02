@@ -32,6 +32,11 @@ export interface Link {
 	pieces: number[];
 	/** Some pieces of the pool have unknown jigsaws, so they may join too. */
 	maybe: boolean;
+	/**
+	 * When no piece of the pool can join, the game tries the pool's
+	 * fallback: the fallback's index and its pieces that can join.
+	 */
+	fallback?: { to: number; pieces: number[] };
 	dead?: DeadEnd;
 }
 
@@ -100,7 +105,7 @@ function parse(text: string | undefined): Json | undefined {
 	}
 }
 
-/** A pool element's pieces; a list element adds each of its elements. */
+/** A pool element's piece; a list element is one piece. */
 function elementPieces(el: Json | undefined, weight: number, structures: Map<string, Jigsaw[]>, out: Omit<Piece, 'share' | 'links' | 'unreachable'>[]) {
 	if (!isObj(el)) {
 		out.push({ id: '?', kind: 'other', weight });
@@ -114,11 +119,17 @@ function elementPieces(el: Json | undefined, weight: number, structures: Map<str
 			out.push({ id, kind: 'single', weight, jigsaws: structures.get(id) });
 			break;
 		}
-		case 'list_pool_element':
-			// The game places a list's elements together, as one piece;
-			// each is listed so its jigsaws show.
-			for (const e of Array.isArray(el.elements) ? el.elements : []) elementPieces(e, weight, structures, out);
+		case 'list_pool_element': {
+			// The game places a list's elements together, as one piece
+			// with one weight, and joins it by its first element's jigsaw
+			// blocks only.
+			const parts: Omit<Piece, 'share' | 'links' | 'unreachable'>[] = [];
+			for (const e of Array.isArray(el.elements) ? el.elements : []) elementPieces(e, 1, structures, parts);
+			const first = parts[0];
+			if (!first) out.push({ id: 'empty list', kind: 'empty', weight, jigsaws: [] });
+			else out.push({ id: parts.map((q) => q.id).join(' + '), kind: first.kind, weight, jigsaws: first.jigsaws });
 			break;
+		}
 		case 'feature_pool_element':
 			out.push({ id: `feature ${strip(String(el.feature ?? '?'))}`, kind: 'feature', weight, jigsaws: [] });
 			break;
@@ -221,7 +232,19 @@ export function jigsawGraph(path: string | null, output: readonly OutputFile[], 
 						if (q.jigsaws === undefined) link.maybe = true;
 						else if (q.jigsaws.some((o) => o.name === j.target)) link.pieces.push(qi);
 					});
-					if (!link.pieces.length && !link.maybe) link.dead = target.pieces.length ? 'no-target' : 'empty-pool';
+					// The game tries the pool's fallback when none of its pieces fit.
+					const fb = target.fallback === undefined ? undefined : index.get(target.fallback);
+					if (!link.pieces.length && !link.maybe && fb !== undefined) {
+						const f = graph.pools[fb];
+						const pieces: number[] = [];
+						f.pieces.forEach((q, qi) => {
+							if (q.jigsaws === undefined) link.maybe = true;
+							else if (q.jigsaws.some((o) => o.name === j.target)) pieces.push(qi);
+						});
+						if (!f.declared && f.id.split(':')[0] === 'minecraft') link.maybe = true;
+						if (pieces.length) link.fallback = { to: fb, pieces };
+					}
+					if (!link.pieces.length && !link.maybe && !link.fallback) link.dead = target.pieces.length ? 'no-target' : 'empty-pool';
 				}
 				if (link.dead) graph.problems.deadEnds++;
 				p.links.push(link);

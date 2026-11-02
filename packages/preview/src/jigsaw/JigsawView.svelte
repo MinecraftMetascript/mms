@@ -66,7 +66,10 @@
 					if (l.to !== undefined) {
 						const tb = boxes[l.to];
 						for (const ti of l.pieces) heads.push({ at: [tb.x, tb.rows[ti]], end: `${l.to}:${ti}` });
-						if (!l.pieces.length) heads.push({ at: [tb.x, tb.y + HEAD / 2], end: `${l.to}` });
+						if (l.fallback) {
+							const fb = boxes[l.fallback.to];
+							for (const ti of l.fallback.pieces) heads.push({ at: [fb.x, fb.rows[ti]], end: `${l.fallback.to}:${ti}` });
+						} else if (!l.pieces.length) heads.push({ at: [tb.x, tb.y + HEAD / 2], end: `${l.to}` });
 					}
 					for (const h of heads) {
 						const key = `${pi}:${qi}>${h.end}`;
@@ -76,7 +79,7 @@
 							e.dead &&= !!l.dead;
 							continue;
 						}
-						out.set(key, { key, from, to: h.at, ends: [`${pi}:${qi}`, h.end], dead: !!l.dead, maybe: l.maybe && !l.pieces.length, title: name });
+						out.set(key, { key, from, to: h.at, ends: [`${pi}:${qi}`, h.end], dead: !!l.dead, maybe: (l.maybe && !l.pieces.length) || !!l.fallback, title: l.fallback ? `${name} (via fallback)` : name });
 					}
 				}
 			});
@@ -123,6 +126,10 @@
 		const pool = l.to !== undefined ? graph.pools[l.to] : undefined;
 		const names = l.pieces.map((i) => strip(pool!.pieces[i].id));
 		if (!pool?.declared) return `${strip(l.pool)} (not read: vanilla or another pack)`;
+		if (l.fallback) {
+			const fb = graph.pools[l.fallback.to];
+			names.push(`only the fallback ${strip(fb.id)}: ${l.fallback.pieces.map((i) => strip(fb.pieces[i].id)).join(', ')}`);
+		}
 		if (l.maybe) names.push('pieces whose jigsaws are unknown');
 		return names.join(', ') || 'nothing (target is empty)';
 	}
