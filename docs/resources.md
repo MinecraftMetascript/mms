@@ -105,6 +105,29 @@ A template's chests can get a loot table from a `Rule` processor with `block_ent
 
 `+`, `-`, `*` and `/` build `add`, `sub`, `mul` and `div`. Arithmetic on constants is folded. A unary `-x` is `x * -1`.
 
+## Inline values where an id is needed
+
+Some fields need an id, and the game will not load an inline value there. Examples are a surface rule's `NoiseThreshold` noise, a biome source's biome, and a template pool's fallback. A density function's noise is in the same group. The schema allows it inline, but the game seeds each noise from its id, so an inline noise fails when the world loads.
+
+You can still write the value inline in those fields. MMS checks it as its own declaration, writes it under `mms_gen/`, and puts its id in the field:
+
+```mms
+DensityFunction hills = Noise({ base_octave = -6, amplitude_modifiers = [1, 1] }, 1, 1)
+```
+
+This writes `worldgen/noise/mms_gen/hills/noise.json` and gives `hills` the noise `<ns>:mms_gen/hills/noise`. A second inline value of the same kind in the same declaration is named `noise_2`, and so on. Each inline noise gets its own id, so two identical inline noises still produce different noise. To share one noise, declare it with a name. Where the game does take inline values, such as density functions, features and surface rules, they stay inline.
+
+A function id takes a block of commands the same way, compiled as a `Function` with no parameters:
+
+```mms
+Advancement found = {
+  criteria = { got = { trigger = inventory_changed } }
+  rewards = { function = {
+    /say found it
+  } }
+}
+```
+
 ## Asset files
 
 Textures, sounds and structure templates are files, not declarations. Keep them anywhere in the project and name them where they are used:

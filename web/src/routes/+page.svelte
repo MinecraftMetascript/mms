@@ -117,7 +117,9 @@
 	const cursorOutput = $derived.by(() => {
 		if (!engine || !cursor) return null;
 		const c = cursor;
-		return engine.output.find((f) => f.uri === c.uri && f.range && within(f.range, c.line)) ?? null;
+		// Files hoisted from inline values share their declaration's lines;
+		// the declaration's own file is the one to show.
+		return engine.output.find((f) => f.uri === c.uri && f.range && !f.implicit && within(f.range, c.line)) ?? null;
 	});
 	$effect(() => {
 		if (cursorOutput) selectedOutput = cursorOutput.path;
