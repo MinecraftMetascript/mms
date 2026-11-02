@@ -193,7 +193,7 @@ OnRespawn {
 
 ### Item hooks
 
-A [custom item](resources.md)'s `on_*` fields each name a function to run when something happens with the item. The functions take no parameters and can be in any file. A field can also hold the commands themselves, as in `on_hit = { /say hit }`. That block is compiled as a function of its own, under `mms_gen/<item>/`. They run as the player, at the player unless the table says otherwise:
+A [custom item](resources.md)'s `on_*` fields each name a function to run when something happens with the item. The functions take no parameters and can be in any file. A field can also hold the commands themselves in a `{ ... }` block, written like a function body (each command on its own line). That block is compiled as a function of its own, under `mms_gen/<item>/`. They run as the player, at the player unless the table says otherwise:
 
 ```
 CustomItem ember_wand = {
