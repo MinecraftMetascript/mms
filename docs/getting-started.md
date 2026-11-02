@@ -4,7 +4,7 @@ MMS is a small language that compiles to Minecraft Java Edition data packs. You 
 
 ## Install
 
-- **In the browser:** the [editor](https://minecraftmetascript.github.io/mms/) needs no install. Projects are saved in your browser, and **Download pack** gives you the data pack as a zip.
+- **In the browser:** the [editor](https://minecraftmetascript.github.io/mms/) needs no install. Projects are saved in your browser (click the project name to switch between them), and **Download pack** gives you the data pack as a zip.
 - **Command line:** download `mms` for your system from the [releases page](https://github.com/MinecraftMetascript/mms/releases). Or, with Go installed, run `go install github.com/minecraftmetascript/mms/engine/cmd/mms@latest`.
 - **VS Code:** install `mms-*.vsix` from the same release, through **Extensions → … → Install from VSIX**. It runs `mms lsp`, so `mms` must be on your `PATH`, or set in `mms.path`.
 - **Zed:** install `editors/zed` from a checkout with **zed: install dev extension** (see [its README](https://github.com/MinecraftMetascript/mms/tree/main/editors/zed#readme)). It uses `mms` from your `PATH`, or downloads the latest release for you.
