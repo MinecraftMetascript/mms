@@ -15,6 +15,7 @@
 	import ProjectsDialog from '#lib/components/ProjectsDialog.svelte';
 	import { requestPersistence } from '#lib/project/store.ts';
 	import Dropdown from '#lib/components/Dropdown.svelte';
+	import { fixAllKeys, formatKeys, mod, quickFixKeys } from '#lib/editor/shortcuts.ts';
 	import { PinButton, PreviewPane, shows } from '@mms/preview';
 	import PreviewWorker from '@mms/preview/worker?worker';
 
@@ -352,13 +353,13 @@
 					class="rounded px-2 py-0.5 whitespace-nowrap hover:bg-hover disabled:opacity-50"
 					disabled={!editor || !project.activeFile}
 					onclick={() => editor?.fixAll()}
-					title="Apply every safe fix in this file (Ctrl/⌘+Alt+F). Ctrl/⌘+. shows the fixes at the cursor.">Fix all</button
+					title="Apply every safe fix in this file ({fixAllKeys}). {quickFixKeys} shows the fixes at the cursor.">Fix all</button
 				>
 				<button
 					class="rounded px-2 py-0.5 whitespace-nowrap hover:bg-hover disabled:opacity-50"
 					disabled={!editor || !project.activeFile}
 					onclick={() => editor?.format()}
-					title="Format this file (Ctrl/⌘+S or Shift+Alt+F)">Format</button
+					title="Format this file ({mod}+S or {formatKeys})">Format</button
 				>
 			</div>
 			<div class="min-h-0 flex-1">
