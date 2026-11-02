@@ -591,3 +591,39 @@ test.describe('on a phone', () => {
 		await expect(page.getByText(/Preview failed/)).toBeHidden();
 	});
 });
+
+test('several projects are saved and can be switched', async ({ page }) => {
+	page.on('dialog', (d) => d.accept());
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	await replaceText(page, 'Noise first = { base_octave = -4, amplitude_modifiers = [1] }\n');
+
+	// An example opens as a second project; the first stays saved.
+	await page.getByRole('button', { name: 'Project ▾' }).click();
+	await page.getByRole('button', { name: /surface-rules/ }).click();
+	await expect(page.getByRole('button', { name: 'surface.mms' })).toBeVisible();
+
+	await page.getByRole('button', { name: 'surface-rules (switch project)' }).click();
+	const list = page.getByRole('list', { name: 'Saved projects' });
+	await expect(list.getByRole('listitem')).toHaveCount(2);
+	await list.getByRole('button', { name: /^my-pack/ }).click();
+	await expect(page.locator('.cm-content')).toContainText('Noise first');
+
+	// Rename it, and the name survives a reload along with both projects.
+	await page.getByRole('button', { name: 'my-pack (switch project)' }).click();
+	await list.getByRole('button', { name: 'Rename my-pack' }).click();
+	await page.getByRole('textbox', { name: 'Project name' }).fill('hills');
+	await page.getByRole('textbox', { name: 'Project name' }).press('Enter');
+	await expect(list.getByRole('button', { name: /^hills/ })).toBeVisible();
+	await page.getByRole('button', { name: 'Close' }).click();
+
+	await page.reload();
+	await expect(page.getByRole('button', { name: 'hills (switch project)' })).toBeVisible();
+	await expect(page.locator('.cm-content')).toContainText('Noise first');
+
+	// Deleting the open project opens the other one.
+	await page.getByRole('button', { name: 'hills (switch project)' }).click();
+	await list.getByRole('button', { name: 'Delete hills' }).click();
+	await expect(page.getByRole('button', { name: 'surface.mms' })).toBeVisible();
+	await expect(list.getByRole('listitem')).toHaveCount(1);
+});

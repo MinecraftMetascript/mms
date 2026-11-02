@@ -8,10 +8,12 @@
 	import Sidebar from '#lib/components/Sidebar.svelte';
 	import JsonView from '#lib/components/JsonView.svelte';
 	import { Engine, type Diagnostic, type DocSymbol, type OutputFile } from '#lib/engine/engine.svelte.ts';
-	import { Project, pathOf, uriOf, starter } from '#lib/project/project.svelte.ts';
+	import { Project, pathOf, uriOf, starter, type ProjectData } from '#lib/project/project.svelte.ts';
 	import { examples } from '#lib/project/examples.ts';
 	import { download, hasResourcePack, isDataPack, packZip, projectZip, readProjectZip, readZip, readZipAssets } from '#lib/project/zip.ts';
 	import PasteJson from '#lib/components/PasteJson.svelte';
+	import ProjectsDialog from '#lib/components/ProjectsDialog.svelte';
+	import { requestPersistence } from '#lib/project/store.ts';
 	import { PinButton, PreviewPane, shows } from '@mms/preview';
 	import PreviewWorker from '@mms/preview/worker?worker';
 
@@ -41,6 +43,7 @@
 	let fileInput: HTMLInputElement;
 	let pasteJson = $state<ReturnType<typeof PasteJson> | null>(null);
 	let editor = $state<ReturnType<typeof Editor> | null>(null);
+	let projects = $state<ReturnType<typeof ProjectsDialog> | null>(null);
 
 	onMount(() => {
 		try {
@@ -64,7 +67,16 @@
 			syncEngine();
 			loaded = true;
 		});
-		return () => e.dispose();
+		// Save before the tab goes away; the save timer may not get to run.
+		const flush = () => void project.flush();
+		const onHide = () => document.visibilityState === 'hidden' && flush();
+		window.addEventListener('pagehide', flush);
+		document.addEventListener('visibilitychange', onHide);
+		return () => {
+			window.removeEventListener('pagehide', flush);
+			document.removeEventListener('visibilitychange', onHide);
+			e.dispose();
+		};
 	});
 
 	// Keep the server's file set and config in step with the project.
@@ -155,19 +167,27 @@
 		if (!pinned && !shows(path)) rightTab = 'json';
 	}
 
+	// Opens data as a new saved project; the open one stays saved.
+	async function openAsNew(data: ProjectData) {
+		await project.create(data);
+		onswitch();
+		// Asked on a user action, since Firefox shows a prompt for it.
+		void requestPersistence(true);
+	}
+	// Another project opened: forget this one's preview state.
+	function onswitch() {
+		pinned = null;
+		selectedOutput = null;
+		cursor = null;
+	}
 	function openExample(id: string) {
 		const ex = examples.find((e) => e.id === id);
 		menu = false;
-		if (!ex) return;
-		if (!confirm(`Open the ${ex.id} example? It replaces the current project; export it first to keep a copy.`)) return;
-		pinned = null;
-		project.replace(structuredClone(ex.data));
+		if (ex) void openAsNew(structuredClone(ex.data));
 	}
 	function newProject() {
 		menu = false;
-		if (!confirm('Start a new project? It replaces the current one; export it first to keep a copy.')) return;
-		pinned = null;
-		project.replace(structuredClone(starter));
+		void openAsNew(structuredClone(starter));
 	}
 	async function importZip(e: Event) {
 		const file = (e.target as HTMLInputElement).files?.[0];
@@ -181,9 +201,9 @@
 				const res = await engine.importPack([...entries].map(([path, text]) => ({ path, text })));
 				if (!res.files.length) throw new Error('the pack has no resources MMS can import');
 				const skipped = res.skipped.length ? ` ${res.skipped.length} file(s) cannot be imported and will be left out.` : '';
-				if (!confirm(`Import ${res.count} resource(s) from the data pack ${file.name}?${skipped} It replaces the current project.`)) return;
+				if (skipped && !confirm(`Import ${res.count} resource(s) from the data pack ${file.name}?${skipped}`)) return;
 				const files = res.files.map((f) => ({ path: f.path, text: f.text }));
-				project.replace({
+				await openAsNew({
 					name: file.name.replace(/\.zip$/i, ''),
 					config: { namespace: res.namespace, description: res.description || 'Imported with MMS' },
 					files,
@@ -191,11 +211,7 @@
 				});
 				return;
 			}
-			const data = readProjectZip(file.name, entries, readZipAssets(bytes));
-			if (confirm(`Import ${data.files.length} file(s) from ${file.name}? It replaces the current project.`)) {
-				pinned = null;
-				project.replace(data);
-			}
+			await openAsNew(readProjectZip(file.name, entries, readZipAssets(bytes)));
 		} catch (err) {
 			alert(`Could not import ${file.name}: ${err instanceof Error ? err.message : err}`);
 		}
@@ -257,12 +273,13 @@
 <div class="flex h-dvh flex-col">
 	<header class="flex items-center gap-3 border-b border-line bg-panel px-3 py-2">
 		<span class="font-semibold tracking-tight">MMS</span>
-		<span class="hidden text-sm text-muted sm:inline">{project.name}</span>
+		<button class="hidden max-w-48 truncate rounded px-2 py-1 text-sm text-muted hover:bg-hover hover:text-ink sm:inline" onclick={() => projects?.open()} title="Switch, rename or delete saved projects" aria-label="{project.name} (switch project)">{project.name}</button>
 		<div class="relative ml-2" bind:this={menuRoot}>
 			<button class="rounded px-2 py-1 text-sm whitespace-nowrap hover:bg-hover" bind:this={menuButton} onclick={() => (menu = !menu)} aria-expanded={menu}>Project ▾</button>
 			{#if menu}
 				<div class="absolute top-full left-0 z-20 mt-1 w-64 rounded-md border border-line bg-panel p-1 text-sm shadow-lg">
 					<button class="block w-full rounded px-2 py-1.5 text-left hover:bg-hover" onclick={newProject}>New project</button>
+					<button class="block w-full rounded px-2 py-1.5 text-left hover:bg-hover" onclick={() => { menu = false; projects?.open(); }}>Open project…</button>
 					<button class="block w-full rounded px-2 py-1.5 text-left hover:bg-hover" onclick={() => { menu = false; fileInput.click(); }}>
 						<span class="block">Import zip…</span>
 						<span class="block text-xs text-muted">An MMS project or a data pack</span>
@@ -299,6 +316,7 @@
 			onclick={() => editor?.format()}
 			title="Format this file (Ctrl/⌘+S or Shift+Alt+F)">Format</button
 		>
+		<ProjectsDialog bind:this={projects} {project} {onswitch} />
 		<input type="file" accept=".zip" class="hidden" bind:this={fileInput} onchange={importZip} />
 		{#if engine}
 			<PasteJson bind:this={pasteJson} {engine} uri={uriOf(project.active)} oninsert={insertDecl} />
