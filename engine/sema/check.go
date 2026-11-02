@@ -41,6 +41,11 @@ type Info struct {
 	// InlineFn is set on a `{ ... }` block written where a function id is
 	// needed: its body is function code, compiled as a hoisted Function.
 	InlineFn bool
+	// Extract is the declaration kind (as written, e.g. "Noise") of an
+	// inline value that could be its own declaration referenced by id
+	// here: one that is hoisted, or one at a position that also takes an
+	// id of that kind. Editors offer to extract it.
+	Extract string
 
 	typed bool
 }
@@ -386,6 +391,7 @@ func (c *Checker) union(e syntax.Expr, v tview) jsonv.Value {
 			return r
 		}
 	}
+	c.markExtract(e, v)
 	var cands []tview
 	for _, m := range v.T.Members {
 		mv := c.norm(tview{T: m, Env: v.Env})

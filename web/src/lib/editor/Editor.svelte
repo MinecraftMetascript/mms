@@ -13,7 +13,7 @@
 	import { semanticHighlighting } from './semantic';
 	import { inlayHints } from './inlay';
 	import { forEachDiagnostic } from '@codemirror/lint';
-	import { findReferences, jumpToDefinition } from '@codemirror/lsp-client';
+	import { LSPPlugin, findReferences, jumpToDefinition } from '@codemirror/lsp-client';
 	import { inlineRename, renameInline } from './rename';
 	import ContextMenu, { type MenuEntries, type MenuItem } from './ContextMenu.svelte';
 	import { fixAllKeys, formatKeys } from './shortcuts';
@@ -52,16 +52,19 @@
 		const sel = v.state.selection.main;
 		if (at != null && (at < sel.from || at > sel.to)) v.dispatch({ selection: { anchor: at } });
 		const fixes = fixesAt(v);
-		const items: MenuEntries = [
-			{ label: 'Go to definition', keys: 'F12', run: run(v, jumpToDefinition) },
-			{ label: 'Find references', keys: 'Shift+F12', run: run(v, findReferences) },
-			{ label: 'Rename symbol', keys: 'F2', run: run(v, renameInline) },
-			null,
-			{ label: 'Format document', keys: formatKeys, run: run(v, formatCommand) },
-			{ label: 'Fix all in this file', keys: fixAllKeys, run: run(v, fixAllCommand) }
-		];
-		if (fixes.length) items.push(null, ...fixes);
-		menu?.show({ x: e.clientX, y: e.clientY }, items, () => v.focus());
+		refactorsAt(v).then((refactors) => {
+			const items: MenuEntries = [
+				{ label: 'Go to definition', keys: 'F12', run: run(v, jumpToDefinition) },
+				{ label: 'Find references', keys: 'Shift+F12', run: run(v, findReferences) },
+				{ label: 'Rename symbol', keys: 'F2', run: run(v, renameInline) },
+				null,
+				{ label: 'Format document', keys: formatKeys, run: run(v, formatCommand) },
+				{ label: 'Fix all in this file', keys: fixAllKeys, run: run(v, fixAllCommand) }
+			];
+			if (fixes.length) items.push(null, ...fixes);
+			if (refactors.length) items.push(null, ...refactors);
+			menu?.show({ x: e.clientX, y: e.clientY }, items, () => v.focus());
+		});
 		return true;
 	}
 	const run = (v: EditorView, cmd: (v: EditorView) => boolean) => () => {
@@ -80,16 +83,60 @@
 		return fixes;
 	}
 
-	/** Cmd/Ctrl+. : a menu of quick fixes at the cursor, as in VS Code and Zed. */
+	/**
+	 * Refactorings for the selection, such as extracting an inline value to
+	 * its own declaration. Applying one then opens the rename box on the
+	 * new declaration's name, as VS Code does.
+	 */
+	async function refactorsAt(v: EditorView): Promise<MenuItem[]> {
+		const plugin = LSPPlugin.get(v);
+		if (!plugin) return [];
+		const uri = uriOf(shown);
+		const sel = v.state.selection.main;
+		const range = { start: plugin.toPosition(sel.from), end: plugin.toPosition(sel.to) };
+		let refactors;
+		try {
+			refactors = await engine.refactors(uri, range);
+		} catch {
+			return [];
+		}
+		// Edits typed while the request ran would shift the positions.
+		if (v.state.selection.main.from !== sel.from || uriOf(shown) !== uri) return [];
+		return refactors.map((r) => ({
+			label: r.title,
+			run: () => {
+				v.focus();
+				// The declaration is inserted at a line start ahead of the value
+				// it replaces, so the first edit's start is where its text begins.
+				const head = r.edits[0];
+				const insertAt = head ? plugin.fromPosition(head.range.start) : -1;
+				applyEdits(v, r.edits);
+				const nameAt = r.name && head ? head.newText.indexOf(' ' + r.name) : -1;
+				if (insertAt < 0 || nameAt < 0) return;
+				const at = insertAt + nameAt + 1;
+				v.dispatch({ selection: { anchor: at }, scrollIntoView: true });
+				renameInline(v);
+			}
+		}));
+	}
+
+	/** Cmd/Ctrl+. : a menu of quick fixes and refactorings at the cursor, as in VS Code and Zed. */
 	function quickFixCommand(v: EditorView) {
 		const at = v.coordsAtPos(v.state.selection.main.head);
 		if (!at) return false;
 		// The lint tooltip under the cursor would cover the menu.
 		v.dispatch({ effects: closeHoverTooltips });
 		const fixes = fixesAt(v);
-		const items: MenuEntries = fixes.length ? [...fixes] : [{ label: 'No quick fixes here', disabled: true, run: () => {} }];
-		items.push(null, { label: 'Fix all in this file', keys: fixAllKeys, run: run(v, fixAllCommand) });
-		menu?.show({ x: at.left, y: at.bottom + 2 }, items, () => v.focus());
+		refactorsAt(v).then((refactors) => {
+			const items: MenuEntries = [...fixes];
+			if (refactors.length) {
+				if (items.length) items.push(null);
+				items.push(...refactors);
+			}
+			if (!items.length) items.push({ label: 'No quick fixes here', disabled: true, run: () => {} });
+			items.push(null, { label: 'Fix all in this file', keys: fixAllKeys, run: run(v, fixAllCommand) });
+			menu?.show({ x: at.left, y: at.bottom + 2 }, items, () => v.focus());
+		});
 		return true;
 	}
 	const theme = new Compartment();
