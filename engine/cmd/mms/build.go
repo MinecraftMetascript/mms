@@ -108,7 +108,7 @@ func runBuild(args []string, stdout, stderr io.Writer) int {
 	fl.SetOutput(stderr)
 	out := fl.String("out", "", "output folder (default: mms.json output, or build); a resource pack goes next to it, in <out>-resources")
 	zipPath := fl.String("zip", "", "write a zip archive instead of a folder; a resource pack goes in <name>-resources.zip")
-	world := fl.String("world", "", "install into a world: writes <world>/datapacks/<namespace>, and the resource pack to <world>/resourcepacks/resources.zip")
+	world := fl.String("world", "", "install into a world: writes <world>/datapacks/<namespace>, and merges the resource pack into <world>/resourcepacks/resources.zip, keeping other projects' files")
 	if err := fl.Parse(args); err != nil {
 		return 2
 	}
@@ -171,15 +171,32 @@ func runBuild(args []string, stdout, stderr io.Writer) int {
 			return fail(err)
 		}
 		fmt.Fprintf(stdout, "wrote %d files to %s\n", len(data), target)
-		if len(res) > 0 {
-			rz, note := worldResourcePack(*world)
-			if err := os.MkdirAll(filepath.Dir(rz), 0o755); err != nil {
+		rz, note := worldResourcePack(*world)
+		_, statErr := os.Stat(rz)
+		if statErr != nil && !os.IsNotExist(statErr) {
+			return fail(statErr)
+		}
+		// With no resources, a pack already there still loses the files
+		// this project put in it last time.
+		if len(res) > 0 || statErr == nil {
+			m, err := project.WriteWorldPack(rz, p.Config.Namespace, res)
+			if err != nil {
 				return fail(err)
 			}
-			if err := writeZip(rz, res); err != nil {
-				return fail(err)
+			if len(res) == 0 {
+				fmt.Fprintf(stdout, "%s has no resources now; removed what it had in %s\n", p.Config.Namespace, rz)
+			} else {
+				fmt.Fprintf(stdout, "wrote resource pack %s (%d files)\n", rz, len(res))
 			}
-			fmt.Fprintf(stdout, "wrote resource pack %s (%d files)\n", rz, len(res))
+			if m.Adopted {
+				fmt.Fprintln(stdout, "replaced the resource pack an earlier mms build left there")
+			}
+			if len(m.Others) > 0 {
+				fmt.Fprintf(stdout, "kept the other packs in it: %s\n", strings.Join(m.Others, ", "))
+			}
+			for _, r := range m.Replaced {
+				fmt.Fprintf(stderr, "mms: warning: overwrote %s\n", r)
+			}
 			fmt.Fprintln(stdout, note)
 		}
 		return 0

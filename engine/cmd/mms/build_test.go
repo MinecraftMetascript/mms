@@ -98,7 +98,7 @@ TemplatePool houses = {
 	if got := listDir(filepath.Join(world, "datapacks", "demo")); got != data {
 		t.Errorf("world data pack:\n got %s\nwant %s", got, data)
 	}
-	if got := listZip(filepath.Join(world, "resourcepacks", "resources.zip")); got != res {
+	if got := listZip(filepath.Join(world, "resourcepacks", "resources.zip")); got != strings.Replace(res, "pack.mcmeta", "mms-world-pack.json pack.mcmeta", 1) {
 		t.Errorf("world resource pack:\n got %s\nwant %s", got, res)
 	}
 }

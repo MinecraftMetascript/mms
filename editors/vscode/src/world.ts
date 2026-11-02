@@ -2,8 +2,8 @@
 // Minecraft world chosen for it, and a button that builds the pack into
 // that world. Building runs `mms build --world <world> <project>`, the same
 // install as the command line: the data pack goes to
-// <world>/datapacks/<namespace> and a resource pack to
-// <world>/resourcepacks/resources.zip. It builds the files on disk, so the
+// <world>/datapacks/<namespace> and a resource pack is merged into
+// <world>/resourcepacks/resources.zip, next to other projects' files. It builds the files on disk, so the
 // project's unsaved files are saved first.
 import { execFile } from 'child_process';
 import * as fs from 'fs';
