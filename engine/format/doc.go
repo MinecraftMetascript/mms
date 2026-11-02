@@ -12,8 +12,13 @@ type (
 	text     string
 	line     struct{ soft bool } // a space (or nothing if soft) when flat, a newline when broken
 	hardLine struct{}            // always a newline; forces enclosing groups to break
-	group    struct{ docs []doc }
-	indent   struct{ docs []doc }
+	group    struct {
+		docs []doc
+		// maxFlat, when set, also breaks the group if its enclosing group
+		// broke and the group is wider than maxFlat printed flat.
+		maxFlat int
+	}
+	indent struct{ docs []doc }
 	// ifBreak prints broken in a broken group and flat otherwise.
 	ifBreak struct{ broken, flat doc }
 	concat  []doc
@@ -29,7 +34,7 @@ var (
 )
 
 func cat(ds ...doc) doc    { return concat(ds) }
-func grp(ds ...doc) doc    { return group{ds} }
+func grp(ds ...doc) doc    { return group{docs: ds} }
 func ind(ds ...doc) doc    { return indent{ds} }
 func txt(s string) doc     { return text(s) }
 func whenBroken(d doc) doc { return ifBreak{broken: d, flat: text("")} }
@@ -82,7 +87,8 @@ func render(d doc, width int) string {
 			}
 		case group:
 			m := flat
-			if c.mode == broken && (hasHard(concat(d.docs)) || !fits(concat(d.docs), width-col, stack)) {
+			if c.mode == broken && (hasHard(concat(d.docs)) || !fits(concat(d.docs), width-col, stack) ||
+				d.maxFlat > 0 && !fits(concat(d.docs), d.maxFlat, nil)) {
 				m = broken
 			}
 			if c.mode == flat {
