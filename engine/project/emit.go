@@ -73,7 +73,8 @@ func (r *Result) Emit() []OutFile {
 		}
 		hooks[name][ns] = append(hooks[name][ns], ls...)
 	}
-	clicks := map[string]bool{} // namespaces with a right-click hook
+	clicks := map[string]bool{}      // namespaces with a right-click hook
+	spotted := map[string][]string{} // namespaces with projectile hooks: their spotted lines
 	consts := map[string]map[int32]bool{}
 	ret := map[string]bool{}
 	used := map[string]bool{} // namespaces whose objective the code uses
@@ -164,6 +165,13 @@ func (r *Result) Emit() []OutFile {
 			if hf.Click {
 				clicks[ns] = true
 			}
+			for eid, e := range hf.Enchantments {
+				ens, epath := splitID(eid)
+				out = append(out, OutFile{Path: "data/" + ens + "/enchantment/" + epath + ".json", Data: jsonv.Marshal(e), Unit: d.Unit.Path, Span: d.D.Sp})
+			}
+			if len(hf.Spotted) > 0 {
+				spotted[ns] = append(spotted[ns], hf.Spotted...)
+			}
 			for _, lc := range it.Languages() {
 				l := lang("assets/"+ns+"/lang/"+lc+".json", d)
 				if l.o.Get(it.LangKey) == nil {
@@ -215,6 +223,12 @@ func (r *Result) Emit() []OutFile {
 	// are alive again (@e skips dead players). Both run at the player.
 	for ns := range hooks["first_join"] {
 		out = append(out, OutFile{Path: "data/" + ns + "/advancement/mms_gen/first_join.json", Data: jsonv.Marshal(sema.FirstJoinAdvancement(ns))})
+	}
+	for ns, ls := range spotted {
+		tick, fn := sema.ProjectileSetup(ns, ls)
+		hook("tick", ns, tick)
+		fns, fpath := splitID(sema.ProjectileSpotted(ns))
+		out = append(out, OutFile{Path: "data/" + fns + "/function/" + fpath + ".mcfunction", Data: lines(fn)})
 	}
 	for ns := range clicks {
 		load, tick := sema.ClickSetup(ns)

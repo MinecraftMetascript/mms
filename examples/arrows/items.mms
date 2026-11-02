@@ -1,7 +1,6 @@
-// The custom arrows are tipped arrows. A tipped arrow keeps its item on
-// the arrow entity once it is shot, components and all, so the tick
-// function in flight.mms can tell which kind of arrow is flying by its
-// custom_data. A tipped arrow also:
+// The custom arrows are tipped arrows. on_projectile_hit_block and
+// on_projectile_hit_entity run a function where the arrow hits (see
+// effects.mms). A tipped arrow as the base also:
 //
 // - takes its colour from potion_contents, on the item and in flight,
 //   where it trails particles of that colour (custom_color is
@@ -19,8 +18,9 @@ CustomItem explosive_arrow = {
       custom_color = 14697499
       custom_name = "arrows.explosive"
     }
-    custom_data = { arrow = "explosive" }
   }
+  on_projectile_hit_block = explode_here
+  on_projectile_hit_entity = explode
 }
 
 /** Teleports whoever shot it to where it lands, like an ender pearl. */
@@ -32,8 +32,9 @@ CustomItem ender_arrow = {
       custom_color = 2062958
       custom_name = "arrows.ender"
     }
-    custom_data = { arrow = "ender" }
   }
+  on_projectile_hit_block = ender_block
+  on_projectile_hit_entity = ender_entity
 }
 
 /**
@@ -62,14 +63,15 @@ CustomItem levitation_arrow = {
 }
 
 /**
- * Every arrow it shoots calls lightning where it hits. The thunder
- * enchantment in bow.mms does the work, so it fires on the exact block
- * or mob the arrow hits, whatever the arrow is.
+ * Every arrow it shoots calls lightning where it hits, whatever the
+ * arrow is. On a bow or crossbow, the projectile hooks follow the arrows
+ * it shoots.
  */
 CustomItem thunder_bow = {
   base = bow
   name = "Thunder Bow"
-  components = { enchantments = { "arrows:thunder" = 1 } }
+  on_projectile_hit_block = strike
+  on_projectile_hit_entity = strike
 }
 
 /** A stick that fires cows. See launch.mms. */

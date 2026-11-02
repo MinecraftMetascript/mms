@@ -2,6 +2,7 @@ package sema
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -48,6 +49,8 @@ type itemHook struct {
 	// their own trigger.
 	press   bool
 	trigger string
+	// projectile hooks run from an enchantment on the arrow's weapon.
+	projectile bool
 }
 
 var itemHooks = []itemHook{
@@ -69,7 +72,26 @@ var itemHooks = []itemHook{
 		desc: "A `Function` without parameters to run, as and at the player, when they pick the item up from the ground."},
 	{field: "on_break", trigger: "item_durability_changed",
 		desc: "A `Function` without parameters to run, as and at the player, when the item runs out of durability and breaks. The item needs durability: a tool, weapon or armor base, or a `max_damage` component."},
+	{field: "on_projectile_hit_block", projectile: true,
+		desc: "A `Function` without parameters to run when an arrow hits a block: an arrow shot from the item, for a bow or crossbow base, or the arrow that is the item, for an arrow, tipped_arrow or spectral_arrow base. It runs as the arrow, at the point it hit; `execute on origin` is the shooter."},
+	{field: "on_projectile_hit_entity", projectile: true,
+		desc: "A `Function` without parameters to run when an arrow hurts an entity: an arrow shot from the item, for a bow or crossbow base, or the arrow that is the item, for an arrow, tipped_arrow or spectral_arrow base. It runs as and at the entity hit; `execute on attacker` is the shooter."},
 }
+
+// ProjectileWeapons are the bases whose projectile hooks follow the
+// arrows they shoot; ProjectileAmmo are the bases that are the arrow.
+var (
+	ProjectileWeapons = []string{"minecraft:bow", "minecraft:crossbow"}
+	ProjectileAmmo    = []string{"minecraft:arrow", "minecraft:tipped_arrow", "minecraft:spectral_arrow"}
+)
+
+// ProjectileTag marks an arrow the tick function has looked at, per
+// namespace.
+func ProjectileTag(ns string) string { return "mms_shot." + ns }
+
+// ProjectileSpotted is the function the tick function runs as each new
+// arrow.
+func ProjectileSpotted(ns string) string { return ns + ":mms_gen/projectile/spotted" }
 
 func itemHookByField(f string) *itemHook {
 	for i := range itemHooks {
@@ -110,6 +132,16 @@ func (c *Checker) checkItemHooks(d *syntax.Decl, o *jsonv.Object, comps *jsonv.O
 	c.checkUseCost(fields, o, comps, press, out)
 	if len(hooks) == 0 {
 		return nil
+	}
+	for _, f := range []string{"on_projectile_hit_block", "on_projectile_hit_entity"} {
+		if hooks[f] == "" {
+			continue
+		}
+		b, _ := o.Get("base").(jsonv.String)
+		if !slices.Contains(ProjectileWeapons, string(b)) && !slices.Contains(ProjectileAmmo, string(b)) {
+			c.errorf("mms/custom-item", fields[f].Span(), "%s follows arrows, so the base must be a bow or crossbow (for the arrows it shoots) or an arrow, tipped_arrow or spectral_arrow (for itself)", f)
+			delete(hooks, f)
+		}
 	}
 	if hooks["on_consume"] != "" && press != "" {
 		c.errorf("mms/custom-item", fields["on_consume"].Span(), "on_consume needs the item to be eaten, but %s makes right click use it without ever finishing; leave out one or the other", press)
@@ -235,11 +267,15 @@ type ItemHookFiles struct {
 	Advancements map[string]jsonv.Value
 	Functions    map[string][]string
 	Click        bool
+	// Enchantments are the projectile hooks' enchantments by id, and
+	// Spotted the lines they add to the namespace's ProjectileSpotted.
+	Enchantments map[string]jsonv.Value
+	Spotted      []string
 }
 
 // ItemHookOutput builds the files for a custom item's hooks.
 func ItemHookOutput(id string, it *CustomItemOut) ItemHookFiles {
-	out := ItemHookFiles{Advancements: map[string]jsonv.Value{}, Functions: map[string][]string{}}
+	out := ItemHookFiles{Advancements: map[string]jsonv.Value{}, Functions: map[string][]string{}, Enchantments: map[string]jsonv.Value{}}
 	if it == nil || len(it.Hooks) == 0 {
 		return out
 	}
@@ -294,7 +330,7 @@ func ItemHookOutput(id string, it *CustomItemOut) ItemHookFiles {
 	sort.Strings(fields)
 	for _, f := range fields {
 		h := itemHookByField(f)
-		if h == nil || h.press {
+		if h == nil || h.press || h.projectile {
 			continue
 		}
 		name := strings.TrimPrefix(f, "on_")
@@ -315,6 +351,8 @@ func ItemHookOutput(id string, it *CustomItemOut) ItemHookFiles {
 			add(name, h.trigger, conds, call)
 		}
 	}
+
+	projectileHooks(id, string(base), hooks, &out)
 
 	hold, click, block, entity := hooks["on_hold_right_click"], hooks["on_right_click"], hooks["on_use_on_block"], hooks["on_right_click_entity"]
 	if hold == "" && click == "" && block == "" && entity == "" {
@@ -385,6 +423,85 @@ func ItemHookOutput(id string, it *CustomItemOut) ItemHookFiles {
 	conds.Set("item", itemPred())
 	add("press", "using_item", conds, body)
 	return out
+}
+
+// projectileHooks writes the projectile hooks. An arrow keeps the bow
+// or crossbow it was shot from as its weapon, and when it hits, the game
+// runs the weapon's enchantment effects at the exact spot: hit_block as
+// the arrow, post_attack as the entity it hurt. So each item with
+// projectile hooks gets an enchantment that runs them, and the tick
+// function adds it to the weapon of each new arrow that is the item or
+// was shot from it. It is never on the item itself, so it shows in no
+// tooltip and adds no glint. The tick function runs before the arrow
+// first moves, so even a point-blank hit is caught.
+func projectileHooks(id, base string, hooks map[string]string, out *ItemHookFiles) {
+	hitBlock, hitEntity := hooks["on_projectile_hit_block"], hooks["on_projectile_hit_entity"]
+	if hitBlock == "" && hitEntity == "" {
+		return
+	}
+	ench := ItemHookID(id, "projectile")
+	run := func(fn string) *jsonv.Object {
+		e := &jsonv.Object{}
+		e.Set("type", jsonv.String("minecraft:run_function"))
+		e.Set("function", jsonv.String(fn))
+		return e
+	}
+	effects := &jsonv.Object{}
+	if hitBlock != "" {
+		eff := &jsonv.Object{}
+		eff.Set("effect", run(hitBlock))
+		effects.Set("minecraft:hit_block", jsonv.Array([]jsonv.Value{eff}))
+	}
+	if hitEntity != "" {
+		eff := &jsonv.Object{}
+		eff.Set("enchanted", jsonv.String("attacker"))
+		eff.Set("affected", jsonv.String("victim"))
+		eff.Set("effect", run(hitEntity))
+		effects.Set("minecraft:post_attack", jsonv.Array([]jsonv.Value{eff}))
+	}
+	cost := func(n string) *jsonv.Object {
+		c := &jsonv.Object{}
+		c.Set("base", jsonv.Number(n))
+		c.Set("per_level_above_first", jsonv.Number("0"))
+		return c
+	}
+	desc := &jsonv.Object{}
+	desc.Set("text", jsonv.String(id))
+	e := &jsonv.Object{}
+	e.Set("description", desc)
+	var items []jsonv.Value
+	for _, w := range ProjectileWeapons {
+		items = append(items, jsonv.String(w))
+	}
+	e.Set("supported_items", jsonv.Array(items))
+	e.Set("weight", jsonv.Number("1"))
+	e.Set("max_level", jsonv.Number("1"))
+	e.Set("min_cost", cost("1"))
+	e.Set("max_cost", cost("1"))
+	e.Set("anvil_cost", jsonv.Number("0"))
+	e.Set("slots", jsonv.Array([]jsonv.Value{jsonv.String("any")}))
+	e.Set("effects", effects)
+	out.Enchantments[ench] = e
+
+	// An arrow from a dispenser has no weapon, so it gets a plain bow.
+	out.Functions[ench] = []string{
+		"execute unless data entity @s weapon run data modify entity @s weapon set value {id:\"minecraft:bow\",count:1}",
+		"data modify entity @s weapon.components.\"minecraft:enchantments\"." + quoteSNBT(ench) + " set value 1",
+	}
+	slot := "weapon"
+	if slices.Contains(ProjectileAmmo, base) {
+		slot = "item"
+	}
+	out.Spotted = append(out.Spotted, "execute if data entity @s "+slot+".components.\"minecraft:custom_data\"{"+ItemHookMarker+":"+quoteSNBT(id)+"} run function "+ench)
+}
+
+// ProjectileSetup is the tick line and spotted function a namespace with
+// projectile hooks needs, given the lines items added to it.
+func ProjectileSetup(ns string, spotted []string) (tick []string, fn []string) {
+	sort.Strings(spotted)
+	tag := ProjectileTag(ns)
+	return []string{"execute as @e[type=#minecraft:arrows,tag=!" + tag + "] run function " + ProjectileSpotted(ns)},
+		append([]string{"tag @s add " + tag}, spotted...)
 }
 
 // UseCost is what each use of a custom item with right-click hooks

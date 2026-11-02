@@ -223,6 +223,8 @@ Function light_block {
 | `on_consume` | finishes eating or drinking the item. It needs a `consumable` component, or a base item that is food or a potion |
 | `on_pickup` | picks the item up from the ground |
 | `on_break` | uses up the item's durability, so it breaks. It needs a base with durability, or a `max_damage` component |
+| `on_projectile_hit_block` | shoots an arrow that hits a block (see [Projectile hooks](#projectile-hooks)). It runs as the arrow, at the point it hit |
+| `on_projectile_hit_entity` | shoots an arrow that hurts an entity. It runs as and at the entity hit |
 
 Every hook marks the item with `mms_item: "<namespace>:<name>"` in its `custom_data`, wherever it is used: in `/give`, recipes and loot. A `custom_data` of your own keeps its keys and gains the marker. Each hook is an advancement, `<namespace>:mms_gen/item_hook/<name>/<hook>`, whose trigger matches the base item with that marker, and a reward function of the same name that revokes it and calls your function.
 
@@ -250,6 +252,30 @@ CustomItem ember_wand = {
 The cost is paid once per press, from the hand that holds the item. With `on_right_click` it is paid on every press. Otherwise it is paid only when `on_use_on_block` or `on_right_click_entity` runs, so a click at the air costs nothing. `on_hold_right_click` alone pays no cost.
 
 A base item that already does something on right click keeps doing it, and then none of the right-click hooks runs. A block is still placed and a bow still draws, and a chest still opens when clicked. Pick a base such as `stick`, `paper` or `amethyst_shard` that does nothing on its own. A `use_cooldown` component has no effect, because the item is never finished being used. Keep a cooldown in a score instead. `on_consume` cannot be combined with the right-click hooks, because they stop the item from ever being finished.
+
+### Projectile hooks
+
+`on_projectile_hit_block` and `on_projectile_hit_entity` follow arrows. What they follow depends on the item's base:
+
+- **A bow or crossbow**: every arrow shot from the item, whatever the arrow is.
+- **An `arrow`, `tipped_arrow` or `spectral_arrow`**: the item itself, once it is shot from any bow, crossbow or dispenser. Prefer `tipped_arrow`: Infinity makes plain `arrow` items free, and a tipped arrow can be coloured with `potion_contents.custom_color`.
+
+```
+CustomItem explosive_arrow = {
+  base = tipped_arrow
+  name = "Explosive Arrow"
+  on_projectile_hit_block = boom
+  on_projectile_hit_entity = boom
+}
+
+Function boom {
+  /summon tnt ~ ~ ~ {fuse:0s,explosion_power:2f}
+}
+```
+
+On a block hit the function runs as the arrow, at the point it hit, so `execute on origin` is whoever shot it, and `kill @s` keeps the arrow from being picked up. On an entity hit it runs as and at the entity hurt, and `execute on attacker` is the shooter.
+
+**How it works.** An arrow keeps the bow or crossbow it was shot from as its `weapon`, and when it hits, the game runs the weapon's enchantment effects at the exact spot: `hit_block` as the arrow, `post_attack` as the entity it hurt. Each item with projectile hooks gets an enchantment, `<namespace>:mms_gen/item_hook/<name>/projectile`, whose effects run the functions. The tick function looks once at each new arrow (it tags them `mms_shot.<namespace>`), and adds the enchantment to the weapon of an arrow that is the item, or that was shot from it. An arrow from a dispenser has no weapon, so it gets a plain bow. The enchantment is never on the item, so it shows in no tooltip and gives no glint. Several items' hooks combine: an Explosive Arrow shot from a bow with hooks runs both.
 
 ## How it compiles
 

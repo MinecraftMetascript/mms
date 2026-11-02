@@ -7,5 +7,4 @@ Lang en_us = {
   "item.minecraft.tipped_arrow.effect.arrows.explosive" = "Explosive Arrow"
   "item.minecraft.tipped_arrow.effect.arrows.ender" = "Ender Arrow"
   "item.minecraft.tipped_arrow.effect.arrows.levitation" = "Arrow of Levitation"
-  "enchantment.arrows.thunder" = "Thunder"
 }

@@ -483,3 +483,72 @@ Function give {
 		}
 	}
 }
+
+// TestProjectileHooks checks on_projectile_hit_block and
+// on_projectile_hit_entity on a bow and on an arrow: the enchantment
+// that runs them (valid against the schema), the tick scan that stamps
+// it on new arrows' weapons, and the base check.
+func TestProjectileHooks(t *testing.T) {
+	pack := spec.MustDefault()
+	p := New(pack, Config{Namespace: "demo"})
+	p.SetFile("main.mms", `
+CustomItem storm_bow = { base = bow, on_projectile_hit_entity = f }
+CustomItem boom = {
+  base = tipped_arrow
+  on_projectile_hit_block = f
+  on_projectile_hit_entity = {
+    /say hit
+  }
+}
+Function f {
+  /say hi
+}
+`)
+	r, _ := p.Analyze(context.Background())
+	if d := diagText(r); d != "" {
+		t.Fatalf("unexpected diagnostics:\n%s", d)
+	}
+	files := map[string]string{}
+	for _, f := range r.Emit() {
+		files[f.Path] = string(f.Data)
+	}
+	for path, want := range map[string]string{
+		"data/demo/function/mms_gen/tick.mcfunction":                      "execute as @e[type=#minecraft:arrows,tag=!mms_shot.demo] run function demo:mms_gen/projectile/spotted\n",
+		"data/demo/function/mms_gen/projectile/spotted.mcfunction":        "tag @s add mms_shot.demo\nexecute if data entity @s item.components.\"minecraft:custom_data\"{mms_item:\"demo:boom\"} run function demo:mms_gen/item_hook/boom/projectile\nexecute if data entity @s weapon.components.\"minecraft:custom_data\"{mms_item:\"demo:storm_bow\"} run function demo:mms_gen/item_hook/storm_bow/projectile\n",
+		"data/demo/function/mms_gen/item_hook/boom/projectile.mcfunction": "data modify entity @s weapon.components.\"minecraft:enchantments\".\"demo:mms_gen/item_hook/boom/projectile\" set value 1\n",
+		"data/demo/enchantment/mms_gen/item_hook/boom/projectile.json":    `"function": "demo:f"`,
+	} {
+		if !strings.Contains(files[path], want) {
+			t.Errorf("%s lacks %q:\n%s", path, want, files[path])
+		}
+	}
+	if s := files["data/demo/enchantment/mms_gen/item_hook/storm_bow/projectile.json"]; strings.Contains(s, "hit_block") || !strings.Contains(s, "post_attack") {
+		t.Errorf("storm_bow enchantment:\n%s", s)
+	}
+	cc := command.New(pack)
+	for path, data := range files {
+		switch {
+		case strings.HasPrefix(path, "data/demo/enchantment/"):
+			v, err := jsonv.Parse([]byte(data))
+			if err != nil {
+				t.Fatalf("%s: %v", path, err)
+			}
+			if errs := sema.Validate(pack, p.Kinds, "enchantment", v); len(errs) > 0 {
+				t.Errorf("%s: %v\n%s", path, errs, data)
+			}
+		case strings.HasPrefix(path, "data/demo/function/mms_gen/"):
+			for _, line := range strings.Split(strings.TrimSpace(data), "\n") {
+				if res := cc.Check(line); res.Problem != nil {
+					t.Errorf("%s: %q: %s", path, line, res.Problem.Message)
+				}
+			}
+		}
+	}
+
+	p = New(pack, Config{Namespace: "demo"})
+	p.SetFile("main.mms", "CustomItem w = { base = stick, on_projectile_hit_block = f }\nFunction f {\n}")
+	r, _ = p.Analyze(context.Background())
+	if d := diagText(r); !strings.Contains(d, "mms/custom-item") {
+		t.Errorf("a stick with a projectile hook: %s", d)
+	}
+}
