@@ -115,7 +115,7 @@ You can still write the value inline in those fields. MMS checks it as its own d
 DensityFunction hills = Noise({ base_octave = -6, amplitude_modifiers = [1, 1] }, 1, 1)
 ```
 
-This writes `worldgen/noise/mms_gen/hills/noise.json` and gives `hills` the noise `<ns>:mms_gen/hills/noise`. A second inline value of the same kind in the same declaration is named `noise_2`, and so on. Each inline noise gets its own id, so two identical inline noises still produce different noise. To share one noise, declare it with a name.
+This writes `worldgen/noise/mms_gen/hills/noise.json` and gives `hills` the noise `<ns>:mms_gen/hills/noise`. A second inline value of the same kind in the same declaration is named `noise_2`, and so on. Each inline noise gets its own id, so two identical inline noises still produce different noise. To share one noise, declare it with a name. Where the game does take inline values, such as density functions, features and surface rules, they stay inline.
 
 A function id takes a block of commands the same way, compiled as a `Function` with no parameters:
 
@@ -126,7 +126,7 @@ Advancement found = {
     /say found it
   } }
 }
-``` Where the game does take inline values, such as density functions, features and surface rules, they stay inline.
+```
 
 ## Asset files
 
