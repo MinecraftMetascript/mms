@@ -5,15 +5,20 @@
 // <world>/datapacks/<namespace> and a resource pack is merged into
 // <world>/resourcepacks/resources.zip, next to other projects' files. It builds the files on disk, so the
 // project's unsaved files are saved first.
+//
+// Under the world, Structures lists what structure blocks saved in it
+// (structures.ts), so pieces built in the game can be pulled into the
+// project for jigsaw template pools, and pulled again after each re-save.
 import { execFile } from 'child_process';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { key, type PackOutput } from './output';
+import { findStructures, importPath, importStructure, status, structureCall, type Status, type WorldStructure } from './structures';
 import { findWorlds, readWorld, savesFolders, type World } from './worlds';
 
-type Row = { id: string; item: vscode.TreeItem };
+type Row = { id: string; item: vscode.TreeItem; children?: () => Row[]; structure?: WorldStructure };
 
 /** The outcome of the last build, shown under the button. */
 type Result = { ok: true; world: string; files: number; resources: boolean; at: Date } | { ok: false; message: string; detail: string; at: Date };
@@ -27,6 +32,9 @@ export class WorldView implements vscode.Disposable, vscode.TreeDataProvider<Row
 	private building = false;
 	private result: Result | undefined;
 	private saveTimer: ReturnType<typeof setTimeout> | undefined;
+	/** Watches the world's generated structures while one is chosen. */
+	private worldWatcher: { world: string; watcher: vscode.FileSystemWatcher } | undefined;
+	private refreshTimer: ReturnType<typeof setTimeout> | undefined;
 	private readonly subscriptions: vscode.Disposable[] = [];
 
 	constructor(
@@ -38,12 +46,18 @@ export class WorldView implements vscode.Disposable, vscode.TreeDataProvider<Row
 	) {
 		this.view = vscode.window.createTreeView('mms.world', { treeDataProvider: this });
 		const watcher = vscode.workspace.createFileSystemWatcher('**/mms.json', false, true, false);
+		// An imported structure changing in the project changes its status.
+		const nbt = vscode.workspace.createFileSystemWatcher('**/*.nbt');
 		this.subscriptions.push(
 			this.changed,
 			this.view,
 			watcher,
 			watcher.onDidCreate(() => void this.findProjects()),
 			watcher.onDidDelete(() => void this.findProjects()),
+			nbt,
+			nbt.onDidCreate(() => this.refreshSoon()),
+			nbt.onDidChange(() => this.refreshSoon()),
+			nbt.onDidDelete(() => this.refreshSoon()),
 			output.onDidChangeDocument(() => this.update()),
 			vscode.workspace.onDidChangeWorkspaceFolders(() => void this.findProjects()),
 			vscode.workspace.onDidSaveTextDocument((d) => this.saved(d)),
@@ -54,7 +68,14 @@ export class WorldView implements vscode.Disposable, vscode.TreeDataProvider<Row
 				const w = this.world();
 				if (w) void vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(path.join(w, 'datapacks')));
 			}),
-			vscode.commands.registerCommand('mms.forgetWorld', () => this.setWorld(undefined))
+			vscode.commands.registerCommand('mms.forgetWorld', () => this.setWorld(undefined)),
+			vscode.commands.registerCommand('mms.importStructure', (row?: Row) => row?.structure && this.importStructures([row.structure])),
+			vscode.commands.registerCommand('mms.importStructures', () => this.chooseStructures()),
+			vscode.commands.registerCommand('mms.copyStructureCall', (row?: Row) => {
+				const st = row?.structure && this.structureInfo(row.structure);
+				if (st) void vscode.env.clipboard.writeText(st.call).then(() => vscode.window.setStatusBarMessage(`$(check) Copied ${st.call}`, 4000));
+			}),
+			vscode.commands.registerCommand('mms.refreshStructures', () => this.changed.fire())
 		);
 		void this.findProjects();
 	}
@@ -83,7 +104,7 @@ export class WorldView implements vscode.Disposable, vscode.TreeDataProvider<Row
 	}
 
 	getChildren(row?: Row): Row[] {
-		if (row) return [];
+		if (row) return row.children?.() ?? [];
 		const project = this.project();
 		const world = project && this.world(project);
 		// No rows shows the welcome text with its buttons (package.json).
@@ -129,7 +150,112 @@ export class WorldView implements vscode.Disposable, vscode.TreeDataProvider<Row
 			}
 			rows.push({ id: 'result', item: s });
 		}
+
+		const found = findStructures(world);
+		const st = new vscode.TreeItem('Structures', found.length ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None);
+		st.id = `structures:${world}`;
+		st.iconPath = new vscode.ThemeIcon('symbol-structure');
+		const waiting = found.filter((f) => this.structureInfo(f)?.status !== 'imported').length;
+		st.description = found.length ? (waiting ? `${waiting} to import` : 'all imported') : 'none saved yet';
+		st.tooltip = new vscode.MarkdownString(
+			'What structure blocks saved in this world (`generated/<namespace>/structure`). Import one to use it in a template pool with `Structure(...)`; after you save it again in the game, it shows as changed.'
+		);
+		st.contextValue = found.length ? 'structures' : 'structures-empty';
+		rows.push({ id: 'structures', item: st, children: () => found.map((f) => this.structureRow(f)) });
 		return rows;
+	}
+
+	/** Where a world structure goes in the project, its status and the call that uses it. */
+	private structureInfo(s: WorldStructure): { rel: string; dest: string; status: Status; call: string } | undefined {
+		const project = this.project();
+		if (!project) return undefined;
+		const folder = vscode.workspace.getConfiguration('mms').get<string>('structuresFolder') || 'structures';
+		const rel = importPath(s, namespace(project), folder);
+		const dest = path.join(project, ...rel.split('/'));
+		return { rel, dest, status: status(s, dest), call: structureCall(rel, s) };
+	}
+
+	private structureRow(s: WorldStructure): Row {
+		const info = this.structureInfo(s)!;
+		const t = new vscode.TreeItem(`${s.ns}:${s.path}`);
+		t.id = `structure:${s.file}`;
+		const label: Record<Status, string> = { new: 'new', imported: 'imported', changed: 'changed in world' };
+		t.description = label[info.status];
+		t.iconPath = new vscode.ThemeIcon(
+			info.status === 'imported' ? 'pass' : info.status === 'changed' ? 'diff-modified' : 'circle-outline',
+			info.status === 'changed' ? new vscode.ThemeColor('gitDecoration.modifiedResourceForeground') : undefined
+		);
+		const ns = namespace(this.project()!);
+		t.tooltip = new vscode.MarkdownString(
+			`Saved ${s.saved.toLocaleString()} in \`${s.file}\`\n\n` +
+				(info.status === 'new' ? `Import copies it to \`${info.rel}\`.` : `In the project at \`${info.rel}\`.`) +
+				`\n\nUse it with \`${info.call}\`` +
+				(s.ns !== ns && ns ? `; its id in the pack is \`${ns}:${s.path}\`, in the project's namespace.` : '.')
+		);
+		t.contextValue = `structure-${info.status}`;
+		// An imported structure shows its project copy; importing is the row's button.
+		if (info.status !== 'new') t.command = { command: 'revealInExplorer', title: 'Reveal in Explorer', arguments: [vscode.Uri.file(info.dest)] };
+		return { id: t.id, item: t, structure: s };
+	}
+
+	/** Lets the user pick structures to import, with the new and changed ones ticked. */
+	private async chooseStructures() {
+		const world = this.world();
+		if (!world) return;
+		const found = findStructures(world);
+		if (!found.length) {
+			void vscode.window.showInformationMessage('No structures saved in this world yet. Save one with a structure block (SAVE mode), then import it here.');
+			return;
+		}
+		const picks = found.map((s) => {
+			const info = this.structureInfo(s)!;
+			return { label: `${s.ns}:${s.path}`, description: info.status === 'imported' ? 'imported' : info.status === 'changed' ? 'changed in world' : 'new', detail: `→ ${info.rel}`, picked: info.status !== 'imported', structure: s };
+		});
+		const chosen = await vscode.window.showQuickPick(picks, { canPickMany: true, title: 'Import structures into the project', placeHolder: 'New and changed structures are ticked' });
+		if (chosen?.length) await this.importStructures(chosen.map((c) => c.structure));
+	}
+
+	/** Copies structures into the project and offers the Structure(...) call. */
+	private async importStructures(list: WorldStructure[]) {
+		const done: { rel: string; call: string }[] = [];
+		for (const s of list) {
+			const info = this.structureInfo(s);
+			if (!info) return;
+			try {
+				importStructure(s, info.dest);
+				done.push(info);
+				this.log(`imported ${s.file} to ${info.dest}`);
+			} catch (e) {
+				void vscode.window.showErrorMessage(`Could not import ${s.ns}:${s.path}: ${e instanceof Error ? e.message : String(e)}`);
+			}
+		}
+		this.changed.fire();
+		if (done.length === 1) {
+			const [d] = done;
+			const choice = await vscode.window.showInformationMessage(`Imported ${d.rel}. Use it in a template pool with ${d.call}.`, 'Copy call');
+			if (choice) await vscode.env.clipboard.writeText(d.call);
+		} else if (done.length > 1) {
+			void vscode.window.setStatusBarMessage(`$(check) Imported ${done.length} structures`, 5000);
+		}
+	}
+
+	/** Redraws soon, so a burst of file events redraws once. */
+	private refreshSoon() {
+		if (this.refreshTimer) clearTimeout(this.refreshTimer);
+		this.refreshTimer = setTimeout(() => this.changed.fire(), 300);
+	}
+
+	/** Watches the chosen world's generated folder, where structure blocks save. */
+	private watchWorld(world: string | undefined) {
+		if (this.worldWatcher?.world === world) return;
+		this.worldWatcher?.watcher.dispose();
+		this.worldWatcher = undefined;
+		if (!world) return;
+		const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(vscode.Uri.file(world), 'generated/**/*.nbt'));
+		watcher.onDidCreate(() => this.refreshSoon());
+		watcher.onDidChange(() => this.refreshSoon());
+		watcher.onDidDelete(() => this.refreshSoon());
+		this.worldWatcher = { world, watcher };
 	}
 
 	/** Lets the user pick a world from the saves folders, or browse to one. */
@@ -283,11 +409,14 @@ export class WorldView implements vscode.Disposable, vscode.TreeDataProvider<Row
 		const project = this.project();
 		void vscode.commands.executeCommand('setContext', 'mms.hasProject', project !== undefined);
 		void vscode.commands.executeCommand('setContext', 'mms.hasWorld', this.world(project) !== undefined);
+		this.watchWorld(this.world(project));
 		this.changed.fire();
 	}
 
 	dispose() {
 		if (this.saveTimer) clearTimeout(this.saveTimer);
+		if (this.refreshTimer) clearTimeout(this.refreshTimer);
+		this.worldWatcher?.watcher.dispose();
 		for (const s of this.subscriptions) s.dispose();
 	}
 }
