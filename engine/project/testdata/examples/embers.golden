@@ -1,7 +1,39 @@
+=== data/embers/advancement/mms_gen/right_click/ember_shard.json
+{
+  "criteria": {
+    "click": {
+      "trigger": "minecraft:using_item",
+      "conditions": {
+        "item": {
+          "items": "minecraft:amethyst_shard",
+          "predicates": {
+            "minecraft:custom_data": {
+              "mms_item": "embers:ember_shard"
+            }
+          }
+        }
+      }
+    }
+  },
+  "rewards": {
+    "function": "embers:mms_gen/right_click/ember_shard"
+  }
+}
 === data/embers/function/give.mcfunction
-give @s amethyst_shard[item_model="embers:ember_shard",item_name={translate:"item.embers.ember_shard",fallback:"Ember Shard"}] 16
+give @s amethyst_shard[item_model="embers:ember_shard",item_name={translate:"item.embers.ember_shard",fallback:"Ember Shard"},consumable={consume_seconds:1000000,animation:"none",has_consume_particles:false},use_effects={can_sprint:true,speed_multiplier:1,interact_vibrations:false},custom_data={mms_item:"embers:ember_shard"}] 16
 give @s music_disc_13[item_model="embers:ember_disc",item_name={translate:"item.embers.ember_disc",fallback:"Music Disc"},jukebox_playable="embers:embers"]
 give @s painting[painting/variant="embers:hearth"]
+=== data/embers/function/mms_gen/load.mcfunction
+scoreboard objectives add mms_click.embers dummy
+=== data/embers/function/mms_gen/right_click/ember_shard.mcfunction
+advancement revoke @s only embers:mms_gen/right_click/ember_shard
+execute if score @s mms_click.embers matches 1.. run return run scoreboard players set @s mms_click.embers 2
+scoreboard players set @s mms_click.embers 2
+particle flame ^ ^1.5 ^1 0.2 0.2 0.2 0.05 20
+playsound item.firecharge.use player @a
+effect give @s fire_resistance 5
+=== data/embers/function/mms_gen/tick.mcfunction
+scoreboard players remove @a[scores={mms_click.embers=1..}] mms_click.embers 1
 === data/embers/jukebox_song/embers.json
 {
   "description": {
@@ -30,6 +62,19 @@ give @s painting[painting/variant="embers:hearth"]
                 "item_name": {
                   "translate": "item.embers.ember_shard",
                   "fallback": "Ember Shard"
+                },
+                "consumable": {
+                  "consume_seconds": 1000000,
+                  "animation": "none",
+                  "has_consume_particles": false
+                },
+                "use_effects": {
+                  "can_sprint": true,
+                  "speed_multiplier": 1,
+                  "interact_vibrations": false
+                },
+                "custom_data": {
+                  "mms_item": "embers:ember_shard"
                 }
               }
             },
@@ -98,9 +143,34 @@ give @s painting[painting/variant="embers:hearth"]
       "item_name": {
         "translate": "item.embers.ember_shard",
         "fallback": "Ember Shard"
+      },
+      "consumable": {
+        "consume_seconds": 1000000,
+        "animation": "none",
+        "has_consume_particles": false
+      },
+      "use_effects": {
+        "can_sprint": true,
+        "speed_multiplier": 1,
+        "interact_vibrations": false
+      },
+      "custom_data": {
+        "mms_item": "embers:ember_shard"
       }
     }
   }
+}
+=== data/minecraft/tags/function/load.json
+{
+  "values": [
+    "embers:mms_gen/load"
+  ]
+}
+=== data/minecraft/tags/function/tick.json
+{
+  "values": [
+    "embers:mms_gen/tick"
+  ]
 }
 === data/minecraft/tags/painting_variant/placeable.json
 {
