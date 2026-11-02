@@ -8,9 +8,9 @@
 Predicate sneaking = EntityProperties(entity = this, predicate = { flags = { is_sneaking = true } })
 
 /**
- * Right click puts items in. With an item in hand it puts in the whole
- * stack; an empty barrel takes the kind of whatever goes in first. With an
- * empty hand it puts in every matching item from the inventory.
+ * Right click puts the held stack in; an empty barrel takes the kind of
+ * whatever goes in first. Sneaking and right-clicking puts in every
+ * matching item from the hotbar and inventory instead.
  */
 OnAdvancement use_barrel = PlayerInteractedWithEntity(
   entity = EntityProperties(
@@ -27,12 +27,18 @@ OnAdvancement use_barrel = PlayerInteractedWithEntity(
   Execute("if entity @e[type=interaction,tag=barrels.this]") {
     open()
     /execute at @s run summon item_display ~ ~ ~ {Tags:["barrels.tmp"]}
-    // Decide once: putting the held stack in empties the hand.
     /execute store success score $holding mms.barrels if items entity @s weapon.mainhand *
-    if (holding == 1) {
+    /execute store success score $sneaking mms.barrels if predicate barrels:sneaking
+    if (sneaking == 1) {
+      // An empty barrel takes the kind of the held item first, if any.
+      if (holding == 1 && stack == 0) {
+        claim()
+      }
+      insert_all()
+    } else if (holding == 1) {
       insert_held()
     } else {
-      insert_all()
+      /title @s actionbar {text:"Right-click with an item to put it in, or sneak to put in everything that matches",color:"gray"}
     }
     /kill @e[type=item_display,tag=barrels.tmp]
     close()
