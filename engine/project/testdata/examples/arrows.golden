@@ -167,6 +167,7 @@ give @s bow[item_name={translate:"item.arrows.thunder_bow",fallback:"Thunder Bow
 give @s tipped_arrow[item_name={translate:"item.arrows.explosive_arrow",fallback:"Explosive Arrow"},potion_contents={custom_color:14697499,custom_name:"arrows.explosive"},custom_data={mms_item:"arrows:explosive_arrow"}] 16
 give @s tipped_arrow[item_name={translate:"item.arrows.ender_arrow",fallback:"Ender Arrow"},potion_contents={custom_color:2062958,custom_name:"arrows.ender"},custom_data={mms_item:"arrows:ender_arrow"}] 16
 give @s tipped_arrow[item_name={translate:"item.arrows.levitation_arrow",fallback:"Arrow of Levitation"},potion_contents={custom_color:13565951,custom_name:"arrows.levitation",custom_effects:[{id:"minecraft:levitation",amplifier:1,duration:60}]},potion_duration_scale=1] 16
+give @s splash_potion[item_name={translate:"item.arrows.blast_potion",fallback:"Blast Potion"},potion_contents={custom_color:14697499,custom_name:"arrows.blast"},custom_data={mms_item:"arrows:blast_potion"}] 8
 give @s stick[item_name={translate:"item.arrows.cow_wand",fallback:"Cow Wand"},consumable={consume_seconds:1000000,animation:"none",has_consume_particles:false},use_effects={can_sprint:true,speed_multiplier:1,interact_vibrations:false},custom_data={mms_item:"arrows:cow_wand"}]
 === data/arrows/function/land_jump.mcfunction
 execute at @s run particle portal ~ ~1 ~ 0.3 0.6 0.3 0.5 40
@@ -174,12 +175,28 @@ tp @s ~ ~ ~
 particle portal ~ ~1 ~ 0.3 0.6 0.3 0.5 40
 playsound entity.player.teleport player @a
 === data/arrows/function/launch.mcfunction
-rotate @s ~ ~
 data modify storage arrows:mms m.a0 set from storage arrows:mms l."launch".speed
 function arrows:launch/_macro0 with storage arrows:mms m
-data modify entity @s Motion set from storage arrows:launch motion
+data modify storage arrows:mms g.launch_yaw set from entity @s Rotation[0]
+execute anchored eyes positioned ^ ^-1.7 ^1.5 run function arrows:launch/_exec1
+=== data/arrows/function/launch/_exec1.mcfunction
+data modify storage arrows:mms m.a0 set from storage arrows:mms g.launch_motion
+data modify storage arrows:mms m.a1 set from storage arrows:mms l."launch".entity
+data modify storage arrows:mms m.a2 set from storage arrows:mms g.launch_yaw
+function arrows:launch/_macro2 with storage arrows:mms m
 === data/arrows/function/launch/_macro0.mcfunction
 $execute anchored feet in minecraft:overworld positioned 0.0 0.0 0.0 positioned ^ ^ ^$(a0) summon marker run function arrows:read_vector
+=== data/arrows/function/launch/_macro2.mcfunction
+$summon falling_block ~ ~ ~ {BlockState:{Name:"minecraft:structure_void"},Time:1,DropItem:0b,CancelDrop:1b,HurtEntities:0b,Motion:$(a0),Passengers:[{id:"$(a1)",Rotation:[$(a2),0.0]}]}
+=== data/arrows/function/mms_gen/item_hook/blast_potion/land.mcfunction
+tag @s add mms_new
+execute at @s summon marker run function arrows:mms_gen/item_hook/blast_potion/land/mount
+tag @s remove mms_new
+=== data/arrows/function/mms_gen/item_hook/blast_potion/land/mount.mcfunction
+tag @s add mms_land.arrows
+data modify entity @s data.mms_land set value "arrows:explode"
+ride @s mount @n[tag=mms_new]
+execute unless predicate arrows:mms_gen/projectile/riding run kill @s
 === data/arrows/function/mms_gen/item_hook/cow_wand/press.mcfunction
 advancement revoke @s only arrows:mms_gen/item_hook/cow_wand/press
 execute if score @s mms_click.arrows matches 1.. run return run scoreboard players set @s mms_click.arrows 2
@@ -196,26 +213,77 @@ execute unless data entity @s weapon run data modify entity @s weapon set value 
 data modify entity @s weapon.components."minecraft:enchantments"."arrows:mms_gen/item_hook/thunder_bow/projectile" set value 1
 === data/arrows/function/mms_gen/load.mcfunction
 scoreboard objectives add mms_click.arrows dummy
+scoreboard objectives add mms.arrows dummy
+scoreboard players set #cf mms.arrows 0
+execute unless data storage arrows:mms g.launch_motion run data modify storage arrows:mms g.launch_motion set value ""
+execute unless data storage arrows:mms g.launch_yaw run data modify storage arrows:mms g.launch_yaw set value ""
 execute in minecraft:overworld run forceload add 0 0
+=== data/arrows/function/mms_gen/projectile/land.mcfunction
+function arrows:mms_gen/projectile/land/run with entity @s data
+kill @s
+=== data/arrows/function/mms_gen/projectile/land/run.mcfunction
+$function $(mms_land)
 === data/arrows/function/mms_gen/projectile/spotted.mcfunction
 tag @s add mms_shot.arrows
+execute if data entity @s Item.components."minecraft:custom_data"{mms_item:"arrows:blast_potion"} run function arrows:mms_gen/item_hook/blast_potion/land
 execute if data entity @s item.components."minecraft:custom_data"{mms_item:"arrows:ender_arrow"} run function arrows:mms_gen/item_hook/ender_arrow/projectile
 execute if data entity @s item.components."minecraft:custom_data"{mms_item:"arrows:explosive_arrow"} run function arrows:mms_gen/item_hook/explosive_arrow/projectile
 execute if data entity @s weapon.components."minecraft:custom_data"{mms_item:"arrows:thunder_bow"} run function arrows:mms_gen/item_hook/thunder_bow/projectile
 === data/arrows/function/mms_gen/tick.mcfunction
+execute as @e[type=splash_potion,tag=!arrows.thrown] run function arrows:throw_further
 execute as @e[type=#minecraft:arrows,tag=!mms_shot.arrows] run function arrows:mms_gen/projectile/spotted
+execute as @e[type=splash_potion,tag=!mms_shot.arrows] run function arrows:mms_gen/projectile/spotted
+execute as @e[type=lingering_potion,tag=!mms_shot.arrows] run function arrows:mms_gen/projectile/spotted
+execute as @e[type=marker,tag=mms_land.arrows,predicate=!arrows:mms_gen/projectile/riding] at @s run function arrows:mms_gen/projectile/land
 scoreboard players remove @a[scores={mms_click.arrows=1..}] mms_click.arrows 1
 === data/arrows/function/read_vector.mcfunction
-data modify storage arrows:launch motion set from entity @s Pos
+data modify storage arrows:mms g.launch_motion set from entity @s Pos
 kill @s
 === data/arrows/function/shoot_cow.mcfunction
-execute anchored eyes positioned ^ ^-0.7 ^1.5 summon cow run function arrows:shoot_cow/_exec0
-playsound entity.cow.ambient neutral @a
-=== data/arrows/function/shoot_cow/_exec0.mcfunction
+data modify storage arrows:mms l."launch".entity set value "cow"
 data modify storage arrows:mms l."launch".speed set value "1.5"
 function arrows:launch
+playsound entity.cow.ambient neutral @a
 === data/arrows/function/strike.mcfunction
 summon lightning_bolt
+=== data/arrows/function/throw_further.mcfunction
+tag @s add arrows.thrown
+execute unless data entity @s Item.components."minecraft:custom_data"{mms_item:"arrows:blast_potion"} run return 0
+execute store result entity @s Motion[0] double 0.00175 run data get entity @s Motion[0] 1000
+execute store result entity @s Motion[1] double 0.00175 run data get entity @s Motion[1] 1000
+execute store result entity @s Motion[2] double 0.00175 run data get entity @s Motion[2] 1000
+=== data/arrows/predicate/mms_gen/projectile/riding.json
+{
+  "type": "minecraft:entity_properties",
+  "entity": "this",
+  "predicate": {
+    "vehicle": {}
+  }
+}
+=== data/arrows/recipe/blast_potion.json
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    "minecraft:glass_bottle",
+    "minecraft:tnt"
+  ],
+  "result": {
+    "id": "minecraft:splash_potion",
+    "components": {
+      "item_name": {
+        "translate": "item.arrows.blast_potion",
+        "fallback": "Blast Potion"
+      },
+      "potion_contents": {
+        "custom_color": 14697499,
+        "custom_name": "arrows.blast"
+      },
+      "custom_data": {
+        "mms_item": "arrows:blast_potion"
+      }
+    }
+  }
+}
 === data/arrows/recipe/cow_wand.json
 {
   "type": "minecraft:crafting_shapeless",
@@ -376,10 +444,12 @@ summon lightning_bolt
   "item.minecraft.tipped_arrow.effect.arrows.explosive": "Explosive Arrow",
   "item.minecraft.tipped_arrow.effect.arrows.ender": "Ender Arrow",
   "item.minecraft.tipped_arrow.effect.arrows.levitation": "Arrow of Levitation",
+  "item.minecraft.splash_potion.effect.arrows.blast": "Blast Potion",
   "item.arrows.explosive_arrow": "Explosive Arrow",
   "item.arrows.ender_arrow": "Ender Arrow",
   "item.arrows.levitation_arrow": "Arrow of Levitation",
   "item.arrows.thunder_bow": "Thunder Bow",
+  "item.arrows.blast_potion": "Blast Potion",
   "item.arrows.cow_wand": "Cow Wand"
 }
 === pack.mcmeta

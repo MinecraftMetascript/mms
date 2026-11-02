@@ -8,5 +8,6 @@ Function give {
   /give @s ${explosive_arrow} 16
   /give @s ${ender_arrow} 16
   /give @s ${levitation_arrow} 16
+  /give @s ${blast_potion} 8
   /give @s ${cow_wand}
 }

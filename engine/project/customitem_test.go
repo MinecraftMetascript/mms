@@ -552,3 +552,62 @@ Function f {
 		t.Errorf("a stick with a projectile hook: %s", d)
 	}
 }
+
+// TestProjectileLand checks on_projectile_land on a splash potion: the
+// tick scans for thrown potions and for markers left behind, the marker
+// that rides each one and holds the function, and the base check.
+func TestProjectileLand(t *testing.T) {
+	pack := spec.MustDefault()
+	p := New(pack, Config{Namespace: "demo"})
+	p.SetFile("main.mms", `
+CustomItem bomb = { base = splash_potion, on_projectile_land = boom }
+Function boom {
+  /say boom
+}
+`)
+	r, _ := p.Analyze(context.Background())
+	if d := diagText(r); d != "" {
+		t.Fatalf("unexpected diagnostics:\n%s", d)
+	}
+	files := map[string]string{}
+	for _, f := range r.Emit() {
+		files[f.Path] = string(f.Data)
+	}
+	for path, want := range map[string]string{
+		"data/demo/function/mms_gen/tick.mcfunction":                      "execute as @e[type=splash_potion,tag=!mms_shot.demo] run function demo:mms_gen/projectile/spotted\nexecute as @e[type=lingering_potion,tag=!mms_shot.demo] run function demo:mms_gen/projectile/spotted\nexecute as @e[type=marker,tag=mms_land.demo,predicate=!demo:mms_gen/projectile/riding] at @s run function demo:mms_gen/projectile/land\n",
+		"data/demo/function/mms_gen/projectile/spotted.mcfunction":        "execute if data entity @s Item.components.\"minecraft:custom_data\"{mms_item:\"demo:bomb\"} run function demo:mms_gen/item_hook/bomb/land\n",
+		"data/demo/function/mms_gen/item_hook/bomb/land/mount.mcfunction": "data modify entity @s data.mms_land set value \"demo:boom\"\nride @s mount @n[tag=mms_new]\nexecute unless predicate demo:mms_gen/projectile/riding run kill @s\n",
+		"data/demo/function/mms_gen/item_hook/bomb/land.mcfunction":       "execute at @s summon marker run function demo:mms_gen/item_hook/bomb/land/mount\n",
+		"data/demo/function/mms_gen/projectile/land/run.mcfunction":       "$function $(mms_land)\n",
+		"data/demo/predicate/mms_gen/projectile/riding.json":              `"vehicle": {}`,
+	} {
+		if !strings.Contains(files[path], want) {
+			t.Errorf("%s lacks %q:\n%s", path, want, files[path])
+		}
+	}
+	cc := command.New(pack)
+	for path, data := range files {
+		if strings.HasPrefix(path, "data/demo/function/mms_gen/") {
+			for _, line := range strings.Split(strings.TrimSpace(data), "\n") {
+				if strings.HasPrefix(line, "$") {
+					continue
+				}
+				if res := cc.Check(line); res.Problem != nil {
+					t.Errorf("%s: %q: %s", path, line, res.Problem.Message)
+				}
+			}
+		}
+	}
+	for _, src := range []string{
+		"CustomItem w = { base = snowball, on_projectile_land = f }\nFunction f {\n}",
+		"CustomItem w = { base = tipped_arrow, on_projectile_land = f }\nFunction f {\n}",
+		"CustomItem w = { base = splash_potion, on_projectile_hit_block = f }\nFunction f {\n}",
+	} {
+		p := New(pack, Config{Namespace: "demo"})
+		p.SetFile("main.mms", src)
+		r, _ := p.Analyze(context.Background())
+		if d := diagText(r); !strings.Contains(d, "mms/custom-item") {
+			t.Errorf("%q: %s", src, d)
+		}
+	}
+}
