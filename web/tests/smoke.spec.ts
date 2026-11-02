@@ -705,3 +705,42 @@ test('several projects are saved and can be switched', async ({ page }) => {
 	await expect(page.getByRole('button', { name: 'surface.mms' })).toBeVisible();
 	await expect(list.getByRole('listitem')).toHaveCount(1);
 });
+
+test('Format is Shift+Alt+F, or Cmd+Shift+I on macOS', async ({ page }) => {
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	await replaceText(page, 'DensityFunction   x=Clamp( 1,0 ,1 )\n');
+	await page.keyboard.press('Shift+Alt+f');
+	await expect(page.locator('.cm-content')).toHaveText('DensityFunction x = Clamp(1, 0, 1)');
+	await expect(page.getByRole('button', { name: 'Format', exact: true })).toHaveAttribute('title', /Shift\+Alt\+F/);
+});
+
+test.describe('on macOS', () => {
+	test.beforeEach(async ({ page }) => {
+		await page.addInitScript(() => Object.defineProperty(Navigator.prototype, 'platform', { get: () => 'MacIntel' }));
+	});
+
+	test('Cmd+Shift+I formats, and Cmd+Option+F fixes all', async ({ page }) => {
+		await page.goto('./');
+		await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+		await page.locator('.cm-content').click();
+		await page.keyboard.press('Meta+a');
+		await page.keyboard.press('Delete');
+		await page.keyboard.insertText('DensityFunction   x=Clamp( 1,0 ,1 )\n');
+		await page.keyboard.press('Meta+Shift+I');
+		await expect(page.locator('.cm-content')).toHaveText('DensityFunction x = Clamp(1, 0, 1)');
+		await expect(page.getByRole('button', { name: 'Format', exact: true })).toHaveAttribute('title', /⌘\+Shift\+I/);
+
+		await page.keyboard.press('Meta+a');
+		await page.keyboard.press('Delete');
+		await page.keyboard.insertText('DensityFunction d = 2 * 0.25\n');
+		await expect(page.locator('.cm-lintRange-hint').first()).toBeVisible();
+		await page.keyboard.press('Meta+Alt+f');
+		await expect(page.locator('.cm-content')).toContainText('DensityFunction d = 0.5');
+
+		await page.locator('.cm-line').first().click({ button: 'right' });
+		const menu = page.getByRole('menu', { name: 'Editor actions' });
+		await expect(menu.getByRole('menuitem', { name: /Format document/ })).toContainText('⌘+Shift+I');
+		await expect(menu.getByRole('menuitem', { name: /Fix all/ })).toContainText('⌘+⌥+F');
+	});
+});

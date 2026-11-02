@@ -15,6 +15,7 @@
 	import { findReferences, jumpToDefinition } from '@codemirror/lsp-client';
 	import { inlineRename, renameInline } from './rename';
 	import ContextMenu, { type MenuEntries, type MenuItem } from './ContextMenu.svelte';
+	import { fixAllKeys, formatKeys } from './shortcuts';
 
 	interface Props {
 		engine: Engine;
@@ -41,10 +42,6 @@
 	let shown = '';
 	let menu: ContextMenu | undefined = $state();
 
-	const mac = typeof navigator !== 'undefined' && /Mac|iP(hone|ad)/.test(navigator.platform);
-	const mod = mac ? '⌘' : 'Ctrl';
-	const alt = mac ? '⌥' : 'Alt';
-
 	/** The right-click menu: language actions, then fixes for problems under the cursor. */
 	function openMenu(v: EditorView, e: MouseEvent) {
 		// Shift+right-click keeps the browser's own menu (copy, paste, spellcheck).
@@ -59,8 +56,8 @@
 			{ label: 'Find references', keys: 'Shift+F12', run: run(v, findReferences) },
 			{ label: 'Rename symbol', keys: 'F2', run: run(v, renameInline) },
 			null,
-			{ label: 'Format document', keys: `Shift+${alt}+F`, run: run(v, formatCommand) },
-			{ label: 'Fix all in this file', keys: `${mod}+${alt}+F`, run: run(v, fixAllCommand) }
+			{ label: 'Format document', keys: formatKeys, run: run(v, formatCommand) },
+			{ label: 'Fix all in this file', keys: fixAllKeys, run: run(v, fixAllCommand) }
 		];
 		if (fixes.length) items.push(null, ...fixes);
 		menu?.show({ x: e.clientX, y: e.clientY }, items, () => v.focus());
@@ -90,7 +87,7 @@
 		v.dispatch({ effects: closeHoverTooltips });
 		const fixes = fixesAt(v);
 		const items: MenuEntries = fixes.length ? [...fixes] : [{ label: 'No quick fixes here', disabled: true, run: () => {} }];
-		items.push(null, { label: 'Fix all in this file', keys: `${mod}+${alt}+F`, run: run(v, fixAllCommand) });
+		items.push(null, { label: 'Fix all in this file', keys: fixAllKeys, run: run(v, fixAllCommand) });
 		menu?.show({ x: at.left, y: at.bottom + 2 }, items, () => v.focus());
 		return true;
 	}
@@ -121,7 +118,9 @@
 				inlineRename(),
 				keymap.of([
 					{ key: 'Mod-s', run: formatCommand, preventDefault: true },
-					{ key: 'Shift-Alt-f', run: formatCommand, preventDefault: true },
+					// Option+Shift+F types "Ï" on macOS, so Format is Cmd+Shift+I there.
+					// Cmd+Option+F (Fix all) is fine: with Cmd held, nothing is typed.
+					{ key: 'Shift-Alt-f', mac: 'Shift-Mod-i', run: formatCommand, preventDefault: true },
 					{ key: 'Mod-Alt-f', run: fixAllCommand, preventDefault: true },
 					{ key: 'Mod-.', run: quickFixCommand, preventDefault: true },
 					// Ctrl+Space (from basicSetup) is taken by the OS on macOS (input
