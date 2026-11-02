@@ -29,6 +29,10 @@ The extension starts when a folder contains an `mms.json` or when you open a `.m
 
 The preview panel uses the same Svelte components as the web editor, from `packages/preview`. `npm run build` bundles the extension (esbuild) and the panel (Vite, into `out/webview`).
 
+## Credits
+
+Previews are rendered with [Deepslate](https://github.com/misode/deepslate) by [Misode](https://github.com/misode), and read vanilla worldgen from Misode's [mcmeta](https://github.com/misode/mcmeta). The license notices of everything the extension bundles are in `out/third-party-licenses.txt`, written by `npm run build`.
+
 ## License
 
 Same as the MMS repository.

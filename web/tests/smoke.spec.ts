@@ -851,3 +851,30 @@ test('Ctrl+. extracts an inline noise to a declaration and renames it', async ({
 	await expect(page.locator('.cm-content')).toContainText('Noise(hill_shape, 1, 1)');
 	await expect(status(page)).toHaveText(/No problems|warning/);
 });
+
+test('Deepslate is credited in About, on previews, and in the shipped licenses', async ({ page, request }) => {
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+
+	await page.getByRole('button', { name: 'About and credits' }).click();
+	const credits = page.getByRole('list', { name: 'Credits' });
+	await expect(credits.getByRole('link', { name: 'Deepslate' })).toHaveAttribute('href', 'https://github.com/misode/deepslate');
+	await expect(credits.getByRole('link', { name: 'Misode' }).first()).toHaveAttribute('href', 'https://github.com/misode');
+	await page.getByRole('button', { name: 'Close' }).click();
+
+	// A rendered preview carries a small credit in its corner.
+	await page.getByRole('button', { name: /Examples/ }).click();
+	await page.getByRole('button', { name: /sky-islands/ }).click();
+	await page.getByRole('button', { name: 'dimension.mms' }).click();
+	await page.locator('.cm-line', { hasText: 'Dimension islands' }).click();
+	const credit = page.locator('[data-credit="deepslate"]');
+	await expect(credit).toContainText('Rendered with Deepslate by Misode', { timeout: 30_000 });
+	await expect(credit.getByRole('link', { name: 'Deepslate' })).toHaveAttribute('href', 'https://github.com/misode/deepslate');
+
+	const licenses = await request.get('third-party-licenses.txt');
+	expect(licenses.ok()).toBe(true);
+	const text = await licenses.text();
+	expect(text).toContain('deepslate 0.27');
+	expect(text).toContain('Copyright (c) 2021 Misode');
+	expect(text).toContain('Copyright (c) 2022 SpyglassMC');
+});

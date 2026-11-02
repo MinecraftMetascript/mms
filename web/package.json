@@ -5,13 +5,14 @@
 	"type": "module",
 	"scripts": {
 		"dev": "vite dev",
-		"build": "vite build",
+		"build": "npm run licenses && vite build",
 		"preview": "vite preview",
-		"prepare": "svelte-kit sync || echo ''",
+		"prepare": "(npm run licenses --silent || echo '') && (svelte-kit sync || echo '')",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"wasm": "./scripts/build-wasm.sh",
-		"test": "playwright test"
+		"test": "playwright test",
+		"licenses": "node ../scripts/third-party-licenses.mjs . static/third-party-licenses.txt @codemirror/autocomplete @codemirror/commands @codemirror/language @codemirror/lint @codemirror/lsp-client @codemirror/state @codemirror/view @lezer/highlight codemirror deepslate fflate idb-keyval marked svelte @sveltejs/kit --notice ../engine/THIRD_PARTY_NOTICES.txt"
 	},
 	"devDependencies": {
 		"@playwright/test": "^1.63.0",
