@@ -16,7 +16,7 @@ Then run `/function arrows:give` for one of everything, or craft them:
 | Ender Arrow (2) | 2 arrows + ender pearl | Teleports whoever shot it to where it lands. |
 | Arrow of Levitation (8) | 8 arrows around a shulker shell | Lifts what it hits for three seconds. |
 | Thunder Bow | bow + lightning rod | Calls lightning wherever its arrows hit, block or mob. Any arrow works. |
-| Blast Potion | glass bottle + TNT | A splash potion that explodes where it lands. |
+| Blast Potion | glass bottle + TNT | A splash potion that flies further than most and explodes where it lands. |
 | Cow Wand | 2 sticks | Right-click to fire a cow the way you are looking. |
 
 The arrows work from bows, crossbows and dispensers.
@@ -46,7 +46,7 @@ The custom arrows are tipped arrows on purpose. Their colour shows on the item a
 - The marker is killed once read. Without that every shot leaves one behind.
 - `launch` reads `^ ^ ^` with `anchored feet`. Under `anchored eyes`, local coordinates start at the eyes of whoever runs the command, which tilts the vector up.
 
-`launch` then summons the entity with that vector as its `Motion`, through a macro, and faced the way the player looks. Setting `Motion` with `/data` after summoning also works on the server, but players were told about the entity when it appeared standing still, so it seems to hang for a moment before it moves.
+`launch` then summons an invisible falling block (`structure_void`) with that vector as its `Motion`, through a macro, with the entity riding it. A mob only tells players where it is every few ticks, so a mob launched on its own seems to hang for a moment before it flies; players run a falling block's physics themselves, so the ride is smooth from the first frame. When the block lands it is removed rather than placed (`CancelDrop`), and the rider drops off.
 
 ## Limits
 

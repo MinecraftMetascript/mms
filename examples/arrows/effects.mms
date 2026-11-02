@@ -48,3 +48,23 @@ Function land_jump {
 Function strike {
   /summon lightning_bolt
 }
+
+/**
+ * Blast Potions fly further than other potions: the first tick one is
+ * seen, its speed is multiplied by 1.75. The item hooks mark the potion
+ * with mms_item in its custom_data, and a thrown potion keeps its item.
+ * Players see the faster flight straight away, because they run a thrown
+ * potion's physics themselves and are sent the new velocity.
+ */
+OnTick {
+  /execute as @e[type=splash_potion,tag=!arrows.thrown] run function arrows:throw_further
+}
+
+/** Runs as a splash potion the first tick it is seen. */
+Function throw_further {
+  /tag @s add arrows.thrown
+  /execute unless data entity @s Item.components."minecraft:custom_data"{mms_item:"arrows:blast_potion"} run return 0
+  /execute store result entity @s Motion[0] double 0.00175 run data get entity @s Motion[0] 1000
+  /execute store result entity @s Motion[1] double 0.00175 run data get entity @s Motion[1] 1000
+  /execute store result entity @s Motion[2] double 0.00175 run data get entity @s Motion[2] 1000
+}

@@ -178,16 +178,16 @@ playsound entity.player.teleport player @a
 data modify storage arrows:mms m.a0 set from storage arrows:mms l."launch".speed
 function arrows:launch/_macro0 with storage arrows:mms m
 data modify storage arrows:mms g.launch_yaw set from entity @s Rotation[0]
-execute anchored eyes positioned ^ ^-0.7 ^1.5 run function arrows:launch/_exec1
+execute anchored eyes positioned ^ ^-1.7 ^1.5 run function arrows:launch/_exec1
 === data/arrows/function/launch/_exec1.mcfunction
-data modify storage arrows:mms m.a0 set from storage arrows:mms l."launch".entity
-data modify storage arrows:mms m.a1 set from storage arrows:mms g.launch_motion
+data modify storage arrows:mms m.a0 set from storage arrows:mms g.launch_motion
+data modify storage arrows:mms m.a1 set from storage arrows:mms l."launch".entity
 data modify storage arrows:mms m.a2 set from storage arrows:mms g.launch_yaw
 function arrows:launch/_macro2 with storage arrows:mms m
 === data/arrows/function/launch/_macro0.mcfunction
 $execute anchored feet in minecraft:overworld positioned 0.0 0.0 0.0 positioned ^ ^ ^$(a0) summon marker run function arrows:read_vector
 === data/arrows/function/launch/_macro2.mcfunction
-$summon $(a0) ~ ~ ~ {Motion:$(a1),Rotation:[$(a2),0.0]}
+$summon falling_block ~ ~ ~ {BlockState:{Name:"minecraft:structure_void"},Time:1,DropItem:0b,CancelDrop:1b,HurtEntities:0b,Motion:$(a0),Passengers:[{id:"$(a1)",Rotation:[$(a2),0.0]}]}
 === data/arrows/function/mms_gen/item_hook/blast_potion/land.mcfunction
 tag @s add mms_new
 execute at @s summon marker run function arrows:mms_gen/item_hook/blast_potion/land/mount
@@ -230,6 +230,7 @@ execute if data entity @s item.components."minecraft:custom_data"{mms_item:"arro
 execute if data entity @s item.components."minecraft:custom_data"{mms_item:"arrows:explosive_arrow"} run function arrows:mms_gen/item_hook/explosive_arrow/projectile
 execute if data entity @s weapon.components."minecraft:custom_data"{mms_item:"arrows:thunder_bow"} run function arrows:mms_gen/item_hook/thunder_bow/projectile
 === data/arrows/function/mms_gen/tick.mcfunction
+execute as @e[type=splash_potion,tag=!arrows.thrown] run function arrows:throw_further
 execute as @e[type=#minecraft:arrows,tag=!mms_shot.arrows] run function arrows:mms_gen/projectile/spotted
 execute as @e[type=splash_potion,tag=!mms_shot.arrows] run function arrows:mms_gen/projectile/spotted
 execute as @e[type=lingering_potion,tag=!mms_shot.arrows] run function arrows:mms_gen/projectile/spotted
@@ -245,6 +246,12 @@ function arrows:launch
 playsound entity.cow.ambient neutral @a
 === data/arrows/function/strike.mcfunction
 summon lightning_bolt
+=== data/arrows/function/throw_further.mcfunction
+tag @s add arrows.thrown
+execute unless data entity @s Item.components."minecraft:custom_data"{mms_item:"arrows:blast_potion"} run return 0
+execute store result entity @s Motion[0] double 0.00175 run data get entity @s Motion[0] 1000
+execute store result entity @s Motion[1] double 0.00175 run data get entity @s Motion[1] 1000
+execute store result entity @s Motion[2] double 0.00175 run data get entity @s Motion[2] 1000
 === data/arrows/predicate/mms_gen/projectile/riding.json
 {
   "type": "minecraft:entity_properties",
