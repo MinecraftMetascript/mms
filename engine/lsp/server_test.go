@@ -678,3 +678,36 @@ func TestOutputCustomItems(t *testing.T) {
 		t.Errorf("range = %v", r)
 	}
 }
+
+// TestExtractAction checks the refactor.extract action: its edits, and
+// the mms.renameAt command a client that asks for it gets.
+func TestExtractAction(t *testing.T) {
+	c := start(t)
+	c.result("initialize", map[string]any{"initializationOptions": map[string]any{"renameAfterExtract": true}})
+	c.notify("initialized", map[string]any{})
+	uri := "file:///a.mms"
+	src := "DensityFunction hills = Noise({ base_octave = -6, amplitude_modifiers = [1] }, 1, 1)\n"
+	c.notify("textDocument/didOpen", map[string]any{"textDocument": map[string]any{"uri": uri, "languageId": "mms", "version": 1, "text": src}})
+	pos := map[string]any{"line": 0, "character": 35}
+	acts := c.result("textDocument/codeAction", map[string]any{"textDocument": map[string]any{"uri": uri}, "range": map[string]any{"start": pos, "end": pos},
+		"context": map[string]any{"diagnostics": []any{}, "only": []string{"refactor"}}}).([]any)
+	if len(acts) != 1 {
+		t.Fatalf("actions = %v", acts)
+	}
+	a := acts[0].(map[string]any)
+	if a["title"] != "Extract { ... } to a Noise declaration" || a["kind"] != "refactor.extract" {
+		t.Errorf("action = %v", a)
+	}
+	edits := a["edit"].(map[string]any)["changes"].(map[string]any)[uri].([]any)
+	if got := edits[0].(map[string]any)["newText"]; got != "Noise hills_noise = { base_octave = -6, amplitude_modifiers = [1] }\n\n" {
+		t.Errorf("declaration = %q", got)
+	}
+	if got := edits[1].(map[string]any)["newText"]; got != "hills_noise" {
+		t.Errorf("reference = %q", got)
+	}
+	cmd := a["command"].(map[string]any)
+	at := cmd["arguments"].([]any)[1].(map[string]any)
+	if cmd["command"] != "mms.renameAt" || at["line"] != float64(0) || at["character"] != float64(6) {
+		t.Errorf("command = %v", cmd)
+	}
+}

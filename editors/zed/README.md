@@ -8,6 +8,7 @@ Language support for [Minecraft Metascript](https://github.com/MinecraftMetascri
   - completion, hover, signature help
   - go to definition, find references, rename
   - quick fixes, and "Fix all" (`source.fixAll.mms`)
+  - "Extract to a declaration" for inline values (`refactor.extract`); rename the new declaration with F2
   - formatting
 
 ## Install

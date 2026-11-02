@@ -111,6 +111,7 @@ func (c *Checker) hoist(e syntax.Expr, id idInfo) (jsonv.Value, bool) {
 	c.Hoisted = append(c.Hoisted, Hoisted{Kind: k, ID: hid, Value: v, Sp: e.Span()})
 	in := c.info(e)
 	in.ID = hid
+	in.Extract = k.Name
 	if in.Help == "" && in.Callable == nil {
 		in.Help = "```mms\n" + k.Name + " " + hid + "\n```\n\nAn inline " + k.Name + " where an id is needed: it is written to its own file and referenced by this id."
 	}
@@ -137,6 +138,7 @@ func (c *Checker) hoistFunction(e syntax.Expr, k Kind) jsonv.Value {
 	c.Hoisted = append(c.Hoisted, Hoisted{Kind: k, ID: hid, Fn: fn.Generate(*f), Sp: obj.Sp})
 	in := c.info(e)
 	in.ID = hid
+	in.Extract = k.Name
 	if in.Help == "" {
 		in.Help = "```mms\nFunction " + hid + "\n```\n\nAn inline function where a function id is needed: it is written to its own file and called by this id."
 	}
@@ -199,4 +201,33 @@ func (c *Checker) preferInline(e syntax.Expr, cands []tview) []tview {
 		return cands
 	}
 	return keep
+}
+
+// markExtract records that e, an inline value in a union that also takes
+// an id of a declarable kind, could be written as its own declaration and
+// referenced here, such as an inline density function where a
+// DensityFunctionRef is expected. Plain numbers and booleans are left
+// out: a constant is clearer inline.
+func (c *Checker) markExtract(e syntax.Expr, v tview) {
+	if c.trial || c.Kinds == nil {
+		return
+	}
+	switch x := e.(type) {
+	case *syntax.Number, *syntax.Bool:
+		return
+	case *syntax.Unary:
+		if _, ok := x.X.(*syntax.Number); ok {
+			return
+		}
+	}
+	for _, m := range v.T.Members {
+		mv := c.norm(tview{T: m, Env: v.Env})
+		if mv.T == nil || mv.T.Kind != "string" {
+			continue
+		}
+		if k, ok := c.hoistKind(idOf(mv.T)); ok && c.hoistable(e, k) {
+			c.info(e).Extract = k.Name
+			return
+		}
+	}
 }
