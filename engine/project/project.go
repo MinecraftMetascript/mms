@@ -160,6 +160,7 @@ type Result struct {
 	assetErr map[string][]syntax.Diagnostic
 	orderErr map[string][]syntax.Diagnostic // feature order cycles
 	langErr  map[string][]syntax.Diagnostic // CustomItem names a Lang also has
+	jigsaw   *jigsawModel                   // structure files' jigsaw blocks, for the jigsaw rules
 	files    fs.FS
 	lintMu   sync.Mutex
 	lintDone bool
