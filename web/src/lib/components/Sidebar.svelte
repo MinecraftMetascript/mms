@@ -3,7 +3,7 @@
 	import { assetExtensions, isAssetPath, uriOf, type Project } from '../project/project.svelte';
 	import { toBase64 } from '../project/base64';
 	import Tree from './Tree.svelte';
-	import { buildTree, type Node } from './tree';
+	import { buildTree, type Node } from '@mms/preview/tree';
 
 	interface Props {
 		project: Project;

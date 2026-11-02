@@ -71,9 +71,47 @@
           "enum": ["off", "messages", "verbose"],
           "default": "off",
           "description": "Log the messages between VS Code and the MMS language server."
+        },
+        "mms.savesFolders": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "markdownDescription": "More Minecraft `saves` folders to list worlds from in the World view, for launchers MMS does not know. The Minecraft launcher's, Prism Launcher's and MultiMC's are found by themselves. `~` is expanded."
+        },
+        "mms.buildOnSave": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Build the pack into the project's chosen world each time a file of the project is saved. Choose the world in the MMS side bar's World view."
         }
       }
     },
+    "viewsContainers": {
+      "activitybar": [
+        { "id": "mms", "title": "Minecraft Metascript", "icon": "icons/sidebar.svg" }
+      ]
+    },
+    "views": {
+      "mms": [
+        { "id": "mms.world", "name": "World", "icon": "icons/sidebar.svg", "initialSize": 1 },
+        { "id": "mms.pack", "name": "Pack", "icon": "icons/sidebar.svg", "initialSize": 3 }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "mms.world",
+        "contents": "No MMS project in this workspace. Open a folder with an mms.json, or create one with `mms init`.",
+        "when": "!mms.hasProject"
+      },
+      {
+        "view": "mms.world",
+        "contents": "Choose a Minecraft world to build this project's pack into. The data pack goes in the world's datapacks folder, and a resource pack, if the project has one, in resourcepacks/resources.zip.\n[Choose World](command:mms.chooseWorld)\nWorlds come from the Minecraft launcher's and Prism Launcher's saves folders, or browse to any world folder.",
+        "when": "mms.hasProject && !mms.hasWorld"
+      },
+      {
+        "view": "mms.pack",
+        "contents": "Nothing generated yet. The files the project writes appear here once the language server has read an MMS project."
+      }
+    ],
     "commands": [
       {
         "command": "mms.restartServer",
@@ -91,15 +129,44 @@
       {
         "command": "mms.previewDeclaration",
         "title": "MMS: Preview Declaration"
-      }
+      },
+      { "command": "mms.buildToWorld", "title": "MMS: Build into World", "icon": "$(play)" },
+      { "command": "mms.chooseWorld", "title": "MMS: Choose World", "icon": "$(globe)" },
+      { "command": "mms.chooseProject", "title": "MMS: Choose Project" },
+      { "command": "mms.revealWorld", "title": "Reveal Data Packs Folder", "icon": "$(folder-opened)" },
+      { "command": "mms.forgetWorld", "title": "Forget This World" },
+      { "command": "mms.openOutput", "title": "Open" },
+      { "command": "mms.previewOutput", "title": "Open Preview", "icon": "$(open-preview)" },
+      { "command": "mms.revealOutputSource", "title": "Go to Source", "icon": "$(go-to-file)" }
     ],
     "menus": {
       "editor/title": [
         { "command": "mms.showPreview", "when": "editorLangId == mms || editorLangId == mmsbook", "group": "navigation" }
       ],
+      "view/title": [
+        { "command": "mms.buildToWorld", "when": "view == mms.world && mms.hasWorld", "group": "navigation@1" },
+        { "command": "mms.chooseWorld", "when": "view == mms.world && mms.hasProject", "group": "navigation@2" }
+      ],
+      "view/item/context": [
+        { "command": "mms.revealWorld", "when": "view == mms.world && viewItem == world", "group": "inline" },
+        { "command": "mms.revealWorld", "when": "view == mms.world && viewItem == world", "group": "1_world@1" },
+        { "command": "mms.forgetWorld", "when": "view == mms.world && viewItem == world", "group": "1_world@2" },
+        { "command": "mms.previewOutput", "when": "view == mms.pack && viewItem =~ /preview/", "group": "inline@1" },
+        { "command": "mms.revealOutputSource", "when": "view == mms.pack && viewItem =~ /source/", "group": "inline@2" },
+        { "command": "mms.previewOutput", "when": "view == mms.pack && viewItem =~ /preview/", "group": "1_output@1" },
+        { "command": "mms.revealOutputSource", "when": "view == mms.pack && viewItem =~ /source/", "group": "1_output@2" }
+      ],
       "commandPalette": [
         { "command": "mms.showPreview", "when": "editorLangId == mms || editorLangId == mmsbook" },
-        { "command": "mms.previewDeclaration", "when": "false" }
+        { "command": "mms.previewDeclaration", "when": "false" },
+        { "command": "mms.buildToWorld", "when": "mms.hasProject" },
+        { "command": "mms.chooseWorld", "when": "mms.hasProject" },
+        { "command": "mms.chooseProject", "when": "mms.hasProject" },
+        { "command": "mms.revealWorld", "when": "false" },
+        { "command": "mms.forgetWorld", "when": "false" },
+        { "command": "mms.openOutput", "when": "false" },
+        { "command": "mms.previewOutput", "when": "false" },
+        { "command": "mms.revealOutputSource", "when": "false" }
       ]
     },
     "keybindings": [
