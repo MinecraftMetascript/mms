@@ -128,11 +128,11 @@ Each call stands for the id the file gets in your namespace: its base name, lowe
 
 Inside the quotes, completion lists the project's files of the helper's type, in VS Code, Zed and the web editor. A path to a file that is not there is an error.
 
-Textures, sounds and [resource pack declarations](#resource-packs) go into a resource pack built next to the data pack: `build-resources/` (set `resourcePack.output` in `mms.json` to change it), `<name>-resources.zip` with `mms build --zip`, and `<world>/resources.zip` with `mms build --world`, which Minecraft loads as that world's resource pack. `"icon": "art/icon.png"` in `mms.json` becomes `pack.png` in both packs.
+Textures, sounds and [resource pack declarations](#resource-packs) go into a resource pack built next to the data pack: `build-resources/` (set `resourcePack.output` in `mms.json` to change it), `<name>-resources.zip` with `mms build --zip`, and `<world>/resourcepacks/resources.zip` with `mms build --world`, the world's bundled pack, which Minecraft applies by itself when you open the world (rejoin after a rebuild). It is not sent to LAN players; a server needs `resource-pack` in `server.properties`. `"icon": "art/icon.png"` in `mms.json` becomes `pack.png` in both packs.
 
 Where the game takes a sound event either by id or inline, as a jukebox song's `sound_event` does, `Sound(...)` writes it inline, `{ "sound_id": "my_pack:tune" }`: the game's sound event registry is fixed, so a pack's own sound cannot be named there by id.
 
-Once a file is included, its id can also be written plainly elsewhere, with its namespace, such as `asset_id = my_pack:sunset`. An id in your namespace that nothing provides is reported by the [`external-asset`](lint.md) lint rule.
+Once a file is included, its id can also be written plainly elsewhere, with its namespace, such as `asset_id = my_pack:sunset`. An id in your namespace that nothing provides is reported by the [`external-asset`](lint.md) lint rule. Ids never include the file extension: the game adds `.png`, `.ogg`, `.nbt` or `.json` itself, so `my_pack:sunset.png` would name `sunset.png.png`. MMS warns about an id written with one (`mms/asset-extension`, with a quick fix) and leaves it out of the output.
 
 The web editor holds asset files too: **+ Add texture or sound** under the sources adds `.png`, `.ogg` and `.nbt` files, which keep their file name as their path. **Download resources** appears next to **Download pack** once there is a resource pack. Project zips carry the asset files both ways.
 

@@ -98,7 +98,7 @@ TemplatePool houses = {
 	if got := listDir(filepath.Join(world, "datapacks", "demo")); got != data {
 		t.Errorf("world data pack:\n got %s\nwant %s", got, data)
 	}
-	if got := listZip(filepath.Join(world, "resources.zip")); got != res {
-		t.Errorf("world resources.zip:\n got %s\nwant %s", got, res)
+	if got := listZip(filepath.Join(world, "resourcepacks", "resources.zip")); got != res {
+		t.Errorf("world resource pack:\n got %s\nwant %s", got, res)
 	}
 }

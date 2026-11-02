@@ -3,6 +3,7 @@ package sema
 import (
 	"regexp"
 	"sort"
+	"strings"
 
 	"github.com/minecraftmetascript/mms/engine/syntax"
 )
@@ -126,6 +127,16 @@ func Collect(units []*Unit, kinds *Kinds, defaultNS string) (*Table, map[string]
 			}
 			if !validPath.MatchString(path) || !validNS.MatchString(sns) {
 				report(u, "mms/invalid-name", d.Name.Sp, "resource names must be lowercase: use '"+Snake(d.Name.Text)+"'")
+				continue
+			}
+			if ext := fileExt(path); ext != "" {
+				// The build adds the file's extension, so this would write
+				// ruby.json.json, and references written without it miss.
+				diags[u.Path] = append(diags[u.Path], syntax.Diagnostic{
+					Code: "mms/invalid-name", Severity: syntax.SeverityError, Sp: d.Name.Sp,
+					Message: "resource names leave out the file extension, which MMS adds itself: use '" + strings.TrimSuffix(d.Name.Text, ext) + "'",
+					Fixes:   []syntax.Fix{{Title: "Remove '" + ext + "'", Safe: true, Edits: []syntax.TextEdit{{Sp: syntax.Span{Start: d.Name.Sp.End - len(ext), End: d.Name.Sp.End}}}}},
+				})
 				continue
 			}
 			sym := &Symbol{NS: sns, Path: path, Kind: k, Decl: d, Unit: u}
