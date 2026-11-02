@@ -576,7 +576,8 @@ Function boom {
 	for path, want := range map[string]string{
 		"data/demo/function/mms_gen/tick.mcfunction":                      "execute as @e[type=splash_potion,tag=!mms_shot.demo] run function demo:mms_gen/projectile/spotted\nexecute as @e[type=lingering_potion,tag=!mms_shot.demo] run function demo:mms_gen/projectile/spotted\nexecute as @e[type=marker,tag=mms_land.demo,predicate=!demo:mms_gen/projectile/riding] at @s run function demo:mms_gen/projectile/land\n",
 		"data/demo/function/mms_gen/projectile/spotted.mcfunction":        "execute if data entity @s Item.components.\"minecraft:custom_data\"{mms_item:\"demo:bomb\"} run function demo:mms_gen/item_hook/bomb/land\n",
-		"data/demo/function/mms_gen/item_hook/bomb/land/mount.mcfunction": "data modify entity @s data.mms_land set value \"demo:boom\"\nride @s mount @n[tag=mms_new]\n",
+		"data/demo/function/mms_gen/item_hook/bomb/land/mount.mcfunction": "data modify entity @s data.mms_land set value \"demo:boom\"\nride @s mount @n[tag=mms_new]\nexecute unless predicate demo:mms_gen/projectile/riding run kill @s\n",
+		"data/demo/function/mms_gen/item_hook/bomb/land.mcfunction":       "execute at @s summon marker run function demo:mms_gen/item_hook/bomb/land/mount\n",
 		"data/demo/function/mms_gen/projectile/land/run.mcfunction":       "$function $(mms_land)\n",
 		"data/demo/predicate/mms_gen/projectile/riding.json":              `"vehicle": {}`,
 	} {

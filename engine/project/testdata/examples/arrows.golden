@@ -183,12 +183,13 @@ data modify entity @s Motion set from storage arrows:launch motion
 $execute anchored feet in minecraft:overworld positioned 0.0 0.0 0.0 positioned ^ ^ ^$(a0) summon marker run function arrows:read_vector
 === data/arrows/function/mms_gen/item_hook/blast_potion/land.mcfunction
 tag @s add mms_new
-execute summon marker run function arrows:mms_gen/item_hook/blast_potion/land/mount
+execute at @s summon marker run function arrows:mms_gen/item_hook/blast_potion/land/mount
 tag @s remove mms_new
 === data/arrows/function/mms_gen/item_hook/blast_potion/land/mount.mcfunction
 tag @s add mms_land.arrows
 data modify entity @s data.mms_land set value "arrows:explode"
 ride @s mount @n[tag=mms_new]
+execute unless predicate arrows:mms_gen/projectile/riding run kill @s
 === data/arrows/function/mms_gen/item_hook/cow_wand/press.mcfunction
 advancement revoke @s only arrows:mms_gen/item_hook/cow_wand/press
 execute if score @s mms_click.arrows matches 1.. run return run scoreboard players set @s mms_click.arrows 2

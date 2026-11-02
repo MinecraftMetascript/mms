@@ -90,6 +90,9 @@ var (
 	ProjectileThrown = []string{"minecraft:splash_potion", "minecraft:lingering_potion"}
 )
 
+// ProjectileRiding is the predicate that a marker is riding something.
+func ProjectileRiding(ns string) string { return ns + ":mms_gen/projectile/riding" }
+
 // ProjectileLandTag marks the markers riding thrown items with
 // on_projectile_land, per namespace.
 func ProjectileLandTag(ns string) string { return "mms_land." + ns }
@@ -532,13 +535,17 @@ func landHook(id, fn string, out *ItemHookFiles) {
 	out.Thrown = true
 	out.Functions[arm] = []string{
 		"tag @s add mms_new",
-		"execute summon marker run function " + arm + "/mount",
+		// The tick function runs this as the potion but not at it.
+		"execute at @s summon marker run function " + arm + "/mount",
 		"tag @s remove mms_new",
 	}
 	out.Functions[arm+"/mount"] = []string{
 		"tag @s add " + ProjectileLandTag(ns),
 		"data modify entity @s data.mms_land set value " + quoteSNBT(fn),
 		"ride @s mount @n[tag=mms_new]",
+		// A marker that failed to mount would set the hook off right
+		// where the potion was thrown.
+		"execute unless predicate " + ProjectileRiding(ns) + " run kill @s",
 	}
 	out.Spotted = append(out.Spotted, "execute if data entity @s Item.components.\"minecraft:custom_data\"{"+ItemHookMarker+":"+quoteSNBT(id)+"} run function "+arm)
 }
@@ -559,7 +566,7 @@ func ProjectileSetup(ns string, spotted []string, thrown bool) (tick []string, f
 	for _, t := range ProjectileThrown {
 		tick = append(tick, "execute as @e[type="+strings.TrimPrefix(t, "minecraft:")+",tag=!"+tag+"] run function "+spot)
 	}
-	riding := ns + ":mms_gen/projectile/riding"
+	riding := ProjectileRiding(ns)
 	vehicle := &jsonv.Object{}
 	vehicle.Set("vehicle", &jsonv.Object{})
 	pred := &jsonv.Object{}
