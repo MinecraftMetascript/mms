@@ -331,8 +331,7 @@ return run execute on attacker if entity @s[tag=barrels.user]
 loot spawn ~ ~ ~ loot barrels:storage_barrel
 kill @s
 === data/barrels/function/take_out.mcfunction
-execute if score $count mms.barrels matches 0 run function barrels:take_out/_if0
-execute if score #cf mms.barrels matches 3 run return run function barrels:mms_gen/ret
+execute if score $count mms.barrels matches 0 run return 0
 scoreboard players operation $amount mms.barrels = $stack mms.barrels
 execute if predicate barrels:sneaking run scoreboard players set $amount mms.barrels 1
 execute if score $amount mms.barrels > $count mms.barrels run scoreboard players operation $amount mms.barrels = $count mms.barrels
@@ -341,11 +340,6 @@ execute if score $count mms.barrels matches 0 run scoreboard players set $stack 
 execute at @s run summon item ~ ~ ~ {Item:{id:"minecraft:stone"},PickupDelay:0s,Tags:["barrels.drop"]}
 function barrels:give_drop
 playsound minecraft:item.bundle.remove_one player @a
-=== data/barrels/function/take_out/_if0.mcfunction
-execute if entity @s[gamemode=!creative] at @e[type=interaction,tag=barrels.this,limit=1] positioned ^ ^0.375 ^-0.5 run setblock ~ ~ ~ air destroy
-execute if entity @s[gamemode=creative] at @e[type=interaction,tag=barrels.this,limit=1] positioned ^ ^0.375 ^-0.5 run setblock ~ ~ ~ air
-scoreboard players set #cf mms.barrels 3
-return 0
 === data/barrels/function/used_by_user.mcfunction
 return run execute on target if entity @s[tag=barrels.user]
 === data/barrels/item_modifier/one.json
