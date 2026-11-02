@@ -81,7 +81,7 @@
         "mms.structuresFolder": {
           "type": "string",
           "default": "structures",
-          "markdownDescription": "The project folder that structures imported from the world go in, relative to the `mms.json` folder. A structure saved as `<namespace>:houses/small` goes to `<folder>/houses/small.nbt` (with the namespace as a subfolder when it is not the project's)."
+          "markdownDescription": "The project folder that structures imported from the world go in, relative to the `mms.json` folder. A structure saved as `<namespace>:houses/small` goes to `<folder>/houses/small.nbt` (a structure from another namespace goes to `<folder>-<namespace>/`, so ids from different namespaces never share a file)."
         },
         "mms.buildOnSave": {
           "type": "boolean",

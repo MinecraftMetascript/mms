@@ -46,12 +46,13 @@ export function findStructures(world: string): WorldStructure[] {
 
 /**
  * Where a structure goes in the project, relative to its folder:
- * <folder>/<path>.nbt, with the namespace as a subfolder when it is not
- * the project's, so other namespaces' structures do not collide.
+ * <folder>/<path>.nbt for the project's namespace, and
+ * <folder>-<namespace>/<path>.nbt for another. Each namespace gets its own
+ * folder, so a:b/foo and b:foo never share a file.
  */
 export function importPath(s: WorldStructure, projectNs: string | undefined, folder: string): string {
-	const parts = [folder.replace(/\\/g, '/').replace(/^\.?\/+|\/+$/g, '') || '.', ...(s.ns === projectNs ? [] : [s.ns]), `${s.path}.nbt`];
-	return path.posix.normalize(parts.join('/'));
+	const base = folder.replace(/\\/g, '/').replace(/^\.?\/+|\/+$/g, '') || 'structures';
+	return path.posix.normalize(`${s.ns === projectNs ? base : `${base}-${s.ns}`}/${s.path}.nbt`);
 }
 
 /**
