@@ -10,7 +10,6 @@ Global reward_every: int = 5
 // Objective names are global to the world, so they carry the pack's name.
 Objective basics_kills = playerKillCount
 Objective basics_points = dummy
-Objective basics_online = dummy
 
 OnLoad {
   /tellraw @a "Points game loaded"
@@ -40,6 +39,10 @@ Function on_kill {
 Function reward {
   /give @s diamond
   /tellraw @s "Reward! You have ${basics_points[@s]} points"
+  // A sword in hand is upgraded instead, unless the player is creative.
+  if (Items(@s, weapon.mainhand, #minecraft:swords) && !Entity(@s[gamemode=creative])) {
+    /item replace entity @s weapon.mainhand with diamond_sword
+  }
 }
 
 /** Counts down from 3, then reports the totals. */
@@ -47,12 +50,13 @@ Function status {
   for i in 1..3 {
     /say ${4 - i}...
   }
-  // A command can write a score that the code then reads.
-  /execute store result score #players basics_online if entity @a
-  let players = basics_online["#players"]
+  let players = Count(@a)
   let average = 0
   if (players > 0) {
     average = total_kills / players
   }
   /tellraw @s "${total_kills} kills in total, ${average} per player"
+  // NBT reads are ints; the height is read as a whole number of blocks.
+  let height = @s::Pos[1]
+  /tellraw @s "You are standing ${Abs(height - 64)} blocks from sea level"
 }

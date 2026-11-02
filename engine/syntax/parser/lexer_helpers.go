@@ -22,3 +22,39 @@ func (l *MMSLexer) atLineStart() bool {
 	}
 	return true
 }
+
+// afterAssign reports whether the current token follows '=' (an
+// assignment, also a compound one) or the keyword return, with only
+// spaces and tabs between. INLINE_COMMAND uses it so that '/' starts a
+// command used as a value, while `a / b` stays a division. The command
+// runs to the end of the line, so it only fits where the statement ends
+// with it.
+func (l *MMSLexer) afterAssign() bool {
+	in := l.GetInputStream()
+	i := l.TokenStartCharIndex - 1
+	for ; i >= 0; i-- {
+		switch in.GetTextFromInterval(antlr.NewInterval(i, i)) {
+		case " ", "\t":
+			continue
+		case "=":
+			if i == 0 {
+				return true
+			}
+			switch in.GetTextFromInterval(antlr.NewInterval(i-1, i-1)) {
+			case "=", "!", "<", ">":
+				return false
+			}
+			return true
+		case "n":
+			return i >= 5 && in.GetTextFromInterval(antlr.NewInterval(i-5, i)) == "return" &&
+				(i == 5 || !isWordChar(in.GetTextFromInterval(antlr.NewInterval(i-6, i-6))))
+		default:
+			return false
+		}
+	}
+	return false
+}
+
+func isWordChar(s string) bool {
+	return s != "" && (s[0] == '_' || s[0] >= 'a' && s[0] <= 'z' || s[0] >= 'A' && s[0] <= 'Z' || s[0] >= '0' && s[0] <= '9')
+}

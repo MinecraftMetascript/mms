@@ -174,6 +174,10 @@ func (s shifter) expr(e Expr) Expr {
 		n = &Index{X: s.expr(x.X), Args: s.args(x.Args), Sp: s.sp(x.Sp)}
 	case *Trailing:
 		n = &Trailing{X: s.expr(x.X), Block: s.block(x.Block), Sp: s.sp(x.Sp)}
+	case *NBT:
+		n = &NBT{X: s.expr(x.X), Key: s.name(x.Key), Raw: x.Raw, Sp: s.sp(x.Sp)}
+	case *CommandExpr:
+		n = &CommandExpr{Text: x.Text, Sp: s.sp(x.Sp)}
 	case *Bad:
 		n = &Bad{Sp: s.sp(x.Sp)}
 	default:

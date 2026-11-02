@@ -25,11 +25,17 @@ type ExecHelper struct {
 	// Sub followed by the arguments.
 	render func(args []execArg) string
 	min    int // fewest arguments
+	// cond marks a test (if ...), which function code can use as a bool.
+	cond bool
+	// nsArg marks a helper whose first argument is an id of this
+	// project's namespace when written bare, such as Predicate(name).
+	nsArg bool
 }
 
 type execArg struct {
 	text     string
 	selector bool
+	coord    bool
 }
 
 func joinArgs(args []execArg) string {
@@ -260,6 +266,14 @@ func (f *fc) execParts(e syntax.Expr) (parts []string, ok bool) {
 				ok = false
 				continue
 			default:
+				if ref, isNBT := f.nbtRef(a.Value); isNBT {
+					if ref == nil {
+						ok = false
+						continue
+					}
+					ea.text, verbatim = ref.String(), false
+					break
+				}
 				sp := a.Value.Span()
 				ea.text = string(f.src[sp.Start:sp.End])
 				switch x := a.Value.(type) {
@@ -267,6 +281,16 @@ func (f *fc) execParts(e syntax.Expr) (parts []string, ok bool) {
 					ea.selector = true
 				case *syntax.Index:
 					_, ea.selector = x.X.(*syntax.Selector)
+				case *syntax.Coord:
+					ea.coord = true
+				case *syntax.Ident:
+					if h.nsArg && len(args) == 0 {
+						ea.text, verbatim = f.ns+":"+x.Name, false
+					}
+				case *syntax.ResLoc:
+					if h.nsArg && len(args) == 0 && !strings.Contains(x.Text, ":") {
+						ea.text, verbatim = f.ns+":"+x.Text, false
+					}
 				}
 			}
 			args = append(args, ea)

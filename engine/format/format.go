@@ -478,7 +478,9 @@ func (p *printer) expr(e syntax.Expr) doc {
 			hi = p.operand(e.Hi, 7)
 		}
 		return cat(lo, txt(".."), hi)
-	case *syntax.Member, *syntax.Call, *syntax.Index, *syntax.Trailing:
+	case *syntax.CommandExpr:
+		return txt("/" + strings.TrimRight(e.Text, " \t"))
+	case *syntax.Member, *syntax.Call, *syntax.Index, *syntax.Trailing, *syntax.NBT:
 		return p.chain(e)
 	}
 	return nil
@@ -613,6 +615,8 @@ loop:
 			base = x.X
 		case *syntax.Trailing:
 			base = x.X
+		case *syntax.NBT:
+			base = x.X
 		default:
 			nodes = nodes[:len(nodes)-1]
 			break loop
@@ -636,6 +640,8 @@ loop:
 			steps = append(steps, step{member: true, d: txt("." + x.Name.Text)})
 		case *syntax.Trailing:
 			steps = append(steps, step{d: cat(txt(" "), p.block(x.Block, false))})
+		case *syntax.NBT:
+			steps = append(steps, step{d: txt("::" + x.Raw)})
 		}
 	}
 	if members < 2 {

@@ -446,6 +446,12 @@ func (f *fc) stmt(out *fn.Block, s syntax.Stmt) {
 		}
 		f.store(&out.Ops, *target, f.expr(&out.Ops, s.Value), s.Value)
 	case *syntax.AssignStmt:
+		if ref, isNBT := f.nbtRef(s.Target); isNBT {
+			if ref != nil {
+				f.nbtAssign(out, ref, s)
+			}
+			return
+		}
 		target := f.target(&out.Ops, s.Target)
 		if target == nil || s.Value == nil {
 			return
@@ -518,6 +524,10 @@ func (f *fc) stmt(out *fn.Block, s syntax.Stmt) {
 		call, ok := s.X.(*syntax.Call)
 		if !ok {
 			c.errorf("mms/unused-value", s.Sp, "this expression does nothing; did you mean to assign it?")
+			return
+		}
+		if name, ok := f.isBuiltin(call); ok {
+			c.errorf("mms/unused-value", s.Sp, "%s is a value; assign it or use it in a condition", name)
 			return
 		}
 		f.call(&out.Ops, call, false)
@@ -601,6 +611,10 @@ func (f *fc) returnStmt(out *fn.Block, s *syntax.ReturnStmt) {
 		f.c.errorf("mms/unsupported", s.Value.Span(), "functions return int or bool; pass strings back through a Global")
 		return
 	}
+	if v.cmd != nil {
+		out.Add(fn.Return{Cmd: v.cmd.text, Success: f.sig.Ret == tBool})
+		return
+	}
 	if v.typ != f.sig.Ret {
 		f.c.errorf("mms/type-mismatch", s.Value.Span(), "this function returns %s, but this is %s", f.sig.Ret, v.typ)
 		return
@@ -617,10 +631,20 @@ type val struct {
 	cond *fn.Cond
 	str  *string // a constant string
 	path string  // a string in storage
+	// cmd is a command used as a value, run when the value is needed.
+	cmd *cmdVal
+	// objective marks a score on a declared Objective, which may be
+	// unset; comparisons then treat it as 0.
+	objective bool
 }
 
 // operand stores a value as an operand, turning a condition into 0 or 1.
 func (f *fc) operand(pre *[]fn.Op, v *val) fn.Operand {
+	if v.cmd != nil {
+		t := f.temp()
+		*pre = append(*pre, fn.Store{Dst: t, Cmd: v.cmd.text})
+		return fn.Of(t)
+	}
 	if v.cond == nil {
 		return v.op
 	}
@@ -639,6 +663,10 @@ func (f *fc) operand(pre *[]fn.Op, v *val) fn.Operand {
 
 func (f *fc) store(pre *[]fn.Op, l local, v *val, e syntax.Expr) {
 	if v == nil {
+		return
+	}
+	if l.typ == tBool && v.cmd != nil {
+		*pre = append(*pre, fn.Store{Dst: l.s, Success: true, Cmd: v.cmd.text})
 		return
 	}
 	if v.typ != l.typ {
@@ -788,13 +816,14 @@ func (f *fc) intExpr(pre *[]fn.Op, e syntax.Expr) *fn.Operand {
 		f.c.errorf("mms/type-mismatch", e.Span(), "expected an int, but this is %s", v.typ)
 		return nil
 	}
-	return &v.op
+	op := f.operand(pre, v)
+	return &op
 }
 
 // cond lowers a bool expression to a condition.
 func (f *fc) cond(e syntax.Expr) fn.Cond {
 	var pre []fn.Op
-	v := f.expr(&pre, e)
+	v := f.asBool(f.expr(&pre, e))
 	if v == nil {
 		return fn.Cond{Pre: pre, Never: true}
 	}
@@ -857,13 +886,31 @@ func (f *fc) expr(pre *[]fn.Op, e syntax.Expr) *val {
 	case *syntax.String:
 		v := e.Value
 		return &val{typ: tString, str: &v}
-	case *syntax.Index:
-		s := f.objScore(e)
+	case *syntax.Index, *syntax.Member, *syntax.NBT:
+		if ref, isNBT := f.nbtRef(e); isNBT {
+			if ref == nil {
+				return nil
+			}
+			return f.nbtRead(pre, ref, "")
+		}
+		ix, ok := e.(*syntax.Index)
+		if !ok {
+			break
+		}
+		s := f.objScore(ix)
 		if s == nil {
 			return nil
 		}
-		return &val{typ: tInt, op: fn.Of(*s)}
+		return &val{typ: tInt, op: fn.Of(*s), objective: true}
+	case *syntax.CommandExpr:
+		return f.commandExpr(e)
 	case *syntax.Call:
+		if IsExecChain(e) {
+			return f.condExpr(pre, e)
+		}
+		if name, ok := f.isBuiltin(e); ok {
+			return f.builtin(pre, name, e)
+		}
 		return f.call(pre, e, true)
 	case *syntax.Unary:
 		return f.unary(pre, e)
@@ -895,7 +942,7 @@ func (f *fc) unary(pre *[]fn.Op, e *syntax.Unary) *val {
 		return &val{typ: tInt, op: fn.Of(t)}
 	case "!":
 		var p []fn.Op
-		v := f.expr(&p, e.X)
+		v := f.asBool(f.expr(&p, e.X))
 		if v == nil {
 			return nil
 		}
@@ -939,7 +986,11 @@ func (f *fc) binary(pre *[]fn.Op, e *syntax.Binary) *val {
 			return f.concat(pre, l, r)
 		}
 		return f.arith(pre, e, l, r)
-	case "-", "*", "/", "%":
+	case "*":
+		if v, ok := f.scaledRead(pre, e); ok {
+			return v
+		}
+	case "-", "/", "%":
 	default:
 		f.c.errorf("mms/unsupported", e.Sp, "'%s' is not supported in functions", e.Op)
 		return nil
@@ -961,7 +1012,8 @@ func (f *fc) arith(pre *[]fn.Op, e *syntax.Binary, lv, rv *val) *val {
 			return nil
 		}
 	}
-	l, r := &lv.op, &rv.op
+	lo, ro := f.operand(pre, lv), f.operand(pre, rv)
+	l, r := &lo, &ro
 	if l.IsConst && r.IsConst {
 		a, b := int64(l.Const), int64(r.Const)
 		var v int64
@@ -1001,6 +1053,9 @@ func (f *fc) compare(pre *[]fn.Op, e *syntax.Binary) *val {
 	if l == nil || r == nil {
 		return nil
 	}
+	if l.typ == tBool || r.typ == tBool {
+		l, r = f.asBool(l), f.asBool(r)
+	}
 	if l.typ != r.typ || (l.typ != tInt && e.Op != "==" && e.Op != "!=") {
 		f.c.errorf("mms/type-mismatch", e.Sp, "cannot compare %s with %s using %s", l.typ, r.typ, e.Op)
 		return nil
@@ -1029,13 +1084,29 @@ func (f *fc) compare(pre *[]fn.Op, e *syntax.Binary) *val {
 		return &val{typ: tBool, cond: &fn.Cond{Pre: p, Never: !ok}}
 	}
 	op := e.Op
+	objective := l.objective
 	if lo.IsConst { // put the score on the left
 		lo, ro = ro, lo
+		objective = r.objective
 		op = map[string]string{"<": ">", "<=": ">=", ">": "<", ">=": "<=", "==": "==", "!=": "!="}[op]
 	}
 	var part string
 	if ro.IsConst {
 		v := int64(ro.Const)
+		if objective {
+			// An unset score reads as 0: tests that accept 0 are written
+			// as the complement, which an unset score passes.
+			if op == "!=" && v == 0 {
+				eq, _, _ := unsetCompare(lo.S, "==", 0)
+				return &val{typ: tBool, cond: f.not(fn.Cond{Pre: p, Parts: eq})}
+			}
+			if parts, always, ok := unsetCompare(lo.S, op, v); ok {
+				if always {
+					return &val{typ: tBool, cond: &fn.Cond{Pre: p}}
+				}
+				return &val{typ: tBool, cond: &fn.Cond{Pre: p, Parts: parts}}
+			}
+		}
 		var rng string
 		switch op {
 		case "<":
@@ -1077,8 +1148,8 @@ func (f *fc) compare(pre *[]fn.Op, e *syntax.Binary) *val {
 // calls may have effects.
 func (f *fc) logic(pre *[]fn.Op, e *syntax.Binary) *val {
 	var lp, rp []fn.Op
-	l := f.expr(&lp, e.L)
-	r := f.expr(&rp, e.R)
+	l := f.asBool(f.expr(&lp, e.L))
+	r := f.asBool(f.expr(&rp, e.R))
 	if l == nil || r == nil {
 		return nil
 	}

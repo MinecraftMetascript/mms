@@ -44,6 +44,9 @@ func countUses(b *Block, uses map[Score]int) {
 		case Arith:
 			add(o.Dst)
 			opnd(o.Src)
+		case Store:
+			add(o.Dst)
+			text(o.Cmd)
 		case Macro:
 			for _, a := range o.Args {
 				if a.Score != nil {
@@ -78,6 +81,7 @@ func countUses(b *Block, uses map[Score]int) {
 			if o.Val != nil {
 				opnd(*o.Val)
 			}
+			text(o.Cmd)
 		}
 	}
 }
@@ -102,6 +106,19 @@ func coalesce(b *Block, uses map[Score]int) {
 	var out []Op
 	ops := b.Ops
 	for i := 0; i < len(ops); i++ {
+		if n, ok := renameFlag(ops[i:], uses); ok {
+			out = append(out, ops[i+2], ops[i+1])
+			i += n - 1
+			continue
+		}
+		if st, ok := ops[i].(Store); ok && isTemp(st.Dst) && i+1 < len(ops) {
+			if fin, ok := ops[i+1].(Set); ok && !fin.Src.IsConst && fin.Src.S == st.Dst && uses[st.Dst] == 2 && !strings.Contains(st.Cmd, fin.Dst.String()) {
+				st.Dst = fin.Dst
+				out = append(out, st)
+				i++
+				continue
+			}
+		}
 		if set, ok := ops[i].(Set); ok && isTemp(set.Dst) {
 			t := set.Dst
 			j := i + 1
@@ -152,6 +169,63 @@ func coalesce(b *Block, uses map[Score]int) {
 		out = append(out, ops[i])
 	}
 	b.Ops = out
+}
+
+// renameFlag matches a condition run into a temporary flag and copied
+// to x right after:
+//
+//	t = 0; <if/exec ...> t = 1; x = 0; if score t matches 1: x = 1
+//
+// and rewrites ops[1] to set x directly. It returns how many ops the
+// pattern took.
+func renameFlag(ops []Op, uses map[Score]int) (int, bool) {
+	if len(ops) < 4 {
+		return 0, false
+	}
+	init, ok := ops[0].(Set)
+	if !ok || !isTemp(init.Dst) || !init.Src.IsConst || init.Src.Const != 0 || uses[init.Dst] != 3 {
+		return 0, false
+	}
+	t := init.Dst
+	setsOne := func(b *Block) bool {
+		if b == nil || len(b.Ops) != 1 {
+			return false
+		}
+		s, ok := b.Ops[0].(Set)
+		return ok && s.Dst == t && s.Src.IsConst && s.Src.Const == 1
+	}
+	var x Score
+	fin, ok := ops[2].(Set)
+	if !ok || !fin.Src.IsConst || fin.Src.Const != 0 {
+		return 0, false
+	}
+	x = fin.Dst
+	copy, ok := ops[3].(If)
+	if !ok || copy.Else != nil || len(copy.Cond.Pre) != 0 || len(copy.Cond.Parts) != 1 ||
+		copy.Cond.Parts[0] != "if score "+t.String()+" matches 1" || copy.Then == nil || len(copy.Then.Ops) != 1 {
+		return 0, false
+	}
+	if s, ok := copy.Then.Ops[0].(Set); !ok || s.Dst != x || !s.Src.IsConst || s.Src.Const != 1 {
+		return 0, false
+	}
+	setX := &Block{Ops: []Op{Set{Dst: x, Src: Const(1)}}}
+	switch run := ops[1].(type) {
+	case If:
+		if run.Else != nil || !setsOne(run.Then) || strings.Contains(strings.Join(run.Cond.Parts, " "), x.String()) || len(run.Cond.Pre) != 0 {
+			return 0, false
+		}
+		run.Then = setX
+		ops[1] = run
+	case Exec:
+		if !setsOne(run.Body) || strings.Contains(strings.Join(run.Parts, " "), x.String()) {
+			return 0, false
+		}
+		run.Body = setX
+		ops[1] = run
+	default:
+		return 0, false
+	}
+	return 4, true
 }
 
 // set is a set of scores.
@@ -236,6 +310,9 @@ func (l *liveness) op(b *Block, i int, live set) set {
 	case Arith:
 		live[o.Dst] = true
 		reads(o.Src, live)
+	case Store:
+		delete(live, o.Dst)
+		readText(o.Cmd, live)
 	case Macro:
 		for _, a := range o.Args {
 			if a.Score != nil {
@@ -303,6 +380,7 @@ func (l *liveness) op(b *Block, i int, live set) set {
 		if o.Val != nil {
 			reads(*o.Val, live)
 		}
+		readText(o.Cmd, live)
 	case Break:
 		live = set{}
 		if n := len(l.loops); n > 0 {

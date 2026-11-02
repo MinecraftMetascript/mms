@@ -117,7 +117,14 @@ func (g *gen) op(fr *frame, op Op) []string {
 		if o.Src.S == o.Dst {
 			return nil
 		}
-		return []string{fmt.Sprintf("scoreboard players operation %s = %s", o.Dst, o.Src.S)}
+		line := fmt.Sprintf("scoreboard players operation %s = %s", o.Dst, o.Src.S)
+		if !strings.HasPrefix(o.Src.S.Obj, "mms.") {
+			// A score on a declared Objective may be unset, which makes
+			// the copy fail and leave the old value: an unset score
+			// reads as 0.
+			return []string{fmt.Sprintf("scoreboard players set %s 0", o.Dst), line}
+		}
+		return []string{line}
 	case Arith:
 		src := o.Src
 		if src.IsConst && (o.Op == "+=" || o.Op == "-=") && src.Const != -1<<31 {
@@ -160,11 +167,31 @@ func (g *gen) op(fr *frame, op Op) []string {
 		}
 		cmd, after := g.run(fr, o.Body, "exec")
 		return append([]string{chain(o.Parts, cmd)}, after...)
+	case Store:
+		what := "result"
+		if o.Success {
+			what = "success"
+		}
+		return []string{chain([]string{fmt.Sprintf("store %s score %s", what, o.Dst)}, o.Cmd)}
 	}
 	panic(fmt.Sprintf("fn: unknown op %T", op))
 }
 
 func (g *gen) ret(fr *frame, o Return) []string {
+	if o.Cmd != "" {
+		if fr.kind == topFrame && !o.Success {
+			return []string{"return run " + o.Cmd}
+		}
+		rv := g.rv()
+		if fr.kind == topFrame {
+			rv = g.score(Holder(g.path, "_r"))
+		}
+		lines := g.op(fr, Store{Dst: rv, Success: o.Success, Cmd: o.Cmd})
+		if fr.kind == topFrame {
+			return append(lines, "return run scoreboard players get "+rv.String())
+		}
+		return append(lines, fmt.Sprintf("scoreboard players set %s %d", g.cf(), cfReturn), "return 0")
+	}
 	if fr.kind == topFrame {
 		switch {
 		case o.Val == nil:
@@ -192,7 +219,7 @@ func (g *gen) single(fr *frame, b *Block) (string, bool) {
 		if len(o.Args) > 0 || o.Recursive {
 			return "", false
 		}
-	case Cmd, Set, Arith:
+	case Cmd, Set, Arith, Store:
 	case Return:
 		if fr.kind != topFrame {
 			return "", false

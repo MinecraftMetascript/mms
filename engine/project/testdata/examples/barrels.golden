@@ -80,8 +80,11 @@ $item replace entity @e[type=item_display,tag=barrels.tmp,limit=1] contents from
 $item modify entity @s $(a0) barrels:remove_amount
 === data/barrels/function/broken.mcfunction
 tag @s add barrels.this
+scoreboard players set $id mms.barrels 0
 scoreboard players operation $id mms.barrels = @s barrel_id
+scoreboard players set $count mms.barrels 0
 scoreboard players operation $count mms.barrels = @s barrel_count
+scoreboard players set $stack mms.barrels 0
 scoreboard players operation $stack mms.barrels = @s barrel_stack
 execute as @e[tag=barrels.part, distance=..2] run function barrels:broken/_exec0
 function barrels:broken/_while1
@@ -280,8 +283,11 @@ return run scoreboard players get #rv mms.barrels
 execute as @e[type=item_frame,tag=barrels.place] at @s run function barrels:place
 execute as @e[type=interaction,tag=barrels.hit] at @s positioned ^ ^0.375 ^-0.5 unless block ~ ~ ~ minecraft:barrel run function barrels:broken
 === data/barrels/function/open.mcfunction
+scoreboard players set $id mms.barrels 0
 scoreboard players operation $id mms.barrels = @e[type=interaction,tag=barrels.this,limit=1] barrel_id
+scoreboard players set $count mms.barrels 0
 scoreboard players operation $count mms.barrels = @e[type=interaction,tag=barrels.this,limit=1] barrel_count
+scoreboard players set $stack mms.barrels 0
 scoreboard players operation $stack mms.barrels = @e[type=interaction,tag=barrels.this,limit=1] barrel_stack
 execute as @e[tag=barrels.part, distance=..12] run function barrels:open/_exec0
 === data/barrels/function/open/_exec0.mcfunction

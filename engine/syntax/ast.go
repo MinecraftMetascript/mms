@@ -272,6 +272,21 @@ type (
 		Block *Block
 		Sp    Span
 	}
+	// NBT is `x::key`, the start of an NBT path on an entity, a storage
+	// or a block. Key is nil while it is still being typed; Raw is the key
+	// as written, quoted when it was.
+	NBT struct {
+		X   Expr
+		Key *Name
+		Raw string
+		Sp  Span
+	}
+	// CommandExpr is a `/command` used as a value, on the right of `=`.
+	// Text excludes the slash.
+	CommandExpr struct {
+		Text string
+		Sp   Span
+	}
 	// Bad stands in for an expression that failed to parse.
 	Bad struct{ Sp Span }
 )
@@ -285,41 +300,45 @@ type Arg struct {
 
 func (a *Arg) Span() Span { return a.Sp }
 
-func (e *Number) Span() Span   { return e.Sp }
-func (e *String) Span() Span   { return e.Sp }
-func (e *Bool) Span() Span     { return e.Sp }
-func (e *Ident) Span() Span    { return e.Sp }
-func (e *ResLoc) Span() Span   { return e.Sp }
-func (e *Tag) Span() Span      { return e.Sp }
-func (e *Selector) Span() Span { return e.Sp }
-func (e *Coord) Span() Span    { return e.Sp }
-func (e *Paren) Span() Span    { return e.Sp }
-func (e *List) Span() Span     { return e.Sp }
-func (e *Object) Span() Span   { return e.Sp }
-func (e *Unary) Span() Span    { return e.Sp }
-func (e *Binary) Span() Span   { return e.Sp }
-func (e *Range) Span() Span    { return e.Sp }
-func (e *Member) Span() Span   { return e.Sp }
-func (e *Call) Span() Span     { return e.Sp }
-func (e *Index) Span() Span    { return e.Sp }
-func (e *Trailing) Span() Span { return e.Sp }
-func (e *Bad) Span() Span      { return e.Sp }
-func (*Number) expr()          {}
-func (*String) expr()          {}
-func (*Bool) expr()            {}
-func (*Ident) expr()           {}
-func (*ResLoc) expr()          {}
-func (*Tag) expr()             {}
-func (*Selector) expr()        {}
-func (*Coord) expr()           {}
-func (*Paren) expr()           {}
-func (*List) expr()            {}
-func (*Object) expr()          {}
-func (*Unary) expr()           {}
-func (*Binary) expr()          {}
-func (*Range) expr()           {}
-func (*Member) expr()          {}
-func (*Call) expr()            {}
-func (*Index) expr()           {}
-func (*Trailing) expr()        {}
-func (*Bad) expr()             {}
+func (e *Number) Span() Span      { return e.Sp }
+func (e *String) Span() Span      { return e.Sp }
+func (e *Bool) Span() Span        { return e.Sp }
+func (e *Ident) Span() Span       { return e.Sp }
+func (e *ResLoc) Span() Span      { return e.Sp }
+func (e *Tag) Span() Span         { return e.Sp }
+func (e *Selector) Span() Span    { return e.Sp }
+func (e *Coord) Span() Span       { return e.Sp }
+func (e *Paren) Span() Span       { return e.Sp }
+func (e *List) Span() Span        { return e.Sp }
+func (e *Object) Span() Span      { return e.Sp }
+func (e *Unary) Span() Span       { return e.Sp }
+func (e *Binary) Span() Span      { return e.Sp }
+func (e *Range) Span() Span       { return e.Sp }
+func (e *Member) Span() Span      { return e.Sp }
+func (e *Call) Span() Span        { return e.Sp }
+func (e *Index) Span() Span       { return e.Sp }
+func (e *Trailing) Span() Span    { return e.Sp }
+func (e *NBT) Span() Span         { return e.Sp }
+func (e *CommandExpr) Span() Span { return e.Sp }
+func (e *Bad) Span() Span         { return e.Sp }
+func (*Number) expr()             {}
+func (*String) expr()             {}
+func (*Bool) expr()               {}
+func (*Ident) expr()              {}
+func (*ResLoc) expr()             {}
+func (*Tag) expr()                {}
+func (*Selector) expr()           {}
+func (*Coord) expr()              {}
+func (*Paren) expr()              {}
+func (*List) expr()               {}
+func (*Object) expr()             {}
+func (*Unary) expr()              {}
+func (*Binary) expr()             {}
+func (*Range) expr()              {}
+func (*Member) expr()             {}
+func (*Call) expr()               {}
+func (*Index) expr()              {}
+func (*Trailing) expr()           {}
+func (*NBT) expr()                {}
+func (*CommandExpr) expr()        {}
+func (*Bad) expr()                {}

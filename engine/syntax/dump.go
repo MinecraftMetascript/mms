@@ -205,6 +205,11 @@ func (d *dumper) expr(e Expr) {
 	case *Trailing:
 		d.line("Trailing")
 		d.in(func() { d.expr(e.X); d.block(e.Block) })
+	case *NBT:
+		d.line("NBT ::%s", e.Raw)
+		d.in(func() { d.expr(e.X) })
+	case *CommandExpr:
+		d.line("CommandExpr /%s", e.Text)
 	case *Bad:
 		d.line("Bad %d-%d", e.Sp.Start, e.Sp.End)
 	case nil:

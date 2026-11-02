@@ -166,6 +166,97 @@ The body can use the function's variables. They are not per entity: a body that 
 
 `break`, `continue` and `return` cannot leave an execute block, because the block may run once per entity. Set a variable inside it and act on it afterwards.
 
+## Conditions on the world
+
+The tests of `execute if` are bool values, written as helpers with the arguments in the order the subcommand takes them:
+
+```
+Function check {
+  if (Block(~ ~-1 ~, stone) && !Entity(@a[distance=..8])) {
+    /say nobody is near this stone
+  }
+  let armed: bool = Items(@s, weapon.mainhand, bow) || Data(@s::Inventory[0])
+  if (At(@p).Entity(@e[type=zombie, distance=..4])) {
+    /say a zombie is near the closest player
+  }
+}
+```
+
+| Helper | Subcommand |
+|---|---|
+| `Block(pos, block)` | `if block` |
+| `Blocks(start, end, destination, all \| masked)` | `if blocks` |
+| `Entity(targets)` | `if entity` |
+| `Biome(pos, biome)` | `if biome` |
+| `Dimension(dimension)` | `if dimension` |
+| `Loaded(pos)` | `if loaded` |
+| `Data(target::path)`, `Data(target, path)` | `if data entity`, `storage` or `block`, by how the target is written |
+| `Items(target, slot, item)` | `if items entity` or `block` |
+| `Predicate(predicate)` | `if predicate` (a bare name is one of this project's predicates) |
+| `Function(function)` | `if function` |
+| `Execute("if ...")` | any test, written as text |
+
+A condition may start with context helpers, such as `At(@p).Entity(...)` or `Positioned(~ ~-1 ~).Block(~ ~ ~, air)`. The test then runs in that context, and the statement it guards does not: `if (At(@p).Block(~ ~-1 ~, lava)) { /say danger }` says it where the function runs. A chain of tests alone, such as `Block(...) && Entity(...)`, becomes one `execute if ... if ...`; a chain with context becomes a flag that is set under `execute at @p ...` and tested after.
+
+The same helpers work as execute blocks: `Entity(@e[tag=boss]) { ... }` runs the block when the boss exists.
+
+`Count(targets)` is the number of entities a selector matches, as an int.
+
+## NBT
+
+`target::path` reads and writes NBT. The target is an entity (a selector), a storage (`namespace:name`, or a bare name for a storage in this namespace) or a block (coordinates). Reads are ints: `data get` rounds decimals down, so multiply first to keep them.
+
+```
+Function nbt {
+  let y = @s::Pos[1]                       // data get entity @s Pos[1]
+  let cents = @s::Pos[1] * 100             // data get entity @s Pos[1] 100
+  let next = siege:path::queue[0].x        // data get storage siege:path queue[0].x
+  let items = ~ ~-1 ~::Items               // the number of entries in a list
+
+  path::count = next + 1                   // storage demo:path, written as an int
+  path::name = "bob"                       // a string
+  path::done = y > 60                      // a bool, written as a byte
+  @s::Health = Float(20)                   // a typed write
+  @s::Motion[1] = Double(cents)            // from a variable, through execute store
+  @s::Pos = @e[tag=m, limit=1]::Pos        // a copy keeps the source's type
+  path::count += 1                         // read, add, write back as an int
+}
+```
+
+`Byte(x)`, `Short(x)`, `Int(x)`, `Long(x)`, `Float(x)` and `Double(x)` set the type of a written number; without one, numbers are ints and bools are bytes. A compound operator such as `+=` writes an int.
+
+A list index is a whole number, counting from the end when negative: `Inventory[-1]`. For any other path form, write the path in quotes: `@s::"Inventory[{Slot:0b}].id"`. Lists and compounds are not written from code yet; use `/data modify`.
+
+The checker checks the selector and the path's syntax. Whether the path fits the entity is left to the game.
+
+## Commands as values
+
+A command on the right of `=` or after `return` runs and gives its result, or its success when the value is a bool:
+
+```
+Function count(): int {
+  let n = /execute if entity @e[tag=enemy]       // store result
+  let has_path: bool = /data get storage demo:path queue  // store success
+  return /scoreboard players get #best demo_score
+}
+```
+
+The command runs to the end of the line, so it cannot sit inside a longer expression; store it in a variable first. `${...}` is not supported inside one.
+
+## Built-in functions
+
+| Function | Value |
+|---|---|
+| `Count(targets)` | the number of entities a selector matches |
+| `Abs(x)` | the absolute value |
+| `Min(a, b, ...)`, `Max(a, b, ...)` | the smallest or largest of the values |
+
+A declared `Function` with one of these names takes precedence.
+
+## Unset scores
+
+A score on an `Objective` that was never set reads as 0: a comparison such as `kills[@s] == 0` or `kills[@s] < 5` holds for a player with no score, and `let n = kills[@s]` gives 0. The scoreboard itself fails such a test, so the generated command is the complement (`execute unless score @s kills matches 1..`), and a copy from a score sets 0 first. Comparing two objective scores with each other still needs both to be set, as `execute if score a < b` does.
+
 ## Event hooks
 
 These declarations run their body when something happens, as the player it happens to, at their position:
@@ -297,7 +388,7 @@ A loop is a function that checks its condition, runs its body and calls itself. 
 
 **Leaving early.** When `break`, `continue` or `return` happens inside a sub-function, it sets `#cf`, and the calling function passes it on. The return value travels in `#rv`.
 
-**Results.** Functions return values with the `return` command, and callers read them with `execute store result score`.
+**Results.** Functions return values with the `return` command, and callers read them with `execute store result score`. NBT reads, `Count` and commands used as values also come through `execute store result score`; a command that gives a bool uses `store success`.
 
 **Recursion.** A call that can lead back to the calling function, directly or through other functions, pushes the caller's scores onto a stack in storage, `<namespace>:mms stack`, and pops them afterwards. Only the scores read after the call are saved. Every other call costs nothing extra.
 

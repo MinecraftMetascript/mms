@@ -210,7 +210,8 @@ func (vm *VM) data(w []string) (result, error) {
 		}
 		v, err := vm.get(id, path)
 		if err != nil {
-			return result{}, err
+			// Nothing at the path: the command fails.
+			return result{failed: true}, nil
 		}
 		scale := 1.0
 		if len(w) > 4 {

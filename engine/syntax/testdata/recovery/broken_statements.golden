@@ -8,5 +8,5 @@ Decl Function f()
         Ident x
         Bad 46-46
       Block
-! 28-35 unexpected '/say hi' expecting {'true', 'false', RESLOC, IDENT, NUMBER, STRING, '..', '{', '(', '[', '+', '-', '!', '#', '@', '~', '^'}
+! 28-35 unexpected '/say hi' expecting {'true', 'false', INLINE_COMMAND, RESLOC, IDENT, NUMBER, STRING, '..', '{', '(', '[', '+', '-', '!', '#', '@', '~', '^'}
 ! 46-47 cannot parse ')'

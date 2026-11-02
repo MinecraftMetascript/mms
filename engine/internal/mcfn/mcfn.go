@@ -279,7 +279,8 @@ func (vm *VM) scoreboard(w []string) (result, error) {
 		a, _ := vm.Score(holder, obj)
 		b, ok := vm.Score(w[6], w[7])
 		if !ok {
-			return result{}, fmt.Errorf("%s has no score on %s", w[6], w[7])
+			// The game fails the command and leaves the score as it was.
+			return result{failed: true}, nil
 		}
 		var v int32
 		switch w[5] {

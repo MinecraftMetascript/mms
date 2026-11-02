@@ -124,6 +124,7 @@ func enclosingCall(f *syntax.File, open *syntax.Token) (name string, index int, 
 func (s *Session) codeValues(a *at, off int) []sema.Candidate {
 	out := locals(a.u.File, a.fn, off)
 	out = append(out, s.projectNames(a)...)
+	out = append(out, sema.BuiltinCandidates()...)
 	out = append(out,
 		sema.Candidate{Label: "true", Kind: sema.CandKeyword, Rank: 200},
 		sema.Candidate{Label: "false", Kind: sema.CandKeyword, Rank: 201})

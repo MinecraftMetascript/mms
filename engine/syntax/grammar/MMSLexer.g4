@@ -22,6 +22,10 @@ FALSE    : 'false';
 // command checker parses it against the command tree.
 COMMAND : '/' {p.atLineStart()}? [a-z] ~[\r\n]*;
 
+// A command as a value: `let n = /execute if entity @a` stores the
+// command's result. It runs to the end of the line, like COMMAND.
+INLINE_COMMAND : '/' {p.afterAssign()}? [a-z] ~[\r\n]*;
+
 DOC_COMMENT   : '/**' .*? '*/' -> channel(HIDDEN);
 BLOCK_COMMENT : '/*' .*? '*/' -> channel(HIDDEN);
 // An unclosed block comment runs to the end of the file, as in Go and C.
@@ -43,6 +47,7 @@ NUMBER : DIGIT+ ('.' DIGIT+)? ([eE] [+-]? DIGIT+)?;
 STRING : '"' (ESC | ~["\\\r\n])* '"' | '\'' (ESC | ~['\\\r\n])* '\'';
 
 ARROW   : '->';
+COLONCOLON : '::';
 DOTDOT  : '..';
 PLUS_EQ : '+=';
 MINUS_EQ: '-=';

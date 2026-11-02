@@ -32,12 +32,14 @@ export const mmsLanguage = StreamLanguage.define<{ inBlock: boolean }>({
 		}
 		if (stream.match(/^"(?:[^"\\]|\\.)*"?/) || stream.match(/^'(?:[^'\\]|\\.)*'?/)) return 'string';
 		if (stream.match(/^\d+(\.\d+)?([eE][+-]?\d+)?/)) return 'number';
+		// A command used as a value: `let n = /data get ...`, `return /...`.
+		if (/(^|[^=!<>])=\s*$|\breturn\s*$/.test(stream.string.slice(0, stream.pos)) && stream.match(/^\/[a-z][^\n]*/)) return 'meta';
 		if (stream.match(/^(true|false|let|if|else|while|for|in|return|break|continue)\b/)) return 'keyword';
 		if (stream.match(/^[a-z0-9_.-]+:[a-z0-9_./-]+/)) return 'atom';
 		// Identifiers are left to semantic tokens, which know kinds from
 		// helpers from references.
 		if (stream.match(/^[A-Za-z_][A-Za-z0-9_]*/)) return null;
-		if (stream.match(/^(==|!=|<=|>=|&&|\|\||\.\.|[-+*/%=<>!])/)) return 'operator';
+		if (stream.match(/^(==|!=|<=|>=|&&|\|\||\.\.|::|[-+*/%=<>!])/)) return 'operator';
 		stream.next();
 		return null;
 	},

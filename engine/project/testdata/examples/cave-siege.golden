@@ -481,6 +481,7 @@ execute if score #banner_second._t2 mms.siege matches 1 run function siege:repat
 function siege:carrot_second
 scoreboard players set #lost cs_tmp 0
 execute as @e[tag=cs_parked] run function siege:parked_damage
+scoreboard players set #banner_second.lost mms.siege 0
 scoreboard players operation #banner_second.lost mms.siege = #lost cs_tmp
 execute if score #banner_second.lost mms.siege matches 1.. run function siege:banner_second/_if2
 execute if score $banner_hp mms.siege matches ..0 run function siege:banner_second/_if3
@@ -572,7 +573,9 @@ execute in siege:scratch if block ~ ~ ~ minecraft:purple_wool at @s run return r
 execute in siege:scratch if block ~ ~ ~ minecraft:blue_wool at @s run return run tp @s ~ ~1 ~1
 execute facing entity @e[tag=cs_core,limit=1] feet rotated ~ 0 positioned ^ ^ ^1 align xyz positioned ~0.5 ~ ~0.5 if block ~ ~ ~ #siege:walkable if block ~ ~1 ~ #siege:walkable run tp @s ~ ~ ~
 === data/siege/function/clear_slab.mcfunction
+scoreboard players set #clear_slab.x mms.siege 0
 scoreboard players operation #clear_slab.x mms.siege = #cx cs_tmp
+scoreboard players set #clear_slab._t0 mms.siege 0
 scoreboard players operation #clear_slab._t0 mms.siege = #cy cs_tmp
 scoreboard players remove #clear_slab._t0 mms.siege 16
 scoreboard players operation #clear_slab._t2 mms.siege = #clear_slab.n mms.siege
@@ -580,9 +583,11 @@ scoreboard players remove #clear_slab._t2 mms.siege 1
 scoreboard players operation #clear_slab._t2 mms.siege *= #c7 mms.siege
 scoreboard players operation #clear_slab.y mms.siege = #clear_slab._t0 mms.siege
 scoreboard players operation #clear_slab.y mms.siege += #clear_slab._t2 mms.siege
+scoreboard players set #clear_slab.z mms.siege 0
 scoreboard players operation #clear_slab.z mms.siege = #cz cs_tmp
 scoreboard players operation #clear_slab.top mms.siege = #clear_slab.y mms.siege
 scoreboard players add #clear_slab.top mms.siege 6
+scoreboard players set #clear_slab._t5 mms.siege 0
 scoreboard players operation #clear_slab._t5 mms.siege = #cy cs_tmp
 scoreboard players add #clear_slab._t5 mms.siege 16
 execute if score #clear_slab.top mms.siege > #clear_slab._t5 mms.siege run function siege:clear_slab/_if0
@@ -625,6 +630,7 @@ data modify storage siege:mms m.a1 set from storage siege:mms l."clear_slab".to
 function siege:clear_slab/_macro11 with storage siege:mms m
 execute if score #clear_slab.n mms.siege matches 1 run function siege:save_banner
 === data/siege/function/clear_slab/_if0.mcfunction
+scoreboard players set #clear_slab.top mms.siege 0
 scoreboard players operation #clear_slab.top mms.siege = #cy cs_tmp
 scoreboard players add #clear_slab.top mms.siege 16
 === data/siege/function/clear_slab/_macro1.mcfunction
@@ -681,6 +687,7 @@ execute if entity @s[tag=cs_sapper] run scoreboard players set @s cs_stuck 10000
 === data/siege/function/enemy_update.mcfunction
 scoreboard players add @s cs_age 1
 function siege:steer
+scoreboard players set #enemy_update._t0 mms.siege 0
 scoreboard players operation #enemy_update._t0 mms.siege = @s cs_age
 scoreboard players operation #enemy_update._t0 mms.siege %= #c25 mms.siege
 execute if score #enemy_update._t0 mms.siege matches 0 run function siege:stuck_check
@@ -691,7 +698,7 @@ function siege:break_step
 === data/siege/function/find_banner.mcfunction
 execute if block ~ ~ ~ #minecraft:banners run return run function siege:found_banner
 scoreboard players add #ray cs_tmp 1
-execute if score #ray cs_tmp matches ..59 positioned ^ ^ ^0.1 run function siege:find_banner
+execute unless score #ray cs_tmp matches 60.. positioned ^ ^ ^0.1 run function siege:find_banner
 === data/siege/function/found_banner.mcfunction
 execute if score $banner_placed mms.siege matches 1 run function siege:found_banner/_if0
 execute if score #cf mms.siege matches 3 run return run function siege:mms_gen/ret
@@ -716,6 +723,7 @@ tag @e[tag=cs_new_carrot] remove cs_new_carrot
 execute in minecraft:overworld run spreadplayers 0 0 0 8 under 40 false @s
 execute at @s run setworldspawn ~ ~ ~
 === data/siege/function/mark.mcfunction
+scoreboard players set #mark._t1 mms.siege 0
 scoreboard players operation #mark._t1 mms.siege = #h cs_tmp
 scoreboard players operation #mark._t1 mms.siege *= #c3 mms.siege
 scoreboard players operation #mark._t1 mms.siege += #v cs_tmp
@@ -829,8 +837,11 @@ execute store result score #px cs_tmp run data get storage siege:path queue[0].x
 execute store result score #py cs_tmp run data get storage siege:path queue[0].y
 execute store result score #pz cs_tmp run data get storage siege:path queue[0].z
 data remove storage siege:path queue[0]
+scoreboard players set #path_step.x mms.siege 0
 scoreboard players operation #path_step.x mms.siege = #px cs_tmp
+scoreboard players set #path_step.y mms.siege 0
 scoreboard players operation #path_step.y mms.siege = #py cs_tmp
+scoreboard players set #path_step.z mms.siege 0
 scoreboard players operation #path_step.z mms.siege = #pz cs_tmp
 scoreboard players set #h cs_tmp 0
 scoreboard players operation #path_step._t0 mms.siege = #path_step.x mms.siege
@@ -888,7 +899,7 @@ return 0
 === data/siege/function/path_work/_while0.mcfunction
 execute unless score #path_work.n mms.siege matches ..39 run return 0
 execute store result score #more cs_tmp if data storage siege:path queue[0]
-execute if score #more cs_tmp matches 0 run function siege:path_work/_if1
+execute unless score #more cs_tmp matches ..-1 unless score #more cs_tmp matches 1.. run function siege:path_work/_if1
 execute if score #cf mms.siege matches 3 run return 0
 function siege:path_step
 scoreboard players add #path_work.n mms.siege 1
@@ -901,7 +912,9 @@ data merge entity @s {Silent:0b}
 execute at @s run tp @s ~ -1000 ~
 kill @s
 === data/siege/function/repath.mcfunction
+scoreboard players set #repath.x mms.siege 0
 scoreboard players operation #repath.x mms.siege = #cx cs_tmp
+scoreboard players set #repath.z mms.siege 0
 scoreboard players operation #repath.z mms.siege = #cz cs_tmp
 scoreboard players operation #repath._t0 mms.siege = #repath.x mms.siege
 scoreboard players remove #repath._t0 mms.siege 32
@@ -970,8 +983,11 @@ return 0
 === data/siege/function/save_banner.mcfunction
 execute at @e[tag=cs_core,limit=1] if block ~ ~ ~ #minecraft:banners run clone ~ ~ ~ ~ ~ ~ to siege:scratch ~ 319 ~
 === data/siege/function/scratch_loaded.mcfunction
+scoreboard players set #scratch_loaded.x mms.siege 0
 scoreboard players operation #scratch_loaded.x mms.siege = #cx cs_tmp
+scoreboard players set #scratch_loaded.y mms.siege 0
 scoreboard players operation #scratch_loaded.y mms.siege = #cy cs_tmp
+scoreboard players set #scratch_loaded.z mms.siege 0
 scoreboard players operation #scratch_loaded.z mms.siege = #cz cs_tmp
 scoreboard players operation #scratch_loaded._t0 mms.siege = #scratch_loaded.x mms.siege
 scoreboard players remove #scratch_loaded._t0 mms.siege 32
@@ -1097,8 +1113,11 @@ tellraw @s "Banner sealed in cobblestone. Enemies should get stuck, then dig in.
 === data/siege/function/seal_banner_obsidian.mcfunction
 execute at @e[tag=cs_core,limit=1] run fill ~-2 ~-1 ~-2 ~2 ~2 ~2 minecraft:obsidian outline
 === data/siege/function/seed.mcfunction
+scoreboard players set #seed.x mms.siege 0
 scoreboard players operation #seed.x mms.siege = #cx cs_tmp
+scoreboard players set #seed.y mms.siege 0
 scoreboard players operation #seed.y mms.siege = #cy cs_tmp
+scoreboard players set #seed.z mms.siege 0
 scoreboard players operation #seed.z mms.siege = #cz cs_tmp
 execute store result storage siege:mms m.a1 int 1 run scoreboard players get #seed.x mms.siege
 function siege:seed/_macro0 with storage siege:mms m
@@ -1194,6 +1213,7 @@ data modify storage siege:mms l."spawn".kind set value "minecraft:zombie"
 scoreboard players set #spawn.count mms.siege 20
 function siege:spawn
 === data/siege/function/standable.mcfunction
+scoreboard players set #standable.dy mms.siege 0
 scoreboard players operation #standable.dy mms.siege = #ny cs_tmp
 scoreboard players operation #standable.dy mms.siege -= #cy cs_tmp
 scoreboard players set #standable._t1 mms.siege 0
@@ -1208,6 +1228,7 @@ return run scoreboard players get #standable._t2 mms.siege
 execute if score #standable.dy mms.siege matches ..-17 run scoreboard players set #standable._t1 mms.siege 1
 === data/siege/function/status.mcfunction
 execute store result score #enemies cs_tmp if entity @e[tag=cs_enemy]
+scoreboard players set #status.enemies mms.siege 0
 scoreboard players operation #status.enemies mms.siege = #enemies cs_tmp
 scoreboard players set #status._f0 mms.siege 0
 execute if score $banner_placed mms.siege matches 1 run scoreboard players set #status._f0 mms.siege 1
@@ -1230,6 +1251,7 @@ scoreboard players set #tgt cs_tmp 0
 execute on target run scoreboard players set #tgt cs_tmp 1
 execute on target if entity @s[tag=cs_carrot] run scoreboard players set #tgt cs_tmp 2
 execute on target if entity @s[tag=cs_parked] run scoreboard players set #tgt cs_tmp 3
+scoreboard players set #steer.tgt mms.siege 0
 scoreboard players operation #steer.tgt mms.siege = #tgt cs_tmp
 execute if score #steer.tgt mms.siege matches 0 run function siege:steer/_if0
 execute if score #steer.tgt mms.siege matches 2.. run function siege:steer/_if1
@@ -1238,6 +1260,7 @@ execute if score #steer.tgt mms.siege matches 3 run scoreboard players set #stee
 scoreboard players operation #bow_check.parked mms.siege = #steer._t1 mms.siege
 function siege:bow_check
 === data/siege/function/steer/_if0.mcfunction
+scoreboard players set #steer._t0 mms.siege 0
 scoreboard players operation #steer._t0 mms.siege = @s cs_age
 scoreboard players operation #steer._t0 mms.siege %= #c5 mms.siege
 execute if score #steer._t0 mms.siege matches 1 unless entity @e[tag=cs_carrot,distance=..5] run function siege:give_carrot
@@ -1249,10 +1272,13 @@ execute unless entity @s[type=minecraft:creeper] on target if entity @s[distance
 execute store result score #ex cs_tmp run data get entity @s Pos[0]
 execute store result score #ey cs_tmp run data get entity @s Pos[1]
 execute store result score #ez cs_tmp run data get entity @s Pos[2]
+scoreboard players set #stuck_check.dx mms.siege 0
 scoreboard players operation #stuck_check.dx mms.siege = #ex cs_tmp
 scoreboard players operation #stuck_check.dx mms.siege -= #cx cs_tmp
+scoreboard players set #stuck_check.dy mms.siege 0
 scoreboard players operation #stuck_check.dy mms.siege = #ey cs_tmp
 scoreboard players operation #stuck_check.dy mms.siege -= #cy cs_tmp
+scoreboard players set #stuck_check.dz mms.siege 0
 scoreboard players operation #stuck_check.dz mms.siege = #ez cs_tmp
 scoreboard players operation #stuck_check.dz mms.siege -= #cz cs_tmp
 execute if score #stuck_check.dx mms.siege matches ..-1 run function siege:stuck_check/_if0
@@ -1263,9 +1289,10 @@ scoreboard players operation #stuck_check._t7 mms.siege += #stuck_check.dy mms.s
 scoreboard players operation #stuck_check._t7 mms.siege += #stuck_check.dz mms.siege
 scoreboard players operation #stuck_check.d mms.siege = #stuck_check._t7 mms.siege
 execute store result score #near cs_tmp if entity @a[distance=..8,gamemode=!spectator,gamemode=!creative]
+scoreboard players set #stuck_check._t8 mms.siege 0
 scoreboard players operation #stuck_check._t8 mms.siege = @s cs_prev
 scoreboard players remove #stuck_check._t8 mms.siege 2
-execute if score #stuck_check.d mms.siege > #stuck_check._t8 mms.siege if score @s cs_stuck matches ..0 if score #near cs_tmp matches 0 run scoreboard players set @s cs_stuck 50
+execute if score #stuck_check.d mms.siege > #stuck_check._t8 mms.siege unless score @s cs_stuck matches 1.. unless score #near cs_tmp matches ..-1 unless score #near cs_tmp matches 1.. run scoreboard players set @s cs_stuck 50
 scoreboard players operation @s cs_prev = #stuck_check.d mms.siege
 === data/siege/function/stuck_check/_if0.mcfunction
 scoreboard players set #stuck_check._t3 mms.siege 0
@@ -1316,13 +1343,16 @@ execute in siege:caves run spreadplayers 0 0 0 8 under 40 false @s
 tellraw @s "Welcome to the caves. The starter cavern is at x 0, z 0."
 === data/siege/function/visit_column.mcfunction
 scoreboard players set #v cs_tmp 0
+scoreboard players set #ny cs_tmp 0
 scoreboard players operation #ny cs_tmp = #py cs_tmp
 execute if function siege:standable run return run function siege:mark
 scoreboard players set #v cs_tmp 1
+scoreboard players set #ny cs_tmp 0
 scoreboard players operation #ny cs_tmp = #py cs_tmp
 scoreboard players add #ny cs_tmp 1
 execute positioned ~ ~1 ~ if function siege:standable run return run function siege:mark
 scoreboard players set #v cs_tmp 2
+scoreboard players set #ny cs_tmp 0
 scoreboard players operation #ny cs_tmp = #py cs_tmp
 scoreboard players remove #ny cs_tmp 1
 execute positioned ~ ~-1 ~ if function siege:standable run return run function siege:mark

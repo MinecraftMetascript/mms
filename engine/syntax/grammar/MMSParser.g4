@@ -56,11 +56,22 @@ statement
     | fieldKey ASSIGN expr                                        # fieldStmt
     | IDENT (DOT IDENT)+ ASSIGN expr                              # pathAssignStmt
     | IDENT LBRACK arg RBRACK ASSIGN expr                         # indexAssignStmt
+    | nbtTarget ASSIGN expr                                       # nbtAssignStmt
     | expr op=(PLUS_EQ | MINUS_EQ | STAR_EQ | SLASH_EQ | PCT_EQ) expr # compoundAssignStmt
     | expr                                                        # exprStmt
     ;
 
 ifTail : IF LPAREN expr RPAREN block (ELSE (ifTail | block))?;
+
+// The left side of `@s::Health = 20`: a target, '::' and a path. Spelled
+// out rather than as an expr so that `rolls =` with a missing value is
+// still a field, and recovers as one.
+nbtTarget
+    : (AT IDENT (LBRACK (arg (COMMA arg)* COMMA?)? RBRACK)? | RESLOC | IDENT | coordinate)
+      COLONCOLON name=(IDENT | STRING) (DOT IDENT | LBRACK arg RBRACK)*
+    ;
+
+coordinate : ((TILDE | CARET) (MINUS? NUMBER)?)+;
 
 fieldKey : IDENT | RESLOC | STRING;
 
@@ -84,6 +95,7 @@ postfix
     | args                                               # callPostfix
     | LBRACK (arg (COMMA arg)* COMMA?)? RBRACK           # indexPostfix
     | block                                              # blockPostfix
+    | COLONCOLON name=(IDENT | STRING)?                  # nbtPostfix
     ;
 
 args : LPAREN (arg (COMMA arg)* COMMA?)? RPAREN;
@@ -92,12 +104,13 @@ arg  : (IDENT ASSIGN)? expr;
 primary
     : NUMBER                                             # numberLit
     | STRING                                             # stringLit
+    | INLINE_COMMAND                                     # commandExpr
     | (TRUE | FALSE)                                     # boolLit
     | IDENT                                              # identRef
     | RESLOC                                             # reslocRef
     | HASH (IDENT | RESLOC)                              # tagRef
     | AT IDENT                                           # selector
-    | ((TILDE | CARET) (MINUS? NUMBER)?)+                # coordinate
+    | coordinate                                         # coordinateLit
     | LPAREN expr RPAREN                                 # parenExpr
     | LBRACK (expr ((COMMA | {p.onNewLine()}?) expr)* COMMA?)? RBRACK # listLit
     | block                                              # objectLit

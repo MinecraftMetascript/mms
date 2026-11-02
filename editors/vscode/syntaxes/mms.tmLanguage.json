@@ -18,7 +18,7 @@
     },
     "command": {
       "name": "meta.command.mms",
-      "begin": "^\\s*(/)([a-z]+)",
+      "begin": "(?:^\\s*|(?<=[^=!<>]=)\\s*|(?<=\\breturn)\\s+)(/)([a-z]+)",
       "beginCaptures": {
         "1": { "name": "punctuation.definition.command.mms" },
         "2": { "name": "support.function.command.mms" }
@@ -60,7 +60,7 @@
         { "name": "constant.numeric.mms", "match": "\\b\\d+(\\.\\d+)?([eE][+-]?\\d+)?\\b" },
         { "name": "entity.name.function.mms", "match": "\\b[A-Z][A-Za-z0-9]*(?=\\s*\\()" },
         { "name": "support.type.mms", "match": "(?<=:\\s)(int|bool|string)\\b" },
-        { "name": "keyword.operator.mms", "match": "\\.\\.|->|[-+*/%]=?|==|!=|<=|>=|&&|\\|\\||[<>!=]" }
+        { "name": "keyword.operator.mms", "match": "\\.\\.|::|->|[-+*/%]=?|==|!=|<=|>=|&&|\\|\\||[<>!=]" }
       ]
     }
   }

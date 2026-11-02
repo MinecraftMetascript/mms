@@ -319,6 +319,8 @@ func (b *builder) stmt(c parser.IStatementContext) Stmt {
 			Value:     b.expr(s.Expr(), sp),
 			Sp:        sp,
 		}
+	case *parser.NbtAssignStmtContext:
+		return &AssignStmt{Target: b.nbtTarget(s.NbtTarget().(*parser.NbtTargetContext)), Op: "=", Value: b.expr(s.Expr(), sp), Sp: sp}
 	case *parser.CompoundAssignStmtContext:
 		return &AssignStmt{
 			Target: b.expr(s.Expr(0), sp),
@@ -447,6 +449,114 @@ func (b *builder) postfix(x Expr, c parser.IPostfixContext, sp Span) Expr {
 		return &Index{X: x, Args: b.args(p.AllArg()), Sp: sp}
 	case *parser.BlockPostfixContext:
 		return &Trailing{X: x, Block: b.block(p.Block()), Sp: sp}
+	case *parser.NbtPostfixContext:
+		n := &NBT{X: x, Sp: sp}
+		if p.GetName() != nil && p.GetName().GetStart() >= 0 {
+			n.Raw = p.GetName().GetText()
+			text := n.Raw
+			if p.GetName().GetTokenType() == parser.MMSLexerSTRING {
+				text = unquote(text)
+			}
+			n.Key = &Name{Text: text, Sp: tokSpan(p.GetName())}
+		} else {
+			b.file.Diags = append(b.file.Diags, Diagnostic{
+				Code: "syntax/missing-name", Severity: SeverityError,
+				Message: "expected an NBT path after '::'", Sp: Span{sp.End, sp.End},
+			})
+		}
+		return n
+	}
+	return x
+}
+
+// nbtTarget builds the left side of an NBT assignment, walking the
+// context's children in order: the base, '::' and the key, then members
+// and indexes.
+func (b *builder) nbtTarget(c *parser.NbtTargetContext) Expr {
+	sp := span(c)
+	var x Expr
+	children := c.GetChildren()
+	i := 0
+	// The base.
+	if t, ok := children[0].(antlr.TerminalNode); ok {
+		switch t.GetSymbol().GetTokenType() {
+		case parser.MMSLexerAT:
+			name := children[1].(antlr.TerminalNode)
+			x = &Selector{Name: name.GetText(), Sp: Span{tokSpan(t.GetSymbol()).Start, tokSpan(name.GetSymbol()).End}}
+			i = 2
+			if i < len(children) {
+				if lb, ok := children[i].(antlr.TerminalNode); ok && lb.GetSymbol().GetTokenType() == parser.MMSLexerLBRACK {
+					var args []parser.IArgContext
+					j := i + 1
+					for ; j < len(children); j++ {
+						if a, ok := children[j].(parser.IArgContext); ok {
+							args = append(args, a)
+						} else if rb, ok := children[j].(antlr.TerminalNode); ok && rb.GetSymbol().GetTokenType() == parser.MMSLexerRBRACK {
+							x = &Index{X: x, Args: b.args(args), Sp: Span{x.Span().Start, tokSpan(rb.GetSymbol()).End}}
+							break
+						}
+					}
+					i = j + 1
+				}
+			}
+		case parser.MMSLexerRESLOC:
+			x = &ResLoc{Text: t.GetText(), Sp: tokSpan(t.GetSymbol())}
+			i = 1
+		case parser.MMSLexerIDENT:
+			x = &Ident{Name: t.GetText(), Sp: tokSpan(t.GetSymbol())}
+			i = 1
+		}
+	} else if cc, ok := children[0].(*parser.CoordinateContext); ok {
+		csp := span(cc)
+		x = &Coord{Text: b.sourceText(csp), Sp: csp}
+		i = 1
+	}
+	if x == nil {
+		return &Bad{Sp: sp}
+	}
+	// '::' and the key.
+	n := &NBT{X: x, Sp: Span{sp.Start, nodeSpan(c.COLONCOLON()).End}}
+	if name := c.GetName(); name != nil {
+		n.Raw = name.GetText()
+		text := n.Raw
+		if name.GetTokenType() == parser.MMSLexerSTRING {
+			text = unquote(text)
+		}
+		n.Key = &Name{Text: text, Sp: tokSpan(name)}
+		n.Sp.End = n.Key.Sp.End
+	}
+	x = n
+	for i++; i < len(children); i++ {
+		if i+1 >= len(children) {
+			break
+		}
+		t, ok := children[i].(antlr.TerminalNode)
+		if !ok {
+			continue
+		}
+		switch t.GetSymbol().GetTokenType() {
+		case parser.MMSLexerDOT:
+			id, ok := children[i+1].(antlr.TerminalNode)
+			if !ok {
+				continue
+			}
+			nm := &Name{Text: id.GetText(), Sp: tokSpan(id.GetSymbol())}
+			x = &Member{X: x, Name: nm, Sp: Span{sp.Start, nm.Sp.End}}
+			i++
+		case parser.MMSLexerLBRACK:
+			a, ok := children[i+1].(parser.IArgContext)
+			if !ok {
+				continue
+			}
+			end := span(a.(antlr.ParserRuleContext)).End
+			if i+2 < len(children) {
+				if rb, ok := children[i+2].(antlr.TerminalNode); ok {
+					end = tokSpan(rb.GetSymbol()).End
+				}
+			}
+			x = &Index{X: x, Args: b.args([]parser.IArgContext{a}), Sp: Span{sp.Start, end}}
+			i += 2
+		}
 	}
 	return x
 }
@@ -472,6 +582,8 @@ func (b *builder) primary(c parser.IPrimaryContext, sp Span) Expr {
 		return &Number{Text: text, Sp: sp}
 	case *parser.StringLitContext:
 		return &String{Value: unquote(text), Raw: text, Sp: sp}
+	case *parser.CommandExprContext:
+		return &CommandExpr{Text: strings.TrimRight(strings.TrimPrefix(text, "/"), " \t\r"), Sp: sp}
 	case *parser.BoolLitContext:
 		return &Bool{Value: text == "true", Sp: sp}
 	case *parser.IdentRefContext:
@@ -482,7 +594,7 @@ func (b *builder) primary(c parser.IPrimaryContext, sp Span) Expr {
 		return &Tag{Name: strings.TrimPrefix(text, "#"), Sp: sp}
 	case *parser.SelectorContext:
 		return &Selector{Name: strings.TrimPrefix(text, "@"), Sp: sp}
-	case *parser.CoordinateContext:
+	case *parser.CoordinateLitContext:
 		return &Coord{Text: b.sourceText(sp), Sp: sp}
 	case *parser.ParenExprContext:
 		return &Paren{X: b.expr(p.Expr(), sp), Sp: sp}

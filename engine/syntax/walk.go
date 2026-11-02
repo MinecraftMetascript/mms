@@ -105,6 +105,11 @@ func Children(n Node) []Node {
 		}
 	case *Trailing:
 		add(n.X, n.Block)
+	case *NBT:
+		add(n.X)
+		if n.Key != nil {
+			add(n.Key)
+		}
 	case *Arg:
 		if n.Name != nil {
 			add(n.Name)

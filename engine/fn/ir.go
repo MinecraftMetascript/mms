@@ -97,8 +97,21 @@ type (
 		Parts []string
 		Body  *Block
 	}
-	// Return leaves the function, with a value when Val is set.
-	Return   struct{ Val *Operand }
+	// Store runs a command and stores its result (or, when Success is
+	// set, whether it succeeded) in Dst: `execute store result score
+	// <dst> run <cmd>`. Cmd may itself be an execute chain.
+	Store struct {
+		Dst     Score
+		Success bool
+		Cmd     string
+	}
+	// Return leaves the function, with a value when Val is set, or with
+	// the result (or success) of Cmd when that is set.
+	Return struct {
+		Val     *Operand
+		Cmd     string
+		Success bool
+	}
 	Break    struct{}
 	Continue struct{}
 )
@@ -111,6 +124,7 @@ func (Call) op()     {}
 func (If) op()       {}
 func (Loop) op()     {}
 func (Exec) op()     {}
+func (Store) op()    {}
 func (Return) op()   {}
 func (Break) op()    {}
 func (Continue) op() {}
