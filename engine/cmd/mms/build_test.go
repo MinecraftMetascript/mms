@@ -92,13 +92,15 @@ TemplatePool houses = {
 		t.Errorf("pack-resources.zip:\n got %s\nwant %s", got, res)
 	}
 
-	world := t.TempDir()
+	game := t.TempDir()
+	world := filepath.Join(game, "saves", "New World")
+	os.MkdirAll(world, 0o755)
 	os.WriteFile(filepath.Join(world, "level.dat"), nil, 0o644)
 	run("-world", world)
 	if got := listDir(filepath.Join(world, "datapacks", "demo")); got != data {
 		t.Errorf("world data pack:\n got %s\nwant %s", got, data)
 	}
-	if got := listZip(filepath.Join(world, "resources.zip")); got != res {
-		t.Errorf("world resources.zip:\n got %s\nwant %s", got, res)
+	if got := listZip(filepath.Join(game, "resourcepacks", "demo-resources.zip")); got != res {
+		t.Errorf("world resource pack:\n got %s\nwant %s", got, res)
 	}
 }

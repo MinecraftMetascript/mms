@@ -128,7 +128,7 @@ Each call stands for the id the file gets in your namespace: its base name, lowe
 
 Inside the quotes, completion lists the project's files of the helper's type, in VS Code, Zed and the web editor. A path to a file that is not there is an error.
 
-Textures, sounds and [resource pack declarations](#resource-packs) go into a resource pack built next to the data pack: `build-resources/` (set `resourcePack.output` in `mms.json` to change it), `<name>-resources.zip` with `mms build --zip`, and `<world>/resources.zip` with `mms build --world`, which Minecraft loads as that world's resource pack. `"icon": "art/icon.png"` in `mms.json` becomes `pack.png` in both packs.
+Textures, sounds and [resource pack declarations](#resource-packs) go into a resource pack built next to the data pack: `build-resources/` (set `resourcePack.output` in `mms.json` to change it), `<name>-resources.zip` with `mms build --zip`, and, with `mms build --world`, the game folder's `resourcepacks/<namespace>-resources.zip` (for a world inside `saves/`). Minecraft does not apply a singleplayer world's own `resources.zip`, so enable the pack once in Options > Resource Packs; it keeps its name, so it stays enabled after rebuilds, and F3+T reloads it in game. `"icon": "art/icon.png"` in `mms.json` becomes `pack.png` in both packs.
 
 Where the game takes a sound event either by id or inline, as a jukebox song's `sound_event` does, `Sound(...)` writes it inline, `{ "sound_id": "my_pack:tune" }`: the game's sound event registry is fixed, so a pack's own sound cannot be named there by id.
 

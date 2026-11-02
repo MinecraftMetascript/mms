@@ -321,7 +321,7 @@
 				<button class="rounded px-2 py-1 text-accent hover:bg-hover" onclick={() => engine?.restart()} title={engine.statusDetail}>Restart</button>
 			{/if}
 			{#if resourcePack}
-				<button class="rounded border border-accent px-3 py-1 font-medium text-accent hover:bg-hover" title="The textures, sounds, models and translations, for the world's resources.zip" onclick={() => exportPack(true)}><span class="sm:hidden">Resources</span><span class="hidden sm:inline">Download resources</span></button>
+				<button class="rounded border border-accent px-3 py-1 font-medium text-accent hover:bg-hover" title="The textures, sounds, models and translations, as a resource pack for the resourcepacks folder" onclick={() => exportPack(true)}><span class="sm:hidden">Resources</span><span class="hidden sm:inline">Download resources</span></button>
 			{/if}
 			<button class="rounded bg-accent px-3 py-1 font-medium text-white hover:opacity-90 disabled:opacity-50" disabled={!engine?.output.length} onclick={() => exportPack()}><span class="sm:hidden">Pack</span><span class="hidden sm:inline">Download pack</span></button>
 		</div>
