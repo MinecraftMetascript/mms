@@ -65,7 +65,7 @@ func (c *Checker) bookSub() *Checker {
 
 // TextDepsHold reports whether every .mmsbook text a check read is
 // still the same.
-func TextDepsHold(texts func(string) (string, bool), deps map[string]bool) bool {
+func TextDepsHold(texts func(string) (string, string, bool), deps map[string]bool) bool {
 	for k := range deps {
 		rest, ok := strings.CutPrefix(k, "t|")
 		if !ok {
@@ -75,7 +75,7 @@ func TextDepsHold(texts func(string) (string, bool), deps map[string]bool) bool 
 		src, sig := rest[:i], rest[i+1:]
 		cur := ""
 		if texts != nil {
-			if t, ok := texts(src); ok {
+			if _, t, ok := texts(src); ok {
 				cur = textSig(t)
 			}
 		}
@@ -298,7 +298,7 @@ func (c *Checker) bookFile(call *syntax.Call) *bookSrc {
 		return nil
 	}
 	if c.Texts != nil {
-		t, ok := c.Texts(src)
+		unit, t, ok := c.Texts(src)
 		if c.Deps != nil {
 			sig := ""
 			if ok {
@@ -309,7 +309,7 @@ func (c *Checker) bookFile(call *syntax.Call) *bookSrc {
 		if ok {
 			// Problems are shown in the file itself.
 			text := []rune(strings.TrimRight(t, "\r\n"))
-			return &bookSrc{text: text, extern: src, at: func(start, end int) syntax.Span {
+			return &bookSrc{text: text, extern: unit, at: func(start, end int) syntax.Span {
 				if end <= start {
 					end = start + 1
 				}

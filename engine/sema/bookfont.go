@@ -122,9 +122,10 @@ func layoutPage(gs []bookGlyph) (lines, cut int) {
 			x = 0
 		case lastSpace >= start:
 			// Move the last word to the next line.
-			newLine(lastSpace + 1)
+			ls := lastSpace
+			newLine(ls + 1)
 			x = 0
-			for j := lastSpace + 1; j <= i; j++ {
+			for j := ls + 1; j <= i; j++ {
 				x += gs[j].w
 			}
 		default:

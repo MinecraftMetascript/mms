@@ -387,7 +387,7 @@ func (c *Checker) customStack(s *Symbol, at syntax.Span) *jsonv.Object {
 	sub := NewChecker(c.Pack, c.Kinds, c.Syms, s.NS)
 	// The use depends on everything the item's check looks up, such as
 	// another custom item in its components.
-	sub.Files, sub.Deps, sub.parent, sub.customOf = c.Files, c.Deps, c, s.ID()
+	sub.Files, sub.Texts, sub.Deps, sub.parent, sub.customOf = c.Files, c.Texts, c.Deps, c, s.ID()
 	if s.Unit != nil && s.Unit.File != nil {
 		sub.Src = s.Unit.File.Src
 	}

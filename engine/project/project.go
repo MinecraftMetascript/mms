@@ -27,6 +27,10 @@ type Project struct {
 	// Texture("a.png") read. Nil means the host has none; set it before
 	// the first Analyze.
 	Files fs.FS
+	// Root is what file paths start with before their path in the
+	// project, such as "file:///home/me/pack/" when a host names files by
+	// URI; "" when they are named by project path.
+	Root string
 
 	mu     sync.Mutex
 	files  map[string]*sema.Unit
@@ -98,12 +102,29 @@ func (p *Project) RemoveFile(path string) {
 	delete(p.chunks, path)
 }
 
-// bookText returns a .mmsbook file's current text.
-func (p *Project) bookText(path string) (string, bool) {
+// bookText returns a .mmsbook file's current text, by its path in the
+// project. Hosts that name files by URI, such as the language server,
+// have it as the URI that ends in the path.
+func (p *Project) bookText(path string) (unit, text string, ok bool) {
 	if !sema.IsBookFile(path) {
-		return "", false
+		return "", "", false
 	}
-	return p.Text(path)
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if t, ok := p.texts[path]; ok {
+		return path, t, true
+	}
+	if p.Root != "" {
+		if t, ok := p.texts[p.Root+path]; ok {
+			return p.Root + path, t, true
+		}
+	}
+	for k, t := range p.texts {
+		if strings.HasSuffix(k, "/"+path) && strings.Contains(k, "://") && (unit == "" || len(k) < len(unit)) {
+			unit, text, ok = k, t, true
+		}
+	}
+	return unit, text, ok
 }
 
 // Text returns a file's current text.

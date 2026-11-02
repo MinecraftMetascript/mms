@@ -81,9 +81,10 @@ type Checker struct {
 	Files fs.FS
 	// Src is the checked file's text; quick fixes need it for layout.
 	Src []rune
-	// Texts returns the text of a project file the host has open as a
-	// source, such as a .mmsbook file; nil when there are none.
-	Texts func(path string) (string, bool)
+	// Texts returns the text of a project file the host has as a
+	// source, such as a .mmsbook file, by its path in the project, and
+	// the unit path it has; nil when there are none.
+	Texts func(path string) (unit, text string, ok bool)
 	// Extern holds problems found in other files, such as a .mmsbook
 	// file a Book reads, by path.
 	Extern map[string][]syntax.Diagnostic
