@@ -14,6 +14,7 @@
 	import { download, hasResourcePack, isDataPack, packZip, projectZip, readProjectZip, readZip, readZipAssets } from '#lib/project/zip.ts';
 	import PasteJson from '#lib/components/PasteJson.svelte';
 	import ProjectsDialog from '#lib/components/ProjectsDialog.svelte';
+	import AboutDialog from '#lib/components/AboutDialog.svelte';
 	import { requestPersistence } from '#lib/project/store.ts';
 	import Dropdown from '#lib/components/Dropdown.svelte';
 	import { fixAllKeys, formatKeys, mod, quickFixKeys } from '#lib/editor/shortcuts.ts';
@@ -37,6 +38,7 @@
 	let pasteJson = $state<ReturnType<typeof PasteJson> | null>(null);
 	let editor = $state<ReturnType<typeof Editor> | null>(null);
 	let projects = $state<ReturnType<typeof ProjectsDialog> | null>(null);
+	let about = $state<ReturnType<typeof AboutDialog> | null>(null);
 
 	onMount(() => {
 		try {
@@ -295,6 +297,8 @@
 						<span class="block text-xs text-muted">An MMS project or a data pack</span>
 					</button>
 					<button class="block w-full rounded px-2 py-1.5 text-left hover:bg-hover" onclick={() => { close(); download(`${project.name || 'project'}-source.zip`, projectZip(project.data())); }}>Export project zip</button>
+					<!-- Phones have no room for the About button in the top bar. -->
+					<button class="block w-full rounded px-2 py-1.5 text-left hover:bg-hover sm:hidden" onclick={() => { close(); about?.open(); }}>About and credits</button>
 				{/snippet}
 			</Dropdown>
 			<Dropdown label="Examples" panelClass="w-72">
@@ -309,6 +313,7 @@
 			</Dropdown>
 		</div>
 		<ProjectsDialog bind:this={projects} {project} {onswitch} />
+		<AboutDialog bind:this={about} />
 		<input type="file" accept=".zip" class="hidden" bind:this={fileInput} onchange={importZip} />
 		{#if engine}
 			<PasteJson bind:this={pasteJson} {engine} uri={uriOf(project.active)} oninsert={insertDecl} />
@@ -327,6 +332,9 @@
 				<span class="hidden sm:inline">{statusText}</span>
 			</span>
 			<a class="rounded px-1.5 py-1 hover:bg-hover sm:px-2" href={resolve('/docs')}>Docs</a>
+			<button class="hidden rounded p-1.5 hover:bg-hover sm:inline-block" onclick={() => about?.open()} aria-label="About and credits" title="About MMS, and credits: previews by Deepslate"
+				><svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 8h.01" /></svg></button
+			>
 			<button
 				class="rounded p-1.5 hover:bg-hover"
 				onclick={nextTheme}

@@ -653,9 +653,18 @@
 				{#if last.legend.length > 12}<span class="text-white/70">+{last.legend.length - 12} more</span>{/if}
 			</div>
 		{/if}
-		{#if info && last && last.min !== Infinity}
-			<div class="pointer-events-none absolute right-2 bottom-2 rounded bg-black/60 px-2 py-1 font-mono text-[11px] text-white">
-				{last.min.toFixed(3)} … {last.max.toFixed(3)}
+		{#if info && last}
+			<div class="pointer-events-none absolute right-2 bottom-2 flex flex-col items-end gap-1">
+				{#if last.min !== Infinity}
+					<div class="rounded bg-black/60 px-2 py-1 font-mono text-[11px] text-white">
+						{last.min.toFixed(3)} … {last.max.toFixed(3)}
+					</div>
+				{/if}
+				<!-- Every preview here is rendered with Misode's Deepslate. -->
+				<p class="pointer-events-auto rounded bg-black/40 px-1.5 py-0.5 text-[10px] text-white/80 hover:text-white" data-credit="deepslate">
+					Rendered with <a class="underline-offset-2 hover:underline" href="https://github.com/misode/deepslate" target="_blank" rel="noopener">Deepslate</a>
+					by <a class="underline-offset-2 hover:underline" href="https://github.com/misode" target="_blank" rel="noopener">Misode</a>
+				</p>
 			</div>
 		{/if}
 	</div>

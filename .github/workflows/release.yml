@@ -38,7 +38,7 @@ jobs:
           ext=""; [ "$GOOS" = windows ] && ext=".exe"
           mkdir -p "dist/$name"
           go build -trimpath -ldflags "-s -w -X main.version=${GITHUB_REF_NAME}" -o "dist/$name/mms$ext" ./cmd/mms
-          cp ../README.md "dist/$name/"
+          cp ../README.md THIRD_PARTY_NOTICES.txt "dist/$name/"
           cd dist
           if [ "$GOOS" = windows ]; then zip -qr "$name.zip" "$name"; else tar czf "$name.tar.gz" "$name"; fi
       - uses: actions/upload-artifact@v4
