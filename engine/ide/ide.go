@@ -407,6 +407,11 @@ func (s *Session) complete(a *at, off int) []sema.Candidate {
 			if a.code() && i == len(a.path)-1 && off > n.Sp.Start && off < n.Sp.End {
 				return s.statementCandidates(a, off)
 			}
+			// An object literal where no object fits, such as `height = {`:
+			// the enclosing object's fields do not belong inside it.
+			if _, ok := parent.(*syntax.Object); ok && !a.code() {
+				return nil
+			}
 		}
 	}
 	return nil
