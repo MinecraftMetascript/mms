@@ -961,13 +961,35 @@ func (s *Server) output(_ context.Context, p struct {
 			l = s.lines(d.Unit.Path)
 			idx[d.Unit.Path] = l
 		}
-		items = append(items, map[string]any{
+		it := map[string]any{
 			"id":    d.ID(),
 			"text":  string(jsonv.Marshal(d.Item.Stack)),
 			"snbt":  sema.StackSNBT(d.Item.Stack),
 			"uri":   d.Unit.Path,
 			"range": l.rng(d.D.Sp),
-		})
+		}
+		// Where a Book's pages start, in its text or its .mmsbook file,
+		// so a preview can open on the page at the cursor.
+		if len(d.Item.PageStarts) > 0 {
+			pages := make([]map[string]any, 0, len(d.Item.PageStarts))
+			for _, ps := range d.Item.PageStarts {
+				unit := ps.File
+				if unit == "" {
+					unit = d.Unit.Path
+				}
+				pl := idx[unit]
+				if pl == nil {
+					pl = s.lines(unit)
+					idx[unit] = pl
+				}
+				if pl == nil {
+					continue
+				}
+				pages = append(pages, map[string]any{"uri": unit, "range": pl.rng(ps.Sp)})
+			}
+			it["pages"] = pages
+		}
+		items = append(items, it)
 	}
 	sort.Slice(items, func(i, j int) bool { return items[i]["id"].(string) < items[j]["id"].(string) })
 	return map[string]any{"files": out, "assets": assets, "items": items, "hasErrors": w.res.HasErrors()}, nil

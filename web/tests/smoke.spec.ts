@@ -798,3 +798,31 @@ test('the Pack tab lists custom items and splits the two packs', async ({ page }
 	await page.getByRole('button', { name: 'pack.mcmeta' }).last().click();
 	await expect(page.locator('pre.json')).toContainText('"min_format": 97');
 });
+
+test('a book previews its pages and opens on the page at the cursor', async ({ page }) => {
+	const errors: string[] = [];
+	page.on('pageerror', (e) => errors.push(e.message));
+	page.on('dialog', (d) => d.accept());
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	await page.getByRole('button', { name: /Examples/ }).click();
+	await page.getByRole('button', { name: /library/ }).click();
+	await page.getByRole('button', { name: 'books.mms' }).click();
+	await expect(status(page)).toHaveText(/No problems/);
+	// The cursor in the guide's text shows the book on that page.
+	await page.locator('.cm-line', { hasText: '# Contents' }).click();
+	const book = page.getByLabel('Book preview');
+	await expect(book.getByText('Library Guide')).toBeVisible();
+	await expect(book.getByText('Page 2 of 3')).toBeVisible();
+	await expect(book.getByText("Loading the game's book")).toBeHidden({ timeout: 20_000 });
+	// The score on that page gets a sample value to try.
+	await expect(book.getByRole('textbox', { name: 'deaths[@s]' })).toBeVisible();
+	await book.getByRole('button', { name: 'Next ›' }).click();
+	await expect(book.getByText('Page 3 of 3')).toBeVisible();
+	// A .mmsbook file shows the book that reads it.
+	await page.getByRole('button', { name: 'books/day_12.mmsbook' }).click();
+	await page.locator('.cm-line', { hasText: 'Something knocks' }).click();
+	await expect(book.getByText('Diary, Day 12')).toBeVisible();
+	await expect(book.getByText('Page 2 of 2')).toBeVisible();
+	expect(errors).toEqual([]);
+});

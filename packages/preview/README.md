@@ -1,6 +1,6 @@
 # @mms/preview
 
-The worldgen previews (Deepslate renders of noise, density functions, noise settings, surface rules and dimensions) and the loot table, recipe and biome inspectors. The web editor (`web/`) and the VS Code extension's preview panel (`editors/vscode/webview/`) both import these components; there is no other copy.
+The worldgen previews (Deepslate renders of noise, density functions, noise settings, surface rules and dimensions), the loot table, recipe and biome inspectors, and the written book preview (`src/book/`, drawn with the game's font and book texture). The web editor (`web/`) and the VS Code extension's preview panel (`editors/vscode/webview/`) both import these components; there is no other copy.
 
 It is a source-only package: hosts compile the Svelte and TypeScript themselves. A host:
 
@@ -9,4 +9,4 @@ It is a source-only package: hosts compile the Svelte and TypeScript themselves.
 - imports `@mms/preview/theme.css` after `tailwindcss`, defines the `--c-*` colours and a `dark` variant,
 - passes `createWorker`, starting `@mms/preview/worker` (`?worker` on the web, `?worker&inline` in a VS Code webview, which only allows blob workers).
 
-`PreviewPane` is the whole pane (inspector or preview, plus the "pinned output is missing" note); `PinButton` is the pin toggle. `npm run check` type-checks the package on its own.
+`PreviewPane` is the whole pane (inspector, preview or book, plus the "pinned output is missing" note); a book is the path `item:<id>` of one of the `items` from `mms/output`, opened on `page`; `PinButton` is the pin toggle. `npm run check` type-checks the package on its own.

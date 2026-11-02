@@ -3,19 +3,23 @@
 // editor. A "Preview" CodeLens above each declaration that has one opens
 // the panel on it, and the panel stays on that declaration while you edit
 // elsewhere, redrawing as the pack changes. The pack comes from the
-// server's `mms/output`.
-import { shows } from '@mms/preview/paths';
+// server's `mms/output`. A Book previews as its pages: its declaration
+// has a lens, and so does each page of its .mmsbook file.
+import { bookPageAt, itemPath, shows } from '@mms/preview/paths';
 import * as vscode from 'vscode';
 import type { LanguageClient } from 'vscode-languageclient/node';
-import type { OutputFile, ToExtension, ToPanel } from './messages';
+import type { OutputFile, OutputItem, ToExtension, ToPanel } from './messages';
 
 export const viewType = 'mms.preview';
 
 export class Previews implements vscode.Disposable, vscode.CodeLensProvider {
 	private panel: vscode.WebviewPanel | undefined;
 	private files: OutputFile[] = [];
+	private items: OutputItem[] = [];
 	/** The output path the panel shows. */
 	private target: string | null = null;
+	/** The book page the panel opens on, from 0. */
+	private page = 0;
 	/** The .mms document last active, whose project's pack is fetched. */
 	private document: vscode.Uri | undefined;
 	private timer: ReturnType<typeof setTimeout> | undefined;
@@ -29,29 +33,39 @@ export class Previews implements vscode.Disposable, vscode.CodeLensProvider {
 	) {
 		this.subscriptions.push(
 			this.lenses,
-			vscode.languages.registerCodeLensProvider({ language: 'mms' }, this),
+			vscode.languages.registerCodeLensProvider([{ language: 'mms' }, { language: 'mmsbook' }], this),
 			vscode.window.onDidChangeActiveTextEditor((e) => {
-				if (e?.document.languageId !== 'mms' || e.document.uri.toString() === this.document?.toString()) return;
+				if (!e || !isSource(e.document) || e.document.uri.toString() === this.document?.toString()) return;
 				// Another file may belong to another project: fetch its pack.
 				this.document = e.document.uri;
 				this.scheduleRefresh();
 			}),
+			// A project with no problems publishes no diagnostics, so edits
+			// refresh the pack (and the lenses) too.
+			vscode.workspace.onDidOpenTextDocument((d) => isSource(d) && this.scheduleRefresh()),
+			vscode.workspace.onDidChangeTextDocument((e) => isSource(e.document) && this.scheduleRefresh()),
 			vscode.window.registerWebviewPanelSerializer(viewType, {
-				deserializeWebviewPanel: async (panel, state?: { path?: string | null }) => {
+				deserializeWebviewPanel: async (panel, state?: { path?: string | null; page?: number }) => {
 					this.target = state?.path ?? null;
+					this.page = state?.page ?? 0;
 					this.adopt(panel);
 				}
 			})
 		);
 	}
 
-	/** Opens the panel on an output path, or on the declaration at the cursor. */
-	show(path?: string) {
+	/**
+	 * Opens the panel on an output path (and a book on a page), or on the
+	 * declaration at the cursor.
+	 */
+	show(path?: string, page?: number) {
 		if (path === undefined) {
 			const editor = vscode.window.activeTextEditor;
-			path = (editor && this.at(editor.document.uri, editor.selection.active.line)?.path) ?? this.target ?? undefined;
+			const at = editor && this.at(editor.document.uri, editor.selection.active.line);
+			if (at) [path, page] = [at.path, at.page];
+			else path = this.target ?? undefined;
 		}
-		if (path !== undefined) this.setTarget(path);
+		if (path !== undefined) this.setTarget(path, page);
 		if (this.panel) {
 			this.panel.reveal(undefined, true);
 			return;
@@ -85,27 +99,65 @@ export class Previews implements vscode.Disposable, vscode.CodeLensProvider {
 				})
 			);
 		}
+		for (const it of this.items) {
+			const path = itemPath(it.id);
+			if (!shows(path, this.items)) continue;
+			if (key(vscode.Uri.parse(it.uri)) === here && !lines.has(it.range.start.line)) {
+				lines.add(it.range.start.line);
+				lenses.push(
+					new vscode.CodeLens(new vscode.Range(it.range.start.line, 0, it.range.start.line, 0), {
+						title: '$(open-preview) Preview',
+						tooltip: `Show the book ${it.id} in the MMS preview`,
+						command: 'mms.previewDeclaration',
+						arguments: [path, 0]
+					})
+				);
+			}
+			// Each page of a .mmsbook file opens the book on that page.
+			it.pages?.forEach((p, i) => {
+				if (p.uri === it.uri || key(vscode.Uri.parse(p.uri)) !== here || lines.has(p.range.start.line)) return;
+				lines.add(p.range.start.line);
+				lenses.push(
+					new vscode.CodeLens(new vscode.Range(p.range.start.line, 0, p.range.start.line, 0), {
+						title: `$(open-preview) Preview page ${i + 1}`,
+						tooltip: `Show page ${i + 1} of ${it.id} in the MMS preview`,
+						command: 'mms.previewDeclaration',
+						arguments: [path, i]
+					})
+				);
+			});
+		}
 		return lenses;
 	}
 
-	private setTarget(path: string | null) {
+	private setTarget(path: string | null, page = 0) {
 		this.target = path;
-		this.post({ type: 'target', path });
-		if (this.panel) this.panel.title = title(path);
+		this.page = page;
+		this.post({ type: 'target', path, page });
+		if (this.panel) this.panel.title = title(path, this.items);
 	}
 
 	/** The output declared at a line of a document, if it has a preview. */
-	private at(uri: vscode.Uri, line: number): OutputFile | undefined {
+	private at(uri: vscode.Uri, line: number): { path: string; page?: number } | undefined {
 		const here = key(uri);
-		return this.files.find(
+		const f = this.files.find(
 			(f) => f.uri && f.range && !f.implicit && f.range.start.line <= line && line <= f.range.end.line && shows(f.path) && key(vscode.Uri.parse(f.uri)) === here
 		);
+		if (f) return { path: f.path };
+		for (const it of this.items) {
+			const path = itemPath(it.id);
+			if (!shows(path, this.items)) continue;
+			const pages = it.pages?.filter((p) => key(vscode.Uri.parse(p.uri)) === here).map((p) => ({ ...p, uri: here }));
+			const page = bookPageAt(pages, here, line);
+			const inDecl = key(vscode.Uri.parse(it.uri)) === here && it.range.start.line <= line && line <= it.range.end.line;
+			if (page !== null || inDecl) return { path, page: page ?? 0 };
+		}
 	}
 
 	private adopt(panel: vscode.WebviewPanel) {
 		this.panel = panel;
 		const root = vscode.Uri.joinPath(this.context.extensionUri, 'out', 'webview');
-		panel.title = title(this.target);
+		panel.title = title(this.target, this.items);
 		panel.iconPath = vscode.Uri.joinPath(this.context.extensionUri, 'icons', 'preview.svg');
 		panel.webview.options = { enableScripts: true, localResourceRoots: [root] };
 		panel.webview.html = this.html(panel.webview, root);
@@ -117,8 +169,8 @@ export class Previews implements vscode.Disposable, vscode.CodeLensProvider {
 
 	private async receive(m: ToExtension) {
 		if (m.type === 'ready') {
-			this.post({ type: 'output', files: this.files });
-			this.setTarget(this.target);
+			this.post({ type: 'output', files: this.files, items: this.items });
+			this.setTarget(this.target, this.page);
 			await this.refresh();
 		} else if (m.type === 'clear') {
 			this.setTarget(null);
@@ -126,7 +178,7 @@ export class Previews implements vscode.Disposable, vscode.CodeLensProvider {
 			const doc = await vscode.workspace.openTextDocument(vscode.Uri.parse(m.uri));
 			const range = new vscode.Range(m.range.start.line, m.range.start.character, m.range.end.line, m.range.end.character);
 			// Open it where the source is being edited, not over the panel.
-			const column = vscode.window.visibleTextEditors.find((e) => e.document.languageId === 'mms')?.viewColumn ?? vscode.ViewColumn.One;
+			const column = vscode.window.visibleTextEditors.find((e) => isSource(e.document))?.viewColumn ?? vscode.ViewColumn.One;
 			const editor = await vscode.window.showTextDocument(doc, { viewColumn: column, selection: new vscode.Range(range.start, range.start) });
 			editor.revealRange(range, vscode.TextEditorRevealType.InCenterIfOutsideViewport);
 		}
@@ -139,11 +191,13 @@ export class Previews implements vscode.Disposable, vscode.CodeLensProvider {
 			// The uri picks the project (the nearest mms.json) in a workspace
 			// with several; servers that predate that ignore it.
 			const active = vscode.window.activeTextEditor?.document;
-			const uri = (this.document ?? (active?.languageId === 'mms' ? active.uri : undefined))?.toString();
-			const out = await client.sendRequest<{ files: OutputFile[]; hasErrors: boolean }>('mms/output', uri ? { uri } : {});
+			const uri = (this.document ?? (isSource(active) ? active!.uri : undefined))?.toString();
+			const out = await client.sendRequest<{ files: OutputFile[]; items?: OutputItem[]; hasErrors: boolean }>('mms/output', uri ? { uri } : {});
 			this.files = out.files;
+			this.items = out.items ?? [];
 			this.lenses.fire();
-			this.post({ type: 'output', files: out.files });
+			this.post({ type: 'output', files: out.files, items: this.items });
+			if (this.panel) this.panel.title = title(this.target, this.items);
 		} catch {
 			// A restart or shutdown; the next analysis refreshes again.
 		}
@@ -158,7 +212,8 @@ export class Previews implements vscode.Disposable, vscode.CodeLensProvider {
 		const script = webview.asWebviewUri(vscode.Uri.joinPath(root, 'preview.js'));
 		const style = webview.asWebviewUri(vscode.Uri.joinPath(root, 'preview.css'));
 		// The preview worker starts from a blob URL and fetches vanilla
-		// worldgen from mcmeta on GitHub.
+		// worldgen from mcmeta on GitHub; the book preview fetches the
+		// game's font and textures from there too.
 		const csp = [
 			"default-src 'none'",
 			`style-src ${webview.cspSource} 'unsafe-inline'`,
@@ -192,9 +247,14 @@ export class Previews implements vscode.Disposable, vscode.CodeLensProvider {
 }
 
 /** The panel's tab title: the declaration it shows. */
-function title(path: string | null): string {
-	const id = path ? shows(path)?.id : undefined;
+function title(path: string | null, items: OutputItem[]): string {
+	const id = path ? shows(path, items)?.id : undefined;
 	return id ? `Preview ${id.replace(/^[^:]+:/, '')}` : 'MMS Preview';
+}
+
+/** Whether a document is MMS source: a .mms file or a .mmsbook book text. */
+function isSource(doc: vscode.TextDocument | undefined): boolean {
+	return doc?.languageId === 'mms' || doc?.languageId === 'mmsbook';
 }
 
 /** A file's identity: its path, ignoring case on Windows. */
