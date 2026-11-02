@@ -868,3 +868,55 @@ test('a book previews its pages and opens on the page at the cursor', async ({ p
 	await expect(book.getByText('Page 2 of 2')).toBeVisible();
 	expect(errors).toEqual([]);
 });
+
+test('Ctrl+. extracts an inline noise to a declaration and renames it', async ({ page }) => {
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	await replaceText(page, 'DensityFunction hills = Noise({ base_octave = -6, amplitude_modifiers = [1] }, 1, 1)\n');
+	await expect(status(page)).toHaveText(/No problems|warning/);
+	await page.locator('.cm-line').first().getByText('base_octave').click();
+	await page.keyboard.press('ControlOrMeta+.');
+	const menu = page.getByRole('menu', { name: 'Editor actions' });
+	const extract = menu.getByRole('menuitem', { name: 'Extract { ... } to a Noise declaration' });
+	await expect(extract).toBeVisible();
+	await extract.click();
+	await expect(page.locator('.cm-content')).toContainText(
+		'Noise hills_noise = { base_octave = -6, amplitude_modifiers = [1] }DensityFunction hills = Noise(hills_noise, 1, 1)'
+	);
+	// The rename box opens on the new name.
+	const box = page.getByRole('textbox', { name: 'New name' });
+	await expect(box).toBeFocused();
+	await expect(box).toHaveValue('hills_noise');
+	await page.keyboard.type('hill_shape');
+	await page.keyboard.press('Enter');
+	await expect(page.locator('.cm-content')).toContainText('Noise hill_shape = {');
+	await expect(page.locator('.cm-content')).toContainText('Noise(hill_shape, 1, 1)');
+	await expect(status(page)).toHaveText(/No problems|warning/);
+});
+
+test('Deepslate is credited in About, on previews, and in the shipped licenses', async ({ page, request }) => {
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+
+	await page.getByRole('button', { name: 'About and credits' }).click();
+	const credits = page.getByRole('list', { name: 'Credits' });
+	await expect(credits.getByRole('link', { name: 'Deepslate' })).toHaveAttribute('href', 'https://github.com/misode/deepslate');
+	await expect(credits.getByRole('link', { name: 'Misode' }).first()).toHaveAttribute('href', 'https://github.com/misode');
+	await page.getByRole('button', { name: 'Close' }).click();
+
+	// A rendered preview carries a small credit in its corner.
+	await page.getByRole('button', { name: /Examples/ }).click();
+	await page.getByRole('button', { name: /sky-islands/ }).click();
+	await page.getByRole('button', { name: 'dimension.mms' }).click();
+	await page.locator('.cm-line', { hasText: 'Dimension islands' }).click();
+	const credit = page.locator('[data-credit="deepslate"]');
+	await expect(credit).toContainText('Rendered with Deepslate by Misode', { timeout: 30_000 });
+	await expect(credit.getByRole('link', { name: 'Deepslate' })).toHaveAttribute('href', 'https://github.com/misode/deepslate');
+
+	const licenses = await request.get('third-party-licenses.txt');
+	expect(licenses.ok()).toBe(true);
+	const text = await licenses.text();
+	expect(text).toContain('deepslate 0.27');
+	expect(text).toContain('Copyright (c) 2021 Misode');
+	expect(text).toContain('Copyright (c) 2022 SpyglassMC');
+});

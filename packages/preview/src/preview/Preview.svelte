@@ -769,38 +769,47 @@
 				{#if last.legend.length > 12}<span class="text-white/70">+{last.legend.length - 12} more</span>{/if}
 			</div>
 		{/if}
-		{#if info && last && palette && valueRange && palette.id !== 'solid'}
-			{@const r = valueRange}
-			{@const flatField = last.min === last.max}
-			<div class="pointer-events-none absolute right-2 bottom-2 flex w-56 flex-col gap-1 rounded bg-black/60 px-2 py-1.5 font-mono text-[11px] text-white" aria-label="Value scale">
-				<div class="relative h-3 rounded-sm" style:background={cssGradient(palette)}>
-					{#if r.lo < 0 && r.hi > 0}
-						<span class="absolute inset-y-0 w-px bg-white/80 mix-blend-difference" style:left="{position(0, r) * 100}%" title="0"></span>
-					{/if}
-					{#if !Number.isNaN(hoverValue)}
-						<span class="absolute -top-1 -bottom-1 w-0.5 -translate-x-1/2 rounded bg-white shadow-[0_0_0_1px_black]" style:left="{position(hoverValue, r) * 100}%"></span>
-					{/if}
-				</div>
-				<div class="relative flex justify-between">
-					<span>{formatValue(r.lo, r)}</span>
-					{#if r.lo < 0 && r.hi > 0 && position(0, r) > 0.2 && position(0, r) < 0.8}
-						<span class="absolute -translate-x-1/2" style:left="{position(0, r) * 100}%">0</span>
-					{/if}
-					<span>{formatValue(r.hi, r)}</span>
-				</div>
-				<div class="text-white/70">
-					{#if last.min === Infinity}
-						no values in view
-					{:else if flatField}
-						flat: {last.min.toFixed(3)} everywhere in view
-					{:else}
-						in view {last.min.toFixed(3)} … {last.max.toFixed(3)}
-					{/if}
-				</div>
-			</div>
-		{:else if info && last && last.min !== Infinity}
-			<div class="pointer-events-none absolute right-2 bottom-2 rounded bg-black/60 px-2 py-1 font-mono text-[11px] text-white">
-				{last.min.toFixed(3)} … {last.max.toFixed(3)}
+		{#if info && last}
+			<div class="pointer-events-none absolute right-2 bottom-2 flex flex-col items-end gap-1">
+				{#if palette && valueRange && palette.id !== 'solid'}
+					{@const r = valueRange}
+					{@const flatField = last.min === last.max}
+					<div class="flex w-56 flex-col gap-1 rounded bg-black/60 px-2 py-1.5 font-mono text-[11px] text-white" aria-label="Value scale">
+						<div class="relative h-3 rounded-sm" style:background={cssGradient(palette)}>
+							{#if r.lo < 0 && r.hi > 0}
+								<span class="absolute inset-y-0 w-px bg-white/80 mix-blend-difference" style:left="{position(0, r) * 100}%" title="0"></span>
+							{/if}
+							{#if !Number.isNaN(hoverValue)}
+								<span class="absolute -top-1 -bottom-1 w-0.5 -translate-x-1/2 rounded bg-white shadow-[0_0_0_1px_black]" style:left="{position(hoverValue, r) * 100}%"></span>
+							{/if}
+						</div>
+						<div class="relative flex justify-between">
+							<span>{formatValue(r.lo, r)}</span>
+							{#if r.lo < 0 && r.hi > 0 && position(0, r) > 0.2 && position(0, r) < 0.8}
+								<span class="absolute -translate-x-1/2" style:left="{position(0, r) * 100}%">0</span>
+							{/if}
+							<span>{formatValue(r.hi, r)}</span>
+						</div>
+						<div class="text-white/70">
+							{#if last.min === Infinity}
+								no values in view
+							{:else if flatField}
+								flat: {last.min.toFixed(3)} everywhere in view
+							{:else}
+								in view {last.min.toFixed(3)} … {last.max.toFixed(3)}
+							{/if}
+						</div>
+					</div>
+				{:else if last.min !== Infinity}
+					<div class="rounded bg-black/60 px-2 py-1 font-mono text-[11px] text-white">
+						{last.min.toFixed(3)} … {last.max.toFixed(3)}
+					</div>
+				{/if}
+				<!-- Every preview here is rendered with Misode's Deepslate. -->
+				<p class="pointer-events-auto rounded bg-black/40 px-1.5 py-0.5 text-[10px] text-white/80 hover:text-white" data-credit="deepslate">
+					Rendered with <a class="underline-offset-2 hover:underline" href="https://github.com/misode/deepslate" target="_blank" rel="noopener">Deepslate</a>
+					by <a class="underline-offset-2 hover:underline" href="https://github.com/misode" target="_blank" rel="noopener">Misode</a>
+				</p>
 			</div>
 		{/if}
 	</div>

@@ -63,6 +63,13 @@ func TestCompletionMatrix(t *testing.T) {
 		{name: "map keys with slash", src: "Biome b = {\n  attributes = {\n    vis|\n  }\n}", want: []string{"visual/sky_color"}, not: []string{"temperature"}, replace: "vis"},
 		{name: "item components", src: "Recipe r = Shapeless([emerald], { id = emerald\n components = {\n |\n }\n})", want: []string{"item_name", "max_stack_size"}, not: []string{"count"}},
 		{name: "map value", src: "Enchantment e = {\n  effects = {\n    minecraft:damage = [|]\n  }\n}", want: []string{"DamageEnchantmentEffect"}},
+		{name: "empty field value before next field", src: "NoiseSettings ns = {\n  default_block = |\n  default_fluid = water\n  sea_level = 0\n}", want: []string{"stone", "FullBlockState"}, not: []string{"default_fluid", "aquifers"}},
+		{name: "empty field value before close", src: "NoiseSettings ns = {\n  sea_level = 0\n  default_block = |\n}", want: []string{"stone"}, not: []string{"default_fluid"}},
+		{name: "empty field value before quoted key", src: "Biome b = {\n  temperature = |\n  \"downfall\" = 0\n}", not: []string{"downfall", "effects"}},
+		{name: "surface rule list in field", src: "NoiseSettings ns = {\n  spawn_target = []\n  material_rule = [\n    |\n  ]\n}", want: []string{"Block", "If", "Sequence"}, not: []string{"aquifers", "debug_functions"}},
+		{name: "surface rule list second item", src: "NoiseSettings ns = {\n  material_rule = [Block(stone), |]\n}", want: []string{"Block", "If"}, not: []string{"aquifers"}},
+		{name: "object where no object fits", src: "NoiseSettings ns = {\n  sea_level = {\n    |\n  }\n}", not: []string{"default_block", "aquifers"}},
+		{name: "inline definition object", src: "Advancement a = {\n  parent = {\n    |\n  }\n}", want: []string{"criteria"}},
 		{name: "function reference", src: "Function g {}\nAdvancement a = { rewards = { function = |} }", want: []string{"g"}},
 
 		// Tags.

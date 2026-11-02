@@ -105,3 +105,35 @@ func TestHelperDocsNamedAndCompound(t *testing.T) {
 		}
 	}
 }
+
+// Optional parameters sit after required ones, and signature help
+// follows named arguments: it highlights the parameter a named argument
+// sets, and positional arguments skip parameters given by name.
+func TestSignatureOptionalLastAndNamed(t *testing.T) {
+	for src, want := range map[string]string{
+		"DensityFunction d = Gradient(y, |)\n":                            "from_coordinate",
+		"DensityFunction d = Gradient(y, 0, 10, -1, 1, |)\n":              "tiling?",
+		"DensityFunction d = Gradient(axis = y, |)\n":                     "from_coordinate",
+		"DensityFunction d = Gradient(y, to_value = 1, from_value = |)\n": "from_value",
+		"DensityFunction d = Gradient(from_coordinate = 0, y, |)\n":       "to_coordinate",
+		"DensityFunction d = Gradient(y, tiling = |)\n":                   "tiling?",
+		"DensityFunction d = Gradient(y, fromCoordinate = 0, |)\n":        "to_coordinate",
+	} {
+		s, off := session(t, src)
+		h, ok := s.Signature("main.mms", off)
+		if !ok || !strings.HasPrefix(h.Label, "Gradient(axis: ") {
+			t.Errorf("%q: signature = %+v, %v", src, h, ok)
+			continue
+		}
+		if got := h.Params[h.Active]; !strings.HasPrefix(got, want+":") {
+			t.Errorf("%q: active = %q, want %s", src, got, want)
+		}
+	}
+	// Positional arguments in the new order build the same JSON.
+	s, _ := session(t, "DensityFunction d = Gradient(y, 0, 10, -1, 1)\n")
+	for _, diag := range s.R.Diagnostics("main.mms") {
+		if diag.Severity == syntax.SeverityError {
+			t.Errorf("positional Gradient: %s", diag.Message)
+		}
+	}
+}

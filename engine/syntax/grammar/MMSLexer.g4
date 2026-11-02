@@ -3,6 +3,11 @@
 // doc-comment lookup can see them (docs/plan.md, "ANTLR setup").
 lexer grammar MMSLexer;
 
+// MISSING is never lexed. Recovery inserts it where a field's value was
+// left out (`key =` followed by the next field), so the parser does not
+// read the next field as the value.
+tokens { MISSING }
+
 // Keywords are lowercase statement words only. Declaration kinds and
 // helpers are ordinary PascalCase identifiers resolved against the spec.
 LET      : 'let';

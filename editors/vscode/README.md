@@ -9,6 +9,7 @@ Language support for [Minecraft Metascript](https://github.com/MinecraftMetascri
 - **Fixes:**
   - quick fixes
   - "Fix all" (`source.fixAll.mms`)
+  - "Extract to a declaration" for inline values (`refactor.extract`), which then opens the rename box on the new name
 - **Formatting** with the opinionated formatter (format on save is on by default for `.mms`).
 - **Semantic highlighting.**
 - **Previews:** click **Preview** above a noise, density function, noise settings, surface rule or dimension to see it rendered beside the editor (density, blocks, 3D, biome map), or above a loot table, recipe or biome to inspect it. The panel stays on that declaration while you edit elsewhere and redraws as you type; click another **Preview** to switch. **MMS: Open Preview to the Side** (the button in the editor title, or `Ctrl+K V`) opens it on the declaration at the cursor. Vanilla worldgen the pack refers to is fetched from GitHub (mcmeta).
@@ -27,6 +28,10 @@ The extension starts when a folder contains an `mms.json` or when you open a `.m
 ## Building
 
 The preview panel uses the same Svelte components as the web editor, from `packages/preview`. `npm run build` bundles the extension (esbuild) and the panel (Vite, into `out/webview`).
+
+## Credits
+
+Previews are rendered with [Deepslate](https://github.com/misode/deepslate) by [Misode](https://github.com/misode), and read vanilla worldgen from Misode's [mcmeta](https://github.com/misode/mcmeta). The license notices of everything the extension bundles are in `out/third-party-licenses.txt`, written by `npm run build`.
 
 ## License
 

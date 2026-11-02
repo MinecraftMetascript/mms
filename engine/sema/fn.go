@@ -869,6 +869,9 @@ func (f *fc) expr(pre *[]fn.Op, e syntax.Expr) *val {
 		return f.unary(pre, e)
 	case *syntax.Binary:
 		return f.binary(pre, e)
+	case *syntax.Bad:
+		// The parser already reported the missing value.
+		return nil
 	}
 	c.errorf("mms/unsupported", e.Span(), "this is not a value a function can compute with")
 	return nil

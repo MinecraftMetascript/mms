@@ -6,5 +6,5 @@ Decl LootTable x
           Ident Pool
           Number 1
     Field rolls
-      Bad 44-44
-! 44-45 cannot parse '}'
+      Bad 43-43
+! 42-43 expected a value after '='

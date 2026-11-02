@@ -137,7 +137,8 @@
       { "command": "mms.forgetWorld", "title": "Forget This World" },
       { "command": "mms.openOutput", "title": "Open" },
       { "command": "mms.previewOutput", "title": "Open Preview", "icon": "$(open-preview)" },
-      { "command": "mms.revealOutputSource", "title": "Go to Source", "icon": "$(go-to-file)" }
+      { "command": "mms.revealOutputSource", "title": "Go to Source", "icon": "$(go-to-file)" },
+      { "command": "mms.renameAt", "title": "MMS: Rename Extracted Declaration" }
     ],
     "menus": {
       "editor/title": [
@@ -159,6 +160,7 @@
       "commandPalette": [
         { "command": "mms.showPreview", "when": "editorLangId == mms || editorLangId == mmsbook" },
         { "command": "mms.previewDeclaration", "when": "false" },
+        { "command": "mms.renameAt", "when": "false" },
         { "command": "mms.buildToWorld", "when": "mms.hasProject" },
         { "command": "mms.chooseWorld", "when": "mms.hasProject" },
         { "command": "mms.chooseProject", "when": "mms.hasProject" },
@@ -182,7 +184,8 @@
     }
   },
   "scripts": {
-    "build": "npm run build:extension && npm run build:webview",
+    "build": "npm run build:extension && npm run build:webview && npm run licenses",
+    "licenses": "node ../../scripts/third-party-licenses.mjs . out/third-party-licenses.txt vscode-languageclient deepslate svelte",
     "build:extension": "esbuild src/extension.ts --bundle --platform=node --format=cjs --external:vscode --outfile=out/extension.js --minify",
     "build:webview": "vite build --config webview/vite.config.ts",
     "check": "tsc --noEmit && svelte-check --tsconfig ./webview/tsconfig.json",

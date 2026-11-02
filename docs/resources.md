@@ -94,7 +94,7 @@ A structure that generates in new chunks takes four resources, each naming the n
 
 | Kind | Says |
 | --- | --- |
-| `StructureSet` | how far apart structures start, with `RandomSpread(spacing, separation, salt)` |
+| `StructureSet` | how far apart structures start, with `RandomSpread(spacing = 24, separation = 8, salt = 1)` |
 | `Structure` | the biomes, the height, and for `Jigsaw(...)` the pool to start from |
 | `TemplatePool` | the templates (`.nbt` files) to place, with their processors |
 | `ProcessorList` | rules that change blocks as a template is placed |
@@ -116,6 +116,8 @@ DensityFunction hills = Noise({ base_octave = -6, amplitude_modifiers = [1, 1] }
 ```
 
 This writes `worldgen/noise/mms_gen/hills/noise.json` and gives `hills` the noise `<ns>:mms_gen/hills/noise`. A second inline value of the same kind in the same declaration is named `noise_2`, and so on. Each inline noise gets its own id, so two identical inline noises still produce different noise. To share one noise, declare it with a name. Where the game does take inline values, such as density functions, features and surface rules, they stay inline.
+
+To turn an inline value into a declaration of its own, put the cursor in it and open the code actions (Ctrl/⌘+. in VS Code, Zed and the web editor). **Extract { ... } to a Noise declaration** moves the value above the declaration that holds it, as `Noise hills_noise = { ... }`, and writes `hills_noise` in its place. The action is offered for every value the build would write under `mms_gen/`, and for any inline value where an id of its kind would also do, such as an inline density function or predicate. The new name is the holding declaration's name and the field's name (or the kind's, for an argument), with a number added if it is taken. VS Code and the web editor open the rename box on it straight away; in Zed, press F2 to rename it.
 
 A function id takes a block of commands the same way, compiled as a `Function` with no parameters:
 

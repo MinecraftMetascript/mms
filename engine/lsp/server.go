@@ -54,6 +54,10 @@ type Server struct {
 	// watchers itself (Zed, Neovim and Helix rely on this; VS Code does
 	// too).
 	watchFiles bool
+	// renameAfterExtract is set when the client handles the mms.renameAt
+	// command (initializationOptions.renameAfterExtract), so extract
+	// actions can start a rename of the new declaration's name.
+	renameAfterExtract bool
 }
 
 // NewServer returns a server over tr checking against pack.
@@ -250,6 +254,9 @@ type initializeParams struct {
 			} `json:"didChangeWatchedFiles"`
 		} `json:"workspace"`
 	} `json:"capabilities"`
+	InitializationOptions struct {
+		RenameAfterExtract bool `json:"renameAfterExtract"`
+	} `json:"initializationOptions"`
 }
 
 // watchedGlobs are the files whose changes on disk the server needs to
@@ -282,6 +289,7 @@ func (s *Server) registerWatchers() {
 
 func (s *Server) initialize(ctx context.Context, p initializeParams) (any, *respError) {
 	s.watchFiles = p.Capabilities.Workspace.DidChangeWatchedFiles.DynamicRegistration
+	s.renameAfterExtract = p.InitializationOptions.RenameAfterExtract
 	s.roots = nil
 	for _, f := range p.WorkspaceFolders {
 		if path := uriPath(f.URI); path != "" {
@@ -313,7 +321,7 @@ func (s *Server) initialize(ctx context.Context, p initializeParams) (any, *resp
 			"documentFormattingProvider": true,
 			"documentSymbolProvider":     true,
 			"inlayHintProvider":          true,
-			"codeActionProvider":         map[string]any{"codeActionKinds": []string{"quickfix", "source.fixAll.mms"}},
+			"codeActionProvider":         map[string]any{"codeActionKinds": []string{"quickfix", "refactor.extract", "source.fixAll.mms"}},
 			"semanticTokensProvider": map[string]any{
 				"legend": map[string]any{"tokenTypes": ide.TokenTypes, "tokenModifiers": ide.TokenModifiers},
 				"full":   true,
