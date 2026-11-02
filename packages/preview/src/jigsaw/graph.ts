@@ -67,7 +67,11 @@ export interface Pool {
 	/** The fallback's index in the graph's pools. */
 	fallbackTo?: number;
 	pieces: Piece[];
-	/** Steps from the start pool: the depth of the pieces it places. */
+	/**
+	 * Steps from the start pool: the depth of the pieces it places. A pool
+	 * reached at several depths is shown once at each, so a pool that
+	 * draws from itself grows out to the right like the structure does.
+	 */
 	depth: number;
 	/** Past the structure's size, so nothing from it is placed. */
 	tooDeep: boolean;
@@ -82,6 +86,11 @@ export interface JigsawGraph {
 	startName?: string;
 	/** In order of depth; the first is the start pool. */
 	pools: Pool[];
+	/**
+	 * Growth repeats from here: the last depth's pools are all already
+	 * shown at this earlier depth, and its jigsaw blocks link back to it.
+	 */
+	repeatsFrom?: number;
 	problems: { deadEnds: number; unreachable: number; tooDeep: number; unknown: number };
 }
 
@@ -177,115 +186,161 @@ export function jigsawGraph(path: string | null, output: readonly OutputFile[], 
 		start = root.id;
 	}
 
-	// Breadth first from the start pool, so each pool sits at the
-	// smallest depth it is reached at. A fallback is tried in place of
-	// its pool, at the same depth.
-	const index = new Map<string, number>();
-	const queue: { id: string; depth: number }[] = [{ id: start, depth: 0 }];
-	const add = (id: string, depth: number) => {
-		if (id === EMPTY || index.has(id) || queue.some((q) => q.id === id)) return;
-		queue.push({ id, depth });
-	};
-	while (queue.length) {
-		const { id, depth } = queue.shift()!;
-		if (index.has(id)) continue;
+	// Pool definitions, read once.
+	type Def = Omit<Pool, 'depth' | 'tooDeep' | 'fallbackTo' | 'pieces'> & { pieces: Omit<Piece, 'links' | 'unreachable'>[] };
+	const defs = new Map<string, Def>();
+	const def = (id: string): Def => {
+		let d = defs.get(id);
+		if (d) return d;
 		const file = files.get(poolFile(id));
 		const json = parse(file?.text);
-		const pool: Pool = { id, declared: !!file, depth, tooDeep: graph.size !== undefined && depth > graph.size, pieces: [] };
-		if (file) pool.path = file.path;
+		d = { id, declared: !!file, pieces: [] };
+		if (file) d.path = file.path;
 		if (isObj(json)) {
-			if (typeof json.fallback === 'string' && fullId(json.fallback) !== EMPTY) pool.fallback = fullId(json.fallback);
+			if (typeof json.fallback === 'string' && fullId(json.fallback) !== EMPTY) d.fallback = fullId(json.fallback);
 			const raw: Omit<Piece, 'share' | 'links' | 'unreachable'>[] = [];
 			for (const e of Array.isArray(json.elements) ? json.elements : []) {
 				if (!isObj(e)) continue;
 				elementPieces(e.element, typeof e.weight === 'number' ? e.weight : 1, structures, raw);
 			}
 			const total = raw.reduce((n, p) => n + p.weight, 0);
-			pool.pieces = raw.map((p) => ({ ...p, share: total ? p.weight / total : 0, links: [], unreachable: false }));
+			d.pieces = raw.map((p) => ({ ...p, share: total ? p.weight / total : 0 }));
 		}
-		index.set(id, graph.pools.length);
-		graph.pools.push(pool);
-		if (pool.fallback) add(pool.fallback, depth);
-		for (const p of pool.pieces) for (const j of p.jigsaws ?? []) if (j.pool !== EMPTY) add(j.pool, depth + 1);
+		defs.set(id, d);
+		return d;
+	};
+
+	// One column per growth step: the pools the previous step's jigsaw
+	// blocks draw from, with their fallbacks, which are tried in their
+	// place. It stops when a step draws from exactly the pools of an
+	// earlier step (other than the start, whose pieces are placed whole),
+	// since from there growth repeats, and at the structure's size.
+	const withFallbacks = (ids: Iterable<string>) => {
+		const out: string[] = [];
+		const add = (id: string) => {
+			if (id === EMPTY || out.includes(id)) return;
+			out.push(id);
+			const fb = def(id).fallback;
+			if (fb) add(fb);
+		};
+		for (const id of ids) add(id);
+		return out;
+	};
+	const sameSet = (a: string[], b: string[]) => a.length === b.length && a.every((id) => b.includes(id));
+	const maxColumns = graph.size !== undefined ? Math.min(graph.size + 2, 16) : 8;
+	const columns: string[][] = [withFallbacks([start])];
+	for (;;) {
+		const next: string[] = [];
+		for (const id of columns[columns.length - 1])
+			for (const p of def(id).pieces) for (const j of p.jigsaws ?? []) if (j.pool !== EMPTY && !next.includes(j.pool)) next.push(j.pool);
+		if (!next.length) break;
+		const col = withFallbacks(next);
+		const again = columns.findIndex((c, i) => i > 0 && sameSet(c, col));
+		if (again >= 0) {
+			graph.repeatsFrom = again;
+			break;
+		}
+		if (columns.length >= maxColumns) break;
+		columns.push(col);
 	}
 
+	const at = new Map<string, number>(); // id@depth -> index in graph.pools
+	columns.forEach((col, depth) => {
+		for (const id of col) {
+			const d = def(id);
+			at.set(`${id}@${depth}`, graph.pools.length);
+			graph.pools.push({ ...d, depth, tooDeep: graph.size !== undefined && depth > graph.size, pieces: d.pieces.map((p) => ({ ...p, links: [], unreachable: false })) });
+		}
+	});
+	// Where a jigsaw block at a depth draws from: its pool one step on,
+	// or where growth repeats, the pool at the earlier depth.
+	const find = (id: string, depth: number): number | undefined => {
+		const i = at.get(`${id}@${depth}`);
+		if (i !== undefined || graph.repeatsFrom === undefined) return i;
+		for (let d = depth; d >= graph.repeatsFrom; d--) {
+			const j = at.get(`${id}@${d}`);
+			if (j !== undefined) return j;
+		}
+		return undefined;
+	};
+
 	// Link each jigsaw block to the pieces of its pool that have a jigsaw
-	// block named its target.
-	const targeted = new Map<number, Set<string>>();
+	// block named its target. Problems count once per piece, however many
+	// depths show it.
+	const targeted = new Map<string, Set<string>>();
+	const counted = new Set<string>();
+	const once = (key: string) => !counted.has(key) && !!counted.add(key);
+	const matches = (pool: Pool, target: string, link: Link) => {
+		const pieces: number[] = [];
+		pool.pieces.forEach((q, qi) => {
+			if (q.jigsaws === undefined) link.maybe = true;
+			else if (q.jigsaws.some((o) => o.name === target)) pieces.push(qi);
+		});
+		return pieces;
+	};
 	for (const pool of graph.pools) {
 		if (pool.tooDeep) graph.problems.tooDeep++;
-		for (const p of pool.pieces) {
-			if (p.jigsaws === undefined && p.kind === 'single') graph.problems.unknown++;
+		pool.fallbackTo = pool.fallback === undefined ? undefined : at.get(`${pool.fallback}@${pool.depth}`);
+		pool.pieces.forEach((p, pi) => {
+			if (p.jigsaws === undefined && p.kind === 'single' && once(`u|${pool.id}|${pi}`)) graph.problems.unknown++;
 			(p.jigsaws ?? []).forEach((j, ji) => {
 				if (j.pool === EMPTY) return;
-				const to = index.get(j.pool);
+				const to = find(j.pool, pool.depth + 1);
 				const target = to === undefined ? undefined : graph.pools[to];
 				const link: Link = { jigsaw: ji, pool: j.pool, to, pieces: [], maybe: false };
-				if (!target?.declared) {
+				if (!def(j.pool).declared) {
 					const ns = j.pool.split(':')[0];
 					if (ns !== 'minecraft' && namespaces.has(ns)) link.dead = 'undeclared';
 					else link.maybe = true;
 				} else if (j.target !== EMPTY) {
-					if (!targeted.has(to!)) targeted.set(to!, new Set());
-					targeted.get(to!)!.add(j.target);
-					target.pieces.forEach((q, qi) => {
-						if (q.jigsaws === undefined) link.maybe = true;
-						else if (q.jigsaws.some((o) => o.name === j.target)) link.pieces.push(qi);
-					});
+					if (!targeted.has(j.pool)) targeted.set(j.pool, new Set());
+					targeted.get(j.pool)!.add(j.target);
+					if (target) link.pieces = matches(target, j.target, link);
+					else link.maybe = true; // past the last depth shown
 					// The game tries the pool's fallback when none of its pieces fit.
-					const fb = target.fallback === undefined ? undefined : index.get(target.fallback);
-					if (!link.pieces.length && !link.maybe && fb !== undefined) {
+					const fb = target?.fallbackTo ?? (target?.fallback === undefined ? undefined : at.get(`${target.fallback}@${target.depth}`));
+					if (target && !link.pieces.length && !link.maybe && fb !== undefined) {
 						const f = graph.pools[fb];
-						const pieces: number[] = [];
-						f.pieces.forEach((q, qi) => {
-							if (q.jigsaws === undefined) link.maybe = true;
-							else if (q.jigsaws.some((o) => o.name === j.target)) pieces.push(qi);
-						});
 						if (!f.declared && f.id.split(':')[0] === 'minecraft') link.maybe = true;
+						const pieces = matches(f, j.target, link);
 						if (pieces.length) link.fallback = { to: fb, pieces };
 					}
-					if (!link.pieces.length && !link.maybe && !link.fallback) link.dead = target.pieces.length ? 'no-target' : 'empty-pool';
+					if (target && !link.pieces.length && !link.maybe && !link.fallback) link.dead = target.pieces.length ? 'no-target' : 'empty-pool';
 				}
-				if (link.dead) graph.problems.deadEnds++;
+				if (link.dead && once(`d|${pool.id}|${pi}|${ji}`)) graph.problems.deadEnds++;
 				p.links.push(link);
 			});
-		}
+		});
 	}
 
-	// A piece outside the start pool is only placed when some jigsaw
-	// block drawing from its pool targets a name it has. A pool's
-	// fallback is drawn from by the same jigsaw blocks as the pool.
-	for (const [i, pool] of graph.pools.entries()) {
-		if (pool.fallback && index.has(pool.fallback)) {
-			pool.fallbackTo = index.get(pool.fallback);
-			const names = targeted.get(i);
-			if (names) {
-				const into = targeted.get(pool.fallbackTo!) ?? new Set();
-				for (const n of names) into.add(n);
-				targeted.set(pool.fallbackTo!, into);
-			}
-		}
+	// A piece outside the start is only placed when some jigsaw block
+	// drawing from its pool targets a name it has. A pool's fallback is
+	// drawn from by the same jigsaw blocks as the pool.
+	for (const [id, names] of [...targeted]) {
+		const fb = def(id).fallback;
+		if (!fb) continue;
+		const into = targeted.get(fb) ?? new Set();
+		for (const n of names) into.add(n);
+		targeted.set(fb, into);
 	}
 	for (const [i, pool] of graph.pools.entries()) {
-		if (i === 0 && root.kind === 'structure') {
+		if (i === 0) {
 			// The start piece is placed whole; with a start_jigsaw_name only
 			// pieces with that jigsaw block can start.
-			if (graph.startName) for (const p of pool.pieces) markUnreachable(p, new Set([graph.startName]), graph);
+			if (root.kind === 'structure' && graph.startName) pool.pieces.forEach((p, pi) => markUnreachable(p, new Set([graph.startName!]), graph, once(`r|start|${pi}`)));
 			continue;
 		}
-		if (i === 0) continue;
-		const names = targeted.get(i);
-		if (!names) continue;
-		for (const p of pool.pieces) markUnreachable(p, names, graph);
+		const names = targeted.get(pool.id);
+		if (names) pool.pieces.forEach((p, pi) => markUnreachable(p, names, graph, once(`r|${pool.id}|${pi}`)));
 	}
 	return graph;
 }
 
-function markUnreachable(p: Piece, names: Set<string>, graph: JigsawGraph) {
+function markUnreachable(p: Piece, names: Set<string>, graph: JigsawGraph, count: boolean) {
 	if (p.kind !== 'single' || p.jigsaws === undefined) return;
 	if (p.jigsaws.some((j) => names.has(j.name))) return;
 	p.unreachable = true;
-	graph.problems.unreachable++;
+	if (count) graph.problems.unreachable++;
 }
 
 /** Plain words for a dead end. */

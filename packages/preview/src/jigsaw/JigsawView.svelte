@@ -157,7 +157,9 @@
 			{#each { length: layout.depth + 1 } as _, d (d)}
 				{@const deep = graph.size !== undefined && d > graph.size}
 				<div class="absolute top-1.5 text-[10px] uppercase tracking-wide {deep ? 'text-amber-600 dark:text-amber-400' : 'text-muted'}" style="left: {LEFT + d * (W + GAP)}px">
-					{d === 0 ? 'Start' : `Depth ${d}`}{deep ? ' · past size' : ''}
+					{d === 0 ? 'Start' : `Depth ${d}`}{deep ? ' · past size' : ''}{d === layout.depth && graph.repeatsFrom !== undefined
+						? ` · then as depth ${graph.repeatsFrom} again`
+						: ''}
 				</div>
 			{/each}
 			<svg class="pointer-events-none absolute inset-0" width={layout.width} height={layout.height} aria-hidden="true">
@@ -178,7 +180,7 @@
 					><title>{e.title}</title></path>
 				{/each}
 			</svg>
-			{#each graph.pools as pool, pi (pool.id)}
+			{#each graph.pools as pool, pi (`${pool.id}@${pool.depth}`)}
 				{@const b = layout.boxes[pi]}
 				<section
 					class="absolute rounded border bg-panel shadow-sm {pool.tooDeep ? 'border-amber-500/70' : !pool.declared && pool.id.split(':')[0] !== 'minecraft' ? 'border-red-500/80' : 'border-line'}"
