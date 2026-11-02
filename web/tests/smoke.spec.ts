@@ -753,3 +753,26 @@ test.describe('on macOS', () => {
 		await expect(menu.getByRole('menuitem', { name: /Fix all/ })).toContainText('⌘+⌥+F');
 	});
 });
+
+test('a book file in an example is checked and completed in place', async ({ page }) => {
+	page.on('dialog', (d) => d.accept());
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	await page.getByRole('button', { name: /Examples/ }).click();
+	await page.getByRole('button', { name: /library/ }).click();
+	await page.getByRole('button', { name: 'books/day_12.mmsbook' }).click();
+	await expect(page.locator('.cm-content')).toContainText('The lamps went out');
+	await expect(status(page)).toHaveText(/No problems/);
+	// A bad style is reported in the book file itself.
+	await page.locator('.cm-line').last().click();
+	await page.keyboard.press('End');
+	await page.keyboard.insertText('\n{purpl}x{/}');
+	await expect(status(page)).toHaveText(/1 error/);
+	await expect(page.locator('.cm-lintRange-error')).toHaveCount(1);
+	// Completion after { offers colors.
+	await page.keyboard.press('Backspace');
+	for (let i = 0; i < 'purpl}x{/}'.length - 1; i++) await page.keyboard.press('Backspace');
+	await page.keyboard.insertText('go');
+	await page.keyboard.press('ControlOrMeta+Space');
+	await expect(page.locator('.cm-tooltip-autocomplete')).toContainText('gold');
+});

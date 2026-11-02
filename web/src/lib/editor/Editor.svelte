@@ -9,7 +9,7 @@
 	import { onMount, untrack } from 'svelte';
 	import type { Engine } from '../engine/engine.svelte';
 	import { uriOf } from '../project/project.svelte';
-	import { mmsHighlight, mmsLanguage } from './language';
+	import { bookHighlight, bookLanguage, mmsHighlight, mmsLanguage } from './language';
 	import { semanticHighlighting } from './semantic';
 	import { inlayHints } from './inlay';
 	import { forEachDiagnostic } from '@codemirror/lint';
@@ -105,6 +105,7 @@
 	}
 
 	function stateFor(p: string, doc: string) {
+		const book = p.endsWith('.mmsbook');
 		return EditorState.create({
 			doc,
 			extensions: [
@@ -112,9 +113,8 @@
 				indentUnit.of('  '),
 				EditorView.lineWrapping,
 				EditorState.tabSize.of(2),
-				mmsLanguage,
-				mmsHighlight,
-				engine.client.plugin(uriOf(p), 'mms'),
+				...(book ? [bookLanguage, bookHighlight] : [mmsLanguage, mmsHighlight]),
+				engine.client.plugin(uriOf(p), book ? 'mmsbook' : 'mms'),
 				semanticHighlighting((uri) => engine.semanticTokens(uri)),
 				inlayHints((uri) => engine.inlayHints(uri)),
 				inlineRename(),

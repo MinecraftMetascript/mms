@@ -1,0 +1,45 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "MMS Book",
+  "scopeName": "text.mmsbook",
+  "patterns": [
+    { "name": "meta.separator.page.mmsbook", "match": "^\\s*---\\s*$" },
+    {
+      "name": "markup.heading.mmsbook",
+      "match": "^(#) (.*)$",
+      "captures": { "1": { "name": "punctuation.definition.heading.mmsbook" }, "2": { "name": "entity.name.section.mmsbook" } }
+    },
+    { "include": "#inline" }
+  ],
+  "repository": {
+    "inline": {
+      "patterns": [
+        { "name": "constant.character.escape.mmsbook", "match": "\\\\." },
+        {
+          "name": "meta.embedded.expression.mmsbook",
+          "begin": "\\$\\{",
+          "end": "\\}",
+          "beginCaptures": { "0": { "name": "punctuation.section.embedded.begin.mmsbook" } },
+          "endCaptures": { "0": { "name": "punctuation.section.embedded.end.mmsbook" } },
+          "patterns": [{ "name": "variable.other.mmsbook", "match": "[A-Za-z_][A-Za-z0-9_:]*" }]
+        },
+        {
+          "name": "entity.name.tag.mmsbook",
+          "match": "\\{(/|(key|sprite|head|t|font|shadow):[^}]*|[^}]*)\\}"
+        },
+        {
+          "match": "(\\[)([^\\]]*)(\\])(\\()([^)]*)(\\))",
+          "captures": {
+            "2": { "name": "string.other.link.title.mmsbook" },
+            "5": { "name": "markup.underline.link.mmsbook" }
+          }
+        },
+        { "name": "markup.bold.mmsbook", "match": "\\*\\*[^*]+\\*\\*" },
+        { "name": "markup.italic.mmsbook", "match": "\\*[^*]+\\*" },
+        { "name": "markup.underline.mmsbook", "match": "__[^_]+__" },
+        { "name": "markup.strikethrough.mmsbook", "match": "~~[^~]+~~" },
+        { "name": "markup.other.obfuscated.mmsbook", "match": "\\|\\|[^|]+\\|\\|" }
+      ]
+    }
+  }
+}

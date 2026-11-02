@@ -25,8 +25,8 @@ func TestLayoutPage(t *testing.T) {
 		{strings.Repeat("a", 16), true, 1}, // bold glyphs are a pixel wider
 		{strings.Repeat("a", 17), true, 2},
 		{strings.Repeat("i", 57), false, 1}, // narrow letters fit more
-		{"aaaaaaaaaa aaaaaaaaaa", false, 2},  // the second word moves down whole
-		{"a\nb\n", false, 2},                 // a final newline adds no line
+		{"aaaaaaaaaa aaaaaaaaaa", false, 2}, // the second word moves down whole
+		{"a\nb\n", false, 2},                // a final newline adds no line
 		{strings.Repeat("a\n", 13) + "a", false, 14},
 	} {
 		if got := linesOf(tc.text, tc.bold); got != tc.lines {

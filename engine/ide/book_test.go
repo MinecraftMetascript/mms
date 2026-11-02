@@ -103,3 +103,10 @@ func TestBookHover(t *testing.T) {
 		}
 	}
 }
+
+func TestBookStringHover(t *testing.T) {
+	s, off := session(t, "Book b = { title = \"T\", author = \"A\", text = [\"Press {key:inv|entory}\"] }\n")
+	if h, _ := s.Hover("main.mms", off); !strings.Contains(h, "key.inventory") {
+		t.Errorf("hover = %q", h)
+	}
+}

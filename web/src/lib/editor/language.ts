@@ -55,3 +55,37 @@ export const mmsHighlight = syntaxHighlighting(
 		{ tag: t.operator, class: 'cm-sem-operator' }
 	])
 );
+
+/** Book markup (.mmsbook): headings, page breaks, style tags, links and ${...}. */
+export const bookLanguage = StreamLanguage.define<{ heading: boolean }>({
+	name: 'mmsbook',
+	startState: () => ({ heading: false }),
+	token(stream, state) {
+		if (stream.sol()) {
+			state.heading = false;
+			if (stream.match(/^\s*---\s*$/)) return 'meta';
+			if (stream.match('# ')) {
+				state.heading = true;
+				return 'keyword';
+			}
+		}
+		if (stream.match(/^\\./)) return 'string';
+		if (stream.match(/^\$\{[^}]*\}?/)) return 'atom';
+		if (stream.match(/^\{[^}]*\}?/)) return 'keyword';
+		if (stream.match(/^\[[^\]]*\]\([^)]*\)?/)) return 'string';
+		if (stream.match(/^(\*\*|__|~~|\|\||\*)/)) return 'operator';
+		stream.next();
+		return state.heading ? 'heading' : null;
+	}
+});
+
+export const bookHighlight = syntaxHighlighting(
+	HighlightStyle.define([
+		{ tag: t.meta, class: 'cm-sem-macro' },
+		{ tag: t.keyword, class: 'cm-sem-keyword' },
+		{ tag: t.atom, class: 'cm-sem-variable' },
+		{ tag: t.string, class: 'cm-sem-string' },
+		{ tag: t.operator, class: 'cm-sem-operator' },
+		{ tag: t.heading, fontWeight: 'bold' }
+	])
+);

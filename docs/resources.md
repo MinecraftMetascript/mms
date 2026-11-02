@@ -238,3 +238,60 @@ Function give {
 Anywhere else that takes an item id, such as a recipe ingredient or an item tag, a custom item is written as its base item, so changing `base` updates every use. The game matches those fields by item id only, so `{ A = ember_shard }` in a recipe accepts any amethyst shard, not only ember shards. The [`custom-item-base`](lint.md) hint marks each such use, and editors show the base item after the name. A custom item's own `base` must be a vanilla item. A `Model`, `ItemModel` or `Lang` entry that the custom item also writes is reported as a duplicate.
 
 To run code when a player right-clicks with the item, hits with it, eats it and so on, set its `on_*` fields to functions; see [item hooks](functions.md#item-hooks).
+
+## Books
+
+A `Book` is a written book. Its pages are written in book markup, a small Markdown-like format, instead of text components:
+
+```
+Objective deaths = "deathCount"
+
+Book guide = {
+  title = "Library Guide"
+  author = "The Librarian"
+  text = [
+    "# Welcome",
+    "This world hides {gold}three diaries{/} in old chests.",
+    "Press {key:jump} to climb.",
+    "---",
+    "[Find a chest](run:/function library:chest \"Places a chest here\")",
+    "You have died ${deaths[@s]} times.",
+  ]
+}
+```
+
+`text` holds one string per line. A line of `---` starts a new page. Long text reads better from its own file: `text = BookText("books/diary.mmsbook")` reads a `.mmsbook` file in the project, where the editor checks and completes the markup and shows its problems in the file itself.
+
+| Field | |
+| --- | --- |
+| `title` | the title on the cover and the item's name, at most 32 characters |
+| `author` | shown as "by ..." under the title |
+| `generation` | `original` (the default), `copy`, `copy_of_copy` or `tattered`. The last two cannot be copied in a crafting table |
+| `text` | the pages in book markup, as strings or `BookText("....mmsbook")` |
+| `pages` | the pages as text components, for full control, instead of `text` |
+| `components` | more item components, such as `lore`, given to every use |
+
+The book's name stands for the book wherever a [custom item](#custom-items) name works: `guide` in a loot entry, `guide * 2` as a recipe result, and `${guide}` in `/give @s ${guide}`.
+
+### Book markup
+
+| Markup | Shows |
+| --- | --- |
+| `# Heading` | a bold line |
+| `**bold**`, `*italic*`, `__underlined__`, `~~struck~~`, `\|\|obfuscated\|\|` | styled text |
+| `{gold}...{/}` | a color: one of the 16 named colors, or `#ff8800` |
+| `{bold red}...{/}` | styles combined: `bold`, `italic`, `underlined`, `strikethrough`, `obfuscated`, colors, `shadow:#3f1f00` (or `#3f1f0080`, or `none`) and `font:uniform` |
+| `{key:jump}` | the key the reader has bound, such as Space |
+| `{sprite:item/diamond}` | an inline icon; `atlas:gui` picks another atlas |
+| `{head:Notch}` | a player's head |
+| `{t:block.minecraft.stone}` | a translated text |
+| `[text](page:2)` | turns to page 2 |
+| `[text](run:/function demo:start)` | runs a command as the reader; MMS checks the command |
+| `[text](suggest:/tp @s ~ ~10 ~)`, `[text](copy:12345)`, `[text](https://...)` | puts text in chat, copies it, or opens a web page |
+| `[text](hover:A red gem)`, `[text](page:2 "Next")` | hover text, alone or after a target |
+| `${kills[@s]}`, `${wave}` | a score or a Global, filled in when the reader first opens the book |
+| `\*` | the character itself |
+
+A book page shows 14 lines of about 19 characters. Text past the last line is cut off in game, so the [`book-overflow`](lint.md) warning marks where a page runs over, measured with the vanilla font. Add a `---` line there.
+
+The [`library`](../examples/library/) example has a guide given on first join and diaries in a chest loot table.

@@ -197,7 +197,7 @@ type Decl struct {
 	// Deps are the symbol lookups the check made (see sema.DepsHold).
 	Deps map[string]bool
 
-	lints    []syntax.Diagnostic // cached lint findings, valid for lintKey
+	lints    []syntax.Diagnostic            // cached lint findings, valid for lintKey
 	extLints map[string][]syntax.Diagnostic // the same, in other files
 	lintKey  string
 	refs     []string

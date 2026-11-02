@@ -96,7 +96,7 @@ type lintRun struct {
 	out  map[string][]syntax.Diagnostic
 	rule *Rule
 	sev  syntax.Severity
-	cur  *[]syntax.Diagnostic // where per-declaration findings go
+	cur  *[]syntax.Diagnostic           // where per-declaration findings go
 	ext  map[string][]syntax.Diagnostic // and those in other files
 }
 

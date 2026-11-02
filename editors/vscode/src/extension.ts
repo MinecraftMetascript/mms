@@ -127,7 +127,10 @@ async function start() {
 	log(`starting ${resolved.command} lsp`);
 	const serverOptions: ServerOptions = { command: resolved.command, args: ['lsp'] };
 	const clientOptions: LanguageClientOptions = {
-		documentSelector: [{ scheme: 'file', language: 'mms' }],
+		documentSelector: [
+			{ scheme: 'file', language: 'mms' },
+			{ scheme: 'file', language: 'mmsbook' }
+		],
 		outputChannel: output,
 		// The server registers its own file watchers (mms.json, sources
 		// and asset files), so no synchronize.fileEvents here.

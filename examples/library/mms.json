@@ -1,0 +1,5 @@
+{
+  "$schema": "https://minecraftmetascript.github.io/mms/mms.schema.json",
+  "namespace": "library",
+  "description": "Written books: a guide for new players and lore found in chests"
+}

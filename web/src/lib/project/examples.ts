@@ -1,7 +1,7 @@
-import type { AssetFile, ProjectData } from './project.svelte';
+import { isSourcePath, type AssetFile, type ProjectData } from './project.svelte';
 
 // The repository's examples, bundled at build time, with their subfolders.
-const raw = import.meta.glob('../../../../examples/**/*.{mms,json}', {
+const raw = import.meta.glob('../../../../examples/**/*.{mms,mmsbook,json}', {
 	query: '?raw',
 	import: 'default',
 	eager: true
@@ -33,7 +33,7 @@ export const examples: Example[] = (() => {
 	for (const [path, text] of Object.entries(raw)) {
 		const [e, name] = split(path);
 		if (name === 'mms.json') e.config = text;
-		else if (name.endsWith('.mms')) e.files.push({ path: name, text });
+		else if (isSourcePath(name)) e.files.push({ path: name, text });
 	}
 	for (const [path, url] of Object.entries(binary)) {
 		const [e, name] = split(path);
