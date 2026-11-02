@@ -183,3 +183,80 @@ Noise n = Noise(-7).
           (argument
             (unary_expression
               (number))))))))
+
+========================================
+NBT paths and commands as values
+========================================
+
+Function f {
+  let y = @s::Pos[1] * 100
+  siege:path::queue[0].x = y
+  ~ ~-1 ~::Items[0].count = Byte(3)
+  let n = /execute if entity @a
+  let d = a / b
+  path::count += 1
+  return /data get storage demo:s list
+}
+
+----------------------------------------
+
+(source_file
+  (declaration
+    (identifier)
+    (identifier)
+    (block
+      (let_statement
+        (identifier)
+        (binary_expression
+          (index_expression
+            (nbt_expression
+              (selector
+                (identifier))
+              (identifier))
+            (argument
+              (number)))
+          (number)))
+      (assignment
+        (member_expression
+          (index_expression
+            (nbt_expression
+              (resource_location)
+              (identifier))
+            (argument
+              (number)))
+          (identifier))
+        (identifier))
+      (assignment
+        (member_expression
+          (index_expression
+            (nbt_expression
+              (coordinates
+                (number))
+              (identifier))
+            (argument
+              (number)))
+          (identifier))
+        (call_expression
+          (identifier)
+          (arguments
+            (argument
+              (number)))))
+      (let_statement
+        (identifier)
+        (inline_command
+          (inline_command_name)
+          (command_text)))
+      (let_statement
+        (identifier)
+        (binary_expression
+          (identifier)
+          (identifier)))
+      (compound_assignment
+        (nbt_expression
+          (identifier)
+          (identifier))
+        (number))
+      (return_statement
+        (inline_command
+          (inline_command_name)
+          (command_text))))))

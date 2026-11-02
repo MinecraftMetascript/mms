@@ -33,6 +33,7 @@
 
 ; Raw commands.
 (command_name) @function.builtin
+(inline_command_name) @function.builtin
 (command_text) @string.special
 (interpolation ["${" "}"] @punctuation.special)
 
@@ -61,7 +62,7 @@
   "+" "-" "*" "/" "%"
   "==" "!=" "<" "<=" ">" ">="
   "&&" "||" "!"
-  "->" ".."
+  "->" ".." "::"
 ] @operator
 
 ["(" ")" "[" "]" "{" "}"] @punctuation.bracket

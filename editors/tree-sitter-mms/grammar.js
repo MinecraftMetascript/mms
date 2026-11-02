@@ -37,7 +37,9 @@ module.exports = grammar({
   // lexer cannot see, so src/scanner.c lexes them (see MMSLexer.g4,
   // COMMAND). `_error_sentinel` is never used by a rule; it tells the
   // scanner that tree-sitter is in error recovery.
-  externals: ($) => [$.command_name, $.command_text, $._error_sentinel],
+  // `inline_command_name` is a command used as a value (`let n = /data
+  // get ...`): the scanner lexes it where the grammar allows one.
+  externals: ($) => [$.command_name, $.command_text, $.inline_command_name, $._error_sentinel],
 
   extras: ($) => [/\s/, $.line_comment, $.block_comment, $.doc_comment],
 
@@ -100,9 +102,14 @@ module.exports = grammar({
           'let',
           field('name', $.identifier),
           optional($.type_annotation),
-          optional(seq('=', field('value', $._expression))),
+          optional(seq('=', field('value', choice($._expression, $.inline_command)))),
         ),
       ),
+
+    // A value on the right of `=` or after return may be a command,
+    // which runs to the end of the line.
+    inline_command: ($) =>
+      prec.right(seq($.inline_command_name, repeat(choice($.command_text, $.interpolation)))),
 
     if_statement: ($) =>
       prec.right(
@@ -121,7 +128,7 @@ module.exports = grammar({
     for_statement: ($) =>
       prec(PREC.for, seq('for', field('name', $.identifier), 'in', field('iterable', $._expression), field('body', $.block))),
 
-    return_statement: ($) => prec.right(seq('return', optional($._expression))),
+    return_statement: ($) => prec.right(seq('return', optional(choice($._expression, $.inline_command)))),
     break_statement: (_) => 'break',
     continue_statement: (_) => 'continue',
 
@@ -133,14 +140,14 @@ module.exports = grammar({
     // `key = value` in a resource body or object literal; a variable,
     // member or index assignment in a function body.
     assignment: ($) =>
-      prec(-1, seq(field('left', $._expression), '=', field('right', $._expression))),
+      prec(-1, seq(field('left', $._expression), '=', field('right', choice($._expression, $.inline_command)))),
 
     compound_assignment: ($) =>
       prec(-1,
         seq(
           field('target', $._expression),
           field('operator', choice('+=', '-=', '*=', '/=', '%=')),
-          field('value', $._expression),
+          field('value', choice($._expression, $.inline_command)),
         ),
       ),
 
@@ -153,6 +160,7 @@ module.exports = grammar({
         $.range_expression,
         $.arrow_expression,
         $.member_expression,
+        $.nbt_expression,
         $.call_expression,
         $.index_expression,
         $.block_call_expression,
@@ -192,6 +200,10 @@ module.exports = grammar({
 
     member_expression: ($) =>
       prec.right(PREC.postfix, seq(field('object', $._expression), '.', optional(field('property', $.identifier)))),
+
+    // @s::Pos[1], siege:path::queue, ~ ~-1 ~::Items
+    nbt_expression: ($) =>
+      prec.right(PREC.postfix, seq(field('object', $._expression), '::', optional(field('path', choice($.identifier, $.string))))),
 
     call_expression: ($) =>
       prec(PREC.postfix, seq(field('function', $._expression), field('arguments', $.arguments))),

@@ -11,6 +11,7 @@
 enum TokenType {
   COMMAND_NAME,
   COMMAND_TEXT,
+  INLINE_COMMAND_NAME,
   ERROR_SENTINEL,
 };
 
@@ -68,18 +69,26 @@ bool tree_sitter_mms_external_scanner_scan(void *payload, TSLexer *lexer, const 
     return scan_command_text(lexer);
   }
 
-  if (!valid_symbols[COMMAND_NAME]) return false;
+  if (!valid_symbols[COMMAND_NAME] && !valid_symbols[INLINE_COMMAND_NAME]) return false;
 
+  // A command used as a value follows `=` or `return` on the same line
+  // (MMSLexer.g4, INLINE_COMMAND); the grammar only asks for it there.
   bool line_start = lexer->get_column(lexer) == 0;
+  bool same_line = true;
   while (lexer->lookahead == ' ' || lexer->lookahead == '\t' || is_newline(lexer->lookahead)) {
-    if (is_newline(lexer->lookahead)) line_start = true;
+    if (is_newline(lexer->lookahead)) {
+      line_start = true;
+      same_line = false;
+    }
     lexer->advance(lexer, true);
   }
-  if (!line_start || lexer->lookahead != '/') return false;
+  if (lexer->lookahead != '/') return false;
+  bool inline_cmd = valid_symbols[INLINE_COMMAND_NAME] && same_line;
+  if (!line_start && !inline_cmd) return false;
   lexer->advance(lexer, false);
   if (!is_lower(lexer->lookahead)) return false;
   while (is_lower(lexer->lookahead) || lexer->lookahead == '_') lexer->advance(lexer, false);
   lexer->mark_end(lexer);
-  lexer->result_symbol = COMMAND_NAME;
+  lexer->result_symbol = inline_cmd ? INLINE_COMMAND_NAME : COMMAND_NAME;
   return true;
 }
