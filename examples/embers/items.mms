@@ -14,6 +14,8 @@ CustomItem ember_shard = {
   base = amethyst_shard
   name = "Ember Shard"
   texture = Texture("art/ember_shard.png")
+  on_right_click = warm
+  on_use_on_block = kindle
 }
 
 /** A music disc that plays the song in music.mms. */
@@ -41,3 +43,24 @@ Recipe ember_disc = Shaped(
   },
   ember_disc,
 )
+
+/**
+ * Right-clicking with an Ember Shard puffs out flames and keeps the
+ * player safe from fire for a few seconds. The shard's on_right_click
+ * runs it once per press, as and at the player; holding the button down
+ * does not repeat it.
+ */
+Function warm {
+  /particle flame ^ ^1.5 ^1 0.2 0.2 0.2 0.05 20
+  /playsound item.firecharge.use player @a
+  /effect give @s fire_resistance 5
+}
+
+/**
+ * Right-clicking a block with an Ember Shard also lights a fire on top
+ * of it, if there is room. on_use_on_block runs positioned at the centre
+ * of the block.
+ */
+Function kindle {
+  /setblock ~ ~1 ~ fire keep
+}

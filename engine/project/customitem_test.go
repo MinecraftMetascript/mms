@@ -6,7 +6,11 @@ import (
 	"testing"
 	"testing/fstest"
 
+	"github.com/minecraftmetascript/mms/engine/command"
+	"github.com/minecraftmetascript/mms/engine/jsonv"
+	"github.com/minecraftmetascript/mms/engine/sema"
 	"github.com/minecraftmetascript/mms/engine/spec"
+	"github.com/minecraftmetascript/mms/engine/syntax"
 )
 
 const customItemSrc = `CustomItem ruby = {
@@ -191,5 +195,177 @@ func TestCustomItemNameEscapes(t *testing.T) {
 				t.Errorf("give.mcfunction:\n%s", got)
 			}
 		}
+	}
+}
+
+// TestRightClick checks on_right_click: the item's consumable,
+// use_effects and marker, the using_item advancement, the once-per-press
+// reward function and the objective's setup.
+func TestRightClick(t *testing.T) {
+	p := New(spec.MustDefault(), Config{Namespace: "demo"})
+	p.SetFile("main.mms", `
+CustomItem wand = {
+  base = stick
+  name = "Wand"
+  on_right_click = zap
+  components = { custom_data = { kind = "wand" } }
+}
+Function zap {
+  /say zap
+}
+Function give {
+  /give @s ${wand}
+}
+`)
+	r, _ := p.Analyze(context.Background())
+	if d := diagText(r); d != "" {
+		t.Fatalf("unexpected diagnostics:\n%s", d)
+	}
+	got := dumpFiles(r.Emit())
+	for _, want := range []string{
+		`give @s stick[item_name={translate:"item.demo.wand",fallback:"Wand"},custom_data={kind:"wand",mms_item:"demo:wand"},consumable={consume_seconds:1000000,animation:"none",has_consume_particles:false},use_effects={can_sprint:true,speed_multiplier:1,interact_vibrations:false}]`,
+		"=== data/demo/advancement/mms_gen/item_hook/wand/press.json\n",
+		`"trigger": "minecraft:using_item"`,
+		`"items": "minecraft:stick"`,
+		`"mms_item": "demo:wand"`,
+		`"function": "demo:mms_gen/item_hook/wand/press"`,
+		"=== data/demo/function/mms_gen/item_hook/wand/press.mcfunction\nadvancement revoke @s only demo:mms_gen/item_hook/wand/press\nexecute if score @s mms_click.demo matches 1.. run return run scoreboard players set @s mms_click.demo 2\nscoreboard players set @s mms_click.demo 2\nfunction demo:zap\n",
+		"=== data/demo/function/zap.mcfunction\nsay zap\n",
+		"scoreboard objectives add mms_click.demo dummy\n",
+		"scoreboard players remove @a[scores={mms_click.demo=1..}] mms_click.demo 1\n",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("missing %q in:\n%s", want, got)
+		}
+	}
+	if strings.Contains(got, "/ray") {
+		t.Errorf("a ray without on_use_on_block or on_right_click_entity:\n%s", got)
+	}
+
+	errs := map[string]string{
+		"CustomItem w = { base = stick, on_right_click = nope }":                                                                    "mms/unknown-id",
+		"CustomItem w = { base = stick, on_hit = f }\nObjective f":                                                                  "mms/unknown-id",
+		"CustomItem w = { base = stick, on_kill = f }\nFunction f(n: int) {\n  /say hi\n}":                                          "mms/custom-item",
+		"CustomItem w = { base = apple, on_consume = f, on_hold_right_click = f }\nFunction f {\n}":                                 "mms/custom-item",
+		"CustomItem w = { base = stick, on_right_click = f, components = { custom_data = \"{a:1}\" } }\nFunction f {\n  /say hi\n}": "mms/custom-item",
+	}
+	for src, want := range errs {
+		p := New(spec.MustDefault(), Config{Namespace: "demo"})
+		p.SetFile("main.mms", src)
+		r, _ := p.Analyze(context.Background())
+		var codes []string
+		for _, d := range r.Diagnostics("main.mms") {
+			if d.Severity == syntax.SeverityError {
+				codes = append(codes, d.Code)
+			}
+		}
+		if len(codes) == 0 || codes[0] != want {
+			t.Errorf("%q: errors %v, want %s", src, codes, want)
+		}
+	}
+}
+
+// TestItemHooks checks every on_* field: each writes an advancement that
+// matches the schema and functions whose commands the command checker
+// accepts.
+func TestItemHooks(t *testing.T) {
+	pack := spec.MustDefault()
+	p := New(pack, Config{Namespace: "demo"})
+	p.SetFile("main.mms", `
+CustomItem staff = {
+  base = iron_sword
+  on_right_click = f
+  on_hold_right_click = f
+  on_use_on_block = f
+  on_right_click_entity = f
+  on_hit = f
+  on_kill = f
+  on_pickup = f
+  on_break = f
+}
+CustomItem pie = { base = pumpkin_pie, on_consume = f }
+Function f {
+  /say hi
+}
+`)
+	r, _ := p.Analyze(context.Background())
+	if d := diagText(r); d != "" {
+		t.Fatalf("unexpected diagnostics:\n%s", d)
+	}
+	files := map[string]string{}
+	for _, f := range r.Emit() {
+		files[f.Path] = string(f.Data)
+	}
+	want := map[string]string{
+		"press":  "minecraft:using_item",
+		"hit":    "minecraft:player_hurt_entity",
+		"kill":   "minecraft:player_killed_entity",
+		"pickup": "minecraft:thrown_item_picked_up_by_player",
+		"break":  "minecraft:item_durability_changed",
+	}
+	for name, trigger := range want {
+		path := "data/demo/advancement/mms_gen/item_hook/staff/" + name + ".json"
+		if !strings.Contains(files[path], trigger) {
+			t.Errorf("%s lacks %s:\n%s", path, trigger, files[path])
+		}
+	}
+	if !strings.Contains(files["data/demo/advancement/mms_gen/item_hook/pie/consume.json"], "minecraft:consume_item") {
+		t.Errorf("no consume advancement")
+	}
+	for _, f := range []string{"press/ray", "press/ray/entity"} {
+		if files["data/demo/function/mms_gen/item_hook/staff/"+f+".mcfunction"] == "" {
+			t.Errorf("no %s function", f)
+		}
+	}
+	if !strings.Contains(files["data/demo/function/mms_gen/item_hook/staff/press.mcfunction"], "function demo:f\nexecute if score") {
+		t.Errorf("hold should run before the press check:\n%s", files["data/demo/function/mms_gen/item_hook/staff/press.mcfunction"])
+	}
+	cc := command.New(pack)
+	for path, data := range files {
+		switch {
+		case strings.HasPrefix(path, "data/demo/advancement/mms_gen/item_hook/"):
+			v, err := jsonv.Parse([]byte(data))
+			if err != nil {
+				t.Fatalf("%s: %v", path, err)
+			}
+			if errs := sema.Validate(pack, p.Kinds, "advancement", v); len(errs) > 0 {
+				t.Errorf("%s: %v\n%s", path, errs, data)
+			}
+		case strings.HasPrefix(path, "data/demo/function/mms_gen/item_hook/"):
+			for _, line := range strings.Split(strings.TrimSpace(data), "\n") {
+				if res := cc.Check(line); res.Problem != nil {
+					t.Errorf("%s: %q: %s", path, line, res.Problem.Message)
+				}
+			}
+		}
+	}
+}
+
+// TestRightClickIncremental checks that a function declared, removed
+// and declared again in another file is picked up by the item.
+func TestRightClickIncremental(t *testing.T) {
+	p := New(spec.MustDefault(), Config{Namespace: "demo"})
+	p.SetFile("item.mms", "CustomItem wand = { base = stick, on_use_on_block = zap }\n")
+	p.SetFile("zap.mms", "Function zap {\n  /say zap\n}\n")
+	errs := func() int {
+		r, _ := p.Analyze(context.Background())
+		n := 0
+		for _, d := range r.Diagnostics("item.mms") {
+			if d.Severity == syntax.SeverityError {
+				n++
+			}
+		}
+		return n
+	}
+	if n := errs(); n != 0 {
+		t.Fatalf("%d errors with the function", n)
+	}
+	p.SetFile("zap.mms", "")
+	if n := errs(); n == 0 {
+		t.Fatal("no error without the function")
+	}
+	p.SetFile("zap.mms", "Function zap {\n  /say zap\n}\n")
+	if n := errs(); n != 0 {
+		t.Fatalf("%d errors after declaring the function again", n)
 	}
 }

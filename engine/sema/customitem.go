@@ -49,6 +49,8 @@ type CustomItemOut struct {
 	Names   map[string]string
 	// Stack is the item stack the name stands for: {id, components}.
 	Stack *jsonv.Object
+	// Hooks maps each on_* field to the function it names.
+	Hooks map[string]string
 }
 
 // Languages lists the item's languages, sorted.
@@ -169,6 +171,9 @@ func customItemType(p *spec.Pack) *spec.Type {
 		{Kind: "pair", Key: "components", Optional: true, Type: &spec.Type{Kind: "reference", Path: "::java::world::component::DataComponentPatch"},
 			Desc: "More item components, such as `max_stack_size` or `rarity`. Every use of the item gets them."},
 	}}
+	for _, h := range itemHookFields() {
+		t.Fields = append(t.Fields, &spec.Field{Kind: "pair", Key: h.key, Optional: true, Type: idType("function"), Desc: h.desc})
+	}
 	got, _ := customTypes.LoadOrStore(p, t)
 	return got.(*spec.Type)
 }
@@ -305,6 +310,7 @@ func (c *Checker) CustomItem(d *syntax.Decl, id string) *CustomItemOut {
 	if user != nil {
 		comps.Members = append(comps.Members, user.Members...)
 	}
+	out.Hooks = c.checkItemHooks(d, o, comps, id)
 	stack := &jsonv.Object{}
 	if b := str("base"); b != "" {
 		stack.Set("id", jsonv.String(b))

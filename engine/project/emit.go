@@ -73,6 +73,7 @@ func (r *Result) Emit() []OutFile {
 		}
 		hooks[name][ns] = append(hooks[name][ns], ls...)
 	}
+	clicks := map[string]bool{} // namespaces with a right-click hook
 	consts := map[string]map[int32]bool{}
 	ret := map[string]bool{}
 	used := map[string]bool{} // namespaces whose objective the code uses
@@ -151,6 +152,18 @@ func (r *Result) Emit() []OutFile {
 			if it.ItemModel != nil {
 				out = append(out, OutFile{Path: "assets/" + ns + "/items/" + path + ".json", Data: jsonv.Marshal(it.ItemModel), Unit: d.Unit.Path, Span: d.D.Sp, Pack: sema.ResourcePack})
 			}
+			hf := sema.ItemHookOutput(d.ID(), it.Stack, it.Hooks)
+			for hid, adv := range hf.Advancements {
+				hns, hpath := splitID(hid)
+				out = append(out, OutFile{Path: "data/" + hns + "/advancement/" + hpath + ".json", Data: jsonv.Marshal(adv), Unit: d.Unit.Path, Span: d.D.Sp})
+			}
+			for fid, ls := range hf.Functions {
+				fns, fpath := splitID(fid)
+				out = append(out, OutFile{Path: "data/" + fns + "/function/" + fpath + ".mcfunction", Data: lines(ls), Unit: d.Unit.Path, Span: d.D.Sp})
+			}
+			if hf.Click {
+				clicks[ns] = true
+			}
 			for _, lc := range it.Languages() {
 				l := lang("assets/"+ns+"/lang/"+lc+".json", d)
 				if l.o.Get(it.LangKey) == nil {
@@ -202,6 +215,11 @@ func (r *Result) Emit() []OutFile {
 	// are alive again (@e skips dead players). Both run at the player.
 	for ns := range hooks["first_join"] {
 		out = append(out, OutFile{Path: "data/" + ns + "/advancement/mms_gen/first_join.json", Data: jsonv.Marshal(sema.FirstJoinAdvancement(ns))})
+	}
+	for ns := range clicks {
+		load, tick := sema.ClickSetup(ns)
+		objectives[ns] = append(objectives[ns], load...)
+		hook("tick", ns, tick)
 	}
 	for ns, ls := range hooks["respawn"] {
 		obj := sema.RespawnObjective(ns)

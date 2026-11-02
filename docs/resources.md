@@ -216,6 +216,7 @@ This writes `models/item/ember_shard.json` (a flat `item/generated` model of the
 | `parent` | the generated model's parent: `item/generated` by default, `item/handheld` for tools |
 | `model` | an existing model to show instead of one made from `texture` |
 | `item_model` | an `ItemModel` id, or an item model body such as `{ model = Select(...) }`, instead of the generated one |
+| `on_right_click`, `on_hit`, ... | functions to run when a player uses the item; see [item hooks](functions.md#item-hooks) |
 | `components` | more item components, given to every use |
 
 Without `texture`, `model` or `item_model`, the item keeps its base item's look and only gets its name and components.
@@ -235,3 +236,5 @@ Function give {
 - **Commands**: `${ember_shard}` writes `amethyst_shard[item_model="embers:ember_shard",item_name={...}]`.
 
 Anywhere else that takes an item id, such as a recipe ingredient or an item tag, a custom item is an error: the game matches those by item id only, so they need the base item. A `Model`, `ItemModel` or `Lang` entry that the custom item also writes is reported as a duplicate.
+
+To run code when a player right-clicks with the item, hits with it, eats it and so on, set its `on_*` fields to functions; see [item hooks](functions.md#item-hooks).
