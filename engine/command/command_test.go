@@ -47,6 +47,8 @@ func TestValidCommands(t *testing.T) {
 		"kill @e[type=!player]",
 		"say ${name} joined",
 		"scoreboard players set ${who} kills ${n}",
+		"execute positioned ^ ^ ^${speed} run summon marker",
+		"setblock ~ ~${dy} ~ stone",
 		"weather clear 10s",
 		"time set 1d",
 		"execute positioned as @s run tp @s ~ ~1 ~",
