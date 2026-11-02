@@ -10,6 +10,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"testing/fstest"
@@ -933,6 +934,17 @@ func (s *Server) output(_ context.Context, p struct {
 			a := map[string]any{"path": f.Path, "src": f.Asset}
 			if f.Pack == sema.ResourcePack {
 				a["pack"] = "resources"
+			} else if structureAsset.MatchString(f.Path) {
+				// A structure file's jigsaw blocks, for the jigsaw
+				// connection preview: the editor gets the pack as JSON
+				// and cannot read the .nbt itself.
+				if js, ok := project.StructureJigsaws(w.proj.Files, f.Asset); ok {
+					list := make([]map[string]any, 0, len(js))
+					for _, j := range js {
+						list = append(list, map[string]any{"pos": j.Pos, "pool": j.Pool, "name": j.Name, "target": j.Target})
+					}
+					a["jigsaws"] = list
+				}
 			}
 			assets = append(assets, a)
 			continue
@@ -1002,6 +1014,9 @@ func (s *Server) output(_ context.Context, p struct {
 	sort.Slice(items, func(i, j int) bool { return items[i]["id"].(string) < items[j]["id"].(string) })
 	return map[string]any{"files": out, "assets": assets, "items": items, "hasErrors": w.res.HasErrors()}, nil
 }
+
+// structureAsset matches a structure file's path in the data pack.
+var structureAsset = regexp.MustCompile(`^data/[^/]+/structures?/.+\.nbt$`)
 
 // ---- URIs
 

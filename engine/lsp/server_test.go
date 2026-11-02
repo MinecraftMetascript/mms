@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/minecraftmetascript/mms/engine/nbt"
 	"github.com/minecraftmetascript/mms/engine/spec"
 )
 
@@ -709,5 +711,37 @@ func TestExtractAction(t *testing.T) {
 	at := cmd["arguments"].([]any)[1].(map[string]any)
 	if cmd["command"] != "mms.renameAt" || at["line"] != float64(0) || at["character"] != float64(6) {
 		t.Errorf("command = %v", cmd)
+	}
+}
+
+// A structure file's jigsaw blocks come with its asset, for the jigsaw
+// connection preview.
+func TestOutputStructureJigsaws(t *testing.T) {
+	c := start(t)
+	c.result("initialize", map[string]any{})
+	data, err := nbt.Encode(map[string]any{
+		"palette": []any{map[string]any{"Name": "minecraft:jigsaw"}},
+		"blocks": []any{map[string]any{"pos": []any{int32(1), int32(2), int32(3)}, "state": int32(0),
+			"nbt": map[string]any{"id": "minecraft:jigsaw", "pool": "mms:rooms", "name": "mms:door", "target": "mms:door"}}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.notify("mms/setAssets", map[string]any{"files": []any{map[string]any{"path": "s/hall.nbt", "data": data}}})
+	c.notify("mms/setFiles", map[string]any{"files": []any{
+		map[string]any{"uri": "mem:///a.mms", "text": "TemplatePool rooms = { fallback = minecraft:empty, elements = [{ weight = 1, element = { element_type = minecraft:single_pool_element, location = Structure(\"s/hall.nbt\"), projection = rigid, processors = minecraft:empty } }] }\n"},
+	}})
+	out := c.result("mms/output", map[string]any{}).(map[string]any)
+	assets := out["assets"].([]any)
+	if len(assets) != 1 {
+		t.Fatalf("assets = %v", assets)
+	}
+	js, _ := assets[0].(map[string]any)["jigsaws"].([]any)
+	if len(js) != 1 {
+		t.Fatalf("asset = %v", assets[0])
+	}
+	j := js[0].(map[string]any)
+	if j["pool"] != "mms:rooms" || j["name"] != "mms:door" || j["target"] != "mms:door" || fmt.Sprint(j["pos"]) != "[1 2 3]" {
+		t.Errorf("jigsaw = %v", j)
 	}
 }

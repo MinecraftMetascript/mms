@@ -16,7 +16,7 @@ export interface OutputFile {
 	pack?: string;
 }
 
-/** A project file the pack copies, such as a texture. */
+/** A project file the pack copies, such as a texture or a structure. */
 export interface OutputAsset {
 	/** Its path in the pack. */
 	path: string;
@@ -24,6 +24,8 @@ export interface OutputAsset {
 	src: string;
 	/** "resources" for a resource pack file. */
 	pack?: string;
+	/** For a structure file: its jigsaw blocks. */
+	jigsaws?: { pos: [number, number, number]; pool: string; name: string; target: string }[];
 }
 
 /** A CustomItem or Book: the item stack its name stands for, which is not a file. */
@@ -38,7 +40,7 @@ export interface OutputItem {
 
 export type ToPanel =
 	/** The generated pack and custom items, refreshed after each analysis. */
-	| { type: 'output'; files: OutputFile[]; items: OutputItem[] }
+	| { type: 'output'; files: OutputFile[]; items: OutputItem[]; assets: OutputAsset[] }
 	/**
 	 * The output path to show, chosen with a Preview CodeLens or the
 	 * open-preview command; for a book, item:<id> and the page to open.

@@ -1,0 +1,5 @@
+{
+  "$schema": "https://minecraftmetascript.github.io/mms/mms.schema.json",
+  "namespace": "dungeon",
+  "description": "A jigsaw dungeon: rooms and halls joined by jigsaw blocks, with a connection preview"
+}
