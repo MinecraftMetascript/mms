@@ -76,6 +76,8 @@ var itemHooks = []itemHook{
 		desc: "A `Function` without parameters to run when an arrow hits a block: an arrow shot from the item, for a bow or crossbow base, or the arrow that is the item, for an arrow, tipped_arrow or spectral_arrow base. It runs as the arrow, at the point it hit; `execute on origin` is the shooter."},
 	{field: "on_projectile_hit_entity", projectile: true,
 		desc: "A `Function` without parameters to run when an arrow hurts an entity: an arrow shot from the item, for a bow or crossbow base, or the arrow that is the item, for an arrow, tipped_arrow or spectral_arrow base. It runs as and at the entity hit; `execute on attacker` is the shooter."},
+	{field: "on_projectile_land", projectile: true,
+		desc: "A `Function` without parameters to run where a thrown splash or lingering potion that is the item lands, whatever it hits. It runs at the spot, as a marker that is removed afterwards. Needs a splash_potion or lingering_potion base."},
 }
 
 // ProjectileWeapons are the bases whose projectile hooks follow the
@@ -83,7 +85,14 @@ var itemHooks = []itemHook{
 var (
 	ProjectileWeapons = []string{"minecraft:bow", "minecraft:crossbow"}
 	ProjectileAmmo    = []string{"minecraft:arrow", "minecraft:tipped_arrow", "minecraft:spectral_arrow"}
+	// ProjectileThrown are the bases on_projectile_land follows: thrown
+	// items that keep no weapon, so no enchantment runs for them.
+	ProjectileThrown = []string{"minecraft:splash_potion", "minecraft:lingering_potion"}
 )
+
+// ProjectileLandTag marks the markers riding thrown items with
+// on_projectile_land, per namespace.
+func ProjectileLandTag(ns string) string { return "mms_land." + ns }
 
 // ProjectileTag marks an arrow the tick function has looked at, per
 // namespace.
@@ -140,6 +149,16 @@ func (c *Checker) checkItemHooks(d *syntax.Decl, o *jsonv.Object, comps *jsonv.O
 		b, _ := o.Get("base").(jsonv.String)
 		if !slices.Contains(ProjectileWeapons, string(b)) && !slices.Contains(ProjectileAmmo, string(b)) {
 			c.errorf("mms/custom-item", fields[f].Span(), "%s follows arrows, so the base must be a bow or crossbow (for the arrows it shoots) or an arrow, tipped_arrow or spectral_arrow (for itself)", f)
+			delete(hooks, f)
+		}
+	}
+	if f := "on_projectile_land"; hooks[f] != "" {
+		if b, _ := o.Get("base").(jsonv.String); !slices.Contains(ProjectileThrown, string(b)) {
+			msg := "on_projectile_land follows a thrown potion, so the base must be splash_potion or lingering_potion"
+			if slices.Contains(ProjectileWeapons, string(b)) || slices.Contains(ProjectileAmmo, string(b)) {
+				msg += "; for arrows use on_projectile_hit_block and on_projectile_hit_entity"
+			}
+			c.errorf("mms/custom-item", fields[f].Span(), "%s", msg)
 			delete(hooks, f)
 		}
 	}
@@ -271,6 +290,9 @@ type ItemHookFiles struct {
 	// Spotted the lines they add to the namespace's ProjectileSpotted.
 	Enchantments map[string]jsonv.Value
 	Spotted      []string
+	// Thrown is set when the item has on_projectile_land, so the
+	// namespace needs the thrown potions' tick lines.
+	Thrown bool
 }
 
 // ItemHookOutput builds the files for a custom item's hooks.
@@ -435,6 +457,9 @@ func ItemHookOutput(id string, it *CustomItemOut) ItemHookFiles {
 // tooltip and adds no glint. The tick function runs before the arrow
 // first moves, so even a point-blank hit is caught.
 func projectileHooks(id, base string, hooks map[string]string, out *ItemHookFiles) {
+	if land := hooks["on_projectile_land"]; land != "" {
+		landHook(id, land, out)
+	}
 	hitBlock, hitEntity := hooks["on_projectile_hit_block"], hooks["on_projectile_hit_entity"]
 	if hitBlock == "" && hitEntity == "" {
 		return
@@ -495,13 +520,58 @@ func projectileHooks(id, base string, hooks map[string]string, out *ItemHookFile
 	out.Spotted = append(out.Spotted, "execute if data entity @s "+slot+".components.\"minecraft:custom_data\"{"+ItemHookMarker+":"+quoteSNBT(id)+"} run function "+ench)
 }
 
-// ProjectileSetup is the tick line and spotted function a namespace with
-// projectile hooks needs, given the lines items added to it.
-func ProjectileSetup(ns string, spotted []string) (tick []string, fn []string) {
+// landHook writes on_projectile_land. A thrown potion keeps no weapon,
+// so no enchantment runs when it lands. Instead the tick function puts a
+// marker on each new one, riding it. The game removes the potion when it
+// lands and drops its passengers where they are, so a marker that is no
+// longer riding anything marks the spot, give or take the potion's last
+// tick of flight. The marker holds the function to run in its data.
+func landHook(id, fn string, out *ItemHookFiles) {
+	ns, _ := splitID(id)
+	arm := ItemHookID(id, "land")
+	out.Thrown = true
+	out.Functions[arm] = []string{
+		"tag @s add mms_new",
+		"execute summon marker run function " + arm + "/mount",
+		"tag @s remove mms_new",
+	}
+	out.Functions[arm+"/mount"] = []string{
+		"tag @s add " + ProjectileLandTag(ns),
+		"data modify entity @s data.mms_land set value " + quoteSNBT(fn),
+		"ride @s mount @n[tag=mms_new]",
+	}
+	out.Spotted = append(out.Spotted, "execute if data entity @s Item.components.\"minecraft:custom_data\"{"+ItemHookMarker+":"+quoteSNBT(id)+"} run function "+arm)
+}
+
+// ProjectileSetup is what a namespace with projectile hooks needs, given
+// the lines items added to its spotted function, and whether any item
+// has on_projectile_land: tick lines, functions and predicates by id.
+func ProjectileSetup(ns string, spotted []string, thrown bool) (tick []string, fns map[string][]string, preds map[string]jsonv.Value) {
 	sort.Strings(spotted)
 	tag := ProjectileTag(ns)
-	return []string{"execute as @e[type=#minecraft:arrows,tag=!" + tag + "] run function " + ProjectileSpotted(ns)},
-		append([]string{"tag @s add " + tag}, spotted...)
+	spot := ProjectileSpotted(ns)
+	fns = map[string][]string{spot: append([]string{"tag @s add " + tag}, spotted...)}
+	preds = map[string]jsonv.Value{}
+	tick = []string{"execute as @e[type=#minecraft:arrows,tag=!" + tag + "] run function " + spot}
+	if !thrown {
+		return tick, fns, preds
+	}
+	for _, t := range ProjectileThrown {
+		tick = append(tick, "execute as @e[type="+strings.TrimPrefix(t, "minecraft:")+",tag=!"+tag+"] run function "+spot)
+	}
+	riding := ns + ":mms_gen/projectile/riding"
+	vehicle := &jsonv.Object{}
+	vehicle.Set("vehicle", &jsonv.Object{})
+	pred := &jsonv.Object{}
+	pred.Set("type", jsonv.String("minecraft:entity_properties"))
+	pred.Set("entity", jsonv.String("this"))
+	pred.Set("predicate", vehicle)
+	preds[riding] = pred
+	land := ns + ":mms_gen/projectile/land"
+	tick = append(tick, "execute as @e[type=marker,tag="+ProjectileLandTag(ns)+",predicate=!"+riding+"] at @s run function "+land)
+	fns[land] = []string{"function " + land + "/run with entity @s data", "kill @s"}
+	fns[land+"/run"] = []string{"$function $(mms_land)"}
+	return tick, fns, preds
 }
 
 // UseCost is what each use of a custom item with right-click hooks

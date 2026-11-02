@@ -1,8 +1,10 @@
-// What the custom arrows and the Thunder Bow do where an arrow hits.
+// What the custom arrows, the Thunder Bow and the Blast Potion do where
+// they hit.
 //
 // on_projectile_hit_block runs as the arrow, at the point it hit, so
 // `execute on origin` is whoever shot it. on_projectile_hit_entity runs
 // as and at the entity it hurt, so `execute on attacker` is the shooter.
+// on_projectile_land runs at the spot a thrown potion landed.
 
 /**
  * A small explosion, half the strength of TNT. It is a TNT entity with

@@ -75,6 +75,7 @@ func (r *Result) Emit() []OutFile {
 	}
 	clicks := map[string]bool{}      // namespaces with a right-click hook
 	spotted := map[string][]string{} // namespaces with projectile hooks: their spotted lines
+	thrown := map[string]bool{}      // namespaces with on_projectile_land
 	consts := map[string]map[int32]bool{}
 	ret := map[string]bool{}
 	used := map[string]bool{} // namespaces whose objective the code uses
@@ -172,6 +173,9 @@ func (r *Result) Emit() []OutFile {
 			if len(hf.Spotted) > 0 {
 				spotted[ns] = append(spotted[ns], hf.Spotted...)
 			}
+			if hf.Thrown {
+				thrown[ns] = true
+			}
 			for _, lc := range it.Languages() {
 				l := lang("assets/"+ns+"/lang/"+lc+".json", d)
 				if l.o.Get(it.LangKey) == nil {
@@ -225,10 +229,16 @@ func (r *Result) Emit() []OutFile {
 		out = append(out, OutFile{Path: "data/" + ns + "/advancement/mms_gen/first_join.json", Data: jsonv.Marshal(sema.FirstJoinAdvancement(ns))})
 	}
 	for ns, ls := range spotted {
-		tick, fn := sema.ProjectileSetup(ns, ls)
+		tick, fns, preds := sema.ProjectileSetup(ns, ls, thrown[ns])
 		hook("tick", ns, tick)
-		fns, fpath := splitID(sema.ProjectileSpotted(ns))
-		out = append(out, OutFile{Path: "data/" + fns + "/function/" + fpath + ".mcfunction", Data: lines(fn)})
+		for fid, fl := range fns {
+			fns, fpath := splitID(fid)
+			out = append(out, OutFile{Path: "data/" + fns + "/function/" + fpath + ".mcfunction", Data: lines(fl)})
+		}
+		for pid, pv := range preds {
+			pns, ppath := splitID(pid)
+			out = append(out, OutFile{Path: "data/" + pns + "/predicate/" + ppath + ".json", Data: jsonv.Marshal(pv)})
+		}
 	}
 	for ns := range clicks {
 		load, tick := sema.ClickSetup(ns)

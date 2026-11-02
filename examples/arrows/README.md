@@ -1,6 +1,6 @@
 # Arrows
 
-Custom projectiles: three new arrows, a bow that calls lightning, and a wand that fires cows.
+Custom projectiles: three new arrows, a bow that calls lightning, an exploding splash potion, and a wand that fires cows.
 
 ## Try it
 
@@ -16,6 +16,7 @@ Then run `/function arrows:give` for one of everything, or craft them:
 | Ender Arrow (2) | 2 arrows + ender pearl | Teleports whoever shot it to where it lands. |
 | Arrow of Levitation (8) | 8 arrows around a shulker shell | Lifts what it hits for three seconds. |
 | Thunder Bow | bow + lightning rod | Calls lightning wherever its arrows hit, block or mob. Any arrow works. |
+| Blast Potion | glass bottle + TNT | A splash potion that explodes where it lands. |
 | Cow Wand | 2 sticks | Right-click to fire a cow the way you are looking. |
 
 The arrows work from bows, crossbows and dispensers.
@@ -34,6 +35,8 @@ The arrows work from bows, crossbows and dispensers.
 **Projectile hooks** (Explosive and Ender arrows, Thunder Bow). `on_projectile_hit_block` and `on_projectile_hit_entity` name a function to run where an arrow hits. On an arrow base they follow that arrow; on a bow or crossbow base they follow every arrow it shoots. A block hit runs as the arrow at the point it hit (`execute on origin` is the shooter); an entity hit runs as and at the entity (`execute on attacker` is the shooter).
 
 Under the hood, an arrow keeps the bow it was shot from as its `weapon`, and the game runs that weapon's enchantment effects at the exact spot it hits. MMS writes an enchantment per item that runs the hook functions, and the tick function adds it to the weapon of each new arrow that is the item or came from it. The hooks combine: an Explosive Arrow from the Thunder Bow explodes and calls lightning. See [Projectile hooks](../../docs/functions.md#projectile-hooks).
+
+**Thrown potions** (Blast Potion). A thrown potion keeps no bow, so no enchantment runs when it lands. `on_projectile_land` puts a marker on each one instead, riding it; the game drops a rider where it removes the potion, and the hook runs at that spot. The spot can be up to one tick of flight short, about half a block for a thrown potion, and the hook can't tell what the potion hit or who threw it.
 
 The custom arrows are tipped arrows on purpose. Their colour shows on the item and as a particle trail in flight, a bow with Infinity does not make them free (it only spares plain `arrow` items), and they take their name from `potion_contents.custom_name` (see `lang.mms`).
 
