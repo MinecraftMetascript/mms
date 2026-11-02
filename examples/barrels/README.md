@@ -22,7 +22,7 @@ Then `/function barrels:give` for four Storage Barrels, or craft one from a barr
 
 - **Place** it like an item frame. On a wall it faces away from the wall; on a floor or ceiling it faces you.
 - **Right-click** the front with an item to put the whole stack in. An empty barrel takes the kind of the first item that goes in. Items must match exactly (id and components), so a named sword and a plain one are different items.
-- **Right-click with an empty hand** to put in every matching item from your inventory.
+- **Sneak and right-click** to put in every matching item from your hotbar and inventory. On an empty barrel, the held item picks the kind first.
 - **Punch** the front to take out a stack; **sneak and punch** to take out one. They drop at your feet and are picked up straight away.
 - **Break** the barrel by mining its sides or edges. Everything inside spills out, and in survival it drops a Storage Barrel.
 

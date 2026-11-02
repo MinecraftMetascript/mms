@@ -236,13 +236,25 @@ execute as @e[type=interaction,tag=barrels.hit,distance=..12] if data entity @s 
 execute as @e[type=interaction,tag=barrels.this] run data remove entity @s interaction
 execute if entity @e[type=interaction,tag=barrels.this] run function barrels:mms_gen/advancement/use_barrel/_exec0
 tag @s remove barrels.user
+=== data/barrels/function/mms_gen/advancement/use_barrel/_else3.mcfunction
+scoreboard players set #mms_gen/advancement/use_barrel._f4 mms.barrels 0
+execute if score $holding mms.barrels matches 1 run scoreboard players set #mms_gen/advancement/use_barrel._f4 mms.barrels 1
+execute if score #mms_gen/advancement/use_barrel._f4 mms.barrels matches 1 run function barrels:insert_held
+execute unless score #mms_gen/advancement/use_barrel._f4 mms.barrels matches 1 run title @s actionbar {text:"Right-click with an item to put it in, or sneak to put in everything that matches",color:"gray"}
 === data/barrels/function/mms_gen/advancement/use_barrel/_exec0.mcfunction
 function barrels:open
 execute at @s run summon item_display ~ ~ ~ {Tags:["barrels.tmp"]}
-execute if items entity @s weapon.mainhand * run function barrels:insert_held
-execute unless items entity @s weapon.mainhand * run function barrels:insert_all
+execute store success score $holding mms.barrels if items entity @s weapon.mainhand *
+execute store success score $sneaking mms.barrels if predicate barrels:sneaking
+scoreboard players set #mms_gen/advancement/use_barrel._f1 mms.barrels 0
+execute if score $sneaking mms.barrels matches 1 run scoreboard players set #mms_gen/advancement/use_barrel._f1 mms.barrels 1
+execute if score #mms_gen/advancement/use_barrel._f1 mms.barrels matches 1 run function barrels:mms_gen/advancement/use_barrel/_if2
+execute unless score #mms_gen/advancement/use_barrel._f1 mms.barrels matches 1 run function barrels:mms_gen/advancement/use_barrel/_else3
 kill @e[type=item_display,tag=barrels.tmp]
 function barrels:close
+=== data/barrels/function/mms_gen/advancement/use_barrel/_if2.mcfunction
+execute if score $holding mms.barrels matches 1 if score $stack mms.barrels matches 0 run function barrels:claim
+function barrels:insert_all
 === data/barrels/function/mms_gen/load.mcfunction
 scoreboard objectives add barrel_id dummy
 scoreboard objectives add barrel_count dummy
@@ -255,6 +267,8 @@ execute unless score $next_id mms.barrels = $next_id mms.barrels run scoreboard 
 execute unless score $id mms.barrels = $id mms.barrels run scoreboard players set $id mms.barrels 0
 execute unless score $count mms.barrels = $count mms.barrels run scoreboard players set $count mms.barrels 0
 execute unless score $stack mms.barrels = $stack mms.barrels run scoreboard players set $stack mms.barrels 0
+execute unless score $holding mms.barrels = $holding mms.barrels run scoreboard players set $holding mms.barrels 0
+execute unless score $sneaking mms.barrels = $sneaking mms.barrels run scoreboard players set $sneaking mms.barrels 0
 execute unless score $held mms.barrels = $held mms.barrels run scoreboard players set $held mms.barrels 0
 execute unless score $diff mms.barrels = $diff mms.barrels run scoreboard players set $diff mms.barrels 0
 execute unless score $amount mms.barrels = $amount mms.barrels run scoreboard players set $amount mms.barrels 0
@@ -297,6 +311,7 @@ $execute rotated $(a0) 0 run summon text_display ^ ^-0.42 ^0.52 {Tags:["barrels.
 execute store result score $dir mms.barrels run data get entity @s Facing
 execute if score $dir mms.barrels matches ..1 run function barrels:place/_if0
 execute align xyz positioned ~0.5 ~0.5 ~0.5 run function barrels:place/_exec1
+tp @s ~ -1000 ~
 kill @s
 === data/barrels/function/place/_exec1.mcfunction
 execute if block ~ ~ ~ #minecraft:replaceable run function barrels:build
