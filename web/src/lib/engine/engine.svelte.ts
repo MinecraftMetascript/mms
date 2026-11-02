@@ -3,6 +3,7 @@ import type { EditorView } from '@codemirror/view';
 import { Supervisor, type EngineStatus } from './supervisor';
 import { ProjectWorkspace } from './workspace';
 import { showDiagnostics } from '../editor/diagnostics';
+import type { InlayHint } from '../editor/inlay';
 
 export interface Diagnostic {
 	range: { start: { line: number; character: number }; end: { line: number; character: number } };
@@ -235,6 +236,16 @@ export class Engine {
 			textDocument: { uri }
 		});
 		return res?.data ?? [];
+	}
+
+	/** Inlay hints for a document, such as a custom item's base item. */
+	async inlayHints(uri: string): Promise<InlayHint[]> {
+		this.client.sync();
+		const res = await this.client.request<object, InlayHint[] | null>('textDocument/inlayHint', {
+			textDocument: { uri },
+			range: { start: { line: 0, character: 0 }, end: { line: 1 << 30, character: 0 } }
+		});
+		return res ?? [];
 	}
 
 	dispose() {

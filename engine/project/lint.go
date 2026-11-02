@@ -26,6 +26,8 @@ type Rule struct {
 var Rules = []*Rule{
 	{ID: "constant-expression", Severity: syntax.SeverityHint, run: lintConstant,
 		Doc: "An arithmetic expression of number literals can be written as its value."},
+	{ID: "custom-item-base", Severity: syntax.SeverityHint, run: lintCustomBase,
+		Doc: "A CustomItem used where the game takes a plain item id, such as a recipe ingredient or an item tag. It stands for its base item there, so it also matches the base item without the custom components."},
 	{ID: "deprecated", Severity: syntax.SeverityWarning, all: lintDeprecated,
 		Doc: "A use of a declaration whose doc comment has a `@deprecated` tag."},
 	{ID: "external-asset", Severity: syntax.SeverityWarning, all: lintExternalAsset,
@@ -329,6 +331,24 @@ func lintNamespace(l *lintRun, d *Decl) {
 		}
 		l.report(d, sp, "'minecraft:' is the default namespace here",
 			syntax.Fix{Title: "Write " + short, Edits: []syntax.TextEdit{{Sp: sp, Text: short}}, Safe: true})
+		return true
+	})
+}
+
+func lintCustomBase(l *lintRun, d *Decl) {
+	syntax.Walk(d.D, func(n syntax.Node) bool {
+		in := d.Info[n]
+		if in == nil || in.Base == "" || in.Symbol == nil {
+			return true
+		}
+		name, base := in.Symbol.Path, strings.TrimPrefix(in.Base, "minecraft:")
+		fix := base
+		if l.r.Syms.Find("item", d.NS+":"+base) != nil {
+			fix = in.Base // a custom item of the same name would win
+		}
+		// Not Safe: the custom item keeps the recipe following its base.
+		l.report(d, n.Span(), fmt.Sprintf("'%s' stands for its base item %s here: this field takes a plain item id, so any %s matches, not only %s", name, base, base, name),
+			syntax.Fix{Title: "Write " + fix, Edits: []syntax.TextEdit{{Sp: n.Span(), Text: fix}}})
 		return true
 	})
 }

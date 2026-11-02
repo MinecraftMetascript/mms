@@ -32,6 +32,9 @@ type Info struct {
 	Folder string
 	// Asset is set on an asset helper call such as Texture("a.png").
 	Asset *Asset
+	// Base is set where a custom item is used as a plain item id: the
+	// base item id written in its place.
+	Base string
 	// Props are the block state properties a multipart `when` object
 	// body can test, for completion.
 	Props map[string][]string
@@ -855,8 +858,15 @@ func (c *Checker) resolveID(text string, id idInfo, e syntax.Expr) string {
 	in.Symbol = sym
 	in.Bare, in.Folder = BareID, reg
 	if sym != nil && sym.Kind.MMS == customItemKind {
-		c.errorf("mms/custom-item", e.Span(), "'%s' is a CustomItem, which is its base item with extra components; this field takes a plain item id, so use the base item. Custom items work in item stacks, loot entries and ${...} in commands", text)
-		return full
+		// A plain item id has no components, so the custom item stands
+		// for its base item. The custom-item-base lint rule says so.
+		c.findSig(reg, sym.ID())
+		base := customItemBase(sym)
+		in.Base = base
+		if id.excluded(base) {
+			c.excludedID(base, id, e.Span())
+		}
+		return base
 	}
 	if id.excluded(full) {
 		c.excludedID(full, id, e.Span())

@@ -207,6 +207,7 @@ func init() {
 		"textDocument/formatting":          typed((*Server).formatting),
 		"textDocument/documentSymbol":      typed((*Server).documentSymbol),
 		"textDocument/semanticTokens/full": typed((*Server).semanticTokens),
+		"textDocument/inlayHint":           typed((*Server).inlayHint),
 		"workspace/didChangeWatchedFiles":  typed((*Server).didChangeWatched),
 		"mms/output":                       typed((*Server).output),
 		"textDocument/codeAction":          typed((*Server).codeAction),
@@ -310,6 +311,7 @@ func (s *Server) initialize(ctx context.Context, p initializeParams) (any, *resp
 			"renameProvider":             map[string]any{"prepareProvider": true},
 			"documentFormattingProvider": true,
 			"documentSymbolProvider":     true,
+			"inlayHintProvider":          true,
 			"codeActionProvider":         map[string]any{"codeActionKinds": []string{"quickfix", "source.fixAll.mms"}},
 			"semanticTokensProvider": map[string]any{
 				"legend": map[string]any{"tokenTypes": ide.TokenTypes, "tokenModifiers": ide.TokenModifiers},
@@ -813,6 +815,25 @@ func (s *Server) documentSymbol(_ context.Context, p struct {
 		out = append(out, map[string]any{
 			"name": sym.Name, "detail": sym.Detail, "kind": symbolKinds[sym.Kind],
 			"range": l.rng(sym.Span), "selectionRange": l.rng(sym.Sel),
+		})
+	}
+	return out, nil
+}
+
+func (s *Server) inlayHint(_ context.Context, p struct {
+	TextDocument docID `json:"textDocument"`
+}) (any, *respError) {
+	w := s.at(p.TextDocument.URI)
+	if w == nil || w.res == nil {
+		return []any{}, nil
+	}
+	l := s.lines(p.TextDocument.URI)
+	hints := w.session().InlayHints(p.TextDocument.URI)
+	out := make([]map[string]any, 0, len(hints))
+	for _, h := range hints {
+		out = append(out, map[string]any{
+			"position": l.pos(h.Off),
+			"label":    h.Label, "tooltip": h.Tooltip, "paddingLeft": true,
 		})
 	}
 	return out, nil

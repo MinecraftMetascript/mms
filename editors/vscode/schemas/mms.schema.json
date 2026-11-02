@@ -35,6 +35,11 @@
           "markdownDescription": "An arithmetic expression of number literals can be written as its value.\n\nDefault: `hint`.",
           "$ref": "#/definitions/severity"
         },
+        "custom-item-base": {
+          "description": "A CustomItem used where the game takes a plain item id, such as a recipe ingredient or an item tag. It stands for its base item there, so it also matches the base item without the custom components.\n\nDefault: `hint`.",
+          "markdownDescription": "A CustomItem used where the game takes a plain item id, such as a recipe ingredient or an item tag. It stands for its base item there, so it also matches the base item without the custom components.\n\nDefault: `hint`.",
+          "$ref": "#/definitions/severity"
+        },
         "deprecated": {
           "description": "A use of a declaration whose doc comment has a `@deprecated` tag.\n\nDefault: `warning`.",
           "markdownDescription": "A use of a declaration whose doc comment has a `@deprecated` tag.\n\nDefault: `warning`.",
