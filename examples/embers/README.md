@@ -19,4 +19,4 @@ That installs the data pack and writes the resource pack to the world's `resourc
 
 The shards are amethyst shards with an `item_model` and a name: each `CustomItem` in `items.mms` writes the model, the item model and the translation, and its name stands for the item in recipes, loot and `/give`. Recipe ingredients match by item id only, so a recipe cannot ask for an Ember Shard instead of any amethyst shard.
 
-Right-click with an Ember Shard to puff out flames and get a few seconds of fire resistance. That is the `OnRightClick ember_shard { ... }` in `items.mms`: it gives the shard a `consumable` component that never finishes, and writes a `using_item` advancement that runs the commands once per press.
+Right-click with an Ember Shard to puff out flames and get a few seconds of fire resistance. That is `on_right_click = warm` on the shard in `items.mms`: it gives the shard a `consumable` component that never finishes, and writes a `using_item` advancement that runs the `warm` function once per press.

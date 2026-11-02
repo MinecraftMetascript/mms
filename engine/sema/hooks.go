@@ -32,7 +32,7 @@ var HookKinds = map[string]string{
 
 // IsCodeKind reports whether a kind's body is function code.
 func IsCodeKind(k Kind) bool {
-	return k.MMS == "Function" || k.MMS == "OnAdvancement" || k.MMS == rightClickKind || HookKinds[k.MMS] != ""
+	return k.MMS == "Function" || k.MMS == "OnAdvancement" || HookKinds[k.MMS] != ""
 }
 
 // AdvancementFunction names the reward function of an OnAdvancement.

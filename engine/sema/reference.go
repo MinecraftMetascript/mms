@@ -73,7 +73,6 @@ var mmsKindDocs = map[string]string{
 	"OnFirstJoin":   "Code that runs once for each player, the first time they are in the world with the pack, as and at that player.",
 	"OnRespawn":     "Code that runs as and at a player right after they respawn.",
 	"CustomItem":    "A vanilla item with its own look and name: `CustomItem ember_shard = { base = amethyst_shard, name = \"Ember Shard\", texture = Texture(\"art/ember_shard.png\") }` writes the model, the item model and the lang entry, and its name stands for the item in item stacks, loot entries and `${...}` in commands.",
-	"OnRightClick":  "Code that runs as and at a player when they right-click with a custom item: `OnRightClick ember_wand { ... }` makes the item usable (consumable and use_effects components and a custom_data marker) and writes a using_item advancement that runs the code once per press. Blocks and other items that already do something on right click keep doing it.",
 	"OnAdvancement": "Code that runs as and at a player each time they meet a trigger: `OnAdvancement name = Trigger(...) { ... }` writes the advancement, its reward function and the revoke.",
 }
 

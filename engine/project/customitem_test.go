@@ -195,18 +195,19 @@ func TestCustomItemNameEscapes(t *testing.T) {
 	}
 }
 
-// TestOnRightClick checks the right-click hook: the item's consumable,
+// TestRightClick checks on_right_click: the item's consumable,
 // use_effects and marker, the using_item advancement, the once-per-press
 // reward function and the objective's setup.
-func TestOnRightClick(t *testing.T) {
+func TestRightClick(t *testing.T) {
 	p := New(spec.MustDefault(), Config{Namespace: "demo"})
 	p.SetFile("main.mms", `
 CustomItem wand = {
   base = stick
   name = "Wand"
+  on_right_click = zap
   components = { custom_data = { kind = "wand" } }
 }
-OnRightClick wand {
+Function zap {
   /say zap
 }
 Function give {
@@ -225,7 +226,8 @@ Function give {
 		`"items": "minecraft:stick"`,
 		`"mms_item": "demo:wand"`,
 		`"function": "demo:mms_gen/right_click/wand"`,
-		"=== data/demo/function/mms_gen/right_click/wand.mcfunction\nadvancement revoke @s only demo:mms_gen/right_click/wand\nexecute if score @s mms_click.demo matches 1.. run return run scoreboard players set @s mms_click.demo 2\nscoreboard players set @s mms_click.demo 2\nsay zap\n",
+		"=== data/demo/function/mms_gen/right_click/wand.mcfunction\nadvancement revoke @s only demo:mms_gen/right_click/wand\nexecute if score @s mms_click.demo matches 1.. run return run scoreboard players set @s mms_click.demo 2\nscoreboard players set @s mms_click.demo 2\nfunction demo:zap\n",
+		"=== data/demo/function/zap.mcfunction\nsay zap\n",
 		"scoreboard objectives add mms_click.demo dummy\n",
 		"scoreboard players remove @a[scores={mms_click.demo=1..}] mms_click.demo 1\n",
 	} {
@@ -235,11 +237,10 @@ Function give {
 	}
 
 	errs := map[string]string{
-		"OnRightClick stick {\n  /say hi\n}":                                                                        "mms/unknown-id",
-		"Function f {\n}\nOnRightClick f {\n  /say hi\n}":                                                           "mms/unknown-id",
-		"CustomItem w = { base = stick }\nOnRightClick w":                                                           "mms/missing-value",
-		"CustomItem w = { base = stick, components = { custom_data = \"{a:1}\" } }\nOnRightClick w {\n  /say hi\n}": "mms/custom-item",
-		"CustomItem w = { base = stick }\nOnRightClick w {\n  /say a\n}\nOnRightClick w {\n  /say b\n}":             "mms/duplicate",
+		"CustomItem w = { base = stick, on_right_click = nope }":                                                                    "mms/unknown-id",
+		"CustomItem w = { base = stick, on_right_click = f }\nObjective f":                                                          "mms/unknown-id",
+		"CustomItem w = { base = stick, on_right_click = f }\nFunction f(n: int) {\n  /say hi\n}":                                   "mms/custom-item",
+		"CustomItem w = { base = stick, on_right_click = f, components = { custom_data = \"{a:1}\" } }\nFunction f {\n  /say hi\n}": "mms/custom-item",
 	}
 	for src, want := range errs {
 		p := New(spec.MustDefault(), Config{Namespace: "demo"})
@@ -257,31 +258,31 @@ Function give {
 	}
 }
 
-// TestOnRightClickIncremental checks that adding and removing an
-// OnRightClick in another file changes the uses of the item.
-func TestOnRightClickIncremental(t *testing.T) {
+// TestRightClickIncremental checks that a function declared, removed
+// and declared again in another file is picked up by the item.
+func TestRightClickIncremental(t *testing.T) {
 	p := New(spec.MustDefault(), Config{Namespace: "demo"})
-	p.SetFile("item.mms", "CustomItem wand = { base = stick }\n")
-	p.SetFile("give.mms", "Function give {\n  /give @s ${wand}\n}\n")
-	give := func() string {
+	p.SetFile("item.mms", "CustomItem wand = { base = stick, on_right_click = zap }\n")
+	p.SetFile("zap.mms", "Function zap {\n  /say zap\n}\n")
+	errs := func() int {
 		r, _ := p.Analyze(context.Background())
-		for _, f := range r.Emit() {
-			if f.Path == "data/demo/function/give.mcfunction" {
-				return string(f.Data)
+		n := 0
+		for _, d := range r.Diagnostics("item.mms") {
+			if d.Severity == syntax.SeverityError {
+				n++
 			}
 		}
-		t.Fatal("no give function")
-		return ""
+		return n
 	}
-	if g := give(); strings.Contains(g, "consumable") {
-		t.Fatalf("consumable before the hook: %s", g)
+	if n := errs(); n != 0 {
+		t.Fatalf("%d errors with the function", n)
 	}
-	p.SetFile("click.mms", "OnRightClick wand {\n  /say zap\n}\n")
-	if g := give(); !strings.Contains(g, "consumable") || !strings.Contains(g, `mms_item:"demo:wand"`) {
-		t.Fatalf("no consumable after adding the hook: %s", g)
+	p.SetFile("zap.mms", "")
+	if n := errs(); n == 0 {
+		t.Fatal("no error without the function")
 	}
-	p.SetFile("click.mms", "")
-	if g := give(); strings.Contains(g, "consumable") {
-		t.Fatalf("consumable after removing the hook: %s", g)
+	p.SetFile("zap.mms", "Function zap {\n  /say zap\n}\n")
+	if n := errs(); n != 0 {
+		t.Fatalf("%d errors after declaring the function again", n)
 	}
 }

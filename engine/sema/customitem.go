@@ -49,6 +49,8 @@ type CustomItemOut struct {
 	Names   map[string]string
 	// Stack is the item stack the name stands for: {id, components}.
 	Stack *jsonv.Object
+	// RightClick is the function on_right_click names, or "".
+	RightClick string
 }
 
 // Languages lists the item's languages, sorted.
@@ -166,6 +168,8 @@ func customItemType(p *spec.Pack) *spec.Type {
 			idType("item_definition"),
 			{Kind: "reference", Path: "::java::assets::item_definition::ItemDefinition"},
 		}}, Desc: "An item model definition to use instead of the generated one: the id of an `ItemModel`, or its body, such as `{ model = Select(...) }` for an item that changes its look."},
+		{Kind: "pair", Key: "on_right_click", Optional: true, Type: idType("function"),
+			Desc: "A `Function` without parameters to run, as and at the player, when they right-click with the item: once per press, not again while the button is held. The item gets `consumable`, `use_effects` and `custom_data` components that make right click detectable. A base item that already does something on right click, such as a block or a bow, keeps doing it."},
 		{Kind: "pair", Key: "components", Optional: true, Type: &spec.Type{Kind: "reference", Path: "::java::world::component::DataComponentPatch"},
 			Desc: "More item components, such as `max_stack_size` or `rarity`. Every use of the item gets them."},
 	}}
@@ -305,7 +309,8 @@ func (c *Checker) CustomItem(d *syntax.Decl, id string) *CustomItemOut {
 	if user != nil {
 		comps.Members = append(comps.Members, user.Members...)
 	}
-	if rc := c.find(rightClickKindFolder, id); rc != nil && rc.Kind.MMS == rightClickKind {
+	if fid := c.checkRightClick(fields["on_right_click"], o.Get("on_right_click")); fid != "" {
+		out.RightClick = fid
 		sp := d.Name.Sp
 		if e := fields["components"]; e != nil {
 			sp = e.Span()

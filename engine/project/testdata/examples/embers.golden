@@ -29,11 +29,13 @@ scoreboard objectives add mms_click.embers dummy
 advancement revoke @s only embers:mms_gen/right_click/ember_shard
 execute if score @s mms_click.embers matches 1.. run return run scoreboard players set @s mms_click.embers 2
 scoreboard players set @s mms_click.embers 2
+function embers:warm
+=== data/embers/function/mms_gen/tick.mcfunction
+scoreboard players remove @a[scores={mms_click.embers=1..}] mms_click.embers 1
+=== data/embers/function/warm.mcfunction
 particle flame ^ ^1.5 ^1 0.2 0.2 0.2 0.05 20
 playsound item.firecharge.use player @a
 effect give @s fire_resistance 5
-=== data/embers/function/mms_gen/tick.mcfunction
-scoreboard players remove @a[scores={mms_click.embers=1..}] mms_click.embers 1
 === data/embers/jukebox_song/embers.json
 {
   "description": {

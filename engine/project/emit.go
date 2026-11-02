@@ -69,7 +69,7 @@ func (r *Result) Emit() []OutFile {
 		}
 		hooks[name][ns] = append(hooks[name][ns], ls...)
 	}
-	clicks := map[string]bool{} // namespaces with an OnRightClick
+	clicks := map[string]bool{} // namespaces with an on_right_click
 	consts := map[string]map[int32]bool{}
 	ret := map[string]bool{}
 	used := map[string]bool{} // namespaces whose objective the code uses
@@ -139,6 +139,13 @@ func (r *Result) Emit() []OutFile {
 			if it.ItemModel != nil {
 				out = append(out, OutFile{Path: "assets/" + ns + "/items/" + path + ".json", Data: jsonv.Marshal(it.ItemModel), Unit: d.Unit.Path, Span: d.D.Sp, Pack: sema.ResourcePack})
 			}
+			if it.RightClick != "" {
+				rcNS, rcPath := splitID(sema.RightClickID(d.ID()))
+				out = append(out,
+					OutFile{Path: "data/" + rcNS + "/advancement/" + rcPath + ".json", Data: jsonv.Marshal(sema.RightClickAdvancement(d.ID(), it.Stack)), Unit: d.Unit.Path, Span: d.D.Sp},
+					OutFile{Path: "data/" + rcNS + "/function/" + rcPath + ".mcfunction", Data: lines(sema.RightClickLines(d.ID(), it.RightClick)), Unit: d.Unit.Path, Span: d.D.Sp})
+				clicks[rcNS] = true
+			}
 			for _, lc := range it.Languages() {
 				l := lang("assets/"+ns+"/lang/"+lc+".json", d)
 				if l.o.Get(it.LangKey) == nil {
@@ -166,14 +173,6 @@ func (r *Result) Emit() []OutFile {
 			}
 			addFn(d)
 			out = append(out, OutFile{Path: "data/" + ns + "/advancement/" + path + ".json", Data: jsonv.Marshal(d.Value), Unit: d.Unit.Path, Span: d.D.Sp})
-		case d.Kind.MMS == "OnRightClick":
-			if d.Fn == nil || d.Value == nil {
-				continue
-			}
-			addFn(d)
-			advNS, advPath := splitID(sema.RightClickID(d.ID()))
-			out = append(out, OutFile{Path: "data/" + advNS + "/advancement/" + advPath + ".json", Data: jsonv.Marshal(d.Value), Unit: d.Unit.Path, Span: d.D.Sp})
-			clicks[advNS] = true
 		case d.Fn != nil:
 			addFn(d)
 			if h := sema.HookKinds[d.Kind.MMS]; h != "" {

@@ -193,6 +193,7 @@ This writes `models/item/ember_shard.json` (a flat `item/generated` model of the
 | `parent` | the generated model's parent: `item/generated` by default, `item/handheld` for tools |
 | `model` | an existing model to show instead of one made from `texture` |
 | `item_model` | an `ItemModel` id, or an item model body such as `{ model = Select(...) }`, instead of the generated one |
+| `on_right_click` | a `Function` to run when a player right-clicks with the item; see [right-click](functions.md#right-click) |
 | `components` | more item components, given to every use |
 
 Without `texture`, `model` or `item_model`, the item keeps its base item's look and only gets its name and components.
@@ -213,4 +214,4 @@ Function give {
 
 Anywhere else that takes an item id, such as a recipe ingredient or an item tag, a custom item is an error: the game matches those by item id only, so they need the base item. A `Model`, `ItemModel` or `Lang` entry that the custom item also writes is reported as a duplicate.
 
-To run code when a player right-clicks with the item, add `OnRightClick ember_shard { ... }`; see [right-click](functions.md#right-click).
+To run code when a player right-clicks with the item, set `on_right_click` to a function; see [right-click](functions.md#right-click).
