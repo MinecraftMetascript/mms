@@ -745,3 +745,40 @@ func TestOutputStructureJigsaws(t *testing.T) {
 		t.Errorf("jigsaw = %v", j)
 	}
 }
+
+// A project file that nothing uses is reported on the file itself, and
+// cleared once something uses it.
+func TestUnusedAssetDiagnostics(t *testing.T) {
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, "art"), 0o755)
+	os.WriteFile(filepath.Join(dir, "mms.json"), []byte(`{"namespace": "demo"}`), 0o644)
+	os.WriteFile(filepath.Join(dir, "art", "p.png"), []byte("\x89PNG\r\n\x1a\nrest"), 0o644)
+	os.WriteFile(filepath.Join(dir, "main.mms"), []byte("DensityFunction x = 1\n"), 0o644)
+	m, png := pathURI(filepath.Join(dir, "main.mms")), pathURI(filepath.Join(dir, "art", "p.png"))
+
+	c := start(t)
+	c.result("initialize", map[string]any{"rootUri": pathURI(dir)})
+	c.notify("textDocument/didOpen", map[string]any{"textDocument": map[string]any{"uri": m, "languageId": "mms", "version": 1, "text": "DensityFunction x = 1\n"}})
+	last := func() []any {
+		c.result("mms/ping", nil)
+		var got []any
+		for _, n := range c.notes {
+			if p, ok := n["params"].(map[string]any); ok && n["method"] == "textDocument/publishDiagnostics" && p["uri"] == png {
+				got = p["diagnostics"].([]any)
+			}
+		}
+		return got
+	}
+	got := last()
+	if len(got) != 1 || got[0].(map[string]any)["code"] != "lint/unused-asset" {
+		t.Fatalf("diagnostics on the file = %v", got)
+	}
+	if out := c.result("mms/output", map[string]any{"uri": m}).(map[string]any); fmt.Sprint(out["unusedAssets"]) != "[art/p.png]" {
+		t.Errorf("unusedAssets = %v", out["unusedAssets"])
+	}
+	src := "PaintingVariant p = { width = 1, height = 1, asset_id = Texture(\"art/p.png\") }\n"
+	c.notify("textDocument/didChange", map[string]any{"textDocument": map[string]any{"uri": m, "version": 2}, "contentChanges": []any{map[string]any{"text": src}}})
+	if got := last(); len(got) != 0 {
+		t.Errorf("still reported once used: %v", got)
+	}
+}

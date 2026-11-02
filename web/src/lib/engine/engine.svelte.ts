@@ -122,6 +122,8 @@ export class Engine {
 	output = $state<OutputFile[]>([]);
 	outputAssets = $state<OutputAsset[]>([]);
 	outputItems = $state<OutputItem[]>([]);
+	/** Project files nothing uses, so the packs leave them out. */
+	unusedAssets = $state<string[]>([]);
 	hasErrors = $state(false);
 	symbols = $state<Record<string, DocSymbol[]>>({});
 
@@ -211,10 +213,11 @@ export class Engine {
 		try {
 			await this.client.initializing;
 			this.client.sync();
-			const out = await this.client.request<object, { files: OutputFile[]; assets?: OutputAsset[]; items?: OutputItem[]; hasErrors: boolean }>('mms/output', {});
+			const out = await this.client.request<object, { files: OutputFile[]; assets?: OutputAsset[]; items?: OutputItem[]; unusedAssets?: string[]; hasErrors: boolean }>('mms/output', {});
 			this.output = out.files;
 			this.outputAssets = out.assets ?? [];
 			this.outputItems = out.items ?? [];
+			this.unusedAssets = out.unusedAssets ?? [];
 			this.hasErrors = out.hasErrors;
 			const syms: Record<string, DocSymbol[]> = {};
 			await Promise.all(

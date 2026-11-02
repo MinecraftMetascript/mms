@@ -71,6 +71,19 @@ func report(w io.Writer, r *project.Result, hints bool) int {
 			fmt.Fprintf(w, "    %s\n    %s%s\n", strings.ReplaceAll(text, "\t", " "), strings.Repeat(" ", col-1), strings.Repeat("^", width))
 		}
 	}
+	// Files nothing uses have no line to point at.
+	if paths, sev := r.UnusedAssets(); sev != syntax.SeverityHint || hints {
+		name := map[syntax.Severity]string{syntax.SeverityError: "error", syntax.SeverityWarning: "warning"}[sev]
+		if name == "" {
+			name = "note"
+		}
+		for _, p := range paths {
+			if sev == syntax.SeverityError {
+				errs++
+			}
+			fmt.Fprintf(w, "%s: %s: %s [lint/unused-asset]\n", p, name, project.UnusedAssetMessage(p))
+		}
+	}
 	return errs
 }
 

@@ -936,8 +936,11 @@ test('a jigsaw structure previews which pieces join which, and marks dead ends',
 	await expect(graph).toContainText('Jigsaw structure');
 	await expect(graph).toContainText('size 6');
 	await expect(graph.getByLabel('Problems')).toHaveText('No problems found');
-	for (const pool of ['start', 'halls', 'rooms', 'caps']) await expect(graph.getByLabel(`Pool dungeon:${pool}`)).toBeVisible();
+	for (const pool of ['start', 'halls', 'rooms', 'caps']) await expect(graph.getByLabel(`Pool dungeon:${pool}`).first()).toBeVisible();
 	await expect(graph.getByLabel('Pool dungeon:halls')).toContainText('75%');
+	// Rooms lead back to halls: each step gets a column until growth repeats.
+	await expect(graph.getByLabel('Pool dungeon:caps')).toHaveCount(2);
+	await expect(graph).toContainText('then as depth 1 again');
 
 	// A piece lists its jigsaw blocks and what joins each.
 	await graph.getByRole('button', { name: /^start/ }).click();
@@ -953,4 +956,19 @@ test('a jigsaw structure previews which pieces join which, and marks dead ends',
 	await expect(graph.getByLabel('Problems')).toContainText('2 dead ends');
 	await expect(graph.getByLabel('Pool dungeon:rooms')).toContainText('No TemplatePool declares this');
 	expect(errors).toEqual([]);
+});
+
+test('a project file nothing uses is marked unused in the asset list', async ({ page }) => {
+	page.on('dialog', (d) => d.accept());
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	await page.getByRole('button', { name: /Examples/ }).click();
+	await page.getByRole('button', { name: /jigsaw/ }).click();
+	await expect(status(page)).toHaveText(/No problems/);
+	const vault = page.getByRole('listitem').filter({ hasText: 'structures/rooms/vault.nbt' });
+	await expect(vault).not.toContainText('unused');
+	const src = readFileSync(new URL('../../examples/jigsaw/dungeon.mms', import.meta.url), 'utf8');
+	await replaceText(page, src.replace('Structure("structures/rooms/vault.nbt", "rooms/vault")', 'Structure("structures/rooms/room.nbt", "rooms/room")'));
+	await expect(vault).toContainText('unused');
+	await expect(vault).toHaveAttribute('title', /Not used/);
 });

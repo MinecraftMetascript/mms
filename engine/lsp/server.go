@@ -47,6 +47,9 @@ type Server struct {
 	// keeps them in the project (the browser has no disk to fall back on).
 	managed   map[string]bool
 	published map[string]bool
+	// assetDiags are the files of each project with unused-asset
+	// diagnostics published, so they clear when used again.
+	assetDiags map[*workspace]map[string]bool
 	// assets holds binary project files (textures, sounds) the browser
 	// sent with mms/setAssets, since it has no disk for Texture() to read.
 	assets   fstest.MapFS
@@ -63,7 +66,7 @@ type Server struct {
 
 // NewServer returns a server over tr checking against pack.
 func NewServer(tr Transport, pack *spec.Pack) *Server {
-	return &Server{tr: tr, pack: pack, open: map[string]bool{}, managed: map[string]bool{}, published: map[string]bool{}}
+	return &Server{tr: tr, pack: pack, open: map[string]bool{}, managed: map[string]bool{}, published: map[string]bool{}, assetDiags: map[*workspace]map[string]bool{}}
 }
 
 type message struct {
@@ -550,6 +553,7 @@ func (s *Server) analyze(ctx context.Context, w *workspace) {
 		}
 		s.publish(u, ds)
 	}
+	s.publishAssets(w, r)
 	for uri := range s.published {
 		// Files that left every project are cleared too.
 		if o := s.owners[uri]; (o == w || o == nil) && !seen[uri] {
@@ -557,6 +561,31 @@ func (s *Server) analyze(ctx context.Context, w *workspace) {
 			delete(s.published, uri)
 		}
 	}
+}
+
+// publishAssets reports the project's files that nothing uses on the
+// files themselves, and clears the ones used again. Only a project on
+// disk has file URIs; the browser shows them from mms/output.
+func (s *Server) publishAssets(w *workspace, r *project.Result) {
+	now := map[string]bool{}
+	if w.root != "" {
+		paths, sev := r.UnusedAssets()
+		for _, p := range paths {
+			uri := pathURI(filepath.Join(w.root, filepath.FromSlash(p)))
+			now[uri] = true
+			s.notify("textDocument/publishDiagnostics", map[string]any{"uri": uri, "diagnostics": []any{map[string]any{
+				"range":    map[string]any{"start": Position{}, "end": Position{}},
+				"severity": int(sev), "source": "mms", "code": "lint/unused-asset", "tags": []int{1},
+				"message": project.UnusedAssetMessage(p),
+			}}})
+		}
+	}
+	for uri := range s.assetDiags[w] {
+		if !now[uri] {
+			s.notify("textDocument/publishDiagnostics", map[string]any{"uri": uri, "diagnostics": []any{}})
+		}
+	}
+	s.assetDiags[w] = now
 }
 
 func (s *Server) publish(u *sema.Unit, ds []syntax.Diagnostic) {
@@ -1012,7 +1041,11 @@ func (s *Server) output(_ context.Context, p struct {
 		items = append(items, it)
 	}
 	sort.Slice(items, func(i, j int) bool { return items[i]["id"].(string) < items[j]["id"].(string) })
-	return map[string]any{"files": out, "assets": assets, "items": items, "hasErrors": w.res.HasErrors()}, nil
+	unused, _ := w.res.UnusedAssets()
+	if unused == nil {
+		unused = []string{}
+	}
+	return map[string]any{"files": out, "assets": assets, "items": items, "unusedAssets": unused, "hasErrors": w.res.HasErrors()}, nil
 }
 
 // structureAsset matches a structure file's path in the data pack.

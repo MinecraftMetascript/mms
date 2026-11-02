@@ -81,8 +81,13 @@
           "$ref": "#/definitions/severity"
         },
         "unused": {
-          "description": "A worldgen piece, predicate or item modifier that nothing in the project references, so the game never uses it.\n\nDefault: `hint`.",
-          "markdownDescription": "A worldgen piece, predicate or item modifier that nothing in the project references, so the game never uses it.\n\nDefault: `hint`.",
+          "description": "A worldgen piece, predicate or item modifier that nothing in the project references, so the game never uses it. A TemplatePool counts as used when a jigsaw block in one of the project's structure files draws from it.\n\nDefault: `hint`.",
+          "markdownDescription": "A worldgen piece, predicate or item modifier that nothing in the project references, so the game never uses it. A TemplatePool counts as used when a jigsaw block in one of the project's structure files draws from it.\n\nDefault: `hint`.",
+          "$ref": "#/definitions/severity"
+        },
+        "unused-asset": {
+          "description": "A .png, .ogg or .nbt file in the project that no Texture, Sound or Structure call and no `icon` uses, so the packs leave it out. It is reported on the file itself (in VS Code's Problems panel, by `mms check`, and in the web editor's asset list), and not while the project has errors.\n\nDefault: `info`.",
+          "markdownDescription": "A .png, .ogg or .nbt file in the project that no Texture, Sound or Structure call and no `icon` uses, so the packs leave it out. It is reported on the file itself (in VS Code's Problems panel, by `mms check`, and in the web editor's asset list), and not while the project has errors.\n\nDefault: `info`.",
           "$ref": "#/definitions/severity"
         },
         "use-sugar": {
