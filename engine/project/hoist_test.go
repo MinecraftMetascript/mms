@@ -130,3 +130,24 @@ func TestHoistErrors(t *testing.T) {
 		t.Fatalf("errors = %q", errs)
 	}
 }
+
+// TestHoistInlineFunction checks that a block of commands where a function
+// id is required compiles as its own function.
+func TestHoistInlineFunction(t *testing.T) {
+	out := emitText(t, `
+Advancement got = {
+  criteria = { t = { trigger = tick } }
+  rewards = { function = {
+    /say hi
+    let n = 3
+  } }
+}
+`)
+	if adv := compact(out["data/demo/advancement/got.json"]); !strings.Contains(adv, `"function":"demo:mms_gen/got/function"`) {
+		t.Errorf("advancement = %s", adv)
+	}
+	got := out["data/demo/function/mms_gen/got/function.mcfunction"]
+	if !strings.Contains(got, "say hi\n") || !strings.Contains(got, "scoreboard players set") {
+		t.Errorf("function = %q", got)
+	}
+}

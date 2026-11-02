@@ -3,6 +3,7 @@ package sema
 import (
 	"strconv"
 
+	"github.com/minecraftmetascript/mms/engine/fn"
 	"github.com/minecraftmetascript/mms/engine/jsonv"
 	"github.com/minecraftmetascript/mms/engine/syntax"
 )
@@ -20,12 +21,18 @@ import (
 //
 // writes worldgen/noise/mms_gen/hills/noise.json and refers to it as
 // <ns>:mms_gen/hills/noise.
+//
+// A function id takes a block of commands, compiled as a Function with
+// no parameters:
+//
+//	rewards = { function = { say found it } }
 
 // Hoisted is an inline value written out as its own resource.
 type Hoisted struct {
 	Kind  Kind
-	ID    string // "ns:mms_gen/<owner>/<name>"
-	Value jsonv.Value
+	ID    string      // "ns:mms_gen/<owner>/<name>"
+	Value jsonv.Value // nil for a function
+	Fn    *fn.Output  // a compiled inline function
 	Sp    syntax.Span // the inline value's span
 }
 
@@ -40,6 +47,9 @@ var keyRequired = map[string]bool{
 func (c *Checker) hoistKind(id idInfo) (Kind, bool) {
 	if !id.Present || id.Registry == "" || id.Slot || id.Tags == "required" || id.Tags == "implicit" || c.Kinds == nil {
 		return Kind{}, false
+	}
+	if id.Registry == "function" {
+		return c.Kinds.Lookup("Function")
 	}
 	k, ok := c.Kinds.ForFolder(c.registryName(id.Registry))
 	if !ok || !k.IsResource() || k.TagOf != "" || k.Assets != "" {
@@ -63,6 +73,10 @@ func (c *Checker) hoistable(e syntax.Expr, k Kind) bool {
 	case *syntax.String, *syntax.Ident, *syntax.ResLoc, *syntax.Tag, *syntax.Bad, nil:
 		return false
 	}
+	if k.MMS == "Function" {
+		_, ok := e.(*syntax.Object)
+		return ok
+	}
 	return c.fits(e, c.kindRoot(k))
 }
 
@@ -81,6 +95,9 @@ func (c *Checker) hoist(e syntax.Expr, id idInfo) (jsonv.Value, bool) {
 	if !ok || !c.hoistable(e, k) {
 		return nil, false
 	}
+	if k.MMS == "Function" {
+		return c.hoistFunction(e, k), true
+	}
 	v := c.check(e, c.kindRoot(k))
 	if c.trial {
 		return jsonv.String(c.NS + ":mms_gen/inline"), true
@@ -96,6 +113,31 @@ func (c *Checker) hoist(e syntax.Expr, id idInfo) (jsonv.Value, bool) {
 		in.Help = "```mms\n" + k.Name + " " + hid + "\n```\n\nAn inline " + k.Name + " where an id is needed: it is written to its own file and referenced by this id."
 	}
 	return jsonv.String(hid), true
+}
+
+// hoistFunction compiles a block of commands written where a function
+// id is required.
+func (c *Checker) hoistFunction(e syntax.Expr, k Kind) jsonv.Value {
+	for p, ok := e.(*syntax.Paren); ok; p, ok = e.(*syntax.Paren) {
+		e = p.X
+	}
+	obj := e.(*syntax.Object)
+	if c.trial {
+		return jsonv.String(c.NS + ":mms_gen/inline")
+	}
+	hid := c.hoistID(k)
+	d := &syntax.Decl{Kind: &syntax.Ident{Name: k.Name, Sp: obj.Sp}, Body: obj.Body, Sp: obj.Sp}
+	f := c.CompileFunction(d, hid, c.Src)
+	if f == nil {
+		return nil
+	}
+	c.Hoisted = append(c.Hoisted, Hoisted{Kind: k, ID: hid, Fn: fn.Generate(*f), Sp: obj.Sp})
+	in := c.info(e)
+	in.ID = hid
+	if in.Help == "" {
+		in.Help = "```mms\nFunction " + hid + "\n```\n\nAn inline function where a function id is needed: it is written to its own file and called by this id."
+	}
+	return jsonv.String(hid)
 }
 
 // hoistID names the next hoisted value of kind k: under mms_gen/, by the

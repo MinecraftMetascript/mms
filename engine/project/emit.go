@@ -77,27 +77,28 @@ func (r *Result) Emit() []OutFile {
 	ret := map[string]bool{}
 	used := map[string]bool{} // namespaces whose objective the code uses
 	fnFiles := map[string]bool{}
-	addFn := func(d *Decl) {
-		for id, ls := range d.Fn.Files {
+	addFnOut := func(o *fn.Output, d *Decl, sp syntax.Span, implicit bool) {
+		for id, ls := range o.Files {
 			if fnFiles[id] {
 				continue // identical OnLoad bodies share their functions
 			}
 			fnFiles[id] = true
 			fns, fpath := splitID(id)
-			out = append(out, OutFile{Path: "data/" + fns + "/function/" + fpath + ".mcfunction", Data: lines(ls), Unit: d.Unit.Path, Span: d.D.Sp})
+			out = append(out, OutFile{Path: "data/" + fns + "/function/" + fpath + ".mcfunction", Data: lines(ls), Unit: d.Unit.Path, Span: sp, Implicit: implicit})
 			markUsed(used, ls)
 		}
-		ns, _ := splitID(d.Fn.ID())
+		ns, _ := splitID(o.ID())
 		if consts[ns] == nil {
 			consts[ns] = map[int32]bool{}
 		}
-		for v := range d.Fn.Consts {
+		for v := range o.Consts {
 			consts[ns][v] = true
 		}
-		if d.Fn.Ret {
+		if o.Ret {
 			ret[ns] = true
 		}
 	}
+	addFn := func(d *Decl) { addFnOut(d.Fn, d, d.D.Sp, false) }
 	// langs holds each lang file, so CustomItem names join the Lang
 	// declaration of their language.
 	type langFile struct {
@@ -115,6 +116,10 @@ func (r *Result) Emit() []OutFile {
 	}
 	for _, d := range r.Order {
 		for _, h := range d.Hoisted {
+			if h.Fn != nil {
+				addFnOut(h.Fn, d, h.Sp, true)
+				continue
+			}
 			hns, hpath := splitID(h.ID)
 			out = append(out, OutFile{Path: h.Kind.Dir(hns) + "/" + hpath + ".json", Data: jsonv.Marshal(h.Value), Unit: d.Unit.Path, Span: h.Sp, Implicit: true})
 		}

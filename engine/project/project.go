@@ -423,6 +423,9 @@ func (p *Project) checkDecl(u *sema.Unit, d *syntax.Decl, k sema.Kind, syms *sem
 		if hasErrors(dr.Diags) {
 			break
 		}
+		if h.Value == nil {
+			continue
+		}
 		if errs := sema.Validate(p.Pack, p.Kinds, h.Kind.Resource, h.Value); len(errs) > 0 {
 			dr.Diags = append(dr.Diags, syntax.Diagnostic{
 				Code: "mms/internal", Severity: syntax.SeverityError, Sp: h.Sp,
