@@ -30,6 +30,8 @@ Global count: int = 0
 Global stack: int = 0
 
 // Scratch values for the raw commands.
+/** 1 when the player clicked with an item in hand. */
+Global holding: int = 0
 Global held: int = 0
 Global diff: int = 0
 Global amount: int = 0

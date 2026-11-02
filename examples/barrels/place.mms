@@ -28,6 +28,9 @@ Function place {
     /execute if block ~ ~ ~ #minecraft:replaceable run function barrels:build
     /execute unless block ~ ~ ~ #minecraft:replaceable run loot spawn ~ ~ ~ loot barrels:storage_barrel
   }
+  // Killing an item frame drops its item, so move the frame far below the
+  // world first: whatever it drops there falls out of the world.
+  /tp @s ~ -1000 ~
   /kill @s
 }
 

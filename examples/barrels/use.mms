@@ -27,8 +27,13 @@ OnAdvancement use_barrel = PlayerInteractedWithEntity(
   Execute("if entity @e[type=interaction,tag=barrels.this]") {
     open()
     /execute at @s run summon item_display ~ ~ ~ {Tags:["barrels.tmp"]}
-    /execute if items entity @s weapon.mainhand * run function barrels:insert_held
-    /execute unless items entity @s weapon.mainhand * run function barrels:insert_all
+    // Decide once: putting the held stack in empties the hand.
+    /execute store success score $holding mms.barrels if items entity @s weapon.mainhand *
+    if (holding == 1) {
+      insert_held()
+    } else {
+      insert_all()
+    }
     /kill @e[type=item_display,tag=barrels.tmp]
     close()
   }
