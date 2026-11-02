@@ -1586,8 +1586,15 @@
                       "type": "CHOICE",
                       "members": [
                         {
-                          "type": "STRING",
-                          "value": "-"
+                          "type": "IMMEDIATE_TOKEN",
+                          "content": {
+                            "type": "PREC",
+                            "value": 1,
+                            "content": {
+                              "type": "STRING",
+                              "value": "-"
+                            }
+                          }
                         },
                         {
                           "type": "BLANK"
@@ -1595,8 +1602,16 @@
                       ]
                     },
                     {
-                      "type": "SYMBOL",
-                      "name": "number"
+                      "type": "ALIAS",
+                      "content": {
+                        "type": "IMMEDIATE_TOKEN",
+                        "content": {
+                          "type": "PATTERN",
+                          "value": "\\d+(\\.\\d+)?"
+                        }
+                      },
+                      "named": true,
+                      "value": "number"
                     }
                   ]
                 },
