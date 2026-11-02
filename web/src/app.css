@@ -328,3 +328,9 @@ body {
 .prose-mms :is(dt, dd) {
 	overflow-wrap: anywhere;
 }
+
+/* An open editor menu (right-click or Ctrl/Cmd+.) hides hover tooltips, which
+   would otherwise open over it while the pointer rests on a problem. */
+body:has([role='menu'][aria-label='Editor actions']) .cm-tooltip-hover {
+	display: none;
+}

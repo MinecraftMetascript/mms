@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { basicSetup } from 'codemirror';
 	import { EditorState, Compartment } from '@codemirror/state';
-	import { EditorView, keymap } from '@codemirror/view';
+	import { EditorView, closeHoverTooltips, keymap } from '@codemirror/view';
 	import { indentWithTab } from '@codemirror/commands';
 	import { acceptCompletion, startCompletion } from '@codemirror/autocomplete';
 	import { indentUnit } from '@codemirror/language';
@@ -14,7 +14,7 @@
 	import { forEachDiagnostic } from '@codemirror/lint';
 	import { findReferences, jumpToDefinition } from '@codemirror/lsp-client';
 	import { inlineRename, renameInline } from './rename';
-	import ContextMenu, { type MenuEntries } from './ContextMenu.svelte';
+	import ContextMenu, { type MenuEntries, type MenuItem } from './ContextMenu.svelte';
 
 	interface Props {
 		engine: Engine;
@@ -53,26 +53,45 @@
 		const at = v.posAtCoords({ x: e.clientX, y: e.clientY });
 		const sel = v.state.selection.main;
 		if (at != null && (at < sel.from || at > sel.to)) v.dispatch({ selection: { anchor: at } });
+		const fixes = fixesAt(v);
+		const items: MenuEntries = [
+			{ label: 'Go to definition', keys: 'F12', run: run(v, jumpToDefinition) },
+			{ label: 'Find references', keys: 'Shift+F12', run: run(v, findReferences) },
+			{ label: 'Rename symbol', keys: 'F2', run: run(v, renameInline) },
+			null,
+			{ label: 'Format document', keys: `Shift+${alt}+F`, run: run(v, formatCommand) },
+			{ label: 'Fix all in this file', keys: `${mod}+${alt}+F`, run: run(v, fixAllCommand) }
+		];
+		if (fixes.length) items.push(null, ...fixes);
+		menu?.show({ x: e.clientX, y: e.clientY }, items, () => v.focus());
+		return true;
+	}
+	const run = (v: EditorView, cmd: (v: EditorView) => boolean) => () => {
+		v.focus();
+		cmd(v);
+	};
+
+	/** Quick fixes for the problems under the cursor. */
+	function fixesAt(v: EditorView): MenuItem[] {
 		const head = v.state.selection.main.head;
-		const run = (cmd: (v: EditorView) => boolean) => () => {
-			v.focus();
-			cmd(v);
-		};
-		const fixes: MenuEntries = [];
+		const fixes: MenuItem[] = [];
 		forEachDiagnostic(v.state, (d, from, to) => {
 			if (head < from || head > to) return;
 			for (const a of d.actions ?? []) fixes.push({ label: a.name, run: () => (v.focus(), a.apply(v, from, to)) });
 		});
-		const items: MenuEntries = [
-			{ label: 'Go to definition', keys: 'F12', run: run(jumpToDefinition) },
-			{ label: 'Find references', keys: 'Shift+F12', run: run(findReferences) },
-			{ label: 'Rename symbol', keys: 'F2', run: run(renameInline) },
-			null,
-			{ label: 'Format document', keys: `Shift+${alt}+F`, run: run(formatCommand) },
-			{ label: 'Fix all in this file', keys: `${mod}+${alt}+F`, run: run(fixAllCommand) }
-		];
-		if (fixes.length) items.push(null, ...fixes);
-		menu?.show({ x: e.clientX, y: e.clientY }, items, () => v.focus());
+		return fixes;
+	}
+
+	/** Cmd/Ctrl+. : a menu of quick fixes at the cursor, as in VS Code and Zed. */
+	function quickFixCommand(v: EditorView) {
+		const at = v.coordsAtPos(v.state.selection.main.head);
+		if (!at) return false;
+		// The lint tooltip under the cursor would cover the menu.
+		v.dispatch({ effects: closeHoverTooltips });
+		const fixes = fixesAt(v);
+		const items: MenuEntries = fixes.length ? [...fixes] : [{ label: 'No quick fixes here', disabled: true, run: () => {} }];
+		items.push(null, { label: 'Fix all in this file', keys: `${mod}+${alt}+F`, run: run(v, fixAllCommand) });
+		menu?.show({ x: at.left, y: at.bottom + 2 }, items, () => v.focus());
 		return true;
 	}
 	const theme = new Compartment();
@@ -104,6 +123,7 @@
 					{ key: 'Mod-s', run: formatCommand, preventDefault: true },
 					{ key: 'Shift-Alt-f', run: formatCommand, preventDefault: true },
 					{ key: 'Mod-Alt-f', run: fixAllCommand, preventDefault: true },
+					{ key: 'Mod-.', run: quickFixCommand, preventDefault: true },
 					// Ctrl+Space (from basicSetup) is taken by the OS on macOS (input
 					// source switching) and by some IMEs elsewhere, so offer the
 					// VS Code and Zed alternatives too: Cmd/Ctrl+I and Alt/Option+Space.

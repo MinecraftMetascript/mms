@@ -46,7 +46,7 @@ test('projects persist and examples open', async ({ page }) => {
 	page.on('dialog', (d) => d.accept());
 	await page.goto('./');
 	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
-	await page.getByRole('button', { name: /Project/ }).click();
+	await page.getByRole('button', { name: /Examples/ }).click();
 	await page.getByRole('button', { name: /surface-rules/ }).click();
 	await expect(page.getByRole('button', { name: 'surface.mms' })).toBeVisible();
 	await expect(status(page)).toHaveText(/No problems/);
@@ -62,7 +62,7 @@ test('an example with several files in folders builds as one project', async ({ 
 	page.on('dialog', (d) => d.accept());
 	await page.goto('./');
 	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
-	await page.getByRole('button', { name: /Project/ }).click();
+	await page.getByRole('button', { name: /Examples/ }).click();
 	await page.getByRole('button', { name: /treasure/ }).click();
 	// recipes/crafting.mms uses the #gems tag declared in tags.mms.
 	await page.getByRole('button', { name: 'recipes/crafting.mms' }).click();
@@ -77,7 +77,7 @@ test('an example with textures and a sound checks and exports both packs', async
 	page.on('dialog', (d) => d.accept());
 	await page.goto('./');
 	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
-	await page.getByRole('button', { name: /Project/ }).click();
+	await page.getByRole('button', { name: /Examples/ }).click();
 	await page.getByRole('button', { name: /embers/ }).click();
 	await expect(page.getByText('art/ember_shard.png', { exact: true })).toBeVisible();
 	await expect(page.getByText('sounds/embers.ogg', { exact: true })).toBeVisible();
@@ -133,7 +133,7 @@ test('dimensions, noise settings and surface rules preview as terrain', async ({
 	page.on('dialog', (d) => d.accept());
 	await page.goto('./');
 	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
-	await page.getByRole('button', { name: /Project/ }).click();
+	await page.getByRole('button', { name: /Examples/ }).click();
 	await page.getByRole('button', { name: /sky-islands/ }).click();
 	await expect(status(page)).toHaveText(/No problems/);
 	const failed = page.getByText(/Preview failed/);
@@ -189,7 +189,7 @@ test('dimensions, noise settings and surface rules preview as terrain', async ({
 	await expect(failed).toBeHidden();
 
 	// A rule that tests a biome through a named condition starts on that biome.
-	await page.getByRole('button', { name: /Project/ }).click();
+	await page.getByRole('button', { name: /Examples/ }).click();
 	await page.getByRole('button', { name: /badlands/ }).click();
 	await page.locator('.cm-line', { hasText: 'SurfaceRule badlands' }).click();
 	await expect(page.getByRole('combobox', { name: 'Biome' })).toHaveValue('minecraft:badlands');
@@ -202,7 +202,7 @@ test('a pinned preview stays put while the cursor moves to another declaration',
 	page.on('dialog', (d) => d.accept());
 	await page.goto('./');
 	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
-	await page.getByRole('button', { name: /Project/ }).click();
+	await page.getByRole('button', { name: /Examples/ }).click();
 	await page.getByRole('button', { name: /sky-islands/ }).click();
 	await expect(status(page)).toHaveText(/No problems/);
 
@@ -237,7 +237,6 @@ test('data packs and pasted JSON import as MMS', async ({ page }) => {
 	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
 
 	// Paste JSON appends a declaration to the open file.
-	await page.getByRole('button', { name: /Project/ }).click();
 	await page.getByRole('button', { name: /Paste JSON/ }).click();
 	await page.getByLabel('Kind', { exact: true }).selectOption('LootTable');
 	await page.getByLabel('Name', { exact: true }).fill('blocks/ruby_ore');
@@ -345,7 +344,7 @@ test('the docs render guides and the reference', async ({ page }) => {
 	await expect(page.locator('#type-util-direction-Axis')).toBeInViewport();
 });
 
-test('the Project menu closes on outside click and Escape, and Format formats', async ({ page }) => {
+test('the Project menu closes on outside click and Escape, and the editor header formats and fixes', async ({ page }) => {
 	await page.goto('./');
 	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
 	const projectButton = page.getByRole('button', { name: /Project/ });
@@ -366,6 +365,17 @@ test('the Project menu closes on outside click and Escape, and Format formats', 
 	await expect(status(page)).toHaveText(/No problems/);
 	await page.getByRole('button', { name: 'Format', exact: true }).click();
 	await expect(page.locator('.cm-content')).toHaveText('DensityFunction x = Clamp(1, 0, 1)');
+
+	// The Project menu holds only project actions; editing actions live in the editor header.
+	await projectButton.click();
+	await expect(page.getByRole('button', { name: /Fix all in this file/ })).toHaveCount(0);
+	await expect(page.getByRole('button', { name: /badlands/ })).toHaveCount(0);
+	await page.keyboard.press('Escape');
+
+	await replaceText(page, 'DensityFunction a = 2 * 0.25\n');
+	await expect(page.locator('.cm-lintRange-hint').first()).toBeVisible();
+	await page.getByRole('button', { name: 'Fix all', exact: true }).click();
+	await expect(page.locator('.cm-content')).toContainText('DensityFunction a = 0.5');
 });
 
 test('doc comments show on hover over a use', async ({ page }) => {
@@ -412,6 +422,19 @@ test('right-click opens editor actions with quick fixes', async ({ page }) => {
 	await expect(fix).not.toContainText('Format');
 	await fix.click();
 	await expect(page.locator('.cm-content')).toContainText('DensityFunction a = 0.5');
+
+	// Ctrl+. lists the fixes at the cursor, and Enter applies the first.
+	await page.locator('.cm-line', { hasText: 'b = a * 2' }).click();
+	await page.keyboard.press('ControlOrMeta+.');
+	await expect(menu).toBeVisible();
+	await expect(menu.getByRole('menuitem', { name: /Go to definition/ })).toHaveCount(0);
+	await expect(menu.getByRole('menuitem', { name: /Fix all in this file/ })).toBeVisible();
+	await page.keyboard.press('Escape');
+	await expect(menu).toBeHidden();
+	await page.locator('.cm-lintRange-hint').first().click();
+	await page.keyboard.press('ControlOrMeta+.');
+	await expect(menu.getByRole('menuitem').first()).toBeFocused();
+	await expect(menu.getByRole('menuitem').first()).not.toContainText('Fix all');
 });
 
 test('Tab indents, Shift+Tab unindents, and Tab accepts a completion', async ({ page }) => {
@@ -539,7 +562,7 @@ test.describe('on a phone', () => {
 		page.on('dialog', (d) => d.accept());
 		await page.goto('./');
 		await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
-		await page.getByRole('button', { name: /Project/ }).click();
+		await page.getByRole('button', { name: /Examples/ }).click();
 		await page.getByRole('button', { name: /badlands/ }).click();
 		const rule = page.locator('.cm-line', { hasText: 'SurfaceRule badlands' });
 		// The editor only renders lines near the viewport; scroll until the rule is there.
@@ -599,7 +622,7 @@ test('several projects are saved and can be switched', async ({ page }) => {
 	await replaceText(page, 'Noise first = { base_octave = -4, amplitude_modifiers = [1] }\n');
 
 	// An example opens as a second project; the first stays saved.
-	await page.getByRole('button', { name: 'Project ▾' }).click();
+	await page.getByRole('button', { name: 'Examples ▾' }).click();
 	await page.getByRole('button', { name: /surface-rules/ }).click();
 	await expect(page.getByRole('button', { name: 'surface.mms' })).toBeVisible();
 
