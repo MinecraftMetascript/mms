@@ -108,7 +108,7 @@ func runBuild(args []string, stdout, stderr io.Writer) int {
 	fl.SetOutput(stderr)
 	out := fl.String("out", "", "output folder (default: mms.json output, or build); a resource pack goes next to it, in <out>-resources")
 	zipPath := fl.String("zip", "", "write a zip archive instead of a folder; a resource pack goes in <name>-resources.zip")
-	world := fl.String("world", "", "install into a world: writes <world>/datapacks/<namespace>, and the resource pack to the game folder's resourcepacks/<namespace>-resources.zip")
+	world := fl.String("world", "", "install into a world: writes <world>/datapacks/<namespace>, and the resource pack to <world>/resourcepacks/resources.zip")
 	if err := fl.Parse(args); err != nil {
 		return 2
 	}
@@ -172,7 +172,7 @@ func runBuild(args []string, stdout, stderr io.Writer) int {
 		}
 		fmt.Fprintf(stdout, "wrote %d files to %s\n", len(data), target)
 		if len(res) > 0 {
-			rz, enable := worldResourcePack(*world, p.Config.Namespace)
+			rz, note := worldResourcePack(*world)
 			if err := os.MkdirAll(filepath.Dir(rz), 0o755); err != nil {
 				return fail(err)
 			}
@@ -180,7 +180,7 @@ func runBuild(args []string, stdout, stderr io.Writer) int {
 				return fail(err)
 			}
 			fmt.Fprintf(stdout, "wrote resource pack %s (%d files)\n", rz, len(res))
-			fmt.Fprintln(stdout, enable)
+			fmt.Fprintln(stdout, note)
 		}
 		return 0
 	}
@@ -264,24 +264,11 @@ func pluralize(n int, s string) string {
 	return s + "s"
 }
 
-// worldResourcePack picks where --world puts the resource pack, and the
-// line that says how to turn it on. A singleplayer world's own
-// resources.zip is not applied (checked in 26.3), so a world inside a
-// game folder's saves/ gets the pack in that game folder's resourcepacks/,
-// under a fixed name so that enabling it once keeps it on across builds.
-// Any other folder, such as a server's world, gets it beside the world.
-func worldResourcePack(world, ns string) (path, enable string) {
-	name := ns + "-resources.zip"
-	abs, err := filepath.Abs(world)
-	if err != nil {
-		abs = world
-	}
-	saves := filepath.Dir(abs)
-	if filepath.Base(saves) == "saves" {
-		game := filepath.Dir(saves)
-		return filepath.Join(game, "resourcepacks", name),
-			"enable it once in Options > Resource Packs; it stays on after rebuilds, and F3+T reloads it in game"
-	}
-	return filepath.Join(filepath.Dir(abs), name),
-		"this world is not in a game folder's saves/, so copy it to resourcepacks/ and enable it, or set it as the server's resource pack"
+// worldResourcePack returns where --world puts the resource pack and a
+// line about it. Minecraft applies a world's bundled pack, which lives at
+// <world>/resourcepacks/resources.zip, by itself when the world is played
+// (not over LAN, and a server needs its own resource-pack setting).
+func worldResourcePack(world string) (path, note string) {
+	return filepath.Join(world, "resourcepacks", "resources.zip"),
+		"Minecraft applies it when the world is opened; rejoin the world after a rebuild"
 }
