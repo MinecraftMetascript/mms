@@ -101,4 +101,5 @@ primary
     | LPAREN expr RPAREN                                 # parenExpr
     | LBRACK (expr ((COMMA | {p.onNewLine()}?) expr)* COMMA?)? RBRACK # listLit
     | block                                              # objectLit
+    | MISSING                                            # missingLit
     ;

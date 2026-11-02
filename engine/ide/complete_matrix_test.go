@@ -63,6 +63,9 @@ func TestCompletionMatrix(t *testing.T) {
 		{name: "map keys with slash", src: "Biome b = {\n  attributes = {\n    vis|\n  }\n}", want: []string{"visual/sky_color"}, not: []string{"temperature"}, replace: "vis"},
 		{name: "item components", src: "Recipe r = Shapeless([emerald], { id = emerald\n components = {\n |\n }\n})", want: []string{"item_name", "max_stack_size"}, not: []string{"count"}},
 		{name: "map value", src: "Enchantment e = {\n  effects = {\n    minecraft:damage = [|]\n  }\n}", want: []string{"DamageEnchantmentEffect"}},
+		{name: "empty field value before next field", src: "NoiseSettings ns = {\n  default_block = |\n  default_fluid = water\n  sea_level = 0\n}", want: []string{"stone", "FullBlockState"}, not: []string{"default_fluid", "aquifers"}},
+		{name: "empty field value before close", src: "NoiseSettings ns = {\n  sea_level = 0\n  default_block = |\n}", want: []string{"stone"}, not: []string{"default_fluid"}},
+		{name: "empty field value before quoted key", src: "Biome b = {\n  temperature = |\n  \"downfall\" = 0\n}", not: []string{"downfall", "effects"}},
 		{name: "function reference", src: "Function g {}\nAdvancement a = { rewards = { function = |} }", want: []string{"g"}},
 
 		// Tags.

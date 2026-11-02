@@ -4,6 +4,7 @@ Decl Block b
     Index
       Ident oak_log
       Arg axis =
-        Bad 30-30
+        Bad 29-29
 ! 23-24 '[' is never closed
 ! 15-16 '(' is never closed
+! 28-29 expected a value after '='

@@ -43,7 +43,7 @@ func mmslexerLexerInit() {
 		"DEFAULT_MODE",
 	}
 	staticData.LiteralNames = []string{
-		"", "'let'", "'if'", "'else'", "'while'", "'for'", "'in'", "'return'",
+		"", "", "'let'", "'if'", "'else'", "'while'", "'for'", "'in'", "'return'",
 		"'break'", "'continue'", "'true'", "'false'", "", "", "", "", "", "",
 		"", "", "", "", "", "'->'", "'..'", "'+='", "'-='", "'*='", "'/='",
 		"'%='", "'=='", "'!='", "'<='", "'>='", "'&&'", "'||'", "'{'", "'}'",
@@ -51,14 +51,14 @@ func mmslexerLexerInit() {
 		"'+'", "'-'", "'*'", "'/'", "'%'", "'!'", "'#'", "'@'", "'~'", "'^'",
 	}
 	staticData.SymbolicNames = []string{
-		"", "LET", "IF", "ELSE", "WHILE", "FOR", "IN", "RETURN", "BREAK", "CONTINUE",
-		"TRUE", "FALSE", "COMMAND", "DOC_COMMENT", "BLOCK_COMMENT", "UNTERMINATED_COMMENT",
-		"LINE_COMMENT", "NEWLINE", "WS", "RESLOC", "IDENT", "NUMBER", "STRING",
-		"ARROW", "DOTDOT", "PLUS_EQ", "MINUS_EQ", "STAR_EQ", "SLASH_EQ", "PCT_EQ",
-		"EQEQ", "NEQ", "LE", "GE", "ANDAND", "OROR", "LBRACE", "RBRACE", "LPAREN",
-		"RPAREN", "LBRACK", "RBRACK", "COMMA", "COLON", "DOT", "ASSIGN", "LT",
-		"GT", "PLUS", "MINUS", "STAR", "SLASH", "PERCENT", "BANG", "HASH", "AT",
-		"TILDE", "CARET", "ERROR_CHAR",
+		"", "MISSING", "LET", "IF", "ELSE", "WHILE", "FOR", "IN", "RETURN",
+		"BREAK", "CONTINUE", "TRUE", "FALSE", "COMMAND", "DOC_COMMENT", "BLOCK_COMMENT",
+		"UNTERMINATED_COMMENT", "LINE_COMMENT", "NEWLINE", "WS", "RESLOC", "IDENT",
+		"NUMBER", "STRING", "ARROW", "DOTDOT", "PLUS_EQ", "MINUS_EQ", "STAR_EQ",
+		"SLASH_EQ", "PCT_EQ", "EQEQ", "NEQ", "LE", "GE", "ANDAND", "OROR", "LBRACE",
+		"RBRACE", "LPAREN", "RPAREN", "LBRACK", "RBRACK", "COMMA", "COLON",
+		"DOT", "ASSIGN", "LT", "GT", "PLUS", "MINUS", "STAR", "SLASH", "PERCENT",
+		"BANG", "HASH", "AT", "TILDE", "CARET", "ERROR_CHAR",
 	}
 	staticData.RuleNames = []string{
 		"LET", "IF", "ELSE", "WHILE", "FOR", "IN", "RETURN", "BREAK", "CONTINUE",
@@ -73,7 +73,7 @@ func mmslexerLexerInit() {
 	}
 	staticData.PredictionContextCache = antlr.NewPredictionContextCache()
 	staticData.serializedATN = []int32{
-		4, 0, 58, 454, 6, -1, 2, 0, 7, 0, 2, 1, 7, 1, 2, 2, 7, 2, 2, 3, 7, 3, 2,
+		4, 0, 59, 454, 6, -1, 2, 0, 7, 0, 2, 1, 7, 1, 2, 2, 7, 2, 2, 3, 7, 3, 2,
 		4, 7, 4, 2, 5, 7, 5, 2, 6, 7, 6, 2, 7, 7, 7, 2, 8, 7, 8, 2, 9, 7, 9, 2,
 		10, 7, 10, 2, 11, 7, 11, 2, 12, 7, 12, 2, 13, 7, 13, 2, 14, 7, 14, 2, 15,
 		7, 15, 2, 16, 7, 16, 2, 17, 7, 17, 2, 18, 7, 18, 2, 19, 7, 19, 2, 20, 7,
@@ -119,13 +119,13 @@ func mmslexerLexerInit() {
 		1, 47, 1, 47, 1, 48, 1, 48, 1, 49, 1, 49, 1, 50, 1, 50, 1, 51, 1, 51, 1,
 		52, 1, 52, 1, 53, 1, 53, 1, 54, 1, 54, 1, 55, 1, 55, 1, 56, 1, 56, 1, 57,
 		1, 57, 1, 58, 1, 58, 1, 59, 1, 59, 1, 60, 1, 60, 1, 61, 1, 61, 1, 62, 1,
-		62, 1, 63, 1, 63, 1, 63, 2, 203, 217, 0, 64, 1, 1, 3, 2, 5, 3, 7, 4, 9,
-		5, 11, 6, 13, 7, 15, 8, 17, 9, 19, 10, 21, 11, 23, 12, 25, 13, 27, 14,
-		29, 15, 31, 16, 33, 17, 35, 18, 37, 19, 39, 20, 41, 21, 43, 22, 45, 23,
-		47, 24, 49, 25, 51, 26, 53, 27, 55, 28, 57, 29, 59, 30, 61, 31, 63, 32,
-		65, 33, 67, 34, 69, 35, 71, 36, 73, 37, 75, 38, 77, 39, 79, 40, 81, 41,
-		83, 42, 85, 43, 87, 44, 89, 45, 91, 46, 93, 47, 95, 48, 97, 49, 99, 50,
-		101, 51, 103, 52, 105, 53, 107, 54, 109, 55, 111, 56, 113, 57, 115, 58,
+		62, 1, 63, 1, 63, 1, 63, 2, 203, 217, 0, 64, 1, 2, 3, 3, 5, 4, 7, 5, 9,
+		6, 11, 7, 13, 8, 15, 9, 17, 10, 19, 11, 21, 12, 23, 13, 25, 14, 27, 15,
+		29, 16, 31, 17, 33, 18, 35, 19, 37, 20, 39, 21, 41, 22, 43, 23, 45, 24,
+		47, 25, 49, 26, 51, 27, 53, 28, 55, 29, 57, 30, 59, 31, 61, 32, 63, 33,
+		65, 34, 67, 35, 69, 36, 71, 37, 73, 38, 75, 39, 77, 40, 79, 41, 81, 42,
+		83, 43, 85, 44, 87, 45, 89, 46, 91, 47, 93, 48, 95, 49, 97, 50, 99, 51,
+		101, 52, 103, 53, 105, 54, 107, 55, 109, 56, 111, 57, 113, 58, 115, 59,
 		117, 0, 119, 0, 121, 0, 123, 0, 125, 0, 127, 0, 1, 0, 14, 1, 0, 97, 122,
 		2, 0, 10, 10, 13, 13, 1, 0, 42, 42, 2, 0, 42, 42, 47, 47, 2, 0, 9, 9, 32,
 		32, 2, 0, 69, 69, 101, 101, 2, 0, 43, 43, 45, 45, 4, 0, 10, 10, 13, 13,
@@ -318,64 +318,65 @@ func NewMMSLexer(input antlr.CharStream) *MMSLexer {
 
 // MMSLexer tokens.
 const (
-	MMSLexerLET                  = 1
-	MMSLexerIF                   = 2
-	MMSLexerELSE                 = 3
-	MMSLexerWHILE                = 4
-	MMSLexerFOR                  = 5
-	MMSLexerIN                   = 6
-	MMSLexerRETURN               = 7
-	MMSLexerBREAK                = 8
-	MMSLexerCONTINUE             = 9
-	MMSLexerTRUE                 = 10
-	MMSLexerFALSE                = 11
-	MMSLexerCOMMAND              = 12
-	MMSLexerDOC_COMMENT          = 13
-	MMSLexerBLOCK_COMMENT        = 14
-	MMSLexerUNTERMINATED_COMMENT = 15
-	MMSLexerLINE_COMMENT         = 16
-	MMSLexerNEWLINE              = 17
-	MMSLexerWS                   = 18
-	MMSLexerRESLOC               = 19
-	MMSLexerIDENT                = 20
-	MMSLexerNUMBER               = 21
-	MMSLexerSTRING               = 22
-	MMSLexerARROW                = 23
-	MMSLexerDOTDOT               = 24
-	MMSLexerPLUS_EQ              = 25
-	MMSLexerMINUS_EQ             = 26
-	MMSLexerSTAR_EQ              = 27
-	MMSLexerSLASH_EQ             = 28
-	MMSLexerPCT_EQ               = 29
-	MMSLexerEQEQ                 = 30
-	MMSLexerNEQ                  = 31
-	MMSLexerLE                   = 32
-	MMSLexerGE                   = 33
-	MMSLexerANDAND               = 34
-	MMSLexerOROR                 = 35
-	MMSLexerLBRACE               = 36
-	MMSLexerRBRACE               = 37
-	MMSLexerLPAREN               = 38
-	MMSLexerRPAREN               = 39
-	MMSLexerLBRACK               = 40
-	MMSLexerRBRACK               = 41
-	MMSLexerCOMMA                = 42
-	MMSLexerCOLON                = 43
-	MMSLexerDOT                  = 44
-	MMSLexerASSIGN               = 45
-	MMSLexerLT                   = 46
-	MMSLexerGT                   = 47
-	MMSLexerPLUS                 = 48
-	MMSLexerMINUS                = 49
-	MMSLexerSTAR                 = 50
-	MMSLexerSLASH                = 51
-	MMSLexerPERCENT              = 52
-	MMSLexerBANG                 = 53
-	MMSLexerHASH                 = 54
-	MMSLexerAT                   = 55
-	MMSLexerTILDE                = 56
-	MMSLexerCARET                = 57
-	MMSLexerERROR_CHAR           = 58
+	MMSLexerMISSING              = 1
+	MMSLexerLET                  = 2
+	MMSLexerIF                   = 3
+	MMSLexerELSE                 = 4
+	MMSLexerWHILE                = 5
+	MMSLexerFOR                  = 6
+	MMSLexerIN                   = 7
+	MMSLexerRETURN               = 8
+	MMSLexerBREAK                = 9
+	MMSLexerCONTINUE             = 10
+	MMSLexerTRUE                 = 11
+	MMSLexerFALSE                = 12
+	MMSLexerCOMMAND              = 13
+	MMSLexerDOC_COMMENT          = 14
+	MMSLexerBLOCK_COMMENT        = 15
+	MMSLexerUNTERMINATED_COMMENT = 16
+	MMSLexerLINE_COMMENT         = 17
+	MMSLexerNEWLINE              = 18
+	MMSLexerWS                   = 19
+	MMSLexerRESLOC               = 20
+	MMSLexerIDENT                = 21
+	MMSLexerNUMBER               = 22
+	MMSLexerSTRING               = 23
+	MMSLexerARROW                = 24
+	MMSLexerDOTDOT               = 25
+	MMSLexerPLUS_EQ              = 26
+	MMSLexerMINUS_EQ             = 27
+	MMSLexerSTAR_EQ              = 28
+	MMSLexerSLASH_EQ             = 29
+	MMSLexerPCT_EQ               = 30
+	MMSLexerEQEQ                 = 31
+	MMSLexerNEQ                  = 32
+	MMSLexerLE                   = 33
+	MMSLexerGE                   = 34
+	MMSLexerANDAND               = 35
+	MMSLexerOROR                 = 36
+	MMSLexerLBRACE               = 37
+	MMSLexerRBRACE               = 38
+	MMSLexerLPAREN               = 39
+	MMSLexerRPAREN               = 40
+	MMSLexerLBRACK               = 41
+	MMSLexerRBRACK               = 42
+	MMSLexerCOMMA                = 43
+	MMSLexerCOLON                = 44
+	MMSLexerDOT                  = 45
+	MMSLexerASSIGN               = 46
+	MMSLexerLT                   = 47
+	MMSLexerGT                   = 48
+	MMSLexerPLUS                 = 49
+	MMSLexerMINUS                = 50
+	MMSLexerSTAR                 = 51
+	MMSLexerSLASH                = 52
+	MMSLexerPERCENT              = 53
+	MMSLexerBANG                 = 54
+	MMSLexerHASH                 = 55
+	MMSLexerAT                   = 56
+	MMSLexerTILDE                = 57
+	MMSLexerCARET                = 58
+	MMSLexerERROR_CHAR           = 59
 )
 
 func (l *MMSLexer) Sempred(localctx antlr.RuleContext, ruleIndex, predIndex int) bool {

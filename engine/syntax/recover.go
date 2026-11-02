@@ -123,3 +123,64 @@ func (s *sliceSource) NextToken() antlr.Token {
 	}
 	return t
 }
+
+// markMissingValues inserts a MISSING token after an '=' whose value was
+// left out: the next token closes a bracket or is a comma, or the next
+// line starts another `key = ...`. Without it the parser reads
+// `default_block =` followed by `default_fluid = water` as
+// `default_block = default_fluid` and then fails on the second '='.
+// No expression contains a bare '=', so a key followed by '=' on a later
+// line always starts a new field or statement.
+func markMissingValues(toks []antlr.Token, synthetic map[antlr.Token]bool) ([]antlr.Token, []Diagnostic) {
+	var def []int // indices of default-channel tokens
+	for i, t := range toks {
+		if t.GetChannel() == antlr.TokenDefaultChannel {
+			def = append(def, i)
+		}
+	}
+	kind := func(k int) int {
+		if k < len(def) {
+			return toks[def[k]].GetTokenType()
+		}
+		return antlr.TokenEOF
+	}
+	missing := map[int]bool{} // toks index of an '=' missing its value
+	for k, i := range def {
+		eq := toks[i]
+		if eq.GetTokenType() != parser.MMSLexerASSIGN || k+1 >= len(def) {
+			continue
+		}
+		next := toks[def[k+1]]
+		switch next.GetTokenType() {
+		case parser.MMSLexerRBRACE, parser.MMSLexerRPAREN, parser.MMSLexerRBRACK, parser.MMSLexerCOMMA:
+			missing[i] = true
+		case parser.MMSLexerIDENT, parser.MMSLexerRESLOC, parser.MMSLexerSTRING:
+			if next.GetLine() > eq.GetLine() && kind(k+2) == parser.MMSLexerASSIGN {
+				missing[i] = true
+			}
+		}
+	}
+	if len(missing) == 0 {
+		return toks, nil
+	}
+	var (
+		out   []antlr.Token
+		diags []Diagnostic
+	)
+	for i, t := range toks {
+		out = append(out, t)
+		if !missing[i] {
+			continue
+		}
+		pos := t.GetStop() + 1
+		tok := antlr.CommonTokenFactoryDEFAULT.Create(&antlr.TokenSourceCharStreamPair{},
+			parser.MMSLexerMISSING, "", antlr.TokenDefaultChannel, pos, pos-1, t.GetLine(), t.GetColumn()+1)
+		out = append(out, tok)
+		synthetic[tok] = true
+		diags = append(diags, Diagnostic{
+			Code: "syntax/missing-value", Severity: SeverityError,
+			Message: "expected a value after '='", Sp: tokSpan(t),
+		})
+	}
+	return out, diags
+}
