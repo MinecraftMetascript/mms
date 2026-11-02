@@ -11,6 +11,7 @@
 	import { uriOf } from '../project/project.svelte';
 	import { mmsHighlight, mmsLanguage } from './language';
 	import { semanticHighlighting } from './semantic';
+	import { inlayHints } from './inlay';
 	import { forEachDiagnostic } from '@codemirror/lint';
 	import { findReferences, jumpToDefinition } from '@codemirror/lsp-client';
 	import { inlineRename, renameInline } from './rename';
@@ -118,6 +119,7 @@
 				mmsHighlight,
 				engine.client.plugin(uriOf(p), 'mms'),
 				semanticHighlighting((uri) => engine.semanticTokens(uri)),
+				inlayHints((uri) => engine.inlayHints(uri)),
 				inlineRename(),
 				keymap.of([
 					{ key: 'Mod-s', run: formatCommand, preventDefault: true },

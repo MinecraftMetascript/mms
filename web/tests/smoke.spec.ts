@@ -331,6 +331,15 @@ test('lint fixes apply from the editor', async ({ page }) => {
 	await expect(page.locator('.cm-unnecessary')).toHaveText('d');
 });
 
+test('a custom item in a recipe ingredient shows its base item', async ({ page }) => {
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	await replaceText(page, 'CustomItem ember = { base = amethyst_shard, name = "Ember" }\nRecipe r = Shapeless([ember, stick], torch)\n');
+	await expect(page.locator('.cm-inlay-hint')).toHaveText('→ amethyst_shard');
+	await expect(page.locator('.cm-lintRange-hint')).toHaveCount(1);
+	await page.screenshot({ path: 'test-results/custom-item-base.png' });
+});
+
 test('loot tables, recipes and biomes show in the inspector', async ({ page }) => {
 	const errors: string[] = [];
 	page.on('pageerror', (e) => errors.push(e.message));

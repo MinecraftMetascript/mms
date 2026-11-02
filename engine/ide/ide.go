@@ -1047,3 +1047,40 @@ func (s *Session) commandCompletion(a *at, sp syntax.Span, off int) ([]Item, syn
 	}
 	return items, syntax.Span{Start: base + ws, End: off}
 }
+
+// InlayHint is a label shown after a span, such as the base item a custom
+// item stands for.
+type InlayHint struct {
+	Off     int // where the label goes
+	Label   string
+	Tooltip string
+}
+
+// InlayHints lists the inlay hints in a file, in order: the base item
+// after each custom item used as a plain item id.
+func (s *Session) InlayHints(path string) []InlayHint {
+	u := s.R.Unit(path)
+	if u == nil {
+		return nil
+	}
+	var out []InlayHint
+	for _, d := range u.File.Decls {
+		dr := s.R.Decls[d]
+		if dr == nil {
+			continue
+		}
+		for n, in := range dr.Info {
+			if in.Base == "" || in.Symbol == nil {
+				continue
+			}
+			base := strings.TrimPrefix(in.Base, "minecraft:")
+			out = append(out, InlayHint{
+				Off:     n.Span().End,
+				Label:   "→ " + base,
+				Tooltip: "A plain item id has no components, so " + in.Symbol.Path + " is written as " + in.Base + " here and any " + base + " matches.",
+			})
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Off < out[j].Off })
+	return out
+}

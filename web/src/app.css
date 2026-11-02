@@ -77,6 +77,14 @@ body {
 .editor .cm-focused .cm-selectionBackground {
 	background: color-mix(in srgb, var(--c-accent) 25%, transparent) !important;
 }
+.editor .cm-inlay-hint {
+	margin-left: 0.4em;
+	padding: 0 0.3em;
+	border-radius: 3px;
+	background: color-mix(in srgb, var(--c-hover) 80%, transparent);
+	color: var(--c-muted);
+	font-size: 0.9em;
+}
 .cm-tooltip {
 	background: var(--c-panel) !important;
 	color: var(--c-ink);

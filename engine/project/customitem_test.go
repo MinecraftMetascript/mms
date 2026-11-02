@@ -107,8 +107,8 @@ func TestCustomItemErrors(t *testing.T) {
 		{`CustomItem a = { base = stick, model = item/stick, item_model = stick }`, "item_model replaces the generated models"},
 		{`CustomItem a = { base = stick, parent = item/handheld }`, "add a texture"},
 		{`CustomItem a = { base = stick, name = { english = "A" } }`, "not a language code"},
-		{"CustomItem a = { base = stick }\nItemTag t = [a]", "is a CustomItem"},
-		{"CustomItem a = { base = stick }\nRecipe r = Shapeless([a], stick)", "is a CustomItem"},
+		{"CustomItem a = { base = stick }\nCustomItem b = { base = a }", "base must be a vanilla item, such as its base minecraft:stick"},
+		{"CustomItem a = { base = stick }\nRecipe r = Shapeless([a], stick)", ""},
 		{"CustomItem a = { base = stick, texture = Texture(\"art/a.png\") }\nItemModel a = { model = Model(model = item/stick) }", "already made by CustomItem"},
 		{"ItemModel a = { model = Model(model = item/stick) }\nCustomItem a = { base = stick, texture = Texture(\"art/a.png\") }", "makes ItemModel 'demo:a', which is already declared"},
 		{"CustomItem a = { base = stick, texture = Texture(\"art/a.png\") }\nModel item/a = { parent = item/generated }", "already made by CustomItem"},
@@ -120,6 +120,53 @@ func TestCustomItemErrors(t *testing.T) {
 		if d := diagText(r); !strings.Contains(d, tc.want) {
 			t.Errorf("%s\nwant %q in:\n%s", tc.src, tc.want, d)
 		}
+	}
+}
+
+// A custom item in a plain item id field, such as an ingredient or an
+// item tag, is written as its base item, with a hint that says so. When
+// the base changes, so do its uses.
+func TestCustomItemAsBase(t *testing.T) {
+	p := New(spec.MustDefault(), Config{Namespace: "demo"})
+	p.SetFile("items.mms", `CustomItem ember = { base = amethyst_shard, name = "Ember" }`)
+	p.SetFile("main.mms", "Recipe torch = Shaped([\"A\", \"B\"], { A = ember, B = stick }, torch)\nItemTag hot = [ember, blaze_rod]\n")
+	emitted := func() map[string]string {
+		r, err := p.Analyze(context.Background())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if d := diagText(r); d != "" {
+			t.Fatalf("unexpected diagnostics:\n%s", d)
+		}
+		var hints []string
+		for _, d := range r.Diagnostics("main.mms") {
+			if d.Code == "lint/custom-item-base" {
+				hints = append(hints, d.Message)
+				if len(d.Fixes) == 0 || d.Fixes[0].Safe {
+					t.Errorf("fixes: %+v", d.Fixes)
+				}
+			}
+		}
+		if len(hints) != 2 {
+			t.Errorf("want 2 custom-item-base hints, got %q", hints)
+		}
+		got := map[string]string{}
+		for _, f := range r.Emit() {
+			got[f.Path] = string(f.Data)
+		}
+		return got
+	}
+	got := emitted()
+	if s := got["data/demo/recipe/torch.json"]; !strings.Contains(s, `"A": "minecraft:amethyst_shard"`) {
+		t.Errorf("torch.json:\n%s", s)
+	}
+	if s := got["data/demo/tags/item/hot.json"]; !strings.Contains(s, `"minecraft:amethyst_shard"`) {
+		t.Errorf("hot.json:\n%s", s)
+	}
+	p.SetFile("items.mms", `CustomItem ember = { base = blaze_powder, name = "Ember" }`)
+	got = emitted()
+	if s := got["data/demo/recipe/torch.json"]; !strings.Contains(s, `"A": "minecraft:blaze_powder"`) {
+		t.Errorf("torch.json was not rechecked:\n%s", s)
 	}
 }
 

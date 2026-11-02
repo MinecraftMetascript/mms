@@ -219,6 +219,9 @@ func (c *Checker) CustomItem(d *syntax.Decl, id string) *CustomItemOut {
 		return string(s)
 	}
 	out := &CustomItemOut{ModelPath: "item/" + path}
+	if b := fields["base"]; b != nil && c.info(b).Base != "" {
+		errAt("base", "'%s' is a CustomItem; base must be a vanilla item, such as its base %s", c.idText(b), c.info(b).Base)
+	}
 
 	texture, model, parent, itemModel := o.Get("texture"), str("model"), str("parent"), o.Get("item_model")
 	switch {
@@ -413,18 +416,7 @@ func (c *Checker) withCustomField(e syntax.Expr, key string) (syntax.Expr, *Symb
 			return nil, nil
 		}
 		s = c.customItemRef(ref)
-		id, _ := customItemFields(s.Decl)["base"].(syntax.Expr)
-		text := "minecraft:air"
-		switch b := id.(type) {
-		case *syntax.Ident:
-			text = b.Name
-		case *syntax.ResLoc:
-			text = b.Text
-		}
-		if !strings.Contains(text, ":") {
-			text = "minecraft:" + text
-		}
-		return &syntax.ResLoc{Text: text, Sp: ref.Span()}, s
+		return &syntax.ResLoc{Text: customItemBase(s), Sp: ref.Span()}, s
 	}
 	switch x := e.(type) {
 	case *syntax.Object:
@@ -464,6 +456,23 @@ func (c *Checker) withCustomField(e syntax.Expr, key string) (syntax.Expr, *Symb
 		}
 	}
 	return nil, nil
+}
+
+// customItemBase is the namespaced id of a custom item's base item.
+// Bases are vanilla items, so an unqualified one is in minecraft.
+func customItemBase(s *Symbol) string {
+	id, _ := customItemFields(s.Decl)["base"].(syntax.Expr)
+	text := "minecraft:air"
+	switch b := id.(type) {
+	case *syntax.Ident:
+		text = b.Name
+	case *syntax.ResLoc:
+		text = b.Text
+	}
+	if !strings.Contains(text, ":") {
+		text = "minecraft:" + text
+	}
+	return text
 }
 
 // idText is the namespaced id an Ident or ResLoc names in this
