@@ -385,6 +385,32 @@ Function down(n: int): int {
 	}
 }
 
+// TestSelectorHolders checks that a selector score holder keeps working
+// after the formatter puts spaces between its arguments.
+func TestSelectorHolders(t *testing.T) {
+	p := New(spec.MustDefault(), Config{Namespace: "demo"})
+	p.SetFile("main.mms", `
+Objective hits
+Function f {
+  hits[@e[type=zombie, tag=x, limit=1]] = 2
+  hits[@e[name="Big Bob", limit=1]] += 1
+}
+`)
+	r, _ := p.Analyze(context.Background())
+	for _, d := range r.Diagnostics("main.mms") {
+		t.Errorf("%s: %s", d.Code, d.Message)
+	}
+	got := dumpFiles(r.Emit())
+	for _, want := range []string{
+		"scoreboard players set @e[type=zombie,tag=x,limit=1] hits 2\n",
+		`scoreboard players add @e[name="Big Bob",limit=1] hits 1` + "\n",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("missing %q in:\n%s", want, got)
+		}
+	}
+}
+
 // TestExampleFunctions runs the function examples' demo functions.
 func TestExampleFunctions(t *testing.T) {
 	r, err := loadDir(t, "../../examples/functions-advanced").Analyze(context.Background())
