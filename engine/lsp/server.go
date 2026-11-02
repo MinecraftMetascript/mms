@@ -255,7 +255,7 @@ type initializeParams struct {
 // watchedGlobs are the files whose changes on disk the server needs to
 // hear about: sources edited outside the editor (a git checkout, say),
 // and the assets that Texture, Sound and Structure read.
-var watchedGlobs = []string{"**/*.mms", "**/" + project.ConfigFile, "**/*.{png,ogg,nbt}"}
+var watchedGlobs = []string{"**/*.mms", "**/*" + sema.BookFileExt, "**/" + project.ConfigFile, "**/*.{png,ogg,nbt}"}
 
 // registerWatchers asks the client to send workspace/didChangeWatchedFiles
 // for watchedGlobs. Clients only watch files a server registers for, so
@@ -303,7 +303,7 @@ func (s *Server) initialize(ctx context.Context, p initializeParams) (any, *resp
 			"textDocumentSync": map[string]any{"openClose": true, "change": 2, "save": map[string]any{"includeText": false}},
 			"completionProvider": map[string]any{
 				// '"' and '/' start and continue asset file paths.
-				"triggerCharacters": []string{".", "(", ",", "=", "[", "#", ":", "\"", "/"},
+				"triggerCharacters": []string{".", "(", ",", "=", "[", "#", ":", "\"", "/", "{", "$"},
 			},
 			"hoverProvider":              true,
 			"signatureHelpProvider":      map[string]any{"triggerCharacters": []string{"(", ","}, "retriggerCharacters": []string{","}},
@@ -433,7 +433,7 @@ func (s *Server) didChangeWatched(ctx context.Context, p struct {
 			s.removeFile(c.URI)
 			continue
 		}
-		if path != "" && strings.HasSuffix(path, ".mms") {
+		if path != "" && (strings.HasSuffix(path, ".mms") || sema.IsBookFile(path)) {
 			if w := s.projectFor(c.URI); w.contains(path) {
 				if b, err := os.ReadFile(path); err == nil {
 					w.proj.SetFile(c.URI, string(b))
@@ -785,7 +785,7 @@ func (s *Server) formatting(_ context.Context, p struct {
 		return nil, nil
 	}
 	text, ok := w.proj.Text(p.TextDocument.URI)
-	if !ok {
+	if !ok || sema.IsBookFile(p.TextDocument.URI) {
 		return nil, nil
 	}
 	out, err := format.Source(text)

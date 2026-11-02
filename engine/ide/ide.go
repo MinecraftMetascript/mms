@@ -97,6 +97,10 @@ type Item struct {
 // Completion lists completions at off, and the span the chosen item
 // replaces (the word being typed).
 func (s *Session) Completion(path string, off int) ([]Item, syntax.Span) {
+	// Book markup, in a .mmsbook file or a Book's text strings.
+	if items, replace, ok := s.bookCompletion(path, off); ok {
+		return items, replace
+	}
 	a := s.at(path, off)
 	if a == nil {
 		return nil, syntax.Span{Start: off, End: off}
@@ -214,6 +218,10 @@ func (a *at) command(t syntax.Token, off int) (syntax.Span, bool) {
 // '"' and '/' complete asset file paths, and '/' also starts a command.
 // Elsewhere, such as after the '/' of a division, they open nothing.
 func (s *Session) TriggerApplies(path string, off int, ch string) bool {
+	// '{' and '$' only complete book markup.
+	if sema.IsBookFile(path) || ch == "{" || ch == "$" {
+		return s.bookTrigger(path, off)
+	}
 	if ch != `"` && ch != "/" {
 		return true
 	}
@@ -682,6 +690,9 @@ func commaBetween(f *syntax.File, from, to int) bool {
 
 // Hover returns Markdown for the node at off and the span it describes.
 func (s *Session) Hover(path string, off int) (string, syntax.Span) {
+	if md, sp, ok := s.bookHover(path, off); ok {
+		return md, sp
+	}
 	a := s.at(path, off)
 	if a == nil || len(a.path) < 2 {
 		return "", syntax.Span{}
@@ -1039,7 +1050,13 @@ func (s *Session) commandCompletion(a *at, sp syntax.Span, off int) ([]Item, syn
 	if items, replace, ok := s.interpolationCompletion(a, base, off); ok {
 		return items, replace
 	}
-	text := string(a.u.File.Src[base:sp.End])
+	items, ws := s.commandItems(string(a.u.File.Src[base:sp.End]), off-base)
+	return items, syntax.Span{Start: base + ws, End: off}
+}
+
+// commandItems completes command text at rune offset off, and returns
+// where the word being completed starts.
+func (s *Session) commandItems(text string, off int) ([]Item, int) {
 	docs := map[string]*sema.Symbol{} // suggested label -> declaration
 	ids := func(reg string) []string {
 		folder := reg
@@ -1059,7 +1076,7 @@ func (s *Session) commandCompletion(a *at, sp syntax.Span, off int) ([]Item, syn
 		}
 		return out
 	}
-	sugg, ws := command.New(s.P.Pack).Complete(text, off-base, ids)
+	sugg, ws := command.New(s.P.Pack).Complete(text, off, ids)
 	items := make([]Item, 0, len(sugg))
 	for i, sg := range sugg {
 		k := sema.CandKeyword
@@ -1072,7 +1089,7 @@ func (s *Session) commandCompletion(a *at, sp syntax.Span, off int) ([]Item, syn
 		}
 		items = append(items, it)
 	}
-	return items, syntax.Span{Start: base + ws, End: off}
+	return items, ws
 }
 
 // InlayHint is a label shown after a span, such as the base item a custom

@@ -84,6 +84,13 @@ type Checker struct {
 	Files fs.FS
 	// Src is the checked file's text; quick fixes need it for layout.
 	Src []rune
+	// Texts returns the text of a project file the host has as a
+	// source, such as a .mmsbook file, by its path in the project, and
+	// the unit path it has; nil when there are none.
+	Texts func(path string) (unit, text string, ok bool)
+	// Extern holds problems found in other files, such as a .mmsbook
+	// file a Book reads, by path.
+	Extern map[string][]syntax.Diagnostic
 
 	// textureName is the id name Texture("...") gets when the call
 	// gives none; a CustomItem sets it to item/<name>.
@@ -860,7 +867,7 @@ func (c *Checker) resolveID(text string, id idInfo, e syntax.Expr) string {
 	in.ID = full
 	in.Symbol = sym
 	in.Bare, in.Folder = BareID, reg
-	if sym != nil && sym.Kind.MMS == customItemKind {
+	if sym != nil && isItemKind(sym.Kind.MMS) {
 		// A plain item id has no components, so the custom item stands
 		// for its base item. The custom-item-base lint rule says so.
 		c.findSig(reg, sym.ID())

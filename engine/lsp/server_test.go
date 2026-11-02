@@ -400,7 +400,7 @@ func TestRegistersWatchers(t *testing.T) {
 			}
 		}
 	}
-	if strings.Join(globs, " ") != "**/*.mms **/mms.json **/*.{png,ogg,nbt}" {
+	if strings.Join(globs, " ") != "**/*.mms **/*.mmsbook **/mms.json **/*.{png,ogg,nbt}" {
 		t.Fatalf("watchers = %q", globs)
 	}
 
@@ -592,6 +592,42 @@ func TestKindCompletionRange(t *testing.T) {
 		return
 	}
 	t.Errorf("Feature not offered: %v", res["items"])
+}
+
+// A .mmsbook file on disk is part of its project: a Book reads it, and
+// its problems, completion and edits in the editor work in the file.
+func TestBookFiles(t *testing.T) {
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, "books"), 0o755)
+	os.WriteFile(filepath.Join(dir, "mms.json"), []byte(`{"namespace": "demo"}`), 0o644)
+	const main = "Book guide = { title = \"G\", author = \"A\", text = BookText(\"books/guide.mmsbook\") }\n"
+	os.WriteFile(filepath.Join(dir, "main.mms"), []byte(main), 0o644)
+	os.WriteFile(filepath.Join(dir, "books", "guide.mmsbook"), []byte("# Hello\n"), 0o644)
+	m, b := pathURI(filepath.Join(dir, "main.mms")), pathURI(filepath.Join(dir, "books", "guide.mmsbook"))
+
+	c := start(t)
+	c.result("initialize", map[string]any{"rootUri": pathURI(dir)})
+	c.notify("textDocument/didOpen", map[string]any{"textDocument": map[string]any{"uri": m, "languageId": "mms", "version": 1, "text": main}})
+	// Unsaved text in the editor is what the Book reads.
+	c.notify("textDocument/didOpen", map[string]any{"textDocument": map[string]any{"uri": b, "languageId": "mmsbook", "version": 1, "text": "# Hello\n{nope}x{/}\n"}})
+	c.result("mms/ping", nil)
+	var got []any
+	for _, n := range c.notes {
+		if p, ok := n["params"].(map[string]any); ok && n["method"] == "textDocument/publishDiagnostics" && p["uri"] == b {
+			got = p["diagnostics"].([]any)
+		}
+	}
+	if len(got) != 1 || !strings.Contains(got[0].(map[string]any)["message"].(string), "'nope' is not a style") {
+		t.Fatalf("book file diagnostics = %v", got)
+	}
+	comp := c.result("textDocument/completion", map[string]any{"textDocument": map[string]any{"uri": b}, "position": map[string]any{"line": 1, "character": 1},
+		"context": map[string]any{"triggerKind": 2, "triggerCharacter": "{"}}).(map[string]any)
+	if items := comp["items"].([]any); len(items) == 0 {
+		t.Error("no completions after { in the book file")
+	}
+	if f := c.result("textDocument/formatting", map[string]any{"textDocument": map[string]any{"uri": b}, "options": map[string]any{}}); f != nil {
+		t.Errorf("formatting a book file = %v", f)
+	}
 }
 
 // A CustomItem with only components writes no file; the output still

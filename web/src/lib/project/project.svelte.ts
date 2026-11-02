@@ -204,7 +204,8 @@ export class Project {
 	add(path: string, text = ''): string {
 		path = normalizePath(path);
 		let unique = path;
-		for (let i = 2; this.files.some((f) => f.path === unique); i++) unique = path.replace(/(\.mms)?$/, `_${i}.mms`);
+		const ext = path.endsWith('.mmsbook') ? '.mmsbook' : '.mms';
+		for (let i = 2; this.files.some((f) => f.path === unique); i++) unique = path.slice(0, -ext.length) + `_${i}${ext}`;
 		this.files.push({ path: unique, text });
 		this.files.sort((a, b) => a.path.localeCompare(b.path));
 		this.active = unique;
@@ -277,6 +278,11 @@ export function normalizePath(p: string): string {
 		.replace(/^\/+/, '')
 		.replace(/\/{2,}/g, '/');
 	if (!p) p = 'untitled';
-	if (!p.endsWith('.mms')) p += '.mms';
+	if (!isSourcePath(p)) p += '.mms';
 	return p;
+}
+
+/** Whether a path is a project source: MMS code, or book text (.mmsbook). */
+export function isSourcePath(p: string): boolean {
+	return p.endsWith('.mms') || p.endsWith('.mmsbook');
 }

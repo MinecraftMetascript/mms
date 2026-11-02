@@ -18,6 +18,7 @@
   "activationEvents": [
     "workspaceContains:**/mms.json",
     "onLanguage:mms",
+    "onLanguage:mmsbook",
     "onWebviewPanel:mms.preview"
   ],
   "contributes": {
@@ -31,6 +32,12 @@
           "light": "./icons/mms-file.svg",
           "dark": "./icons/mms-file.svg"
         }
+      },
+      {
+        "id": "mmsbook",
+        "aliases": ["MMS Book"],
+        "extensions": [".mmsbook"],
+        "configuration": "./language-configuration-book.json"
       }
     ],
     "jsonValidation": [
@@ -44,6 +51,11 @@
         "language": "mms",
         "scopeName": "source.mms",
         "path": "./syntaxes/mms.tmLanguage.json"
+      },
+      {
+        "language": "mmsbook",
+        "scopeName": "text.mmsbook",
+        "path": "./syntaxes/mmsbook.tmLanguage.json"
       }
     ],
     "configuration": {
