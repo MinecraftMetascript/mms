@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
 
 const status = (page: Page) => page.getByRole('status');
@@ -919,4 +920,37 @@ test('Deepslate is credited in About, on previews, and in the shipped licenses',
 	expect(text).toContain('deepslate 0.27');
 	expect(text).toContain('Copyright (c) 2021 Misode');
 	expect(text).toContain('Copyright (c) 2022 SpyglassMC');
+});
+
+test('a jigsaw structure previews which pieces join which, and marks dead ends', async ({ page }) => {
+	const errors: string[] = [];
+	page.on('pageerror', (e) => errors.push(e.message));
+	page.on('dialog', (d) => d.accept());
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	await page.getByRole('button', { name: /Examples/ }).click();
+	await page.getByRole('button', { name: /jigsaw/ }).click();
+	await expect(status(page)).toHaveText(/No problems/);
+	await page.locator('.cm-line', { hasText: 'Structure dungeon = Jigsaw(' }).click();
+	const graph = page.getByLabel('Jigsaw connections');
+	await expect(graph).toContainText('Jigsaw structure');
+	await expect(graph).toContainText('size 6');
+	await expect(graph.getByLabel('Problems')).toHaveText('No problems found');
+	for (const pool of ['start', 'halls', 'rooms', 'caps']) await expect(graph.getByLabel(`Pool dungeon:${pool}`)).toBeVisible();
+	await expect(graph.getByLabel('Pool dungeon:halls')).toContainText('75%');
+
+	// A piece lists its jigsaw blocks and what joins each.
+	await graph.getByRole('button', { name: /^start/ }).click();
+	const details = page.getByLabel('Piece details');
+	await expect(details.getByRole('row')).toHaveCount(5);
+	await expect(details.getByRole('row').nth(1)).toContainText('halls/hall, halls/short_hall');
+
+	// Renaming a pool leaves the halls' exits pointing at nothing. The
+	// preview is pinned, since the edit moves the cursor away.
+	await page.getByRole('button', { name: /^Pin/ }).click();
+	const src = readFileSync(new URL('../../examples/jigsaw/dungeon.mms', import.meta.url), 'utf8');
+	await replaceText(page, src.replace('TemplatePool rooms = {', 'TemplatePool rooms2 = {'));
+	await expect(graph.getByLabel('Problems')).toContainText('2 dead ends');
+	await expect(graph.getByLabel('Pool dungeon:rooms')).toContainText('No TemplatePool declares this');
+	expect(errors).toEqual([]);
 });

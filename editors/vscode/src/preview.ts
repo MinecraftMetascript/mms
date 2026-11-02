@@ -31,7 +31,7 @@ export class Previews implements vscode.Disposable, vscode.CodeLensProvider {
 			vscode.languages.registerCodeLensProvider([{ language: 'mms' }, { language: 'mmsbook' }], this),
 			output.onDidChange(() => {
 				this.lenses.fire();
-				this.post({ type: 'output', files: this.files, items: this.items });
+				this.post({ type: 'output', files: this.files, items: this.items, assets: this.output.assets });
 				if (this.panel) this.panel.title = title(this.target, this.items);
 			}),
 			vscode.window.registerWebviewPanelSerializer(viewType, {
@@ -79,6 +79,8 @@ export class Previews implements vscode.Disposable, vscode.CodeLensProvider {
 			if (!f.uri || !f.range || f.implicit || key(vscode.Uri.parse(f.uri)) !== here) continue;
 			const what = shows(f.path);
 			if (!what || lines.has(f.range.start.line)) continue;
+			// Only a jigsaw structure has pieces to connect.
+			if (what.kind === 'structure' && !/"type"\s*:\s*"(minecraft:)?jigsaw"/.test(f.text)) continue;
 			lines.add(f.range.start.line);
 			const at = new vscode.Range(f.range.start.line, 0, f.range.start.line, 0);
 			lenses.push(
@@ -160,7 +162,7 @@ export class Previews implements vscode.Disposable, vscode.CodeLensProvider {
 
 	private async receive(m: ToExtension) {
 		if (m.type === 'ready') {
-			this.post({ type: 'output', files: this.files, items: this.items });
+			this.post({ type: 'output', files: this.files, items: this.items, assets: this.output.assets });
 			this.setTarget(this.target, this.page);
 			await this.output.refresh();
 		} else if (m.type === 'clear') {

@@ -4,6 +4,7 @@ import { Supervisor, type EngineStatus } from './supervisor';
 import { ProjectWorkspace } from './workspace';
 import { showDiagnostics } from '../editor/diagnostics';
 import type { InlayHint } from '../editor/inlay';
+import type { OutputJigsaw } from '@mms/preview';
 
 export interface Diagnostic {
 	range: { start: { line: number; character: number }; end: { line: number; character: number } };
@@ -79,6 +80,8 @@ export interface OutputAsset {
 	path: string;
 	src: string;
 	pack?: string;
+	/** For a structure file: its jigsaw blocks. */
+	jigsaws?: OutputJigsaw[];
 }
 
 export interface DocSymbol {

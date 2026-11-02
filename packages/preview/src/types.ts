@@ -28,3 +28,23 @@ export interface OutputItem {
 	/** For a Book: where each page of its text starts. */
 	pages?: { uri: string; range: SourceRange }[];
 }
+
+/** A jigsaw block of a structure file: where it is, and what it joins. */
+export interface OutputJigsaw {
+	pos: [number, number, number];
+	pool: string;
+	name: string;
+	target: string;
+}
+
+/** A project file the pack copies, such as a texture or a structure. */
+export interface OutputAsset {
+	/** Its path in the pack. */
+	path: string;
+	/** Its path in the project. */
+	src: string;
+	/** "resources" for a resource pack file. */
+	pack?: string;
+	/** For a structure file: its jigsaw blocks. */
+	jigsaws?: OutputJigsaw[];
+}

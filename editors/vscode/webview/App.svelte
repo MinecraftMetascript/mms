@@ -5,13 +5,14 @@
 	// on that declaration while you edit elsewhere.
 	import { itemPath, PreviewPane, type OutputFile, type OutputItem } from '@mms/preview';
 	import PreviewWorker from '@mms/preview/worker?worker&inline';
-	import type { ToPanel, ToExtension } from '../src/messages';
+	import type { OutputAsset, ToPanel, ToExtension } from '../src/messages';
 
 	// The state is what VS Code hands back when it restores the panel.
 	const vscode = acquireVsCodeApi<{ path: string | null; page?: number }>();
 
 	let output = $state<OutputFile[]>([]);
 	let items = $state<OutputItem[]>([]);
+	let assets = $state<OutputAsset[]>([]);
 	let path = $state<string | null>(vscode.getState()?.path ?? null);
 	// The book page to open, from 0.
 	let page = $state(vscode.getState()?.page ?? 0);
@@ -24,6 +25,7 @@
 		if (m.type === 'output') {
 			output = m.files;
 			items = m.items;
+			assets = m.assets;
 			ready = true;
 		} else if (m.type === 'target') {
 			path = m.path;
@@ -57,13 +59,14 @@
 			<PreviewPane
 				{output}
 				{items}
+				{assets}
 				{page}
 				{path}
 				pinned={path}
 				unpinLabel="clear it"
 				onunpin={() => vscode.postMessage({ type: 'clear' } satisfies ToExtension)}
 				createWorker={() => new PreviewWorker()}
-				hint="Click Preview above a noise, density function, noise settings, surface rule, dimension, loot table, recipe, biome or book to show it here."
+				hint="Click Preview above a noise, density function, noise settings, surface rule, dimension, loot table, recipe, biome, template pool, jigsaw structure or book to show it here."
 			/>
 		{:else}
 			<p class="p-3 text-xs text-muted">Waiting for the MMS language server…</p>

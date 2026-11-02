@@ -430,6 +430,7 @@
 						<PreviewPane
 							output={engine.output}
 							items={engine.outputItems}
+							assets={engine.outputAssets}
 							page={bookPage}
 							path={previewPath}
 							{pinned}
