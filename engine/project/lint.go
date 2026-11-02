@@ -24,6 +24,8 @@ type Rule struct {
 
 // Rules lists every lint rule, sorted by id.
 var Rules = []*Rule{
+	{ID: "book-overflow", Severity: syntax.SeverityWarning, run: lintBookOverflow,
+		Doc: "A Book page with more text than the book screen shows: 14 lines of about 19 characters. The game cuts the rest off. Widths are measured with the vanilla font, so text outside ASCII is a close guess."},
 	{ID: "constant-expression", Severity: syntax.SeverityHint, run: lintConstant,
 		Doc: "An arithmetic expression of number literals can be written as its value."},
 	{ID: "custom-item-base", Severity: syntax.SeverityHint, run: lintCustomBase,
@@ -95,6 +97,7 @@ type lintRun struct {
 	rule *Rule
 	sev  syntax.Severity
 	cur  *[]syntax.Diagnostic // where per-declaration findings go
+	ext  map[string][]syntax.Diagnostic // and those in other files
 }
 
 func (l *lintRun) report(d *Decl, sp syntax.Span, msg string, fixes ...syntax.Fix) {
@@ -125,8 +128,8 @@ func (r *Result) lint() map[string][]syntax.Diagnostic {
 			continue
 		}
 		if d.lintKey != key {
-			d.lints = nil
-			l.cur = &d.lints
+			d.lints, d.extLints = nil, map[string][]syntax.Diagnostic{}
+			l.cur, l.ext = &d.lints, d.extLints
 			for _, rule := range Rules {
 				if rule.run == nil {
 					continue
@@ -138,6 +141,11 @@ func (r *Result) lint() map[string][]syntax.Diagnostic {
 			d.lintKey = key
 		}
 		l.out[d.Unit.Path] = append(l.out[d.Unit.Path], d.lints...)
+		for path, ds := range d.extLints {
+			if r.Unit(path) != nil {
+				l.out[path] = append(l.out[path], ds...)
+			}
+		}
 	}
 	for _, rule := range Rules {
 		if rule.all == nil {
@@ -579,5 +587,19 @@ func lintDeprecated(l *lintRun) {
 				Code: "lint/deprecated", Severity: l.sev, Sp: u.sp, Deprecated: true, Message: msg,
 			})
 		}
+	}
+}
+
+func lintBookOverflow(l *lintRun, d *Decl) {
+	if d.Item == nil {
+		return
+	}
+	for _, ov := range d.Item.Overflows {
+		msg := fmt.Sprintf("%spage %d runs to %d lines, but a book page shows 14, so the game cuts the rest off from here; start a new page with a --- line", ov.Where, ov.Page, ov.Lines)
+		if ov.File != "" {
+			l.ext[ov.File] = append(l.ext[ov.File], syntax.Diagnostic{Code: "lint/" + l.rule.ID, Severity: l.sev, Message: msg, Sp: ov.Sp})
+			continue
+		}
+		l.report(d, ov.Sp, msg)
 	}
 }

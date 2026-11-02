@@ -67,7 +67,7 @@ func SigOf(d *syntax.Decl) FuncSig {
 // SymSig is the signature part of a symbol that other declarations
 // depend on; it is "" for most kinds.
 func SymSig(s *Symbol) string {
-	if s.Kind.MMS == "Function" || s.Kind.MMS == "Global" || s.Kind.MMS == customItemKind {
+	if s.Kind.MMS == "Function" || s.Kind.MMS == "Global" || isItemKind(s.Kind.MMS) {
 		return symSig(s)
 	}
 	return ""
@@ -79,7 +79,7 @@ func symSig(s *Symbol) string {
 	if s == nil || s.Decl == nil {
 		return ""
 	}
-	if s.Kind.MMS == customItemKind {
+	if isItemKind(s.Kind.MMS) {
 		return customItemSig(s)
 	}
 	if s.Kind.MMS == "Global" {

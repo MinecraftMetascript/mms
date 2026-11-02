@@ -30,6 +30,11 @@
       "markdownDescription": "Lint rule severities by rule id. Each rule can be `error`, `warning`, `info`, `hint` or `off`.",
       "type": "object",
       "properties": {
+        "book-overflow": {
+          "description": "A Book page with more text than the book screen shows: 14 lines of about 19 characters. The game cuts the rest off. Widths are measured with the vanilla font, so text outside ASCII is a close guess.\n\nDefault: `warning`.",
+          "markdownDescription": "A Book page with more text than the book screen shows: 14 lines of about 19 characters. The game cuts the rest off. Widths are measured with the vanilla font, so text outside ASCII is a close guess.\n\nDefault: `warning`.",
+          "$ref": "#/definitions/severity"
+        },
         "constant-expression": {
           "description": "An arithmetic expression of number literals can be written as its value.\n\nDefault: `hint`.",
           "markdownDescription": "An arithmetic expression of number literals can be written as its value.\n\nDefault: `hint`.",

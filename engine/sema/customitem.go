@@ -51,6 +51,8 @@ type CustomItemOut struct {
 	Stack *jsonv.Object
 	// Hooks maps each on_* field to the function it names.
 	Hooks map[string]string
+	// Overflows are a Book's pages that run past the bottom of the page.
+	Overflows []BookOverflow
 }
 
 // Languages lists the item's languages, sorted.
@@ -362,7 +364,7 @@ func (c *Checker) customItemRef(e syntax.Expr) *Symbol {
 	if ns == "" {
 		ns = c.NS
 	}
-	if s := c.Syms.Find("item", ns+":"+path); s == nil || s.Kind.MMS != customItemKind {
+	if s := c.Syms.Find("item", ns+":"+path); s == nil || !isItemKind(s.Kind.MMS) {
 		return nil
 	}
 	s := c.findSig("item", ns+":"+path)
@@ -389,7 +391,12 @@ func (c *Checker) customStack(s *Symbol, at syntax.Span) *jsonv.Object {
 	if s.Unit != nil && s.Unit.File != nil {
 		sub.Src = s.Unit.File.Src
 	}
-	out := sub.CustomItem(s.Decl, s.ID())
+	var out *CustomItemOut
+	if s.Kind.MMS == bookKind {
+		out = sub.Book(s.Decl, s.ID())
+	} else {
+		out = sub.CustomItem(s.Decl, s.ID())
+	}
 	if out == nil {
 		return nil
 	}
@@ -412,7 +419,7 @@ func customStackComponents(st *jsonv.Object) *jsonv.Object {
 func (c *Checker) withCustomField(e syntax.Expr, key string) (syntax.Expr, *Symbol) {
 	base := func(ref syntax.Expr) (syntax.Expr, *Symbol) {
 		s := c.Syms.Find("item", c.idText(ref))
-		if s == nil || s.Kind.MMS != customItemKind {
+		if s == nil || !isItemKind(s.Kind.MMS) {
 			return nil, nil
 		}
 		s = c.customItemRef(ref)
@@ -461,6 +468,9 @@ func (c *Checker) withCustomField(e syntax.Expr, key string) (syntax.Expr, *Symb
 // customItemBase is the namespaced id of a custom item's base item.
 // Bases are vanilla items, so an unqualified one is in minecraft.
 func customItemBase(s *Symbol) string {
+	if s.Kind.MMS == bookKind {
+		return "minecraft:written_book"
+	}
 	id, _ := customItemFields(s.Decl)["base"].(syntax.Expr)
 	text := "minecraft:air"
 	switch b := id.(type) {
@@ -498,7 +508,7 @@ func (c *Checker) isCustomItem(e syntax.Expr) bool {
 		return false
 	}
 	s := c.find("item", c.idText(e))
-	return s != nil && s.Kind.MMS == customItemKind
+	return s != nil && isItemKind(s.Kind.MMS)
 }
 
 // customStackRule lowers a custom item in an item stack: `ember_shard`,

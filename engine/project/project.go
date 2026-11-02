@@ -53,6 +53,13 @@ func (p *Project) SetFile(path, text string) {
 	if old, ok := p.texts[path]; ok && old == text {
 		return
 	}
+	if sema.IsBookFile(path) {
+		// Book text is not MMS: a Book declaration reads it with
+		// BookText, and its problems are reported in the file.
+		p.texts[path] = text
+		p.files[path] = &sema.Unit{Path: path, File: &syntax.File{Src: []rune(text)}}
+		return
+	}
 	f, chunks, moved := syntax.Reparse(text, p.chunks[path])
 	for d, m := range moved {
 		// A declaration moved twice since the last analysis: chain the
@@ -89,6 +96,14 @@ func (p *Project) RemoveFile(path string) {
 	delete(p.texts, path)
 	delete(p.files, path)
 	delete(p.chunks, path)
+}
+
+// bookText returns a .mmsbook file's current text.
+func (p *Project) bookText(path string) (string, bool) {
+	if !sema.IsBookFile(path) {
+		return "", false
+	}
+	return p.Text(path)
 }
 
 // Text returns a file's current text.
@@ -155,10 +170,14 @@ type Decl struct {
 	Hoisted []sema.Hoisted
 	Info    map[syntax.Node]*sema.Info
 	Diags   []syntax.Diagnostic
+	// Extern are problems in other files, such as a Book's .mmsbook
+	// file, by path.
+	Extern map[string][]syntax.Diagnostic
 	// Deps are the symbol lookups the check made (see sema.DepsHold).
 	Deps map[string]bool
 
 	lints    []syntax.Diagnostic // cached lint findings, valid for lintKey
+	extLints map[string][]syntax.Diagnostic // the same, in other files
 	lintKey  string
 	refs     []string
 	refsDone bool
@@ -201,6 +220,7 @@ func (r *Result) Diagnostics(path string) []syntax.Diagnostic {
 		if d.Unit == u {
 			out = append(out, d.Diags...)
 		}
+		out = append(out, d.Extern[path]...)
 	}
 	out = append(out, r.Lints()[path]...)
 	sort.SliceStable(out, func(i, j int) bool { return out[i].Sp.Start < out[j].Sp.Start })
@@ -272,6 +292,10 @@ func (p *Project) Analyze(ctx context.Context) (*Result, error) {
 				}
 				// An asset file it read was added, removed or changed.
 				if dr != nil && !sema.AssetDepsHold(p.Files, dr.Deps) {
+					dr = nil
+				}
+				// A .mmsbook file it read was edited.
+				if dr != nil && !sema.TextDepsHold(p.bookText, dr.Deps) {
 					dr = nil
 				}
 			}
@@ -351,6 +375,7 @@ func (p *Project) checkDecl(u *sema.Unit, d *syntax.Decl, k sema.Kind, syms *sem
 	dr = &Decl{Unit: u, D: d, Kind: k, NS: ns}
 	c := sema.NewChecker(p.Pack, p.Kinds, syms, ns)
 	c.Files = p.Files
+	c.Texts = p.bookText
 	c.Src = u.File.Src
 	c.Owner = dr.ID()
 	if c.Owner == "" {
@@ -395,6 +420,8 @@ func (p *Project) checkDecl(u *sema.Unit, d *syntax.Decl, k sema.Kind, syms *sem
 		}
 	case k.MMS == "CustomItem":
 		dr.Item = c.CustomItem(d, dr.ID())
+	case k.MMS == "Book":
+		dr.Item = c.Book(d, dr.ID())
 	case k.MMS == "Objective":
 		dr.Lines = objective(c, d)
 	case k.MMS == "Global":
@@ -402,6 +429,7 @@ func (p *Project) checkDecl(u *sema.Unit, d *syntax.Decl, k sema.Kind, syms *sem
 	}
 	dr.Info = c.Info
 	dr.Diags = c.Diags
+	dr.Extern = c.Extern
 	dr.Deps = c.Deps
 	dr.Hoisted = c.Hoisted
 	// Re-validate lowered output: a value that passed the checker but not
