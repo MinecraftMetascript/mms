@@ -4,6 +4,7 @@
 package ide
 
 import (
+	"slices"
 	"sort"
 	"strings"
 
@@ -679,6 +680,50 @@ func argIndex(f *syntax.File, call *syntax.Call, off int) int {
 	return index
 }
 
+// activeParam is the parameter signature help highlights at off: the one
+// a named argument there sets, or else the next positional slot, which
+// skips parameters already given by name.
+func activeParam(f *syntax.File, call *syntax.Call, off int, params []string) int {
+	keys := make([]string, len(params))
+	for i, p := range params {
+		k, _, _ := strings.Cut(p, ":")
+		keys[i] = strings.TrimSuffix(strings.TrimSpace(k), "?")
+	}
+	named := map[string]bool{}
+	pos := 0
+	for _, arg := range call.Args {
+		before := arg.Sp.End < off && commaBetween(f, arg.Sp.End, off)
+		if arg.Name == nil {
+			if before {
+				pos++
+			}
+			continue
+		}
+		key := arg.Name.Text
+		if !slices.Contains(keys, key) {
+			key = sema.Snake(key)
+		}
+		if !before && arg.Sp.Start <= off {
+			if i := slices.Index(keys, key); i >= 0 {
+				return i
+			}
+		}
+		named[key] = true
+	}
+	last := 0
+	for i, k := range keys {
+		if named[k] {
+			continue
+		}
+		if pos == 0 {
+			return i
+		}
+		pos--
+		last = i
+	}
+	return last
+}
+
 func commaBetween(f *syntax.File, from, to int) bool {
 	for _, t := range f.Tokens {
 		if t.Sp.Start >= from && t.Sp.End <= to && t.Kind == parser.MMSLexerCOMMA {
@@ -788,13 +833,7 @@ func (s *Session) Signature(path string, off int) (SignatureHelp, bool) {
 		if h.Label == "" {
 			return SignatureHelp{}, false
 		}
-		active := 0
-		for _, arg := range call.Args {
-			if arg.Name == nil && arg.Sp.End < off && commaBetween(a.u.File, arg.Sp.End, off) {
-				active++
-			}
-		}
-		h.Active = min(active, max(len(h.Params)-1, 0))
+		h.Active = activeParam(a.u.File, call, off, h.Params)
 		return h, true
 	}
 	return SignatureHelp{}, false

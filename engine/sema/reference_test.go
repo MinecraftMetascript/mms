@@ -103,3 +103,35 @@ func TestReferenceTypes(t *testing.T) {
 		t.Errorf("Biome params = %v", got)
 	}
 }
+
+// Optional parameters come after required ones in every helper, so a
+// positional call can leave them out.
+func TestOptionalParamsLast(t *testing.T) {
+	p := spec.MustDefault()
+	ref := BuildReference(p, NewKinds(p))
+	n := 0
+	for _, g := range ref.Groups {
+		for _, h := range g.Helpers {
+			n++
+			seenOpt := ""
+			for _, prm := range h.Params {
+				if prm.Optional {
+					seenOpt = prm.Name
+				} else if seenOpt != "" {
+					t.Errorf("%s %s: required %s after optional %s: %s", g.Dispatcher, h.Name, prm.Name, seenOpt, h.Signature)
+				}
+			}
+		}
+	}
+	if n < 100 {
+		t.Fatalf("only %d helpers checked", n)
+	}
+	gradient := "Gradient(axis: Axis, from_coordinate: "
+	for _, g := range ref.Groups {
+		for _, h := range g.Helpers {
+			if g.Dispatcher == "minecraft:density_function" && h.Name == "Gradient" && !strings.HasPrefix(h.Signature, gradient) {
+				t.Errorf("Gradient signature = %q, want prefix %q", h.Signature, gradient)
+			}
+		}
+	}
+}
