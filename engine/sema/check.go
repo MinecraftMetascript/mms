@@ -82,6 +82,13 @@ type Checker struct {
 	// textureName is the id name Texture("...") gets when the call
 	// gives none; a CustomItem sets it to item/<name>.
 	textureName string
+	// Owner is the id of the declaration being checked; inline values
+	// hoisted out of it are named after it.
+	Owner string
+	// Hoisted are inline values written where an id is required, each
+	// to be written as its own resource (see hoist.go).
+	Hoisted []Hoisted
+	hoistN  map[string]int
 	// customOf is the custom item this checker expands, to catch an item
 	// that contains itself.
 	customOf string
@@ -361,6 +368,11 @@ func (c *Checker) union(e syntax.Expr, v tview) jsonv.Value {
 	if r, ok := c.inlineSound(e, v); ok {
 		return r
 	}
+	if id, ok := c.keyRequiredID(v); ok {
+		if r, ok := c.hoist(e, id); ok {
+			return r
+		}
+	}
 	var cands []tview
 	for _, m := range v.T.Members {
 		mv := c.norm(tview{T: m, Env: v.Env})
@@ -368,6 +380,7 @@ func (c *Checker) union(e syntax.Expr, v tview) jsonv.Value {
 			cands = append(cands, mv)
 		}
 	}
+	cands = c.preferInline(e, cands)
 	switch len(cands) {
 	case 0:
 		if name := callName(e); name != "" {
@@ -477,9 +490,9 @@ func (c *Checker) fits(e syntax.Expr, v tview) bool {
 			id := idOf(v.T)
 			return id.Present && id.Tags != ""
 		case *syntax.Call:
-			return c.assetFits(e, idOf(v.T))
+			return c.assetFits(e, idOf(v.T)) || c.hoistFits(e, idOf(v.T))
 		}
-		return false
+		return c.hoistFits(e, idOf(v.T))
 	case "boolean":
 		if n, ok := e.(*syntax.Number); ok {
 			return n.Text == "0" || n.Text == "1"
@@ -798,6 +811,9 @@ func (c *Checker) stringValue(e syntax.Expr, v tview) jsonv.Value {
 			c.errorf("mms/type-mismatch", e.Span(), "a tag is not allowed here; expected a single %s id", id.Registry)
 			return nil
 		}
+	}
+	if r, ok := c.hoist(e, id); ok {
+		return r
 	}
 	c.mismatch(e, v)
 	return nil

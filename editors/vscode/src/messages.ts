@@ -10,6 +10,8 @@ export interface OutputFile {
 	text: string;
 	uri?: string;
 	range?: Range;
+	/** Written for an inline value where an id is required; range is that value's. */
+	implicit?: boolean;
 }
 
 export type ToPanel =

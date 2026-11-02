@@ -196,6 +196,61 @@ test('dimensions, noise settings and surface rules preview as terrain', async ({
 	expect(errors).toEqual([]);
 });
 
+test('an inline noise where an id is needed previews', async ({ page }) => {
+	const errors: string[] = [];
+	page.on('pageerror', (e) => errors.push(e.message));
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	const failed = page.getByText(/Preview failed/);
+
+	// The game and Deepslate seed a noise by its id, so the inline one is
+	// written to its own file; the cursor still shows the density function.
+	await replaceText(page, 'DensityFunction d = Noise({ base_octave = -5, amplitude_modifiers = [1, 1] }, 1, 1) * 0.5\n');
+	await expect(status(page)).toHaveText(/No problems/);
+	await page.locator('.cm-line').first().click();
+	await expect(page.getByText('my_pack:d', { exact: true })).toBeVisible();
+	await expect(page.locator('canvas')).toBeVisible();
+	await expect(page.locator('text=/-?\\d\\.\\d{3} … -?\\d\\.\\d{3}/')).toBeVisible({ timeout: 20_000 });
+	await expect(failed).toBeHidden();
+	await page.getByRole('tab', { name: 'JSON' }).click();
+	await expect(page.locator('pre.json')).toContainText('"noise": "my_pack:mms_gen/d/noise"');
+
+	// Noise settings with an inline noise in the router build terrain.
+	await replaceText(
+		page,
+		[
+			'Noise simple = { base_octave = -4, amplitude_modifiers = [1] }',
+			'NoiseSettings custom {',
+			'  default_block = stone',
+			'  default_fluid = water',
+			'  disable_mob_generation = false',
+			'  material_rule = [If(NoiseThreshold(simple, 0.5, 1)) { Block(glowstone) }]',
+			'  sea_level = 0',
+			'  noise = { min_y = -64, height = 256 }',
+			'  legacy_random_source = false',
+			'  noise_router = {',
+			'    chunk_surface_level = 0, temperature = 0, vegetation = 0, continents = 0, erosion = 0, depth = 0, ridges = 0',
+			'    final_density = Max(',
+			'      left = Gradient(axis = y, from_coordinate = 0, to_coordinate = 256, from_value = 0, to_value = 1),',
+			'      right = Noise({ normalize = false, base_octave = 4, base_amplitude = 6 }, 1, 1),',
+			'    )',
+			'  }',
+			'  aquifers = { barrier = 0, fluid_level_floodedness = 0, fluid_level_spread = 0, lava = 0, exclusion = 0, surface_level = 0 }',
+			'  spawn_target = []',
+			'}',
+			''
+		].join('\n')
+	);
+	await expect(status(page)).toHaveText(/No problems/);
+	await page.locator('.cm-line', { hasText: 'NoiseSettings custom' }).click();
+	await page.getByRole('tab', { name: 'Preview' }).click();
+	await expect(page.getByText('my_pack:custom', { exact: true })).toBeVisible();
+	await expect(page.locator('canvas')).toBeVisible({ timeout: 30_000 });
+	await expect(page.getByText('Rendering…')).toBeHidden({ timeout: 30_000 });
+	await expect(failed).toBeHidden();
+	expect(errors).toEqual([]);
+});
+
 test('a pinned preview stays put while the cursor moves to another declaration', async ({ page }) => {
 	const errors: string[] = [];
 	page.on('pageerror', (e) => errors.push(e.message));

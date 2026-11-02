@@ -33,6 +33,8 @@ export interface OutputFile {
 	pack?: string;
 	uri?: string;
 	range?: Diagnostic['range'];
+	/** Written for an inline value where an id is required; range is that value's. */
+	implicit?: boolean;
 }
 
 /** A project file the pack copies, such as a texture: its output path and source. */

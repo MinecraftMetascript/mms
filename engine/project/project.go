@@ -149,9 +149,12 @@ type Decl struct {
 	Fn *fn.Output
 	// Item is a checked CustomItem: the files it writes and the stack
 	// its name stands for.
-	Item  *sema.CustomItemOut
-	Info  map[syntax.Node]*sema.Info
-	Diags []syntax.Diagnostic
+	Item *sema.CustomItemOut
+	// Hoisted are inline values written where an id is required, each
+	// written as its own resource.
+	Hoisted []sema.Hoisted
+	Info    map[syntax.Node]*sema.Info
+	Diags   []syntax.Diagnostic
 	// Deps are the symbol lookups the check made (see sema.DepsHold).
 	Deps map[string]bool
 
@@ -349,9 +352,13 @@ func (p *Project) checkDecl(u *sema.Unit, d *syntax.Decl, k sema.Kind, syms *sem
 	c := sema.NewChecker(p.Pack, p.Kinds, syms, ns)
 	c.Files = p.Files
 	c.Src = u.File.Src
+	c.Owner = dr.ID()
+	if c.Owner == "" {
+		c.Owner = ns + ":" + sema.Snake(k.Name)
+	}
 	defer func() {
 		if rec := recover(); rec != nil {
-			dr.Value, dr.Tag, dr.Lines, dr.Fn, dr.Item = nil, nil, nil, nil, nil
+			dr.Value, dr.Tag, dr.Lines, dr.Fn, dr.Item, dr.Hoisted = nil, nil, nil, nil, nil, nil
 			dr.Info = c.Info
 			dr.Diags = append(c.Diags, syntax.Diagnostic{
 				Code: "mms/internal", Severity: syntax.SeverityError, Sp: d.Kind.Sp,
@@ -396,6 +403,7 @@ func (p *Project) checkDecl(u *sema.Unit, d *syntax.Decl, k sema.Kind, syms *sem
 	dr.Info = c.Info
 	dr.Diags = c.Diags
 	dr.Deps = c.Deps
+	dr.Hoisted = c.Hoisted
 	// Re-validate lowered output: a value that passed the checker but not
 	// the schema means a lowering bug, reported as an internal error
 	// rather than written as bad JSON.
@@ -408,6 +416,17 @@ func (p *Project) checkDecl(u *sema.Unit, d *syntax.Decl, k sema.Kind, syms *sem
 			dr.Diags = append(dr.Diags, syntax.Diagnostic{
 				Code: "mms/internal", Severity: syntax.SeverityError, Sp: d.Kind.Sp,
 				Message: "internal error: the generated JSON does not match the schema (" + errs[0] + "). Please report this with the declaration's source.",
+			})
+		}
+	}
+	for _, h := range dr.Hoisted {
+		if hasErrors(dr.Diags) {
+			break
+		}
+		if errs := sema.Validate(p.Pack, p.Kinds, h.Kind.Resource, h.Value); len(errs) > 0 {
+			dr.Diags = append(dr.Diags, syntax.Diagnostic{
+				Code: "mms/internal", Severity: syntax.SeverityError, Sp: h.Sp,
+				Message: "internal error: the generated " + h.Kind.Resource + " JSON for this inline value does not match the schema (" + errs[0] + "). Please report this with the declaration's source.",
 			})
 		}
 	}

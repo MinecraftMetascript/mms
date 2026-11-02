@@ -28,6 +28,10 @@ type OutFile struct {
 	// Asset is the project file a copied asset comes from. Its Data is
 	// nil until ReadAssets.
 	Asset string
+	// Implicit marks a file written for an inline value where an id is
+	// required; Span is that value's. Editors follow the cursor to the
+	// declaration's own file, not to these.
+	Implicit bool
 }
 
 // Emit lays out the data pack: one file per resource, merged tags, raw
@@ -110,6 +114,10 @@ func (r *Result) Emit() []OutFile {
 		return l
 	}
 	for _, d := range r.Order {
+		for _, h := range d.Hoisted {
+			hns, hpath := splitID(h.ID)
+			out = append(out, OutFile{Path: h.Kind.Dir(hns) + "/" + hpath + ".json", Data: jsonv.Marshal(h.Value), Unit: d.Unit.Path, Span: h.Sp, Implicit: true})
+		}
 		id := d.ID()
 		ns, path := splitID(id)
 		switch {

@@ -911,6 +911,9 @@ func (s *Server) output(_ context.Context, p struct {
 		if f.Pack == sema.ResourcePack {
 			m["pack"] = "resources"
 		}
+		if f.Implicit {
+			m["implicit"] = true
+		}
 		if f.Unit != "" {
 			l := idx[f.Unit]
 			if l == nil {

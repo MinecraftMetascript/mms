@@ -71,7 +71,7 @@ export class Previews implements vscode.Disposable, vscode.CodeLensProvider {
 		const lenses: vscode.CodeLens[] = [];
 		const lines = new Set<number>();
 		for (const f of this.files) {
-			if (!f.uri || !f.range || key(vscode.Uri.parse(f.uri)) !== here) continue;
+			if (!f.uri || !f.range || f.implicit || key(vscode.Uri.parse(f.uri)) !== here) continue;
 			const what = shows(f.path);
 			if (!what || lines.has(f.range.start.line)) continue;
 			lines.add(f.range.start.line);
@@ -98,7 +98,7 @@ export class Previews implements vscode.Disposable, vscode.CodeLensProvider {
 	private at(uri: vscode.Uri, line: number): OutputFile | undefined {
 		const here = key(uri);
 		return this.files.find(
-			(f) => f.uri && f.range && f.range.start.line <= line && line <= f.range.end.line && shows(f.path) && key(vscode.Uri.parse(f.uri)) === here
+			(f) => f.uri && f.range && !f.implicit && f.range.start.line <= line && line <= f.range.end.line && shows(f.path) && key(vscode.Uri.parse(f.uri)) === here
 		);
 	}
 
