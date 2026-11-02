@@ -30,6 +30,11 @@
 				<button class="ml-auto shrink-0 rounded px-1.5 py-0.5 text-accent hover:bg-hover" onclick={() => onsource(file)}>Show source</button>
 			{/if}
 		</div>
+		{#if file.item}
+			<p class="border-b border-line px-3 py-1.5 text-xs text-muted">
+				A custom item is not a file of its own. Its name stands for this item stack in recipes, loot tables and <code>{'${' + file.item.id.slice(file.item.id.indexOf(':') + 1) + '}'}</code> in commands: <code class="break-all text-ink">{file.item.snbt}</code>
+			</p>
+		{/if}
 		<pre class="json min-h-0 flex-1 overflow-auto px-3 py-2 font-mono text-[12.5px] leading-5">{@html highlight(file.text)}</pre>
 	{:else}
 		<p class="p-4 text-sm text-muted">Select a generated file, or put the cursor in a declaration, to see its JSON.</p>

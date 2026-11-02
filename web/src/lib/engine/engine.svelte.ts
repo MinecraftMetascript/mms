@@ -36,7 +36,31 @@ export interface OutputFile {
 	range?: Diagnostic['range'];
 	/** Written for an inline value where an id is required; range is that value's. */
 	implicit?: boolean;
+	/** Set when this is a custom item's stack shown as JSON, not a pack file. */
+	item?: OutputItem;
 }
+
+/**
+ * A CustomItem: the item stack its name stands for. It is not a file of
+ * its own, so it is listed apart from the pack's files.
+ */
+export interface OutputItem {
+	id: string;
+	/** The stack as JSON: {id, components}. */
+	text: string;
+	/** The stack as a command writes it, such as stick[max_stack_size=1]. */
+	snbt: string;
+	uri: string;
+	range: Diagnostic['range'];
+}
+
+/**
+ * The key the editor selects an output by. A data pack file keeps its
+ * path; a resource pack file is under resources/, since both packs have a
+ * pack.mcmeta; a custom item is item:<id>.
+ */
+export const outputKey = (f: OutputFile) => (f.pack === 'resources' ? `resources/${f.path}` : f.path);
+export const itemKey = (it: OutputItem) => `item:${it.id}`;
 
 /** A project file the pack copies, such as a texture: its output path and source. */
 export interface OutputAsset {
@@ -82,6 +106,7 @@ export class Engine {
 	diagnostics = $state<Record<string, Diagnostic[]>>({});
 	output = $state<OutputFile[]>([]);
 	outputAssets = $state<OutputAsset[]>([]);
+	outputItems = $state<OutputItem[]>([]);
 	hasErrors = $state(false);
 	symbols = $state<Record<string, DocSymbol[]>>({});
 
@@ -171,9 +196,10 @@ export class Engine {
 		try {
 			await this.client.initializing;
 			this.client.sync();
-			const out = await this.client.request<object, { files: OutputFile[]; assets?: OutputAsset[]; hasErrors: boolean }>('mms/output', {});
+			const out = await this.client.request<object, { files: OutputFile[]; assets?: OutputAsset[]; items?: OutputItem[]; hasErrors: boolean }>('mms/output', {});
 			this.output = out.files;
 			this.outputAssets = out.assets ?? [];
+			this.outputItems = out.items ?? [];
 			this.hasErrors = out.hasErrors;
 			const syms: Record<string, DocSymbol[]> = {};
 			await Promise.all(
