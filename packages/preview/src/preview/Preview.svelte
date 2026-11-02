@@ -16,6 +16,8 @@
 		type PreviewResponse,
 		type PreviewView
 	} from './protocol';
+	import { VOID } from './colors';
+	import { colorize, cssGradient, formatValue, paletteOf, palettes, position, rangeFor, solidPalette, type PaletteId, type Range } from './colormaps';
 
 	interface Props {
 		output: OutputFile[];
@@ -82,6 +84,63 @@
 	let biome = $state('minecraft:plains');
 	let terrain = $state('minecraft:overworld');
 	const flat = $derived(info ? topDown(info.kind, mode) : false);
+
+	// Density colouring: a palette per kind, remembered in this browser, and
+	// the range it spans (the values in view, -1 to 1, or the user's own).
+	type DensityKind = 'noise' | 'density_function' | 'noise_settings';
+	const paletteDefaults: Record<DensityKind, PaletteId> = { noise: 'grayscale', density_function: 'viridis', noise_settings: 'solid' };
+	const paletteKey = (k: DensityKind) => `mms.preview.palette.${k}`;
+	function storedPalette(k: DensityKind): PaletteId {
+		try {
+			const v = localStorage.getItem(paletteKey(k)) as PaletteId | null;
+			if (v && (v === 'solid' ? k === 'noise_settings' : palettes.some((p) => p.id === v))) return v;
+		} catch {
+			// Storage can be unavailable (private windows, some webviews).
+		}
+		return paletteDefaults[k];
+	}
+	let paletteIds = $state<Record<DensityKind, PaletteId>>({
+		noise: storedPalette('noise'),
+		density_function: storedPalette('density_function'),
+		noise_settings: storedPalette('noise_settings')
+	});
+	const densityKind = $derived(info && mode === 'density' && info.kind !== 'material_rule' && info.kind !== 'dimension' ? (info.kind as DensityKind) : null);
+	const palette = $derived(densityKind ? paletteOf(paletteIds[densityKind]) : null);
+	const paletteChoices = $derived(densityKind === 'noise_settings' ? [solidPalette, ...palettes] : palettes);
+	function setPalette(id: PaletteId) {
+		if (!densityKind) return;
+		paletteIds[densityKind] = id;
+		try {
+			localStorage.setItem(paletteKey(densityKind), id);
+		} catch {
+			// Not remembered; still applies now.
+		}
+		draw();
+	}
+	type RangeMode = 'auto' | 'unit' | 'custom';
+	let rangeMode = $state<RangeMode>('auto');
+	let customRange = $state<Range>({ lo: -1, hi: 1 });
+	/** The range the palette spans for the current render. */
+	const valueRange = $derived.by((): Range | null => {
+		if (!palette || !last || last.labels) return null;
+		const fixed = rangeMode === 'unit' ? { lo: -1, hi: 1 } : rangeMode === 'custom' ? customRange : undefined;
+		return rangeFor(palette, last.min, last.max, fixed);
+	});
+	function setRangeMode(m: RangeMode) {
+		if (m === 'custom' && rangeMode !== 'custom' && last && Number.isFinite(last.min)) {
+			// Start from what is shown, so switching doesn't jump.
+			const r = valueRange ?? { lo: -1, hi: 1 };
+			customRange = { lo: +r.lo.toPrecision(3), hi: +r.hi.toPrecision(3) };
+		}
+		rangeMode = m;
+		draw();
+	}
+	function setCustom(end: 'lo' | 'hi', text: string) {
+		const v = Number(text);
+		if (text.trim() === '' || !Number.isFinite(v)) return;
+		customRange = { ...customRange, [end]: v };
+		draw();
+	}
 	// CSS pixels per rendered pixel; terrain is costly to sample, so coarser.
 	// The isometric view is drawn with polygons, so it renders at device pixels.
 	const resolution = $derived(
@@ -270,6 +329,8 @@
 			ctx.drawImage(last.bitmap, 0, 0);
 			if (shown && shown !== last.bitmap) shown.close();
 			shown = last.bitmap;
+		} else if (palette && palette.id !== 'solid' && valueRange && mode === 'density') {
+			ctx.putImageData(new ImageData(colorize(last.values, palette, valueRange, VOID), last.width, last.height), 0, 0);
 		} else {
 			ctx.putImageData(new ImageData(last.pixels, last.width, last.height), 0, 0);
 		}
@@ -515,6 +576,15 @@
 		const coord = coords(toWorld(at.px, at.py));
 		return Number.isNaN(v) ? coord : `${coord} · ${show(v)}`;
 	});
+	/** The value under the pointer, for the scale's marker. */
+	const hoverValue = $derived.by(() => {
+		const at = hover;
+		if (!at || !last || mode !== 'density') return NaN;
+		const ix = Math.floor(at.px);
+		const iy = Math.floor(at.py);
+		if (ix < 0 || iy < 0 || ix >= last.width || iy >= last.height) return NaN;
+		return last.values[iy * last.width + ix];
+	});
 	const lockValue = $derived.by(() => {
 		if (!lock || !last) return '';
 		const [px, py] = toPixel(lock);
@@ -557,6 +627,52 @@
 						{#each biomeChoices.all as b (b)}<option value={b}>{b.replace(/^minecraft:/, '')}</option>{/each}
 					</select>
 				</label>
+			{/if}
+			{#if palette}
+				<label class="flex items-center gap-1">
+					Palette
+					<select
+						aria-label="Palette"
+						class="rounded border border-line bg-panel px-1 py-0.5 text-ink"
+						value={palette.id}
+						onchange={(e) => setPalette(e.currentTarget.value as PaletteId)}
+					>
+						{#each paletteChoices as p (p.id)}<option value={p.id}>{p.name}</option>{/each}
+					</select>
+				</label>
+				{#if palette.id !== 'solid'}
+					<label class="flex items-center gap-1" title="The values the palette spans: those in view, -1 to 1, or your own">
+						Range
+						<select
+							aria-label="Range"
+							class="rounded border border-line bg-panel px-1 py-0.5 text-ink"
+							value={rangeMode}
+							onchange={(e) => setRangeMode(e.currentTarget.value as RangeMode)}
+						>
+							<option value="auto">Auto (in view)</option>
+							<option value="unit">−1 to 1</option>
+							<option value="custom">Custom</option>
+						</select>
+					</label>
+					{#if rangeMode === 'custom'}
+						<input
+							type="number"
+							step="any"
+							aria-label="Range from"
+							class="w-16 rounded border border-line bg-panel px-1.5 py-0.5 text-ink"
+							value={customRange.lo}
+							oninput={(e) => setCustom('lo', e.currentTarget.value)}
+						/>
+						<input
+							type="number"
+							step="any"
+							aria-label="Range to"
+							class="w-16 rounded border border-line bg-panel px-1.5 py-0.5 text-ink"
+							value={customRange.hi}
+							oninput={(e) => setCustom('hi', e.currentTarget.value)}
+						/>
+					{/if}
+				{/if}
 			{/if}
 			{#if mode !== 'iso'}
 				<div class="flex items-center gap-1" role="group" aria-label="Camera">
@@ -655,7 +771,36 @@
 		{/if}
 		{#if info && last}
 			<div class="pointer-events-none absolute right-2 bottom-2 flex flex-col items-end gap-1">
-				{#if last.min !== Infinity}
+				{#if palette && valueRange && palette.id !== 'solid'}
+					{@const r = valueRange}
+					{@const flatField = last.min === last.max}
+					<div class="flex w-56 flex-col gap-1 rounded bg-black/60 px-2 py-1.5 font-mono text-[11px] text-white" aria-label="Value scale">
+						<div class="relative h-3 rounded-sm" style:background={cssGradient(palette)}>
+							{#if r.lo < 0 && r.hi > 0}
+								<span class="absolute inset-y-0 w-px bg-white/80 mix-blend-difference" style:left="{position(0, r) * 100}%" title="0"></span>
+							{/if}
+							{#if !Number.isNaN(hoverValue)}
+								<span class="absolute -top-1 -bottom-1 w-0.5 -translate-x-1/2 rounded bg-white shadow-[0_0_0_1px_black]" style:left="{position(hoverValue, r) * 100}%"></span>
+							{/if}
+						</div>
+						<div class="relative flex justify-between">
+							<span>{formatValue(r.lo, r)}</span>
+							{#if r.lo < 0 && r.hi > 0 && position(0, r) > 0.2 && position(0, r) < 0.8}
+								<span class="absolute -translate-x-1/2" style:left="{position(0, r) * 100}%">0</span>
+							{/if}
+							<span>{formatValue(r.hi, r)}</span>
+						</div>
+						<div class="text-white/70">
+							{#if last.min === Infinity}
+								no values in view
+							{:else if flatField}
+								flat: {last.min.toFixed(3)} everywhere in view
+							{:else}
+								in view {last.min.toFixed(3)} … {last.max.toFixed(3)}
+							{/if}
+						</div>
+					</div>
+				{:else if last.min !== Infinity}
 					<div class="rounded bg-black/60 px-2 py-1 font-mono text-[11px] text-white">
 						{last.min.toFixed(3)} … {last.max.toFixed(3)}
 					</div>

@@ -127,6 +127,48 @@ test('an example with textures and a sound checks and exports both packs', async
 	await expect(status(page)).toHaveText(/2 errors/);
 });
 
+test('density previews use the picked palette over the range in view', async ({ page }) => {
+	const errors: string[] = [];
+	page.on('pageerror', (e) => errors.push(e.message));
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+
+	// A gradient from 0 to 1 spans the whole palette, not a sliver of a -1 to 1 one.
+	await replaceText(page, 'DensityFunction grad = Gradient(axis = y, from_coordinate = 0, to_coordinate = 512, from_value = 0, to_value = 1)\n');
+	await expect(status(page)).toHaveText(/No problems/);
+	await page.locator('.cm-line').first().click();
+	const scale = page.getByLabel('Value scale');
+	await expect(scale).toContainText(/in view 0\.000 … 0\.\d{3}/, { timeout: 20_000 });
+	await expect(scale).toContainText(/^\s*0\.000\s+0\.\d{3}/);
+
+	const pixel = (x: number, y: number) =>
+		page.locator('canvas').evaluate((c: HTMLCanvasElement, [fx, fy]) => {
+			const d = c.getContext('2d')!.getImageData(Math.floor(c.width * fx), Math.floor(c.height * fy), 1, 1).data;
+			return [d[0], d[1], d[2]];
+		}, [x, y]);
+	// Viridis: dark purple at the bottom (0), yellow at the top.
+	await expect(page.getByLabel('Palette')).toHaveValue('viridis');
+	expect((await pixel(0.5, 0.98))[2]).toBeGreaterThan((await pixel(0.5, 0.98))[1]);
+	expect((await pixel(0.5, 0.01))[0]).toBeGreaterThan(200);
+
+	// Grayscale runs black to white over the same range.
+	await page.getByLabel('Palette').selectOption('grayscale');
+	await expect.poll(async () => (await pixel(0.5, 0.98))[0]).toBeLessThan(20);
+	expect((await pixel(0.5, 0.01))[0]).toBeGreaterThan(200);
+
+	// A fixed -1 to 1 range puts 0 in the middle grey.
+	await page.getByLabel('Range').selectOption('unit');
+	await expect.poll(async () => (await pixel(0.5, 0.98))[0]).toBeGreaterThan(110);
+	await expect(scale).toContainText('-1.00');
+
+	// The palette is remembered.
+	await page.reload();
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	await page.locator('.cm-line').first().click();
+	await expect(page.getByLabel('Palette')).toHaveValue('grayscale');
+	expect(errors).toEqual([]);
+});
+
 test('dimensions, noise settings and surface rules preview as terrain', async ({ page }) => {
 	const errors: string[] = [];
 	page.on('pageerror', (e) => errors.push(e.message));
