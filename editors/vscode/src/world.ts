@@ -222,6 +222,9 @@ export class WorldView implements vscode.Disposable, vscode.TreeDataProvider<Row
 			const info = this.structureInfo(s);
 			if (!info) return;
 			try {
+				// The folder setting must not lead out of the project.
+				const inside = path.relative(this.project()!, info.dest);
+				if (inside.startsWith('..') || path.isAbsolute(inside)) throw new Error(`"mms.structuresFolder" points outside the project (${info.rel})`);
 				importStructure(s, info.dest);
 				done.push(info);
 				this.log(`imported ${s.file} to ${info.dest}`);
