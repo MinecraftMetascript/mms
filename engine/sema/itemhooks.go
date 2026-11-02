@@ -153,11 +153,17 @@ func (c *Checker) checkItemHooks(d *syntax.Decl, o *jsonv.Object, comps *jsonv.O
 }
 
 // checkHookFunction checks an on_* field, which names a Function
-// without parameters, and returns the function's id.
+// without parameters or holds an inline { ... } block that hoisting has
+// compiled as one, and returns the function's id.
 func (c *Checker) checkHookFunction(field string, e syntax.Expr, v jsonv.Value) string {
 	s, _ := v.(jsonv.String)
 	if s == "" || e == nil {
 		return ""
+	}
+	for _, h := range c.Hoisted {
+		if h.ID == string(s) && h.Fn != nil {
+			return string(s) // an inline { ... } block, compiled as a Function
+		}
 	}
 	fn := c.find("function", string(s))
 	if fn == nil || fn.Kind.MMS != "Function" {
