@@ -1,0 +1,337 @@
+=== data/arrows/advancement/mms_gen/item_hook/cow_wand/press.json
+{
+  "criteria": {
+    "press": {
+      "trigger": "minecraft:using_item",
+      "conditions": {
+        "item": {
+          "items": "minecraft:stick",
+          "predicates": {
+            "minecraft:custom_data": {
+              "mms_item": "arrows:cow_wand"
+            }
+          }
+        }
+      }
+    }
+  },
+  "rewards": {
+    "function": "arrows:mms_gen/item_hook/cow_wand/press"
+  }
+}
+=== data/arrows/enchantment/thunder.json
+{
+  "description": {
+    "translate": "enchantment.arrows.thunder",
+    "fallback": "Thunder"
+  },
+  "supported_items": "minecraft:bow",
+  "weight": 1,
+  "max_level": 1,
+  "min_cost": {
+    "base": 30,
+    "per_level_above_first": 0
+  },
+  "max_cost": {
+    "base": 50,
+    "per_level_above_first": 0
+  },
+  "anvil_cost": 8,
+  "slots": [
+    "mainhand",
+    "offhand"
+  ],
+  "effects": {
+    "hit_block": [
+      {
+        "effect": {
+          "type": "minecraft:summon_entity",
+          "entity": "minecraft:lightning_bolt"
+        }
+      }
+    ],
+    "post_attack": [
+      {
+        "requirements": {
+          "type": "minecraft:damage_source_properties",
+          "predicate": {
+            "is_direct": false
+          }
+        },
+        "effect": {
+          "type": "minecraft:summon_entity",
+          "entity": "minecraft:lightning_bolt"
+        },
+        "enchanted": "attacker",
+        "affected": "victim"
+      }
+    ]
+  }
+}
+=== data/arrows/function/arm.mcfunction
+tag @s add arrows.flying
+scoreboard players set $owner mms.arrows 0
+execute on origin unless score @s shooter_id matches 1.. run function arrows:number_shooter
+execute on origin run scoreboard players operation $owner mms.arrows = @s shooter_id
+tag @s add arrows.new
+execute summon marker run function arrows:mount
+tag @s remove arrows.new
+=== data/arrows/function/ender_jump.mcfunction
+scoreboard players operation $owner mms.arrows = @s shot_by
+execute if score $owner mms.arrows matches 0 run return 0
+execute as @e[scores={shooter_id=1..}] if score @s shooter_id = $owner mms.arrows run tag @s add arrows.jumper
+execute facing entity @e[tag=arrows.jumper,limit=1] feet positioned ^ ^ ^0.5 as @e[tag=arrows.jumper,limit=1] run function arrows:land_jump
+tag @e[tag=arrows.jumper] remove arrows.jumper
+=== data/arrows/function/explode.mcfunction
+summon tnt ~ ~ ~ {fuse:0s,explosion_power:2f,block_state:{Name:"minecraft:air"}}
+=== data/arrows/function/give.mcfunction
+give @s bow
+give @s bow[item_name={translate:"item.arrows.thunder_bow",fallback:"Thunder Bow"},enchantments={"arrows:thunder":1}]
+give @s tipped_arrow[item_name={translate:"item.arrows.explosive_arrow",fallback:"Explosive Arrow"},potion_contents={custom_color:14697499,custom_name:"arrows.explosive"},custom_data={arrow:"explosive"}] 16
+give @s tipped_arrow[item_name={translate:"item.arrows.ender_arrow",fallback:"Ender Arrow"},potion_contents={custom_color:2062958,custom_name:"arrows.ender"},custom_data={arrow:"ender"}] 16
+give @s tipped_arrow[item_name={translate:"item.arrows.levitation_arrow",fallback:"Arrow of Levitation"},potion_contents={custom_color:13565951,custom_name:"arrows.levitation",custom_effects:[{id:"minecraft:levitation",amplifier:1,duration:60}]},potion_duration_scale=1] 16
+give @s stick[item_name={translate:"item.arrows.cow_wand",fallback:"Cow Wand"},consumable={consume_seconds:1000000,animation:"none",has_consume_particles:false},use_effects={can_sprint:true,speed_multiplier:1,interact_vibrations:false},custom_data={mms_item:"arrows:cow_wand"}]
+=== data/arrows/function/impact.mcfunction
+execute if entity @s[tag=arrows.explosive] run function arrows:explode
+execute if entity @s[tag=arrows.ender] run function arrows:ender_jump
+kill @s
+=== data/arrows/function/land_jump.mcfunction
+particle portal ~ ~1 ~ 0.3 0.6 0.3 0.5 40
+execute at @s run particle portal ~ ~1 ~ 0.3 0.6 0.3 0.5 40
+tp @s ~ ~ ~
+playsound entity.player.teleport player @a
+=== data/arrows/function/launch.mcfunction
+rotate @s ~ ~
+data modify storage arrows:mms m.a0 set from storage arrows:mms l."launch".speed
+function arrows:launch/_macro0 with storage arrows:mms m
+data modify entity @s Motion set from storage arrows:launch motion
+=== data/arrows/function/launch/_macro0.mcfunction
+$execute anchored feet in minecraft:overworld positioned 0.0 0.0 0.0 positioned ^ ^ ^$(a0) summon marker run function arrows:read_vector
+=== data/arrows/function/mms_gen/item_hook/cow_wand/press.mcfunction
+advancement revoke @s only arrows:mms_gen/item_hook/cow_wand/press
+execute if score @s mms_click.arrows matches 1.. run return run scoreboard players set @s mms_click.arrows 2
+scoreboard players set @s mms_click.arrows 2
+function arrows:shoot_cow
+=== data/arrows/function/mms_gen/load.mcfunction
+scoreboard objectives add shooter_id dummy
+scoreboard objectives add shot_by dummy
+scoreboard objectives add mms_click.arrows dummy
+scoreboard objectives add mms.arrows dummy
+scoreboard players set #cf mms.arrows 0
+execute unless score $shooters mms.arrows = $shooters mms.arrows run scoreboard players set $shooters mms.arrows 0
+execute unless score $owner mms.arrows = $owner mms.arrows run scoreboard players set $owner mms.arrows 0
+execute in minecraft:overworld run forceload add 0 0
+=== data/arrows/function/mms_gen/tick.mcfunction
+function arrows:mms_gen/tick/ca80342a
+scoreboard players remove @a[scores={mms_click.arrows=1..}] mms_click.arrows 1
+=== data/arrows/function/mms_gen/tick/ca80342a.mcfunction
+execute as @e[type=arrow, tag=!arrows.seen] at @s run function arrows:spotted
+execute as @e[type=arrow,tag=arrows.flying,nbt={inGround:1b}] at @s run function arrows:stuck
+execute as @e[type=marker,tag=arrows.stand_in,predicate=!arrows:riding] at @s run function arrows:impact
+=== data/arrows/function/mount.mcfunction
+tag @s add arrows.stand_in
+execute if data entity @n[type=arrow,tag=arrows.new] item.components."minecraft:custom_data"{arrow:"explosive"} run tag @s add arrows.explosive
+execute if data entity @n[type=arrow,tag=arrows.new] item.components."minecraft:custom_data"{arrow:"ender"} run tag @s add arrows.ender
+scoreboard players operation @s shot_by = $owner mms.arrows
+ride @s mount @n[type=arrow,tag=arrows.new]
+=== data/arrows/function/number_shooter.mcfunction
+scoreboard players add $shooters mms.arrows 1
+scoreboard players operation @s shooter_id = $shooters mms.arrows
+=== data/arrows/function/read_vector.mcfunction
+data modify storage arrows:launch motion set from entity @s Pos
+kill @s
+=== data/arrows/function/shoot_cow.mcfunction
+execute anchored eyes positioned ^ ^-0.7 ^1.5 summon cow run function arrows:shoot_cow/_exec0
+playsound entity.cow.ambient neutral @a
+=== data/arrows/function/shoot_cow/_exec0.mcfunction
+data modify storage arrows:mms l."launch".speed set value "1.5"
+function arrows:launch
+=== data/arrows/function/spotted.mcfunction
+tag @s add arrows.seen
+execute if data entity @s item.components."minecraft:custom_data".arrow run function arrows:arm
+=== data/arrows/function/stuck.mcfunction
+execute on passengers if entity @s[tag=arrows.stand_in] run function arrows:impact
+kill @s
+=== data/arrows/predicate/riding.json
+{
+  "type": "minecraft:entity_properties",
+  "entity": "this",
+  "predicate": {
+    "vehicle": {}
+  }
+}
+=== data/arrows/recipe/cow_wand.json
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    "minecraft:stick",
+    "minecraft:stick"
+  ],
+  "result": {
+    "id": "minecraft:stick",
+    "components": {
+      "item_name": {
+        "translate": "item.arrows.cow_wand",
+        "fallback": "Cow Wand"
+      },
+      "consumable": {
+        "consume_seconds": 1000000,
+        "animation": "none",
+        "has_consume_particles": false
+      },
+      "use_effects": {
+        "can_sprint": true,
+        "speed_multiplier": 1,
+        "interact_vibrations": false
+      },
+      "custom_data": {
+        "mms_item": "arrows:cow_wand"
+      }
+    }
+  }
+}
+=== data/arrows/recipe/ender_arrow.json
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    "minecraft:arrow",
+    "minecraft:arrow",
+    "minecraft:ender_pearl"
+  ],
+  "result": {
+    "id": "minecraft:tipped_arrow",
+    "count": 2,
+    "components": {
+      "item_name": {
+        "translate": "item.arrows.ender_arrow",
+        "fallback": "Ender Arrow"
+      },
+      "potion_contents": {
+        "custom_color": 2062958,
+        "custom_name": "arrows.ender"
+      },
+      "custom_data": {
+        "arrow": "ender"
+      }
+    }
+  }
+}
+=== data/arrows/recipe/explosive_arrow.json
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    "minecraft:arrow",
+    "minecraft:gunpowder"
+  ],
+  "result": {
+    "id": "minecraft:tipped_arrow",
+    "components": {
+      "item_name": {
+        "translate": "item.arrows.explosive_arrow",
+        "fallback": "Explosive Arrow"
+      },
+      "potion_contents": {
+        "custom_color": 14697499,
+        "custom_name": "arrows.explosive"
+      },
+      "custom_data": {
+        "arrow": "explosive"
+      }
+    }
+  }
+}
+=== data/arrows/recipe/levitation_arrow.json
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "AAA",
+    "ASA",
+    "AAA"
+  ],
+  "key": {
+    "A": "minecraft:arrow",
+    "S": "minecraft:shulker_shell"
+  },
+  "result": {
+    "id": "minecraft:tipped_arrow",
+    "count": 8,
+    "components": {
+      "item_name": {
+        "translate": "item.arrows.levitation_arrow",
+        "fallback": "Arrow of Levitation"
+      },
+      "potion_contents": {
+        "custom_color": 13565951,
+        "custom_name": "arrows.levitation",
+        "custom_effects": [
+          {
+            "id": "minecraft:levitation",
+            "amplifier": 1,
+            "duration": 60
+          }
+        ]
+      },
+      "potion_duration_scale": 1
+    }
+  }
+}
+=== data/arrows/recipe/thunder_bow.json
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    "minecraft:bow",
+    "minecraft:lightning_rod"
+  ],
+  "result": {
+    "id": "minecraft:bow",
+    "components": {
+      "item_name": {
+        "translate": "item.arrows.thunder_bow",
+        "fallback": "Thunder Bow"
+      },
+      "enchantments": {
+        "arrows:thunder": 1
+      }
+    }
+  }
+}
+=== data/minecraft/tags/function/load.json
+{
+  "values": [
+    "arrows:mms_gen/load"
+  ]
+}
+=== data/minecraft/tags/function/tick.json
+{
+  "values": [
+    "arrows:mms_gen/tick"
+  ]
+}
+=== pack.mcmeta
+{
+  "pack": {
+    "description": "Projectiles: arrows that explode, teleport or float their target, a bow that calls lightning, and a wand that launches cows",
+    "min_format": 121,
+    "max_format": 121
+  }
+}
+=== assets/arrows/lang/en_us.json
+{
+  "item.minecraft.tipped_arrow.effect.arrows.explosive": "Explosive Arrow",
+  "item.minecraft.tipped_arrow.effect.arrows.ender": "Ender Arrow",
+  "item.minecraft.tipped_arrow.effect.arrows.levitation": "Arrow of Levitation",
+  "enchantment.arrows.thunder": "Thunder",
+  "item.arrows.explosive_arrow": "Explosive Arrow",
+  "item.arrows.ender_arrow": "Ender Arrow",
+  "item.arrows.levitation_arrow": "Arrow of Levitation",
+  "item.arrows.thunder_bow": "Thunder Bow",
+  "item.arrows.cow_wand": "Cow Wand"
+}
+=== pack.mcmeta
+{
+  "pack": {
+    "description": "Projectiles: arrows that explode, teleport or float their target, a bow that calls lightning, and a wand that launches cows",
+    "min_format": 97,
+    "max_format": 97
+  }
+}

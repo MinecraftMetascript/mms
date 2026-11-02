@@ -1,0 +1,5 @@
+{
+  "$schema": "https://minecraftmetascript.github.io/mms/mms.schema.json",
+  "namespace": "arrows",
+  "description": "Projectiles: arrows that explode, teleport or float their target, a bow that calls lightning, and a wand that launches cows"
+}

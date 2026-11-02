@@ -374,13 +374,13 @@ func (s *state) coords(pos, n int, blocks bool) (int, bool) {
 		case strings.HasPrefix(w, "~"):
 			rest = w[1:]
 		default:
-			if blocks {
+			if blocks && !strings.Contains(w, interp) {
 				if _, err := strconv.ParseInt(w, 10, 32); err != nil {
 					return 0, s.fail(i, end, "expected a whole block coordinate, ~ or ^")
 				}
 			}
 		}
-		if rest != "" {
+		if rest != "" && !strings.Contains(w, interp) {
 			if _, err := strconv.ParseFloat(rest, 64); err != nil {
 				return 0, s.fail(i, end, "expected a coordinate such as 10, ~ or ~-2.5")
 			}
