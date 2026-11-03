@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"flag"
 	"fmt"
@@ -180,15 +181,20 @@ func runBuild(args []string, stdout, stderr io.Writer) int {
 			return 1
 		}
 		target := filepath.Join(*world, "datapacks", p.Config.Namespace)
+		before, err := project.ReadPackDir(target)
+		if err != nil {
+			return fail(err)
+		}
 		if err := project.WriteDir(target, data); err != nil {
 			return fail(err)
 		}
 		fmt.Fprintf(stdout, "wrote %d files to %s\n", len(data), target)
 		rz, note := worldResourcePack(*world)
-		_, statErr := os.Stat(rz)
+		oldZip, statErr := os.ReadFile(rz)
 		if statErr != nil && !os.IsNotExist(statErr) {
 			return fail(statErr)
 		}
+		resChanged := false
 		// With no resources, a pack already there still loses the files
 		// this project put in it last time.
 		if len(res) > 0 || statErr == nil {
@@ -211,7 +217,9 @@ func runBuild(args []string, stdout, stderr io.Writer) int {
 				fmt.Fprintf(stderr, "mms: warning: overwrote %s\n", r)
 			}
 			fmt.Fprintln(stdout, note)
+			resChanged = !bytes.Equal(oldZip, m.Zip)
 		}
+		fmt.Fprintln(stdout, project.PlanApply(before, data, resChanged).Message())
 		return 0
 	}
 	resOut := filepath.Join(dir, p.Config.ResourceOutput())
@@ -300,5 +308,5 @@ func pluralize(n int, s string) string {
 // (not over LAN, and a server needs its own resource-pack setting).
 func worldResourcePack(world string) (path, note string) {
 	return filepath.Join(world, "resourcepacks", "resources.zip"),
-		"Minecraft applies it when the world is opened; rejoin the world after a rebuild"
+		"Minecraft applies it when the world is opened"
 }

@@ -21,7 +21,24 @@ import { findWorlds, readWorld, savesFolders, type World } from './worlds';
 type Row = { id: string; item: vscode.TreeItem; children?: () => Row[]; structure?: WorldStructure };
 
 /** The outcome of the last build, shown under the button. */
-type Result = { ok: true; world: string; files: number; resources: boolean; at: Date } | { ok: false; message: string; detail: string; at: Date };
+type Result =
+	| { ok: true; world: string; files: number; resources: boolean; next: NextStep | undefined; at: Date }
+	| { ok: false; message: string; detail: string; at: Date };
+
+/**
+ * What the player does in the game for the build to take effect, from the
+ * "next step:" line `mms build --world` prints last: run /reload, or exit
+ * and rejoin the world when worldgen, other registries or the resource
+ * pack changed. Older mms builds print no such line.
+ */
+type NextStep = { action: 'reload' | 'rejoin' | 'none'; line: string };
+
+export function nextStep(stdout: string): NextStep | undefined {
+	const m = /^next step: (run \/reload|exit and rejoin|none)\b.*$/m.exec(stdout);
+	if (!m) return undefined;
+	const action = m[1] === 'none' ? 'none' : m[1] === 'exit and rejoin' ? 'rejoin' : 'reload';
+	return { action, line: m[0].replace(/^next step: /, '') };
+}
 
 export class WorldView implements vscode.Disposable, vscode.TreeDataProvider<Row> {
 	private readonly changed = new vscode.EventEmitter<void>();
@@ -139,9 +156,14 @@ export class WorldView implements vscode.Disposable, vscode.TreeDataProvider<Row
 			s.description = time;
 			if (r.ok) {
 				s.iconPath = new vscode.ThemeIcon('check', new vscode.ThemeColor('testing.iconPassed'));
+				const step = r.next ? r.next.line.charAt(0).toUpperCase() + r.next.line.slice(1) + '.' : '';
+				if (r.next?.action === 'reload') s.description = `${time} · run /reload`;
+				else if (r.next?.action === 'rejoin') s.description = `${time} · rejoin the world`;
 				s.tooltip = new vscode.MarkdownString(
-					`Built into \`${r.world}\`.\n\nRun \`/reload\` in the game to load the data pack.` +
-						(r.resources ? ' Rejoin the world to load the resource pack.' : '')
+					`Built into \`${r.world}\`.\n\n` +
+						(r.next
+							? step
+							: 'Run `/reload` in the game to load the data pack.' + (r.resources ? ' Rejoin the world to load the resource pack.' : ''))
 				);
 			} else {
 				s.iconPath = new vscode.ThemeIcon('error', new vscode.ThemeColor('errorForeground'));
@@ -374,8 +396,20 @@ export class WorldView implements vscode.Disposable, vscode.TreeDataProvider<Row
 		if (run.code === 0) {
 			const files = [...run.stdout.matchAll(/(\d+) files?/g)].reduce((n, m) => n + Number(m[1]), 0);
 			const resources = /resource pack/.test(run.stdout);
-			this.result = { ok: true, world, files, resources, at: new Date() };
-			void vscode.window.setStatusBarMessage(`$(check) MMS: built into ${name}`, 5000);
+			const next = nextStep(run.stdout);
+			this.result = { ok: true, world, files, resources, next, at: new Date() };
+			if (next?.action === 'reload') {
+				void vscode.window.showInformationMessage(`MMS: built into ${name}. Run /reload in the game to apply it.`, 'Copy /reload').then((c) => {
+					if (c) void vscode.env.clipboard.writeText('/reload');
+				});
+			} else if (next?.action === 'rejoin') {
+				const changed = /; (.*) changed\b/.exec(next.line)?.[1];
+				void vscode.window.showInformationMessage(
+					`MMS: built into ${name}. Exit and rejoin the world to apply it` + (changed ? ` (${changed} changed; /reload is not enough).` : '.')
+				);
+			} else {
+				void vscode.window.setStatusBarMessage(next ? `$(check) MMS: built into ${name}; nothing changed` : `$(check) MMS: built into ${name}`, 5000);
+			}
 		} else {
 			const errors = /(\d+) errors?; nothing written/.exec(run.stderr);
 			const message = errors ? `${errors[1]} ${errors[1] === '1' ? 'error' : 'errors'}; nothing written` : 'Build failed';

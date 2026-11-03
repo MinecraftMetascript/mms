@@ -37,12 +37,13 @@ TemplatePool houses = {
 			t.Fatal(err)
 		}
 	}
-	run := func(args ...string) {
+	run := func(args ...string) string {
 		t.Helper()
 		var out, errOut bytes.Buffer
 		if code := runBuild(append(args, dir), &out, &errOut); code != 0 {
 			t.Fatalf("build %v: exit %d: %s", args, code, errOut.String())
 		}
+		return out.String()
 	}
 	listDir := func(root string) string {
 		var got []string
@@ -94,11 +95,41 @@ TemplatePool houses = {
 
 	world := t.TempDir()
 	os.WriteFile(filepath.Join(world, "level.dat"), nil, 0o644)
-	run("-world", world)
+	if out := run("-world", world); !strings.Contains(out, "next step: exit and rejoin the world; jukebox_song, painting_variant, resource pack, worldgen/template_pool changed") {
+		t.Errorf("first world build should ask for a rejoin:\n%s", out)
+	}
+	if out := run("-world", world); !strings.Contains(out, "next step: none") {
+		t.Errorf("an unchanged rebuild should need nothing:\n%s", out)
+	}
 	if got := listDir(filepath.Join(world, "datapacks", "demo")); got != data {
 		t.Errorf("world data pack:\n got %s\nwant %s", got, data)
 	}
 	if got := listZip(filepath.Join(world, "resourcepacks", "resources.zip")); got != strings.Replace(res, "pack.mcmeta", "mms-world-pack.json pack.mcmeta", 1) {
 		t.Errorf("world resource pack:\n got %s\nwant %s", got, res)
 	}
+}
+
+// TestBuildWorldNextStep checks that a world build says /reload for
+// functions and a rejoin for worldgen.
+func TestBuildWorldNextStep(t *testing.T) {
+	dir, world := t.TempDir(), t.TempDir()
+	os.WriteFile(filepath.Join(world, "level.dat"), nil, 0o644)
+	os.WriteFile(filepath.Join(dir, "mms.json"), []byte(`{"namespace":"demo"}`), 0o644)
+	build := func(src, want string) {
+		t.Helper()
+		os.WriteFile(filepath.Join(dir, "main.mms"), []byte(src), 0o644)
+		var out, errOut bytes.Buffer
+		if code := runBuild([]string{"-world", world, dir}, &out, &errOut); code != 0 {
+			t.Fatalf("exit %d: %s", code, errOut.String())
+		}
+		lines := strings.Split(strings.TrimSpace(out.String()), "\n")
+		if got := lines[len(lines)-1]; got != want {
+			t.Errorf("last line:\n got %s\nwant %s", got, want)
+		}
+	}
+	const df = "DensityFunction hills = Noise(minecraft:ridge, 0.25, 0) * 0.5\n"
+	build(df+"OnLoad {\n  /say one\n}\n", "next step: exit and rejoin the world; worldgen/density_function changed, which Minecraft only reads when the world is opened")
+	build(df+"OnLoad {\n  /say two\n}\n", "next step: run /reload in the world; function changed")
+	build(df+"OnLoad {\n  /say two\n}\n", "next step: none; the pack is the same as the last build")
+	build("DensityFunction hills = Noise(minecraft:ridge, 0.5, 0) * 0.5\nOnLoad {\n  /say two\n}\n", "next step: exit and rejoin the world; worldgen/density_function changed, which Minecraft only reads when the world is opened")
 }
