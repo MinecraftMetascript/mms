@@ -116,5 +116,6 @@ export type FromWorld =
 	/** file is a WorldStructureRow's file. */
 	| { type: 'import'; file: string }
 	| { type: 'copyCall'; file: string }
+	| { type: 'deleteFromWorld'; file: string }
 	/** rel is relative to the project folder. */
 	| { type: 'revealFile'; rel: string };

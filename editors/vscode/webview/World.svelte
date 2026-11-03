@@ -152,13 +152,13 @@
 					<button class="secondary small-btn" title="Open the world's generated folder, where structure blocks save" onclick={() => send({ type: 'run', action: 'revealStructureWorld' })}>Open folder</button>
 				</div>
 				<p class="muted small">
-					Builds never touch this world, so the pieces saved in it are safe.
+					Builds never write to this world.
 					<button class="link" onclick={() => send({ type: 'run', action: 'sameStructureWorld' })}>{s.world ? 'Use the build world instead' : 'Forget this world'}</button>
 				</p>
 			{:else}
 				<p class="muted small">
 					From the build world.
-					<button class="link" title="Build in one world and save structures in another, so builds never generate over the pieces" onclick={() => send({ type: 'run', action: 'chooseStructureWorld' })}>Use a separate world…</button>
+					<button class="link" title="Save structures in one world and build the pack into another" onclick={() => send({ type: 'run', action: 'chooseStructureWorld' })}>Use a separate world…</button>
 				</p>
 			{/if}
 			{#if !s.structures.length && !s.unusedFiles.length}
@@ -196,6 +196,7 @@
 								{#if r.status !== 'new'}
 									<button class="secondary" onclick={() => send({ type: 'revealFile', rel: r.rel })}>Show file</button>
 								{/if}
+								<button class="secondary danger" title="Delete this save from the world, for one saved under the wrong name. Asks first." onclick={() => send({ type: 'deleteFromWorld', file: r.file })}>Delete from world</button>
 							</div>
 						</li>
 					{/each}
@@ -324,6 +325,9 @@
 	}
 	.secondary:hover:not(:disabled) {
 		background: var(--vscode-button-secondaryHoverBackground);
+	}
+	.danger:hover:not(:disabled) {
+		color: var(--vscode-errorForeground);
 	}
 	.small-btn {
 		padding: 1px 8px;

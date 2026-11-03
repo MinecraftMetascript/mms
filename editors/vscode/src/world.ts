@@ -19,8 +19,8 @@
 //
 // Structures can come from a separate world: a creative world the pieces
 // are built in, while the pack is built into another one. Builds then never
-// touch the world the pieces live in (no new worldgen over them), and that
-// world can stay open while the build world is left and rejoined. With no
+// touch the world the pieces live in, and that world can stay open while
+// the build world is left and rejoined. With no
 // separate world chosen, structures come from the build world.
 import { execFile } from 'child_process';
 import * as fs from 'fs';
@@ -154,11 +154,12 @@ export class WorldView implements vscode.Disposable, vscode.WebviewViewProvider 
 			await vscode.workspace.getConfiguration('mms').update('buildOnSave', m.on, vscode.ConfigurationTarget.Workspace);
 			return;
 		}
-		if (m.type === 'import' || m.type === 'copyCall') {
+		if (m.type === 'import' || m.type === 'copyCall' || m.type === 'deleteFromWorld') {
 			const world = this.structureWorld();
 			const s = world && findStructures(world).find((f) => f.file === m.file);
 			if (!s) return;
 			if (m.type === 'import') return this.importStructures([s]);
+			if (m.type === 'deleteFromWorld') return this.deleteFromWorld(world, s);
 			const info = this.structureInfo(s);
 			if (info) await vscode.env.clipboard.writeText(info.call);
 			return;
@@ -340,6 +341,40 @@ export class WorldView implements vscode.Disposable, vscode.WebviewViewProvider 
 		}
 	}
 
+	/**
+	 * Deletes a structure the world saved, such as one saved under the wrong
+	 * name, after asking. Files go to the trash where the system has one, and
+	 * the project's imported copy is left alone.
+	 */
+	private async deleteFromWorld(world: string, s: WorldStructure) {
+		const id = `${s.ns}:${s.path}`;
+		const name = readWorld(world)?.name ?? path.basename(world);
+		const choice = await vscode.window.showWarningMessage(
+			`Delete ${id} from ${name}?`,
+			{
+				modal: true,
+				detail: `This deletes ${savedFiles(world, s).length > 1 ? 'its saves' : 'its save'} in the world's generated folder (moved to the trash where possible). The copy imported into the project, if any, stays. If the world is open, the game may still use the structure until it is reopened.`
+			},
+			'Delete'
+		);
+		if (choice !== 'Delete') return;
+		for (const file of savedFiles(world, s)) {
+			try {
+				await vscode.workspace.fs.delete(vscode.Uri.file(file), { useTrash: true });
+			} catch {
+				// No trash (some Linux setups): delete outright, as confirmed.
+				try {
+					await vscode.workspace.fs.delete(vscode.Uri.file(file), { useTrash: false });
+				} catch (e) {
+					void vscode.window.showErrorMessage(`Could not delete ${file}: ${e instanceof Error ? e.message : String(e)}`);
+				}
+			}
+			this.log(`deleted ${file}`);
+		}
+		this.redraw();
+		void vscode.window.setStatusBarMessage(`$(trash) Deleted ${id} from ${name}`, 4000);
+	}
+
 	/** Redraws soon, so a burst of file events redraws once. */
 	private refreshSoon() {
 		if (this.refreshTimer) clearTimeout(this.refreshTimer);
@@ -420,18 +455,8 @@ export class WorldView implements vscode.Disposable, vscode.WebviewViewProvider 
 			}
 		}
 		if (!dir) return;
-		if (purpose === 'build' && same(other, dir)) {
-			// Building into the world the pieces are saved in is what a
-			// separate structure world avoids; say so before doing it.
-			const choice = await vscode.window.showWarningMessage(
-				`${readWorld(dir)?.name ?? path.basename(dir)} is the world structures are imported from. Building into it can generate new terrain and structures over the pieces saved there.`,
-				{ modal: true },
-				'Build into it anyway'
-			);
-			if (!choice) return;
-			await this.setWorld(undefined, project, 'structures');
-		}
-		// The build world picked as the structure world is no separate world.
+		// One world picked for both is no separate structure world.
+		if (purpose === 'build' && same(other, dir)) await this.setWorld(undefined, project, 'structures');
 		if (purpose === 'structures' && same(this.world(project), dir)) dir = undefined;
 		await this.setWorld(dir, project, purpose);
 	}
@@ -587,6 +612,17 @@ function namespace(project: string): string | undefined {
 
 function expandHome(p: string): string {
 	return p === '~' || p.startsWith('~/') || p.startsWith('~\\') ? path.join(os.homedir(), p.slice(1)) : p;
+}
+
+/**
+ * Every file a world holds for a structure's id: both the 1.21+ structure/
+ * folder and the older structures/ one, so deleting it does not just
+ * uncover an older save.
+ */
+function savedFiles(world: string, s: WorldStructure): string[] {
+	return ['structure', 'structures']
+		.map((folder) => path.join(world, 'generated', s.ns, folder, ...s.path.split('/')) + '.nbt')
+		.filter((f) => fs.existsSync(f));
 }
 
 /** Which of a project's two worlds is being chosen. */
