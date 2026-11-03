@@ -7,6 +7,7 @@
 	// drawn with the theme's button colours, and results are cards without
 	// them, so the two never look alike.
 	import type { FromWorld, ToWorld, WorldState, WorldStructureRow } from '../src/messages';
+	import { group, type Group, type Node } from './groups';
 
 	const vscode = acquireVsCodeApi<WorldState>();
 	let s = $state<WorldState | undefined>(vscode.getState());
@@ -33,8 +34,75 @@
 	const label: Record<WorldStructureRow['status'], string> = { new: 'New', imported: 'Imported', changed: 'Changed in world' };
 	const waiting = $derived(s?.structures.filter((r) => r.status !== 'imported').length ?? 0);
 	const unused = $derived((s?.structures.filter((r) => r.unused).length ?? 0) + (s?.unusedFiles.length ?? 0));
+	// The structures as folders, split at / and _ in their names, so big
+	// packs of pieces stay readable. With several namespaces the namespace
+	// is the top folder.
+	const groups = $derived.by(() => {
+		const rows = s?.structures ?? [];
+		const many = new Set(rows.map((r) => r.id.split(':')[0])).size > 1;
+		return group(rows, (r) => (many ? r.id : r.id.slice(r.id.indexOf(':') + 1)));
+	});
+	// Folders the user opened or closed; the rest are open when they hold
+	// something to do (new, changed or not used) and closed otherwise.
+	let open = $state<Record<string, boolean>>({});
+	const isOpen = (g: Group<WorldStructureRow>) => open[g.key] ?? g.items.some((r) => r.status !== 'imported' || r.unused);
 	const sentence = (line: string) => line.charAt(0).toUpperCase() + line.slice(1);
 </script>
+
+{#snippet row(r: WorldStructureRow)}
+	<li class="st" class:unused={r.unused} class:changed={r.status === 'changed'}>
+		<div class="st-head">
+			<span class="name grow" title={`Saved ${r.saved} in ${r.file}`}>{r.id}</span>
+			{#if r.unused}
+				<span class="badge warn-badge">Not used</span>
+			{:else}
+				<span class="badge" class:changed-badge={r.status === 'changed'}>{label[r.status]}</span>
+			{/if}
+		</div>
+		{#if r.unused}
+			<div class="small">No <code>Structure(...)</code> call uses <code>{r.rel}</code>, so the pack leaves it out. Add it to a template pool:</div>
+			<code class="call">{r.call}</code>
+		{:else if r.status === 'new'}
+			<div class="muted small">Import copies it to {r.rel}.</div>
+		{:else}
+			<div class="muted small">{r.rel}</div>
+		{/if}
+		{#if r.packId}<div class="muted small">Its id in the pack is {r.packId}, in the project's namespace.</div>{/if}
+		<div class="actions">
+			{#if r.status !== 'imported'}
+				<button class="primary" onclick={() => send({ type: 'import', file: r.file })}>{r.status === 'changed' ? 'Import again' : 'Import'}</button>
+			{/if}
+			<button class="secondary" title={r.call} onclick={() => copy(r.file, { type: 'copyCall', file: r.file })}>{copied === r.file ? 'Copied' : 'Copy call'}</button>
+			{#if r.status !== 'new'}
+				<button class="secondary" onclick={() => send({ type: 'revealFile', rel: r.rel })}>Show file</button>
+			{/if}
+			<button class="secondary danger" title="Delete this save from the world, for one saved under the wrong name. Asks first." onclick={() => send({ type: 'deleteFromWorld', file: r.file })}>Delete from world</button>
+		</div>
+	</li>
+{/snippet}
+
+{#snippet tree(nodes: Node<WorldStructureRow>[])}
+	{#each nodes as n (n.kind === 'group' ? `g:${n.key}` : n.item.file)}
+		{#if n.kind === 'leaf'}
+			{@render row(n.item)}
+		{:else}
+			{@const todo = n.items.filter((r) => r.status !== 'imported')}
+			{@const notUsed = n.items.filter((r) => r.unused).length}
+			<li class="group">
+				<details open={isOpen(n)} ontoggle={(e) => (open[n.key] = e.currentTarget.open)}>
+					<summary>
+						<span class="folder name grow">{n.label}</span>
+						<span class="muted small">{n.items.length}{todo.length ? ` · ${todo.length} to import` : ''}{notUsed ? ` · ${notUsed} not used` : ''}</span>
+						{#if todo.length}
+							<button class="secondary small-btn" title="Import the new and changed structures in this group" onclick={(e) => { e.preventDefault(); send({ type: 'importFiles', files: todo.map((r) => r.file) }); }}>Import {todo.length}</button>
+						{/if}
+					</summary>
+					<ul>{@render tree(n.children)}</ul>
+				</details>
+			</li>
+		{/if}
+	{/each}
+{/snippet}
 
 {#if !s}
 	<p class="muted pad">Loading…</p>
@@ -169,37 +237,7 @@
 					{#if s.unusedPaused}· the not-used check waits until the project has no errors{/if}
 				</p>
 				<ul>
-					{#each s.structures as r (r.file)}
-						<li class="st" class:unused={r.unused} class:changed={r.status === 'changed'}>
-							<div class="st-head">
-								<span class="name grow" title={`Saved ${r.saved} in ${r.file}`}>{r.id}</span>
-								{#if r.unused}
-									<span class="badge warn-badge">Not used</span>
-								{:else}
-									<span class="badge" class:changed-badge={r.status === 'changed'}>{label[r.status]}</span>
-								{/if}
-							</div>
-							{#if r.unused}
-								<div class="small">No <code>Structure(...)</code> call uses <code>{r.rel}</code>, so the pack leaves it out. Add it to a template pool:</div>
-								<code class="call">{r.call}</code>
-							{:else if r.status === 'new'}
-								<div class="muted small">Import copies it to {r.rel}.</div>
-							{:else}
-								<div class="muted small">{r.rel}</div>
-							{/if}
-							{#if r.packId}<div class="muted small">Its id in the pack is {r.packId}, in the project's namespace.</div>{/if}
-							<div class="actions">
-								{#if r.status !== 'imported'}
-									<button class="primary" onclick={() => send({ type: 'import', file: r.file })}>{r.status === 'changed' ? 'Import again' : 'Import'}</button>
-								{/if}
-								<button class="secondary" title={r.call} onclick={() => copy(r.file, { type: 'copyCall', file: r.file })}>{copied === r.file ? 'Copied' : 'Copy call'}</button>
-								{#if r.status !== 'new'}
-									<button class="secondary" onclick={() => send({ type: 'revealFile', rel: r.rel })}>Show file</button>
-								{/if}
-								<button class="secondary danger" title="Delete this save from the world, for one saved under the wrong name. Asks first." onclick={() => send({ type: 'deleteFromWorld', file: r.file })}>Delete from world</button>
-							</div>
-						</li>
-					{/each}
+					{@render tree(groups)}
 					{#each s.unusedFiles as rel (rel)}
 						<li class="st unused">
 							<div class="st-head">
@@ -456,6 +494,33 @@
 		background: var(--vscode-editorWarning-foreground);
 		color: var(--vscode-editor-background);
 		font-weight: 600;
+	}
+	.group > details > summary {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		cursor: pointer;
+		padding: 2px 0;
+		list-style: none;
+	}
+	.group > details > summary::-webkit-details-marker {
+		display: none;
+	}
+	.group > details > summary::before {
+		content: '▸';
+		width: 12px;
+		color: var(--vscode-icon-foreground);
+	}
+	.group > details[open] > summary::before {
+		content: '▾';
+	}
+	.group > details > ul {
+		padding-left: 12px;
+		margin-top: 4px;
+		border-left: 1px solid var(--vscode-tree-indentGuidesStroke, var(--vscode-widget-border, transparent));
+	}
+	.folder {
+		font-family: var(--vscode-editor-font-family);
 	}
 	.call {
 		display: block;

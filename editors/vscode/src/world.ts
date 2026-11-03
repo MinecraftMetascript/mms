@@ -164,6 +164,12 @@ export class WorldView implements vscode.Disposable, vscode.WebviewViewProvider 
 			if (info) await vscode.env.clipboard.writeText(info.call);
 			return;
 		}
+		if (m.type === 'importFiles') {
+			const world = this.structureWorld();
+			if (!world) return;
+			const want = new Set(m.files);
+			return this.importStructures(findStructures(world).filter((f) => want.has(f.file)));
+		}
 		if (m.type === 'revealFile') {
 			const project = this.project();
 			if (project) await vscode.commands.executeCommand('revealInExplorer', vscode.Uri.file(path.join(project, ...m.rel.split('/'))));
