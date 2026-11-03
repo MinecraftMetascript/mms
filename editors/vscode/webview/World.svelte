@@ -1,7 +1,8 @@
 <script lang="ts">
 	// The World view's page: the project, its world, the Build button with
 	// the last build's result and what to do in the game next, and the
-	// structures saved in the world. The extension (src/world.ts) owns the
+	// structures saved in the structure world (the build world unless a
+	// separate one is chosen). The extension (src/world.ts) owns the
 	// state and sends all of it after each change. Actions are buttons,
 	// drawn with the theme's button colours, and results are cards without
 	// them, so the two never look alike.
@@ -55,10 +56,11 @@
 			<div class="row">
 				<span class="icon" aria-hidden="true">◍</span>
 				<div class="grow">
+					<div class="muted small">Builds into</div>
 					<div class="name" title={s.world.path}>{s.world.name}</div>
 					{#if s.world.folder}<div class="muted small">{s.world.folder}</div>{/if}
 				</div>
-				<button class="secondary small-btn" title="Choose another world" onclick={() => send({ type: 'run', action: 'chooseWorld' })}>Change</button>
+				<button class="secondary small-btn" title="Choose another world to build into" onclick={() => send({ type: 'run', action: 'chooseWorld' })}>Change</button>
 				<button class="secondary small-btn" title="Open the world's datapacks folder" onclick={() => send({ type: 'run', action: 'revealWorld' })}>Open folder</button>
 			</div>
 		{/if}
@@ -69,6 +71,9 @@
 			<p>Choose a Minecraft world to build this project's pack into. The data pack goes in the world's datapacks folder, and a resource pack, if the project has one, in resourcepacks/resources.zip.</p>
 			<button class="primary wide" onclick={() => send({ type: 'run', action: 'chooseWorld' })}>Choose world…</button>
 			<p class="muted small">Worlds come from the Minecraft launcher's and Prism Launcher's saves folders, or browse to any world folder.</p>
+			{#if !s.structureWorld}
+				<button class="secondary small-btn" onclick={() => send({ type: 'run', action: 'chooseStructureWorld' })}>Only import structures from a world…</button>
+			{/if}
 		</section>
 	{:else}
 		<section>
@@ -123,7 +128,10 @@
 				</div>
 			{/if}
 		</section>
+	{/if}
 
+	{#if s.structureWorld}
+		{@const from = s.structureWorld}
 		<section>
 			<div class="head">
 				<h2 class="grow">Structures</h2>
@@ -132,6 +140,27 @@
 				{/if}
 				<button class="icon-btn" title="Refresh" aria-label="Refresh" onclick={() => send({ type: 'run', action: 'refresh' })}>↻</button>
 			</div>
+			{#if from.separate}
+				<div class="row">
+					<span class="icon" aria-hidden="true">◍</span>
+					<div class="grow">
+						<div class="muted small">From</div>
+						<div class="name" title={from.path}>{from.name}</div>
+						{#if from.folder}<div class="muted small">{from.folder}</div>{/if}
+					</div>
+					<button class="secondary small-btn" title="Choose another world to import structures from" onclick={() => send({ type: 'run', action: 'chooseStructureWorld' })}>Change</button>
+					<button class="secondary small-btn" title="Open the world's generated folder, where structure blocks save" onclick={() => send({ type: 'run', action: 'revealStructureWorld' })}>Open folder</button>
+				</div>
+				<p class="muted small">
+					Builds never touch this world, so the pieces saved in it are safe.
+					{#if s.world}<button class="link" onclick={() => send({ type: 'run', action: 'sameStructureWorld' })}>Use the build world instead</button>{/if}
+				</p>
+			{:else}
+				<p class="muted small">
+					From the build world.
+					<button class="link" title="Build in one world and save structures in another, so builds never generate over the pieces" onclick={() => send({ type: 'run', action: 'chooseStructureWorld' })}>Use a separate world…</button>
+				</p>
+			{/if}
 			{#if !s.structures.length && !s.unusedFiles.length}
 				<p class="muted small">None saved yet. Save one with a structure block in SAVE mode; it shows up here to import into the project for a template pool.</p>
 			{:else}
@@ -176,7 +205,7 @@
 								<span class="name grow">{rel}</span>
 								<span class="badge warn-badge">Not used</span>
 							</div>
-							<div class="small">In the project but not saved in this world, and no <code>Structure(...)</code> call uses it, so the pack leaves it out.</div>
+							<div class="small">In the project but not saved in {from.name}, and no <code>Structure(...)</code> call uses it, so the pack leaves it out.</div>
 							<div class="actions">
 								<button class="secondary" onclick={() => send({ type: 'revealFile', rel })}>Show file</button>
 							</div>
@@ -303,6 +332,18 @@
 	.wide {
 		width: 100%;
 		padding: 6px 10px;
+	}
+	/* An inline action inside a sentence; still a button, but it reads as a link. */
+	.link {
+		background: none;
+		border: 0;
+		padding: 0;
+		color: var(--vscode-textLink-foreground);
+		text-decoration: underline;
+		font-size: inherit;
+	}
+	.link:hover {
+		color: var(--vscode-textLink-activeForeground);
 	}
 	.icon-btn {
 		background: none;
