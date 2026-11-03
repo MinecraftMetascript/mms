@@ -37,7 +37,8 @@ for (const t of wanted) {
 	}
 }
 
-const vsce = path.join(root, 'node_modules', '.bin', process.platform === 'win32' ? 'vsce.cmd' : 'vsce');
+// vsce's own entry point, run with this node: no shell, so paths with spaces work on Windows.
+const vsce = path.join(root, 'node_modules', '@vscode', 'vsce', 'vsce');
 const ldflags = ['-s', '-w'];
 if (process.env.MMS_VERSION) ldflags.push(`-X main.version=${process.env.MMS_VERSION}`);
 
@@ -55,7 +56,7 @@ try {
 		});
 		fs.copyFileSync(path.join(engine, 'THIRD_PARTY_NOTICES.txt'), path.join(bin, 'THIRD_PARTY_NOTICES.txt'));
 		if (goos !== 'windows') fs.chmodSync(path.join(bin, exe), 0o755);
-		execFileSync(vsce, ['package', '--skip-license', '--target', target], { cwd: root, stdio: 'inherit', shell: process.platform === 'win32' });
+		execFileSync(process.execPath, [vsce, 'package', '--skip-license', '--target', target], { cwd: root, stdio: 'inherit' });
 	}
 } finally {
 	// The universal .vsix (`npm run package`) must not pick up a stray binary.

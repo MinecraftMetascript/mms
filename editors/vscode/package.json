@@ -185,7 +185,7 @@
     "build:extension": "esbuild src/extension.ts --bundle --platform=node --format=cjs --external:vscode --outfile=out/extension.js --minify",
     "build:webview": "vite build --config webview/vite.config.ts && vite build --config webview/world.vite.config.ts",
     "check": "tsc --noEmit && svelte-check --tsconfig ./webview/tsconfig.json",
-    "package": "npm run check && npm run build && vsce package --skip-license",
+    "package": "npm run check && npm run build && node -e \"require('node:fs').rmSync('bin', { recursive: true, force: true })\" && vsce package --skip-license",
     "package:targets": "npm run check && npm run build && node scripts/package-targets.mjs"
   },
   "dependencies": {
