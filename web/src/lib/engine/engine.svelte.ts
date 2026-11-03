@@ -82,6 +82,8 @@ export interface OutputAsset {
 	pack?: string;
 	/** For a structure file: its jigsaw blocks. */
 	jigsaws?: OutputJigsaw[];
+	/** For a structure file: its size in blocks, x y z. */
+	size?: [number, number, number];
 }
 
 export interface DocSymbol {

@@ -955,6 +955,19 @@ test('a jigsaw structure previews which pieces join which, and marks dead ends',
 	await replaceText(page, src.replace('TemplatePool rooms = {', 'TemplatePool rooms2 = {'));
 	await expect(graph.getByLabel('Problems')).toContainText('2 dead ends');
 	await expect(graph.getByLabel('Pool dungeon:rooms')).toContainText('No TemplatePool declares this');
+
+	// The graph copies as Markdown, dead ends and all, to share it.
+	await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+	await graph.getByRole('button', { name: 'Copy as Markdown' }).click();
+	await expect(graph.getByRole('button', { name: 'Copied' })).toBeVisible();
+	const md = await page.evaluate(() => navigator.clipboard.readText());
+	expect(md).toContain('# Jigsaw connections: dungeon:dungeon');
+	expect(md).toContain('- Dead end: `dungeon:halls/hall` in `dungeon:halls`, jigsaw block at 2 1 8 facing south (name `dungeon:hall_exit`, pool `dungeon:rooms`, target `dungeon:room_entry`): no TemplatePool declares dungeon:rooms.');
+	expect(md).toContain('- `dungeon:halls/hall` · weight 3 (75%) · size 5×5×9');
+	expect(md).toContain('No TemplatePool declares this pool.');
+	expect(md).toContain('```mermaid\nflowchart LR');
+	await graph.getByRole('button', { name: 'Copy Mermaid' }).click();
+	expect(await page.evaluate(() => navigator.clipboard.readText())).toMatch(/^flowchart LR\n {2}subgraph P0\["start · start"\]/);
 	expect(errors).toEqual([]);
 });
 

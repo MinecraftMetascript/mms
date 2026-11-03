@@ -13,7 +13,8 @@ import (
 
 func TestStructureHoverListsJigsaws(t *testing.T) {
 	data, err := nbt.Encode(map[string]any{
-		"palette": []any{map[string]any{"Name": "minecraft:jigsaw"}},
+		"size":    []any{int32(5), int32(3), int32(5)},
+		"palette": []any{map[string]any{"Name": "minecraft:jigsaw", "Properties": map[string]any{"orientation": "south_up"}}},
 		"blocks": []any{map[string]any{"pos": []any{int32(2), int32(0), int32(4)}, "state": int32(0),
 			"nbt": map[string]any{"id": "minecraft:jigsaw", "pool": "test:tops", "name": "test:bottom", "target": "test:top"}}},
 	})
@@ -30,7 +31,7 @@ func TestStructureHoverListsJigsaws(t *testing.T) {
 	}
 	s := &Session{P: p, R: r}
 	md, _ := s.Hover("main.mms", strings.Index(src, "Structure")+2)
-	if !strings.Contains(md, "| 2 0 4 | `test:bottom` | `test:tops` | `test:top` |") {
+	if !strings.Contains(md, "size 5×3×5") || !strings.Contains(md, "| 2 0 4 | south up | `test:bottom` | `test:tops` | `test:top` |") {
 		t.Fatalf("hover:\n%s", md)
 	}
 }

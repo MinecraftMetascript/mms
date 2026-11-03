@@ -720,7 +720,8 @@ func TestOutputStructureJigsaws(t *testing.T) {
 	c := start(t)
 	c.result("initialize", map[string]any{})
 	data, err := nbt.Encode(map[string]any{
-		"palette": []any{map[string]any{"Name": "minecraft:jigsaw"}},
+		"size":    []any{int32(5), int32(4), int32(7)},
+		"palette": []any{map[string]any{"Name": "minecraft:jigsaw", "Properties": map[string]any{"orientation": "east_up"}}},
 		"blocks": []any{map[string]any{"pos": []any{int32(1), int32(2), int32(3)}, "state": int32(0),
 			"nbt": map[string]any{"id": "minecraft:jigsaw", "pool": "mms:rooms", "name": "mms:door", "target": "mms:door"}}},
 	})
@@ -736,12 +737,15 @@ func TestOutputStructureJigsaws(t *testing.T) {
 	if len(assets) != 1 {
 		t.Fatalf("assets = %v", assets)
 	}
+	if size := fmt.Sprint(assets[0].(map[string]any)["size"]); size != "[5 4 7]" {
+		t.Errorf("size = %s", size)
+	}
 	js, _ := assets[0].(map[string]any)["jigsaws"].([]any)
 	if len(js) != 1 {
 		t.Fatalf("asset = %v", assets[0])
 	}
 	j := js[0].(map[string]any)
-	if j["pool"] != "mms:rooms" || j["name"] != "mms:door" || j["target"] != "mms:door" || fmt.Sprint(j["pos"]) != "[1 2 3]" {
+	if j["pool"] != "mms:rooms" || j["name"] != "mms:door" || j["target"] != "mms:door" || fmt.Sprint(j["pos"]) != "[1 2 3]" || j["orientation"] != "east_up" || j["joint"] != "aligned" {
 		t.Errorf("jigsaw = %v", j)
 	}
 }

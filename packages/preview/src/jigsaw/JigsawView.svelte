@@ -5,7 +5,8 @@
 	// lines to the pieces that can join it, and lights those pieces. Dead
 	// ends, pieces nothing can join, and pools past the structure's size
 	// are marked.
-	import { deadEndText, type JigsawGraph, type Link, type Piece } from './graph';
+	import { type JigsawGraph, type Link, type Piece } from './graph';
+	import { jigsawMarkdown, jigsawMermaid, joinsText } from './export';
 
 	let { graph }: { graph: JigsawGraph } = $props();
 
@@ -207,17 +208,32 @@
 	}
 	const detail = $derived(pieceAt(picked));
 	/** The pieces a jigsaw block can join, in words. */
-	function joins(l: Link): string {
-		if (l.dead) return deadEndText(l, strip(detail!.piece.jigsaws![l.jigsaw].target));
-		const pool = l.to !== undefined ? graph.pools[l.to] : undefined;
-		const names = l.pieces.map((i) => strip(pool!.pieces[i].id));
-		if (!pool?.declared) return `${strip(l.pool)} (not read: vanilla or another pack)`;
-		if (l.fallback) {
-			const fb = graph.pools[l.fallback.to];
-			names.push(`only the fallback ${strip(fb.id)}: ${l.fallback.pieces.map((i) => strip(fb.pieces[i].id)).join(', ')}`);
+	const joins = (l: Link) => joinsText(graph, detail!.piece, l, strip);
+
+	// Copy the graph as text to share it: a Markdown report (with a
+	// Mermaid chart) or just the Mermaid chart.
+	let copied = $state<string | null>(null);
+	let copyTimer: ReturnType<typeof setTimeout> | undefined;
+	async function copy(what: 'markdown' | 'mermaid') {
+		const text = what === 'markdown' ? jigsawMarkdown(graph) : jigsawMermaid(graph);
+		let ok = false;
+		try {
+			await navigator.clipboard.writeText(text);
+			ok = true;
+		} catch {
+			// Some hosts block the clipboard API; fall back to a selection.
+			const area = document.createElement('textarea');
+			area.value = text;
+			area.style.position = 'fixed';
+			area.style.opacity = '0';
+			document.body.append(area);
+			area.select();
+			ok = document.execCommand('copy');
+			area.remove();
 		}
-		if (l.maybe) names.push('pieces whose jigsaws are unknown');
-		return names.join(', ') || 'nothing (target is empty)';
+		copied = ok ? what : 'failed';
+		clearTimeout(copyTimer);
+		copyTimer = setTimeout(() => (copied = null), 2000);
 	}
 	const problems = $derived(graph.problems);
 </script>
@@ -236,6 +252,21 @@
 			{#if problems.tooDeep}<span class="text-amber-600 dark:text-amber-400">{problems.tooDeep} past size</span>{/if}
 			{#if problems.unknown}<span class="text-muted" title="Pieces that are not this project's structure files, so their jigsaw blocks are not read">{problems.unknown} not read</span>{/if}
 			{#if !problems.deadEnds && !problems.unreachable && !problems.tooDeep}<span class="text-muted">No problems found</span>{/if}
+		</span>
+		<span class="flex gap-1" aria-label="Export">
+			<button
+				type="button"
+				class="rounded border border-line px-1.5 py-0.5 hover:bg-hover"
+				title="Copy every pool, piece and jigsaw block (position, facing, size, what it joins, dead ends) as Markdown with a Mermaid chart, to paste into an issue or a chat"
+				onclick={() => copy('markdown')}>{copied === 'markdown' ? 'Copied' : 'Copy as Markdown'}</button
+			>
+			<button
+				type="button"
+				class="rounded border border-line px-1.5 py-0.5 hover:bg-hover"
+				title="Copy the graph as a Mermaid flowchart"
+				onclick={() => copy('mermaid')}>{copied === 'mermaid' ? 'Copied' : 'Copy Mermaid'}</button
+			>
+			{#if copied === 'failed'}<span class="text-red-600 dark:text-red-400">Couldn't copy</span>{/if}
 		</span>
 	</div>
 	<div class="min-h-0 flex-1 overflow-auto bg-canvas">
@@ -336,7 +367,7 @@
 			{@const p = detail.piece}
 			<h3 class="mb-1 font-semibold">
 				<span class="font-mono">{strip(p.id)}</span>
-				<span class="font-normal text-muted">· in {strip(graph.pools[detail.pool].id)}, weight {p.weight} ({pct(p.share)})</span>
+				<span class="font-normal text-muted">· in {strip(graph.pools[detail.pool].id)}, weight {p.weight} ({pct(p.share)}){p.size ? `, size ${p.size.join('×')}` : ''}</span>
 			</h3>
 			{#if p.unreachable}
 				<p class="mb-1 text-amber-700 dark:text-amber-300">No jigsaw block that draws from this pool targets a name this piece has, so it is never placed.</p>
@@ -348,13 +379,14 @@
 			{:else}
 				<table class="w-full border-collapse">
 					<thead class="text-left text-muted">
-						<tr><th class="py-0.5 font-normal">At</th><th class="font-normal">Name</th><th class="font-normal">Pool</th><th class="font-normal">Target</th><th class="font-normal">Joins</th></tr>
+						<tr><th class="py-0.5 font-normal">At</th><th class="font-normal" title="The way it points, then the way its top points">Facing</th><th class="font-normal">Name</th><th class="font-normal">Pool</th><th class="font-normal">Target</th><th class="font-normal">Joins</th></tr>
 					</thead>
 					<tbody>
 						{#each p.jigsaws as j, ji (ji)}
 							{@const l = p.links.find((l) => l.jigsaw === ji)}
 							<tr class="border-t border-line align-top">
 								<td class="py-1 pr-2 whitespace-nowrap">{j.pos.join(' ')}</td>
+								<td class="pr-2 whitespace-nowrap" title={j.joint ? `joint: ${j.joint}` : undefined}>{j.orientation?.replace('_', ', top ') ?? '?'}</td>
 								<td class="pr-2 font-mono">{strip(j.name)}</td>
 								<td class="pr-2 font-mono">{strip(j.pool)}</td>
 								<td class="pr-2 font-mono">{strip(j.target)}</td>

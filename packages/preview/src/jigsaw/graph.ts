@@ -20,7 +20,9 @@ export type DeadEnd =
 	/** Its pool has no pieces. */
 	| 'empty-pool'
 	/** No piece of its pool has a jigsaw block named its target. */
-	| 'no-target';
+	| 'no-target'
+	/** Its pool's jigsaw blocks named its target all face a way it cannot join (up joins only down; sideways only sideways). */
+	| 'facing';
 
 export interface Link {
 	/** The jigsaw block, by its index in the piece's jigsaws. */
@@ -49,6 +51,8 @@ export interface Piece {
 	share: number;
 	/** Its jigsaw blocks; undefined when unknown (not a project structure file). */
 	jigsaws?: Jigsaw[];
+	/** Its size in blocks, x y z, when it is a project structure file. */
+	size?: [number, number, number];
 	links: Link[];
 	/**
 	 * No jigsaw block that draws from this pool targets a name this piece
@@ -115,7 +119,7 @@ function parse(text: string | undefined): Json | undefined {
 }
 
 /** A pool element's piece; a list element is one piece. */
-function elementPieces(el: Json | undefined, weight: number, structures: Map<string, Jigsaw[]>, out: Omit<Piece, 'share' | 'links' | 'unreachable'>[]) {
+function elementPieces(el: Json | undefined, weight: number, structures: Map<string, OutputAsset>, out: Omit<Piece, 'share' | 'links' | 'unreachable'>[]) {
 	if (!isObj(el)) {
 		out.push({ id: '?', kind: 'other', weight });
 		return;
@@ -125,7 +129,8 @@ function elementPieces(el: Json | undefined, weight: number, structures: Map<str
 		case 'single_pool_element':
 		case 'legacy_single_pool_element': {
 			const id = fullId(String(el.location ?? '?'));
-			out.push({ id, kind: 'single', weight, jigsaws: structures.get(id) });
+			const a = structures.get(id);
+			out.push({ id, kind: 'single', weight, jigsaws: a?.jigsaws, ...(a?.size ? { size: a.size } : {}) });
 			break;
 		}
 		case 'list_pool_element': {
@@ -136,7 +141,7 @@ function elementPieces(el: Json | undefined, weight: number, structures: Map<str
 			for (const e of Array.isArray(el.elements) ? el.elements : []) elementPieces(e, 1, structures, parts);
 			const first = parts[0];
 			if (!first) out.push({ id: 'empty list', kind: 'empty', weight, jigsaws: [] });
-			else out.push({ id: parts.map((q) => q.id).join(' + '), kind: first.kind, weight, jigsaws: first.jigsaws });
+			else out.push({ id: parts.map((q) => q.id).join(' + '), kind: first.kind, weight, jigsaws: first.jigsaws, ...(first.size ? { size: first.size } : {}) });
 			break;
 		}
 		case 'feature_pool_element':
@@ -158,10 +163,10 @@ export function jigsawGraph(path: string | null, output: readonly OutputFile[], 
 	const root = jigsawable(path);
 	if (!root) return null;
 	const files = new Map(output.map((f) => [f.path, f]));
-	const structures = new Map<string, Jigsaw[]>();
+	const structures = new Map<string, OutputAsset>();
 	for (const a of assets) {
 		const m = nbtPath.exec(a.path);
-		if (m && a.jigsaws) structures.set(`${m[1]}:${m[2]}`, a.jigsaws);
+		if (m && a.jigsaws) structures.set(`${m[1]}:${m[2]}`, a);
 	}
 	// Namespaces the project writes to: a pool there must be declared.
 	const namespaces = new Set<string>();
@@ -270,11 +275,13 @@ export function jigsawGraph(path: string | null, output: readonly OutputFile[], 
 	const targeted = new Map<string, Set<string>>();
 	const counted = new Set<string>();
 	const once = (key: string) => !counted.has(key) && !!counted.add(key);
-	const matches = (pool: Pool, target: string, link: Link) => {
+	let named = false; // a piece had the target name, but faced the wrong way
+	const matches = (pool: Pool, j: Jigsaw, link: Link) => {
 		const pieces: number[] = [];
 		pool.pieces.forEach((q, qi) => {
 			if (q.jigsaws === undefined) link.maybe = true;
-			else if (q.jigsaws.some((o) => o.name === target)) pieces.push(qi);
+			else if (q.jigsaws.some((o) => o.name === j.target && canFace(j, o))) pieces.push(qi);
+			else if (q.jigsaws.some((o) => o.name === j.target)) named = true;
 		});
 		return pieces;
 	};
@@ -288,6 +295,7 @@ export function jigsawGraph(path: string | null, output: readonly OutputFile[], 
 				const to = find(j.pool, pool.depth + 1);
 				const target = to === undefined ? undefined : graph.pools[to];
 				const link: Link = { jigsaw: ji, pool: j.pool, to, pieces: [], maybe: false };
+				named = false;
 				if (!def(j.pool).declared) {
 					const ns = j.pool.split(':')[0];
 					if (ns !== 'minecraft' && namespaces.has(ns)) link.dead = 'undeclared';
@@ -295,17 +303,17 @@ export function jigsawGraph(path: string | null, output: readonly OutputFile[], 
 				} else if (j.target !== EMPTY) {
 					if (!targeted.has(j.pool)) targeted.set(j.pool, new Set());
 					targeted.get(j.pool)!.add(j.target);
-					if (target) link.pieces = matches(target, j.target, link);
+					if (target) link.pieces = matches(target, j, link);
 					else link.maybe = true; // past the last depth shown
 					// The game tries the pool's fallback when none of its pieces fit.
 					const fb = target?.fallbackTo ?? (target?.fallback === undefined ? undefined : at.get(`${target.fallback}@${target.depth}`));
 					if (target && !link.pieces.length && !link.maybe && fb !== undefined) {
 						const f = graph.pools[fb];
 						if (!f.declared && f.id.split(':')[0] === 'minecraft') link.maybe = true;
-						const pieces = matches(f, j.target, link);
+						const pieces = matches(f, j, link);
 						if (pieces.length) link.fallback = { to: fb, pieces };
 					}
-					if (target && !link.pieces.length && !link.maybe && !link.fallback) link.dead = target.pieces.length ? 'no-target' : 'empty-pool';
+					if (target && !link.pieces.length && !link.maybe && !link.fallback) link.dead = !target.pieces.length ? 'empty-pool' : named ? 'facing' : 'no-target';
 				}
 				if (link.dead && once(`d|${pool.id}|${pi}|${ji}`)) graph.problems.deadEnds++;
 				p.links.push(link);
@@ -343,8 +351,24 @@ function markUnreachable(p: Piece, names: Set<string>, graph: JigsawGraph, count
 	if (count) graph.problems.unreachable++;
 }
 
+/** The way a jigsaw block faces, from its orientation, or undefined. */
+export const front = (j: Jigsaw) => (j.orientation?.includes('_') ? j.orientation.split('_')[0] : undefined);
+
+/**
+ * Whether two jigsaw blocks can ever join by facing: the game turns the
+ * new piece only about the y axis, so up joins only down and sideways
+ * only sideways. Unknown facing counts as able to.
+ */
+export function canFace(a: Jigsaw, b: Jigsaw): boolean {
+	const fa = front(a), fb = front(b);
+	if (!fa || !fb) return true;
+	const vertical = (f: string) => f === 'up' || f === 'down';
+	if (!vertical(fa) && !vertical(fb)) return true;
+	return (fa === 'up' && fb === 'down') || (fa === 'down' && fb === 'up');
+}
+
 /** Plain words for a dead end. */
-export function deadEndText(l: Link, target: string): string {
+export function deadEndText(l: Link, target: string, j?: Jigsaw): string {
 	switch (l.dead) {
 		case 'undeclared':
 			return `no TemplatePool declares ${l.pool}`;
@@ -352,6 +376,11 @@ export function deadEndText(l: Link, target: string): string {
 			return `${l.pool} has no pieces`;
 		case 'no-target':
 			return `no piece of ${l.pool} has a jigsaw block named ${target}`;
+		case 'facing': {
+			const f = j && front(j);
+			const want = f === 'up' ? 'down' : f === 'down' ? 'up' : 'sideways';
+			return `every jigsaw block named ${target} in ${l.pool} faces a way this one can't join${f ? ` (it faces ${f}, so it needs one facing ${want})` : ''}`;
+		}
 		default:
 			return '';
 	}
