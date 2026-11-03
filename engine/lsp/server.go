@@ -995,6 +995,9 @@ func (s *Server) output(_ context.Context, p struct {
 		if f.Implicit {
 			m["implicit"] = true
 		}
+		if len(f.Labels) > 0 {
+			m["labels"] = f.Labels
+		}
 		if f.Unit != "" {
 			l := idx[f.Unit]
 			if l == nil {

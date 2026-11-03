@@ -188,3 +188,49 @@ func TestJigsawFitArch(t *testing.T) {
 		t.Fatalf("got:\n%s\nwant:\n%s", got, want)
 	}
 }
+
+// A doc comment above a template pool element labels it, so the same
+// structure with different processors can be told apart.
+func TestPoolElementLabels(t *testing.T) {
+	files := fstest.MapFS{"art/icon.png": {Data: pngBytes}, "s/cap.nbt": {Data: piece(t)}}
+	src := `ProcessorList worn = { processors = [] }
+TemplatePool caps = {
+  fallback = minecraft:empty
+  elements = [
+    { weight = 5, element = { element_type = minecraft:single_pool_element, location = Structure("s/cap.nbt", "cap"), projection = rigid, processors = minecraft:empty } },
+    /** @label Worn road cap */
+    { weight = 1, element = { element_type = minecraft:single_pool_element, location = Structure("s/cap.nbt", "cap"), projection = rigid, processors = worn } },
+    // a plain comment is not a label
+    { weight = 1, element = { element_type = minecraft:single_pool_element, location = Structure("s/cap.nbt", "cap"), projection = rigid, processors = worn } },
+    /**
+     * Heavily worn.
+     * More text.
+     */
+    { weight = 1, element = { element_type = minecraft:single_pool_element, location = Structure("s/cap.nbt", "cap"), projection = rigid, processors = worn } },
+  ]
+}
+`
+	_, r := assetProject(t, files, src)
+	for _, f := range r.Emit() {
+		if f.Path == "data/demo/worldgen/template_pool/caps.json" {
+			if got := fmt.Sprint(f.Labels); got != "map[/elements/1:Worn road cap /elements/3:Heavily worn.]" {
+				t.Fatalf("labels = %s", got)
+			}
+			return
+		}
+	}
+	t.Fatal("no pool file")
+}
+
+// 26.x structure files write palette entries as {id, properties}.
+func TestJigsawOrientation26Palette(t *testing.T) {
+	root := map[string]any{
+		"palette": []any{map[string]any{"id": "minecraft:jigsaw", "properties": map[string]any{"orientation": "up_north"}}},
+		"blocks": []any{map[string]any{"pos": []any{int32(2), int32(0), int32(13)}, "state": int32(0),
+			"nbt": map[string]any{"id": "minecraft:jigsaw", "pool": "demo:a", "name": "demo:b", "target": "demo:c", "joint": "rollable"}}},
+	}
+	got := Jigsaws(root)
+	if len(got) != 1 || got[0].Orientation != "up_north" || got[0].Joint != "rollable" {
+		t.Fatalf("got %+v", got)
+	}
+}

@@ -3,6 +3,7 @@ package project
 import (
 	"archive/zip"
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -32,6 +33,10 @@ type OutFile struct {
 	// required; Span is that value's. Editors follow the cursor to the
 	// declaration's own file, not to these.
 	Implicit bool
+	// Labels names parts of the file by JSON pointer, from doc comments
+	// in the source, such as "/elements/2" for a template pool element
+	// written under a `/** @label Worn road cap */` comment.
+	Labels map[string]string
 }
 
 // Emit lays out the data pack: one file per resource, merged tags, raw
@@ -193,6 +198,9 @@ func (r *Result) Emit() []OutFile {
 				continue
 			}
 			f := OutFile{Path: d.Kind.Dir(ns) + "/" + path + ".json", Data: jsonv.Marshal(d.Value), Unit: d.Unit.Path, Span: d.D.Sp}
+			if d.Kind.Folder() == "worldgen/template_pool" {
+				f.Labels = elementLabels(d)
+			}
 			if d.Kind.Assets != "" {
 				f.Pack = sema.ResourcePack
 			}
@@ -390,4 +398,39 @@ func Zip(files []OutFile) ([]byte, error) {
 		return nil, err
 	}
 	return buf.Bytes(), nil
+}
+
+// elementLabels reads the doc comments above the entries of a declared
+// object's `elements` list, as labels keyed by JSON pointer: a template
+// pool can list one structure several times with different processors,
+// and a label tells them apart in the jigsaw preview.
+func elementLabels(d *Decl) map[string]string {
+	obj, ok := d.D.Value.(*syntax.Object)
+	if !ok || obj.Body == nil || d.Unit == nil || d.Unit.File == nil {
+		return nil
+	}
+	var out map[string]string
+	for _, it := range obj.Body.Items {
+		f, ok := it.(*syntax.FieldStmt)
+		if !ok || f.Key == nil || f.Key.Text != "elements" {
+			continue
+		}
+		list, ok := f.Value.(*syntax.List)
+		if !ok {
+			continue
+		}
+		for i, e := range list.Elems {
+			doc := syntax.DocAt(d.Unit.File, e.Span().Start)
+			if doc == "" {
+				continue
+			}
+			if l := syntax.ParseDoc(doc).Label(); l != "" {
+				if out == nil {
+					out = map[string]string{}
+				}
+				out[fmt.Sprintf("/elements/%d", i)] = l
+			}
+		}
+	}
+	return out
 }

@@ -12,6 +12,8 @@ const EMPTY = 'minecraft:empty';
 const pct = (n: number) => (n >= 0.995 ? '100%' : n < 0.01 ? '<1%' : `${Math.round(n * 100)}%`);
 const code = (s: string) => `\`${s}\``;
 const sizeText = (s: [number, number, number]) => `${s[0]}×${s[1]}×${s[2]}`;
+/** A piece as `id`, with its label when it has one. */
+const pieceName = (p: Piece) => `${p.kind === 'single' ? code(p.id) : `*${p.id}*`}${p.label ? ` "${p.label}"` : ''}`;
 
 /** Its facing, the way its top points, and joint, from its orientation. */
 function facing(j: Jigsaw): { front: string; top: string } | null {
@@ -42,12 +44,14 @@ function sides(j: Jigsaw, size: [number, number, number] | undefined): { on: str
 /** The pieces a jigsaw block can join, in words, with full ids. */
 export function joinsText(graph: JigsawGraph, piece: Piece, l: Link, id: (s: string) => string = (s) => s): string {
 	if (l.dead) return deadEndText(l, id(piece.jigsaws![l.jigsaw].target), piece.jigsaws![l.jigsaw]);
+	if (l.truncated) return `${id(l.pool)} (beyond the depths shown)`;
 	const pool = l.to !== undefined ? graph.pools[l.to] : undefined;
 	if (!pool?.declared) return `${id(l.pool)} (not read: vanilla or another pack)`;
-	const names = l.pieces.map((i) => id(pool.pieces[i].id));
+	const named = (q: Piece) => (q.label ? `${id(q.id)} (${q.label})` : id(q.id));
+	const names = l.pieces.map((i) => named(pool.pieces[i]));
 	if (l.fallback) {
 		const fb = graph.pools[l.fallback.to];
-		names.push(`only the fallback ${id(fb.id)}: ${l.fallback.pieces.map((i) => id(fb.pieces[i].id)).join(', ')}`);
+		names.push(`only the fallback ${id(fb.id)}: ${l.fallback.pieces.map((i) => named(fb.pieces[i])).join(', ')}`);
 	}
 	if (l.maybe) names.push('pieces whose jigsaws are unknown');
 	return names.join(', ') || 'nothing (target is empty)';
@@ -122,7 +126,7 @@ export function jigsawMarkdown(graph: JigsawGraph): string {
 				const j = p.jigsaws![l.jigsaw];
 				const f = facing(j);
 				problems.push(
-					`- Dead end: ${code(p.id)} in ${code(pool.id)}, jigsaw block at ${j.pos.join(' ')}${f ? ` facing ${f.front}` : ''} (name ${code(j.name)}, pool ${code(j.pool)}, target ${code(j.target)}): ${deadEndText(l, j.target, j)}.`
+					`- Dead end: ${pieceName(p)} in ${code(pool.id)}, jigsaw block at ${j.pos.join(' ')}${f ? ` facing ${f.front}` : ''} (name ${code(j.name)}, pool ${code(j.pool)}, target ${code(j.target)}): ${deadEndText(l, j.target, j)}.`
 				);
 			});
 			if (p.unreachable && !seen.has(`never|${pool.id}|${pi}`)) {
@@ -131,18 +135,18 @@ export function jigsawMarkdown(graph: JigsawGraph): string {
 				const wanted =
 					pool === start && graph.startName ? code(graph.startName) : [...(targets.get(pool.id) ?? [])].map(code).join(', ') || 'none';
 				problems.push(
-					`- Never joined: ${code(p.id)} in ${code(pool.id)}. Its jigsaw names are ${has}, but jigsaw blocks drawing from this pool only target ${wanted}${pool === start ? ' (the start jigsaw name)' : ''}.`
+					`- Never joined: ${pieceName(p)} in ${code(pool.id)}. Its jigsaw names are ${has}, but jigsaw blocks drawing from this pool only target ${wanted}${pool === start ? ' (the start jigsaw name)' : ''}.`
 				);
 			}
 			if (p.kind === 'single' && p.jigsaws === undefined && !seen.has(`unknown|${p.id}`)) {
 				seen.add(`unknown|${p.id}`);
-				problems.push(`- Not read: ${code(p.id)} in ${code(pool.id)} is not a structure file of this project, so its jigsaw blocks are unknown.`);
+				problems.push(`- Not read: ${pieceName(p)} in ${code(pool.id)} is not a structure file of this project, so its jigsaw blocks are unknown.`);
 			}
 			for (const j of p.jigsaws ?? []) {
 				const w = sides(j, p.size).warn;
 				if (w && !seen.has(`side|${p.id}|${j.pos.join(',')}`)) {
 					seen.add(`side|${p.id}|${j.pos.join(',')}`);
-					problems.push(`- Check: ${code(p.id)} jigsaw block at ${j.pos.join(' ')} (${code(j.name)}) ${w} (size ${sizeText(p.size!)}).`);
+					problems.push(`- Check: ${pieceName(p)} jigsaw block at ${j.pos.join(' ')} (${code(j.name)}) ${w} (size ${sizeText(p.size!)}).`);
 				}
 			}
 		});
@@ -175,7 +179,7 @@ export function jigsawMarkdown(graph: JigsawGraph): string {
 			const head = [`weight ${p.weight} (${pct(p.share)})`];
 			if (p.size) head.push(`size ${sizeText(p.size)}`);
 			if (p.unreachable) head.push('**never joined**');
-			out.push(`- ${p.kind === 'single' ? code(p.id) : `*${p.id}*`} · ${head.join(' · ')}`);
+			out.push(`- ${pieceName(p)} · ${head.join(' · ')}`);
 			if (p.kind !== 'single') continue;
 			if (!p.jigsaws) {
 				out.push('  - Jigsaw blocks unknown: not a structure file of this project.');
@@ -226,7 +230,8 @@ export function jigsawMermaid(graph: JigsawGraph): string {
 			const bits = [pct(p.share)];
 			if (p.size) bits.push(sizeText(p.size));
 			if (p.jigsaws === undefined && p.kind === 'single') bits.push('jigsaws unknown');
-			lines.push(`    P${pi}_${qi}[${label(`${p.kind === 'single' ? strip(p.id) : p.id}<br/>${bits.join(' · ')}`)}]`);
+			const name = p.kind === 'single' ? strip(p.id) : p.id;
+			lines.push(`    P${pi}_${qi}[${label(`${p.label ? `${p.label}<br/>${name}` : name}<br/>${bits.join(' · ')}`)}]`);
 			if (p.unreachable) never.push(`P${pi}_${qi}`);
 		});
 		lines.push('  end');
@@ -258,7 +263,8 @@ export function jigsawMermaid(graph: JigsawGraph): string {
 				const back = (to: number) => graph.pools[to].depth <= pool.depth;
 				for (const t of l.pieces) edge(from, `P${l.to}_${t}`, name, back(l.to) || l.maybe);
 				if (l.fallback) for (const t of l.fallback.pieces) edge(from, `P${l.fallback.to}_${t}`, `${name} (fallback)`, true);
-				if (!l.pieces.length && !l.fallback) edge(from, `P${l.to}`, name, true);
+				// Pieces whose jigsaws are unknown may join too: a dotted line to the pool.
+				if ((!l.pieces.length && !l.fallback) || (l.maybe && l.pieces.length)) edge(from, `P${l.to}`, name, true);
 			}
 		});
 		if (pool.fallbackTo !== undefined) edge(`P${pi}`, `P${pool.fallbackTo}`, 'fallback', true);

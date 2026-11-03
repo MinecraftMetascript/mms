@@ -12,6 +12,8 @@ export interface OutputFile {
 	range?: Range;
 	/** Written for an inline value where an id is required; range is that value's. */
 	implicit?: boolean;
+	/** Labels for parts of the file by JSON pointer, from doc comments, such as "/elements/2" of a template pool. */
+	labels?: Record<string, string>;
 	/** "resources" for a resource pack file. */
 	pack?: string;
 }
