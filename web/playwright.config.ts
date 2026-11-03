@@ -8,6 +8,8 @@ export default defineConfig({
 	use: {
 		baseURL: `http://localhost:4173${process.env.BASE_PATH ?? ''}/`,
 		viewport: { width: 1400, height: 850 },
+		// A trace of each failed test lands in test-results, which CI uploads.
+		trace: 'retain-on-failure',
 		launchOptions: process.env.PW_CHROMIUM ? { executablePath: process.env.PW_CHROMIUM } : {}
 	},
 	webServer: {
