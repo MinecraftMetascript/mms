@@ -23,6 +23,10 @@ import { WorldView } from './world';
 const releasesUrl = 'https://github.com/MinecraftMetascript/mms/releases';
 const exe = process.platform === 'win32' ? 'mms.exe' : 'mms';
 
+// bundled is the mms that platform-specific builds of the extension carry in
+// bin/ (see scripts/package-targets.mjs). Set on activation.
+let bundled: string | undefined;
+
 let client: LanguageClient | undefined;
 let output: vscode.OutputChannel | undefined;
 let pack: PackOutput | undefined;
@@ -76,6 +80,29 @@ function findMms(): string | undefined {
 
 type Resolved = { command: string } | { error: string };
 
+// findBundled returns the mms shipped inside the extension, if this build of
+// the extension has one. The universal build (and a build from source) has
+// none and falls back to PATH.
+function findBundled(): string | undefined {
+	if (!bundled || !isFile(bundled)) return undefined;
+	if (process.platform !== 'win32') {
+		// Unpacking a .vsix can drop the executable bit.
+		try {
+			fs.accessSync(bundled, fs.constants.X_OK);
+		} catch {
+			try {
+				fs.chmodSync(bundled, 0o755);
+			} catch (e) {
+				log(`cannot make ${bundled} executable: ${e instanceof Error ? e.message : String(e)}`);
+				return undefined;
+			}
+		}
+	}
+	return bundled;
+}
+
+// resolveServer picks the mms to run: mms.path if set, then the one bundled
+// with the extension, then mms on PATH (or where `go install` puts it).
 function resolveServer(): Resolved {
 	const configured = vscode.workspace.getConfiguration('mms').get<string>('path')?.trim();
 	if (configured) {
@@ -85,9 +112,11 @@ function resolveServer(): Resolved {
 		}
 		return { command: p };
 	}
+	const own = findBundled();
+	if (own) return { command: own };
 	const found = findMms();
 	if (found) return { command: found };
-	return { error: 'The mms executable was not found on your PATH or in ~/go/bin.' };
+	return { error: 'This build of the extension does not include mms for your platform, and the mms executable was not found on your PATH or in ~/go/bin.' };
 }
 
 function reportStartFailure(reason: string) {
@@ -183,6 +212,7 @@ function restart(): Promise<void> {
 }
 
 export function activate(context: vscode.ExtensionContext) {
+	bundled = path.join(context.extensionPath, 'bin', exe);
 	output = vscode.window.createOutputChannel('MMS Language Server');
 	pack = new PackOutput(() => client);
 	const previews = new Previews(context, pack);

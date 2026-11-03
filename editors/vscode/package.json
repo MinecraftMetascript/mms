@@ -64,7 +64,7 @@
         "mms.path": {
           "type": "string",
           "default": "",
-          "markdownDescription": "Path to the `mms` executable, for example `/Users/you/mms/engine/mms`. `~` and `${workspaceFolder}` are expanded. Empty means `mms` on your `PATH`, then `~/go/bin/mms` (where `go install` puts it)."
+          "markdownDescription": "Path to the `mms` executable, for example `/Users/you/mms/engine/mms`. `~` and `${workspaceFolder}` are expanded. Empty means the `mms` bundled with the extension, then `mms` on your `PATH`, then `~/go/bin/mms` (where `go install` puts it). Set it to use your own build, such as a local `go build`."
         },
         "mms.trace.server": {
           "type": "string",
@@ -185,7 +185,8 @@
     "build:extension": "esbuild src/extension.ts --bundle --platform=node --format=cjs --external:vscode --outfile=out/extension.js --minify",
     "build:webview": "vite build --config webview/vite.config.ts && vite build --config webview/world.vite.config.ts",
     "check": "tsc --noEmit && svelte-check --tsconfig ./webview/tsconfig.json",
-    "package": "npm run check && npm run build && vsce package --skip-license"
+    "package": "npm run check && npm run build && vsce package --skip-license",
+    "package:targets": "npm run check && npm run build && node scripts/package-targets.mjs"
   },
   "dependencies": {
     "vscode-languageclient": "9.0.1"

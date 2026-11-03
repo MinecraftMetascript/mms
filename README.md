@@ -37,7 +37,7 @@ mms reference             # every kind and helper, as JSON
 mms version               # the version and the Minecraft version it targets
 ```
 
-Release builds of `mms` for Linux, macOS and Windows, and the VS Code extension (`editors/vscode`), are attached to each [GitHub release](https://github.com/MinecraftMetascript/mms/releases).
+Release builds of `mms` for Linux, macOS and Windows, and the VS Code extension (`editors/vscode`), are attached to each [GitHub release](https://github.com/MinecraftMetascript/mms/releases). Each platform's build of the extension includes `mms`, so editor users install only the extension.
 
 ## Documentation
 

@@ -21,15 +21,23 @@ Language support for [Minecraft Metascript](https://github.com/MinecraftMetascri
 
 ## Setup
 
-The extension runs the `mms` language server. Download `mms` for your platform from the [releases page](https://github.com/MinecraftMetascript/mms/releases) and put it on your `PATH`, or set `mms.path` to its location.
+The extension runs the `mms` language server. The platform-specific builds of the extension (`mms-<platform>-<version>.vsix` on the [releases page](https://github.com/MinecraftMetascript/mms/releases), such as `mms-darwin-arm64-1.0.0.vsix`) include `mms`, so there is nothing else to install. They exist for Windows, macOS and Linux (including Alpine), on x64 and arm64.
 
-To use a local build, run `go install ./cmd/mms` in `engine/` (the extension also looks in `~/go/bin`, which VS Code launched from the macOS Dock may not have on its `PATH`), or run `go build ./cmd/mms` and set `mms.path` to the full path of the binary, such as `/Users/you/mms/engine/mms`. `~` and `${workspaceFolder}` work in `mms.path`.
+The extension uses the first of:
+
+1. `mms.path`, if you set it. `~` and `${workspaceFolder}` work in it.
+2. The `mms` bundled with the extension.
+3. `mms` on your `PATH`, then `~/go/bin` (where `go install` puts it, which VS Code launched from the macOS Dock may not have on its `PATH`).
+
+The universal `mms-<version>.vsix` has no `mms` in it and uses the `PATH`; download `mms` for your platform from the same release. To run a local build of the language server, run `go build ./cmd/mms` in `engine/` and set `mms.path` to the full path of the binary, such as `/Users/you/mms/engine/mms`. The **World** view's builds use the same `mms`.
 
 The extension starts when a folder contains an `mms.json` or when you open a `.mms` file. If the server cannot start, a notification says why; fix it and run **MMS: Restart Language Server** (also use it after updating `mms`). **MMS: Show Language Server Output** shows the server log.
 
 ## Building
 
 The preview panel uses the same Svelte components as the web editor, from `packages/preview`. `npm run build` bundles the extension (esbuild), the panel (Vite, into `out/webview`) and the World view's page (`webview/World.svelte`, into `out/world`).
+
+`npm run package` makes the universal `.vsix`, without `mms`. `npm run package:targets` makes one `.vsix` per VS Code platform with `mms` cross-compiled into `bin/` (it needs Go); pass targets to make only some, such as `npm run package:targets -- linux-x64 darwin-arm64`. `MMS_VERSION` sets the version `mms version` prints.
 
 ## Credits
 
