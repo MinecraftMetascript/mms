@@ -25,6 +25,13 @@ import (
 type Jigsaw struct {
 	Pos                [3]int
 	Pool, Name, Target string
+	// Orientation is the block's orientation state, such as north_up:
+	// the way it faces, then the way its top points. Empty when unknown.
+	Orientation string
+	// Joint is rollable or aligned: whether a piece joined to an up or
+	// down facing jigsaw block may turn. The game defaults it to aligned
+	// for sideways facing blocks and rollable for up or down ones.
+	Joint string
 }
 
 // structureCache holds parsed structure files by path, size and
@@ -36,33 +43,54 @@ var structureCache = struct {
 
 type structureFile struct {
 	jigsaws []Jigsaw
-	ok      bool // false when the file could not be read as a structure
+	size    [3]int // x, y, z; zero when the file has no size
+	ok      bool   // false when the file could not be read as a structure
 }
 
 // StructureJigsaws returns the jigsaw blocks of a structure file in the
 // project; ok is false when it cannot be read as one.
 func StructureJigsaws(fsys fs.FS, src string) ([]Jigsaw, bool) { return readJigsaws(fsys, src) }
 
+// StructureSize returns a structure file's size in blocks (x, y, z); ok
+// is false when it cannot be read as one or has no size.
+func StructureSize(fsys fs.FS, src string) ([3]int, bool) {
+	f := readStructure(fsys, src)
+	return f.size, f.ok && f.size != [3]int{}
+}
+
 // readJigsaws returns the jigsaw blocks of a structure file in fsys; ok
 // is false when it cannot be read or parsed.
 func readJigsaws(fsys fs.FS, src string) ([]Jigsaw, bool) {
+	f := readStructure(fsys, src)
+	return f.jigsaws, f.ok
+}
+
+// readStructure reads a structure file in fsys, cached.
+func readStructure(fsys fs.FS, src string) structureFile {
 	if fsys == nil {
-		return nil, false
+		return structureFile{}
 	}
 	st, err := fs.Stat(fsys, src)
 	if err != nil || st.IsDir() {
-		return nil, false
+		return structureFile{}
 	}
 	key := fmt.Sprintf("%p|%s|%d|%d", fsys, src, st.Size(), st.ModTime().UnixNano())
 	structureCache.Lock()
 	f, hit := structureCache.m[key]
 	structureCache.Unlock()
 	if hit {
-		return f.jigsaws, f.ok
+		return f
 	}
 	if data, err := fs.ReadFile(fsys, src); err == nil {
 		if root, err := nbt.Decode(data); err == nil {
 			f = structureFile{jigsaws: Jigsaws(root), ok: true}
+			if size, ok := root["size"].([]any); ok && len(size) == 3 {
+				for i, v := range size {
+					if n, ok := v.(int32); ok {
+						f.size[i] = int(n)
+					}
+				}
+			}
 		}
 	}
 	structureCache.Lock()
@@ -71,7 +99,7 @@ func readJigsaws(fsys fs.FS, src string) ([]Jigsaw, bool) {
 	}
 	structureCache.m[key] = f
 	structureCache.Unlock()
-	return f.jigsaws, f.ok
+	return f
 }
 
 // Jigsaws lists the jigsaw blocks of a decoded structure file, in the
@@ -92,15 +120,27 @@ func Jigsaws(root map[string]any) []Jigsaw {
 			continue
 		}
 		isJigsaw := data["id"] == "minecraft:jigsaw"
+		orientation := ""
 		if s, ok := block["state"].(int32); ok && int(s) < len(palette) && s >= 0 {
 			if st, ok := palette[s].(map[string]any); ok && st["Name"] == "minecraft:jigsaw" {
 				isJigsaw = true
+				if props, ok := st["Properties"].(map[string]any); ok {
+					orientation, _ = props["orientation"].(string)
+				}
 			}
 		}
 		if !isJigsaw {
 			continue
 		}
-		j := Jigsaw{Pool: nbtID(data["pool"]), Name: nbtID(data["name"]), Target: nbtID(data["target"])}
+		j := Jigsaw{Pool: nbtID(data["pool"]), Name: nbtID(data["name"]), Target: nbtID(data["target"]), Orientation: orientation}
+		j.Joint, _ = data["joint"].(string)
+		if j.Joint == "" && orientation != "" {
+			if strings.HasPrefix(orientation, "up_") || strings.HasPrefix(orientation, "down_") {
+				j.Joint = "rollable"
+			} else {
+				j.Joint = "aligned"
+			}
+		}
 		if pos, ok := block["pos"].([]any); ok && len(pos) == 3 {
 			for i, v := range pos {
 				if n, ok := v.(int32); ok {

@@ -101,3 +101,29 @@ func TestJigsawTarget(t *testing.T) {
 		t.Fatalf("unknown piece: got %s", got)
 	}
 }
+
+// A jigsaw block carries its orientation and joint; without a joint tag
+// the game's default applies: aligned sideways, rollable up or down.
+func TestJigsawOrientationAndJoint(t *testing.T) {
+	palette := []any{
+		map[string]any{"Name": "minecraft:jigsaw", "Properties": map[string]any{"orientation": "west_up"}},
+		map[string]any{"Name": "minecraft:jigsaw", "Properties": map[string]any{"orientation": "up_north"}},
+	}
+	jig := func(x, state int32, joint string) any {
+		data := map[string]any{"id": "minecraft:jigsaw", "pool": "demo:a", "name": "demo:b", "target": "demo:c"}
+		if joint != "" {
+			data["joint"] = joint
+		}
+		return map[string]any{"pos": []any{x, int32(0), int32(0)}, "state": state, "nbt": data}
+	}
+	got := Jigsaws(map[string]any{"palette": palette, "blocks": []any{jig(0, 0, ""), jig(1, 1, ""), jig(2, 1, "aligned")}})
+	want := []string{"west_up aligned", "up_north rollable", "up_north aligned"}
+	if len(got) != len(want) {
+		t.Fatalf("got %v", got)
+	}
+	for i, j := range got {
+		if s := j.Orientation + " " + j.Joint; s != want[i] {
+			t.Errorf("jigsaw %d = %q, want %q", i, s, want[i])
+		}
+	}
+}

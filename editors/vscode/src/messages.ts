@@ -25,7 +25,9 @@ export interface OutputAsset {
 	/** "resources" for a resource pack file. */
 	pack?: string;
 	/** For a structure file: its jigsaw blocks. */
-	jigsaws?: { pos: [number, number, number]; pool: string; name: string; target: string }[];
+	jigsaws?: { pos: [number, number, number]; pool: string; name: string; target: string; orientation?: string; joint?: string }[];
+	/** For a structure file: its size in blocks, x y z. */
+	size?: [number, number, number];
 }
 
 /** A CustomItem or Book: the item stack its name stands for, which is not a file. */

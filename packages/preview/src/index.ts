@@ -10,5 +10,6 @@ export { default as BookView } from './book/BookView.svelte';
 export { previewable, previewFile } from './preview/protocol';
 export { inspectable } from './inspect/common';
 export { jigsawGraph, type JigsawGraph } from './jigsaw/graph';
+export { jigsawMarkdown, jigsawMermaid } from './jigsaw/export';
 export { default as JigsawView } from './jigsaw/JigsawView.svelte';
 export type { OutputAsset, OutputFile, OutputItem, OutputJigsaw, SourceRange } from './types';

@@ -803,9 +803,17 @@ func (s *Session) jigsawHover(src string) string {
 		return ""
 	}
 	var sb strings.Builder
-	sb.WriteString("\n\n**Jigsaw blocks**\n\n| At | Name | Pool | Target |\n|---|---|---|---|\n")
+	sb.WriteString("\n\n**Jigsaw blocks**")
+	if size, ok := project.StructureSize(s.P.Files, src); ok {
+		fmt.Fprintf(&sb, " · size %d×%d×%d", size[0], size[1], size[2])
+	}
+	sb.WriteString("\n\n| At | Facing | Name | Pool | Target |\n|---|---|---|---|---|\n")
 	for _, j := range js {
-		fmt.Fprintf(&sb, "| %d %d %d | `%s` | `%s` | `%s` |\n", j.Pos[0], j.Pos[1], j.Pos[2], j.Name, j.Pool, j.Target)
+		facing := strings.ReplaceAll(j.Orientation, "_", " ")
+		if j.Joint == "rollable" && (strings.HasPrefix(j.Orientation, "up_") || strings.HasPrefix(j.Orientation, "down_")) {
+			facing += ", rollable"
+		}
+		fmt.Fprintf(&sb, "| %d %d %d | %s | `%s` | `%s` | `%s` |\n", j.Pos[0], j.Pos[1], j.Pos[2], facing, j.Name, j.Pool, j.Target)
 	}
 	return sb.String()
 }

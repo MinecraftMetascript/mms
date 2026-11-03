@@ -35,6 +35,10 @@ export interface OutputJigsaw {
 	pool: string;
 	name: string;
 	target: string;
+	/** Its orientation state, such as north_up: the way it faces, then the way its top points. */
+	orientation?: string;
+	/** rollable or aligned: whether a piece joined to an up or down facing block may turn. */
+	joint?: string;
 }
 
 /** A project file the pack copies, such as a texture or a structure. */
@@ -47,4 +51,6 @@ export interface OutputAsset {
 	pack?: string;
 	/** For a structure file: its jigsaw blocks. */
 	jigsaws?: OutputJigsaw[];
+	/** For a structure file: its size in blocks, x y z. */
+	size?: [number, number, number];
 }

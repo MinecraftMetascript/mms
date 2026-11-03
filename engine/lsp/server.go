@@ -970,9 +970,19 @@ func (s *Server) output(_ context.Context, p struct {
 				if js, ok := project.StructureJigsaws(w.proj.Files, f.Asset); ok {
 					list := make([]map[string]any, 0, len(js))
 					for _, j := range js {
-						list = append(list, map[string]any{"pos": j.Pos, "pool": j.Pool, "name": j.Name, "target": j.Target})
+						m := map[string]any{"pos": j.Pos, "pool": j.Pool, "name": j.Name, "target": j.Target}
+						if j.Orientation != "" {
+							m["orientation"] = j.Orientation
+						}
+						if j.Joint != "" {
+							m["joint"] = j.Joint
+						}
+						list = append(list, m)
 					}
 					a["jigsaws"] = list
+				}
+				if size, ok := project.StructureSize(w.proj.Files, f.Asset); ok {
+					a["size"] = size
 				}
 			}
 			assets = append(assets, a)

@@ -49,6 +49,8 @@ export interface Piece {
 	share: number;
 	/** Its jigsaw blocks; undefined when unknown (not a project structure file). */
 	jigsaws?: Jigsaw[];
+	/** Its size in blocks, x y z, when it is a project structure file. */
+	size?: [number, number, number];
 	links: Link[];
 	/**
 	 * No jigsaw block that draws from this pool targets a name this piece
@@ -115,7 +117,7 @@ function parse(text: string | undefined): Json | undefined {
 }
 
 /** A pool element's piece; a list element is one piece. */
-function elementPieces(el: Json | undefined, weight: number, structures: Map<string, Jigsaw[]>, out: Omit<Piece, 'share' | 'links' | 'unreachable'>[]) {
+function elementPieces(el: Json | undefined, weight: number, structures: Map<string, OutputAsset>, out: Omit<Piece, 'share' | 'links' | 'unreachable'>[]) {
 	if (!isObj(el)) {
 		out.push({ id: '?', kind: 'other', weight });
 		return;
@@ -125,7 +127,8 @@ function elementPieces(el: Json | undefined, weight: number, structures: Map<str
 		case 'single_pool_element':
 		case 'legacy_single_pool_element': {
 			const id = fullId(String(el.location ?? '?'));
-			out.push({ id, kind: 'single', weight, jigsaws: structures.get(id) });
+			const a = structures.get(id);
+			out.push({ id, kind: 'single', weight, jigsaws: a?.jigsaws, ...(a?.size ? { size: a.size } : {}) });
 			break;
 		}
 		case 'list_pool_element': {
@@ -136,7 +139,7 @@ function elementPieces(el: Json | undefined, weight: number, structures: Map<str
 			for (const e of Array.isArray(el.elements) ? el.elements : []) elementPieces(e, 1, structures, parts);
 			const first = parts[0];
 			if (!first) out.push({ id: 'empty list', kind: 'empty', weight, jigsaws: [] });
-			else out.push({ id: parts.map((q) => q.id).join(' + '), kind: first.kind, weight, jigsaws: first.jigsaws });
+			else out.push({ id: parts.map((q) => q.id).join(' + '), kind: first.kind, weight, jigsaws: first.jigsaws, ...(first.size ? { size: first.size } : {}) });
 			break;
 		}
 		case 'feature_pool_element':
@@ -158,10 +161,10 @@ export function jigsawGraph(path: string | null, output: readonly OutputFile[], 
 	const root = jigsawable(path);
 	if (!root) return null;
 	const files = new Map(output.map((f) => [f.path, f]));
-	const structures = new Map<string, Jigsaw[]>();
+	const structures = new Map<string, OutputAsset>();
 	for (const a of assets) {
 		const m = nbtPath.exec(a.path);
-		if (m && a.jigsaws) structures.set(`${m[1]}:${m[2]}`, a.jigsaws);
+		if (m && a.jigsaws) structures.set(`${m[1]}:${m[2]}`, a);
 	}
 	// Namespaces the project writes to: a pool there must be declared.
 	const namespaces = new Set<string>();
