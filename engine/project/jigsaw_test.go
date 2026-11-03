@@ -1,6 +1,7 @@
 package project
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -125,5 +126,65 @@ func TestJigsawOrientationAndJoint(t *testing.T) {
 		if s := j.Orientation + " " + j.Joint; s != want[i] {
 			t.Errorf("jigsaw %d = %q, want %q", i, s, want[i])
 		}
+	}
+}
+
+// orientedPiece builds a structure file of the given size whose jigsaw
+// blocks are each x,y,z|orientation|pool|name|target.
+func orientedPiece(t *testing.T, size [3]int32, jigsaws ...string) []byte {
+	t.Helper()
+	var palette, blocks []any
+	for i, j := range jigsaws {
+		f := strings.Split(j, "|")
+		var x, y, z int32
+		fmt.Sscanf(f[0], "%d,%d,%d", &x, &y, &z)
+		palette = append(palette, map[string]any{"Name": "minecraft:jigsaw", "Properties": map[string]any{"orientation": f[1]}})
+		blocks = append(blocks, map[string]any{"pos": []any{x, y, z}, "state": int32(i),
+			"nbt": map[string]any{"id": "minecraft:jigsaw", "pool": f[2], "name": f[3], "target": f[4]}})
+	}
+	data, err := nbt.Encode(map[string]any{"size": []any{size[0], size[1], size[2]}, "palette": palette, "blocks": blocks})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return data
+}
+
+// Up joins only down and sideways only sideways; an inset jigsaw is
+// internal, and a room too big to fit inside the hall never joins it.
+func TestJigsawFacingAndSide(t *testing.T) {
+	files := fstest.MapFS{
+		"s/hall.nbt": {Data: orientedPiece(t, [3]int32{5, 5, 9},
+			"2,1,8|south_up|demo:rooms|demo:exit|demo:entry",    // ok: rooms has a sideways entry
+			"2,4,4|up_north|demo:rooms|demo:exit|demo:entry",    // up, but every entry is sideways
+			"2,0,4|down_north|demo:cellar|demo:exit|demo:hatch", // ok: cellar's hatch faces up
+			"0,1,4|east_up|demo:rooms|demo:exit|demo:entry",     // faces east on the west side
+		)},
+		"s/room.nbt":   {Data: orientedPiece(t, [3]int32{7, 5, 7}, "3,1,0|north_up|minecraft:empty|demo:entry|minecraft:empty")},
+		"s/cellar.nbt": {Data: orientedPiece(t, [3]int32{5, 4, 5}, "2,3,2|up_south|minecraft:empty|demo:hatch|minecraft:empty")},
+	}
+	src := pool("halls", `Structure("s/hall.nbt", "hall")`) + pool("rooms", `Structure("s/room.nbt", "room")`) + pool("cellar", `Structure("s/cellar.nbt", "cellar")`)
+	_, r := assetProject(t, files, src)
+	got := jigsawDiags(r)
+	want := "lint/jigsaw-facing: 's/hall.nbt' has a jigsaw block at 2 4 4 facing up that targets 'demo:entry' in the pool 'demo:rooms', but every jigsaw block named 'demo:entry' there faces sideways (north); it can only join one facing down, so the pieces never connect\n" +
+		"lint/jigsaw-fit: 's/hall.nbt' has an internal jigsaw block at 0 1 4 facing east (it is not on the piece's east edge, so the block in front of it is inside the 5×5×9 piece), so a piece from 'demo:rooms' that joins it must fit inside this piece: 'demo:room' (7×5×7) sticks out 3 east, so it is never placed there; nothing fits, so nothing joins there. If it should join outward, move it to the east edge\n"
+	if got != want {
+		t.Fatalf("got:\n%s\nwant:\n%s", got, want)
+	}
+}
+
+// An arch on a road 6 high, mounted by an up facing jigsaw on the road's
+// floor, must be 5 high or less: the game places it inside the road.
+func TestJigsawFitArch(t *testing.T) {
+	files := fstest.MapFS{
+		"s/road.nbt":  {Data: orientedPiece(t, [3]int32{7, 6, 16}, "3,0,8|up_north|demo:arches|demo:mount|demo:arch", "3,1,0|north_up|minecraft:empty|demo:road|minecraft:empty", "3,1,15|south_up|minecraft:empty|demo:road|minecraft:empty")},
+		"s/arch5.nbt": {Data: orientedPiece(t, [3]int32{7, 5, 3}, "3,0,1|down_north|minecraft:empty|demo:arch|minecraft:empty")},
+		"s/arch6.nbt": {Data: orientedPiece(t, [3]int32{7, 6, 3}, "3,0,1|down_north|minecraft:empty|demo:arch|minecraft:empty")},
+	}
+	src := pool("roads", `Structure("s/road.nbt", "road")`) + pool("arches", `Structure("s/arch5.nbt", "arch5")`, `Structure("s/arch6.nbt", "arch6")`)
+	_, r := assetProject(t, files, src)
+	got := jigsawDiags(r)
+	want := "lint/jigsaw-fit: 's/road.nbt' has an internal jigsaw block at 3 0 8 facing up (it is not on the piece's top, so the block in front of it is inside the 7×6×16 piece), so a piece from 'demo:arches' that joins it must fit inside this piece: 'demo:arch6' (7×6×3) sticks out 1 up, so it is never placed there. If it should join outward, move it to the top\n"
+	if got != want {
+		t.Fatalf("got:\n%s\nwant:\n%s", got, want)
 	}
 }

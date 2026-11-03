@@ -55,6 +55,16 @@
           "markdownDescription": "An id of a texture, sound or structure in the project's namespace that no Texture, Sound or Structure call in the project provides. The pack still loads, but the file must come from another pack.\n\nDefault: `warning`.",
           "$ref": "#/definitions/severity"
         },
+        "jigsaw-facing": {
+          "description": "A jigsaw block that can never join its target: every jigsaw block with its target name in its pool faces a way it cannot meet. The game turns pieces only about the y axis, so a block facing up joins only one facing down, and a sideways block only a sideways one.\n\nDefault: `warning`.",
+          "markdownDescription": "A jigsaw block that can never join its target: every jigsaw block with its target name in its pool faces a way it cannot meet. The game turns pieces only about the y axis, so a block facing up joins only one facing down, and a sideways block only a sideways one.\n\nDefault: `warning`.",
+          "$ref": "#/definitions/severity"
+        },
+        "jigsaw-fit": {
+          "description": "An internal jigsaw block (the block in front of it is inside its own piece, such as an arch mount on a road, or a jigsaw inset by a block by mistake) whose pool has pieces that stick out of the piece however they are turned. The game only places a piece joined at an internal jigsaw wholly inside its parent, so those pieces are never placed there. Height is not checked for terrain_matching pieces.\n\nDefault: `warning`.",
+          "markdownDescription": "An internal jigsaw block (the block in front of it is inside its own piece, such as an arch mount on a road, or a jigsaw inset by a block by mistake) whose pool has pieces that stick out of the piece however they are turned. The game only places a piece joined at an internal jigsaw wholly inside its parent, so those pieces are never placed there. Height is not checked for terrain_matching pieces.\n\nDefault: `warning`.",
+          "$ref": "#/definitions/severity"
+        },
         "jigsaw-pool": {
           "description": "A jigsaw block in a structure file that Structure(\"...\") includes draws from a pool in the project's namespace that no TemplatePool declares. The game skips the jigsaw, so the structure stops growing there. The quick fix declares the pool.\n\nDefault: `warning`.",
           "markdownDescription": "A jigsaw block in a structure file that Structure(\"...\") includes draws from a pool in the project's namespace that no TemplatePool declares. The game skips the jigsaw, so the structure stops growing there. The quick fix declares the pool.\n\nDefault: `warning`.",

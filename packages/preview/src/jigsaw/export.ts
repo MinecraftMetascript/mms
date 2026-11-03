@@ -21,7 +21,8 @@ function facing(j: Jigsaw): { front: string; top: string } | null {
 
 /**
  * The sides of the piece a jigsaw block sits on, and a note when it faces
- * out of a side it is not on (it then joins inside or across the piece).
+ * out of a side it is not on: the game then treats it as internal and only
+ * places a piece there that fits wholly inside this one.
  */
 function sides(j: Jigsaw, size: [number, number, number] | undefined): { on: string[]; warn?: string } {
 	if (!size) return { on: [] };
@@ -34,13 +35,13 @@ function sides(j: Jigsaw, size: [number, number, number] | undefined): { on: str
 	if (y === 0) on.push('down');
 	if (y === size[1] - 1) on.push('up');
 	const f = facing(j);
-	const warn = f && !on.includes(f.front) ? `faces ${f.front} but is not on the ${f.front} side` : undefined;
+	const warn = f && !on.includes(f.front) ? `is internal: it faces ${f.front} but is not on the ${f.front} side, so a piece joining it must fit inside this one` : undefined;
 	return { on, warn };
 }
 
 /** The pieces a jigsaw block can join, in words, with full ids. */
 export function joinsText(graph: JigsawGraph, piece: Piece, l: Link, id: (s: string) => string = (s) => s): string {
-	if (l.dead) return deadEndText(l, id(piece.jigsaws![l.jigsaw].target));
+	if (l.dead) return deadEndText(l, id(piece.jigsaws![l.jigsaw].target), piece.jigsaws![l.jigsaw]);
 	const pool = l.to !== undefined ? graph.pools[l.to] : undefined;
 	if (!pool?.declared) return `${id(l.pool)} (not read: vanilla or another pack)`;
 	const names = l.pieces.map((i) => id(pool.pieces[i].id));
@@ -121,7 +122,7 @@ export function jigsawMarkdown(graph: JigsawGraph): string {
 				const j = p.jigsaws![l.jigsaw];
 				const f = facing(j);
 				problems.push(
-					`- Dead end: ${code(p.id)} in ${code(pool.id)}, jigsaw block at ${j.pos.join(' ')}${f ? ` facing ${f.front}` : ''} (name ${code(j.name)}, pool ${code(j.pool)}, target ${code(j.target)}): ${deadEndText(l, j.target)}.`
+					`- Dead end: ${code(p.id)} in ${code(pool.id)}, jigsaw block at ${j.pos.join(' ')}${f ? ` facing ${f.front}` : ''} (name ${code(j.name)}, pool ${code(j.pool)}, target ${code(j.target)}): ${deadEndText(l, j.target, j)}.`
 				);
 			});
 			if (p.unreachable && !seen.has(`never|${pool.id}|${pi}`)) {
@@ -248,7 +249,7 @@ export function jigsawMermaid(graph: JigsawGraph): string {
 				const name = strip(j.target);
 				if (l.dead) {
 					const id = `D${pi}_${qi}_${l.jigsaw}`;
-					lines.push(`  ${id}([${label(`dead end: ${deadEndText(l, name)}`)}])`);
+					lines.push(`  ${id}([${label(`dead end: ${deadEndText(l, name, j)}`)}])`);
 					edge(from, id, name, false);
 					dead.push(id);
 					continue;
