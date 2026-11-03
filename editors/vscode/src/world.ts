@@ -28,8 +28,8 @@ import { findWorlds, readWorld, savesFolders, type World } from './worlds';
 
 /** The outcome of the last build, shown under the button. */
 type Result =
-	| { ok: true; world: string; files: number; resources: boolean; next: NextStep | undefined; at: Date }
-	| { ok: false; message: string; detail: string; problems: boolean; at: Date };
+	| { ok: true; project: string; world: string; files: number; resources: boolean; next: NextStep | undefined; at: Date }
+	| { ok: false; project: string; world: string; message: string; detail: string; problems: boolean; at: Date };
 
 /**
  * What the player does in the game for the build to take effect, from the
@@ -200,7 +200,9 @@ export class WorldView implements vscode.Disposable, vscode.WebviewViewProvider 
 		const info = readWorld(world);
 		const name = info?.name ?? path.basename(world);
 		state.world = { name, folder: path.basename(world) === name ? undefined : path.basename(world), path: world };
-		state.result = this.result && view(this.result);
+		// A result is shown only under the project and world it was built for.
+		const r = this.result;
+		state.result = r && r.project === project && r.world === world ? view(r) : undefined;
 		// The pack's unused-asset findings are for the project the pack follows.
 		const unused = new Set(this.output.unusedAssets.filter((p) => p.endsWith('.nbt')));
 		for (const s of findStructures(world)) {
@@ -439,7 +441,7 @@ export class WorldView implements vscode.Disposable, vscode.WebviewViewProvider 
 			const files = [...run.stdout.matchAll(/(\d+) files?/g)].reduce((n, m) => n + Number(m[1]), 0);
 			const resources = /resource pack/.test(run.stdout);
 			const next = nextStep(run.stdout);
-			this.result = { ok: true, world, files, resources, next, at: new Date() };
+			this.result = { ok: true, project, world, files, resources, next, at: new Date() };
 			// The view shows the result and what to do in the game; the
 			// status bar says it briefly, which also covers a build on save
 			// with the side bar closed.
@@ -448,7 +450,7 @@ export class WorldView implements vscode.Disposable, vscode.WebviewViewProvider 
 		} else {
 			const errors = /(\d+) errors?; nothing written/.exec(run.stderr);
 			const message = errors ? `${errors[1]} ${errors[1] === '1' ? 'error' : 'errors'}; nothing written` : 'Build failed';
-			this.result = { ok: false, message, detail: run.stderr.trim(), problems: !!errors, at: new Date() };
+			this.result = { ok: false, project, world, message, detail: run.stderr.trim(), problems: !!errors, at: new Date() };
 			// A failure the view shows needs no notification; with the view
 			// hidden, one says so.
 			if (!this.view?.visible) {

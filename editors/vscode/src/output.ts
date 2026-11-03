@@ -50,6 +50,8 @@ export class PackOutput implements vscode.Disposable {
 	follow(uri: vscode.Uri) {
 		if (uri.toString() === this.document?.toString()) return;
 		this.document = uri;
+		// The old project's unused files are not this one's; the next fetch fills them.
+		this.unusedAssets = [];
 		this.projectChanged.fire();
 		this.scheduleRefresh();
 	}
@@ -64,11 +66,15 @@ export class PackOutput implements vscode.Disposable {
 		const client = this.client();
 		if (!client?.isRunning()) return;
 		try {
-			const uri = this.document?.toString();
+			const asked = this.document;
+			const uri = asked?.toString();
 			const out = await client.sendRequest<{ files: OutputFile[]; items?: OutputItem[]; assets?: OutputAsset[]; unusedAssets?: string[]; hasErrors: boolean }>(
 				'mms/output',
 				uri ? { uri } : {}
 			);
+			// A reply for a document the pack no longer follows is stale; the
+			// fetch scheduled by follow() brings the current one.
+			if (asked !== this.document) return;
 			this.files = out.files;
 			this.items = out.items ?? [];
 			this.assets = out.assets ?? [];
