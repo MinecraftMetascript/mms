@@ -30,6 +30,8 @@ export interface Link {
 	pool: string;
 	/** The pool's index in the graph's pools, when the graph has it. */
 	to?: number;
+	/** Its pool is declared but past the last depth the graph shows. */
+	truncated?: boolean;
 	/** The pieces of that pool that can join here, by index. */
 	pieces: number[];
 	/** Some pieces of the pool have unknown jigsaws, so they may join too. */
@@ -45,6 +47,8 @@ export interface Link {
 export interface Piece {
 	/** The structure id, or a description for a feature or empty element. */
 	id: string;
+	/** Its label, from a doc comment above its pool element, such as `/** @label Worn road cap *\/`. */
+	label?: string;
 	kind: 'single' | 'feature' | 'empty' | 'other';
 	weight: number;
 	/** Its share of the pool's total weight, 0..1. */
@@ -204,10 +208,12 @@ export function jigsawGraph(path: string | null, output: readonly OutputFile[], 
 		if (isObj(json)) {
 			if (typeof json.fallback === 'string' && fullId(json.fallback) !== EMPTY) d.fallback = fullId(json.fallback);
 			const raw: Omit<Piece, 'share' | 'links' | 'unreachable'>[] = [];
-			for (const e of Array.isArray(json.elements) ? json.elements : []) {
-				if (!isObj(e)) continue;
+			(Array.isArray(json.elements) ? json.elements : []).forEach((e, i) => {
+				if (!isObj(e)) return;
 				elementPieces(e.element, typeof e.weight === 'number' ? e.weight : 1, structures, raw);
-			}
+				const label = file?.labels?.[`/elements/${i}`];
+				if (label) raw[raw.length - 1].label = label;
+			});
 			const total = raw.reduce((n, p) => n + p.weight, 0);
 			d.pieces = raw.map((p) => ({ ...p, share: total ? p.weight / total : 0 }));
 		}
@@ -304,7 +310,10 @@ export function jigsawGraph(path: string | null, output: readonly OutputFile[], 
 					if (!targeted.has(j.pool)) targeted.set(j.pool, new Set());
 					targeted.get(j.pool)!.add(j.target);
 					if (target) link.pieces = matches(target, j, link);
-					else link.maybe = true; // past the last depth shown
+					else {
+						link.maybe = true; // past the last depth shown
+						link.truncated = true;
+					}
 					// The game tries the pool's fallback when none of its pieces fit.
 					const fb = target?.fallbackTo ?? (target?.fallback === undefined ? undefined : at.get(`${target.fallback}@${target.depth}`));
 					if (target && !link.pieces.length && !link.maybe && fb !== undefined) {

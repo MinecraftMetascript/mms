@@ -7,6 +7,8 @@ export interface OutputFile {
 	range?: { start: { line: number; character: number }; end: { line: number; character: number } };
 	/** Written for an inline value where an id is required; range is that value's. */
 	implicit?: boolean;
+	/** Labels for parts of the file by JSON pointer, from doc comments, such as "/elements/2" of a template pool. */
+	labels?: Record<string, string>;
 }
 
 /** A source position, as the language server sends it. */

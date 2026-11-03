@@ -47,6 +47,8 @@ export interface OutputFile {
 	range?: Diagnostic['range'];
 	/** Written for an inline value where an id is required; range is that value's. */
 	implicit?: boolean;
+	/** Labels for parts of the file by JSON pointer, from doc comments, such as "/elements/2" of a template pool. */
+	labels?: Record<string, string>;
 	/** Set when this is a custom item's stack shown as JSON, not a pack file. */
 	item?: OutputItem;
 }

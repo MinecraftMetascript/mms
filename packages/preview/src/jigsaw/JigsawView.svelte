@@ -338,12 +338,12 @@
 							type="button"
 							class="flex w-full items-center gap-1.5 px-2 text-left hover:bg-hover {picked === key ? 'bg-selected' : related.has(key) && focus !== key ? 'bg-accent/15' : ''} {p.unreachable ? 'text-amber-700 dark:text-amber-300' : ''}"
 							style="height: {ROW}px"
-							title={p.unreachable ? `${p.id}: no jigsaw block that draws from this pool targets a name this piece has, so it is never placed` : p.id}
+							title={`${p.label ? `${p.label} (${p.id})` : p.id}${p.unreachable ? ': no jigsaw block that draws from this pool targets a name this piece has, so it is never placed' : ''}`}
 							onpointerenter={() => (hover = key)}
 							onpointerleave={() => (hover = null)}
 							onclick={() => (picked = picked === key ? null : key)}
 						>
-							<span class="min-w-0 flex-1 truncate {p.kind === 'single' ? 'font-mono' : 'italic text-muted'}">{p.kind === 'single' ? strip(p.id) : p.id}</span>
+							{#if p.label}<span class="min-w-0 flex-1 truncate">{p.label}</span>{:else}<span class="min-w-0 flex-1 truncate {p.kind === 'single' ? 'font-mono' : 'italic text-muted'}">{p.kind === 'single' ? strip(p.id) : p.id}</span>{/if}
 							{#if p.links.some((l) => l.dead)}<span class="text-red-600 dark:text-red-400" title="A jigsaw block here joins nothing">●</span>{/if}
 							<span class="shrink-0 text-[10px] text-muted" title="Weight {p.weight}">{pct(p.share)}</span>
 							<span class="w-6 shrink-0 text-right text-[10px] text-muted" title={p.jigsaws ? `${p.jigsaws.length} jigsaw ${p.jigsaws.length === 1 ? 'block' : 'blocks'}` : 'Jigsaw blocks unknown: not a structure file of this project'}>{p.jigsaws ? `⧉${p.jigsaws.length}` : '?'}</span>
@@ -366,7 +366,7 @@
 		{#if detail}
 			{@const p = detail.piece}
 			<h3 class="mb-1 font-semibold">
-				<span class="font-mono">{strip(p.id)}</span>
+				{#if p.label}{p.label} <span class="font-normal text-muted">·</span> {/if}<span class="font-mono">{strip(p.id)}</span>
 				<span class="font-normal text-muted">· in {strip(graph.pools[detail.pool].id)}, weight {p.weight} ({pct(p.share)}){p.size ? `, size ${p.size.join('×')}` : ''}</span>
 			</h3>
 			{#if p.unreachable}

@@ -123,11 +123,15 @@ func Jigsaws(root map[string]any) []Jigsaw {
 		isJigsaw := data["id"] == "minecraft:jigsaw"
 		orientation := ""
 		if s, ok := block["state"].(int32); ok && int(s) < len(palette) && s >= 0 {
-			if st, ok := palette[s].(map[string]any); ok && st["Name"] == "minecraft:jigsaw" {
+			// Palette entries are {Name, Properties} up to 1.21 and
+			// {id, properties} in 26.x structure files.
+			if st, ok := palette[s].(map[string]any); ok && (st["Name"] == "minecraft:jigsaw" || st["id"] == "minecraft:jigsaw") {
 				isJigsaw = true
-				if props, ok := st["Properties"].(map[string]any); ok {
-					orientation, _ = props["orientation"].(string)
+				props, ok := st["Properties"].(map[string]any)
+				if !ok {
+					props, _ = st["properties"].(map[string]any)
 				}
+				orientation, _ = props["orientation"].(string)
 			}
 		}
 		if !isJigsaw {

@@ -89,6 +89,15 @@ These JSDoc-style tags are understood:
 - `@returns text` (or `@return`) describes the result.
 - `@deprecated [text]` marks the declaration as deprecated. Every use gets a `deprecated` lint warning and is struck through in the editor.
 - `@example` starts a code example, and `@see text` adds a pointer elsewhere.
+- `@label text` names an entry of a template pool's `elements` list. A doc comment works above an entry too, and the jigsaw preview and its export show its label (or else the first line of its text) next to the piece. That tells apart one structure listed several times with different processors:
+
+  ```
+  elements = [
+    WeightedElement(50, SinglePoolElement(rigid, Structure("structures/road_cap.nbt"), [])),
+    /** @label Worn road cap */
+    WeightedElement(10, SinglePoolElement(rigid, Structure("structures/road_cap.nbt"), road_wear_medium)),
+  ]
+  ```
 
 Other tags are shown as written. The formatter lines doc comments up with a ` * ` on every line and keeps the indentation inside them, so indented code and nested lists survive.
 

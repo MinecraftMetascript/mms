@@ -946,7 +946,9 @@ test('a jigsaw structure previews which pieces join which, and marks dead ends',
 	await graph.getByRole('button', { name: /^start/ }).click();
 	const details = page.getByLabel('Piece details');
 	await expect(details.getByRole('row')).toHaveCount(5);
-	await expect(details.getByRole('row').nth(1)).toContainText('halls/hall, halls/short_hall');
+	await expect(details.getByRole('row').nth(1)).toContainText('halls/hall (Long hall), halls/short_hall (Short hall)');
+	// A doc comment above a pool element labels its piece.
+	await expect(graph.getByLabel('Pool dungeon:halls').first()).toContainText('Long hall');
 
 	// Renaming a pool leaves the halls' exits pointing at nothing. The
 	// preview is pinned, since the edit moves the cursor away.
@@ -962,8 +964,8 @@ test('a jigsaw structure previews which pieces join which, and marks dead ends',
 	await expect(graph.getByRole('button', { name: 'Copied' })).toBeVisible();
 	const md = await page.evaluate(() => navigator.clipboard.readText());
 	expect(md).toContain('# Jigsaw connections: dungeon:dungeon');
-	expect(md).toContain('- Dead end: `dungeon:halls/hall` in `dungeon:halls`, jigsaw block at 2 1 8 facing south (name `dungeon:hall_exit`, pool `dungeon:rooms`, target `dungeon:room_entry`): no TemplatePool declares dungeon:rooms.');
-	expect(md).toContain('- `dungeon:halls/hall` · weight 3 (75%) · size 5×5×9');
+	expect(md).toContain('- Dead end: `dungeon:halls/hall` "Long hall" in `dungeon:halls`, jigsaw block at 2 1 8 facing south (name `dungeon:hall_exit`, pool `dungeon:rooms`, target `dungeon:room_entry`): no TemplatePool declares dungeon:rooms.');
+	expect(md).toContain('- `dungeon:halls/hall` "Long hall" · weight 3 (75%) · size 5×5×9');
 	expect(md).toContain('No TemplatePool declares this pool.');
 	expect(md).toContain('```mermaid\nflowchart LR');
 	await graph.getByRole('button', { name: 'Copy Mermaid' }).click();

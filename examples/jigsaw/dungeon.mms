@@ -55,6 +55,7 @@ TemplatePool start = {
 TemplatePool halls = {
   fallback = caps
   elements = [
+    /** @label Long hall */
     {
       weight = 3
       element = SinglePoolElement(
@@ -63,6 +64,7 @@ TemplatePool halls = {
         processors = minecraft:empty,
       )
     },
+    /** @label Short hall */
     {
       weight = 1
       element = SinglePoolElement(
