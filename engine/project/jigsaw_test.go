@@ -234,3 +234,39 @@ func TestJigsawOrientation26Palette(t *testing.T) {
 		t.Fatalf("got %+v", got)
 	}
 }
+
+// A 5 wide T between 7 wide roads: the roads its other arms would grow
+// overlap the road it joined, so those arms never grow. A 7 wide T is fine.
+func TestJigsawOverlapNarrowJunction(t *testing.T) {
+	road := func(x, y, z int, f string) string {
+		return fmt.Sprintf("%d,%d,%d|%s_up|demo:roads|demo:road_end|demo:road_end", x, y, z, f)
+	}
+	// The junction's arms grow straights only, as in a town whose roads
+	// never put two junctions side by side.
+	arm := func(x, y, z int, f string) string {
+		return fmt.Sprintf("%d,%d,%d|%s_up|demo:straights|demo:road_end|demo:road_end", x, y, z, f)
+	}
+	el := func(loc string) string {
+		return `{ weight = 1, element = { element_type = minecraft:single_pool_element, location = ` + loc + `, projection = rigid, processors = minecraft:empty } }`
+	}
+	src := func(tee string) string {
+		return "TemplatePool roads = {\n  fallback = caps\n  elements = [" + el(`Structure("s/straight.nbt", "straight")`) + ", " + el(`Structure("s/`+tee+`.nbt", "`+tee+`")`) + "]\n}\n" +
+			"TemplatePool straights = {\n  fallback = caps\n  elements = [" + el(`Structure("s/straight.nbt", "straight")`) + "]\n}\n" +
+			"TemplatePool caps = {\n  fallback = minecraft:empty\n  elements = [" + el(`Structure("s/cap.nbt", "cap")`) + "]\n}\n"
+	}
+	files := fstest.MapFS{
+		"s/straight.nbt": {Data: orientedPiece(t, [3]int32{7, 6, 7}, road(0, 0, 3, "west"), road(6, 0, 3, "east"))},
+		"s/tee.nbt":      {Data: orientedPiece(t, [3]int32{5, 6, 5}, arm(0, 0, 2, "west"), arm(2, 0, 4, "south"), arm(4, 0, 2, "east"))},
+		"s/wide.nbt":     {Data: orientedPiece(t, [3]int32{7, 6, 7}, arm(0, 0, 3, "west"), arm(3, 0, 6, "south"), arm(6, 0, 3, "east"))},
+		"s/cap.nbt":      {Data: orientedPiece(t, [3]int32{3, 6, 7}, "0,0,3|west_up|minecraft:empty|demo:road_end|minecraft:empty")},
+	}
+	_, r := assetProject(t, files, src("tee"))
+	got := jigsawDiags(r)
+	if !strings.Contains(got, "lint/jigsaw-overlap: When 's/tee.nbt' joins 's/straight.nbt' by its jigsaw block at 0 0 2 (onto the one at 0 0 3), its jigsaw block at 2 0 4 ('demo:road_end', drawing from 'demo:straights') can never grow") || strings.Contains(got, "'s/wide.nbt'") || strings.Contains(got, "When 's/straight.nbt'") {
+		t.Fatalf("narrow T:\n%s", got)
+	}
+	_, r = assetProject(t, files, src("wide"))
+	if got := jigsawDiags(r); strings.Contains(got, "jigsaw-overlap") {
+		t.Fatalf("7 wide T:\n%s", got)
+	}
+}

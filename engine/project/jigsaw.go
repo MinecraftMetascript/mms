@@ -198,6 +198,11 @@ type poolPieces struct {
 	// terrain holds the pieces placed with terrain_matching projection,
 	// whose height follows the ground rather than the jigsaw block.
 	terrain map[string]bool
+	// empty is set when the pool has an empty or feature element, so
+	// placing nothing there can be what the author meant.
+	empty bool
+	// fallback is the pool tried when none of its pieces fit.
+	fallback string
 }
 
 func (r *Result) jigsawModel() *jigsawModel {
@@ -223,6 +228,12 @@ func (r *Result) jigsawModel() *jigsawModel {
 		}
 		p := &poolPieces{known: !hasErrors(d.Diags)}
 		if o, ok := d.Value.(*jsonv.Object); ok {
+			if fb, ok := o.Get("fallback").(jsonv.String); ok {
+				p.fallback = string(fb)
+				if !strings.Contains(p.fallback, ":") {
+					p.fallback = "minecraft:" + p.fallback
+				}
+			}
 			if els, ok := o.Get("elements").(jsonv.Array); ok {
 				for _, e := range els {
 					if eo, ok := e.(*jsonv.Object); ok {
@@ -269,6 +280,7 @@ func (m *jigsawModel) addPieces(p *poolPieces, v jsonv.Value) {
 			}
 		}
 	case "feature_pool_element", "empty_pool_element":
+		p.empty = true
 	default:
 		p.known = false
 	}
@@ -600,3 +612,169 @@ func lintJigsawFit(l *lintRun) {
 }
 
 func sum(a [6]int) int { return a[0] + a[1] + a[2] + a[3] + a[4] + a[5] }
+
+// box is a block box, min and max corners inclusive.
+type box [2][3]int
+
+func (a box) overlaps(b box) bool {
+	for i := range 3 {
+		if a[1][i] < b[0][i] || b[1][i] < a[0][i] {
+			return false
+		}
+	}
+	return true
+}
+
+// placed is a piece placed in the frame of the piece the check starts
+// from: turned r quarter turns, then moved by off.
+type placed struct {
+	size [3]int
+	r    int
+	off  [3]int
+}
+
+func (p placed) pos(q [3]int) [3]int { return add(rotate(q, p.r), p.off) }
+func (p placed) dir(f string) [3]int { return rotate(dirs[f], p.r) }
+func (p placed) box() box {
+	a, b := p.pos([3]int{}), p.pos(sub(p.size, [3]int{1, 1, 1}))
+	return box{{min(a[0], b[0]), min(a[1], b[1]), min(a[2], b[2])}, {max(a[0], b[0]), max(a[1], b[1]), max(a[2], b[2])}}
+}
+
+// join places a child piece of the given size onto jigsaw j of piece
+// at, joining through the child's jigsaw o turned r quarter turns; ok is
+// false when that turn does not line the two blocks up.
+func join(at placed, j Jigsaw, size [3]int, o Jigsaw, r int) (placed, bool) {
+	jf := at.dir(j.front())
+	if rotate(dirs[o.front()], r) != neg(jf) {
+		return placed{}, false
+	}
+	if (j.front() == "up" || j.front() == "down") && j.Joint == "aligned" && rotate(dirs[o.top()], r) != at.dir(j.top()) {
+		return placed{}, false
+	}
+	return placed{size: size, r: r, off: sub(add(at.pos(j.Pos), jf), rotate(o.Pos, r))}, true
+}
+
+// internal reports whether the block in front of jigsaw j is inside the
+// piece, so what joins there is placed inside it.
+func internal(size [3]int, j Jigsaw) bool {
+	f := add(j.Pos, dirs[j.front()])
+	for i := range 3 {
+		if f[i] < 0 || f[i] >= size[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// lintJigsawOverlap reports a jigsaw block that can never grow when its
+// piece joins a given parent: every piece its pool (and the pool's
+// fallback) could place there, turned any way that lines the blocks up,
+// overlaps the parent or the piece itself, and the game never places a
+// piece that overlaps one already placed. A junction narrower than the
+// roads around it is the usual cause. Only certain cases are reported:
+// every piece involved is a rigid project structure file with a known
+// size and facing, and no pool involved has an empty or feature element.
+func lintJigsawOverlap(l *lintRun) {
+	m := l.jigsaws()
+	terrain := map[string]bool{}
+	for _, p := range m.pools {
+		for id := range p.terrain {
+			terrain[id] = true
+		}
+	}
+	// candidates lists a pool's pieces and its fallback's, or ok false
+	// when placing nothing there may be meant or something is unknown.
+	candidates := func(pool string) (out []*structureUse, ok bool) {
+		seen := map[string]bool{}
+		for pool != "" && pool != "minecraft:empty" && !seen[pool] {
+			seen[pool] = true
+			p := m.pools[pool]
+			if p == nil || !p.known || p.empty {
+				return nil, false
+			}
+			for _, id := range p.pieces {
+				u := m.byID[id]
+				if u == nil || u.size == [3]int{} || terrain[id] {
+					return nil, false
+				}
+				out = append(out, u)
+			}
+			pool = p.fallback
+		}
+		return out, len(out) > 0
+	}
+	known := func(u *structureUse) bool {
+		for _, j := range u.jigsaws {
+			if j.front() == "" {
+				return false
+			}
+		}
+		return true
+	}
+	for _, c := range m.uses {
+		if c.size == [3]int{} || terrain[c.ID] || !known(c) {
+			continue
+		}
+		reported := map[int]bool{}
+		// Each parent jigsaw block that can draw this piece.
+		for _, pa := range m.uses {
+			if pa.size == [3]int{} || terrain[pa.ID] || !known(pa) {
+				continue
+			}
+			for _, jp := range pa.jigsaws {
+				if jp.Target == "minecraft:empty" || internal(pa.size, jp) {
+					continue
+				}
+				pieces, ok := candidates(jp.Pool)
+				if !ok || !slices.Contains(pieces, c) {
+					continue
+				}
+				parent := placed{size: pa.size}
+				for ci, jc := range c.jigsaws {
+					if jc.Name != jp.Target {
+						continue
+					}
+					for r := range 4 {
+						child, ok := join(parent, jp, c.size, jc, r)
+						if !ok || child.box().overlaps(parent.box()) {
+							continue
+						}
+						for oi, jo := range c.jigsaws {
+							if oi == ci || reported[oi] || jo.Target == "minecraft:empty" || internal(c.size, jo) {
+								continue
+							}
+							grow, ok := candidates(jo.Pool)
+							if !ok {
+								continue
+							}
+							fits, tried := false, false
+							for _, g := range grow {
+								for _, jg := range g.jigsaws {
+									if jg.Name != jo.Target {
+										continue
+									}
+									for rg := range 4 {
+										gp, ok := join(child, jo, g.size, jg, rg)
+										if !ok {
+											continue
+										}
+										tried = true
+										if !gp.box().overlaps(parent.box()) && !gp.box().overlaps(child.box()) {
+											fits = true
+										}
+									}
+								}
+							}
+							if !tried || fits {
+								continue
+							}
+							reported[oi] = true
+							msg := fmt.Sprintf("When '%s' joins '%s' by its jigsaw block at %s (onto the one at %s), its jigsaw block at %s ('%s', drawing from '%s') can never grow: every piece that pool or its fallback could place there overlaps '%s' or '%s', however it is turned, and the game never places overlapping pieces. A junction narrower than the pieces around it is the usual cause", c.Src, pa.Src, posText(jc.Pos), posText(jp.Pos), posText(jo.Pos), jo.Name, jo.Pool, pa.Src, c.Src)
+							l.out[c.decl.Unit.Path] = append(l.out[c.decl.Unit.Path], syntax.Diagnostic{Code: "lint/" + l.rule.ID, Severity: l.sev, Sp: c.sp, Message: msg})
+						}
+					}
+				}
+			}
+		}
+	}
+}
