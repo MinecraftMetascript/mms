@@ -972,3 +972,25 @@ test('a project file nothing uses is marked unused in the asset list', async ({ 
 	await expect(vault).toContainText('unused');
 	await expect(vault).toHaveAttribute('title', /Not used/);
 });
+
+test('a function runs in the function preview', async ({ page }) => {
+	const errors: string[] = [];
+	page.on('pageerror', (e) => errors.push(e.message));
+	page.on('dialog', (d) => d.accept());
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	await page.getByRole('button', { name: /Examples/ }).click();
+	await page.getByRole('button', { name: /functions-basics/ }).click();
+	await expect(status(page)).toHaveText(/No problems/);
+	await page.locator('.cm-line', { hasText: 'Function status {' }).click();
+	const run = page.getByLabel('Function preview');
+	await expect(run.getByText('basics:status', { exact: true })).toBeVisible();
+	// The load tag ran first, then the function counted down and reported.
+	const chat = run.getByLabel('Chat');
+	await expect(chat).toContainText('Points game loaded');
+	await expect(chat).toContainText('0 kills in total, 0 per player');
+	await expect(run.getByRole('cell', { name: '$reward_every' })).toBeVisible();
+	await run.getByRole('button', { name: '+20' }).click();
+	await expect(run.getByText('tick 20')).toBeVisible();
+	expect(errors).toEqual([]);
+});
