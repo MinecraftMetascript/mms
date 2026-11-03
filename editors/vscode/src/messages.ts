@@ -54,3 +54,61 @@ export type ToExtension =
 	| { type: 'clear' }
 	/** Go to a declaration's source. */
 	| { type: 'reveal'; uri: string; range: Range };
+
+// The World view's page (webview/World.svelte). The extension owns the
+// state and sends all of it after each change; the page only draws it and
+// sends back what was clicked.
+
+/** What the player does in the game after a build, from `mms build --world`. */
+export type NextAction = 'reload' | 'rejoin' | 'none';
+
+export type WorldResult =
+	| { ok: true; files: number; at: string; next?: { action: NextAction; line: string; changed?: string }; resources: boolean }
+	| { ok: false; message: string; detail: string; at: string; problems: boolean };
+
+/** A structure a structure block saved in the world. */
+export interface WorldStructureRow {
+	/** Its .nbt file in the world, which names it in messages. */
+	file: string;
+	/** Its id in the game, such as tower:base. */
+	id: string;
+	status: 'new' | 'imported' | 'changed';
+	/** Where it goes (or is) in the project, relative to the mms.json folder. */
+	rel: string;
+	call: string;
+	saved: string;
+	/** Imported, but no Structure(...) call names the project copy (lint/unused-asset). */
+	unused: boolean;
+	/** Its id in the pack, when it was saved under another namespace. */
+	packId?: string;
+}
+
+export interface WorldState {
+	/** No project means no mms.json in the workspace. */
+	project?: { name: string; ns?: string; path: string; canChoose: boolean };
+	/** No world means none chosen yet for the project. */
+	world?: { name: string; folder?: string; path: string };
+	building: boolean;
+	buildOnSave: boolean;
+	result?: WorldResult;
+	structures: WorldStructureRow[];
+	/** Project .nbt files no Structure(...) call names that are not saves of this world. */
+	unusedFiles: string[];
+	/** The unused check waits for a project without errors. */
+	unusedPaused: boolean;
+}
+
+export type ToWorld = { type: 'state'; state: WorldState };
+
+export type FromWorld =
+	| { type: 'ready' }
+	| {
+			type: 'run';
+			action: 'build' | 'chooseWorld' | 'chooseProject' | 'revealWorld' | 'forgetWorld' | 'showProblems' | 'showOutput' | 'copyReload' | 'dismiss' | 'refresh' | 'importWaiting';
+	  }
+	| { type: 'buildOnSave'; on: boolean }
+	/** file is a WorldStructureRow's file. */
+	| { type: 'import'; file: string }
+	| { type: 'copyCall'; file: string }
+	/** rel is relative to the project folder. */
+	| { type: 'revealFile'; rel: string };

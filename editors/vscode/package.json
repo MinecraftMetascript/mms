@@ -97,21 +97,11 @@
     },
     "views": {
       "mms": [
-        { "id": "mms.world", "name": "World", "icon": "icons/sidebar.svg", "initialSize": 2 },
-        { "id": "mms.pack", "name": "Pack", "icon": "icons/sidebar.svg", "initialSize": 3 }
+        { "id": "mms.world", "type": "webview", "name": "World", "icon": "icons/sidebar.svg", "initialSize": 3 },
+        { "id": "mms.pack", "name": "Pack", "icon": "icons/sidebar.svg", "initialSize": 2 }
       ]
     },
     "viewsWelcome": [
-      {
-        "view": "mms.world",
-        "contents": "No MMS project in this workspace. Open a folder with an mms.json, or create one with `mms init`.",
-        "when": "!mms.hasProject"
-      },
-      {
-        "view": "mms.world",
-        "contents": "Choose a Minecraft world to build this project's pack into. The data pack goes in the world's datapacks folder, and a resource pack, if the project has one, in resourcepacks/resources.zip.\n[Choose World](command:mms.chooseWorld)\nWorlds come from the Minecraft launcher's and Prism Launcher's saves folders, or browse to any world folder.",
-        "when": "mms.hasProject && !mms.hasWorld"
-      },
       {
         "view": "mms.pack",
         "contents": "Nothing generated yet. The files the project writes appear here once the language server has read an MMS project."
@@ -144,10 +134,7 @@
       { "command": "mms.previewOutput", "title": "Open Preview", "icon": "$(open-preview)" },
       { "command": "mms.revealOutputSource", "title": "Go to Source", "icon": "$(go-to-file)" },
       { "command": "mms.renameAt", "title": "MMS: Rename Extracted Declaration" },
-      { "command": "mms.importStructures", "title": "MMS: Import Structures from World…", "icon": "$(cloud-download)" },
-      { "command": "mms.importStructure", "title": "Import into Project", "icon": "$(cloud-download)" },
-      { "command": "mms.copyStructureCall", "title": "Copy Structure(...) Call", "icon": "$(copy)" },
-      { "command": "mms.refreshStructures", "title": "Refresh", "icon": "$(refresh)" }
+      { "command": "mms.importStructures", "title": "MMS: Import Structures from World…", "icon": "$(cloud-download)" }
     ],
     "menus": {
       "editor/title": [
@@ -158,15 +145,6 @@
         { "command": "mms.chooseWorld", "when": "view == mms.world && mms.hasProject", "group": "navigation@2" }
       ],
       "view/item/context": [
-        { "command": "mms.revealWorld", "when": "view == mms.world && viewItem == world", "group": "inline" },
-        { "command": "mms.revealWorld", "when": "view == mms.world && viewItem == world", "group": "1_world@1" },
-        { "command": "mms.forgetWorld", "when": "view == mms.world && viewItem == world", "group": "1_world@2" },
-        { "command": "mms.importStructures", "when": "view == mms.world && viewItem == structures", "group": "inline@1" },
-        { "command": "mms.refreshStructures", "when": "view == mms.world && viewItem =~ /^structures/", "group": "inline@2" },
-        { "command": "mms.importStructure", "when": "view == mms.world && viewItem =~ /^structure-(new|changed)$/", "group": "inline@1" },
-        { "command": "mms.copyStructureCall", "when": "view == mms.world && viewItem =~ /^structure-/", "group": "inline@2" },
-        { "command": "mms.importStructure", "when": "view == mms.world && viewItem =~ /^structure-/", "group": "1_structure@1" },
-        { "command": "mms.copyStructureCall", "when": "view == mms.world && viewItem =~ /^structure-/", "group": "1_structure@2" },
         { "command": "mms.previewOutput", "when": "view == mms.pack && viewItem =~ /preview/", "group": "inline@1" },
         { "command": "mms.revealOutputSource", "when": "view == mms.pack && viewItem =~ /source/", "group": "inline@2" },
         { "command": "mms.previewOutput", "when": "view == mms.pack && viewItem =~ /preview/", "group": "1_output@1" },
@@ -177,9 +155,6 @@
         { "command": "mms.previewDeclaration", "when": "false" },
         { "command": "mms.renameAt", "when": "false" },
         { "command": "mms.importStructures", "when": "mms.hasWorld" },
-        { "command": "mms.importStructure", "when": "false" },
-        { "command": "mms.copyStructureCall", "when": "false" },
-        { "command": "mms.refreshStructures", "when": "false" },
         { "command": "mms.buildToWorld", "when": "mms.hasProject" },
         { "command": "mms.chooseWorld", "when": "mms.hasProject" },
         { "command": "mms.chooseProject", "when": "mms.hasProject" },
@@ -206,7 +181,7 @@
     "build": "npm run build:extension && npm run build:webview && npm run licenses",
     "licenses": "node ../../scripts/third-party-licenses.mjs . out/third-party-licenses.txt vscode-languageclient deepslate svelte --notice ../../packages/preview/src/vendor/cmdlib/NOTICE.md",
     "build:extension": "esbuild src/extension.ts --bundle --platform=node --format=cjs --external:vscode --outfile=out/extension.js --minify",
-    "build:webview": "vite build --config webview/vite.config.ts",
+    "build:webview": "vite build --config webview/vite.config.ts && vite build --config webview/world.vite.config.ts",
     "check": "tsc --noEmit && svelte-check --tsconfig ./webview/tsconfig.json",
     "package": "npm run check && npm run build && vsce package --skip-license"
   },

@@ -6,24 +6,30 @@
 // <world>/resourcepacks/resources.zip, next to other projects' files. It builds the files on disk, so the
 // project's unsaved files are saved first.
 //
+// The view is a webview (webview/World.svelte, built into out/world), so
+// its actions are real buttons and the result of a build, with what to do
+// in the game next, stays in the view instead of a notification. A
+// notification is only shown when the view is hidden.
+//
 // Under the world, Structures lists what structure blocks saved in it
 // (structures.ts), so pieces built in the game can be pulled into the
 // project for jigsaw template pools, and pulled again after each re-save.
+// Imported pieces that no Structure(...) call names (the unused-asset lint)
+// are marked there.
 import { execFile } from 'child_process';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import * as vscode from 'vscode';
+import type { FromWorld, ToWorld, WorldResult, WorldState } from './messages';
 import { key, type PackOutput } from './output';
 import { findStructures, importPath, importStructure, status, structureCall, type Status, type WorldStructure } from './structures';
 import { findWorlds, readWorld, savesFolders, type World } from './worlds';
 
-type Row = { id: string; item: vscode.TreeItem; children?: () => Row[]; structure?: WorldStructure };
-
 /** The outcome of the last build, shown under the button. */
 type Result =
-	| { ok: true; world: string; files: number; resources: boolean; next: NextStep | undefined; at: Date }
-	| { ok: false; message: string; detail: string; at: Date };
+	| { ok: true; project: string; world: string; files: number; resources: boolean; next: NextStep | undefined; at: Date }
+	| { ok: false; project: string; world: string; message: string; detail: string; problems: boolean; at: Date };
 
 /**
  * What the player does in the game for the build to take effect, from the
@@ -40,10 +46,8 @@ export function nextStep(stdout: string): NextStep | undefined {
 	return { action, line: m[0].replace(/^next step: /, '') };
 }
 
-export class WorldView implements vscode.Disposable, vscode.TreeDataProvider<Row> {
-	private readonly changed = new vscode.EventEmitter<void>();
-	readonly onDidChangeTreeData = this.changed.event;
-	private readonly view: vscode.TreeView<Row>;
+export class WorldView implements vscode.Disposable, vscode.WebviewViewProvider {
+	private view: vscode.WebviewView | undefined;
 	/** Every folder with an mms.json in the workspace. */
 	private projects: string[] = [];
 	private building = false;
@@ -61,13 +65,11 @@ export class WorldView implements vscode.Disposable, vscode.TreeDataProvider<Row
 		private readonly mms: () => { command: string } | { error: string },
 		private readonly log: (line: string) => void
 	) {
-		this.view = vscode.window.createTreeView('mms.world', { treeDataProvider: this });
 		const watcher = vscode.workspace.createFileSystemWatcher('**/mms.json', false, true, false);
 		// An imported structure changing in the project changes its status.
 		const nbt = vscode.workspace.createFileSystemWatcher('**/*.nbt');
 		this.subscriptions.push(
-			this.changed,
-			this.view,
+			vscode.window.registerWebviewViewProvider('mms.world', this),
 			watcher,
 			watcher.onDidCreate(() => void this.findProjects()),
 			watcher.onDidDelete(() => void this.findProjects()),
@@ -76,23 +78,19 @@ export class WorldView implements vscode.Disposable, vscode.TreeDataProvider<Row
 			nbt.onDidChange(() => this.refreshSoon()),
 			nbt.onDidDelete(() => this.refreshSoon()),
 			output.onDidChangeDocument(() => this.update()),
+			// The unused-asset findings come with each new pack.
+			output.onDidChange(() => this.redraw()),
 			vscode.workspace.onDidChangeWorkspaceFolders(() => void this.findProjects()),
 			vscode.workspace.onDidSaveTextDocument((d) => this.saved(d)),
+			vscode.workspace.onDidChangeConfiguration((e) => {
+				if (e.affectsConfiguration('mms.buildOnSave') || e.affectsConfiguration('mms.structuresFolder')) this.redraw();
+			}),
 			vscode.commands.registerCommand('mms.chooseWorld', () => this.chooseWorld()),
 			vscode.commands.registerCommand('mms.chooseProject', () => this.chooseProject()),
 			vscode.commands.registerCommand('mms.buildToWorld', () => this.build()),
-			vscode.commands.registerCommand('mms.revealWorld', () => {
-				const w = this.world();
-				if (w) void vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(path.join(w, 'datapacks')));
-			}),
+			vscode.commands.registerCommand('mms.revealWorld', () => this.revealWorld()),
 			vscode.commands.registerCommand('mms.forgetWorld', () => this.setWorld(undefined)),
-			vscode.commands.registerCommand('mms.importStructure', (row?: Row) => row?.structure && this.importStructures([row.structure])),
-			vscode.commands.registerCommand('mms.importStructures', () => this.chooseStructures()),
-			vscode.commands.registerCommand('mms.copyStructureCall', (row?: Row) => {
-				const st = row?.structure && this.structureInfo(row.structure);
-				if (st) void vscode.env.clipboard.writeText(st.call).then(() => vscode.window.setStatusBarMessage(`$(check) Copied ${st.call}`, 4000));
-			}),
-			vscode.commands.registerCommand('mms.refreshStructures', () => this.changed.fire())
+			vscode.commands.registerCommand('mms.importStructures', () => this.chooseStructures())
 		);
 		void this.findProjects();
 	}
@@ -116,75 +114,138 @@ export class WorldView implements vscode.Disposable, vscode.TreeDataProvider<Row
 		return w && fs.existsSync(path.join(w, 'level.dat')) ? w : undefined;
 	}
 
-	getTreeItem(row: Row): vscode.TreeItem {
-		return row.item;
+	resolveWebviewView(view: vscode.WebviewView) {
+		this.view = view;
+		const root = vscode.Uri.joinPath(this.context.extensionUri, 'out', 'world');
+		view.webview.options = { enableScripts: true, enableCommandUris: false, localResourceRoots: [root] };
+		view.webview.html = this.html(view.webview, root);
+		view.webview.onDidReceiveMessage((m: FromWorld) => void this.receive(m), undefined, this.subscriptions);
+		// A hidden view misses posts; it is sent the state again when shown.
+		view.onDidChangeVisibility(() => view.visible && this.redraw(), undefined, this.subscriptions);
+		view.onDidDispose(() => {
+			if (this.view === view) this.view = undefined;
+		});
 	}
 
-	getChildren(row?: Row): Row[] {
-		if (row) return row.children?.() ?? [];
+	private async receive(m: FromWorld) {
+		if (m.type === 'ready') return this.redraw();
+		if (m.type === 'buildOnSave') {
+			await vscode.workspace.getConfiguration('mms').update('buildOnSave', m.on, vscode.ConfigurationTarget.Workspace);
+			return;
+		}
+		if (m.type === 'import' || m.type === 'copyCall') {
+			const world = this.world();
+			const s = world && findStructures(world).find((f) => f.file === m.file);
+			if (!s) return;
+			if (m.type === 'import') return this.importStructures([s]);
+			const info = this.structureInfo(s);
+			if (info) await vscode.env.clipboard.writeText(info.call);
+			return;
+		}
+		if (m.type === 'revealFile') {
+			const project = this.project();
+			if (project) await vscode.commands.executeCommand('revealInExplorer', vscode.Uri.file(path.join(project, ...m.rel.split('/'))));
+			return;
+		}
+		switch (m.action) {
+			case 'build':
+				return this.build();
+			case 'chooseWorld':
+				return this.chooseWorld();
+			case 'chooseProject':
+				return this.chooseProject();
+			case 'revealWorld':
+				return this.revealWorld();
+			case 'forgetWorld':
+				return this.setWorld(undefined);
+			case 'showProblems':
+				return void vscode.commands.executeCommand('workbench.actions.view.problems');
+			case 'showOutput':
+				return void vscode.commands.executeCommand('mms.showOutput');
+			case 'copyReload':
+				return vscode.env.clipboard.writeText('/reload');
+			case 'dismiss':
+				this.result = undefined;
+				return this.redraw();
+			case 'refresh':
+				return this.redraw();
+			case 'importWaiting': {
+				const world = this.world();
+				if (world) await this.importStructures(findStructures(world).filter((s) => this.structureInfo(s)?.status !== 'imported'));
+				return;
+			}
+		}
+	}
+
+	private revealWorld() {
+		const w = this.world();
+		if (w) void vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(path.join(w, 'datapacks')));
+	}
+
+	/** Everything the view draws. */
+	private state(): WorldState {
 		const project = this.project();
 		const world = project && this.world(project);
-		// No rows shows the welcome text with its buttons (package.json).
-		if (!project || !world) return [];
-		const rows: Row[] = [];
-		const p = new vscode.TreeItem(path.basename(project));
-		p.iconPath = new vscode.ThemeIcon('package');
-		p.description = namespace(project);
-		p.tooltip = `Project: ${path.join(project, 'mms.json')}` + (this.projects.length > 1 ? '\n\nClick to choose another project.' : '');
-		if (this.projects.length > 1) p.command = { command: 'mms.chooseProject', title: 'Choose Project' };
-		rows.push({ id: 'project', item: p });
-
+		const state: WorldState = {
+			building: this.building,
+			buildOnSave: vscode.workspace.getConfiguration('mms').get<boolean>('buildOnSave') ?? false,
+			structures: [],
+			unusedFiles: [],
+			unusedPaused: this.output.hasErrors
+		};
+		if (!project) return state;
+		const ns = namespace(project);
+		state.project = { name: path.basename(project), ns, path: path.join(project, 'mms.json'), canChoose: this.projects.length > 1 };
+		if (!world) return state;
 		const info = readWorld(world);
-		const w = new vscode.TreeItem(info?.name ?? path.basename(world));
-		w.iconPath = new vscode.ThemeIcon('globe');
-		w.description = path.basename(world) === info?.name ? undefined : path.basename(world);
-		w.tooltip = new vscode.MarkdownString(`World: \`${world}\`\n\nClick to choose another world.`);
-		w.command = { command: 'mms.chooseWorld', title: 'Choose World' };
-		w.contextValue = 'world';
-		rows.push({ id: 'world', item: w });
-
-		const b = new vscode.TreeItem(this.building ? 'Building…' : 'Build into world');
-		b.iconPath = new vscode.ThemeIcon(this.building ? 'sync~spin' : 'play');
-		b.tooltip = `Run mms build --world, writing ${path.join('datapacks', '<namespace>')} and ${path.join('resourcepacks', 'resources.zip')} in the world`;
-		if (!this.building) b.command = { command: 'mms.buildToWorld', title: 'Build into World' };
-		rows.push({ id: 'build', item: b });
-
+		const name = info?.name ?? path.basename(world);
+		state.world = { name, folder: path.basename(world) === name ? undefined : path.basename(world), path: world };
+		// A result is shown only under the project and world it was built for.
 		const r = this.result;
-		if (r && !this.building) {
-			const time = r.at.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
-			const s = new vscode.TreeItem(r.ok ? `Built ${r.files} ${r.files === 1 ? 'file' : 'files'}` : r.message);
-			s.description = time;
-			if (r.ok) {
-				s.iconPath = new vscode.ThemeIcon('check', new vscode.ThemeColor('testing.iconPassed'));
-				const step = r.next ? r.next.line.charAt(0).toUpperCase() + r.next.line.slice(1) + '.' : '';
-				if (r.next?.action === 'reload') s.description = `${time} · run /reload`;
-				else if (r.next?.action === 'rejoin') s.description = `${time} · rejoin the world`;
-				s.tooltip = new vscode.MarkdownString(
-					`Built into \`${r.world}\`.\n\n` +
-						(r.next
-							? step
-							: 'Run `/reload` in the game to load the data pack.' + (r.resources ? ' Rejoin the world to load the resource pack.' : ''))
-				);
-			} else {
-				s.iconPath = new vscode.ThemeIcon('error', new vscode.ThemeColor('errorForeground'));
-				s.tooltip = r.detail;
-				s.command = { command: 'workbench.actions.view.problems', title: 'Show Problems' };
-			}
-			rows.push({ id: 'result', item: s });
+		state.result = r && r.project === project && r.world === world ? view(r) : undefined;
+		// The pack's unused-asset findings are for the project the pack follows.
+		const unused = new Set(this.output.unusedAssets.filter((p) => p.endsWith('.nbt')));
+		for (const s of findStructures(world)) {
+			const st = this.structureInfo(s)!;
+			state.structures.push({
+				file: s.file,
+				id: `${s.ns}:${s.path}`,
+				status: st.status,
+				rel: st.rel,
+				call: st.call,
+				saved: s.saved.toLocaleString(),
+				unused: st.status !== 'new' && unused.delete(st.rel),
+				packId: s.ns !== ns && ns ? `${ns}:${s.path}` : undefined
+			});
 		}
+		state.unusedFiles = [...unused].sort();
+		return state;
+	}
 
-		const found = findStructures(world);
-		const st = new vscode.TreeItem('Structures', found.length ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None);
-		st.id = `structures:${world}`;
-		st.iconPath = new vscode.ThemeIcon('symbol-structure');
-		const waiting = found.filter((f) => this.structureInfo(f)?.status !== 'imported').length;
-		st.description = found.length ? (waiting ? `${waiting} to import` : 'all imported') : 'none saved yet';
-		st.tooltip = new vscode.MarkdownString(
-			'What structure blocks saved in this world (`generated/<namespace>/structure`). Import one to use it in a template pool with `Structure(...)`; after you save it again in the game, it shows as changed.'
-		);
-		st.contextValue = found.length ? 'structures' : 'structures-empty';
-		rows.push({ id: 'structures', item: st, children: () => found.map((f) => this.structureRow(f)) });
-		return rows;
+	private redraw() {
+		if (!this.view) return;
+		void this.view.webview.postMessage({ type: 'state', state: this.state() } satisfies ToWorld);
+	}
+
+	private html(webview: vscode.Webview, root: vscode.Uri): string {
+		const nonce = Array.from({ length: 32 }, () => Math.floor(Math.random() * 36).toString(36)).join('');
+		const script = webview.asWebviewUri(vscode.Uri.joinPath(root, 'world.js'));
+		const style = webview.asWebviewUri(vscode.Uri.joinPath(root, 'world.css'));
+		const csp = ["default-src 'none'", `style-src ${webview.cspSource} 'unsafe-inline'`, `script-src 'nonce-${nonce}'`, `font-src ${webview.cspSource}`].join('; ');
+		return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="${csp}">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="${style}">
+<title>World</title>
+</head>
+<body>
+<div id="app"></div>
+<script type="module" nonce="${nonce}" src="${script}"></script>
+</body>
+</html>`;
 	}
 
 	/** Where a world structure goes in the project, its status and the call that uses it. */
@@ -195,29 +256,6 @@ export class WorldView implements vscode.Disposable, vscode.TreeDataProvider<Row
 		const rel = importPath(s, namespace(project), folder);
 		const dest = path.join(project, ...rel.split('/'));
 		return { rel, dest, status: status(s, dest), call: structureCall(rel, s) };
-	}
-
-	private structureRow(s: WorldStructure): Row {
-		const info = this.structureInfo(s)!;
-		const t = new vscode.TreeItem(`${s.ns}:${s.path}`);
-		t.id = `structure:${s.file}`;
-		const label: Record<Status, string> = { new: 'new', imported: 'imported', changed: 'changed in world' };
-		t.description = label[info.status];
-		t.iconPath = new vscode.ThemeIcon(
-			info.status === 'imported' ? 'pass' : info.status === 'changed' ? 'diff-modified' : 'circle-outline',
-			info.status === 'changed' ? new vscode.ThemeColor('gitDecoration.modifiedResourceForeground') : undefined
-		);
-		const ns = namespace(this.project()!);
-		t.tooltip = new vscode.MarkdownString(
-			`Saved ${s.saved.toLocaleString()} in \`${s.file}\`\n\n` +
-				(info.status === 'new' ? `Import copies it to \`${info.rel}\`.` : `In the project at \`${info.rel}\`.`) +
-				`\n\nUse it with \`${info.call}\`` +
-				(s.ns !== ns && ns ? `; its id in the pack is \`${ns}:${s.path}\`, in the project's namespace.` : '.')
-		);
-		t.contextValue = `structure-${info.status}`;
-		// An imported structure shows its project copy; importing is the row's button.
-		if (info.status !== 'new') t.command = { command: 'revealInExplorer', title: 'Reveal in Explorer', arguments: [vscode.Uri.file(info.dest)] };
-		return { id: t.id, item: t, structure: s };
 	}
 
 	/** Lets the user pick structures to import, with the new and changed ones ticked. */
@@ -254,12 +292,18 @@ export class WorldView implements vscode.Disposable, vscode.TreeDataProvider<Row
 				void vscode.window.showErrorMessage(`Could not import ${s.ns}:${s.path}: ${e instanceof Error ? e.message : String(e)}`);
 			}
 		}
-		this.changed.fire();
-		if (done.length === 1) {
+		this.redraw();
+		// The row now says it is imported, with its Copy call button; a
+		// notification only when the view is hidden (an import from the
+		// command palette).
+		if (!done.length) return;
+		if (this.view?.visible) {
+			void vscode.window.setStatusBarMessage(`$(check) Imported ${done.length === 1 ? done[0].rel : `${done.length} structures`}`, 4000);
+		} else if (done.length === 1) {
 			const [d] = done;
 			const choice = await vscode.window.showInformationMessage(`Imported ${d.rel}. Use it in a template pool with ${d.call}.`, 'Copy call');
 			if (choice) await vscode.env.clipboard.writeText(d.call);
-		} else if (done.length > 1) {
+		} else {
 			void vscode.window.setStatusBarMessage(`$(check) Imported ${done.length} structures`, 5000);
 		}
 	}
@@ -267,7 +311,7 @@ export class WorldView implements vscode.Disposable, vscode.TreeDataProvider<Row
 	/** Redraws soon, so a burst of file events redraws once. */
 	private refreshSoon() {
 		if (this.refreshTimer) clearTimeout(this.refreshTimer);
-		this.refreshTimer = setTimeout(() => this.changed.fire(), 300);
+		this.refreshTimer = setTimeout(() => this.redraw(), 300);
 	}
 
 	/** Watches the chosen world's generated folder, where structure blocks save. */
@@ -397,30 +441,27 @@ export class WorldView implements vscode.Disposable, vscode.TreeDataProvider<Row
 			const files = [...run.stdout.matchAll(/(\d+) files?/g)].reduce((n, m) => n + Number(m[1]), 0);
 			const resources = /resource pack/.test(run.stdout);
 			const next = nextStep(run.stdout);
-			this.result = { ok: true, world, files, resources, next, at: new Date() };
-			if (next?.action === 'reload') {
-				void vscode.window.showInformationMessage(`MMS: built into ${name}. Run /reload in the game to apply it.`, 'Copy /reload').then((c) => {
-					if (c) void vscode.env.clipboard.writeText('/reload');
-				});
-			} else if (next?.action === 'rejoin') {
-				const changed = /; (.*) changed\b/.exec(next.line)?.[1];
-				void vscode.window.showInformationMessage(
-					`MMS: built into ${name}. Exit and rejoin the world to apply it` + (changed ? ` (${changed} changed; /reload is not enough).` : '.')
-				);
-			} else {
-				void vscode.window.setStatusBarMessage(next ? `$(check) MMS: built into ${name}; nothing changed` : `$(check) MMS: built into ${name}`, 5000);
-			}
+			this.result = { ok: true, project, world, files, resources, next, at: new Date() };
+			// The view shows the result and what to do in the game; the
+			// status bar says it briefly, which also covers a build on save
+			// with the side bar closed.
+			const todo = next?.action === 'reload' ? '; run /reload' : next?.action === 'rejoin' ? '; rejoin the world' : next ? '; nothing changed' : '';
+			void vscode.window.setStatusBarMessage(`$(check) MMS: built into ${name}${todo}`, this.view?.visible ? 5000 : 15000);
 		} else {
 			const errors = /(\d+) errors?; nothing written/.exec(run.stderr);
 			const message = errors ? `${errors[1]} ${errors[1] === '1' ? 'error' : 'errors'}; nothing written` : 'Build failed';
-			this.result = { ok: false, message, detail: run.stderr.trim(), at: new Date() };
-			const last = run.stderr.trim().split('\n').pop()?.replace(/^mms: /, '') ?? '';
-			void vscode.window
-				.showErrorMessage(errors ? `MMS: ${message} to ${name}. Fix the problems and build again.` : `MMS: building into ${name} failed: ${last}`, errors ? 'Show problems' : 'Show output')
-				.then((c) => {
-					if (c === 'Show problems') void vscode.commands.executeCommand('workbench.actions.view.problems');
-					else if (c === 'Show output') void vscode.commands.executeCommand('mms.showOutput');
-				});
+			this.result = { ok: false, project, world, message, detail: run.stderr.trim(), problems: !!errors, at: new Date() };
+			// A failure the view shows needs no notification; with the view
+			// hidden, one says so.
+			if (!this.view?.visible) {
+				const last = run.stderr.trim().split('\n').pop()?.replace(/^mms: /, '') ?? '';
+				void vscode.window
+					.showErrorMessage(errors ? `MMS: ${message} to ${name}. Fix the problems and build again.` : `MMS: building into ${name} failed: ${last}`, errors ? 'Show problems' : 'Show output')
+					.then((c) => {
+						if (c === 'Show problems') void vscode.commands.executeCommand('workbench.actions.view.problems');
+						else if (c === 'Show output') void vscode.commands.executeCommand('mms.showOutput');
+					});
+			}
 		}
 		this.update();
 	}
@@ -447,7 +488,7 @@ export class WorldView implements vscode.Disposable, vscode.TreeDataProvider<Row
 		void vscode.commands.executeCommand('setContext', 'mms.hasProject', project !== undefined);
 		void vscode.commands.executeCommand('setContext', 'mms.hasWorld', this.world(project) !== undefined);
 		this.watchWorld(this.world(project));
-		this.changed.fire();
+		this.redraw();
 	}
 
 	dispose() {
@@ -480,4 +521,12 @@ function namespace(project: string): string | undefined {
 
 function expandHome(p: string): string {
 	return p === '~' || p.startsWith('~/') || p.startsWith('~\\') ? path.join(os.homedir(), p.slice(1)) : p;
+}
+
+/** A build result as the view shows it. */
+function view(r: Result): WorldResult {
+	const at = r.at.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+	if (!r.ok) return { ok: false, message: r.message, detail: r.detail, problems: r.problems, at };
+	const next = r.next && { action: r.next.action, line: r.next.line, changed: /; (.*) changed\b/.exec(r.next.line)?.[1] };
+	return { ok: true, files: r.files, at, next, resources: r.resources };
 }
