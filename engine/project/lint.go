@@ -38,6 +38,8 @@ var Rules = []*Rule{
 		Doc: "A jigsaw block that can never join its target: every jigsaw block with its target name in its pool faces a way it cannot meet. The game turns pieces only about the y axis, so a block facing up joins only one facing down, and a sideways block only a sideways one."},
 	{ID: "jigsaw-fit", Severity: syntax.SeverityWarning, all: lintJigsawFit,
 		Doc: "An internal jigsaw block (the block in front of it is inside its own piece, such as an arch mount on a road, or a jigsaw inset by a block by mistake) whose pool has pieces that stick out of the piece however they are turned. The game only places a piece joined at an internal jigsaw wholly inside its parent, so those pieces are never placed there. Height is not checked for terrain_matching pieces."},
+	{ID: "jigsaw-overlap", Severity: syntax.SeverityInfo, all: lintJigsawOverlap,
+		Doc: "A jigsaw block that can never grow when its piece joins a given parent: every piece its pool and the pool's fallback could place there overlaps the parent or the piece itself, however it is turned, and the game never places overlapping pieces. A junction narrower than the roads around it is the usual cause. Only certain cases are reported: every piece involved is a rigid project structure file with a known size and facing, and no pool involved has an empty or feature element."},
 	{ID: "jigsaw-pool", Severity: syntax.SeverityWarning, all: lintJigsawPool,
 		Doc: "A jigsaw block in a structure file that Structure(\"...\") includes draws from a pool in the project's namespace that no TemplatePool declares. The game skips the jigsaw, so the structure stops growing there. The quick fix declares the pool."},
 	{ID: "jigsaw-target", Severity: syntax.SeverityWarning, all: lintJigsawTarget,
