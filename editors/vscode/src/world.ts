@@ -16,6 +16,12 @@
 // project for jigsaw template pools, and pulled again after each re-save.
 // Imported pieces that no Structure(...) call names (the unused-asset lint)
 // are marked there.
+//
+// Structures can come from a separate world: a creative world the pieces
+// are built in, while the pack is built into another one. Builds then never
+// touch the world the pieces live in, and that world can stay open while
+// the build world is left and rejoined. With no
+// separate world chosen, structures come from the build world.
 import { execFile } from 'child_process';
 import * as fs from 'fs';
 import * as os from 'os';
@@ -90,7 +96,8 @@ export class WorldView implements vscode.Disposable, vscode.WebviewViewProvider 
 			vscode.commands.registerCommand('mms.buildToWorld', () => this.build()),
 			vscode.commands.registerCommand('mms.revealWorld', () => this.revealWorld()),
 			vscode.commands.registerCommand('mms.forgetWorld', () => this.setWorld(undefined)),
-			vscode.commands.registerCommand('mms.importStructures', () => this.chooseStructures())
+			vscode.commands.registerCommand('mms.importStructures', () => this.chooseStructures()),
+			vscode.commands.registerCommand('mms.chooseStructureWorld', () => this.chooseWorld('structures'))
 		);
 		void this.findProjects();
 	}
@@ -107,10 +114,24 @@ export class WorldView implements vscode.Disposable, vscode.WebviewViewProvider 
 		return this.projects[0];
 	}
 
-	/** The world chosen for the project, if it still exists. */
+	/** The world chosen for the project to build into, if it still exists. */
 	world(project = this.project()): string | undefined {
+		return this.stored('mms.worlds', project);
+	}
+
+	/** The world structures are imported from: the separate one if chosen, else the build world. */
+	structureWorld(project = this.project()): string | undefined {
+		return this.stored('mms.structureWorlds', project) ?? this.world(project);
+	}
+
+	/** Whether the project has a structure world of its own, apart from the build world. */
+	private separateStructureWorld(project = this.project()): boolean {
+		return this.stored('mms.structureWorlds', project) !== undefined;
+	}
+
+	private stored(state: 'mms.worlds' | 'mms.structureWorlds', project: string | undefined): string | undefined {
 		if (!project) return undefined;
-		const w = this.context.workspaceState.get<Record<string, string>>('mms.worlds')?.[key(vscode.Uri.file(project))];
+		const w = this.context.workspaceState.get<Record<string, string>>(state)?.[key(vscode.Uri.file(project))];
 		return w && fs.existsSync(path.join(w, 'level.dat')) ? w : undefined;
 	}
 
@@ -133,11 +154,12 @@ export class WorldView implements vscode.Disposable, vscode.WebviewViewProvider 
 			await vscode.workspace.getConfiguration('mms').update('buildOnSave', m.on, vscode.ConfigurationTarget.Workspace);
 			return;
 		}
-		if (m.type === 'import' || m.type === 'copyCall') {
-			const world = this.world();
+		if (m.type === 'import' || m.type === 'copyCall' || m.type === 'deleteFromWorld') {
+			const world = this.structureWorld();
 			const s = world && findStructures(world).find((f) => f.file === m.file);
 			if (!s) return;
 			if (m.type === 'import') return this.importStructures([s]);
+			if (m.type === 'deleteFromWorld') return this.deleteFromWorld(world, s);
 			const info = this.structureInfo(s);
 			if (info) await vscode.env.clipboard.writeText(info.call);
 			return;
@@ -169,8 +191,17 @@ export class WorldView implements vscode.Disposable, vscode.WebviewViewProvider 
 				return this.redraw();
 			case 'refresh':
 				return this.redraw();
+			case 'chooseStructureWorld':
+				return this.chooseWorld('structures');
+			case 'sameStructureWorld':
+				return this.setWorld(undefined, undefined, 'structures');
+			case 'revealStructureWorld': {
+				const w = this.structureWorld();
+				if (w) void vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(path.join(w, 'generated')));
+				return;
+			}
 			case 'importWaiting': {
-				const world = this.world();
+				const world = this.structureWorld();
 				if (world) await this.importStructures(findStructures(world).filter((s) => this.structureInfo(s)?.status !== 'imported'));
 				return;
 			}
@@ -186,6 +217,7 @@ export class WorldView implements vscode.Disposable, vscode.WebviewViewProvider 
 	private state(): WorldState {
 		const project = this.project();
 		const world = project && this.world(project);
+		const from = project && this.structureWorld(project);
 		const state: WorldState = {
 			building: this.building,
 			buildOnSave: vscode.workspace.getConfiguration('mms').get<boolean>('buildOnSave') ?? false,
@@ -196,16 +228,17 @@ export class WorldView implements vscode.Disposable, vscode.WebviewViewProvider 
 		if (!project) return state;
 		const ns = namespace(project);
 		state.project = { name: path.basename(project), ns, path: path.join(project, 'mms.json'), canChoose: this.projects.length > 1 };
-		if (!world) return state;
-		const info = readWorld(world);
-		const name = info?.name ?? path.basename(world);
-		state.world = { name, folder: path.basename(world) === name ? undefined : path.basename(world), path: world };
-		// A result is shown only under the project and world it was built for.
-		const r = this.result;
-		state.result = r && r.project === project && r.world === world ? view(r) : undefined;
+		if (world) {
+			state.world = describe(world);
+			// A result is shown only under the project and world it was built for.
+			const r = this.result;
+			state.result = r && r.project === project && r.world === world ? view(r) : undefined;
+		}
+		if (!from) return state;
+		state.structureWorld = { ...describe(from), separate: this.separateStructureWorld(project) };
 		// The pack's unused-asset findings are for the project the pack follows.
 		const unused = new Set(this.output.unusedAssets.filter((p) => p.endsWith('.nbt')));
-		for (const s of findStructures(world)) {
+		for (const s of findStructures(from)) {
 			const st = this.structureInfo(s)!;
 			state.structures.push({
 				file: s.file,
@@ -260,7 +293,7 @@ export class WorldView implements vscode.Disposable, vscode.WebviewViewProvider 
 
 	/** Lets the user pick structures to import, with the new and changed ones ticked. */
 	private async chooseStructures() {
-		const world = this.world();
+		const world = this.structureWorld();
 		if (!world) return;
 		const found = findStructures(world);
 		if (!found.length) {
@@ -308,13 +341,47 @@ export class WorldView implements vscode.Disposable, vscode.WebviewViewProvider 
 		}
 	}
 
+	/**
+	 * Deletes a structure the world saved, such as one saved under the wrong
+	 * name, after asking. Files go to the trash where the system has one, and
+	 * the project's imported copy is left alone.
+	 */
+	private async deleteFromWorld(world: string, s: WorldStructure) {
+		const id = `${s.ns}:${s.path}`;
+		const name = readWorld(world)?.name ?? path.basename(world);
+		const choice = await vscode.window.showWarningMessage(
+			`Delete ${id} from ${name}?`,
+			{
+				modal: true,
+				detail: `This deletes ${savedFiles(world, s).length > 1 ? 'its saves' : 'its save'} in the world's generated folder (moved to the trash where possible). The copy imported into the project, if any, stays. If the world is open, the game may still use the structure until it is reopened.`
+			},
+			'Delete'
+		);
+		if (choice !== 'Delete') return;
+		for (const file of savedFiles(world, s)) {
+			try {
+				await vscode.workspace.fs.delete(vscode.Uri.file(file), { useTrash: true });
+			} catch {
+				// No trash (some Linux setups): delete outright, as confirmed.
+				try {
+					await vscode.workspace.fs.delete(vscode.Uri.file(file), { useTrash: false });
+				} catch (e) {
+					void vscode.window.showErrorMessage(`Could not delete ${file}: ${e instanceof Error ? e.message : String(e)}`);
+				}
+			}
+			this.log(`deleted ${file}`);
+		}
+		this.redraw();
+		void vscode.window.setStatusBarMessage(`$(trash) Deleted ${id} from ${name}`, 4000);
+	}
+
 	/** Redraws soon, so a burst of file events redraws once. */
 	private refreshSoon() {
 		if (this.refreshTimer) clearTimeout(this.refreshTimer);
 		this.refreshTimer = setTimeout(() => this.redraw(), 300);
 	}
 
-	/** Watches the chosen world's generated folder, where structure blocks save. */
+	/** Watches the structure world's generated folder, where structure blocks save. */
 	private watchWorld(world: string | undefined) {
 		if (this.worldWatcher?.world === world) return;
 		this.worldWatcher?.watcher.dispose();
@@ -327,29 +394,46 @@ export class WorldView implements vscode.Disposable, vscode.WebviewViewProvider 
 		this.worldWatcher = { world, watcher };
 	}
 
-	/** Lets the user pick a world from the saves folders, or browse to one. */
-	async chooseWorld() {
+	/**
+	 * Lets the user pick a world from the saves folders, or browse to one:
+	 * the world to build into, or the world to import structures from.
+	 */
+	async chooseWorld(purpose: Purpose = 'build') {
 		const project = this.project();
 		if (!project) {
-			void vscode.window.showWarningMessage('Open a folder with an mms.json to build its pack into a world.');
+			void vscode.window.showWarningMessage(
+				purpose === 'build' ? 'Open a folder with an mms.json to build its pack into a world.' : 'Open a folder with an mms.json to import structures into it.'
+			);
 			return;
 		}
 		const extra = (vscode.workspace.getConfiguration('mms').get<string[]>('savesFolders') ?? []).map(expandHome);
 		const worlds = findWorlds(savesFolders(extra));
-		const current = this.world(project);
+		const current = purpose === 'build' ? this.world(project) : this.structureWorld(project);
+		// The other world, marked in the list so the two are told apart.
+		const other = purpose === 'build' ? (this.separateStructureWorld(project) ? this.structureWorld(project) : undefined) : this.world(project);
+		// A world reached through a symlinked saves folder is still the same world.
+		const real = (p: string) => {
+			try {
+				return fs.realpathSync(p);
+			} catch {
+				return p;
+			}
+		};
+		const same = (a: string | undefined, b: string) => a !== undefined && key(vscode.Uri.file(real(a))) === key(vscode.Uri.file(real(b)));
 		type Pick = vscode.QuickPickItem & { world?: World; browse?: true };
 		const picks: Pick[] = [{ label: '$(folder-opened) Browse for a world folder…', browse: true }];
 		for (const w of worlds) {
+			const role = same(other, w.dir) ? (purpose === 'build' ? 'structures come from here' : 'the pack is built here') : '';
 			picks.push({
 				label: w.name,
-				description: [w.source, w.name === path.basename(w.dir) ? '' : path.basename(w.dir)].filter(Boolean).join(' · '),
+				description: [w.source, w.name === path.basename(w.dir) ? '' : path.basename(w.dir), role].filter(Boolean).join(' · '),
 				detail: `Played ${w.saved.toLocaleString()}`,
-				picked: current !== undefined && key(vscode.Uri.file(current)) === key(vscode.Uri.file(w.dir)),
+				picked: same(current, w.dir),
 				world: w
 			});
 		}
 		const pick = await vscode.window.showQuickPick(picks, {
-			title: `Build ${path.basename(project)} into a world`,
+			title: purpose === 'build' ? `Build ${path.basename(project)} into a world` : `Import structures into ${path.basename(project)} from a world`,
 			placeHolder: worlds.length ? 'Choose a Minecraft world (most recently played first)' : 'No worlds found in the usual saves folders; browse for one',
 			matchOnDescription: true
 		});
@@ -370,16 +454,22 @@ export class WorldView implements vscode.Disposable, vscode.WebviewViewProvider 
 				return;
 			}
 		}
-		if (dir) await this.setWorld(dir, project);
+		if (!dir) return;
+		// One world picked for both is no separate structure world.
+		if (purpose === 'build' && same(other, dir)) await this.setWorld(undefined, project, 'structures');
+		if (purpose === 'structures' && same(this.world(project), dir)) dir = undefined;
+		await this.setWorld(dir, project, purpose);
 	}
 
-	private async setWorld(dir: string | undefined, project = this.project()) {
+	/** Sets (or with no dir, forgets) the project's build world or separate structure world. */
+	private async setWorld(dir: string | undefined, project = this.project(), purpose: Purpose = 'build') {
 		if (!project) return;
-		const worlds = { ...this.context.workspaceState.get<Record<string, string>>('mms.worlds') };
+		const state = purpose === 'build' ? 'mms.worlds' : 'mms.structureWorlds';
+		const worlds = { ...this.context.workspaceState.get<Record<string, string>>(state) };
 		if (dir) worlds[key(vscode.Uri.file(project))] = dir;
 		else delete worlds[key(vscode.Uri.file(project))];
-		await this.context.workspaceState.update('mms.worlds', worlds);
-		this.result = undefined;
+		await this.context.workspaceState.update(state, worlds);
+		if (purpose === 'build') this.result = undefined;
 		this.update();
 	}
 
@@ -487,7 +577,8 @@ export class WorldView implements vscode.Disposable, vscode.WebviewViewProvider 
 		const project = this.project();
 		void vscode.commands.executeCommand('setContext', 'mms.hasProject', project !== undefined);
 		void vscode.commands.executeCommand('setContext', 'mms.hasWorld', this.world(project) !== undefined);
-		this.watchWorld(this.world(project));
+		void vscode.commands.executeCommand('setContext', 'mms.hasStructureWorld', this.structureWorld(project) !== undefined);
+		this.watchWorld(this.structureWorld(project));
 		this.redraw();
 	}
 
@@ -521,6 +612,26 @@ function namespace(project: string): string | undefined {
 
 function expandHome(p: string): string {
 	return p === '~' || p.startsWith('~/') || p.startsWith('~\\') ? path.join(os.homedir(), p.slice(1)) : p;
+}
+
+/**
+ * Every file a world holds for a structure's id: both the 1.21+ structure/
+ * folder and the older structures/ one, so deleting it does not just
+ * uncover an older save.
+ */
+function savedFiles(world: string, s: WorldStructure): string[] {
+	return ['structure', 'structures']
+		.map((folder) => path.join(world, 'generated', s.ns, folder, ...s.path.split('/')) + '.nbt')
+		.filter((f) => fs.existsSync(f));
+}
+
+/** Which of a project's two worlds is being chosen. */
+type Purpose = 'build' | 'structures';
+
+/** A world's name, and its folder name when that differs. */
+function describe(world: string): { name: string; folder?: string; path: string } {
+	const name = readWorld(world)?.name ?? path.basename(world);
+	return { name, folder: path.basename(world) === name ? undefined : path.basename(world), path: world };
 }
 
 /** A build result as the view shows it. */

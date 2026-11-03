@@ -86,13 +86,18 @@ export interface WorldStructureRow {
 export interface WorldState {
 	/** No project means no mms.json in the workspace. */
 	project?: { name: string; ns?: string; path: string; canChoose: boolean };
-	/** No world means none chosen yet for the project. */
+	/** The world the pack is built into. None means none chosen yet for the project. */
 	world?: { name: string; folder?: string; path: string };
+	/**
+	 * The world structures are imported from: a separate one when chosen
+	 * (separate is true), else the build world.
+	 */
+	structureWorld?: { name: string; folder?: string; path: string; separate: boolean };
 	building: boolean;
 	buildOnSave: boolean;
 	result?: WorldResult;
 	structures: WorldStructureRow[];
-	/** Project .nbt files no Structure(...) call names that are not saves of this world. */
+	/** Project .nbt files no Structure(...) call names that are not saves of the structure world. */
 	unusedFiles: string[];
 	/** The unused check waits for a project without errors. */
 	unusedPaused: boolean;
@@ -104,11 +109,13 @@ export type FromWorld =
 	| { type: 'ready' }
 	| {
 			type: 'run';
-			action: 'build' | 'chooseWorld' | 'chooseProject' | 'revealWorld' | 'forgetWorld' | 'showProblems' | 'showOutput' | 'copyReload' | 'dismiss' | 'refresh' | 'importWaiting';
+			action: 'build' | 'chooseWorld' | 'chooseProject' | 'revealWorld' | 'forgetWorld' | 'showProblems' | 'showOutput' | 'copyReload' | 'dismiss' | 'refresh' | 'importWaiting'
+				| 'chooseStructureWorld' | 'sameStructureWorld' | 'revealStructureWorld';
 	  }
 	| { type: 'buildOnSave'; on: boolean }
 	/** file is a WorldStructureRow's file. */
 	| { type: 'import'; file: string }
 	| { type: 'copyCall'; file: string }
+	| { type: 'deleteFromWorld'; file: string }
 	/** rel is relative to the project folder. */
 	| { type: 'revealFile'; rel: string };
