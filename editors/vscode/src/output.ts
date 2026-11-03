@@ -12,6 +12,8 @@ export class PackOutput implements vscode.Disposable {
 	items: OutputItem[] = [];
 	assets: OutputAsset[] = [];
 	hasErrors = false;
+	/** Project files nothing uses (lint/unused-asset), relative to the mms.json folder. */
+	unusedAssets: string[] = [];
 	/** The source document whose project's pack is fetched. */
 	private document: vscode.Uri | undefined;
 	private timer: ReturnType<typeof setTimeout> | undefined;
@@ -63,7 +65,7 @@ export class PackOutput implements vscode.Disposable {
 		if (!client?.isRunning()) return;
 		try {
 			const uri = this.document?.toString();
-			const out = await client.sendRequest<{ files: OutputFile[]; items?: OutputItem[]; assets?: OutputAsset[]; hasErrors: boolean }>(
+			const out = await client.sendRequest<{ files: OutputFile[]; items?: OutputItem[]; assets?: OutputAsset[]; unusedAssets?: string[]; hasErrors: boolean }>(
 				'mms/output',
 				uri ? { uri } : {}
 			);
@@ -71,6 +73,7 @@ export class PackOutput implements vscode.Disposable {
 			this.items = out.items ?? [];
 			this.assets = out.assets ?? [];
 			this.hasErrors = out.hasErrors;
+			this.unusedAssets = out.unusedAssets ?? [];
 			this.changed.fire();
 		} catch {
 			// A restart or shutdown; the next analysis refreshes again.
