@@ -153,7 +153,7 @@
 				</div>
 				<p class="muted small">
 					Builds never touch this world, so the pieces saved in it are safe.
-					{#if s.world}<button class="link" onclick={() => send({ type: 'run', action: 'sameStructureWorld' })}>Use the build world instead</button>{/if}
+					<button class="link" onclick={() => send({ type: 'run', action: 'sameStructureWorld' })}>{s.world ? 'Use the build world instead' : 'Forget this world'}</button>
 				</p>
 			{:else}
 				<p class="muted small">

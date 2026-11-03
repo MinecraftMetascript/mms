@@ -376,7 +376,15 @@ export class WorldView implements vscode.Disposable, vscode.WebviewViewProvider 
 		const current = purpose === 'build' ? this.world(project) : this.structureWorld(project);
 		// The other world, marked in the list so the two are told apart.
 		const other = purpose === 'build' ? (this.separateStructureWorld(project) ? this.structureWorld(project) : undefined) : this.world(project);
-		const same = (a: string | undefined, b: string) => a !== undefined && key(vscode.Uri.file(a)) === key(vscode.Uri.file(b));
+		// A world reached through a symlinked saves folder is still the same world.
+		const real = (p: string) => {
+			try {
+				return fs.realpathSync(p);
+			} catch {
+				return p;
+			}
+		};
+		const same = (a: string | undefined, b: string) => a !== undefined && key(vscode.Uri.file(real(a))) === key(vscode.Uri.file(real(b)));
 		type Pick = vscode.QuickPickItem & { world?: World; browse?: true };
 		const picks: Pick[] = [{ label: '$(folder-opened) Browse for a world folder…', browse: true }];
 		for (const w of worlds) {
