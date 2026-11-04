@@ -88,7 +88,6 @@
 		return d === 1 ? 'yesterday' : `${d} days ago`;
 	}
 
-	const status: Record<WorldStructureRow['status'], string> = { new: 'New', imported: '', changed: 'Changed' };
 	const waiting = $derived(s?.structures.filter((r) => r.status !== 'imported').length ?? 0);
 	const unused = $derived((s?.structures.filter((r) => r.unused).length ?? 0) + (s?.unusedFiles.length ?? 0));
 	// The structures as folders, split at / in their ids, so big
@@ -108,54 +107,63 @@
 	const sentence = (line: string) => line.charAt(0).toUpperCase() + line.slice(1);
 </script>
 
-{#snippet row(r: WorldStructureRow, prefix: string)}
-	<li class="st" class:unused={r.unused} class:changed={r.status === 'changed'} class:new={r.status === 'new'} oncontextmenu={(e) => openMenu(e, rowMenu(r))}>
-		<div class="st-head">
-			<span class="name grow" title={r.id}>{nameOf(r).slice(prefix.length)}</span>
-			{#if r.unused}
-				<span class="tag warn-tag">Not used</span>
-			{:else if status[r.status]}
-				<span class="tag" class:changed-tag={r.status === 'changed'} class:new-tag={r.status === 'new'}>{status[r.status]}</span>
-			{/if}
-			{#if r.status !== 'imported'}
-				<button class="primary small-btn" title={r.status === 'changed' ? 'Replace the project copy with this save (overwrites any edits to it)' : `Copy it to ${r.rel}`} onclick={() => send({ type: 'import', file: r.file })}>{r.status === 'changed' ? 'Import again' : 'Import'}</button>
-			{:else if r.unused}
-				<button class="secondary small-btn" title={r.call} onclick={() => copy(r.file, { type: 'copyCall', file: r.file })}>{copied === r.file ? 'Copied' : 'Copy call'}</button>
-			{/if}
-			<button class="icon-btn more" title="More actions" aria-label="More actions for {r.id}" aria-haspopup="menu" onclick={(e) => openMenu(e, rowMenu(r))}>⋯</button>
+{#snippet icon(name: 'import' | 'copy' | 'more' | 'check')}
+	<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+		{#if name === 'import'}<path d="M8 2.5v7M5 7l3 3 3-3M3 11v2.5h10V11" />
+		{:else if name === 'copy'}<rect x="5.5" y="5.5" width="8" height="8" rx="1" /><path d="M10.5 5.5V3.5a1 1 0 0 0-1-1h-6a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2" />
+		{:else if name === 'check'}<path d="M3 8.5l3 3 7-7" />
+		{:else}<circle cx="3.5" cy="8" r=".6" fill="currentColor" /><circle cx="8" cy="8" r=".6" fill="currentColor" /><circle cx="12.5" cy="8" r=".6" fill="currentColor" />{/if}
+	</svg>
+{/snippet}
+
+{#snippet row(r: WorldStructureRow, prefix: string, depth: number)}
+	{@const tip = [
+		r.id,
+		r.status === 'new' ? `New: not in the project yet. Import copies it to ${r.rel}.` : r.status === 'changed' ? `Changed: differs from the project copy ${r.rel}. Import again overwrites it.` : r.rel,
+		r.unused ? `Not used: no Structure(...) call uses it, so the pack leaves it out. Add it to a template pool:\n${r.call}` : '',
+		r.packId ? `In the pack as ${r.packId}, the project's namespace.` : '',
+		`Saved ${r.saved}`
+	].filter(Boolean).join('\n')}
+	<li>
+		<div class="item" style:--depth={depth} title={tip} tabindex="0" role="treeitem" aria-selected="false" oncontextmenu={(e) => openMenu(e, rowMenu(r))} onkeydown={(e) => { if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) openMenu(e as unknown as MouseEvent, rowMenu(r)); }}>
+			<span class="twistie"></span>
+			<span class="label" class:new-text={r.status === 'new'} class:changed-text={r.status === 'changed'} class:warn-text={r.unused}>{nameOf(r).slice(prefix.length)}</span>
+			<span class="desc">
+				{#if r.unused}<span class="warn-text">not used</span>{' · '}{:else if r.status === 'new'}<span class="new-text">new</span>{' · '}{:else if r.status === 'changed'}<span class="changed-text">changed</span>{' · '}{/if}{ago(r.savedMs)}
+			</span>
+			<span class="actions-inline">
+				{#if r.status !== 'imported'}
+					<button class="icon-btn" title={r.status === 'changed' ? 'Import again (overwrites the project copy)' : 'Import into the project'} aria-label="Import {r.id}" onclick={() => send({ type: 'import', file: r.file })}>{@render icon('import')}</button>
+				{/if}
+				<button class="icon-btn" title="Copy {r.call}" aria-label="Copy the Structure call for {r.id}" onclick={() => copy(r.file, { type: 'copyCall', file: r.file })}>{@render icon(copied === r.file ? 'check' : 'copy')}</button>
+				<button class="icon-btn" title="More actions" aria-label="More actions for {r.id}" aria-haspopup="menu" onclick={(e) => openMenu(e, rowMenu(r))}>{@render icon('more')}</button>
+			</span>
 		</div>
-		<div class="muted small detail" title={`Saved ${r.saved} in ${r.file}`}>
-			{#if r.status === 'new'}Saved {ago(r.savedMs)}, not in the project yet
-			{:else if r.status === 'changed'}Saved {ago(r.savedMs)}, differs from the project copy
-			{:else}Saved {ago(r.savedMs)} · {r.rel}{/if}
-		</div>
-		{#if r.unused}
-			<div class="small">No <code>Structure(...)</code> call uses it, so the pack leaves it out. Add it to a template pool:</div>
-			<code class="call">{r.call}</code>
-		{/if}
-		{#if r.packId}<div class="muted small">In the pack as {r.packId}, the project's namespace.</div>{/if}
 	</li>
 {/snippet}
 
-{#snippet tree(nodes: Node<WorldStructureRow>[], prefix: string)}
+{#snippet tree(nodes: Node<WorldStructureRow>[], prefix: string, depth: number)}
 	{#each nodes as n (n.kind === 'group' ? `g:${n.key}` : n.item.file)}
 		{#if n.kind === 'leaf'}
-			{@render row(n.item, prefix)}
+			{@render row(n.item, prefix, depth)}
 		{:else}
 			{@const todo = n.items.filter((r) => r.status !== 'imported')}
 			{@const notUsed = n.items.filter((r) => r.unused).length}
-			<li class="group">
+			<li>
 				<details open={isOpen(n)} ontoggle={(e) => (open[n.key] = e.currentTarget.open)}>
-					<summary>
-						<span class="folder name" title={n.key}>{n.label}</span>
-						<span class="muted small count">{n.items.length}</span>
-						{#if notUsed}<span class="small warn-text count">{notUsed} not used</span>{/if}
-						<span class="grow"></span>
+					<summary class="item" style:--depth={depth} title={n.key}>
+						<span class="twistie" aria-hidden="true"></span>
+						<span class="label folder">{n.label}</span>
+						<span class="desc">
+							{n.items.length}{#if todo.length}{' · '}<span class="new-text">{todo.length} to import</span>{/if}{#if notUsed}{' · '}<span class="warn-text">{notUsed} not used</span>{/if}
+						</span>
 						{#if todo.length}
-							<button class="secondary small-btn" title="Import the new and changed structures in this folder" onclick={(e) => { e.preventDefault(); send({ type: 'importFiles', files: todo.map((r) => r.file) }); }}>Import {todo.length}</button>
+							<span class="actions-inline">
+								<button class="icon-btn" title="Import the {todo.length} new and changed structures in {n.label}" aria-label="Import {todo.length} in {n.label}" onclick={(e) => { e.preventDefault(); send({ type: 'importFiles', files: todo.map((r) => r.file) }); }}>{@render icon('import')}</button>
+							</span>
 						{/if}
 					</summary>
-					<ul class="tree-list">{@render tree(n.children, n.key)}</ul>
+					<ul class="tree">{@render tree(n.children, n.key, depth + 1)}</ul>
 				</details>
 			</li>
 		{/if}
@@ -291,20 +299,25 @@
 				<p class="muted small">None saved yet. Save one with a structure block in SAVE mode; it shows up here to import into the project for a template pool.</p>
 			{:else}
 				<p class="muted small">
-					{[s.structures.length ? (waiting ? `${waiting} to import` : 'All imported') : '', unused ? `${unused} not used` : ''].filter(Boolean).join(' · ')}
-					{#if s.unusedPaused}· the not-used check waits until the project has no errors{/if}
+					{s.structures.length ? (waiting ? `${waiting} to import` : 'All imported') : ''}
+					{#if unused}
+						{s.structures.length ? ' · ' : ''}<span class="warn-text">{unused} not used</span>: no <code>Structure(...)</code> call uses {unused === 1 ? 'it' : 'them'}, so the pack leaves {unused === 1 ? 'it' : 'them'} out. Copy a row's call into a template pool.
+					{/if}
+					{#if s.unusedPaused}(The not-used check waits until the project has no errors.){/if}
 				</p>
-				<ul class="tree-list">
-					{@render tree(groups, '')}
+				<ul class="tree" role="tree">
+					{@render tree(groups, '', 0)}
 					{#each s.unusedFiles as rel (rel)}
 						{@const items: MenuItem[] = [{ label: 'Show file in Explorer', run: () => send({ type: 'revealFile', rel }) }]}
-						<li class="st unused" oncontextmenu={(e) => openMenu(e, items)}>
-							<div class="st-head">
-								<span class="name grow" title={rel}>{rel}</span>
-								<span class="tag warn-tag">Not used</span>
-								<button class="icon-btn more" title="More actions" aria-label="More actions for {rel}" aria-haspopup="menu" onclick={(e) => openMenu(e, items)}>⋯</button>
+						<li>
+							<div class="item" style:--depth={0} tabindex="0" role="treeitem" aria-selected="false" title={`${rel}\nNot saved in ${from.name}, and no Structure(...) call uses it, so the pack leaves it out.`} oncontextmenu={(e) => openMenu(e, items)}>
+								<span class="twistie"></span>
+								<span class="label warn-text">{rel}</span>
+								<span class="desc"><span class="warn-text">not used</span> · not in world</span>
+								<span class="actions-inline">
+									<button class="icon-btn" title="More actions" aria-label="More actions for {rel}" aria-haspopup="menu" onclick={(e) => openMenu(e, items)}>{@render icon('more')}</button>
+								</span>
 							</div>
-							<div class="small">Not saved in {from.name}, and no <code>Structure(...)</code> call uses it, so the pack leaves it out.</div>
 						</li>
 					{/each}
 				</ul>
@@ -370,8 +383,7 @@
 	}
 	.row,
 	.head,
-	.card-head,
-	.st-head {
+	.card-head {
 		display: flex;
 		align-items: center;
 		gap: 6px;
@@ -534,65 +546,105 @@
 		cursor: pointer;
 	}
 
-	/* Structures: list rows, mostly text. A coloured edge marks the ones
-	   with something to do; the ⋯ button shows on hover or focus but stays
-	   faintly visible so it can be found. */
-	.st {
-		padding: 4px 6px 4px 8px;
-		border-left: 3px solid transparent;
-		border-radius: 2px;
+	/* Structures: a tree like the Explorer's. One 22px line per item, the
+	   status as coloured words in the description (like git decorations),
+	   and the actions as icons that show on hover or keyboard focus. The
+	   full explanation is in each item's tooltip. */
+	ul.tree {
+		gap: 0;
+		margin: 0 -12px;
 	}
-	.st:hover,
-	.st:focus-within {
+	ul.tree ul.tree {
+		margin: 0;
+	}
+	.item {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		height: 22px;
+		padding: 0 4px 0 calc(8px + var(--depth, 0) * 12px);
+		cursor: default;
+		white-space: nowrap;
+		outline: none;
+	}
+	.item:hover {
 		background: var(--vscode-list-hoverBackground);
 	}
-	.st.new {
-		border-left-color: var(--vscode-gitDecoration-untrackedResourceForeground, #73c991);
+	.item:focus-visible {
+		outline: 1px solid var(--vscode-list-focusOutline, var(--vscode-focusBorder));
+		outline-offset: -1px;
 	}
-	.st.changed {
-		border-left-color: var(--vscode-gitDecoration-modifiedResourceForeground);
+	.twistie {
+		flex: 0 0 12px;
+		text-align: center;
+		color: var(--vscode-icon-foreground);
 	}
-	.st.unused {
-		border-left-color: var(--vscode-editorWarning-foreground);
-		background: color-mix(in srgb, var(--vscode-editorWarning-foreground) 8%, transparent);
+	summary.item {
+		list-style: none;
+		cursor: pointer;
 	}
-	.st .detail {
+	summary.item::-webkit-details-marker {
+		display: none;
+	}
+	summary.item .twistie::before {
+		content: '›';
+		display: inline-block;
+		font-size: 14px;
+		line-height: 1;
+		transition: transform 0.1s;
+	}
+	details[open] > summary.item .twistie::before {
+		transform: rotate(90deg);
+	}
+	.label {
+		flex: 0 1 auto;
+		min-width: 0;
 		overflow: hidden;
 		text-overflow: ellipsis;
-		white-space: nowrap;
+	}
+	.desc {
+		flex: 1 1 0;
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		font-size: 0.92em;
+		color: var(--vscode-descriptionForeground);
+	}
+	.actions-inline {
+		display: none;
+		flex: 0 0 auto;
+		gap: 0;
+	}
+	.item:hover .actions-inline,
+	.item:focus-within .actions-inline {
+		display: flex;
+	}
+	.actions-inline .icon-btn {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 22px;
+		height: 20px;
+		padding: 0;
+		border-radius: 4px;
+	}
+	.new-text {
+		color: var(--vscode-gitDecoration-untrackedResourceForeground, #73c991);
+	}
+	.changed-text {
+		color: var(--vscode-gitDecoration-modifiedResourceForeground);
+	}
+	.warn-text {
+		color: var(--vscode-editorWarning-foreground);
 	}
 	.more {
 		opacity: 0.45;
 		font-weight: 700;
 		letter-spacing: 1px;
 	}
-	.st:hover .more,
 	.row:hover .more,
 	.more:focus-visible {
 		opacity: 1;
-	}
-	.tag {
-		font-size: 11px;
-		white-space: nowrap;
-		color: var(--vscode-descriptionForeground);
-	}
-	.new-tag {
-		color: var(--vscode-gitDecoration-untrackedResourceForeground, #73c991);
-	}
-	.changed-tag {
-		color: var(--vscode-gitDecoration-modifiedResourceForeground);
-	}
-	.warn-tag,
-	.warn-text {
-		color: var(--vscode-editorWarning-foreground);
-		font-weight: 600;
-	}
-	.count {
-		white-space: nowrap;
-		flex-shrink: 0;
-	}
-	ul.tree-list {
-		gap: 2px;
 	}
 
 	/* The ⋯ menu, drawn like VS Code's own context menus. */
@@ -631,41 +683,5 @@
 		height: 1px;
 		margin: 4px 0;
 		background: var(--vscode-menu-separatorBackground, var(--vscode-widget-border, transparent));
-	}
-	.group > details > summary {
-		display: flex;
-		align-items: center;
-		gap: 6px;
-		cursor: pointer;
-		padding: 2px 0;
-		list-style: none;
-	}
-	.group > details > summary::-webkit-details-marker {
-		display: none;
-	}
-	.group > details > summary::before {
-		content: '▸';
-		width: 12px;
-		color: var(--vscode-icon-foreground);
-	}
-	.group > details[open] > summary::before {
-		content: '▾';
-	}
-	.group > details > ul {
-		padding-left: 12px;
-		margin-top: 4px;
-		border-left: 1px solid var(--vscode-tree-indentGuidesStroke, var(--vscode-widget-border, transparent));
-	}
-	.folder {
-		min-width: 0;
-		font-family: var(--vscode-editor-font-family);
-	}
-	.call {
-		display: block;
-		margin-top: 4px;
-		padding: 2px 6px;
-		background: var(--vscode-textCodeBlock-background);
-		border-radius: 2px;
-		overflow-wrap: anywhere;
 	}
 </style>
