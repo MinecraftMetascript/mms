@@ -1,6 +1,6 @@
 # Arrows
 
-Custom projectiles: three new arrows, a bow that calls lightning, and a wand that fires cows.
+Custom projectiles: three new arrows, a bow that calls lightning, an exploding splash potion, and a wand that fires cows.
 
 ## Try it
 
@@ -16,6 +16,7 @@ Then run `/function arrows:give` for one of everything, or craft them:
 | Ender Arrow (2) | 2 arrows + ender pearl | Teleports whoever shot it to where it lands. |
 | Arrow of Levitation (8) | 8 arrows around a shulker shell | Lifts what it hits for three seconds. |
 | Thunder Bow | bow + lightning rod | Calls lightning wherever its arrows hit, block or mob. Any arrow works. |
+| Blast Potion | glass bottle + TNT | A splash potion that flies further than most and explodes where it lands. |
 | Cow Wand | 2 sticks | Right-click to fire a cow the way you are looking. |
 
 The arrows work from bows, crossbows and dispensers.
@@ -26,7 +27,7 @@ The arrows work from bows, crossbows and dispensers.
 | --- | --- |
 | `items.mms` | The custom items and their recipes. |
 | `effects.mms` | What the Explosive and Ender arrows and the Thunder Bow do where an arrow hits. |
-| `launch.mms` | The Cow Wand, and a `launch` function that throws an entity the way it faces. |
+| `launch.mms` | The Cow Wand, and a `launch` function that summons an entity already flying the way the player looks. |
 | `lang.mms` | Names for the arrows. |
 
 **Effects in the arrow** (Arrow of Levitation). A tipped arrow applies its `potion_contents` to what it hits, and `custom_effects` can be any effects at all. No commands run. `potion_duration_scale = 1` makes the effect last as long as written; tipped arrows normally give an eighth.
@@ -34,6 +35,8 @@ The arrows work from bows, crossbows and dispensers.
 **Projectile hooks** (Explosive and Ender arrows, Thunder Bow). `on_projectile_hit_block` and `on_projectile_hit_entity` name a function to run where an arrow hits. On an arrow base they follow that arrow; on a bow or crossbow base they follow every arrow it shoots. A block hit runs as the arrow at the point it hit (`execute on origin` is the shooter); an entity hit runs as and at the entity (`execute on attacker` is the shooter).
 
 Under the hood, an arrow keeps the bow it was shot from as its `weapon`, and the game runs that weapon's enchantment effects at the exact spot it hits. MMS writes an enchantment per item that runs the hook functions, and the tick function adds it to the weapon of each new arrow that is the item or came from it. The hooks combine: an Explosive Arrow from the Thunder Bow explodes and calls lightning. See [Projectile hooks](../../docs/functions.md#projectile-hooks).
+
+**Thrown potions** (Blast Potion). A thrown potion keeps no bow, so no enchantment runs when it lands. `on_projectile_land` puts a marker on each one instead, riding it; the game drops a rider where it removes the potion, and the hook runs at that spot. The spot can be up to one tick of flight short, about half a block for a thrown potion, and the hook can't tell what the potion hit or who threw it.
 
 The custom arrows are tipped arrows on purpose. Their colour shows on the item and as a particle trail in flight, a bow with Infinity does not make them free (it only spares plain `arrow` items), and they take their name from `potion_contents.custom_name` (see `lang.mms`).
 
@@ -43,7 +46,7 @@ The custom arrows are tipped arrows on purpose. Their colour shows on the item a
 - The marker is killed once read. Without that every shot leaves one behind.
 - `launch` reads `^ ^ ^` with `anchored feet`. Under `anchored eyes`, local coordinates start at the eyes of whoever runs the command, which tilts the vector up.
 
-`launch` runs as the entity being thrown (`execute summon cow run ...`), so it never has to find it again by tag. It also turns the entity to face the way it flies.
+`launch` then summons an invisible falling block (`structure_void`) with that vector as its `Motion`, through a macro, with the entity riding it. A mob only tells players where it is every few ticks, so a mob launched on its own seems to hang for a moment before it flies; players run a falling block's physics themselves, so the ride is smooth from the first frame. When the block lands it is removed rather than placed (`CancelDrop`), and the rider drops off.
 
 ## Limits
 

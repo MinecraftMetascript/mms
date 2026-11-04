@@ -33,6 +33,25 @@ export function inspectable(path: string | null): { kind: InspectKind; id: strin
 	return { kind, id: `${m[1]}:${m[3]}` };
 }
 
+const jigsawPattern = /^data\/([^/]+)\/worldgen\/(template_pool|structure)\/(.+)\.json$/;
+
+/**
+ * The template pool or structure a jigsaw connection graph starts from.
+ * Any structure qualifies by path; only a jigsaw one has a graph.
+ */
+export function jigsawable(path: string | null): { kind: 'pool' | 'structure'; id: string } | null {
+	const m = path ? jigsawPattern.exec(path) : null;
+	return m ? { kind: m[2] === 'template_pool' ? 'pool' : 'structure', id: `${m[1]}:${m[3]}` } : null;
+}
+
+const functionPattern = /^data\/([^/]+)\/function\/(.+)\.mcfunction$/;
+
+/** The function an output path names, which the function preview runs. */
+export function runnable(path: string | null): { kind: 'function'; id: string } | null {
+	const m = path ? functionPattern.exec(path) : null;
+	return m ? { kind: 'function', id: `${m[1]}:${m[2]}` } : null;
+}
+
 /** The key an editor selects a custom item or book by. */
 export const itemPath = (id: string) => `item:${id}`;
 
@@ -60,6 +79,8 @@ export function bookPageAt(pages: readonly { uri: string; range: { start: { line
 
 /**
  * What the preview pane shows for an output path: a preview, an
- * inspector, a book, or nothing. Books need the items to tell.
+ * inspector, a jigsaw graph, a book, a function run, or nothing. Books
+ * need the items to tell.
  */
-export const shows = (path: string | null, items?: readonly { id: string; text: string }[]) => previewable(path) ?? inspectable(path) ?? bookAt(path, items);
+export const shows = (path: string | null, items?: readonly { id: string; text: string }[]) =>
+	previewable(path) ?? inspectable(path) ?? jigsawable(path) ?? bookAt(path, items) ?? runnable(path);

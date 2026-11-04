@@ -10,6 +10,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"testing/fstest"
@@ -46,6 +47,9 @@ type Server struct {
 	// keeps them in the project (the browser has no disk to fall back on).
 	managed   map[string]bool
 	published map[string]bool
+	// assetDiags are the files of each project with unused-asset
+	// diagnostics published, so they clear when used again.
+	assetDiags map[*workspace]map[string]bool
 	// assets holds binary project files (textures, sounds) the browser
 	// sent with mms/setAssets, since it has no disk for Texture() to read.
 	assets   fstest.MapFS
@@ -54,11 +58,15 @@ type Server struct {
 	// watchers itself (Zed, Neovim and Helix rely on this; VS Code does
 	// too).
 	watchFiles bool
+	// renameAfterExtract is set when the client handles the mms.renameAt
+	// command (initializationOptions.renameAfterExtract), so extract
+	// actions can start a rename of the new declaration's name.
+	renameAfterExtract bool
 }
 
 // NewServer returns a server over tr checking against pack.
 func NewServer(tr Transport, pack *spec.Pack) *Server {
-	return &Server{tr: tr, pack: pack, open: map[string]bool{}, managed: map[string]bool{}, published: map[string]bool{}}
+	return &Server{tr: tr, pack: pack, open: map[string]bool{}, managed: map[string]bool{}, published: map[string]bool{}, assetDiags: map[*workspace]map[string]bool{}}
 }
 
 type message struct {
@@ -250,6 +258,9 @@ type initializeParams struct {
 			} `json:"didChangeWatchedFiles"`
 		} `json:"workspace"`
 	} `json:"capabilities"`
+	InitializationOptions struct {
+		RenameAfterExtract bool `json:"renameAfterExtract"`
+	} `json:"initializationOptions"`
 }
 
 // watchedGlobs are the files whose changes on disk the server needs to
@@ -282,6 +293,7 @@ func (s *Server) registerWatchers() {
 
 func (s *Server) initialize(ctx context.Context, p initializeParams) (any, *respError) {
 	s.watchFiles = p.Capabilities.Workspace.DidChangeWatchedFiles.DynamicRegistration
+	s.renameAfterExtract = p.InitializationOptions.RenameAfterExtract
 	s.roots = nil
 	for _, f := range p.WorkspaceFolders {
 		if path := uriPath(f.URI); path != "" {
@@ -313,7 +325,7 @@ func (s *Server) initialize(ctx context.Context, p initializeParams) (any, *resp
 			"documentFormattingProvider": true,
 			"documentSymbolProvider":     true,
 			"inlayHintProvider":          true,
-			"codeActionProvider":         map[string]any{"codeActionKinds": []string{"quickfix", "source.fixAll.mms"}},
+			"codeActionProvider":         map[string]any{"codeActionKinds": []string{"quickfix", "refactor.extract", "source.fixAll.mms"}},
 			"semanticTokensProvider": map[string]any{
 				"legend": map[string]any{"tokenTypes": ide.TokenTypes, "tokenModifiers": ide.TokenModifiers},
 				"full":   true,
@@ -541,6 +553,7 @@ func (s *Server) analyze(ctx context.Context, w *workspace) {
 		}
 		s.publish(u, ds)
 	}
+	s.publishAssets(w, r)
 	for uri := range s.published {
 		// Files that left every project are cleared too.
 		if o := s.owners[uri]; (o == w || o == nil) && !seen[uri] {
@@ -548,6 +561,31 @@ func (s *Server) analyze(ctx context.Context, w *workspace) {
 			delete(s.published, uri)
 		}
 	}
+}
+
+// publishAssets reports the project's files that nothing uses on the
+// files themselves, and clears the ones used again. Only a project on
+// disk has file URIs; the browser shows them from mms/output.
+func (s *Server) publishAssets(w *workspace, r *project.Result) {
+	now := map[string]bool{}
+	if w.root != "" {
+		paths, sev := r.UnusedAssets()
+		for _, p := range paths {
+			uri := pathURI(filepath.Join(w.root, filepath.FromSlash(p)))
+			now[uri] = true
+			s.notify("textDocument/publishDiagnostics", map[string]any{"uri": uri, "diagnostics": []any{map[string]any{
+				"range":    map[string]any{"start": Position{}, "end": Position{}},
+				"severity": int(sev), "source": "mms", "code": "lint/unused-asset", "tags": []int{1},
+				"message": project.UnusedAssetMessage(p),
+			}}})
+		}
+	}
+	for uri := range s.assetDiags[w] {
+		if !now[uri] {
+			s.notify("textDocument/publishDiagnostics", map[string]any{"uri": uri, "diagnostics": []any{}})
+		}
+	}
+	s.assetDiags[w] = now
 }
 
 func (s *Server) publish(u *sema.Unit, ds []syntax.Diagnostic) {
@@ -925,6 +963,27 @@ func (s *Server) output(_ context.Context, p struct {
 			a := map[string]any{"path": f.Path, "src": f.Asset}
 			if f.Pack == sema.ResourcePack {
 				a["pack"] = "resources"
+			} else if structureAsset.MatchString(f.Path) {
+				// A structure file's jigsaw blocks, for the jigsaw
+				// connection preview: the editor gets the pack as JSON
+				// and cannot read the .nbt itself.
+				if js, ok := project.StructureJigsaws(w.proj.Files, f.Asset); ok {
+					list := make([]map[string]any, 0, len(js))
+					for _, j := range js {
+						m := map[string]any{"pos": j.Pos, "pool": j.Pool, "name": j.Name, "target": j.Target}
+						if j.Orientation != "" {
+							m["orientation"] = j.Orientation
+						}
+						if j.Joint != "" {
+							m["joint"] = j.Joint
+						}
+						list = append(list, m)
+					}
+					a["jigsaws"] = list
+				}
+				if size, ok := project.StructureSize(w.proj.Files, f.Asset); ok {
+					a["size"] = size
+				}
 			}
 			assets = append(assets, a)
 			continue
@@ -935,6 +994,9 @@ func (s *Server) output(_ context.Context, p struct {
 		}
 		if f.Implicit {
 			m["implicit"] = true
+		}
+		if len(f.Labels) > 0 {
+			m["labels"] = f.Labels
 		}
 		if f.Unit != "" {
 			l := idx[f.Unit]
@@ -992,8 +1054,15 @@ func (s *Server) output(_ context.Context, p struct {
 		items = append(items, it)
 	}
 	sort.Slice(items, func(i, j int) bool { return items[i]["id"].(string) < items[j]["id"].(string) })
-	return map[string]any{"files": out, "assets": assets, "items": items, "hasErrors": w.res.HasErrors()}, nil
+	unused, _ := w.res.UnusedAssets()
+	if unused == nil {
+		unused = []string{}
+	}
+	return map[string]any{"files": out, "assets": assets, "items": items, "unusedAssets": unused, "hasErrors": w.res.HasErrors()}, nil
 }
+
+// structureAsset matches a structure file's path in the data pack.
+var structureAsset = regexp.MustCompile(`^data/[^/]+/structures?/.+\.nbt$`)
 
 // ---- URIs
 

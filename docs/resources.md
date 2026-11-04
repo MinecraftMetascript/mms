@@ -94,7 +94,7 @@ A structure that generates in new chunks takes four resources, each naming the n
 
 | Kind | Says |
 | --- | --- |
-| `StructureSet` | how far apart structures start, with `RandomSpread(spacing, separation, salt)` |
+| `StructureSet` | how far apart structures start, with `RandomSpread(spacing = 24, separation = 8, salt = 1)` |
 | `Structure` | the biomes, the height, and for `Jigsaw(...)` the pool to start from |
 | `TemplatePool` | the templates (`.nbt` files) to place, with their processors |
 | `ProcessorList` | rules that change blocks as a template is placed |
@@ -116,6 +116,8 @@ DensityFunction hills = Noise({ base_octave = -6, amplitude_modifiers = [1, 1] }
 ```
 
 This writes `worldgen/noise/mms_gen/hills/noise.json` and gives `hills` the noise `<ns>:mms_gen/hills/noise`. A second inline value of the same kind in the same declaration is named `noise_2`, and so on. Each inline noise gets its own id, so two identical inline noises still produce different noise. To share one noise, declare it with a name. Where the game does take inline values, such as density functions, features and surface rules, they stay inline.
+
+To turn an inline value into a declaration of its own, put the cursor in it and open the code actions (Ctrl/⌘+. in VS Code, Zed and the web editor). **Extract { ... } to a Noise declaration** moves the value above the declaration that holds it, as `Noise hills_noise = { ... }`, and writes `hills_noise` in its place. The action is offered for every value the build would write under `mms_gen/`, and for any inline value where an id of its kind would also do, such as an inline density function or predicate. The new name is the holding declaration's name and the field's name (or the kind's, for an argument), with a number added if it is taken. VS Code and the web editor open the rename box on it straight away; in Zed, press F2 to rename it.
 
 A function id takes a block of commands the same way, compiled as a `Function` with no parameters:
 
@@ -152,6 +154,10 @@ Each call stands for the id the file gets in your namespace: its base name, lowe
 Inside the quotes, completion lists the project's files of the helper's type, in VS Code, Zed and the web editor. A path to a file that is not there is an error.
 
 Textures, sounds and [resource pack declarations](#resource-packs) go into a resource pack built next to the data pack: `build-resources/` (set `resourcePack.output` in `mms.json` to change it), `<name>-resources.zip` with `mms build --zip`, and `<world>/resourcepacks/resources.zip` with `mms build --world`, the world's bundled pack, which Minecraft applies by itself when you open the world (rejoin after a rebuild). It is not sent to LAN players; a server needs `resource-pack` in `server.properties`. `"icon": "art/icon.png"` in `mms.json` becomes `pack.png` in both packs.
+
+A world has only one bundled pack, so `--world` merges into it instead of overwriting it: build several projects into the same world and each keeps its files. Rebuilding a project replaces only the files it wrote last time, recorded in `mms-world-pack.json` inside the zip (Minecraft ignores it). Lang files, `sounds.json`, atlases and fonts that several projects write are merged: keys are combined and atlas sources and font providers are appended. Any other file two projects both write goes to the one built last, with a warning. A `resources.zip` that MMS did not write, such as a hand-made pack, is kept the same way. The description in `pack.mcmeta` lists every pack in the zip. Data packs already sit side by side, in `<world>/datapacks/<namespace>`.
+
+The last line `mms build --world` prints says what to do in the game, from what changed since the last build into that world: `next step: run /reload in the world` when only functions, loot tables, recipes, advancements, predicates, item modifiers, structure templates or tags of built-in registries (blocks, items, entity types...) changed, and `next step: exit and rejoin the world` when worldgen, dimensions, other registry entries (enchantments, variants, damage types, dialogs...), their tags or the resource pack changed, since Minecraft reads those only when the world is opened. `next step: none` means the build wrote the same files as before. The VS Code World view shows the same advice after each build.
 
 Where the game takes a sound event either by id or inline, as a jukebox song's `sound_event` does, `Sound(...)` writes it inline, `{ "sound_id": "my_pack:tune" }`: the game's sound event registry is fixed, so a pack's own sound cannot be named there by id.
 

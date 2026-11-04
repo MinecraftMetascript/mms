@@ -4,6 +4,7 @@ import { Supervisor, type EngineStatus } from './supervisor';
 import { ProjectWorkspace } from './workspace';
 import { showDiagnostics } from '../editor/diagnostics';
 import type { InlayHint } from '../editor/inlay';
+import type { OutputJigsaw } from '@mms/preview';
 
 export interface Diagnostic {
 	range: { start: { line: number; character: number }; end: { line: number; character: number } };
@@ -18,6 +19,16 @@ export interface Diagnostic {
 export interface TextEdit {
 	range: Diagnostic['range'];
 	newText: string;
+}
+
+/**
+ * A refactoring such as "Extract { ... } to a Noise declaration": its
+ * edits, and the default name it picked (renamed after applying).
+ */
+export interface Refactor {
+	title: string;
+	edits: TextEdit[];
+	name?: string;
 }
 
 /** A fix the engine attached to a diagnostic; safe fixes never change the pack. */
@@ -36,6 +47,8 @@ export interface OutputFile {
 	range?: Diagnostic['range'];
 	/** Written for an inline value where an id is required; range is that value's. */
 	implicit?: boolean;
+	/** Labels for parts of the file by JSON pointer, from doc comments, such as "/elements/2" of a template pool. */
+	labels?: Record<string, string>;
 	/** Set when this is a custom item's stack shown as JSON, not a pack file. */
 	item?: OutputItem;
 }
@@ -69,6 +82,10 @@ export interface OutputAsset {
 	path: string;
 	src: string;
 	pack?: string;
+	/** For a structure file: its jigsaw blocks. */
+	jigsaws?: OutputJigsaw[];
+	/** For a structure file: its size in blocks, x y z. */
+	size?: [number, number, number];
 }
 
 export interface DocSymbol {
@@ -109,6 +126,8 @@ export class Engine {
 	output = $state<OutputFile[]>([]);
 	outputAssets = $state<OutputAsset[]>([]);
 	outputItems = $state<OutputItem[]>([]);
+	/** Project files nothing uses, so the packs leave them out. */
+	unusedAssets = $state<string[]>([]);
 	hasErrors = $state(false);
 	symbols = $state<Record<string, DocSymbol[]>>({});
 
@@ -198,10 +217,11 @@ export class Engine {
 		try {
 			await this.client.initializing;
 			this.client.sync();
-			const out = await this.client.request<object, { files: OutputFile[]; assets?: OutputAsset[]; items?: OutputItem[]; hasErrors: boolean }>('mms/output', {});
+			const out = await this.client.request<object, { files: OutputFile[]; assets?: OutputAsset[]; items?: OutputItem[]; unusedAssets?: string[]; hasErrors: boolean }>('mms/output', {});
 			this.output = out.files;
 			this.outputAssets = out.assets ?? [];
 			this.outputItems = out.items ?? [];
+			this.unusedAssets = out.unusedAssets ?? [];
 			this.hasErrors = out.hasErrors;
 			const syms: Record<string, DocSymbol[]> = {};
 			await Promise.all(
@@ -236,6 +256,16 @@ export class Engine {
 	async resourceKinds(): Promise<ResourceKind[]> {
 		await this.client.initializing;
 		return this.client.request<object, ResourceKind[]>('mms/resourceKinds', {});
+	}
+
+	/** Refactorings for a range of a file, such as extracting an inline value to a declaration. */
+	async refactors(uri: string, range: Diagnostic['range']): Promise<Refactor[]> {
+		this.client.sync();
+		const actions = await this.client.request<
+			object,
+			{ title: string; edit?: { changes?: Record<string, TextEdit[]> }; data?: { rename?: { name: string } } }[]
+		>('textDocument/codeAction', { textDocument: { uri }, range, context: { diagnostics: [], only: ['refactor'] } });
+		return (actions ?? []).map((a) => ({ title: a.title, edits: a.edit?.changes?.[uri] ?? [], name: a.data?.rename?.name }));
 	}
 
 	/** The edits that fix every safely fixable problem in a file. */

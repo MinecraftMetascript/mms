@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
 
 const status = (page: Page) => page.getByRole('status');
@@ -125,6 +126,48 @@ test('an example with textures and a sound checks and exports both packs', async
 	await page.getByRole('listitem').filter({ hasText: 'art/hearth.png' }).hover();
 	await page.getByRole('button', { name: 'Delete art/hearth.png' }).click();
 	await expect(status(page)).toHaveText(/2 errors/);
+});
+
+test('density previews use the picked palette over the range in view', async ({ page }) => {
+	const errors: string[] = [];
+	page.on('pageerror', (e) => errors.push(e.message));
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+
+	// A gradient from 0 to 1 spans the whole palette, not a sliver of a -1 to 1 one.
+	await replaceText(page, 'DensityFunction grad = Gradient(axis = y, from_coordinate = 0, to_coordinate = 512, from_value = 0, to_value = 1)\n');
+	await expect(status(page)).toHaveText(/No problems/);
+	await page.locator('.cm-line').first().click();
+	const scale = page.getByLabel('Value scale');
+	await expect(scale).toContainText(/in view 0\.000 … 0\.\d{3}/, { timeout: 20_000 });
+	await expect(scale).toContainText(/^\s*0\.000\s+0\.\d{3}/);
+
+	const pixel = (x: number, y: number) =>
+		page.locator('canvas').evaluate((c: HTMLCanvasElement, [fx, fy]) => {
+			const d = c.getContext('2d')!.getImageData(Math.floor(c.width * fx), Math.floor(c.height * fy), 1, 1).data;
+			return [d[0], d[1], d[2]];
+		}, [x, y]);
+	// Viridis: dark purple at the bottom (0), yellow at the top.
+	await expect(page.getByLabel('Palette')).toHaveValue('viridis');
+	expect((await pixel(0.5, 0.98))[2]).toBeGreaterThan((await pixel(0.5, 0.98))[1]);
+	expect((await pixel(0.5, 0.01))[0]).toBeGreaterThan(200);
+
+	// Grayscale runs black to white over the same range.
+	await page.getByLabel('Palette').selectOption('grayscale');
+	await expect.poll(async () => (await pixel(0.5, 0.98))[0]).toBeLessThan(20);
+	expect((await pixel(0.5, 0.01))[0]).toBeGreaterThan(200);
+
+	// A fixed -1 to 1 range puts 0 in the middle grey.
+	await page.getByLabel('Range').selectOption('unit');
+	await expect.poll(async () => (await pixel(0.5, 0.98))[0]).toBeGreaterThan(110);
+	await expect(scale).toContainText('-1.00');
+
+	// The palette is remembered.
+	await page.reload();
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	await page.locator('.cm-line').first().click();
+	await expect(page.getByLabel('Palette')).toHaveValue('grayscale');
+	expect(errors).toEqual([]);
 });
 
 test('dimensions, noise settings and surface rules preview as terrain', async ({ page }) => {
@@ -824,5 +867,145 @@ test('a book previews its pages and opens on the page at the cursor', async ({ p
 	await page.locator('.cm-line', { hasText: 'Something knocks' }).click();
 	await expect(book.getByText('Diary, Day 12')).toBeVisible();
 	await expect(book.getByText('Page 2 of 2')).toBeVisible();
+	expect(errors).toEqual([]);
+});
+
+test('Ctrl+. extracts an inline noise to a declaration and renames it', async ({ page }) => {
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	await replaceText(page, 'DensityFunction hills = Noise({ base_octave = -6, amplitude_modifiers = [1] }, 1, 1)\n');
+	await expect(status(page)).toHaveText(/No problems|warning/);
+	await page.locator('.cm-line').first().getByText('base_octave').click();
+	await page.keyboard.press('ControlOrMeta+.');
+	const menu = page.getByRole('menu', { name: 'Editor actions' });
+	const extract = menu.getByRole('menuitem', { name: 'Extract { ... } to a Noise declaration' });
+	await expect(extract).toBeVisible();
+	await extract.click();
+	await expect(page.locator('.cm-content')).toContainText(
+		'Noise hills_noise = { base_octave = -6, amplitude_modifiers = [1] }DensityFunction hills = Noise(hills_noise, 1, 1)'
+	);
+	// The rename box opens on the new name.
+	const box = page.getByRole('textbox', { name: 'New name' });
+	await expect(box).toBeFocused();
+	await expect(box).toHaveValue('hills_noise');
+	await page.keyboard.type('hill_shape');
+	await page.keyboard.press('Enter');
+	await expect(page.locator('.cm-content')).toContainText('Noise hill_shape = {');
+	await expect(page.locator('.cm-content')).toContainText('Noise(hill_shape, 1, 1)');
+	await expect(status(page)).toHaveText(/No problems|warning/);
+});
+
+test('Deepslate is credited in About, on previews, and in the shipped licenses', async ({ page, request }) => {
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+
+	await page.getByRole('button', { name: 'About and credits' }).click();
+	const credits = page.getByRole('list', { name: 'Credits' });
+	await expect(credits.getByRole('link', { name: 'Deepslate' })).toHaveAttribute('href', 'https://github.com/misode/deepslate');
+	await expect(credits.getByRole('link', { name: 'Misode' }).first()).toHaveAttribute('href', 'https://github.com/misode');
+	await page.getByRole('button', { name: 'Close' }).click();
+
+	// A rendered preview carries a small credit in its corner.
+	await page.getByRole('button', { name: /Examples/ }).click();
+	await page.getByRole('button', { name: /sky-islands/ }).click();
+	await page.getByRole('button', { name: 'dimension.mms' }).click();
+	await page.locator('.cm-line', { hasText: 'Dimension islands' }).click();
+	const credit = page.locator('[data-credit="deepslate"]');
+	await expect(credit).toContainText('Rendered with Deepslate by Misode', { timeout: 30_000 });
+	await expect(credit.getByRole('link', { name: 'Deepslate' })).toHaveAttribute('href', 'https://github.com/misode/deepslate');
+
+	const licenses = await request.get('third-party-licenses.txt');
+	expect(licenses.ok()).toBe(true);
+	const text = await licenses.text();
+	expect(text).toContain('deepslate 0.27');
+	expect(text).toContain('Copyright (c) 2021 Misode');
+	expect(text).toContain('Copyright (c) 2022 SpyglassMC');
+});
+
+test('a jigsaw structure previews which pieces join which, and marks dead ends', async ({ page }) => {
+	const errors: string[] = [];
+	page.on('pageerror', (e) => errors.push(e.message));
+	page.on('dialog', (d) => d.accept());
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	await page.getByRole('button', { name: /Examples/ }).click();
+	await page.getByRole('button', { name: /jigsaw/ }).click();
+	await expect(status(page)).toHaveText(/No problems/);
+	await page.locator('.cm-line', { hasText: 'Structure dungeon = Jigsaw(' }).click();
+	const graph = page.getByLabel('Jigsaw connections');
+	await expect(graph).toContainText('Jigsaw structure');
+	await expect(graph).toContainText('size 6');
+	await expect(graph.getByLabel('Problems')).toHaveText('No problems found');
+	for (const pool of ['start', 'halls', 'rooms', 'caps']) await expect(graph.getByLabel(`Pool dungeon:${pool}`).first()).toBeVisible();
+	await expect(graph.getByLabel('Pool dungeon:halls')).toContainText('75%');
+	// Rooms lead back to halls: each step gets a column until growth repeats.
+	await expect(graph.getByLabel('Pool dungeon:caps')).toHaveCount(2);
+	await expect(graph).toContainText('then as depth 1 again');
+
+	// A piece lists its jigsaw blocks and what joins each.
+	await graph.getByRole('button', { name: /^start/ }).click();
+	const details = page.getByLabel('Piece details');
+	await expect(details.getByRole('row')).toHaveCount(5);
+	await expect(details.getByRole('row').nth(1)).toContainText('halls/hall (Long hall), halls/short_hall (Short hall)');
+	// A doc comment above a pool element labels its piece.
+	await expect(graph.getByLabel('Pool dungeon:halls').first()).toContainText('Long hall');
+
+	// Renaming a pool leaves the halls' exits pointing at nothing. The
+	// preview is pinned, since the edit moves the cursor away.
+	await page.getByRole('button', { name: /^Pin/ }).click();
+	const src = readFileSync(new URL('../../examples/jigsaw/dungeon.mms', import.meta.url), 'utf8');
+	await replaceText(page, src.replace('TemplatePool rooms = {', 'TemplatePool rooms2 = {'));
+	await expect(graph.getByLabel('Problems')).toContainText('2 dead ends');
+	await expect(graph.getByLabel('Pool dungeon:rooms')).toContainText('No TemplatePool declares this');
+
+	// The graph copies as Markdown, dead ends and all, to share it.
+	await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+	await graph.getByRole('button', { name: 'Copy as Markdown' }).click();
+	await expect(graph.getByRole('button', { name: 'Copied' })).toBeVisible();
+	const md = await page.evaluate(() => navigator.clipboard.readText());
+	expect(md).toContain('# Jigsaw connections: dungeon:dungeon');
+	expect(md).toContain('- Dead end: `dungeon:halls/hall` "Long hall" in `dungeon:halls`, jigsaw block at 2 1 8 facing south (name `dungeon:hall_exit`, pool `dungeon:rooms`, target `dungeon:room_entry`): no TemplatePool declares dungeon:rooms.');
+	expect(md).toContain('- `dungeon:halls/hall` "Long hall" · weight 3 (75%) · size 5×5×9');
+	expect(md).toContain('No TemplatePool declares this pool.');
+	expect(md).toContain('```mermaid\nflowchart LR');
+	await graph.getByRole('button', { name: 'Copy Mermaid' }).click();
+	expect(await page.evaluate(() => navigator.clipboard.readText())).toMatch(/^flowchart LR\n {2}subgraph P0\["start · start"\]/);
+	expect(errors).toEqual([]);
+});
+
+test('a project file nothing uses is marked unused in the asset list', async ({ page }) => {
+	page.on('dialog', (d) => d.accept());
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	await page.getByRole('button', { name: /Examples/ }).click();
+	await page.getByRole('button', { name: /jigsaw/ }).click();
+	await expect(status(page)).toHaveText(/No problems/);
+	const vault = page.getByRole('listitem').filter({ hasText: 'structures/rooms/vault.nbt' });
+	await expect(vault).not.toContainText('unused');
+	const src = readFileSync(new URL('../../examples/jigsaw/dungeon.mms', import.meta.url), 'utf8');
+	await replaceText(page, src.replace('Structure("structures/rooms/vault.nbt", "rooms/vault")', 'Structure("structures/rooms/room.nbt", "rooms/room")'));
+	await expect(vault).toContainText('unused');
+	await expect(vault).toHaveAttribute('title', /Not used/);
+});
+
+test('a function runs in the function preview', async ({ page }) => {
+	const errors: string[] = [];
+	page.on('pageerror', (e) => errors.push(e.message));
+	page.on('dialog', (d) => d.accept());
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	await page.getByRole('button', { name: /Examples/ }).click();
+	await page.getByRole('button', { name: /functions-basics/ }).click();
+	await expect(status(page)).toHaveText(/No problems/);
+	await page.locator('.cm-line', { hasText: 'Function status {' }).click();
+	const run = page.getByLabel('Function preview');
+	await expect(run.getByText('basics:status', { exact: true })).toBeVisible();
+	// The load tag ran first, then the function counted down and reported.
+	const chat = run.getByLabel('Chat');
+	await expect(chat).toContainText('Points game loaded');
+	await expect(chat).toContainText('0 kills in total, 0 per player');
+	await expect(run.getByRole('cell', { name: '$reward_every' })).toBeVisible();
+	await run.getByRole('button', { name: '+20' }).click();
+	await expect(run.getByText('tick 20')).toBeVisible();
 	expect(errors).toEqual([]);
 });

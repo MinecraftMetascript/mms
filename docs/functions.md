@@ -316,6 +316,7 @@ Function light_block {
 | `on_break` | uses up the item's durability, so it breaks. It needs a base with durability, or a `max_damage` component |
 | `on_projectile_hit_block` | shoots an arrow that hits a block (see [Projectile hooks](#projectile-hooks)). It runs as the arrow, at the point it hit |
 | `on_projectile_hit_entity` | shoots an arrow that hurts an entity. It runs as and at the entity hit |
+| `on_projectile_land` | throws the item, a splash or lingering potion, and it lands. It runs at the spot it landed |
 
 Every hook marks the item with `mms_item: "<namespace>:<name>"` in its `custom_data`, wherever it is used: in `/give`, recipes and loot. A `custom_data` of your own keeps its keys and gains the marker. Each hook is an advancement, `<namespace>:mms_gen/item_hook/<name>/<hook>`, whose trigger matches the base item with that marker, and a reward function of the same name that revokes it and calls your function.
 
@@ -367,6 +368,18 @@ Function boom {
 On a block hit the function runs as the arrow, at the point it hit, so `execute on origin` is whoever shot it, and `kill @s` keeps the arrow from being picked up. On an entity hit it runs as and at the entity hurt, and `execute on attacker` is the shooter.
 
 **How it works.** An arrow keeps the bow or crossbow it was shot from as its `weapon`, and when it hits, the game runs the weapon's enchantment effects at the exact spot: `hit_block` as the arrow, `post_attack` as the entity it hurt. Each item with projectile hooks gets an enchantment, `<namespace>:mms_gen/item_hook/<name>/projectile`, whose effects run the functions. The tick function looks once at each new arrow (it tags them `mms_shot.<namespace>`), and adds the enchantment to the weapon of an arrow that is the item, or that was shot from it. An arrow from a dispenser has no weapon, so it gets a plain bow. The enchantment is never on the item, so it shows in no tooltip and gives no glint. Several items' hooks combine: an Explosive Arrow shot from a bow with hooks runs both.
+
+**Thrown potions.** `on_projectile_land` works on a `splash_potion` or `lingering_potion` base, and runs where the thrown potion lands, whatever it hits:
+
+```
+CustomItem blast_potion = {
+  base = splash_potion
+  name = "Blast Potion"
+  on_projectile_land = boom
+}
+```
+
+A thrown potion keeps no weapon, so no enchantment runs for it. Instead the tick function puts a marker on each new one, riding it, with the function's id in its `data`. The game drops a projectile's passengers where it removes it, so a marker that is no longer riding anything (`<namespace>:mms_gen/projectile/riding`) marks the spot. The function runs as that marker, at it, and the marker is removed afterwards. The spot is where the potion was at the end of its last tick of flight, so up to about half a block short, and the function can't tell what the potion hit or who threw it. The potion still splashes as usual.
 
 ## How it compiles
 

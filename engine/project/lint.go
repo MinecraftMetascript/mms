@@ -34,6 +34,16 @@ var Rules = []*Rule{
 		Doc: "A use of a declaration whose doc comment has a `@deprecated` tag."},
 	{ID: "external-asset", Severity: syntax.SeverityWarning, all: lintExternalAsset,
 		Doc: "An id of a texture, sound or structure in the project's namespace that no Texture, Sound or Structure call in the project provides. The pack still loads, but the file must come from another pack."},
+	{ID: "jigsaw-facing", Severity: syntax.SeverityWarning, all: lintJigsawFacing,
+		Doc: "A jigsaw block that can never join its target: every jigsaw block with its target name in its pool faces a way it cannot meet. The game turns pieces only about the y axis, so a block facing up joins only one facing down, and a sideways block only a sideways one."},
+	{ID: "jigsaw-fit", Severity: syntax.SeverityWarning, all: lintJigsawFit,
+		Doc: "An internal jigsaw block (the block in front of it is inside its own piece, such as an arch mount on a road, or a jigsaw inset by a block by mistake) whose pool has pieces that stick out of the piece however they are turned. The game only places a piece joined at an internal jigsaw wholly inside its parent, so those pieces are never placed there. Height is not checked for terrain_matching pieces."},
+	{ID: "jigsaw-overlap", Severity: syntax.SeverityInfo, all: lintJigsawOverlap,
+		Doc: "A jigsaw block that can never grow when its piece joins a given parent: every piece its pool and the pool's fallback could place there overlaps the parent or the piece itself, however it is turned, and the game never places overlapping pieces. A junction narrower than the roads around it is the usual cause. Only certain cases are reported: every piece involved is a rigid project structure file with a known size and facing, and no pool involved has an empty or feature element."},
+	{ID: "jigsaw-pool", Severity: syntax.SeverityWarning, all: lintJigsawPool,
+		Doc: "A jigsaw block in a structure file that Structure(\"...\") includes draws from a pool in the project's namespace that no TemplatePool declares. The game skips the jigsaw, so the structure stops growing there. The quick fix declares the pool."},
+	{ID: "jigsaw-target", Severity: syntax.SeverityWarning, all: lintJigsawTarget,
+		Doc: "A jigsaw block whose target no piece of its pool can join: none of the pool's structure files has a jigsaw block with that name, or the pool has no pieces. Only pools whose pieces are all the project's own structure files are checked."},
 	{ID: "overrides-vanilla", Severity: syntax.SeverityInfo, run: lintOverrides,
 		Doc: "A declaration in the minecraft namespace replaces the vanilla resource with the same id."},
 	{ID: "quoted-name", Severity: syntax.SeverityHint, run: lintQuoted,
@@ -43,7 +53,9 @@ var Rules = []*Rule{
 	{ID: "use-sugar", Severity: syntax.SeverityHint, run: lintSugar,
 		Doc: "An object literal that has a shorter MMS form: an item entry as its id, `1..3` for a uniform provider or bounds, `diamond * 4` for a stack, a trigger call for a criterion, and `&&`, `||` and `!` for conditions."},
 	{ID: "unused", Severity: syntax.SeverityHint, all: lintUnused,
-		Doc: "A worldgen piece, predicate or item modifier that nothing in the project references, so the game never uses it."},
+		Doc: "A worldgen piece, predicate or item modifier that nothing in the project references, so the game never uses it. A TemplatePool counts as used when a jigsaw block in one of the project's structure files draws from it."},
+	{ID: "unused-asset", Severity: syntax.SeverityInfo,
+		Doc: "A .png, .ogg or .nbt file in the project that no Texture, Sound or Structure call and no `icon` uses, so the packs leave it out. It is reported on the file itself (in VS Code's Problems panel, by `mms check`, and in the web editor's asset list), and not while the project has errors."},
 }
 
 // RuleByID returns a rule, or nil.
@@ -89,6 +101,7 @@ var unusedFolders = map[string]bool{
 	"predicate":                                        true,
 	"item_modifier":                                    true,
 	"worldgen/multi_noise_biome_source_parameter_list": true,
+	"worldgen/template_pool":                           true,
 }
 
 type lintRun struct {
@@ -484,6 +497,12 @@ func lintUnused(l *lintRun) {
 	for _, d := range r.Order {
 		for _, ref := range d.references() {
 			used[ref] = true
+		}
+	}
+	// A jigsaw block in a structure file draws from a pool by id.
+	for _, s := range l.jigsaws().uses {
+		for _, j := range s.jigsaws {
+			used["worldgen/template_pool|"+j.Pool] = true
 		}
 	}
 	var unused []*sema.Symbol

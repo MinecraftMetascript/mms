@@ -7,6 +7,8 @@ export interface OutputFile {
 	range?: { start: { line: number; character: number }; end: { line: number; character: number } };
 	/** Written for an inline value where an id is required; range is that value's. */
 	implicit?: boolean;
+	/** Labels for parts of the file by JSON pointer, from doc comments, such as "/elements/2" of a template pool. */
+	labels?: Record<string, string>;
 }
 
 /** A source position, as the language server sends it. */
@@ -27,4 +29,30 @@ export interface OutputItem {
 	range: SourceRange;
 	/** For a Book: where each page of its text starts. */
 	pages?: { uri: string; range: SourceRange }[];
+}
+
+/** A jigsaw block of a structure file: where it is, and what it joins. */
+export interface OutputJigsaw {
+	pos: [number, number, number];
+	pool: string;
+	name: string;
+	target: string;
+	/** Its orientation state, such as north_up: the way it faces, then the way its top points. */
+	orientation?: string;
+	/** rollable or aligned: whether a piece joined to an up or down facing block may turn. */
+	joint?: string;
+}
+
+/** A project file the pack copies, such as a texture or a structure. */
+export interface OutputAsset {
+	/** Its path in the pack. */
+	path: string;
+	/** Its path in the project. */
+	src: string;
+	/** "resources" for a resource pack file. */
+	pack?: string;
+	/** For a structure file: its jigsaw blocks. */
+	jigsaws?: OutputJigsaw[];
+	/** For a structure file: its size in blocks, x y z. */
+	size?: [number, number, number];
 }

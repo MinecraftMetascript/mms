@@ -7,8 +7,8 @@ const raw = import.meta.glob('../../../../examples/**/*.{mms,mmsbook,json}', {
 	eager: true
 }) as Record<string, string>;
 
-// Their textures and sounds, as data: URLs.
-const binary = import.meta.glob('../../../../examples/**/*.{png,ogg}', {
+// Their textures, sounds and structures, as data: URLs.
+const binary = import.meta.glob('../../../../examples/**/*.{png,ogg,nbt}', {
 	query: '?inline',
 	import: 'default',
 	eager: true

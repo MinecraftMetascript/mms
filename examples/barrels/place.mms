@@ -4,6 +4,8 @@
 
 /** The direction the new barrel's front faces, as an item frame Facing: 2 north, 3 south, 4 west, 5 east. */
 Global dir: int = 0
+/** 1 when the frame's block has room for a barrel. */
+Global fits: int = 0
 
 OnTick {
   /execute as @e[type=item_frame,tag=barrels.place] at @s run function barrels:place
@@ -25,11 +27,17 @@ Function place {
     /execute as @p if entity @s[y_rotation=-135..-45] run scoreboard players set $dir mms.barrels 4
   }
   Align(xyz).Positioned(~0.5 ~0.5 ~0.5) {
-    /execute if block ~ ~ ~ #minecraft:replaceable run function barrels:build
-    /execute unless block ~ ~ ~ #minecraft:replaceable run loot spawn ~ ~ ~ loot barrels:storage_barrel
+    // Check once: after build() the block is a barrel, which is not
+    // replaceable, so a second check would hand the item back as well.
+    /execute store success score $fits mms.barrels if block ~ ~ ~ #minecraft:replaceable
+    if (fits == 1) {
+      build()
+    } else {
+      /loot spawn ~ ~ ~ loot barrels:storage_barrel
+    }
   }
-  // Killing an item frame drops its item, so move the frame far below the
-  // world first: whatever it drops there falls out of the world.
+  // Move the frame far below the world before removing it, so that if
+  // removing it drops anything, the drop falls out of the world.
   /tp @s ~ -1000 ~
   /kill @s
 }

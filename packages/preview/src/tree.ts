@@ -1,3 +1,6 @@
+// A folder tree of output paths, shared by the web editor's Pack tab and
+// the VS Code extension's Pack view. Free of DOM types.
+
 export interface Node {
 	name: string;
 	path: string;

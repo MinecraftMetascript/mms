@@ -21,5 +21,7 @@ export default defineConfig({
 	// extension); the host's own Svelte and Deepslate serve it.
 	resolve: { dedupe: ['svelte', 'deepslate'] },
 	server: { fs: { allow: ['../packages'] } },
+	// Structure files in the examples load as data: URLs, like textures.
+	assetsInclude: ['**/*.nbt'],
 	worker: { format: 'es' }
 });

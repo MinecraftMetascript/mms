@@ -4,6 +4,8 @@
 package ide
 
 import (
+	"fmt"
+	"slices"
 	"sort"
 	"strings"
 
@@ -389,6 +391,8 @@ func (s *Session) complete(a *at, off int) []sema.Candidate {
 				if in := a.c.ListItemInfo(a.info(n)); in != nil {
 					return a.c.ValueCandidates(in)
 				}
+				// Inside a list, the enclosing object's fields never fit.
+				return nil
 			}
 		case *syntax.Trailing:
 			if n.Block.Sp.Contains(off) && off > n.Block.Sp.Start {
@@ -404,6 +408,11 @@ func (s *Session) complete(a *at, off int) []sema.Candidate {
 			// blank line asked for with Ctrl+Space.
 			if a.code() && i == len(a.path)-1 && off > n.Sp.Start && off < n.Sp.End {
 				return s.statementCandidates(a, off)
+			}
+			// An object literal where no object fits, such as `height = {`:
+			// the enclosing object's fields do not belong inside it.
+			if _, ok := parent.(*syntax.Object); ok && !a.code() {
+				return nil
 			}
 		}
 	}
@@ -679,6 +688,50 @@ func argIndex(f *syntax.File, call *syntax.Call, off int) int {
 	return index
 }
 
+// activeParam is the parameter signature help highlights at off: the one
+// a named argument there sets, or else the next positional slot, which
+// skips parameters already given by name.
+func activeParam(f *syntax.File, call *syntax.Call, off int, params []string) int {
+	keys := make([]string, len(params))
+	for i, p := range params {
+		k, _, _ := strings.Cut(p, ":")
+		keys[i] = strings.TrimSuffix(strings.TrimSpace(k), "?")
+	}
+	named := map[string]bool{}
+	pos := 0
+	for _, arg := range call.Args {
+		before := arg.Sp.End < off && commaBetween(f, arg.Sp.End, off)
+		if arg.Name == nil {
+			if before {
+				pos++
+			}
+			continue
+		}
+		key := arg.Name.Text
+		if !slices.Contains(keys, key) {
+			key = sema.Snake(key)
+		}
+		if !before && arg.Sp.Start <= off {
+			if i := slices.Index(keys, key); i >= 0 {
+				return i
+			}
+		}
+		named[key] = true
+	}
+	last := 0
+	for i, k := range keys {
+		if named[k] {
+			continue
+		}
+		if pos == 0 {
+			return i
+		}
+		pos--
+		last = i
+	}
+	return last
+}
+
 func commaBetween(f *syntax.File, from, to int) bool {
 	for _, t := range f.Tokens {
 		if t.Sp.Start >= from && t.Sp.End <= to && t.Kind == parser.MMSLexerCOMMA {
@@ -728,6 +781,9 @@ func (s *Session) Hover(path string, off int) (string, syntax.Span) {
 		n := a.path[i]
 		if in := a.info(n); in != nil {
 			if md := a.c.Hover(in); md != "" {
+				if in.Asset != nil && in.Asset.Helper == "Structure" {
+					md += s.jigsawHover(in.Asset.Src)
+				}
 				return md, n.Span()
 			}
 		}
@@ -737,6 +793,29 @@ func (s *Session) Hover(path string, off int) (string, syntax.Span) {
 		}
 	}
 	return "", syntax.Span{}
+}
+
+// jigsawHover lists a structure file's jigsaw blocks, for the hover of
+// its Structure("...") call.
+func (s *Session) jigsawHover(src string) string {
+	js, ok := project.StructureJigsaws(s.P.Files, src)
+	if !ok || len(js) == 0 {
+		return ""
+	}
+	var sb strings.Builder
+	sb.WriteString("\n\n**Jigsaw blocks**")
+	if size, ok := project.StructureSize(s.P.Files, src); ok {
+		fmt.Fprintf(&sb, " · size %d×%d×%d", size[0], size[1], size[2])
+	}
+	sb.WriteString("\n\n| At | Facing | Name | Pool | Target |\n|---|---|---|---|---|\n")
+	for _, j := range js {
+		facing := strings.ReplaceAll(j.Orientation, "_", " ")
+		if j.Joint == "rollable" && (strings.HasPrefix(j.Orientation, "up_") || strings.HasPrefix(j.Orientation, "down_")) {
+			facing += ", rollable"
+		}
+		fmt.Fprintf(&sb, "| %d %d %d | %s | `%s` | `%s` | `%s` |\n", j.Pos[0], j.Pos[1], j.Pos[2], facing, j.Name, j.Pool, j.Target)
+	}
+	return sb.String()
 }
 
 func (s *Session) declHover(d *project.Decl) string {
@@ -788,13 +867,7 @@ func (s *Session) Signature(path string, off int) (SignatureHelp, bool) {
 		if h.Label == "" {
 			return SignatureHelp{}, false
 		}
-		active := 0
-		for _, arg := range call.Args {
-			if arg.Name == nil && arg.Sp.End < off && commaBetween(a.u.File, arg.Sp.End, off) {
-				active++
-			}
-		}
-		h.Active = min(active, max(len(h.Params)-1, 0))
+		h.Active = activeParam(a.u.File, call, off, h.Params)
 		return h, true
 	}
 	return SignatureHelp{}, false

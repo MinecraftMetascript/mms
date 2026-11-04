@@ -266,6 +266,7 @@ scoreboard objectives add mms.barrels dummy
 scoreboard players set #cf mms.barrels 0
 scoreboard players set #c32 mms.barrels 32
 execute unless score $dir mms.barrels = $dir mms.barrels run scoreboard players set $dir mms.barrels 0
+execute unless score $fits mms.barrels = $fits mms.barrels run scoreboard players set $fits mms.barrels 0
 execute unless score $next_id mms.barrels = $next_id mms.barrels run scoreboard players set $next_id mms.barrels 0
 execute unless score $id mms.barrels = $id mms.barrels run scoreboard players set $id mms.barrels 0
 execute unless score $count mms.barrels = $count mms.barrels run scoreboard players set $count mms.barrels 0
@@ -320,8 +321,11 @@ execute align xyz positioned ~0.5 ~0.5 ~0.5 run function barrels:place/_exec1
 tp @s ~ -1000 ~
 kill @s
 === data/barrels/function/place/_exec1.mcfunction
-execute if block ~ ~ ~ #minecraft:replaceable run function barrels:build
-execute unless block ~ ~ ~ #minecraft:replaceable run loot spawn ~ ~ ~ loot barrels:storage_barrel
+execute store success score $fits mms.barrels if block ~ ~ ~ #minecraft:replaceable
+scoreboard players set #place._f2 mms.barrels 0
+execute if score $fits mms.barrels matches 1 run scoreboard players set #place._f2 mms.barrels 1
+execute if score #place._f2 mms.barrels matches 1 run function barrels:build
+execute unless score #place._f2 mms.barrels matches 1 run loot spawn ~ ~ ~ loot barrels:storage_barrel
 === data/barrels/function/place/_if0.mcfunction
 scoreboard players set $dir mms.barrels 3
 execute as @p if entity @s[y_rotation=-45..45] run scoreboard players set $dir mms.barrels 2

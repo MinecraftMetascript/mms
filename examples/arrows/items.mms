@@ -74,6 +74,22 @@ CustomItem thunder_bow = {
   on_projectile_hit_entity = strike
 }
 
+/**
+ * A splash potion that explodes where it lands. Thrown potions keep no
+ * bow, so on_projectile_land follows the potion itself instead.
+ */
+CustomItem blast_potion = {
+  base = splash_potion
+  name = "Blast Potion"
+  components = {
+    potion_contents = {
+      custom_color = 14697499
+      custom_name = "arrows.blast"
+    }
+  }
+  on_projectile_land = explode
+}
+
 /** A stick that fires cows. See launch.mms. */
 CustomItem cow_wand = {
   base = stick
@@ -95,5 +111,7 @@ Recipe levitation_arrow = Shaped(
 )
 
 Recipe thunder_bow = Shapeless([bow, lightning_rod], thunder_bow)
+
+Recipe blast_potion = Shapeless([glass_bottle, tnt], blast_potion)
 
 Recipe cow_wand = Shapeless([stick, stick], cow_wand)

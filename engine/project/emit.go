@@ -3,6 +3,7 @@ package project
 import (
 	"archive/zip"
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -32,6 +33,10 @@ type OutFile struct {
 	// required; Span is that value's. Editors follow the cursor to the
 	// declaration's own file, not to these.
 	Implicit bool
+	// Labels names parts of the file by JSON pointer, from doc comments
+	// in the source, such as "/elements/2" for a template pool element
+	// written under a `/** @label Worn road cap */` comment.
+	Labels map[string]string
 }
 
 // Emit lays out the data pack: one file per resource, merged tags, raw
@@ -75,6 +80,7 @@ func (r *Result) Emit() []OutFile {
 	}
 	clicks := map[string]bool{}      // namespaces with a right-click hook
 	spotted := map[string][]string{} // namespaces with projectile hooks: their spotted lines
+	thrown := map[string]bool{}      // namespaces with on_projectile_land
 	consts := map[string]map[int32]bool{}
 	ret := map[string]bool{}
 	used := map[string]bool{} // namespaces whose objective the code uses
@@ -172,6 +178,9 @@ func (r *Result) Emit() []OutFile {
 			if len(hf.Spotted) > 0 {
 				spotted[ns] = append(spotted[ns], hf.Spotted...)
 			}
+			if hf.Thrown {
+				thrown[ns] = true
+			}
 			for _, lc := range it.Languages() {
 				l := lang("assets/"+ns+"/lang/"+lc+".json", d)
 				if l.o.Get(it.LangKey) == nil {
@@ -189,6 +198,9 @@ func (r *Result) Emit() []OutFile {
 				continue
 			}
 			f := OutFile{Path: d.Kind.Dir(ns) + "/" + path + ".json", Data: jsonv.Marshal(d.Value), Unit: d.Unit.Path, Span: d.D.Sp}
+			if d.Kind.Folder() == "worldgen/template_pool" {
+				f.Labels = elementLabels(d)
+			}
 			if d.Kind.Assets != "" {
 				f.Pack = sema.ResourcePack
 			}
@@ -225,10 +237,16 @@ func (r *Result) Emit() []OutFile {
 		out = append(out, OutFile{Path: "data/" + ns + "/advancement/mms_gen/first_join.json", Data: jsonv.Marshal(sema.FirstJoinAdvancement(ns))})
 	}
 	for ns, ls := range spotted {
-		tick, fn := sema.ProjectileSetup(ns, ls)
+		tick, fns, preds := sema.ProjectileSetup(ns, ls, thrown[ns])
 		hook("tick", ns, tick)
-		fns, fpath := splitID(sema.ProjectileSpotted(ns))
-		out = append(out, OutFile{Path: "data/" + fns + "/function/" + fpath + ".mcfunction", Data: lines(fn)})
+		for fid, fl := range fns {
+			fns, fpath := splitID(fid)
+			out = append(out, OutFile{Path: "data/" + fns + "/function/" + fpath + ".mcfunction", Data: lines(fl)})
+		}
+		for pid, pv := range preds {
+			pns, ppath := splitID(pid)
+			out = append(out, OutFile{Path: "data/" + pns + "/predicate/" + ppath + ".json", Data: jsonv.Marshal(pv)})
+		}
 	}
 	for ns := range clicks {
 		load, tick := sema.ClickSetup(ns)
@@ -380,4 +398,39 @@ func Zip(files []OutFile) ([]byte, error) {
 		return nil, err
 	}
 	return buf.Bytes(), nil
+}
+
+// elementLabels reads the doc comments above the entries of a declared
+// object's `elements` list, as labels keyed by JSON pointer: a template
+// pool can list one structure several times with different processors,
+// and a label tells them apart in the jigsaw preview.
+func elementLabels(d *Decl) map[string]string {
+	obj, ok := d.D.Value.(*syntax.Object)
+	if !ok || obj.Body == nil || d.Unit == nil || d.Unit.File == nil {
+		return nil
+	}
+	var out map[string]string
+	for _, it := range obj.Body.Items {
+		f, ok := it.(*syntax.FieldStmt)
+		if !ok || f.Key == nil || f.Key.Text != "elements" {
+			continue
+		}
+		list, ok := f.Value.(*syntax.List)
+		if !ok {
+			continue
+		}
+		for i, e := range list.Elems {
+			doc := syntax.DocAt(d.Unit.File, e.Span().Start)
+			if doc == "" {
+				continue
+			}
+			if l := syntax.ParseDoc(doc).Label(); l != "" {
+				if out == nil {
+					out = map[string]string{}
+				}
+				out[fmt.Sprintf("/elements/%d", i)] = l
+			}
+		}
+	}
+	return out
 }
