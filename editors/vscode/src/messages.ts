@@ -44,7 +44,14 @@ export interface OutputItem {
 
 export type ToPanel =
 	/** The generated pack and custom items, refreshed after each analysis. */
-	| { type: 'output'; files: OutputFile[]; items: OutputItem[]; assets: OutputAsset[] }
+	| {
+			type: 'output';
+			files: OutputFile[];
+			items: OutputItem[];
+			assets: OutputAsset[];
+			/** The pack's copied .png textures as data URLs, by pack path: custom item icons. */
+			textures?: Record<string, string>;
+	  }
 	/**
 	 * The output path to show, chosen with a Preview CodeLens or the
 	 * open-preview command; for a book, item:<id> and the page to open.

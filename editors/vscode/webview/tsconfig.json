@@ -9,7 +9,10 @@
 		"noEmit": true,
 		"verbatimModuleSyntax": true,
 		"isolatedModules": true,
-		"allowImportingTsExtensions": true
+		"allowImportingTsExtensions": true,
+		"paths": {
+			"deepslate": ["../node_modules/deepslate"]
+		}
 	},
 	"include": ["*.ts", "*.svelte", "../src/messages.ts"]
 }

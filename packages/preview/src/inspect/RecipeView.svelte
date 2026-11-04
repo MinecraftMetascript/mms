@@ -1,9 +1,12 @@
 <script lang="ts">
-	import { label } from './common';
+	import { getContext } from 'svelte';
+	import { emptyItems, itemsKey, look, type ItemContext } from './items';
 	import type { RecipeInfo } from './recipe';
 	import Slot from './Slot.svelte';
 
 	let { info }: { info: RecipeInfo } = $props();
+	const items = getContext<() => ItemContext>(itemsKey) ?? (() => emptyItems);
+	const result = $derived(info.result ? look(info.result.id, info.result.components, items()) : null);
 	const grid = $derived.by(() => {
 		const g = info.grid ?? [];
 		return Array.from({ length: 3 }, (_, y) => Array.from({ length: 3 }, (_, x) => g[y]?.[x] ?? null));
@@ -48,8 +51,14 @@
 		{#if info.layout !== 'special'}<span class="text-2xl text-muted" aria-hidden="true">→</span>{/if}
 		{#if info.result}
 			<div class="flex flex-col items-center gap-1">
-				<Slot slot={[info.result.id]} count={info.result.count} big />
-				<span class="text-xs" aria-label="Result">{info.result.count > 1 ? `${info.result.count} × ` : ''}{label(info.result.id)}</span>
+				<Slot slot={[info.result.id]} count={info.result.count} components={info.result.components} big />
+				<span class="text-xs" aria-label="Result" title={result?.title}>{info.result.count > 1 ? `${info.result.count} × ` : ''}{result?.name}</span>
+				{#if result?.named}
+					<span class="text-[10px] text-muted">
+						{#if result.custom}<span class="font-mono">{result.custom}</span> ·{/if}
+						on <span class="font-mono">{info.result.id.replace(/^minecraft:/, '')}</span>
+					</span>
+				{/if}
 				{#if info.notes?.result}<span class="text-xs text-muted">{info.notes.result}</span>{/if}
 			</div>
 		{/if}

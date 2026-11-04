@@ -6,6 +6,7 @@
 	// the pack.
 	import BookView from './book/BookView.svelte';
 	import Inspect from './inspect/Inspect.svelte';
+	import { itemContext } from './inspect/items';
 	import { inspectable } from './inspect/common';
 	import JigsawView from './jigsaw/JigsawView.svelte';
 	import { jigsawGraph } from './jigsaw/graph';
@@ -32,8 +33,14 @@
 		page?: number;
 		/** The files the pack copies; structure files carry their jigsaw blocks. */
 		assets?: OutputAsset[];
+		/**
+		 * Image URLs (data: or webview URIs) of the pack's copied textures,
+		 * by their path in the pack, so a custom item shows its icon.
+		 */
+		textures?: Record<string, string>;
 	}
-	let { output, path, pinned, onunpin, createWorker, hint, unpinLabel = 'unpin it', items = [], page = 0, assets = [] }: Props = $props();
+	let { output, path, pinned, onunpin, createWorker, hint, unpinLabel = 'unpin it', items = [], page = 0, assets = [], textures = {} }: Props = $props();
+	const itemInfo = $derived(itemContext(output, items, textures));
 
 	const file = $derived(output.find((f) => f.path === path) ?? null);
 	const book = $derived(bookAt(path, items) ? (items.find((it) => itemPath(it.id) === path) ?? null) : null);
@@ -57,7 +64,7 @@
 		{:else if file && jigsawable(file.path)}
 			<p class="p-3 text-xs text-muted">This structure isn't a jigsaw one, so it has no pieces to connect.</p>
 		{:else if file && inspectable(file.path)}
-			<Inspect {file} />
+			<Inspect {file} items={itemInfo} />
 		{:else if file && runnable(file.path)}
 			<FunctionRun {output} path={file.path} />
 		{:else}
