@@ -5,12 +5,14 @@
 // picks the project (the nearest mms.json) in a workspace with several.
 import * as vscode from 'vscode';
 import type { LanguageClient } from 'vscode-languageclient/node';
-import type { OutputAsset, OutputFile, OutputItem } from './messages';
+import type { OutputAsset, OutputFile, OutputHole, OutputItem } from './messages';
 
 export class PackOutput implements vscode.Disposable {
 	files: OutputFile[] = [];
 	items: OutputItem[] = [];
 	assets: OutputAsset[] = [];
+	/** The project's JigsawHole declarations. */
+	jigsawHoles: OutputHole[] = [];
 	hasErrors = false;
 	/** Project files nothing uses (lint/unused-asset), relative to the mms.json folder. */
 	unusedAssets: string[] = [];
@@ -68,7 +70,7 @@ export class PackOutput implements vscode.Disposable {
 		try {
 			const asked = this.document;
 			const uri = asked?.toString();
-			const out = await client.sendRequest<{ files: OutputFile[]; items?: OutputItem[]; assets?: OutputAsset[]; unusedAssets?: string[]; hasErrors: boolean }>(
+			const out = await client.sendRequest<{ files: OutputFile[]; items?: OutputItem[]; assets?: OutputAsset[]; jigsawHoles?: OutputHole[]; unusedAssets?: string[]; hasErrors: boolean }>(
 				'mms/output',
 				uri ? { uri } : {}
 			);
@@ -78,6 +80,7 @@ export class PackOutput implements vscode.Disposable {
 			this.files = out.files;
 			this.items = out.items ?? [];
 			this.assets = out.assets ?? [];
+			this.jigsawHoles = out.jigsawHoles ?? [];
 			this.hasErrors = out.hasErrors;
 			this.unusedAssets = out.unusedAssets ?? [];
 			this.changed.fire();

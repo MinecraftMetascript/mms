@@ -9,12 +9,14 @@
 // The preview panel (preview.ts) shows the web editor's worldgen previews.
 // The MMS side bar has the World view (world.ts), which builds the pack
 // into a Minecraft world, and the Pack view (packView.ts), which lists the
-// generated files. Both panels read the pack from output.ts.
+// generated files, and the Jigsaw view (jigsaw.ts), which copies give
+// commands for set-up jigsaw blocks. The panels read the pack from output.ts.
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { LanguageClient, type LanguageClientOptions, type ServerOptions } from 'vscode-languageclient/node';
+import { JigsawView } from './jigsaw';
 import { PackOutput } from './output';
 import { PackView } from './packView';
 import { Previews } from './preview';
@@ -223,6 +225,7 @@ export function activate(context: vscode.ExtensionContext) {
 		previews,
 		world,
 		new PackView(pack, () => world.project()),
+		new JigsawView(context, pack, () => world.project()),
 		vscode.commands.registerCommand('mms.showPreview', () => previews.show()),
 		vscode.commands.registerCommand('mms.previewDeclaration', (path: string, page?: number) => previews.show(path, page)),
 		vscode.commands.registerCommand('mms.renameAt', renameAt),

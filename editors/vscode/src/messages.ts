@@ -27,9 +27,17 @@ export interface OutputAsset {
 	/** "resources" for a resource pack file. */
 	pack?: string;
 	/** For a structure file: its jigsaw blocks. */
-	jigsaws?: { pos: [number, number, number]; pool: string; name: string; target: string; orientation?: string; joint?: string }[];
+	jigsaws?: { pos: [number, number, number]; pool: string; name: string; target: string; orientation?: string; joint?: string; final_state?: string }[];
 	/** For a structure file: its size in blocks, x y z. */
 	size?: [number, number, number];
+}
+
+/** A `JigsawHole name` declaration: a jigsaw block name, which writes no file. */
+export interface OutputHole {
+	id: string;
+	doc?: string;
+	uri: string;
+	range: Range;
 }
 
 /** A CustomItem or Book: the item stack its name stands for, which is not a file. */
@@ -134,3 +142,72 @@ export type FromWorld =
 	| { type: 'importFiles'; files: string[] }
 	/** rel is relative to the project folder. */
 	| { type: 'revealFile'; rel: string };
+
+// The Jigsaw view's page (webview/Jigsaw.svelte). The page owns the form;
+// the extension sends the lists to choose from and the recent blocks, and
+// copies the give command the page builds.
+
+/** How a jigsaw block is set up, as its screen in the game shows it. */
+export interface JigsawConfig {
+	/** The item's name in the hotbar, and the recent list's; may be empty. */
+	label: string;
+	/** Target pool. */
+	pool: string;
+	/** Target name: the jigsaw block of the next piece to join onto. */
+	target: string;
+	name: string;
+	/** Turns into, once the structure is placed. */
+	finalState: string;
+	joint: 'rollable' | 'aligned';
+}
+
+export interface JigsawPoolRow {
+	id: string;
+	/** The jigsaw names its pieces have, when its pieces are project structure files. */
+	names: string[];
+}
+
+export interface JigsawHoleRow {
+	id: string;
+	doc?: string;
+}
+
+/** A jigsaw block in one of the pack's structure files. */
+export interface JigsawExisting {
+	/** The structure's project file, relative to the mms.json folder. */
+	src: string;
+	/** Its id in the pack, such as dungeon:halls/hall. */
+	id: string;
+	pos: [number, number, number];
+	orientation?: string;
+	config: JigsawConfig;
+}
+
+export interface JigsawRecent {
+	config: JigsawConfig;
+	/** When it was last copied, in ms since the epoch. */
+	at: number;
+}
+
+export interface JigsawState {
+	project?: { name: string; ns?: string };
+	holes: JigsawHoleRow[];
+	pools: JigsawPoolRow[];
+	recent: JigsawRecent[];
+	existing: JigsawExisting[];
+	/** The holes can only be read from a project without errors in their files. */
+	hasErrors: boolean;
+}
+
+export type ToJigsaw = { type: 'state'; state: JigsawState };
+
+export type FromJigsaw =
+	| { type: 'ready' }
+	/** Copy the command, and remember the block as recent. */
+	| { type: 'copy'; config: JigsawConfig; command: string }
+	| { type: 'forget'; config: JigsawConfig }
+	| { type: 'forgetAll' }
+	/** Add `JigsawHole <name>` to the project, next to its other holes. */
+	| { type: 'declare'; id: string }
+	| { type: 'revealHole'; id: string }
+	| { type: 'revealFile'; src: string };

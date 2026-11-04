@@ -977,6 +977,9 @@ func (s *Server) output(_ context.Context, p struct {
 						if j.Joint != "" {
 							m["joint"] = j.Joint
 						}
+						if j.FinalState != "" {
+							m["final_state"] = j.FinalState
+						}
 						list = append(list, m)
 					}
 					a["jigsaws"] = list
@@ -1054,11 +1057,30 @@ func (s *Server) output(_ context.Context, p struct {
 		items = append(items, it)
 	}
 	sort.Slice(items, func(i, j int) bool { return items[i]["id"].(string) < items[j]["id"].(string) })
+	// JigsawHole declarations write no file; an editor lists them where a
+	// jigsaw block's name or target is chosen.
+	holes := []map[string]any{}
+	for _, d := range w.res.Order {
+		if d.Kind.MMS != sema.JigsawHoleKind || d.D.Name == nil || d.Unit == nil || d.ID() == "" {
+			continue
+		}
+		l := idx[d.Unit.Path]
+		if l == nil {
+			l = s.lines(d.Unit.Path)
+			idx[d.Unit.Path] = l
+		}
+		h := map[string]any{"id": d.ID(), "uri": d.Unit.Path, "range": l.rng(d.D.Sp)}
+		if doc := sema.DocMarkdown(d.D.Doc); doc != "" {
+			h["doc"] = doc
+		}
+		holes = append(holes, h)
+	}
+	sort.Slice(holes, func(i, j int) bool { return holes[i]["id"].(string) < holes[j]["id"].(string) })
 	unused, _ := w.res.UnusedAssets()
 	if unused == nil {
 		unused = []string{}
 	}
-	return map[string]any{"files": out, "assets": assets, "items": items, "unusedAssets": unused, "hasErrors": w.res.HasErrors()}, nil
+	return map[string]any{"files": out, "assets": assets, "items": items, "jigsawHoles": holes, "unusedAssets": unused, "hasErrors": w.res.HasErrors()}, nil
 }
 
 // structureAsset matches a structure file's path in the data pack.

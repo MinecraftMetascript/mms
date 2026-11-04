@@ -125,3 +125,17 @@ TemplatePool caps = {
     },
   ]
 }
+
+// The names the pieces' jigsaw blocks join by. Declaring them lists them
+// in the editor's Jigsaw view, and the jigsaw-hole lint reports a jigsaw
+// block whose name or target is not one of them, such as a typo made in
+// the game's jigsaw screen.
+
+/** The doorways of the start room and of rooms, leading on to a hall. */
+JigsawHole room_exit
+/** The near end of a hall, where it joins a room_exit. */
+JigsawHole hall_entry
+/** The far end of a hall, leading on to a room. */
+JigsawHole hall_exit
+/** The doorway a room joins a hall_exit by. */
+JigsawHole room_entry
