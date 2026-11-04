@@ -253,6 +253,7 @@ export class WorldView implements vscode.Disposable, vscode.WebviewViewProvider 
 				rel: st.rel,
 				call: st.call,
 				saved: s.saved.toLocaleString(),
+				savedMs: s.saved.getTime(),
 				unused: st.status !== 'new' && unused.delete(st.rel),
 				packId: s.ns !== ns && ns ? `${ns}:${s.path}` : undefined
 			});

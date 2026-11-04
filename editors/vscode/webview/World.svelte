@@ -5,7 +5,10 @@
 	// separate one is chosen). The extension (src/world.ts) owns the
 	// state and sends all of it after each change. Actions are buttons,
 	// drawn with the theme's button colours, and results are cards without
-	// them, so the two never look alike.
+	// them, so the two never look alike. Each structure row shows at most
+	// one button, for the one thing to do next (Import, or Copy call for a
+	// structure no pool uses); the rest are in its ⋯ menu, which a
+	// right-click also opens, so the list stays mostly text.
 	import type { FromWorld, ToWorld, WorldState, WorldStructureRow } from '../src/messages';
 	import { group, type Group, type Node } from './groups';
 
@@ -31,7 +34,60 @@
 		copyTimer = setTimeout(() => (copied = null), 1500);
 	}
 
-	const label: Record<WorldStructureRow['status'], string> = { new: 'New', imported: 'Imported', changed: 'Changed in world' };
+	// A row's ⋯ menu (or a world row's): where it opens and what it holds.
+	type MenuItem = { label: string; run: () => void; danger?: boolean } | 'sep';
+	let menu = $state<{ x: number; y: number; right: boolean; items: MenuItem[] } | null>(null);
+	let menuEl = $state<HTMLDivElement>();
+	function openMenu(e: MouseEvent, items: MenuItem[]) {
+		e.preventDefault();
+		e.stopPropagation();
+		// From the button: under it, right-aligned. From a right-click: at the pointer.
+		const b = e.type === 'contextmenu' ? null : (e.currentTarget as HTMLElement).getBoundingClientRect();
+		menu = { x: b ? b.right : e.clientX, y: b ? b.bottom + 2 : e.clientY, right: !!b, items };
+	}
+	// Keep the menu inside the view, and put the keyboard on its first item.
+	$effect(() => {
+		if (!menu || !menuEl) return;
+		const r = menuEl.getBoundingClientRect();
+		const x = menu.right ? menu.x - r.width : menu.x;
+		menuEl.style.left = `${Math.max(4, Math.min(x, window.innerWidth - r.width - 4))}px`;
+		menuEl.style.top = `${Math.max(4, menu.y + r.height > window.innerHeight - 4 ? menu.y - r.height - 4 : menu.y)}px`;
+		menuEl.querySelector('button')?.focus();
+	});
+	const closeMenu = () => (menu = null);
+	function menuKey(e: KeyboardEvent) {
+		if (!menu) return;
+		if (e.key === 'Escape') return closeMenu();
+		if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+		e.preventDefault();
+		const items = [...(menuEl?.querySelectorAll('button') ?? [])];
+		const at = items.indexOf(document.activeElement as HTMLButtonElement);
+		items[(at + (e.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length]?.focus();
+	}
+
+	function rowMenu(r: WorldStructureRow): MenuItem[] {
+		return [
+			...(r.status !== 'imported' ? [{ label: r.status === 'changed' ? 'Import again' : 'Import', run: () => send({ type: 'import', file: r.file }) }] : []),
+			{ label: 'Copy Structure(...) call', run: () => send({ type: 'copyCall', file: r.file }) },
+			...(r.status !== 'new' ? [{ label: 'Show file in Explorer', run: () => send({ type: 'revealFile', rel: r.rel }) }] : []),
+			'sep',
+			{ label: 'Delete from world…', danger: true, run: () => send({ type: 'deleteFromWorld', file: r.file }) }
+		];
+	}
+
+	// "5 min ago", for when a structure was saved; the full time is in the tooltip.
+	let now = $state(Date.now());
+	setInterval(() => (now = Date.now()), 60_000);
+	function ago(ms: number): string {
+		const min = Math.round((now - ms) / 60_000);
+		if (min < 1) return 'just now';
+		if (min < 60) return `${min} min ago`;
+		const h = Math.round(min / 60);
+		if (h < 24) return `${h} h ago`;
+		const d = Math.round(h / 24);
+		return d === 1 ? 'yesterday' : `${d} days ago`;
+	}
+
 	const waiting = $derived(s?.structures.filter((r) => r.status !== 'imported').length ?? 0);
 	const unused = $derived((s?.structures.filter((r) => r.unused).length ?? 0) + (s?.unusedFiles.length ?? 0));
 	// The structures as folders, split at / in their ids, so big
@@ -39,9 +95,11 @@
 	// is the top folder.
 	const groups = $derived.by(() => {
 		const rows = s?.structures ?? [];
-		const many = new Set(rows.map((r) => r.id.split(':')[0])).size > 1;
-		return group(rows, (r) => (many ? r.id : r.id.slice(r.id.indexOf(':') + 1)));
+		return group(rows, nameOf);
 	});
+	// The name the list sorts into folders by, and shows (less its folder).
+	const manyNs = $derived(new Set((s?.structures ?? []).map((r) => r.id.split(':')[0])).size > 1);
+	const nameOf = (r: WorldStructureRow) => (manyNs ? r.id : r.id.slice(r.id.indexOf(':') + 1));
 	// Folders the user opened or closed; the rest are open when they hold
 	// something to do (new, changed or not used) and closed otherwise.
 	let open = $state<Record<string, boolean>>({});
@@ -49,55 +107,63 @@
 	const sentence = (line: string) => line.charAt(0).toUpperCase() + line.slice(1);
 </script>
 
-{#snippet row(r: WorldStructureRow)}
-	<li class="st" class:unused={r.unused} class:changed={r.status === 'changed'}>
-		<div class="st-head">
-			<span class="name grow" title={`Saved ${r.saved} in ${r.file}`}>{r.id}</span>
-			{#if r.unused}
-				<span class="badge warn-badge">Not used</span>
-			{:else}
-				<span class="badge" class:changed-badge={r.status === 'changed'}>{label[r.status]}</span>
-			{/if}
-		</div>
-		{#if r.unused}
-			<div class="small">No <code>Structure(...)</code> call uses <code>{r.rel}</code>, so the pack leaves it out. Add it to a template pool:</div>
-			<code class="call">{r.call}</code>
-		{:else if r.status === 'new'}
-			<div class="muted small">Import copies it to {r.rel}.</div>
-		{:else}
-			<div class="muted small">{r.rel}</div>
-		{/if}
-		{#if r.packId}<div class="muted small">Its id in the pack is {r.packId}, in the project's namespace.</div>{/if}
-		<div class="actions">
-			{#if r.status !== 'imported'}
-				<button class="primary" onclick={() => send({ type: 'import', file: r.file })}>{r.status === 'changed' ? 'Import again' : 'Import'}</button>
-			{/if}
-			<button class="secondary" title={r.call} onclick={() => copy(r.file, { type: 'copyCall', file: r.file })}>{copied === r.file ? 'Copied' : 'Copy call'}</button>
-			{#if r.status !== 'new'}
-				<button class="secondary" onclick={() => send({ type: 'revealFile', rel: r.rel })}>Show file</button>
-			{/if}
-			<button class="secondary danger" title="Delete this save from the world, for one saved under the wrong name. Asks first." onclick={() => send({ type: 'deleteFromWorld', file: r.file })}>Delete from world</button>
+{#snippet icon(name: 'import' | 'copy' | 'more' | 'check')}
+	<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+		{#if name === 'import'}<path d="M8 2.5v7M5 7l3 3 3-3M3 11v2.5h10V11" />
+		{:else if name === 'copy'}<rect x="5.5" y="5.5" width="8" height="8" rx="1" /><path d="M10.5 5.5V3.5a1 1 0 0 0-1-1h-6a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2" />
+		{:else if name === 'check'}<path d="M3 8.5l3 3 7-7" />
+		{:else}<circle cx="3.5" cy="8" r=".6" fill="currentColor" /><circle cx="8" cy="8" r=".6" fill="currentColor" /><circle cx="12.5" cy="8" r=".6" fill="currentColor" />{/if}
+	</svg>
+{/snippet}
+
+{#snippet row(r: WorldStructureRow, prefix: string, depth: number)}
+	{@const tip = [
+		r.id,
+		r.status === 'new' ? `New: not in the project yet. Import copies it to ${r.rel}.` : r.status === 'changed' ? `Changed: differs from the project copy ${r.rel}. Import again overwrites it.` : r.rel,
+		r.unused ? `Not used: no Structure(...) call uses it, so the pack leaves it out. Add it to a template pool:\n${r.call}` : '',
+		r.packId ? `In the pack as ${r.packId}, the project's namespace.` : '',
+		`Saved ${r.saved}`
+	].filter(Boolean).join('\n')}
+	<li>
+		<div class="item" style:--depth={depth} title={tip} tabindex="0" role="treeitem" aria-selected="false" oncontextmenu={(e) => openMenu(e, rowMenu(r))} onkeydown={(e) => { if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) openMenu(e as unknown as MouseEvent, rowMenu(r)); }}>
+			<span class="twistie"></span>
+			<span class="label" class:new-text={r.status === 'new'} class:changed-text={r.status === 'changed'} class:warn-text={r.unused}>{nameOf(r).slice(prefix.length)}</span>
+			<span class="desc">
+				{#if r.unused}<span class="warn-text">not used</span>{' · '}{:else if r.status === 'new'}<span class="new-text">new</span>{' · '}{:else if r.status === 'changed'}<span class="changed-text">changed</span>{' · '}{/if}{ago(r.savedMs)}
+			</span>
+			<span class="actions-inline">
+				{#if r.status !== 'imported'}
+					<button class="icon-btn" title={r.status === 'changed' ? 'Import again (overwrites the project copy)' : 'Import into the project'} aria-label="Import {r.id}" onclick={() => send({ type: 'import', file: r.file })}>{@render icon('import')}</button>
+				{/if}
+				<button class="icon-btn" title="Copy {r.call}" aria-label="Copy the Structure call for {r.id}" onclick={() => copy(r.file, { type: 'copyCall', file: r.file })}>{@render icon(copied === r.file ? 'check' : 'copy')}</button>
+				<button class="icon-btn" title="More actions" aria-label="More actions for {r.id}" aria-haspopup="menu" onclick={(e) => openMenu(e, rowMenu(r))}>{@render icon('more')}</button>
+			</span>
 		</div>
 	</li>
 {/snippet}
 
-{#snippet tree(nodes: Node<WorldStructureRow>[])}
+{#snippet tree(nodes: Node<WorldStructureRow>[], prefix: string, depth: number)}
 	{#each nodes as n (n.kind === 'group' ? `g:${n.key}` : n.item.file)}
 		{#if n.kind === 'leaf'}
-			{@render row(n.item)}
+			{@render row(n.item, prefix, depth)}
 		{:else}
 			{@const todo = n.items.filter((r) => r.status !== 'imported')}
 			{@const notUsed = n.items.filter((r) => r.unused).length}
-			<li class="group">
+			<li>
 				<details open={isOpen(n)} ontoggle={(e) => (open[n.key] = e.currentTarget.open)}>
-					<summary>
-						<span class="folder name grow">{n.label}</span>
-						<span class="muted small">{n.items.length}{todo.length ? ` · ${todo.length} to import` : ''}{notUsed ? ` · ${notUsed} not used` : ''}</span>
+					<summary class="item" style:--depth={depth} title={n.key}>
+						<span class="twistie" aria-hidden="true"></span>
+						<span class="label folder">{n.label}</span>
+						<span class="desc">
+							{n.items.length}{#if todo.length}{' · '}<span class="new-text">{todo.length} to import</span>{/if}{#if notUsed}{' · '}<span class="warn-text">{notUsed} not used</span>{/if}
+						</span>
 						{#if todo.length}
-							<button class="secondary small-btn" title="Import the new and changed structures in this group" onclick={(e) => { e.preventDefault(); send({ type: 'importFiles', files: todo.map((r) => r.file) }); }}>Import {todo.length}</button>
+							<span class="actions-inline">
+								<button class="icon-btn" title="Import the {todo.length} new and changed structures in {n.label}" aria-label="Import {todo.length} in {n.label}" onclick={(e) => { e.preventDefault(); send({ type: 'importFiles', files: todo.map((r) => r.file) }); }}>{@render icon('import')}</button>
+							</span>
 						{/if}
 					</summary>
-					<ul>{@render tree(n.children)}</ul>
+					<ul class="tree">{@render tree(n.children, n.key, depth + 1)}</ul>
 				</details>
 			</li>
 		{/if}
@@ -129,7 +195,7 @@
 					{#if s.world.folder}<div class="muted small">{s.world.folder}</div>{/if}
 				</div>
 				<button class="secondary small-btn" title="Choose another world to build into" onclick={() => send({ type: 'run', action: 'chooseWorld' })}>Change</button>
-				<button class="secondary small-btn" title="Open the world's datapacks folder" onclick={() => send({ type: 'run', action: 'revealWorld' })}>Open folder</button>
+				<button class="icon-btn more" title="More actions" aria-label="More actions for the build world" aria-haspopup="menu" onclick={(e) => openMenu(e, [{ label: 'Open datapacks folder', run: () => send({ type: 'run', action: 'revealWorld' }) }])}>⋯</button>
 			</div>
 		{/if}
 	</section>
@@ -217,12 +283,12 @@
 						{#if from.folder}<div class="muted small">{from.folder}</div>{/if}
 					</div>
 					<button class="secondary small-btn" title="Choose another world to import structures from" onclick={() => send({ type: 'run', action: 'chooseStructureWorld' })}>Change</button>
-					<button class="secondary small-btn" title="Open the world's generated folder, where structure blocks save" onclick={() => send({ type: 'run', action: 'revealStructureWorld' })}>Open folder</button>
+					<button class="icon-btn more" title="More actions" aria-label="More actions for the structure world" aria-haspopup="menu" onclick={(e) => openMenu(e, [
+						{ label: 'Open generated folder', run: () => send({ type: 'run', action: 'revealStructureWorld' }) },
+						{ label: s?.world ? 'Use the build world instead' : 'Forget this world', run: () => send({ type: 'run', action: 'sameStructureWorld' }) }
+					])}>⋯</button>
 				</div>
-				<p class="muted small">
-					Builds never write to this world.
-					<button class="link" onclick={() => send({ type: 'run', action: 'sameStructureWorld' })}>{s.world ? 'Use the build world instead' : 'Forget this world'}</button>
-				</p>
+				<p class="muted small">Builds never write to this world.</p>
 			{:else}
 				<p class="muted small">
 					From the build world.
@@ -233,20 +299,24 @@
 				<p class="muted small">None saved yet. Save one with a structure block in SAVE mode; it shows up here to import into the project for a template pool.</p>
 			{:else}
 				<p class="muted small">
-					{[s.structures.length ? (waiting ? `${waiting} to import` : 'All imported') : '', unused ? `${unused} not used` : ''].filter(Boolean).join(' · ')}
-					{#if s.unusedPaused}· the not-used check waits until the project has no errors{/if}
+					{s.structures.length ? (waiting ? `${waiting} to import` : 'All imported') : ''}
+					{#if unused}
+						{s.structures.length ? ' · ' : ''}<span class="warn-text">{unused} not used</span>
+					{/if}
+					{#if s.unusedPaused}(The not-used check waits until the project has no errors.){/if}
 				</p>
-				<ul>
-					{@render tree(groups)}
+				<ul class="tree" role="tree">
+					{@render tree(groups, '', 0)}
 					{#each s.unusedFiles as rel (rel)}
-						<li class="st unused">
-							<div class="st-head">
-								<span class="name grow">{rel}</span>
-								<span class="badge warn-badge">Not used</span>
-							</div>
-							<div class="small">In the project but not saved in {from.name}, and no <code>Structure(...)</code> call uses it, so the pack leaves it out.</div>
-							<div class="actions">
-								<button class="secondary" onclick={() => send({ type: 'revealFile', rel })}>Show file</button>
+						{@const items: MenuItem[] = [{ label: 'Show file in Explorer', run: () => send({ type: 'revealFile', rel }) }]}
+						<li>
+							<div class="item" style:--depth={0} tabindex="0" role="treeitem" aria-selected="false" title={`${rel}\nNot saved in ${from.name}, and no Structure(...) call uses it, so the pack leaves it out.`} oncontextmenu={(e) => openMenu(e, items)}>
+								<span class="twistie"></span>
+								<span class="label warn-text missing">{rel}</span>
+								<span class="desc"><span class="warn-text">not used</span> · not in world</span>
+								<span class="actions-inline">
+									<button class="icon-btn" title="More actions" aria-label="More actions for {rel}" aria-haspopup="menu" onclick={(e) => openMenu(e, items)}>{@render icon('more')}</button>
+								</span>
 							</div>
 						</li>
 					{/each}
@@ -254,6 +324,19 @@
 			{/if}
 		</section>
 	{/if}
+{/if}
+
+<svelte:window onclick={closeMenu} onblur={closeMenu} onresize={closeMenu} onkeydown={menuKey} />
+{#if menu}
+	<div class="menu" role="menu" tabindex="-1" bind:this={menuEl} onclick={(e) => e.stopPropagation()} onkeydown={(e) => { e.stopPropagation(); menuKey(e); }}>
+		{#each menu.items as it, i (i)}
+			{#if it === 'sep'}
+				<div class="sep" role="separator"></div>
+			{:else}
+				<button role="menuitem" class:danger={it.danger} onclick={() => { closeMenu(); it.run(); }}>{it.label}</button>
+			{/if}
+		{/each}
+	</div>
 {/if}
 
 <style>
@@ -300,8 +383,7 @@
 	}
 	.row,
 	.head,
-	.card-head,
-	.st-head {
+	.card-head {
 		display: flex;
 		align-items: center;
 		gap: 6px;
@@ -464,70 +546,146 @@
 		cursor: pointer;
 	}
 
-	/* Structures */
-	.st {
-		padding: 6px 8px;
-		border: 1px solid var(--vscode-widget-border, var(--vscode-panel-border, transparent));
-		border-left-width: 3px;
-		border-radius: 2px;
+	/* Structures: a tree like the Explorer's. One 22px line per item, the
+	   status as coloured words in the description (like git decorations),
+	   and the actions as icons that show on hover or keyboard focus. The
+	   full explanation is in each item's tooltip. */
+	ul.tree {
+		gap: 0;
+		margin: 0 -12px;
 	}
-	.st.changed {
-		border-left-color: var(--vscode-gitDecoration-modifiedResourceForeground);
+	ul.tree ul.tree {
+		margin: 0;
 	}
-	.st.unused {
-		border-left-color: var(--vscode-editorWarning-foreground);
-		background: color-mix(in srgb, var(--vscode-editorWarning-foreground) 8%, transparent);
-	}
-	.badge {
-		font-size: 11px;
-		padding: 0 6px;
-		border-radius: 9px;
-		background: var(--vscode-badge-background);
-		color: var(--vscode-badge-foreground);
-		white-space: nowrap;
-	}
-	.changed-badge {
-		background: var(--vscode-gitDecoration-modifiedResourceForeground);
-		color: var(--vscode-editor-background);
-	}
-	.warn-badge {
-		background: var(--vscode-editorWarning-foreground);
-		color: var(--vscode-editor-background);
-		font-weight: 600;
-	}
-	.group > details > summary {
+	.item {
 		display: flex;
 		align-items: center;
 		gap: 6px;
-		cursor: pointer;
-		padding: 2px 0;
-		list-style: none;
+		height: 22px;
+		padding: 0 4px 0 calc(8px + var(--depth, 0) * 12px);
+		cursor: default;
+		white-space: nowrap;
+		outline: none;
 	}
-	.group > details > summary::-webkit-details-marker {
-		display: none;
+	.item:hover {
+		background: var(--vscode-list-hoverBackground);
 	}
-	.group > details > summary::before {
-		content: '▸';
-		width: 12px;
+	.item:focus-visible {
+		outline: 1px solid var(--vscode-list-focusOutline, var(--vscode-focusBorder));
+		outline-offset: -1px;
+	}
+	.twistie {
+		flex: 0 0 12px;
+		text-align: center;
 		color: var(--vscode-icon-foreground);
 	}
-	.group > details[open] > summary::before {
-		content: '▾';
+	summary.item {
+		list-style: none;
+		cursor: pointer;
 	}
-	.group > details > ul {
-		padding-left: 12px;
-		margin-top: 4px;
-		border-left: 1px solid var(--vscode-tree-indentGuidesStroke, var(--vscode-widget-border, transparent));
+	summary.item::-webkit-details-marker {
+		display: none;
 	}
-	.folder {
-		font-family: var(--vscode-editor-font-family);
+	summary.item .twistie::before {
+		content: '›';
+		display: inline-block;
+		font-size: 14px;
+		line-height: 1;
+		transition: transform 0.1s;
 	}
-	.call {
-		display: block;
-		margin-top: 4px;
-		padding: 2px 6px;
-		background: var(--vscode-textCodeBlock-background);
-		border-radius: 2px;
-		overflow-wrap: anywhere;
+	details[open] > summary.item .twistie::before {
+		transform: rotate(90deg);
+	}
+	.label {
+		flex: 0 1 auto;
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	.desc {
+		flex: 1 1 0;
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		font-size: 0.92em;
+		color: var(--vscode-descriptionForeground);
+	}
+	.actions-inline {
+		display: none;
+		flex: 0 0 auto;
+		gap: 0;
+	}
+	.item:hover .actions-inline,
+	.item:focus-within .actions-inline {
+		display: flex;
+	}
+	.actions-inline .icon-btn {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 22px;
+		height: 20px;
+		padding: 0;
+		border-radius: 4px;
+	}
+	.new-text {
+		color: var(--vscode-gitDecoration-untrackedResourceForeground, #73c991);
+	}
+	.changed-text {
+		color: var(--vscode-gitDecoration-modifiedResourceForeground);
+	}
+	.warn-text {
+		color: var(--vscode-editorWarning-foreground);
+	}
+	/* In the project but not saved in the structure world. */
+	.missing {
+		font-style: italic;
+	}
+	.more {
+		opacity: 0.45;
+		font-weight: 700;
+		letter-spacing: 1px;
+	}
+	.row:hover .more,
+	.more:focus-visible {
+		opacity: 1;
+	}
+
+	/* The ⋯ menu, drawn like VS Code's own context menus. */
+	.menu {
+		position: fixed;
+		z-index: 10;
+		min-width: 170px;
+		padding: 4px 0;
+		background: var(--vscode-menu-background, var(--vscode-editorWidget-background));
+		color: var(--vscode-menu-foreground, var(--vscode-foreground));
+		border: 1px solid var(--vscode-menu-border, var(--vscode-widget-border, transparent));
+		border-radius: 4px;
+		box-shadow: 0 2px 8px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.36));
+		display: flex;
+		flex-direction: column;
+	}
+	.menu button {
+		background: none;
+		border: 0;
+		border-radius: 0;
+		text-align: left;
+		padding: 3px 14px;
+		color: inherit;
+		white-space: nowrap;
+	}
+	.menu button:hover,
+	.menu button:focus-visible {
+		background: var(--vscode-menu-selectionBackground, var(--vscode-list-activeSelectionBackground));
+		color: var(--vscode-menu-selectionForeground, inherit);
+		outline: none;
+	}
+	.menu .danger {
+		color: var(--vscode-errorForeground);
+	}
+	.menu .sep {
+		height: 1px;
+		margin: 4px 0;
+		background: var(--vscode-menu-separatorBackground, var(--vscode-widget-border, transparent));
 	}
 </style>

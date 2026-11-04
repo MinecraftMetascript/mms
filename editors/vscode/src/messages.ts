@@ -88,6 +88,8 @@ export interface WorldStructureRow {
 	rel: string;
 	call: string;
 	saved: string;
+	/** When it was saved, in ms since the epoch, for "saved 5 min ago". */
+	savedMs: number;
 	/** Imported, but no Structure(...) call names the project copy (lint/unused-asset). */
 	unused: boolean;
 	/** Its id in the pack, when it was saved under another namespace. */
