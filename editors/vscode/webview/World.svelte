@@ -118,7 +118,7 @@
 				<span class="tag" class:changed-tag={r.status === 'changed'} class:new-tag={r.status === 'new'}>{status[r.status]}</span>
 			{/if}
 			{#if r.status !== 'imported'}
-				<button class="primary small-btn" title={r.status === 'changed' ? 'Copy the newer save over the project copy' : `Copy it to ${r.rel}`} onclick={() => send({ type: 'import', file: r.file })}>{r.status === 'changed' ? 'Import again' : 'Import'}</button>
+				<button class="primary small-btn" title={r.status === 'changed' ? 'Replace the project copy with this save (overwrites any edits to it)' : `Copy it to ${r.rel}`} onclick={() => send({ type: 'import', file: r.file })}>{r.status === 'changed' ? 'Import again' : 'Import'}</button>
 			{:else if r.unused}
 				<button class="secondary small-btn" title={r.call} onclick={() => copy(r.file, { type: 'copyCall', file: r.file })}>{copied === r.file ? 'Copied' : 'Copy call'}</button>
 			{/if}
@@ -126,7 +126,7 @@
 		</div>
 		<div class="muted small detail" title={`Saved ${r.saved} in ${r.file}`}>
 			{#if r.status === 'new'}Saved {ago(r.savedMs)}, not in the project yet
-			{:else if r.status === 'changed'}Saved again {ago(r.savedMs)}, newer than the project copy
+			{:else if r.status === 'changed'}Saved {ago(r.savedMs)}, differs from the project copy
 			{:else}Saved {ago(r.savedMs)} · {r.rel}{/if}
 		</div>
 		{#if r.unused}
@@ -315,7 +315,7 @@
 
 <svelte:window onclick={closeMenu} onblur={closeMenu} onresize={closeMenu} onkeydown={menuKey} />
 {#if menu}
-	<div class="menu" role="menu" tabindex="-1" bind:this={menuEl} onclick={(e) => e.stopPropagation()} onkeydown={menuKey}>
+	<div class="menu" role="menu" tabindex="-1" bind:this={menuEl} onclick={(e) => e.stopPropagation()} onkeydown={(e) => { e.stopPropagation(); menuKey(e); }}>
 		{#each menu.items as it, i (i)}
 			{#if it === 'sep'}
 				<div class="sep" role="separator"></div>
