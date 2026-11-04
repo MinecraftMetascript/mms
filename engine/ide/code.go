@@ -48,7 +48,7 @@ func (s *Session) mmsComplete(a *at, off int) ([]sema.Candidate, bool) {
 			return criteria(), true
 		}
 	}
-	if !a.code() || d.Body == nil || !d.Body.Sp.Contains(off) {
+	if !a.code() || a.fn.Body == nil || !a.fn.Body.Sp.Contains(off) {
 		return nil, false
 	}
 	// Arguments of an execute helper, `As(|)`, or of a function call.
@@ -122,7 +122,7 @@ func enclosingCall(f *syntax.File, open *syntax.Token) (name string, index int, 
 // parameters and locals in scope at off, then the Globals, the
 // objectives (read as `name[@s]`) and the functions, then true and false.
 func (s *Session) codeValues(a *at, off int) []sema.Candidate {
-	out := locals(a.u.File, a.decl.D, off)
+	out := locals(a.u.File, a.fn, off)
 	out = append(out, s.projectNames(a)...)
 	out = append(out,
 		sema.Candidate{Label: "true", Kind: sema.CandKeyword, Rank: 200},
@@ -229,4 +229,62 @@ func criteria() []sema.Candidate {
 		out = append(out, sema.Candidate{Label: c, Kind: sema.CandEnum, Rank: i})
 	}
 	return out
+}
+
+// interpolationCompletion completes the expression of a `${...}` in a
+// raw command, from base (the command's first rune after `/`) to off: the
+// values codeValues lists, plus custom items, which a command can take
+// as an item argument. ok is false when off is not inside an open ${.
+func (s *Session) interpolationCompletion(a *at, base, off int) ([]Item, syntax.Span, bool) {
+	src := a.u.File.Src
+	open := -1 // the rune after the innermost unclosed `${`
+	depth := 0
+	for i := base; i < off; i++ {
+		switch {
+		case open < 0 && src[i] == '$' && i+1 < off && src[i+1] == '{':
+			open, depth = i+2, 1
+			i++
+		case open >= 0 && src[i] == '{':
+			depth++
+		case open >= 0 && src[i] == '}':
+			if depth--; depth == 0 {
+				open = -1
+			}
+		}
+	}
+	if open < 0 || !a.code() {
+		return nil, syntax.Span{}, false
+	}
+	start := off
+	for start > open && identRune(src[start-1]) {
+		start--
+	}
+	end := off
+	for end < len(src) && identRune(src[end]) {
+		end++
+	}
+	cands := s.codeValues(a, start)
+	for _, sym := range s.R.Syms.All() {
+		if sym.Kind.MMS != "CustomItem" {
+			continue
+		}
+		name := sym.Path
+		if sym.NS != a.decl.NS {
+			name = sym.ID()
+		}
+		cands = append(cands, sema.Candidate{Label: name, Kind: sema.CandID, Detail: "CustomItem", Doc: sema.DocMarkdown(sym.Decl.Doc), Rank: 80})
+	}
+	items := make([]Item, 0, len(cands))
+	for i, c := range cands {
+		it := Item{Label: c.Label, Kind: c.Kind, Detail: c.Detail, Doc: c.Doc, Sort: sortKey(i)}
+		if c.Insert != "" {
+			it.Insert, it.Snippet = c.Insert, true
+		}
+		items = append(items, it)
+	}
+	return items, syntax.Span{Start: start, End: end}, true
+}
+
+func identRune(r rune) bool {
+	return r == '_' || r == ':' || r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9'
 }

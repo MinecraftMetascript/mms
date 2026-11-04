@@ -274,7 +274,7 @@
 
 <div class="flex h-dvh flex-col">
 	<header class="flex items-center gap-2 border-b border-line bg-panel px-3 py-2">
-		<span class="flex shrink-0 items-center"><Logo class="h-6 w-auto" /></span>
+		<span class="flex shrink-0 items-center"><Logo class="h-6 w-auto sm:hidden" wordmark={false} /><Logo class="hidden h-6 w-auto sm:block" /></span>
 		<button class="hidden max-w-48 truncate rounded px-2 py-1 text-sm text-muted hover:bg-hover hover:text-ink sm:inline" onclick={() => projects?.open()} title="Switch, rename or delete saved projects" aria-label="{project.name} (switch project)">{project.name}</button>
 		<div class="flex items-center sm:ml-2">
 			<Dropdown label="Project">

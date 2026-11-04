@@ -114,6 +114,13 @@ func TestCustomItemErrors(t *testing.T) {
 		{"CustomItem a = { base = stick, texture = Texture(\"art/a.png\") }\nModel item/a = { parent = item/generated }", "already made by CustomItem"},
 		{"CustomItem a = { base = stick, name = \"A\" }\nLang en_us = { \"item.demo.a\" = \"B\" }", "already sets 'item.demo.a'"},
 		{"CustomItem a = { base = stick, components = { bundle_contents = [a] } }\nRecipe r = Shapeless([stick], a)", "contains itself"},
+		{`CustomItem a = { base = stick, durability = 5, components = { max_damage = 6 } }`, "durability sets the max_damage component, which components also sets"},
+		{`CustomItem a = { base = stick, durability = 0 }`, "must be in 1.."},
+		{`CustomItem a = { base = stick, durability = 5, components = { max_stack_size = 16 } }`, "cannot stack"},
+		{`CustomItem a = { base = stick, components = { max_damage = 5, max_stack_size = 16 } }`, "cannot stack"},
+		{`CustomItem a = { base = stick, components = { durability = 5 } }`, "Bedrock Edition component. In Java Edition use max_damage"},
+		{`CustomItem a = { base = stick, components = { digger = {} } }`, "In Java Edition use tool"},
+		{`CustomItem a = { base = stick, components = { additional_trade_cost = 1 } }`, "not allowed here"},
 	}
 	for _, tc := range cases {
 		_, r := assetProject(t, files, tc.src)
@@ -480,6 +487,34 @@ Function give {
 	} {
 		if !strings.Contains(got, want) {
 			t.Errorf("missing %q in:\n%s", want, got)
+		}
+	}
+}
+
+// durability sets max_damage, and any item with max_damage gets a stack
+// size of 1, since the game rejects a damageable item that stacks.
+func TestCustomItemDurability(t *testing.T) {
+	src := "CustomItem wand = { base = stick, durability = 5 }\n" +
+		"CustomItem pick = { base = stick, components = { max_damage = 7 } }\n" +
+		"CustomItem one = { base = stick, durability = 9, components = { max_stack_size = 1 } }\n" +
+		"Function give {\n  /give @s ${wand}\n  /give @s ${pick}\n  /give @s ${one}\n}"
+	_, r := assetProject(t, fstest.MapFS{}, src)
+	if d := diagText(r); d != "" {
+		t.Fatalf("unexpected diagnostics:\n%s", d)
+	}
+	var give string
+	for _, f := range r.Emit() {
+		if f.Path == "data/demo/function/give.mcfunction" {
+			give = string(f.Data)
+		}
+	}
+	for _, want := range []string{
+		"give @s stick[max_damage=5,max_stack_size=1",
+		"give @s stick[max_damage=7,max_stack_size=1",
+		"give @s stick[max_stack_size=1,max_damage=9",
+	} {
+		if !strings.Contains(give, want) {
+			t.Errorf("give lacks %q:\n%s", want, give)
 		}
 	}
 }

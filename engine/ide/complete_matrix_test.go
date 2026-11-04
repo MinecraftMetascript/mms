@@ -65,6 +65,9 @@ func TestCompletionMatrix(t *testing.T) {
 		{name: "map value", src: "Enchantment e = {\n  effects = {\n    minecraft:damage = [|]\n  }\n}", want: []string{"DamageEnchantmentEffect"}},
 		{name: "function reference", src: "Function g {}\nAdvancement a = { rewards = { function = |} }", want: []string{"g"}},
 
+		{name: "custom item fields", src: "CustomItem w = {\n  base = stick\n  |\n}", want: []string{"durability", "components", "texture"}},
+		{name: "custom item components", src: "CustomItem w = {\n  base = stick\n  components = {\n    |\n  }\n}", want: []string{"max_damage", "damage", "unbreakable", "tool", "equippable", "food"}, not: []string{"additional_trade_cost", "creative_slot_lock", "map_post_processing"}},
+
 		// Tags.
 		{name: "tag entries", src: "ItemTag gems = [|]", want: []string{"diamond", "#logs", "Optional"}, not: []string{"#gems"}},
 		{name: "tag entry prefix", src: "ItemTag gems = [dia|]", want: []string{"diamond"}, replace: "dia"},
@@ -101,6 +104,26 @@ func TestCompletionMatrix(t *testing.T) {
 		{name: "command criterion", src: "Function f {\n  /scoreboard objectives add x |\n}", want: []string{"dummy", "deathCount"}},
 		{name: "command item", src: "Function f {\n  /give @s minecraft:dia|\n}", want: []string{"diamond"}, replace: "minecraft:dia"},
 		{name: "command in execute block", src: "Function f {\n  As(@a).At(@s) {\n    /|\n  }\n}", want: []string{"say"}},
+
+		{name: "interpolation", src: "Function f(n: int) {\n  let x = 1\n  /say ${|}\n}", want: []string{"n", "x"}, not: []string{"say", "As"}},
+		{name: "interpolation prefix", src: "Global g: int = 0\nFunction f {\n  /say ${g|}\n}", want: []string{"g"}, replace: "g"},
+		{name: "interpolation custom item", src: "CustomItem shard = { base = stick }\nFunction f {\n  /give @s ${|}\n}", want: []string{"shard"}},
+		{name: "after interpolation", src: "Function f {\n  let x = 1\n  /scoreboard players set @s ${x} |\n}", not: []string{"x"}},
+
+		// Inline function blocks, where a function id is needed: the same
+		// as a Function body.
+		{name: "inline command start", src: "Advancement a = { rewards = { function = {\n  /|\n} } }", want: []string{"say", "scoreboard"}},
+		{name: "inline command name", src: "Advancement a = { rewards = { function = {\n  /scoreb|\n} } }", want: []string{"scoreboard"}, replace: "scoreb"},
+		{name: "inline statement", src: "Advancement a = { rewards = { function = {\n  /say hi\n  |\n} } }", want: []string{"As", "let", "return"}, not: []string{"experience", "loot"}},
+		{name: "inline local", src: "Advancement a = { rewards = { function = {\n  let x = 1\n  let y = |\n} } }", want: []string{"x", "true"}, not: []string{"As"}},
+		{name: "inline interpolation", src: "Advancement a = { rewards = { function = {\n  let x = 1\n  /say ${|}\n} } }", want: []string{"x"}},
+		{name: "inline execute selector", src: "Advancement a = { rewards = { function = {\n  As(|)\n} } }", want: []string{"@a", "@s"}},
+		{name: "inline execute chain", src: "Advancement a = { rewards = { function = {\n  As(@a).|\n} } }", want: []string{"At", "Positioned"}},
+		{name: "item hook command", src: "CustomItem w = {\n  base = stick\n  on_right_click = {\n    /|\n  }\n}", want: []string{"say", "give"}},
+		{name: "item hook statement", src: "CustomItem w = {\n  base = stick\n  on_right_click = {\n    |\n  }\n}", want: []string{"As", "let"}, not: []string{"on_hit", "components"}},
+		{name: "item hook execute block", src: "CustomItem w = {\n  base = stick\n  on_hit = {\n    As(@a) {\n      /|\n    }\n  }\n}", want: []string{"say"}},
+		{name: "item hook global", src: "Global g: int = 0\nCustomItem w = {\n  base = stick\n  on_hit = {\n    g|\n  }\n}", want: []string{"g"}, replace: "g"},
+		{name: "item hook field still a field", src: "CustomItem w = {\n  base = stick\n  on_hit = {\n    /say hi\n  }\n  |\n}", want: []string{"on_right_click"}, not: []string{"As"}},
 
 		// No completion.
 		{name: "comment", src: "// Feature |\nFeature f = {}", none: true},

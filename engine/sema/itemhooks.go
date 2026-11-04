@@ -68,7 +68,7 @@ var itemHooks = []itemHook{
 	{field: "on_pickup", trigger: "thrown_item_picked_up_by_player",
 		desc: "A `Function` without parameters to run, as and at the player, when they pick the item up from the ground."},
 	{field: "on_break", trigger: "item_durability_changed",
-		desc: "A `Function` without parameters to run, as and at the player, when the item runs out of durability and breaks. The item needs durability: a tool, weapon or armor base, or a `max_damage` component."},
+		desc: "A `Function` without parameters to run, as and at the player, when the item runs out of durability and breaks. The item needs durability: a tool, weapon or armor base, or `durability = n`."},
 }
 
 func itemHookByField(f string) *itemHook {
@@ -156,8 +156,8 @@ func (c *Checker) checkItemHooks(d *syntax.Decl, o *jsonv.Object, comps *jsonv.O
 }
 
 // checkUseCost checks consume_on_use and damage_on_use, which need a
-// right-click hook to pay them, and damage_on_use a max_damage component.
-// It gives a damageable item a stack size of 1, as the game requires.
+// right-click hook to pay them, and damage_on_use a max_damage component
+// (from durability or components).
 func (c *Checker) checkUseCost(fields map[string]syntax.Expr, o, comps *jsonv.Object, press string, out *CustomItemOut) {
 	num := func(key string) int {
 		n, _ := o.Get(key).(jsonv.Number)
@@ -179,17 +179,8 @@ func (c *Checker) checkUseCost(fields map[string]syntax.Expr, o, comps *jsonv.Ob
 			}
 		}
 		if max <= 0 {
-			c.errorf("mms/custom-item", fields["damage_on_use"].Span(), "damage_on_use needs the item's durability: add max_damage to its components, such as components = { max_damage = 32 }")
+			c.errorf("mms/custom-item", fields["damage_on_use"].Span(), "damage_on_use needs the item's durability: add one, such as durability = 32")
 			return
-		}
-		switch n := componentValue(comps, "max_stack_size").(type) {
-		case nil:
-			comps.Set("max_stack_size", jsonv.Number("1"))
-		case jsonv.Number:
-			if n != "1" {
-				c.errorf("mms/custom-item", fields["components"].Span(), "an item with durability cannot stack: the game requires max_stack_size = 1 with max_damage")
-				return
-			}
 		}
 		out.Use.MaxDamage = max
 	}
