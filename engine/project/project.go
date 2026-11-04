@@ -448,6 +448,8 @@ func (p *Project) checkDecl(u *sema.Unit, d *syntax.Decl, k sema.Kind, syms *sem
 		dr.Lines = objective(c, d)
 	case k.MMS == "Global":
 		dr.Lines = c.Global(d)
+	case k.MMS == sema.JigsawHoleKind:
+		c.JigsawHole(d)
 	}
 	dr.Info = c.Info
 	dr.Diags = c.Diags

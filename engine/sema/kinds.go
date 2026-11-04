@@ -16,7 +16,7 @@ type Kind struct {
 	// TagOf is the registry a tag kind lists ("block", "worldgen/biome").
 	TagOf string
 	// MMS is set for language-level kinds: Namespace, Function, Objective,
-	// Global, CustomItem, Book and the event hooks (OnLoad, OnTick, OnFirstJoin,
+	// Global, CustomItem, Book, JigsawHole and the event hooks (OnLoad, OnTick, OnFirstJoin,
 	// OnRespawn, OnAdvancement).
 	MMS string
 	// Assets is the folder under assets/<ns>/ for resource-pack kinds
@@ -56,7 +56,7 @@ var mmsKinds = map[string]bool{
 	"Namespace": true, "Function": true, "Objective": true, "Global": true,
 	"OnLoad": true, "OnTick": true,
 	"OnFirstJoin": true, "OnRespawn": true, "OnAdvancement": true,
-	"CustomItem": true, "Book": true,
+	"CustomItem": true, "Book": true, "JigsawHole": true,
 }
 
 // kindAliases name resource kinds whose MMS names differ from the folder,
@@ -189,3 +189,9 @@ func (ks *Kinds) ForFolder(folder string) (Kind, bool) {
 	}
 	return Kind{}, false
 }
+
+// JigsawHoleKind names a jigsaw block name: `JigsawHole road_end`. It
+// writes nothing; editors list the declared holes where a jigsaw block's
+// name or target is chosen, and the jigsaw-hole lint checks the names
+// structure files use against them.
+const JigsawHoleKind = "JigsawHole"

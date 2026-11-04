@@ -98,7 +98,8 @@
     "views": {
       "mms": [
         { "id": "mms.world", "type": "webview", "name": "World", "icon": "icons/sidebar.svg", "initialSize": 3 },
-        { "id": "mms.pack", "name": "Pack", "icon": "icons/sidebar.svg", "initialSize": 2 }
+        { "id": "mms.pack", "name": "Pack", "icon": "icons/sidebar.svg", "initialSize": 2 },
+        { "id": "mms.jigsaw", "type": "webview", "name": "Jigsaw", "icon": "icons/sidebar.svg", "initialSize": 3 }
       ]
     },
     "viewsWelcome": [
@@ -188,7 +189,7 @@
     "build": "npm run build:extension && npm run build:webview && npm run licenses",
     "licenses": "node ../../scripts/third-party-licenses.mjs . out/third-party-licenses.txt vscode-languageclient deepslate svelte --notice ../../packages/preview/src/vendor/cmdlib/NOTICE.md",
     "build:extension": "esbuild src/extension.ts --bundle --platform=node --format=cjs --external:vscode --outfile=out/extension.js --minify",
-    "build:webview": "vite build --config webview/vite.config.ts && vite build --config webview/world.vite.config.ts",
+    "build:webview": "vite build --config webview/vite.config.ts && vite build --config webview/world.vite.config.ts && vite build --config webview/jigsaw.vite.config.ts",
     "check": "tsc --noEmit && svelte-check --tsconfig ./webview/tsconfig.json",
     "package": "npm run check && npm run build && node -e \"require('node:fs').rmSync('bin', { recursive: true, force: true })\" && vsce package --skip-license",
     "package:targets": "npm run check && npm run build && node scripts/package-targets.mjs"

@@ -786,3 +786,27 @@ func TestUnusedAssetDiagnostics(t *testing.T) {
 		t.Errorf("still reported once used: %v", got)
 	}
 }
+
+// JigsawHole declarations write no file; mms/output lists them, with
+// their doc comments, for an editor's jigsaw block form.
+func TestOutputJigsawHoles(t *testing.T) {
+	c := start(t)
+	c.result("initialize", map[string]any{})
+	c.notify("mms/setFiles", map[string]any{"files": []any{
+		map[string]any{"uri": "mem:///a.mms", "text": "/** Where a road ends. */\nJigsawHole road_end\nJigsawHole arch\n"},
+	}})
+	out := c.result("mms/output", map[string]any{}).(map[string]any)
+	holes := out["jigsawHoles"].([]any)
+	if len(holes) != 2 {
+		t.Fatalf("holes: %v", holes)
+	}
+	a, b := holes[0].(map[string]any), holes[1].(map[string]any)
+	if a["id"] != "mms:arch" || b["id"] != "mms:road_end" || b["doc"] != "Where a road ends." || b["uri"] != "mem:///a.mms" {
+		t.Fatalf("holes: %v", holes)
+	}
+	for _, f := range out["files"].([]any) {
+		if p := f.(map[string]any)["path"]; p != "pack.mcmeta" {
+			t.Errorf("a JigsawHole wrote %v", p)
+		}
+	}
+}

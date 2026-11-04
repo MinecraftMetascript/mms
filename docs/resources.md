@@ -99,6 +99,17 @@ A structure that generates in new chunks takes four resources, each naming the n
 | `TemplatePool` | the templates (`.nbt` files) to place, with their processors |
 | `ProcessorList` | rules that change blocks as a template is placed |
 
+### Jigsaw holes
+
+A jigsaw block joins pieces by name: its target is the name of a jigsaw block in a piece of its pool. Those names are typed into the game's jigsaw screen, so a typo only shows as a structure that stops growing. `JigsawHole` declares a name, and writes no file:
+
+```mms
+/** The far end of a hall, leading on to a room. */
+JigsawHole hall_exit
+```
+
+This declares `<namespace>:hall_exit`. The editors list the declared holes where a jigsaw block's name or target is chosen (VS Code's **Jigsaw** view, which copies a `/give` command for a set-up jigsaw block). Once a namespace declares a hole, the `jigsaw-hole` lint reports a jigsaw block in a structure file whose name or target in that namespace is not declared, with the closest declared hole and a fix that declares it. The [`jigsaw`](../examples/jigsaw/) example declares its holes.
+
 A template's chests can get a loot table from a `Rule` processor with `block_entity_modifier = AppendLoot(chests/buried)`. That works on vanilla templates too, so a structure can reuse one without its own `.nbt` file. The [`treasure`](../examples/treasure/) example does this in `worldgen.mms`.
 
 ## Density functions

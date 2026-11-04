@@ -7,6 +7,7 @@ import (
 	"testing/fstest"
 
 	"github.com/minecraftmetascript/mms/engine/nbt"
+	"github.com/minecraftmetascript/mms/engine/syntax"
 )
 
 // piece builds a structure file with a stone block and the given jigsaw
@@ -268,5 +269,66 @@ func TestJigsawOverlapNarrowJunction(t *testing.T) {
 	_, r = assetProject(t, files, src("wide"))
 	if got := jigsawDiags(r); strings.Contains(got, "jigsaw-overlap") {
 		t.Fatalf("7 wide T:\n%s", got)
+	}
+}
+
+// JigsawHole declares a jigsaw name: it writes nothing, and once a
+// namespace declares one, a jigsaw name or target there that is not
+// declared is reported, with the closest hole and a fix that declares it.
+func TestJigsawHole(t *testing.T) {
+	files := fstest.MapFS{
+		"art/icon.png": {Data: pngBytes},
+		"s/base.nbt":   {Data: piece(t, "demo:tops|demo:bottom|demo:top", "demo:tops|demo:botom|demo:top", "minecraft:empty|other:x|minecraft:empty")},
+		"s/top.nbt":    {Data: piece(t, "minecraft:empty|demo:top|minecraft:empty")},
+	}
+	src := pool("starts", `Structure("s/base.nbt", "base")`) + pool("tops", `Structure("s/top.nbt", "top")`)
+	// No holes declared: nothing is checked.
+	_, r := assetProject(t, files, src)
+	if got := jigsawDiags(r); got != "" {
+		t.Fatalf("no holes: got %s", got)
+	}
+	_, r = assetProject(t, files, src+"/** The underside. */\nJigsawHole bottom\nJigsawHole top\n")
+	got := jigsawDiags(r)
+	want := "lint/jigsaw-hole: 's/base.nbt' has a jigsaw block at 2 0 0 whose name is 'demo:botom', which is not a declared JigsawHole (did you mean 'demo:bottom'?)\n"
+	if got != want {
+		t.Fatalf("got:\n%s\nwant:\n%s", got, want)
+	}
+	for _, f := range r.Emit() {
+		if strings.Contains(f.Path, "jigsaw_hole") || strings.Contains(f.Path, "bottom") {
+			t.Fatalf("a JigsawHole wrote %s", f.Path)
+		}
+	}
+	var fixed string
+	for _, d := range r.Diagnostics("main.mms") {
+		if d.Code == "lint/jigsaw-hole" {
+			if len(d.Fixes) == 0 || d.Fixes[0].Title != "Declare JigsawHole botom" {
+				t.Fatalf("fixes: %+v", d.Fixes)
+			}
+			fixed = string(r.Unit("main.mms").File.Src) + d.Fixes[0].Edits[0].Text
+		}
+	}
+	_, r = assetProject(t, files, fixed)
+	if got := diagText(r); got != "" {
+		t.Fatalf("after fix: %s", got)
+	}
+}
+
+// A JigsawHole is only a name: a value, body or duplicate is an error.
+func TestJigsawHoleErrors(t *testing.T) {
+	files := fstest.MapFS{"art/icon.png": {Data: pngBytes}}
+	_, r := assetProject(t, files, "JigsawHole a = 3\nJigsawHole b { }\nJigsawHole c\nJigsawHole c\n// A hole may share a name with a pool.\nJigsawHole tops\n"+pool("tops"))
+	var got []string
+	for _, d := range r.Diagnostics("main.mms") {
+		if d.Severity == syntax.SeverityError {
+			got = append(got, d.Code+": "+d.Message)
+		}
+	}
+	want := []string{
+		"mms/syntax: a JigsawHole is only a name; write `JigsawHole a` with nothing after it",
+		"mms/syntax: a JigsawHole is only a name; write `JigsawHole b` with nothing after it",
+		"mms/duplicate: JigsawHole 'demo:c' is already declared in main.mms",
+	}
+	if strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Fatalf("got:\n%s\nwant:\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
 	}
 }

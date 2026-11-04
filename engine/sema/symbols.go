@@ -37,13 +37,20 @@ type Table struct {
 
 func key(folder, id string) string { return folder + "|" + id }
 
+// ownKey reports whether a kind's names live apart from every resource
+// folder: an objective, a global and a jigsaw hole may share a name with
+// a function or anything else.
+func ownKey(k Kind) bool {
+	return k.MMS == "Objective" || k.MMS == "Global" || k.MMS == JigsawHoleKind
+}
+
 // Find returns the symbol of a resource folder ("worldgen/noise") and id.
 func (t *Table) Find(folder, id string) *Symbol { return t.byKey[key(folder, id)] }
 
 // Same returns this table's symbol for the declaration s names, which may
 // come from an earlier table, or nil when it is no longer declared.
 func (t *Table) Same(s *Symbol) *Symbol {
-	if s.Kind.MMS == "Objective" || s.Kind.MMS == "Global" {
+	if ownKey(s.Kind) {
 		return t.byKey[key(s.Kind.MMS, s.ID())]
 	}
 	return t.byKey[key(s.Kind.Folder(), s.ID())]
@@ -141,7 +148,7 @@ func Collect(units []*Unit, kinds *Kinds, defaultNS string) (*Table, map[string]
 			}
 			sym := &Symbol{NS: sns, Path: path, Kind: k, Decl: d, Unit: u}
 			kk := key(k.Folder(), sym.ID())
-			if k.MMS == "Objective" || k.MMS == "Global" {
+			if ownKey(k) {
 				kk = key(k.MMS, sym.ID())
 			}
 			if prev, dup := t.byKey[kk]; dup {

@@ -10,6 +10,7 @@ import (
 
 	"github.com/minecraftmetascript/mms/engine/jsonv"
 	"github.com/minecraftmetascript/mms/engine/nbt"
+	"github.com/minecraftmetascript/mms/engine/sema"
 	"github.com/minecraftmetascript/mms/engine/syntax"
 )
 
@@ -33,6 +34,9 @@ type Jigsaw struct {
 	// down facing jigsaw block may turn. The game defaults it to aligned
 	// for sideways facing blocks and rollable for up or down ones.
 	Joint string
+	// FinalState is the block the jigsaw block turns into once the
+	// structure is placed, such as minecraft:air.
+	FinalState string
 }
 
 // structureCache holds parsed structure files by path, size and
@@ -139,6 +143,7 @@ func Jigsaws(root map[string]any) []Jigsaw {
 		}
 		j := Jigsaw{Pool: nbtID(data["pool"]), Name: nbtID(data["name"]), Target: nbtID(data["target"]), Orientation: orientation}
 		j.Joint, _ = data["joint"].(string)
+		j.FinalState, _ = data["final_state"].(string)
 		if j.Joint == "" && orientation != "" {
 			if strings.HasPrefix(orientation, "up_") || strings.HasPrefix(orientation, "down_") {
 				j.Joint = "rollable"
@@ -777,4 +782,96 @@ func lintJigsawOverlap(l *lintRun) {
 			}
 		}
 	}
+}
+
+// lintJigsawHole reports a jigsaw block whose name or target is in a
+// namespace that declares JigsawHoles but is not one of them. Holes
+// are opt-in: a namespace without any is not checked.
+func lintJigsawHole(l *lintRun) {
+	holes, nsHas := map[string]bool{}, map[string]bool{}
+	for _, s := range l.r.Syms.All() {
+		if s.Kind.MMS == sema.JigsawHoleKind {
+			holes[s.ID()] = true
+			nsHas[s.NS] = true
+		}
+	}
+	if len(holes) == 0 {
+		return
+	}
+	for _, s := range l.jigsaws().uses {
+		reported := map[string]bool{}
+		for _, j := range s.jigsaws {
+			for _, f := range []struct{ field, id string }{{"name", j.Name}, {"target", j.Target}} {
+				ns, _, _ := strings.Cut(f.id, ":")
+				if !nsHas[ns] || holes[f.id] || reported[f.id] {
+					continue
+				}
+				reported[f.id] = true
+				d := syntax.Diagnostic{
+					Code: "lint/" + l.rule.ID, Severity: l.sev, Sp: s.sp,
+					Message: fmt.Sprintf("'%s' has a jigsaw block at %s whose %s is '%s', which is not a declared JigsawHole%s", s.Src, posText(j.Pos), f.field, f.id, nearHole(f.id, holes)),
+				}
+				if fix, ok := l.r.newHoleFix(s, f.id); ok {
+					d.Fixes = []syntax.Fix{fix}
+				}
+				l.out[s.decl.Unit.Path] = append(l.out[s.decl.Unit.Path], d)
+			}
+		}
+	}
+}
+
+// nearHole suggests the declared hole closest to id, for a typo.
+func nearHole(id string, holes map[string]bool) string {
+	best, bestD := "", 3
+	for h := range holes {
+		if d := editDistance(id, h); d < bestD || (d == bestD && best != "" && h < best) {
+			best, bestD = h, d
+		}
+	}
+	if best == "" {
+		return ""
+	}
+	return fmt.Sprintf(" (did you mean '%s'?)", best)
+}
+
+func editDistance(a, b string) int {
+	prev := make([]int, len(b)+1)
+	for j := range prev {
+		prev[j] = j
+	}
+	for i := 1; i <= len(a); i++ {
+		cur := make([]int, len(b)+1)
+		cur[0] = i
+		for j := 1; j <= len(b); j++ {
+			cost := 1
+			if a[i-1] == b[j-1] {
+				cost = 0
+			}
+			cur[j] = min(prev[j]+1, cur[j-1]+1, prev[j-1]+cost)
+		}
+		prev = cur
+	}
+	return prev[len(b)]
+}
+
+// newHoleFix adds `JigsawHole name` at the end of the file of the
+// Structure call, when that file ends in the hole's namespace.
+func (r *Result) newHoleFix(s *structureUse, id string) (syntax.Fix, bool) {
+	ns, name, _ := strings.Cut(id, ":")
+	var last *Decl
+	for _, d := range r.Order {
+		if d.Unit == s.decl.Unit {
+			last = d
+		}
+	}
+	if last == nil || last.NS != ns {
+		return syntax.Fix{}, false
+	}
+	src := s.decl.Unit.File.Src
+	text := fmt.Sprintf("\nJigsawHole %s\n", name)
+	if len(src) > 0 && src[len(src)-1] != '\n' {
+		text = "\n" + text
+	}
+	end := len(src)
+	return syntax.Fix{Title: fmt.Sprintf("Declare JigsawHole %s", name), Edits: []syntax.TextEdit{{Sp: syntax.Span{Start: end, End: end}, Text: text}}}, true
 }

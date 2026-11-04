@@ -14,5 +14,5 @@
 			"deepslate": ["../node_modules/deepslate"]
 		}
 	},
-	"include": ["*.ts", "*.svelte", "../src/messages.ts"]
+	"include": ["*.ts", "*.svelte", "../src/messages.ts", "../src/jigsawGive.ts"]
 }
