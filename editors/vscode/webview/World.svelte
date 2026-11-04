@@ -301,7 +301,7 @@
 				<p class="muted small">
 					{s.structures.length ? (waiting ? `${waiting} to import` : 'All imported') : ''}
 					{#if unused}
-						{s.structures.length ? ' · ' : ''}<span class="warn-text">{unused} not used</span>: no <code>Structure(...)</code> call uses {unused === 1 ? 'it' : 'them'}, so the pack leaves {unused === 1 ? 'it' : 'them'} out. Copy a row's call into a template pool.
+						{s.structures.length ? ' · ' : ''}<span class="warn-text">{unused} not used</span>
 					{/if}
 					{#if s.unusedPaused}(The not-used check waits until the project has no errors.){/if}
 				</p>
@@ -312,7 +312,7 @@
 						<li>
 							<div class="item" style:--depth={0} tabindex="0" role="treeitem" aria-selected="false" title={`${rel}\nNot saved in ${from.name}, and no Structure(...) call uses it, so the pack leaves it out.`} oncontextmenu={(e) => openMenu(e, items)}>
 								<span class="twistie"></span>
-								<span class="label warn-text">{rel}</span>
+								<span class="label warn-text missing">{rel}</span>
 								<span class="desc"><span class="warn-text">not used</span> · not in world</span>
 								<span class="actions-inline">
 									<button class="icon-btn" title="More actions" aria-label="More actions for {rel}" aria-haspopup="menu" onclick={(e) => openMenu(e, items)}>{@render icon('more')}</button>
@@ -636,6 +636,10 @@
 	}
 	.warn-text {
 		color: var(--vscode-editorWarning-foreground);
+	}
+	/* In the project but not saved in the structure world. */
+	.missing {
+		font-style: italic;
 	}
 	.more {
 		opacity: 0.45;
