@@ -11,7 +11,7 @@ repository = "https://github.com/MinecraftMetascript/mms"
 # (editors/zed/README.md, "Changing the grammar").
 [grammars.mms]
 repository = "https://github.com/MinecraftMetascript/mms"
-rev = "0815c34abd5868966a48db3201d0c2816dd9ba49"
+rev = "e7cf26f1792f4ebeca2b7f44907b0223fcdfd9f7"
 path = "editors/tree-sitter-mms"
 
 # Book markup (.mmsbook) is close enough to Markdown for its block grammar
