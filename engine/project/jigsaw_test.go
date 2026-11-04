@@ -311,6 +311,26 @@ func TestJigsawHole(t *testing.T) {
 	if got := diagText(r); got != "" {
 		t.Fatalf("after fix: %s", got)
 	}
+	// A file that ends in another namespace gets the full id, so the fix
+	// still declares the missing hole; minecraft:empty is never reported,
+	// even with a minecraft hole declared.
+	_, r = assetProject(t, files, src+"JigsawHole bottom\nJigsawHole top\nJigsawHole minecraft:side\nNamespace other\n")
+	found := 0
+	for _, d := range r.Diagnostics("main.mms") {
+		if d.Code != "lint/jigsaw-hole" {
+			continue
+		}
+		if strings.Contains(d.Message, "minecraft:empty") {
+			t.Fatalf("reported minecraft:empty: %s", d.Message)
+		}
+		if len(d.Fixes) == 0 || d.Fixes[0].Edits[0].Text != "\nJigsawHole demo:botom\n" {
+			t.Fatalf("fixes: %+v", d.Fixes)
+		}
+		found++
+	}
+	if found != 1 {
+		t.Fatalf("want 1 jigsaw-hole finding, got %d", found)
+	}
 }
 
 // A JigsawHole is only a name: a value, body or duplicate is an error.

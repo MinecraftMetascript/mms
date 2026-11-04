@@ -226,13 +226,13 @@ async function reveal(uri: string, range: { start: { line: number; character: nu
 	await vscode.window.showTextDocument(doc, { selection: new vscode.Range(at, at), preview: true });
 }
 
-/** The namespace in a project's mms.json, if it can be read. */
-function namespace(project: string): string | undefined {
+/** The namespace in a project's mms.json, or mms, the engine's default. */
+function namespace(project: string): string {
 	try {
 		const ns = JSON.parse(fs.readFileSync(path.join(project, 'mms.json'), 'utf8')).namespace;
-		return typeof ns === 'string' ? ns : undefined;
+		return typeof ns === 'string' && ns ? ns : 'mms';
 	} catch {
-		return undefined;
+		return 'mms';
 	}
 }
 

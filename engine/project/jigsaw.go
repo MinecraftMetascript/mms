@@ -803,7 +803,7 @@ func lintJigsawHole(l *lintRun) {
 		for _, j := range s.jigsaws {
 			for _, f := range []struct{ field, id string }{{"name", j.Name}, {"target", j.Target}} {
 				ns, _, _ := strings.Cut(f.id, ":")
-				if !nsHas[ns] || holes[f.id] || reported[f.id] {
+				if f.id == "minecraft:empty" || !nsHas[ns] || holes[f.id] || reported[f.id] {
 					continue
 				}
 				reported[f.id] = true
@@ -855,23 +855,27 @@ func editDistance(a, b string) int {
 }
 
 // newHoleFix adds `JigsawHole name` at the end of the file of the
-// Structure call, when that file ends in the hole's namespace.
+// Structure call: the bare name when the file ends in the hole's
+// namespace, else the full id.
 func (r *Result) newHoleFix(s *structureUse, id string) (syntax.Fix, bool) {
 	ns, name, _ := strings.Cut(id, ":")
-	var last *Decl
-	for _, d := range r.Order {
-		if d.Unit == s.decl.Unit {
-			last = d
+	// The namespace in force at the end of the file: the last Namespace
+	// declaration's, or the project's.
+	end := r.cfg.Namespace
+	for _, d := range s.decl.Unit.File.Decls {
+		if d.Kind != nil && d.Kind.Name == "Namespace" && d.Name != nil {
+			end = d.Name.Text
 		}
 	}
-	if last == nil || last.NS != ns {
-		return syntax.Fix{}, false
+	decl := name
+	if end != ns {
+		decl = id
 	}
 	src := s.decl.Unit.File.Src
-	text := fmt.Sprintf("\nJigsawHole %s\n", name)
+	text := fmt.Sprintf("\nJigsawHole %s\n", decl)
 	if len(src) > 0 && src[len(src)-1] != '\n' {
 		text = "\n" + text
 	}
-	end := len(src)
-	return syntax.Fix{Title: fmt.Sprintf("Declare JigsawHole %s", name), Edits: []syntax.TextEdit{{Sp: syntax.Span{Start: end, End: end}, Text: text}}}, true
+	at := len(src)
+	return syntax.Fix{Title: fmt.Sprintf("Declare JigsawHole %s", decl), Edits: []syntax.TextEdit{{Sp: syntax.Span{Start: at, End: at}, Text: text}}}, true
 }

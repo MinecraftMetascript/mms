@@ -104,6 +104,8 @@
 		items[(at + (e.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length]?.focus();
 	}
 	function rowKey(e: KeyboardEvent, config: JigsawConfig, items: MenuItem[]) {
+		// Keys on the row's own buttons are theirs.
+		if (e.target !== e.currentTarget) return;
 		if (e.key === 'Enter' || e.key === ' ') {
 			e.preventDefault();
 			load(config);
