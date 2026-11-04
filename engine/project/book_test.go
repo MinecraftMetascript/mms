@@ -254,3 +254,73 @@ func TestBookFileByURI(t *testing.T) {
 		t.Fatalf("diagnostics = %+v", ds)
 	}
 }
+
+// TestBookRawPageValues checks raw text components in pages: string enums
+// such as click and hover actions stay unnamespaced (the game rejects
+// "minecraft:show_text"), and colors take "#hex" strings.
+func TestBookRawPageValues(t *testing.T) {
+	const src = `Book manual = {
+  title = "Builders Manual"
+  author = "Shuckle I"
+  pages = [
+    {
+      text = "Hi!"
+      hover_event = { action = show_text, value = "Yeet!" }
+      click_event = { action = "minecraft:run_command", command = "/say hi" }
+    },
+    { text = "a", click_event = { action = change_page, page = 1 }, hover_event = { action = show_item, id = diamond } },
+    { type = nbt, nbt = "x", source = storage, storage = "minecraft:s" },
+    { text = "b", shadow_color = "#80FF0000", color = red },
+    { text = "c", shadow_color = "#FF0000" },
+    { text = "d", shadow_color = [1, 0, 0, 0.5] },
+  ]
+}
+LootTable chest { pools = [Pool(1, [manual])] }
+`
+	_, r := bookProject(t, src, nil)
+	if d := diagText(r); d != "" {
+		t.Fatalf("unexpected diagnostics:\n%s", d)
+	}
+	pages, _ := json.Marshal(pagesOf(t, emitted(t, r, "data/demo/loot_table/chest.json")))
+	for _, want := range []string{
+		`"hover_event":{"action":"show_text","value":"Yeet!"}`,
+		`"click_event":{"action":"run_command","command":"/say hi"}`,
+		`"click_event":{"action":"change_page","page":1}`,
+		`"hover_event":{"action":"show_item","id":"minecraft:diamond"}`,
+		`"source":"storage"`, `"type":"nbt"`, `"color":"red"`,
+		`"shadow_color":-2130771968`, `"shadow_color":-65536`, `"shadow_color":[1,0,0,0.5]`,
+	} {
+		if !strings.Contains(string(pages), want) {
+			t.Errorf("pages lack %s:\n%s", want, pages)
+		}
+	}
+	if strings.Contains(string(pages), `"minecraft:show`) || strings.Contains(string(pages), `"minecraft:run`) || strings.Contains(string(pages), `"minecraft:change`) {
+		t.Errorf("namespaced action:\n%s", pages)
+	}
+}
+
+func TestColorErrors(t *testing.T) {
+	for _, tc := range []struct{ value, want string }{
+		{`"#FF00"`, `expected an RGBA color such as "#RRGGBB" or "#AARRGGBB", got string "#FF00"`},
+		{`red`, `expected an RGBA color, got 'red'. Write a color as "#RRGGBB" or "#AARRGGBB"`},
+		{`[1, 0, 0]`, `list must have 4 items, got 3`},
+	} {
+		_, r := bookProject(t, `Book b = { title = "T", author = "A", pages = [{ text = "x", shadow_color = `+tc.value+` }] }`, nil)
+		if d := diagText(r); !strings.Contains(d, tc.want) {
+			t.Errorf("%s: diagnostics %q lack %q", tc.value, d, tc.want)
+		}
+	}
+	// A biome's colors are read as "#RRGGBB" strings by the game, so the
+	// string is kept, but an alpha is not allowed.
+	_, r := bookProject(t, `Biome b { temperature = 1, downfall = 0, has_precipitation = false, carvers = [], features = [], effects = { water_color = "#3F76E4" } }`, nil)
+	if d := diagText(r); d != "" {
+		t.Fatalf("biome: %s", d)
+	}
+	if b := emitted(t, r, "data/demo/worldgen/biome/b.json"); !strings.Contains(b, `"water_color": "#3F76E4"`) {
+		t.Errorf("biome:\n%s", b)
+	}
+	_, r = bookProject(t, `Biome b { temperature = 1, downfall = 0, has_precipitation = false, carvers = [], features = [], effects = { water_color = "#803F76E4" } }`, nil)
+	if d := diagText(r); !strings.Contains(d, `expected an RGB color such as "#RRGGBB"`) {
+		t.Errorf("biome alpha: %s", d)
+	}
+}

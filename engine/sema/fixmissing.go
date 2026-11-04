@@ -126,6 +126,9 @@ func (c *Checker) placeholder(v tview, depth int) string {
 	if v.T == nil || depth > 8 {
 		return "{}"
 	}
+	if _, ok := colorOf(v); ok {
+		return colorPlaceholder
+	}
 	t := v.T
 	switch t.Kind {
 	case "boolean":

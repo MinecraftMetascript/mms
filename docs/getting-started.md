@@ -116,6 +116,8 @@ The [`treasure`](../examples/treasure/) and [`functions-advanced`](../examples/f
 
 - **Object literals** mirror the JSON: `{ key = value }`. Fields are separated by newlines or commas.
 - **Lists** are `[a, b, c]`.
+- **Enum values** are bare words: `action = show_text`, `color = red`. They are written exactly as the game spells them; only ids get `minecraft:`.
+- **Colors** (fields such as `shadow_color` or a biome's `water_color`) take `"#RRGGBB"`, or `"#AARRGGBB"` where the color has an alpha (alpha first, so `"#80FF0000"` is half-transparent red). The game's own forms work too: an integer, or `[r, g, b]` / `[r, g, b, a]` with each part from 0 to 1. MMS writes a `"#hex"` string as the integer where the game wants one.
 - **Ids** can drop `minecraft:`. A bare name such as `diamond` or `#gems` means your own declaration if one exists, otherwise the vanilla one.
 - **Helpers** build typed objects: `Pool(...)` is a loot pool, and `Noise(...)` is `{ type = noise, ... }`. Every dispatched type has a helper named after its type, and arguments can be positional or named. See [Writing resources](resources.md) and the [reference](https://minecraftmetascript.github.io/mms/docs/reference).
 

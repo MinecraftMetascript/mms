@@ -42,6 +42,8 @@ func TestMissingFieldFix(t *testing.T) {
 		{"DensityFunction d = Noise()\n", `DensityFunction d = Noise(noise = "", xz_scale = 0, y_scale = 0)` + "\n"},
 		// Unions start from their simplest member: a number provider is a number.
 		{"LootTable t = { pools = [{ entries = [] }] }\n", "LootTable t = { pools = [{ entries = [], rolls = 0 }] }\n"},
+		// Colors start as opaque white, in the "#hex" form.
+		{"Biome b { temperature = 0, downfall = 0, has_precipitation = false, carvers = [], features = [], effects = {} }\n", "Biome b { temperature = 0, downfall = 0, has_precipitation = false, carvers = [], features = [], effects = { water_color = \"#FFFFFF\" } }\n"},
 		{"Biome b {\n  temperature = 1\n}\n", "Biome b {\n  temperature = 1\n  downfall = 0\n  has_precipitation = false\n  effects = {}\n  carvers = []\n  features = []\n}\n"},
 	}
 	for _, c := range cases {

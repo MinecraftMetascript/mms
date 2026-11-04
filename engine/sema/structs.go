@@ -99,6 +99,22 @@ func (c *Checker) caseKeyOf(e syntax.Expr, disp *dispInfo) string {
 	return key
 }
 
+// keyValue is the JSON written for a dispatch key. A key field typed as
+// a string enum, such as a text component's hover_event and click_event
+// `action`, holds plain strings (`show_text`), so it is written as the
+// enum spells it; ids from a registry get the minecraft namespace.
+func (d *dispInfo) keyValue(key string) string {
+	if d.KeyEnum != nil {
+		bare := strings.TrimPrefix(key, "minecraft:")
+		for _, s := range d.KeyEnum {
+			if strings.TrimPrefix(s, "minecraft:") == bare {
+				return s
+			}
+		}
+	}
+	return "minecraft:" + key
+}
+
 // buildStruct turns assignments into an object in schema field order,
 // checking each value at its field's type and reporting missing and
 // unknown fields.
@@ -122,7 +138,7 @@ func (c *Checker) buildStruct(fs []field, disp *dispInfo, caseKey string, as []a
 		if disp != nil && f.Key == disp.KeyField {
 			used[f.Key] = true
 			if caseKey != "" {
-				o.Set(f.Key, jsonv.String("minecraft:"+caseKey))
+				o.Set(f.Key, jsonv.String(disp.keyValue(caseKey)))
 			} else if a := byKey[f.Key]; a != nil {
 				o.Set(f.Key, c.check(a.expr, f.Type))
 			} else if !f.Optional {
