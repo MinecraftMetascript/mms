@@ -277,6 +277,19 @@ Book guide = {
 | `pages` | the pages as text components, for full control, instead of `text` |
 | `components` | more item components, such as `lore`, given to every use |
 
+Raw `pages` are text components written as MMS objects, so click and hover events read like the JSON:
+
+```
+pages = [
+  {
+    text = "Hi!"
+    shadow_color = "#80000000"
+    hover_event = { action = show_text, value = "Yeet!" }
+    click_event = { action = change_page, page = 2 }
+  },
+]
+```
+
 The book's name stands for the book wherever a [custom item](#custom-items) name works: `guide` in a loot entry, `guide * 2` as a recipe result, and `${guide}` in `/give @s ${guide}`.
 
 ### Book markup

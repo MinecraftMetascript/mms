@@ -60,3 +60,15 @@ func TestCustomItemInlayHint(t *testing.T) {
 		t.Errorf("hint after %q", got)
 	}
 }
+
+func TestColorHover(t *testing.T) {
+	for _, tc := range []struct{ src, want string }{
+		{`Book b = { title = "T", author = "A", pages = [{ text = "x", shadow_co|lor = "#FF0000" }] }`, `"#AARRGGBB"`},
+		{`Biome b { effects = { water_co|lor = "#3F76E4" } }`, `"#RRGGBB"`},
+	} {
+		s, off := session(t, tc.src)
+		if h, _ := s.Hover("main.mms", off); !strings.Contains(h, tc.want) || !strings.Contains(h, "from 0 to 1") {
+			t.Errorf("%q: hover = %q, want %q", tc.src, h, tc.want)
+		}
+	}
+}

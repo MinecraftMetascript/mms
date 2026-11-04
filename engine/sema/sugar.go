@@ -196,6 +196,10 @@ func (c *Checker) sugar(e syntax.Expr, v tview) *sugarRule {
 		if b, ok := e.(*syntax.Binary); ok && b.Op == "*" && isID(b.L) && isNumber(b.R) {
 			return &sugarRule{stackCount}
 		}
+	case tRGB, tRGBA, tStringRGB, tStringARGB:
+		if isColorHexString(e) {
+			return &sugarRule{colorHex}
+		}
 	case tCriterion:
 		if x, ok := e.(*syntax.Call); ok {
 			if id, ok := x.Fn.(*syntax.Ident); ok && id.Name != "AdvancementCriterion" {

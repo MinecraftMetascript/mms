@@ -213,7 +213,7 @@ func (c *Checker) FieldCandidates(in *Info, present map[string]bool, call bool) 
 		if f.Optional {
 			rank = 2
 		}
-		out = append(out, Candidate{Label: f.Key, Kind: CandField, Insert: f.Key + " = $1", Detail: describe(f.Type), Doc: f.Desc, Rank: rank})
+		out = append(out, Candidate{Label: f.Key, Kind: CandField, Insert: f.Key + " = $1", Detail: describe(f.Type), Doc: withColorHelp(f.Desc, f.Type), Rank: rank})
 	}
 	// A map's keys, such as an enchantment's effect components or a
 	// biome's attributes, when the key type lists them.
@@ -402,6 +402,9 @@ func (c *Checker) Hover(in *Info) string {
 		if in.Field.Desc != "" {
 			parts = append(parts, in.Field.Desc)
 		}
+		if ct, ok := colorOf(in.Field.Type); ok {
+			parts = append(parts, ct.help())
+		}
 	case in.Symbol != nil:
 		s := in.Symbol
 		parts = append(parts, "```mms\n"+SymbolHead(s.Kind.Name, s.ID(), s.Decl)+"\n```")
@@ -428,6 +431,9 @@ func (c *Checker) Hover(in *Info) string {
 		}
 	case in.typed:
 		parts = append(parts, "Expected: "+describe(in.Type))
+		if ct, ok := colorOf(in.Type); ok {
+			parts = append(parts, ct.help())
+		}
 	}
 	return strings.Join(parts, "\n\n")
 }

@@ -306,10 +306,22 @@ func (c *Checker) check(e syntax.Expr, v tview) jsonv.Value {
 }
 
 func (c *Checker) mismatch(e syntax.Expr, v tview) {
-	c.errorf("mms/type-mismatch", e.Span(), "expected %s, got %s", describe(v), exprKind(e))
+	c.errorf("mms/type-mismatch", e.Span(), "expected %s, got %s%s", describe(v), exprKind(e), colorHint(v))
+}
+
+// colorHint is how to write a color, appended to an error at a color
+// type; "" elsewhere.
+func colorHint(v tview) string {
+	if ct, ok := colorOf(v); ok {
+		return ". " + strings.ReplaceAll(ct.help(), "`", "")
+	}
+	return ""
 }
 
 func describe(v tview) string {
+	if ct, ok := colorOf(v); ok {
+		return ct.name()
+	}
 	if v.Name != "" {
 		return spec.ShortPath(v.Name)
 	}
@@ -341,6 +353,14 @@ func rangeText(r *spec.Range) string {
 		return ""
 	}
 	return " in " + strings.TrimPrefix(spec.Format(&spec.Type{Kind: "int", ValueRange: r}, 0), "int @ ")
+}
+
+// lengthText is a list length range in words: "4", "1 to 3", "at least 1".
+func lengthText(r *spec.Range) string {
+	if r.Min != nil && r.Max != nil && *r.Min == *r.Max && r.Kind == 0 {
+		return strconv.FormatFloat(*r.Min, 'f', -1, 64)
+	}
+	return strings.TrimPrefix(rangeText(r), " in ")
 }
 
 func exprKind(e syntax.Expr) string {
@@ -412,7 +432,7 @@ func (c *Checker) union(e syntax.Expr, v tview) jsonv.Value {
 			c.errorf("mms/unknown-callable", id.Sp, "%s", msg)
 			return nil
 		}
-		c.errorf("mms/type-mismatch", e.Span(), "expected %s, got %s", unionText(v), exprKind(e))
+		c.errorf("mms/type-mismatch", e.Span(), "expected %s, got %s%s", unionText(v), exprKind(e), colorHint(v))
 		return nil
 	case 1:
 		return c.check(e, cands[0])
@@ -431,6 +451,9 @@ func (c *Checker) union(e syntax.Expr, v tview) jsonv.Value {
 }
 
 func unionText(v tview) string {
+	if ct, ok := colorOf(v); ok {
+		return ct.name()
+	}
 	if v.Name != "" {
 		return spec.ShortPath(v.Name)
 	}
@@ -580,7 +603,7 @@ func (c *Checker) listValue(e syntax.Expr, v tview) jsonv.Value {
 	if r := v.T.LengthRange; r != nil {
 		n := float64(len(l.Elems))
 		if (r.Min != nil && n < *r.Min) || (r.Max != nil && n > *r.Max) {
-			c.errorf("mms/out-of-range", l.Sp, "list must have%s items, got %d", rangeText(r), len(l.Elems))
+			c.errorf("mms/out-of-range", l.Sp, "list must have %s items, got %d", lengthText(r), len(l.Elems))
 		}
 	}
 	return out
