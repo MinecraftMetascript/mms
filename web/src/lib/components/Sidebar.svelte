@@ -1,9 +1,9 @@
 <script lang="ts">
-	import type { DocSymbol, Diagnostic, Engine, OutputFile } from '../engine/engine.svelte';
+	import { itemKey, type DocSymbol, type Diagnostic, type Engine, type OutputFile } from '../engine/engine.svelte';
 	import { assetExtensions, isAssetPath, uriOf, type Project } from '../project/project.svelte';
 	import { toBase64 } from '../project/base64';
 	import Tree from './Tree.svelte';
-	import { buildTree } from './tree';
+	import { buildTree, type Node } from '@mms/preview/tree';
 
 	interface Props {
 		project: Project;
@@ -28,7 +28,14 @@
 		return { errors, warnings };
 	};
 
-	const packTree = $derived(buildTree(engine.output.map((f: OutputFile) => f.path)));
+	// Each pack is its own tree: both have a pack.mcmeta, and the resource
+	// pack is a separate download. Leaves carry the output's key.
+	const packTree = (pack?: string) =>
+		buildTree(engine.output.filter((f: OutputFile) => f.pack === pack).map((f: OutputFile) => f.path)).map(function rekey(n): Node {
+			return { ...n, path: pack ? `${pack}/${n.path}` : n.path, children: n.children.map(rekey) };
+		});
+	const dataTree = $derived(packTree(undefined));
+	const resourceTree = $derived(packTree('resources'));
 
 	function startRename(path: string) {
 		renaming = path;
@@ -109,14 +116,19 @@
 				<div class="px-2 pt-3 pb-0.5 text-[11px] font-medium tracking-wide text-muted uppercase">Assets</div>
 				<ul class="text-[13px]">
 					{#each project.assets as a (a.path)}
-						<li class="group flex items-center rounded hover:bg-hover" title="Use it with Texture(&quot;{a.path}&quot;) or Sound(&quot;{a.path}&quot;)">
+						{@const unused = engine.unusedAssets.includes(a.path)}
+						<li
+							class="group flex items-center rounded hover:bg-hover"
+							title="{unused ? 'Not used, so the pack leaves it out. ' : ''}Use it with {a.path.endsWith('.nbt') ? 'Structure' : a.path.endsWith('.ogg') ? 'Sound' : 'Texture'}(&quot;{a.path}&quot;)"
+						>
 							<span class="flex min-w-0 flex-1 items-center gap-1.5 px-2 py-0.5">
 								{#if a.path.endsWith('.png')}
 									<img class="size-4 shrink-0 [image-rendering:pixelated]" src="data:image/png;base64,{a.data}" alt="" />
 								{:else}
 									<span class="w-4 shrink-0 text-center text-[10px] text-muted">{a.path.endsWith('.ogg') ? '♪' : '▦'}</span>
 								{/if}
-								<span class="truncate">{a.path}</span>
+								<span class="truncate {unused ? 'text-muted' : ''}">{a.path}</span>
+								{#if unused}<span class="shrink-0 rounded bg-hover px-1 text-[10px] text-muted">unused</span>{/if}
 							</span>
 							<button class="hidden px-1.5 text-muted group-hover:block hover:text-red-600" title="Delete" aria-label="Delete {a.path}" onclick={() => removeAsset(a.path)}>×</button>
 						</li>
@@ -126,8 +138,30 @@
 			<button class="w-full rounded px-2 py-1 text-left text-[13px] text-accent hover:bg-hover" onclick={() => assetInput?.click()}>+ Add texture or sound</button>
 			<input type="file" multiple accept={assetExtensions.join(',')} class="hidden" bind:this={assetInput} onchange={addAssets} />
 		{:else if tab === 'pack'}
-			{#if engine.output.length}
-				<Tree nodes={packTree} selected={selectedOutput} onselect={onoutput} />
+			{#if engine.output.length || engine.outputItems.length}
+				{#if resourceTree.length || engine.outputItems.length}
+					<div class="px-2 pt-1 pb-0.5 text-[11px] font-medium tracking-wide text-muted uppercase">Data pack</div>
+				{/if}
+				<Tree nodes={dataTree} selected={selectedOutput} onselect={onoutput} />
+				{#if resourceTree.length}
+					<div class="px-2 pt-3 pb-0.5 text-[11px] font-medium tracking-wide text-muted uppercase">Resource pack</div>
+					<Tree nodes={resourceTree} selected={selectedOutput} onselect={onoutput} />
+				{/if}
+				{#if engine.outputItems.length}
+					<div class="px-2 pt-3 pb-0.5 text-[11px] font-medium tracking-wide text-muted uppercase" title="A custom item is not a file: its name stands for this item stack in recipes, loot tables and commands">Custom items</div>
+					<ul class="text-[13px]">
+						{#each engine.outputItems as it (it.id)}
+							<li>
+								<button
+									class="flex w-full items-center truncate rounded px-2 py-0.5 text-left hover:bg-hover"
+									class:bg-selected={selectedOutput === itemKey(it)}
+									title={it.snbt}
+									onclick={() => onoutput(itemKey(it))}>{it.id}</button
+								>
+							</li>
+						{/each}
+					</ul>
+				{/if}
 			{:else}
 				<p class="p-2 text-xs text-muted">Nothing generated yet.</p>
 			{/if}

@@ -1,0 +1,10 @@
+name = "MMS Book"
+grammar = "markdown"
+path_suffixes = ["mmsbook"]
+soft_wrap = "editor_width"
+autoclose_before = ";:.,=}])>"
+brackets = [
+  { start = "{", end = "}", close = true, newline = false },
+  { start = "[", end = "]", close = true, newline = false },
+  { start = "(", end = ")", close = true, newline = false },
+]

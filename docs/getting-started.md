@@ -4,9 +4,9 @@ MMS is a small language that compiles to Minecraft Java Edition data packs. You 
 
 ## Install
 
-- **In the browser:** the [editor](https://minecraftmetascript.github.io/mms/) needs no install. Projects are saved in your browser, and **Download pack** gives you the data pack as a zip.
+- **In the browser:** the [editor](https://minecraftmetascript.github.io/mms/) needs no install. Projects are saved in your browser (click the project name to switch between them), and **Download pack** gives you the data pack as a zip.
 - **Command line:** download `mms` for your system from the [releases page](https://github.com/MinecraftMetascript/mms/releases). Or, with Go installed, run `go install github.com/minecraftmetascript/mms/engine/cmd/mms@latest`.
-- **VS Code:** install `mms-*.vsix` from the same release, through **Extensions → … → Install from VSIX**. It runs `mms lsp`, so `mms` must be on your `PATH`, or set in `mms.path`.
+- **VS Code:** install the `.vsix` for your system from the same release, such as `mms-win32-x64-1.0.0.vsix` or `mms-darwin-arm64-1.0.0.vsix`, through **Extensions → … → Install from VSIX**. It includes `mms`, so you do not need the command line to use the editor. (The universal `mms-1.0.0.vsix` does not, and runs `mms` from your `PATH` or `mms.path`.)
 - **Zed:** install `editors/zed` from a checkout with **zed: install dev extension** (see [its README](https://github.com/MinecraftMetascript/mms/tree/main/editors/zed#readme)). It uses `mms` from your `PATH`, or downloads the latest release for you.
 
 ## A first project
@@ -89,6 +89,15 @@ These JSDoc-style tags are understood:
 - `@returns text` (or `@return`) describes the result.
 - `@deprecated [text]` marks the declaration as deprecated. Every use gets a `deprecated` lint warning and is struck through in the editor.
 - `@example` starts a code example, and `@see text` adds a pointer elsewhere.
+- `@label text` names an entry of a template pool's `elements` list. A doc comment works above an entry too, and the jigsaw preview and its export show its label (or else the first line of its text) next to the piece. That tells apart one structure listed several times with different processors:
+
+  ```
+  elements = [
+    WeightedElement(50, SinglePoolElement(rigid, Structure("structures/road_cap.nbt"), [])),
+    /** @label Worn road cap */
+    WeightedElement(10, SinglePoolElement(rigid, Structure("structures/road_cap.nbt"), road_wear_medium)),
+  ]
+  ```
 
 Other tags are shown as written. The formatter lines doc comments up with a ` * ` on every line and keeps the indentation inside them, so indented code and nested lists survive.
 

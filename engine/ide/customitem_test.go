@@ -47,3 +47,16 @@ func TestCustomItemEditor(t *testing.T) {
 		}
 	}
 }
+
+// A custom item used as a plain item id shows its base item after it.
+func TestCustomItemInlayHint(t *testing.T) {
+	s, _ := session(t, "CustomItem ruby = { base = emerald }\nRecipe r = Shapeless([ruby, stick], ruby * 2)\n|")
+	hints := s.InlayHints("main.mms")
+	if len(hints) != 1 || hints[0].Label != "→ emerald" {
+		t.Fatalf("hints = %+v", hints)
+	}
+	src := []rune(s.R.Unit("main.mms").File.Src)
+	if got := string(src[hints[0].Off-4 : hints[0].Off]); got != "ruby" {
+		t.Errorf("hint after %q", got)
+	}
+}

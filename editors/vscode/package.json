@@ -4,6 +4,7 @@
   "description": "Language support for Minecraft Metascript (.mms): diagnostics, completion, formatting, quick fixes and worldgen previews from the MMS language server.",
   "version": "1.0.0",
   "publisher": "minecraftmetascript",
+  "icon": "icons/mms.png",
   "license": "SEE LICENSE IN README.md",
   "repository": {
     "type": "git",
@@ -17,6 +18,7 @@
   "activationEvents": [
     "workspaceContains:**/mms.json",
     "onLanguage:mms",
+    "onLanguage:mmsbook",
     "onWebviewPanel:mms.preview"
   ],
   "contributes": {
@@ -25,7 +27,17 @@
         "id": "mms",
         "aliases": ["Minecraft Metascript", "MMS"],
         "extensions": [".mms"],
-        "configuration": "./language-configuration.json"
+        "configuration": "./language-configuration.json",
+        "icon": {
+          "light": "./icons/mms-file.svg",
+          "dark": "./icons/mms-file.svg"
+        }
+      },
+      {
+        "id": "mmsbook",
+        "aliases": ["MMS Book"],
+        "extensions": [".mmsbook"],
+        "configuration": "./language-configuration-book.json"
       }
     ],
     "jsonValidation": [
@@ -39,6 +51,11 @@
         "language": "mms",
         "scopeName": "source.mms",
         "path": "./syntaxes/mms.tmLanguage.json"
+      },
+      {
+        "language": "mmsbook",
+        "scopeName": "text.mmsbook",
+        "path": "./syntaxes/mmsbook.tmLanguage.json"
       }
     ],
     "configuration": {
@@ -47,16 +64,49 @@
         "mms.path": {
           "type": "string",
           "default": "",
-          "markdownDescription": "Path to the `mms` executable, for example `/Users/you/mms/engine/mms`. `~` and `${workspaceFolder}` are expanded. Empty means `mms` on your `PATH`, then `~/go/bin/mms` (where `go install` puts it)."
+          "markdownDescription": "Path to the `mms` executable, for example `/Users/you/mms/engine/mms`. `~` and `${workspaceFolder}` are expanded. Empty means the `mms` bundled with the extension, then `mms` on your `PATH`, then `~/go/bin/mms` (where `go install` puts it). Set it to use your own build, such as a local `go build`."
         },
         "mms.trace.server": {
           "type": "string",
           "enum": ["off", "messages", "verbose"],
           "default": "off",
           "description": "Log the messages between VS Code and the MMS language server."
+        },
+        "mms.savesFolders": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "markdownDescription": "More Minecraft `saves` folders to list worlds from in the World view, for launchers MMS does not know. The Minecraft launcher's, Prism Launcher's and MultiMC's are found by themselves. `~` is expanded."
+        },
+        "mms.structuresFolder": {
+          "type": "string",
+          "default": "structures",
+          "markdownDescription": "The project folder that structures imported from the world go in, relative to the `mms.json` folder. A structure saved as `<namespace>:houses/small` goes to `<folder>/houses/small.nbt` (a structure from another namespace goes to `<folder>-<namespace>/`, so ids from different namespaces never share a file)."
+        },
+        "mms.buildOnSave": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Build the pack into the project's chosen world each time a file of the project is saved. Choose the world in the MMS side bar's World view."
         }
       }
     },
+    "viewsContainers": {
+      "activitybar": [
+        { "id": "mms", "title": "Minecraft Metascript", "icon": "icons/sidebar.svg" }
+      ]
+    },
+    "views": {
+      "mms": [
+        { "id": "mms.world", "type": "webview", "name": "World", "icon": "icons/sidebar.svg", "initialSize": 3 },
+        { "id": "mms.pack", "name": "Pack", "icon": "icons/sidebar.svg", "initialSize": 2 }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "mms.pack",
+        "contents": "Nothing generated yet. The files the project writes appear here once the language server has read an MMS project."
+      }
+    ],
     "commands": [
       {
         "command": "mms.restartServer",
@@ -74,19 +124,51 @@
       {
         "command": "mms.previewDeclaration",
         "title": "MMS: Preview Declaration"
-      }
+      },
+      { "command": "mms.buildToWorld", "title": "MMS: Build into World", "icon": "$(play)" },
+      { "command": "mms.chooseWorld", "title": "MMS: Choose World", "icon": "$(globe)" },
+      { "command": "mms.chooseStructureWorld", "title": "MMS: Choose World to Import Structures From" },
+      { "command": "mms.chooseProject", "title": "MMS: Choose Project" },
+      { "command": "mms.revealWorld", "title": "Reveal Data Packs Folder", "icon": "$(folder-opened)" },
+      { "command": "mms.forgetWorld", "title": "Forget This World" },
+      { "command": "mms.openOutput", "title": "Open" },
+      { "command": "mms.previewOutput", "title": "Open Preview", "icon": "$(open-preview)" },
+      { "command": "mms.revealOutputSource", "title": "Go to Source", "icon": "$(go-to-file)" },
+      { "command": "mms.renameAt", "title": "MMS: Rename Extracted Declaration" },
+      { "command": "mms.importStructures", "title": "MMS: Import Structures from World…", "icon": "$(cloud-download)" }
     ],
     "menus": {
       "editor/title": [
-        { "command": "mms.showPreview", "when": "editorLangId == mms", "group": "navigation" }
+        { "command": "mms.showPreview", "when": "editorLangId == mms || editorLangId == mmsbook", "group": "navigation" }
+      ],
+      "view/title": [
+        { "command": "mms.buildToWorld", "when": "view == mms.world && mms.hasWorld", "group": "navigation@1" },
+        { "command": "mms.chooseWorld", "when": "view == mms.world && mms.hasProject", "group": "navigation@2" }
+      ],
+      "view/item/context": [
+        { "command": "mms.previewOutput", "when": "view == mms.pack && viewItem =~ /preview/", "group": "inline@1" },
+        { "command": "mms.revealOutputSource", "when": "view == mms.pack && viewItem =~ /source/", "group": "inline@2" },
+        { "command": "mms.previewOutput", "when": "view == mms.pack && viewItem =~ /preview/", "group": "1_output@1" },
+        { "command": "mms.revealOutputSource", "when": "view == mms.pack && viewItem =~ /source/", "group": "1_output@2" }
       ],
       "commandPalette": [
-        { "command": "mms.showPreview", "when": "editorLangId == mms" },
-        { "command": "mms.previewDeclaration", "when": "false" }
+        { "command": "mms.showPreview", "when": "editorLangId == mms || editorLangId == mmsbook" },
+        { "command": "mms.previewDeclaration", "when": "false" },
+        { "command": "mms.renameAt", "when": "false" },
+        { "command": "mms.importStructures", "when": "mms.hasStructureWorld" },
+        { "command": "mms.chooseStructureWorld", "when": "mms.hasProject" },
+        { "command": "mms.buildToWorld", "when": "mms.hasProject" },
+        { "command": "mms.chooseWorld", "when": "mms.hasProject" },
+        { "command": "mms.chooseProject", "when": "mms.hasProject" },
+        { "command": "mms.revealWorld", "when": "false" },
+        { "command": "mms.forgetWorld", "when": "false" },
+        { "command": "mms.openOutput", "when": "false" },
+        { "command": "mms.previewOutput", "when": "false" },
+        { "command": "mms.revealOutputSource", "when": "false" }
       ]
     },
     "keybindings": [
-      { "command": "mms.showPreview", "key": "ctrl+k v", "mac": "cmd+k v", "when": "editorLangId == mms" }
+      { "command": "mms.showPreview", "key": "ctrl+k v", "mac": "cmd+k v", "when": "editorLangId == mms || editorLangId == mmsbook" }
     ],
     "configurationDefaults": {
       "[mms]": {
@@ -98,11 +180,13 @@
     }
   },
   "scripts": {
-    "build": "npm run build:extension && npm run build:webview",
+    "build": "npm run build:extension && npm run build:webview && npm run licenses",
+    "licenses": "node ../../scripts/third-party-licenses.mjs . out/third-party-licenses.txt vscode-languageclient deepslate svelte --notice ../../packages/preview/src/vendor/cmdlib/NOTICE.md",
     "build:extension": "esbuild src/extension.ts --bundle --platform=node --format=cjs --external:vscode --outfile=out/extension.js --minify",
-    "build:webview": "vite build --config webview/vite.config.ts",
+    "build:webview": "vite build --config webview/vite.config.ts && vite build --config webview/world.vite.config.ts",
     "check": "tsc --noEmit && svelte-check --tsconfig ./webview/tsconfig.json",
-    "package": "npm run check && npm run build && vsce package --skip-license"
+    "package": "npm run check && npm run build && node -e \"require('node:fs').rmSync('bin', { recursive: true, force: true })\" && vsce package --skip-license",
+    "package:targets": "npm run check && npm run build && node scripts/package-targets.mjs"
   },
   "dependencies": {
     "vscode-languageclient": "9.0.1"

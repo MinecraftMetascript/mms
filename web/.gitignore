@@ -26,3 +26,4 @@ vite.config.ts.timestamp-*
 /static/mms.wasm
 /static/wasm_exec.js
 /src/lib/docs/reference.json
+/static/third-party-licenses.txt

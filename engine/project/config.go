@@ -6,6 +6,7 @@ package project
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/minecraftmetascript/mms/engine/sema"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -128,6 +129,11 @@ func (c Config) SourceFiles(dir string) ([]string, error) {
 					return filepath.SkipDir
 				}
 			}
+			return nil
+		}
+		if sema.IsBookFile(rel) {
+			// Book text belongs to the project wherever it is.
+			out = append(out, rel)
 			return nil
 		}
 		for _, re := range res {

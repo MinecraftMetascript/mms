@@ -1,0 +1,26 @@
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+
+version: '3'
+
+vars:
+  GREETING: Hello, world!
+
+tasks:
+  rebuild-all:
+    desc: Rebuild all components
+    cmds:
+      - task: rebuild-mms
+      - task: rebuild-vscode
+  rebuild-mms:
+    dir: engine
+    desc: Rebuild the MMS Command Line
+    cmds:
+      - go build -o ../bin/mms ./cmd/mms
+    silent: true
+
+  rebuild-vscode:
+    dir: editors/vscode
+    desc: Rebuild the VSCode Extension
+    cmds:
+      - npm install
+      - npm run build

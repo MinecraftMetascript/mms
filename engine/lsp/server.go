@@ -10,6 +10,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"testing/fstest"
@@ -17,6 +18,7 @@ import (
 
 	"github.com/minecraftmetascript/mms/engine/format"
 	"github.com/minecraftmetascript/mms/engine/ide"
+	"github.com/minecraftmetascript/mms/engine/jsonv"
 	"github.com/minecraftmetascript/mms/engine/project"
 	"github.com/minecraftmetascript/mms/engine/sema"
 	"github.com/minecraftmetascript/mms/engine/spec"
@@ -45,6 +47,9 @@ type Server struct {
 	// keeps them in the project (the browser has no disk to fall back on).
 	managed   map[string]bool
 	published map[string]bool
+	// assetDiags are the files of each project with unused-asset
+	// diagnostics published, so they clear when used again.
+	assetDiags map[*workspace]map[string]bool
 	// assets holds binary project files (textures, sounds) the browser
 	// sent with mms/setAssets, since it has no disk for Texture() to read.
 	assets   fstest.MapFS
@@ -53,11 +58,15 @@ type Server struct {
 	// watchers itself (Zed, Neovim and Helix rely on this; VS Code does
 	// too).
 	watchFiles bool
+	// renameAfterExtract is set when the client handles the mms.renameAt
+	// command (initializationOptions.renameAfterExtract), so extract
+	// actions can start a rename of the new declaration's name.
+	renameAfterExtract bool
 }
 
 // NewServer returns a server over tr checking against pack.
 func NewServer(tr Transport, pack *spec.Pack) *Server {
-	return &Server{tr: tr, pack: pack, open: map[string]bool{}, managed: map[string]bool{}, published: map[string]bool{}}
+	return &Server{tr: tr, pack: pack, open: map[string]bool{}, managed: map[string]bool{}, published: map[string]bool{}, assetDiags: map[*workspace]map[string]bool{}}
 }
 
 type message struct {
@@ -207,6 +216,7 @@ func init() {
 		"textDocument/formatting":          typed((*Server).formatting),
 		"textDocument/documentSymbol":      typed((*Server).documentSymbol),
 		"textDocument/semanticTokens/full": typed((*Server).semanticTokens),
+		"textDocument/inlayHint":           typed((*Server).inlayHint),
 		"workspace/didChangeWatchedFiles":  typed((*Server).didChangeWatched),
 		"mms/output":                       typed((*Server).output),
 		"textDocument/codeAction":          typed((*Server).codeAction),
@@ -248,12 +258,15 @@ type initializeParams struct {
 			} `json:"didChangeWatchedFiles"`
 		} `json:"workspace"`
 	} `json:"capabilities"`
+	InitializationOptions struct {
+		RenameAfterExtract bool `json:"renameAfterExtract"`
+	} `json:"initializationOptions"`
 }
 
 // watchedGlobs are the files whose changes on disk the server needs to
 // hear about: sources edited outside the editor (a git checkout, say),
 // and the assets that Texture, Sound and Structure read.
-var watchedGlobs = []string{"**/*.mms", "**/" + project.ConfigFile, "**/*.{png,ogg,nbt}"}
+var watchedGlobs = []string{"**/*.mms", "**/*" + sema.BookFileExt, "**/" + project.ConfigFile, "**/*.{png,ogg,nbt}"}
 
 // registerWatchers asks the client to send workspace/didChangeWatchedFiles
 // for watchedGlobs. Clients only watch files a server registers for, so
@@ -280,6 +293,7 @@ func (s *Server) registerWatchers() {
 
 func (s *Server) initialize(ctx context.Context, p initializeParams) (any, *respError) {
 	s.watchFiles = p.Capabilities.Workspace.DidChangeWatchedFiles.DynamicRegistration
+	s.renameAfterExtract = p.InitializationOptions.RenameAfterExtract
 	s.roots = nil
 	for _, f := range p.WorkspaceFolders {
 		if path := uriPath(f.URI); path != "" {
@@ -301,7 +315,7 @@ func (s *Server) initialize(ctx context.Context, p initializeParams) (any, *resp
 			"textDocumentSync": map[string]any{"openClose": true, "change": 2, "save": map[string]any{"includeText": false}},
 			"completionProvider": map[string]any{
 				// '"' and '/' start and continue asset file paths.
-				"triggerCharacters": []string{".", "(", ",", "=", "[", "#", ":", "\"", "/"},
+				"triggerCharacters": []string{".", "(", ",", "=", "[", "#", ":", "\"", "/", "{", "$"},
 			},
 			"hoverProvider":              true,
 			"signatureHelpProvider":      map[string]any{"triggerCharacters": []string{"(", ","}, "retriggerCharacters": []string{","}},
@@ -310,7 +324,8 @@ func (s *Server) initialize(ctx context.Context, p initializeParams) (any, *resp
 			"renameProvider":             map[string]any{"prepareProvider": true},
 			"documentFormattingProvider": true,
 			"documentSymbolProvider":     true,
-			"codeActionProvider":         map[string]any{"codeActionKinds": []string{"quickfix", "source.fixAll.mms"}},
+			"inlayHintProvider":          true,
+			"codeActionProvider":         map[string]any{"codeActionKinds": []string{"quickfix", "refactor.extract", "source.fixAll.mms"}},
 			"semanticTokensProvider": map[string]any{
 				"legend": map[string]any{"tokenTypes": ide.TokenTypes, "tokenModifiers": ide.TokenModifiers},
 				"full":   true,
@@ -430,7 +445,7 @@ func (s *Server) didChangeWatched(ctx context.Context, p struct {
 			s.removeFile(c.URI)
 			continue
 		}
-		if path != "" && strings.HasSuffix(path, ".mms") {
+		if path != "" && (strings.HasSuffix(path, ".mms") || sema.IsBookFile(path)) {
 			if w := s.projectFor(c.URI); w.contains(path) {
 				if b, err := os.ReadFile(path); err == nil {
 					w.proj.SetFile(c.URI, string(b))
@@ -538,6 +553,7 @@ func (s *Server) analyze(ctx context.Context, w *workspace) {
 		}
 		s.publish(u, ds)
 	}
+	s.publishAssets(w, r)
 	for uri := range s.published {
 		// Files that left every project are cleared too.
 		if o := s.owners[uri]; (o == w || o == nil) && !seen[uri] {
@@ -545,6 +561,31 @@ func (s *Server) analyze(ctx context.Context, w *workspace) {
 			delete(s.published, uri)
 		}
 	}
+}
+
+// publishAssets reports the project's files that nothing uses on the
+// files themselves, and clears the ones used again. Only a project on
+// disk has file URIs; the browser shows them from mms/output.
+func (s *Server) publishAssets(w *workspace, r *project.Result) {
+	now := map[string]bool{}
+	if w.root != "" {
+		paths, sev := r.UnusedAssets()
+		for _, p := range paths {
+			uri := pathURI(filepath.Join(w.root, filepath.FromSlash(p)))
+			now[uri] = true
+			s.notify("textDocument/publishDiagnostics", map[string]any{"uri": uri, "diagnostics": []any{map[string]any{
+				"range":    map[string]any{"start": Position{}, "end": Position{}},
+				"severity": int(sev), "source": "mms", "code": "lint/unused-asset", "tags": []int{1},
+				"message": project.UnusedAssetMessage(p),
+			}}})
+		}
+	}
+	for uri := range s.assetDiags[w] {
+		if !now[uri] {
+			s.notify("textDocument/publishDiagnostics", map[string]any{"uri": uri, "diagnostics": []any{}})
+		}
+	}
+	s.assetDiags[w] = now
 }
 
 func (s *Server) publish(u *sema.Unit, ds []syntax.Diagnostic) {
@@ -782,7 +823,7 @@ func (s *Server) formatting(_ context.Context, p struct {
 		return nil, nil
 	}
 	text, ok := w.proj.Text(p.TextDocument.URI)
-	if !ok {
+	if !ok || sema.IsBookFile(p.TextDocument.URI) {
 		return nil, nil
 	}
 	out, err := format.Source(text)
@@ -813,6 +854,25 @@ func (s *Server) documentSymbol(_ context.Context, p struct {
 		out = append(out, map[string]any{
 			"name": sym.Name, "detail": sym.Detail, "kind": symbolKinds[sym.Kind],
 			"range": l.rng(sym.Span), "selectionRange": l.rng(sym.Sel),
+		})
+	}
+	return out, nil
+}
+
+func (s *Server) inlayHint(_ context.Context, p struct {
+	TextDocument docID `json:"textDocument"`
+}) (any, *respError) {
+	w := s.at(p.TextDocument.URI)
+	if w == nil || w.res == nil {
+		return []any{}, nil
+	}
+	l := s.lines(p.TextDocument.URI)
+	hints := w.session().InlayHints(p.TextDocument.URI)
+	out := make([]map[string]any, 0, len(hints))
+	for _, h := range hints {
+		out = append(out, map[string]any{
+			"position": l.pos(h.Off),
+			"label":    h.Label, "tooltip": h.Tooltip, "paddingLeft": true,
 		})
 	}
 	return out, nil
@@ -903,6 +963,27 @@ func (s *Server) output(_ context.Context, p struct {
 			a := map[string]any{"path": f.Path, "src": f.Asset}
 			if f.Pack == sema.ResourcePack {
 				a["pack"] = "resources"
+			} else if structureAsset.MatchString(f.Path) {
+				// A structure file's jigsaw blocks, for the jigsaw
+				// connection preview: the editor gets the pack as JSON
+				// and cannot read the .nbt itself.
+				if js, ok := project.StructureJigsaws(w.proj.Files, f.Asset); ok {
+					list := make([]map[string]any, 0, len(js))
+					for _, j := range js {
+						m := map[string]any{"pos": j.Pos, "pool": j.Pool, "name": j.Name, "target": j.Target}
+						if j.Orientation != "" {
+							m["orientation"] = j.Orientation
+						}
+						if j.Joint != "" {
+							m["joint"] = j.Joint
+						}
+						list = append(list, m)
+					}
+					a["jigsaws"] = list
+				}
+				if size, ok := project.StructureSize(w.proj.Files, f.Asset); ok {
+					a["size"] = size
+				}
 			}
 			assets = append(assets, a)
 			continue
@@ -910,6 +991,12 @@ func (s *Server) output(_ context.Context, p struct {
 		m := map[string]any{"path": f.Path, "text": string(f.Data)}
 		if f.Pack == sema.ResourcePack {
 			m["pack"] = "resources"
+		}
+		if f.Implicit {
+			m["implicit"] = true
+		}
+		if len(f.Labels) > 0 {
+			m["labels"] = f.Labels
 		}
 		if f.Unit != "" {
 			l := idx[f.Unit]
@@ -922,8 +1009,60 @@ func (s *Server) output(_ context.Context, p struct {
 		out = append(out, m)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i]["path"].(string) < out[j]["path"].(string) })
-	return map[string]any{"files": out, "assets": assets, "hasErrors": w.res.HasErrors()}, nil
+	// A CustomItem is not a file of its own: its name stands for an item
+	// stack wherever it is used, and it writes files only for its look
+	// and name. Listing the stack lets an editor show every custom item,
+	// including one with just components.
+	items := []map[string]any{}
+	for _, d := range w.res.Order {
+		if d.Item == nil || d.Item.Stack == nil || d.Unit == nil {
+			continue
+		}
+		l := idx[d.Unit.Path]
+		if l == nil {
+			l = s.lines(d.Unit.Path)
+			idx[d.Unit.Path] = l
+		}
+		it := map[string]any{
+			"id":    d.ID(),
+			"text":  string(jsonv.Marshal(d.Item.Stack)),
+			"snbt":  sema.StackSNBT(d.Item.Stack),
+			"uri":   d.Unit.Path,
+			"range": l.rng(d.D.Sp),
+		}
+		// Where a Book's pages start, in its text or its .mmsbook file,
+		// so a preview can open on the page at the cursor.
+		if len(d.Item.PageStarts) > 0 {
+			pages := make([]map[string]any, 0, len(d.Item.PageStarts))
+			for _, ps := range d.Item.PageStarts {
+				unit := ps.File
+				if unit == "" {
+					unit = d.Unit.Path
+				}
+				pl := idx[unit]
+				if pl == nil {
+					pl = s.lines(unit)
+					idx[unit] = pl
+				}
+				if pl == nil {
+					continue
+				}
+				pages = append(pages, map[string]any{"uri": unit, "range": pl.rng(ps.Sp)})
+			}
+			it["pages"] = pages
+		}
+		items = append(items, it)
+	}
+	sort.Slice(items, func(i, j int) bool { return items[i]["id"].(string) < items[j]["id"].(string) })
+	unused, _ := w.res.UnusedAssets()
+	if unused == nil {
+		unused = []string{}
+	}
+	return map[string]any{"files": out, "assets": assets, "items": items, "unusedAssets": unused, "hasErrors": w.res.HasErrors()}, nil
 }
+
+// structureAsset matches a structure file's path in the data pack.
+var structureAsset = regexp.MustCompile(`^data/[^/]+/structures?/.+\.nbt$`)
 
 // ---- URIs
 

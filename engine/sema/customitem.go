@@ -49,6 +49,15 @@ type CustomItemOut struct {
 	Names   map[string]string
 	// Stack is the item stack the name stands for: {id, components}.
 	Stack *jsonv.Object
+	// Hooks maps each on_* field to the function it names.
+	Hooks map[string]string
+	// Overflows are a Book's pages that run past the bottom of the page.
+	Overflows []BookOverflow
+	// Use is what each right-click use takes from the item.
+	Use UseCost
+	// PageStarts are where each page of a Book's text starts, so an
+	// editor can open its preview on the page at the cursor.
+	PageStarts []BookPageStart
 }
 
 // Languages lists the item's languages, sorted.
@@ -169,6 +178,16 @@ func customItemType(p *spec.Pack) *spec.Type {
 		{Kind: "pair", Key: "components", Optional: true, Type: &spec.Type{Kind: "reference", Path: "::java::world::component::DataComponentPatch"},
 			Desc: "More item components, such as `max_stack_size` or `rarity`. Every use of the item gets them."},
 	}}
+	one := 1.0
+	positive := &spec.Type{Kind: "int", ValueRange: &spec.Range{Min: &one}}
+	t.Fields = append(t.Fields,
+		&spec.Field{Kind: "pair", Key: "consume_on_use", Optional: true, Type: positive,
+			Desc: "How many of the item each right-click use takes from the stack, paid once per press by on_right_click, on_use_on_block or on_right_click_entity."},
+		&spec.Field{Kind: "pair", Key: "damage_on_use", Optional: true, Type: positive,
+			Desc: "How much durability each right-click use costs, paid like consume_on_use. The item needs a `max_damage` component, and gets `max_stack_size = 1` unless it sets one. When the durability runs out the item breaks, and on_break runs."})
+	for _, h := range itemHookFields() {
+		t.Fields = append(t.Fields, &spec.Field{Kind: "pair", Key: h.key, Optional: true, Type: idType("function"), Desc: h.desc})
+	}
 	got, _ := customTypes.LoadOrStore(p, t)
 	return got.(*spec.Type)
 }
@@ -214,6 +233,9 @@ func (c *Checker) CustomItem(d *syntax.Decl, id string) *CustomItemOut {
 		return string(s)
 	}
 	out := &CustomItemOut{ModelPath: "item/" + path}
+	if b := fields["base"]; b != nil && c.info(b).Base != "" {
+		errAt("base", "'%s' is a CustomItem; base must be a vanilla item, such as its base %s", c.idText(b), c.info(b).Base)
+	}
 
 	texture, model, parent, itemModel := o.Get("texture"), str("model"), str("parent"), o.Get("item_model")
 	switch {
@@ -305,6 +327,7 @@ func (c *Checker) CustomItem(d *syntax.Decl, id string) *CustomItemOut {
 	if user != nil {
 		comps.Members = append(comps.Members, user.Members...)
 	}
+	out.Hooks = c.checkItemHooks(d, o, comps, id, out)
 	stack := &jsonv.Object{}
 	if b := str("base"); b != "" {
 		stack.Set("id", jsonv.String(b))
@@ -353,7 +376,7 @@ func (c *Checker) customItemRef(e syntax.Expr) *Symbol {
 	if ns == "" {
 		ns = c.NS
 	}
-	if s := c.Syms.Find("item", ns+":"+path); s == nil || s.Kind.MMS != customItemKind {
+	if s := c.Syms.Find("item", ns+":"+path); s == nil || !isItemKind(s.Kind.MMS) {
 		return nil
 	}
 	s := c.findSig("item", ns+":"+path)
@@ -376,11 +399,16 @@ func (c *Checker) customStack(s *Symbol, at syntax.Span) *jsonv.Object {
 	sub := NewChecker(c.Pack, c.Kinds, c.Syms, s.NS)
 	// The use depends on everything the item's check looks up, such as
 	// another custom item in its components.
-	sub.Files, sub.Deps, sub.parent, sub.customOf = c.Files, c.Deps, c, s.ID()
+	sub.Files, sub.Texts, sub.Deps, sub.parent, sub.customOf = c.Files, c.Texts, c.Deps, c, s.ID()
 	if s.Unit != nil && s.Unit.File != nil {
 		sub.Src = s.Unit.File.Src
 	}
-	out := sub.CustomItem(s.Decl, s.ID())
+	var out *CustomItemOut
+	if s.Kind.MMS == bookKind {
+		out = sub.Book(s.Decl, s.ID())
+	} else {
+		out = sub.CustomItem(s.Decl, s.ID())
+	}
 	if out == nil {
 		return nil
 	}
@@ -403,22 +431,11 @@ func customStackComponents(st *jsonv.Object) *jsonv.Object {
 func (c *Checker) withCustomField(e syntax.Expr, key string) (syntax.Expr, *Symbol) {
 	base := func(ref syntax.Expr) (syntax.Expr, *Symbol) {
 		s := c.Syms.Find("item", c.idText(ref))
-		if s == nil || s.Kind.MMS != customItemKind {
+		if s == nil || !isItemKind(s.Kind.MMS) {
 			return nil, nil
 		}
 		s = c.customItemRef(ref)
-		id, _ := customItemFields(s.Decl)["base"].(syntax.Expr)
-		text := "minecraft:air"
-		switch b := id.(type) {
-		case *syntax.Ident:
-			text = b.Name
-		case *syntax.ResLoc:
-			text = b.Text
-		}
-		if !strings.Contains(text, ":") {
-			text = "minecraft:" + text
-		}
-		return &syntax.ResLoc{Text: text, Sp: ref.Span()}, s
+		return &syntax.ResLoc{Text: customItemBase(s), Sp: ref.Span()}, s
 	}
 	switch x := e.(type) {
 	case *syntax.Object:
@@ -460,6 +477,26 @@ func (c *Checker) withCustomField(e syntax.Expr, key string) (syntax.Expr, *Symb
 	return nil, nil
 }
 
+// customItemBase is the namespaced id of a custom item's base item.
+// Bases are vanilla items, so an unqualified one is in minecraft.
+func customItemBase(s *Symbol) string {
+	if s.Kind.MMS == bookKind {
+		return "minecraft:written_book"
+	}
+	id, _ := customItemFields(s.Decl)["base"].(syntax.Expr)
+	text := "minecraft:air"
+	switch b := id.(type) {
+	case *syntax.Ident:
+		text = b.Name
+	case *syntax.ResLoc:
+		text = b.Text
+	}
+	if !strings.Contains(text, ":") {
+		text = "minecraft:" + text
+	}
+	return text
+}
+
 // idText is the namespaced id an Ident or ResLoc names in this
 // namespace.
 func (c *Checker) idText(e syntax.Expr) string {
@@ -483,7 +520,7 @@ func (c *Checker) isCustomItem(e syntax.Expr) bool {
 		return false
 	}
 	s := c.find("item", c.idText(e))
-	return s != nil && s.Kind.MMS == customItemKind
+	return s != nil && isItemKind(s.Kind.MMS)
 }
 
 // customStackRule lowers a custom item in an item stack: `ember_shard`,

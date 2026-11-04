@@ -1,7 +1,106 @@
+=== data/embers/advancement/mms_gen/item_hook/ember_shard/press.json
+{
+  "criteria": {
+    "press": {
+      "trigger": "minecraft:using_item",
+      "conditions": {
+        "item": {
+          "items": "minecraft:amethyst_shard",
+          "predicates": {
+            "minecraft:custom_data": {
+              "mms_item": "embers:ember_shard"
+            }
+          }
+        }
+      }
+    }
+  },
+  "rewards": {
+    "function": "embers:mms_gen/item_hook/ember_shard/press"
+  }
+}
+=== data/embers/advancement/mms_gen/item_hook/ember_wand/press.json
+{
+  "criteria": {
+    "press": {
+      "trigger": "minecraft:using_item",
+      "conditions": {
+        "item": {
+          "items": "minecraft:blaze_rod",
+          "predicates": {
+            "minecraft:custom_data": {
+              "mms_item": "embers:ember_wand"
+            }
+          }
+        }
+      }
+    }
+  },
+  "rewards": {
+    "function": "embers:mms_gen/item_hook/ember_wand/press"
+  }
+}
 === data/embers/function/give.mcfunction
-give @s amethyst_shard[item_model="embers:ember_shard",item_name={translate:"item.embers.ember_shard",fallback:"Ember Shard"}] 16
+give @s amethyst_shard[item_model="embers:ember_shard",item_name={translate:"item.embers.ember_shard",fallback:"Ember Shard"},consumable={consume_seconds:1000000,animation:"none",has_consume_particles:false},use_effects={can_sprint:true,speed_multiplier:1,interact_vibrations:false},custom_data={mms_item:"embers:ember_shard"}] 16
+give @s blaze_rod[item_name={translate:"item.embers.ember_wand",fallback:"Ember Wand"},max_damage=32,max_stack_size=1,consumable={consume_seconds:1000000,animation:"none",has_consume_particles:false},use_effects={can_sprint:true,speed_multiplier:1,interact_vibrations:false},custom_data={mms_item:"embers:ember_wand"}]
 give @s music_disc_13[item_model="embers:ember_disc",item_name={translate:"item.embers.ember_disc",fallback:"Music Disc"},jukebox_playable="embers:embers"]
 give @s painting[painting/variant="embers:hearth"]
+=== data/embers/function/kindle.mcfunction
+setblock ~ ~1 ~ fire keep
+=== data/embers/function/mms_gen/item_hook/ember_shard/press.mcfunction
+advancement revoke @s only embers:mms_gen/item_hook/ember_shard/press
+execute if score @s mms_click.embers matches 1.. run return run scoreboard players set @s mms_click.embers 2
+scoreboard players set @s mms_click.embers 2
+function embers:warm
+function embers:mms_gen/item_hook/ember_shard/press/cost
+=== data/embers/function/mms_gen/item_hook/ember_shard/press/cost.mcfunction
+execute if items entity @s weapon.mainhand amethyst_shard[custom_data~{mms_item:"embers:ember_shard"}] run return run function embers:mms_gen/item_hook/ember_shard/press/cost/mainhand
+execute if items entity @s weapon.offhand amethyst_shard[custom_data~{mms_item:"embers:ember_shard"}] run function embers:mms_gen/item_hook/ember_shard/press/cost/offhand
+=== data/embers/function/mms_gen/item_hook/ember_shard/press/cost/mainhand.mcfunction
+item modify entity @s weapon.mainhand {type:"minecraft:set_count",count:-1,add:true}
+=== data/embers/function/mms_gen/item_hook/ember_shard/press/cost/offhand.mcfunction
+item modify entity @s weapon.offhand {type:"minecraft:set_count",count:-1,add:true}
+=== data/embers/function/mms_gen/item_hook/ember_wand/press.mcfunction
+advancement revoke @s only embers:mms_gen/item_hook/ember_wand/press
+execute if score @s mms_click.embers matches 1.. run return run scoreboard players set @s mms_click.embers 2
+scoreboard players set @s mms_click.embers 2
+tag @s add mms_clicker
+execute store result score #block mms_click.embers run attribute @s block_interaction_range get 10
+execute store result score #entity mms_click.embers run attribute @s entity_interaction_range get 10
+scoreboard players set #ray mms_click.embers 0
+execute anchored eyes positioned ^ ^ ^ anchored feet run function embers:mms_gen/item_hook/ember_wand/press/ray
+tag @s remove mms_clicker
+=== data/embers/function/mms_gen/item_hook/ember_wand/press/cost.mcfunction
+execute if items entity @s weapon.mainhand blaze_rod[custom_data~{mms_item:"embers:ember_wand"}] run return run function embers:mms_gen/item_hook/ember_wand/press/cost/mainhand
+execute if items entity @s weapon.offhand blaze_rod[custom_data~{mms_item:"embers:ember_wand"}] run function embers:mms_gen/item_hook/ember_wand/press/cost/offhand
+=== data/embers/function/mms_gen/item_hook/ember_wand/press/cost/mainhand.mcfunction
+item modify entity @s weapon.mainhand {type:"minecraft:set_damage",damage:-0.046875,add:true}
+execute if items entity @s weapon.mainhand *[damage~{durability:{max:0}}] run function embers:mms_gen/item_hook/ember_wand/press/cost/mainhand/break
+=== data/embers/function/mms_gen/item_hook/ember_wand/press/cost/mainhand/break.mcfunction
+item replace entity @s weapon.mainhand with air
+playsound entity.item.break player @a
+=== data/embers/function/mms_gen/item_hook/ember_wand/press/cost/offhand.mcfunction
+item modify entity @s weapon.offhand {type:"minecraft:set_damage",damage:-0.046875,add:true}
+execute if items entity @s weapon.offhand *[damage~{durability:{max:0}}] run function embers:mms_gen/item_hook/ember_wand/press/cost/offhand/break
+=== data/embers/function/mms_gen/item_hook/ember_wand/press/cost/offhand/break.mcfunction
+item replace entity @s weapon.offhand with air
+playsound entity.item.break player @a
+=== data/embers/function/mms_gen/item_hook/ember_wand/press/ray.mcfunction
+scoreboard players add #ray mms_click.embers 1
+execute if score #ray mms_click.embers <= #entity mms_click.embers positioned ~-0.99 ~-0.99 ~-0.99 as @e[dx=0,dy=0,dz=0,tag=!mms_clicker,type=!item,type=!experience_orb,type=!marker,type=!area_effect_cloud,type=!arrow,type=!spectral_arrow,type=!trident,type=!block_display,type=!item_display,type=!text_display,type=!lightning_bolt] positioned ~0.99 ~0.99 ~0.99 if entity @s[dx=0,dy=0,dz=0] run return 1
+execute unless block ~ ~ ~ #minecraft:air unless block ~ ~ ~ water unless block ~ ~ ~ lava unless block ~ ~ ~ light unless block ~ ~ ~ structure_void unless block ~ ~ ~ bubble_column run return run execute align xyz positioned ~0.5 ~0.5 ~0.5 run function embers:mms_gen/item_hook/ember_wand/press/ray/block
+execute if score #ray mms_click.embers < #block mms_click.embers positioned ^ ^ ^0.1 run function embers:mms_gen/item_hook/ember_wand/press/ray
+=== data/embers/function/mms_gen/item_hook/ember_wand/press/ray/block.mcfunction
+function embers:kindle
+function embers:mms_gen/item_hook/ember_wand/press/cost
+=== data/embers/function/mms_gen/load.mcfunction
+scoreboard objectives add mms_click.embers dummy
+=== data/embers/function/mms_gen/tick.mcfunction
+scoreboard players remove @a[scores={mms_click.embers=1..}] mms_click.embers 1
+=== data/embers/function/warm.mcfunction
+particle flame ^ ^1.5 ^1 0.2 0.2 0.2 0.05 20
+playsound item.firecharge.use player @a
+effect give @s fire_resistance 5
 === data/embers/jukebox_song/embers.json
 {
   "description": {
@@ -30,6 +129,19 @@ give @s painting[painting/variant="embers:hearth"]
                 "item_name": {
                   "translate": "item.embers.ember_shard",
                   "fallback": "Ember Shard"
+                },
+                "consumable": {
+                  "consume_seconds": 1000000,
+                  "animation": "none",
+                  "has_consume_particles": false
+                },
+                "use_effects": {
+                  "can_sprint": true,
+                  "speed_multiplier": 1,
+                  "interact_vibrations": false
+                },
+                "custom_data": {
+                  "mms_item": "embers:ember_shard"
                 }
               }
             },
@@ -98,9 +210,34 @@ give @s painting[painting/variant="embers:hearth"]
       "item_name": {
         "translate": "item.embers.ember_shard",
         "fallback": "Ember Shard"
+      },
+      "consumable": {
+        "consume_seconds": 1000000,
+        "animation": "none",
+        "has_consume_particles": false
+      },
+      "use_effects": {
+        "can_sprint": true,
+        "speed_multiplier": 1,
+        "interact_vibrations": false
+      },
+      "custom_data": {
+        "mms_item": "embers:ember_shard"
       }
     }
   }
+}
+=== data/minecraft/tags/function/load.json
+{
+  "values": [
+    "embers:mms_gen/load"
+  ]
+}
+=== data/minecraft/tags/function/tick.json
+{
+  "values": [
+    "embers:mms_gen/tick"
+  ]
 }
 === data/minecraft/tags/painting_variant/placeable.json
 {
@@ -138,6 +275,7 @@ give @s painting[painting/variant="embers:hearth"]
   "painting.embers.hearth.title": "Hearth",
   "painting.embers.hearth.author": "MMS Examples",
   "item.embers.ember_shard": "Ember Shard",
+  "item.embers.ember_wand": "Ember Wand",
   "item.embers.ember_disc": "Music Disc"
 }
 === assets/embers/models/item/ember_disc.json

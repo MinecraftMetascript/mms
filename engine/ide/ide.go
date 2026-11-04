@@ -4,6 +4,8 @@
 package ide
 
 import (
+	"fmt"
+	"slices"
 	"sort"
 	"strings"
 
@@ -38,6 +40,10 @@ type at struct {
 	top  []syntax.Node
 	decl *project.Decl
 	c    *sema.Checker
+	// fn is the function code at the cursor: the declaration of a
+	// Function or hook, or an inline `{ ... }` function block (as a Decl
+	// with only a body) in any declaration. nil outside function code.
+	fn *syntax.Decl
 }
 
 func (s *Session) at(path string, off int) *at {
@@ -66,6 +72,7 @@ func (s *Session) at(path string, off int) *at {
 			a.decl = s.R.Decls[d]
 		}
 	}
+	a.fn = a.codeRoot()
 	if a.decl != nil {
 		a.c = sema.NewChecker(s.P.Pack, s.P.Kinds, s.R.Syms, a.decl.NS)
 	} else {
@@ -116,6 +123,10 @@ type Item struct {
 // Completion lists completions at off, and the span the chosen item
 // replaces (the word being typed).
 func (s *Session) Completion(path string, off int) ([]Item, syntax.Span) {
+	// Book markup, in a .mmsbook file or a Book's text strings.
+	if items, replace, ok := s.bookCompletion(path, off); ok {
+		return items, replace
+	}
 	a := s.at(path, off)
 	if a == nil {
 		return nil, syntax.Span{Start: off, End: off}
@@ -233,6 +244,10 @@ func (a *at) command(t syntax.Token, off int) (syntax.Span, bool) {
 // '"' and '/' complete asset file paths, and '/' also starts a command.
 // Elsewhere, such as after the '/' of a division, they open nothing.
 func (s *Session) TriggerApplies(path string, off int, ch string) bool {
+	// '{' and '$' only complete book markup.
+	if sema.IsBookFile(path) || ch == "{" || ch == "$" {
+		return s.bookTrigger(path, off)
+	}
 	if ch != `"` && ch != "/" {
 		return true
 	}
@@ -400,6 +415,8 @@ func (s *Session) complete(a *at, off int) []sema.Candidate {
 				if in := a.c.ListItemInfo(a.info(n)); in != nil {
 					return a.c.ValueCandidates(in)
 				}
+				// Inside a list, the enclosing object's fields never fit.
+				return nil
 			}
 		case *syntax.Trailing:
 			if n.Block.Sp.Contains(off) && off > n.Block.Sp.Start {
@@ -416,6 +433,11 @@ func (s *Session) complete(a *at, off int) []sema.Candidate {
 			if a.code() && i == len(a.path)-1 && off > n.Sp.Start && off < n.Sp.End {
 				return s.statementCandidates(a, off)
 			}
+			// An object literal where no object fits, such as `height = {`:
+			// the enclosing object's fields do not belong inside it.
+			if _, ok := parent.(*syntax.Object); ok && !a.code() {
+				return nil
+			}
 		}
 	}
 	return nil
@@ -425,7 +447,7 @@ func (s *Session) complete(a *at, off int) []sema.Candidate {
 // the variables in scope, the execute helpers, the statement keywords,
 // then the Globals, objectives and functions.
 func (s *Session) statementCandidates(a *at, off int) []sema.Candidate {
-	out := locals(a.u.File, a.decl.D, off)
+	out := locals(a.u.File, a.fn, off)
 	out = append(out, sema.ExecCandidates(true)...)
 	for i, kw := range []string{"let", "if", "while", "for", "return"} {
 		out = append(out, sema.Candidate{Label: kw, Kind: sema.CandKeyword, Rank: 100 + i})
@@ -452,8 +474,27 @@ func lineStart(src []rune, off int) bool {
 	return true
 }
 
-// code reports whether the cursor's declaration holds function code.
-func (a *at) code() bool { return a.decl != nil && sema.IsCodeKind(a.decl.Kind) }
+// code reports whether the cursor is in function code.
+func (a *at) code() bool { return a.fn != nil }
+
+// codeRoot finds the function code holding the cursor: the innermost
+// inline function block on the path, such as CustomItem's
+// `on_right_click = { ... }` or an advancement's `function = { ... }`,
+// else the declaration when its kind holds code.
+func (a *at) codeRoot() *syntax.Decl {
+	if a.decl == nil {
+		return nil
+	}
+	for i := len(a.path) - 1; i >= 2; i-- {
+		if o, ok := a.path[i].(*syntax.Object); ok && o.Body != nil && a.info(o) != nil && a.info(o).InlineFn {
+			return &syntax.Decl{Body: o.Body, Sp: o.Sp}
+		}
+	}
+	if sema.IsCodeKind(a.decl.Kind) {
+		return a.decl.D
+	}
+	return nil
+}
 
 // startsStatement reports whether path[i] is the head word of a statement:
 // the word itself, or the first helper name of a call chain such as
@@ -671,6 +712,50 @@ func argIndex(f *syntax.File, call *syntax.Call, off int) int {
 	return index
 }
 
+// activeParam is the parameter signature help highlights at off: the one
+// a named argument there sets, or else the next positional slot, which
+// skips parameters already given by name.
+func activeParam(f *syntax.File, call *syntax.Call, off int, params []string) int {
+	keys := make([]string, len(params))
+	for i, p := range params {
+		k, _, _ := strings.Cut(p, ":")
+		keys[i] = strings.TrimSuffix(strings.TrimSpace(k), "?")
+	}
+	named := map[string]bool{}
+	pos := 0
+	for _, arg := range call.Args {
+		before := arg.Sp.End < off && commaBetween(f, arg.Sp.End, off)
+		if arg.Name == nil {
+			if before {
+				pos++
+			}
+			continue
+		}
+		key := arg.Name.Text
+		if !slices.Contains(keys, key) {
+			key = sema.Snake(key)
+		}
+		if !before && arg.Sp.Start <= off {
+			if i := slices.Index(keys, key); i >= 0 {
+				return i
+			}
+		}
+		named[key] = true
+	}
+	last := 0
+	for i, k := range keys {
+		if named[k] {
+			continue
+		}
+		if pos == 0 {
+			return i
+		}
+		pos--
+		last = i
+	}
+	return last
+}
+
 func commaBetween(f *syntax.File, from, to int) bool {
 	for _, t := range f.Tokens {
 		if t.Sp.Start >= from && t.Sp.End <= to && t.Kind == parser.MMSLexerCOMMA {
@@ -682,6 +767,9 @@ func commaBetween(f *syntax.File, from, to int) bool {
 
 // Hover returns Markdown for the node at off and the span it describes.
 func (s *Session) Hover(path string, off int) (string, syntax.Span) {
+	if md, sp, ok := s.bookHover(path, off); ok {
+		return md, sp
+	}
 	a := s.at(path, off)
 	if a != nil && len(a.path) < 2 && len(a.top) > 0 && s.R.Exp != nil {
 		// A build-time loop header or let.
@@ -728,6 +816,9 @@ func (s *Session) Hover(path string, off int) (string, syntax.Span) {
 		n := a.path[i]
 		if in := a.info(n); in != nil {
 			if md := a.c.Hover(in); md != "" {
+				if in.Asset != nil && in.Asset.Helper == "Structure" {
+					md += s.jigsawHover(in.Asset.Src)
+				}
 				return md, n.Span()
 			}
 		}
@@ -737,6 +828,29 @@ func (s *Session) Hover(path string, off int) (string, syntax.Span) {
 		}
 	}
 	return "", syntax.Span{}
+}
+
+// jigsawHover lists a structure file's jigsaw blocks, for the hover of
+// its Structure("...") call.
+func (s *Session) jigsawHover(src string) string {
+	js, ok := project.StructureJigsaws(s.P.Files, src)
+	if !ok || len(js) == 0 {
+		return ""
+	}
+	var sb strings.Builder
+	sb.WriteString("\n\n**Jigsaw blocks**")
+	if size, ok := project.StructureSize(s.P.Files, src); ok {
+		fmt.Fprintf(&sb, " · size %d×%d×%d", size[0], size[1], size[2])
+	}
+	sb.WriteString("\n\n| At | Facing | Name | Pool | Target |\n|---|---|---|---|---|\n")
+	for _, j := range js {
+		facing := strings.ReplaceAll(j.Orientation, "_", " ")
+		if j.Joint == "rollable" && (strings.HasPrefix(j.Orientation, "up_") || strings.HasPrefix(j.Orientation, "down_")) {
+			facing += ", rollable"
+		}
+		fmt.Fprintf(&sb, "| %d %d %d | %s | `%s` | `%s` | `%s` |\n", j.Pos[0], j.Pos[1], j.Pos[2], facing, j.Name, j.Pool, j.Target)
+	}
+	return sb.String()
 }
 
 func (s *Session) declHover(d *project.Decl) string {
@@ -788,13 +902,7 @@ func (s *Session) Signature(path string, off int) (SignatureHelp, bool) {
 		if h.Label == "" {
 			return SignatureHelp{}, false
 		}
-		active := 0
-		for _, arg := range call.Args {
-			if arg.Name == nil && arg.Sp.End < off && commaBetween(a.u.File, arg.Sp.End, off) {
-				active++
-			}
-		}
-		h.Active = min(active, max(len(h.Params)-1, 0))
+		h.Active = activeParam(a.u.File, call, off, h.Params)
 		return h, true
 	}
 	return SignatureHelp{}, false
@@ -1047,7 +1155,16 @@ func (s *Session) Symbols(path string) []Symbol {
 // functions, objectives and resources.
 func (s *Session) commandCompletion(a *at, sp syntax.Span, off int) ([]Item, syntax.Span) {
 	base := sp.Start + 1
-	text := string(a.u.File.Src[base:sp.End])
+	if items, replace, ok := s.interpolationCompletion(a, base, off); ok {
+		return items, replace
+	}
+	items, ws := s.commandItems(string(a.u.File.Src[base:sp.End]), off-base)
+	return items, syntax.Span{Start: base + ws, End: off}
+}
+
+// commandItems completes command text at rune offset off, and returns
+// where the word being completed starts.
+func (s *Session) commandItems(text string, off int) ([]Item, int) {
 	docs := map[string]*sema.Symbol{} // suggested label -> declaration
 	ids := func(reg string) []string {
 		folder := reg
@@ -1067,7 +1184,7 @@ func (s *Session) commandCompletion(a *at, sp syntax.Span, off int) ([]Item, syn
 		}
 		return out
 	}
-	sugg, ws := command.New(s.P.Pack).Complete(text, off-base, ids)
+	sugg, ws := command.New(s.P.Pack).Complete(text, off, ids)
 	items := make([]Item, 0, len(sugg))
 	for i, sg := range sugg {
 		k := sema.CandKeyword
@@ -1080,5 +1197,42 @@ func (s *Session) commandCompletion(a *at, sp syntax.Span, off int) ([]Item, syn
 		}
 		items = append(items, it)
 	}
-	return items, syntax.Span{Start: base + ws, End: off}
+	return items, ws
+}
+
+// InlayHint is a label shown after a span, such as the base item a custom
+// item stands for.
+type InlayHint struct {
+	Off     int // where the label goes
+	Label   string
+	Tooltip string
+}
+
+// InlayHints lists the inlay hints in a file, in order: the base item
+// after each custom item used as a plain item id.
+func (s *Session) InlayHints(path string) []InlayHint {
+	u := s.R.Unit(path)
+	if u == nil {
+		return nil
+	}
+	var out []InlayHint
+	for _, d := range u.File.Decls {
+		dr := s.R.Decls[d]
+		if dr == nil {
+			continue
+		}
+		for n, in := range dr.Info {
+			if in.Base == "" || in.Symbol == nil {
+				continue
+			}
+			base := strings.TrimPrefix(in.Base, "minecraft:")
+			out = append(out, InlayHint{
+				Off:     n.Span().End,
+				Label:   "→ " + base,
+				Tooltip: "A plain item id has no components, so " + in.Symbol.Path + " is written as " + in.Base + " here and any " + base + " matches.",
+			})
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Off < out[j].Off })
+	return out
 }

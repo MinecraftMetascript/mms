@@ -1,7 +1,7 @@
 import { strFromU8, strToU8, unzipSync, zipSync, type Zippable } from 'fflate';
 import type { OutputAsset, OutputFile } from '../engine/engine.svelte';
 import { fromBase64, toBase64 } from './base64';
-import { isAssetPath, type AssetFile, type ProjectData } from './project.svelte';
+import { isAssetPath, isSourcePath, type AssetFile, type ProjectData } from './project.svelte';
 
 const fixed = new Date(1980, 0, 1);
 
@@ -76,7 +76,7 @@ export function readProjectZip(name: string, entries: Map<string, string>, asset
 			} catch {
 				/* keep defaults */
 			}
-		} else if (rel.endsWith('.mms')) {
+		} else if (isSourcePath(rel)) {
 			files.push({ path: rel, text });
 		}
 	}

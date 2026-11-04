@@ -1,0 +1,5 @@
+{
+  "$schema": "https://minecraftmetascript.github.io/mms/mms.schema.json",
+  "namespace": "barrels",
+  "description": "Storage barrels: one kind of item, up to 32 stacks, with the item and the count shown on the front"
+}

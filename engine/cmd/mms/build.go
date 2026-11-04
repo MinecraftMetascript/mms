@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"flag"
 	"fmt"
@@ -71,6 +72,19 @@ func report(w io.Writer, r *project.Result, hints bool) int {
 			fmt.Fprintf(w, "    %s\n    %s%s\n", strings.ReplaceAll(text, "\t", " "), strings.Repeat(" ", col-1), strings.Repeat("^", width))
 		}
 	}
+	// Files nothing uses have no line to point at.
+	if paths, sev := r.UnusedAssets(); sev != syntax.SeverityHint || hints {
+		name := map[syntax.Severity]string{syntax.SeverityError: "error", syntax.SeverityWarning: "warning"}[sev]
+		if name == "" {
+			name = "note"
+		}
+		for _, p := range paths {
+			if sev == syntax.SeverityError {
+				errs++
+			}
+			fmt.Fprintf(w, "%s: %s: %s [lint/unused-asset]\n", p, name, project.UnusedAssetMessage(p))
+		}
+	}
 	return errs
 }
 
@@ -108,7 +122,7 @@ func runBuild(args []string, stdout, stderr io.Writer) int {
 	fl.SetOutput(stderr)
 	out := fl.String("out", "", "output folder (default: mms.json output, or build); a resource pack goes next to it, in <out>-resources")
 	zipPath := fl.String("zip", "", "write a zip archive instead of a folder; a resource pack goes in <name>-resources.zip")
-	world := fl.String("world", "", "install into a world: writes <world>/datapacks/<namespace>, and the resource pack to <world>/resources.zip")
+	world := fl.String("world", "", "install into a world: writes <world>/datapacks/<namespace>, and merges the resource pack into <world>/resourcepacks/resources.zip, keeping other projects' files")
 	if err := fl.Parse(args); err != nil {
 		return 2
 	}
@@ -167,19 +181,45 @@ func runBuild(args []string, stdout, stderr io.Writer) int {
 			return 1
 		}
 		target := filepath.Join(*world, "datapacks", p.Config.Namespace)
+		before, err := project.ReadPackDir(target)
+		if err != nil {
+			return fail(err)
+		}
 		if err := project.WriteDir(target, data); err != nil {
 			return fail(err)
 		}
 		fmt.Fprintf(stdout, "wrote %d files to %s\n", len(data), target)
-		// Minecraft loads <world>/resources.zip as the world's own
-		// resource pack, so the world gets the whole project.
-		if len(res) > 0 {
-			rz := filepath.Join(*world, "resources.zip")
-			if err := writeZip(rz, res); err != nil {
+		rz, note := worldResourcePack(*world)
+		oldZip, statErr := os.ReadFile(rz)
+		if statErr != nil && !os.IsNotExist(statErr) {
+			return fail(statErr)
+		}
+		resChanged := false
+		// With no resources, a pack already there still loses the files
+		// this project put in it last time.
+		if len(res) > 0 || statErr == nil {
+			m, err := project.WriteWorldPack(rz, p.Config.Namespace, res)
+			if err != nil {
 				return fail(err)
 			}
-			fmt.Fprintf(stdout, "wrote resource pack %s (%d files)\n", rz, len(res))
+			if len(res) == 0 {
+				fmt.Fprintf(stdout, "%s has no resources now; removed what it had in %s\n", p.Config.Namespace, rz)
+			} else {
+				fmt.Fprintf(stdout, "wrote resource pack %s (%d files)\n", rz, len(res))
+			}
+			if m.Adopted {
+				fmt.Fprintln(stdout, "replaced the resource pack an earlier mms build left there")
+			}
+			if len(m.Others) > 0 {
+				fmt.Fprintf(stdout, "kept the other packs in it: %s\n", strings.Join(m.Others, ", "))
+			}
+			for _, r := range m.Replaced {
+				fmt.Fprintf(stderr, "mms: warning: overwrote %s\n", r)
+			}
+			fmt.Fprintln(stdout, note)
+			resChanged = !bytes.Equal(oldZip, m.Zip)
 		}
+		fmt.Fprintln(stdout, project.PlanApply(before, data, resChanged).Message())
 		return 0
 	}
 	resOut := filepath.Join(dir, p.Config.ResourceOutput())
@@ -260,4 +300,13 @@ func pluralize(n int, s string) string {
 		return s
 	}
 	return s + "s"
+}
+
+// worldResourcePack returns where --world puts the resource pack and a
+// line about it. Minecraft applies a world's bundled pack, which lives at
+// <world>/resourcepacks/resources.zip, by itself when the world is played
+// (not over LAN, and a server needs its own resource-pack setting).
+func worldResourcePack(world string) (path, note string) {
+	return filepath.Join(world, "resourcepacks", "resources.zip"),
+		"Minecraft applies it when the world is opened"
 }

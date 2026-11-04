@@ -1,16 +1,19 @@
 # Lint rules
 
-The engine lints every declaration that checks without errors. Findings appear in the editor, in `mms check` (hints only with `-hints`), and as LSP diagnostics with quick fixes. `mms fix` and the editor's "Fix all" (Ctrl/⌘+Alt+F) apply every *safe* fix. A safe fix never changes the generated pack.
+The engine lints every declaration that checks without errors. Findings appear in the editor, in `mms check` (hints only with `-hints`), and as LSP diagnostics with quick fixes. `mms fix` and the editor's "Fix all" (Ctrl/⌘+Alt+F) apply every *safe* fix. In the web editor, Ctrl/⌘+. lists the quick fixes at the cursor, and Format is Shift+Alt+F (⌘+Shift+I on macOS) or Ctrl/⌘+S. A safe fix never changes the generated pack.
 
 | Rule | Default | Fix | What it reports |
 | --- | --- | --- | --- |
-| `unused` | hint | none | A density function, noise, feature, carver, processor list, surface rule or condition, predicate, item modifier or parameter list that nothing references, by id or in a command. The game never loads these on its own. Declarations in `minecraft` are skipped, because they override vanilla files. The editor fades the name. |
+| `unused` | hint | none | A density function, noise, feature, carver, processor list, surface rule or condition, predicate, item modifier, parameter list or template pool that nothing references, by id or in a command. A template pool also counts as used when a jigsaw block in one of the project's structure files draws from it. The game never loads these on its own. Declarations in `minecraft` are skipped, because they override vanilla files. The editor fades the name. |
 | `quoted-name` | hint | safe | An id, dispatch key or enum name written in quotes: `"minecraft:stone"` becomes `stone`. |
 | `redundant-namespace` | hint | safe | A `minecraft:` prefix that can be dropped. It is kept when the project declares its own resource with the short name. |
 | `use-sugar` | hint | safe | An object literal with a shorter form: a dispatched object as its helper call (`{ type = noise, noise = ridge }` becomes `Noise(noise = ridge)`), and the sugar in [resources.md](resources.md): bare item entries, `1..3`, `diamond * 4`, trigger calls, `&&`, `||`, `!` and density arithmetic. Parentheses are added where precedence needs them. |
+| `custom-item-base` | hint | quick fix | A [custom item](resources.md#custom-items) in a field that takes a plain item id, such as a recipe ingredient or an item tag. It is written as its base item, so the field also matches the base item without the custom components. The quick fix writes the base item instead. |
 | `constant-expression` | hint | safe | Arithmetic on number literals, such as `2 * 0.25`, which is replaced by its value. |
 | `deprecated` | warning | none | A use of a declaration whose [doc comment](getting-started.md#doc-comments) has a `@deprecated` tag, anywhere in the project, commands included. The message carries the tag's text, and the editor strikes the use out. |
 | `external-asset` | warning | none | A texture, sound or structure id in a namespace the project declares that no `Texture`, `Sound` or `Structure` call in the project provides. The pack still loads, so this is a warning: the file has to come from another pack. See [Asset files](resources.md#asset-files). |
+| `unused-asset` | info | none | A `.png`, `.ogg` or `.nbt` file in the project that no `Texture`, `Sound` or `Structure` call and no `icon` uses, so the packs leave it out. It has no source line, so it shows on the file itself: in VS Code's Problems panel, in `mms check` output, and as an "unused" badge in the web editor's asset list. Nothing is reported while the project has errors. |
+| `book-overflow` | warning | none | A [Book](resources.md#books) page with more text than the book screen shows, 14 lines of 114 pixels. The game cuts the rest off without a warning. Widths come from the vanilla font, so text outside ASCII is a close guess. In a `.mmsbook` file the warning is in the file. |
 | `overrides-vanilla` | info | none | A declaration that replaces a vanilla resource, such as `LootTable minecraft:blocks/stone`. A tag only counts when it sets `replace`, since otherwise it adds to vanilla's entries. It is skipped when the project namespace is `minecraft`. |
 
 ## Configuration

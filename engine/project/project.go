@@ -27,6 +27,10 @@ type Project struct {
 	// Texture("a.png") read. Nil means the host has none; set it before
 	// the first Analyze.
 	Files fs.FS
+	// Root is what file paths start with before their path in the
+	// project, such as "file:///home/me/pack/" when a host names files by
+	// URI; "" when they are named by project path.
+	Root string
 
 	mu     sync.Mutex
 	files  map[string]*sema.Unit
@@ -51,6 +55,13 @@ func (p *Project) SetFile(path, text string) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if old, ok := p.texts[path]; ok && old == text {
+		return
+	}
+	if sema.IsBookFile(path) {
+		// Book text is not MMS: a Book declaration reads it with
+		// BookText, and its problems are reported in the file.
+		p.texts[path] = text
+		p.files[path] = &sema.Unit{Path: path, File: &syntax.File{Src: []rune(text)}}
 		return
 	}
 	f, chunks, moved := syntax.Reparse(text, p.chunks[path])
@@ -91,6 +102,31 @@ func (p *Project) RemoveFile(path string) {
 	delete(p.chunks, path)
 }
 
+// bookText returns a .mmsbook file's current text, by its path in the
+// project. Hosts that name files by URI, such as the language server,
+// have it as the URI that ends in the path.
+func (p *Project) bookText(path string) (unit, text string, ok bool) {
+	if !sema.IsBookFile(path) {
+		return "", "", false
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if t, ok := p.texts[path]; ok {
+		return path, t, true
+	}
+	if p.Root != "" {
+		if t, ok := p.texts[p.Root+path]; ok {
+			return p.Root + path, t, true
+		}
+	}
+	for k, t := range p.texts {
+		if strings.HasSuffix(k, "/"+path) && strings.Contains(k, "://") && (unit == "" || len(k) < len(unit)) {
+			unit, text, ok = k, t, true
+		}
+	}
+	return unit, text, ok
+}
+
 // Text returns a file's current text.
 func (p *Project) Text(path string) (string, bool) {
 	p.mu.Lock()
@@ -124,6 +160,7 @@ type Result struct {
 	assetErr map[string][]syntax.Diagnostic
 	orderErr map[string][]syntax.Diagnostic // feature order cycles
 	langErr  map[string][]syntax.Diagnostic // CustomItem names a Lang also has
+	jigsaw   *jigsawModel                   // structure files' jigsaw blocks, for the jigsaw rules
 	files    fs.FS
 	lintMu   sync.Mutex
 	lintDone bool
@@ -151,13 +188,20 @@ type Decl struct {
 	Fn *fn.Output
 	// Item is a checked CustomItem: the files it writes and the stack
 	// its name stands for.
-	Item  *sema.CustomItemOut
-	Info  map[syntax.Node]*sema.Info
-	Diags []syntax.Diagnostic
+	Item *sema.CustomItemOut
+	// Hoisted are inline values written where an id is required, each
+	// written as its own resource.
+	Hoisted []sema.Hoisted
+	Info    map[syntax.Node]*sema.Info
+	Diags   []syntax.Diagnostic
+	// Extern are problems in other files, such as a Book's .mmsbook
+	// file, by path.
+	Extern map[string][]syntax.Diagnostic
 	// Deps are the symbol lookups the check made (see sema.DepsHold).
 	Deps map[string]bool
 
-	lints    []syntax.Diagnostic // cached lint findings, valid for lintKey
+	lints    []syntax.Diagnostic            // cached lint findings, valid for lintKey
+	extLints map[string][]syntax.Diagnostic // the same, in other files
 	lintKey  string
 	refs     []string
 	refsDone bool
@@ -197,6 +241,9 @@ func (r *Result) Diagnostics(path string) []syntax.Diagnostic {
 	out = append(out, r.orderErr[path]...)
 	out = append(out, r.langErr[path]...)
 	out = append(out, r.loopDiags(u)...)
+	for _, d := range r.Order {
+		out = append(out, d.Extern[path]...)
+	}
 	out = append(out, r.Lints()[path]...)
 	sort.SliceStable(out, func(i, j int) bool { return out[i].Sp.Start < out[j].Sp.Start })
 	return dedupe(out)
@@ -354,6 +401,10 @@ func (p *Project) Analyze(ctx context.Context) (*Result, error) {
 				if dr != nil && !sema.AssetDepsHold(p.Files, dr.Deps) {
 					dr = nil
 				}
+				// A .mmsbook file it read was edited.
+				if dr != nil && !sema.TextDepsHold(p.bookText, dr.Deps) {
+					dr = nil
+				}
 			}
 			if dr == nil {
 				dr = p.checkDecl(u, d, k, syms)
@@ -440,12 +491,17 @@ func (p *Project) checkDecl(u *sema.Unit, d *syntax.Decl, k sema.Kind, syms *sem
 	dr = &Decl{Unit: u, D: d, Kind: k, NS: ns}
 	c := sema.NewChecker(p.Pack, p.Kinds, syms, ns)
 	c.Files = p.Files
+	c.Texts = p.bookText
 	c.Src = u.File.Src
 	c.Env = u.Env[d]
 	c.Ctx = d.Kind.Name + " " + d.NameText()
+	c.Owner = dr.ID()
+	if c.Owner == "" {
+		c.Owner = ns + ":" + sema.Snake(k.Name)
+	}
 	defer func() {
 		if rec := recover(); rec != nil {
-			dr.Value, dr.Tag, dr.Lines, dr.Fn, dr.Item = nil, nil, nil, nil, nil
+			dr.Value, dr.Tag, dr.Lines, dr.Fn, dr.Item, dr.Hoisted = nil, nil, nil, nil, nil, nil
 			dr.Info = c.Info
 			dr.Diags = append(c.Diags, syntax.Diagnostic{
 				Code: "mms/internal", Severity: syntax.SeverityError, Sp: d.Kind.Sp,
@@ -482,6 +538,8 @@ func (p *Project) checkDecl(u *sema.Unit, d *syntax.Decl, k sema.Kind, syms *sem
 		}
 	case k.MMS == "CustomItem":
 		dr.Item = c.CustomItem(d, dr.ID())
+	case k.MMS == "Book":
+		dr.Item = c.Book(d, dr.ID())
 	case k.MMS == "Objective":
 		dr.Lines = objective(c, d)
 	case k.MMS == "Global":
@@ -489,7 +547,9 @@ func (p *Project) checkDecl(u *sema.Unit, d *syntax.Decl, k sema.Kind, syms *sem
 	}
 	dr.Info = c.Info
 	dr.Diags = c.Diags
+	dr.Extern = c.Extern
 	dr.Deps = c.Deps
+	dr.Hoisted = c.Hoisted
 	// Re-validate lowered output: a value that passed the checker but not
 	// the schema means a lowering bug, reported as an internal error
 	// rather than written as bad JSON.
@@ -502,6 +562,20 @@ func (p *Project) checkDecl(u *sema.Unit, d *syntax.Decl, k sema.Kind, syms *sem
 			dr.Diags = append(dr.Diags, syntax.Diagnostic{
 				Code: "mms/internal", Severity: syntax.SeverityError, Sp: d.Kind.Sp,
 				Message: "internal error: the generated JSON does not match the schema (" + errs[0] + "). Please report this with the declaration's source.",
+			})
+		}
+	}
+	for _, h := range dr.Hoisted {
+		if hasErrors(dr.Diags) {
+			break
+		}
+		if h.Value == nil {
+			continue
+		}
+		if errs := sema.Validate(p.Pack, p.Kinds, h.Kind.Resource, h.Value); len(errs) > 0 {
+			dr.Diags = append(dr.Diags, syntax.Diagnostic{
+				Code: "mms/internal", Severity: syntax.SeverityError, Sp: h.Sp,
+				Message: "internal error: the generated " + h.Kind.Resource + " JSON for this inline value does not match the schema (" + errs[0] + "). Please report this with the declaration's source.",
 			})
 		}
 	}

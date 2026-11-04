@@ -193,6 +193,105 @@ OnRespawn {
 - **`OnFirstJoin { ... }`** runs once per player, the first time they are in the world with the pack. It uses a tick advancement, `<namespace>:mms_gen/first_join`, that is never revoked; `/advancement revoke @s only <namespace>:mms_gen/first_join` makes it run again.
 - **`OnRespawn { ... }`** runs right after a player respawns. A `deathCount` objective, `mms_respawn.<namespace>`, notes the death, and the tick function runs the body once the player is alive again.
 
+### Item hooks
+
+A [custom item](resources.md)'s `on_*` fields each name a function to run when something happens with the item. The functions take no parameters and can be in any file. A field can also hold the commands themselves in a `{ ... }` block, written like a function body (each command on its own line). That block is compiled as a function of its own, under `mms_gen/<item>/`. They run as the player, at the player unless the table says otherwise:
+
+```
+CustomItem ember_wand = {
+  base = stick
+  name = "Ember Wand"
+  on_right_click = cast_ember
+  on_use_on_block = light_block
+}
+
+Function cast_ember {
+  /particle flame ^ ^1.5 ^1 0.2 0.2 0.2 0.05 20
+}
+
+Function light_block {
+  /setblock ~ ~1 ~ fire keep
+}
+```
+
+| Field | Runs when the player... |
+| --- | --- |
+| `on_right_click` | right-clicks with the item, once per press |
+| `on_hold_right_click` | holds right click with the item: every tick, from the first |
+| `on_use_on_block` | right-clicks a block with the item, once per press. It runs positioned at the centre of the block |
+| `on_right_click_entity` | right-clicks an entity with the item, once per press. It runs at the entity, which has the tag `mms_target` while the function runs, so `@e[tag=mms_target,limit=1]` is the entity |
+| `on_hit` | hurts an entity while holding the item in their main hand |
+| `on_kill` | kills an entity while holding the item in their main hand |
+| `on_consume` | finishes eating or drinking the item. It needs a `consumable` component, or a base item that is food or a potion |
+| `on_pickup` | picks the item up from the ground |
+| `on_break` | uses up the item's durability, so it breaks. It needs a base with durability, or a `max_damage` component |
+| `on_projectile_hit_block` | shoots an arrow that hits a block (see [Projectile hooks](#projectile-hooks)). It runs as the arrow, at the point it hit |
+| `on_projectile_hit_entity` | shoots an arrow that hurts an entity. It runs as and at the entity hit |
+| `on_projectile_land` | throws the item, a splash or lingering potion, and it lands. It runs at the spot it landed |
+
+Every hook marks the item with `mms_item: "<namespace>:<name>"` in its `custom_data`, wherever it is used: in `/give`, recipes and loot. A `custom_data` of your own keeps its keys and gains the marker. Each hook is an advancement, `<namespace>:mms_gen/item_hook/<name>/<hook>`, whose trigger matches the base item with that marker, and a reward function of the same name that revokes it and calls your function.
+
+**Right click.** The four right-click hooks use the consumable method from the [datapack.wiki guide](https://datapack.wiki/guide/right-click/consumable_component):
+
+- The item gets a `consumable` component that takes about eleven days to eat, with no animation, sound or particles, so right click "uses" it without using it up. It also gets `use_effects`, so the player is not slowed down while holding the button. Set `consumable` or `use_effects` in the item's `components` to use your own instead.
+- A `using_item` advancement, `.../press`, fires on every tick the button is held. `on_hold_right_click` runs on each of those ticks. For the others, a score, `mms_click.<namespace>`, notes that the player is still holding the button. The tick function counts it down, and they run only once it has reached 0.
+- `on_use_on_block` and `on_right_click_entity` step a ray from the player's eyes, 0.1 blocks at a time, out to their `block_interaction_range` and `entity_interaction_range`. It stops at the first block or entity it meets. The ray counts a whole block as solid, so it can stop short of a slab or a flower's actual shape, and it skips items, arrows, markers and display entities.
+- `on_right_click` runs on every press, whether or not the player is looking at a block or entity.
+
+**Use cost.** Two more fields make each right-click use cost something:
+
+```
+CustomItem ember_wand = {
+  base = blaze_rod
+  on_use_on_block = kindle
+  damage_on_use = 1
+  components = { max_damage = 32 }
+}
+```
+
+- `consume_on_use = n` takes `n` of the item from the stack.
+- `damage_on_use = n` costs `n` points of durability. When the durability runs out, the item breaks with the break sound, and `on_break` runs. The item needs a `max_damage` component. MMS doesn't know vanilla items' durability, so a base item's own durability is not enough. A damageable item cannot stack, so the item gets `max_stack_size = 1` unless it sets one, and any other stack size is an error.
+
+The cost is paid once per press, from the hand that holds the item. With `on_right_click` it is paid on every press. Otherwise it is paid only when `on_use_on_block` or `on_right_click_entity` runs, so a click at the air costs nothing. `on_hold_right_click` alone pays no cost.
+
+A base item that already does something on right click keeps doing it, and then none of the right-click hooks runs. A block is still placed and a bow still draws, and a chest still opens when clicked. Pick a base such as `stick`, `paper` or `amethyst_shard` that does nothing on its own. A `use_cooldown` component has no effect, because the item is never finished being used. Keep a cooldown in a score instead. `on_consume` cannot be combined with the right-click hooks, because they stop the item from ever being finished.
+
+### Projectile hooks
+
+`on_projectile_hit_block` and `on_projectile_hit_entity` follow arrows. What they follow depends on the item's base:
+
+- **A bow or crossbow**: every arrow shot from the item, whatever the arrow is.
+- **An `arrow`, `tipped_arrow` or `spectral_arrow`**: the item itself, once it is shot from any bow, crossbow or dispenser. Prefer `tipped_arrow`: Infinity makes plain `arrow` items free, and a tipped arrow can be coloured with `potion_contents.custom_color`.
+
+```
+CustomItem explosive_arrow = {
+  base = tipped_arrow
+  name = "Explosive Arrow"
+  on_projectile_hit_block = boom
+  on_projectile_hit_entity = boom
+}
+
+Function boom {
+  /summon tnt ~ ~ ~ {fuse:0s,explosion_power:2f}
+}
+```
+
+On a block hit the function runs as the arrow, at the point it hit, so `execute on origin` is whoever shot it, and `kill @s` keeps the arrow from being picked up. On an entity hit it runs as and at the entity hurt, and `execute on attacker` is the shooter.
+
+**How it works.** An arrow keeps the bow or crossbow it was shot from as its `weapon`, and when it hits, the game runs the weapon's enchantment effects at the exact spot: `hit_block` as the arrow, `post_attack` as the entity it hurt. Each item with projectile hooks gets an enchantment, `<namespace>:mms_gen/item_hook/<name>/projectile`, whose effects run the functions. The tick function looks once at each new arrow (it tags them `mms_shot.<namespace>`), and adds the enchantment to the weapon of an arrow that is the item, or that was shot from it. An arrow from a dispenser has no weapon, so it gets a plain bow. The enchantment is never on the item, so it shows in no tooltip and gives no glint. Several items' hooks combine: an Explosive Arrow shot from a bow with hooks runs both.
+
+**Thrown potions.** `on_projectile_land` works on a `splash_potion` or `lingering_potion` base, and runs where the thrown potion lands, whatever it hits:
+
+```
+CustomItem blast_potion = {
+  base = splash_potion
+  name = "Blast Potion"
+  on_projectile_land = boom
+}
+```
+
+A thrown potion keeps no weapon, so no enchantment runs for it. Instead the tick function puts a marker on each new one, riding it, with the function's id in its `data`. The game drops a projectile's passengers where it removes it, so a marker that is no longer riding anything (`<namespace>:mms_gen/projectile/riding`) marks the spot. The function runs as that marker, at it, and the marker is removed afterwards. The spot is where the potion was at the end of its last tick of flight, so up to about half a block short, and the function can't tell what the potion hit or who threw it. The potion still splashes as usual.
+
 ## How it compiles
 
 Values live on one scoreboard objective per namespace, `mms.<namespace>`:

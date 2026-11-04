@@ -1,7 +1,8 @@
 name: release
 
 # Pushing a tag such as v1.0.0 builds the CLI for every platform and the
-# VS Code extension, and publishes them as a GitHub release.
+# VS Code extension (a universal .vsix plus one per platform with mms
+# bundled), and publishes them as a GitHub release.
 on:
   push:
     tags: ["v*"]
@@ -38,7 +39,7 @@ jobs:
           ext=""; [ "$GOOS" = windows ] && ext=".exe"
           mkdir -p "dist/$name"
           go build -trimpath -ldflags "-s -w -X main.version=${GITHUB_REF_NAME}" -o "dist/$name/mms$ext" ./cmd/mms
-          cp ../README.md "dist/$name/"
+          cp ../README.md THIRD_PARTY_NOTICES.txt "dist/$name/"
           cd dist
           if [ "$GOOS" = windows ]; then zip -qr "$name.zip" "$name"; else tar czf "$name.tar.gz" "$name"; fi
       - uses: actions/upload-artifact@v4
@@ -56,8 +57,17 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: engine/go.mod
+          cache-dependency-path: engine/go.sum
       - run: npm ci
+      # The universal mms-<version>.vsix, which runs mms from mms.path or PATH.
       - run: npm run package
+      # One mms-<target>-<version>.vsix per platform, with mms bundled.
+      - run: node scripts/package-targets.mjs
+        env:
+          MMS_VERSION: ${{ github.ref_name }}
       - uses: actions/upload-artifact@v4
         with:
           name: vscode

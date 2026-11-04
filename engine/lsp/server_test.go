@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/minecraftmetascript/mms/engine/nbt"
 	"github.com/minecraftmetascript/mms/engine/spec"
 )
 
@@ -400,7 +402,7 @@ func TestRegistersWatchers(t *testing.T) {
 			}
 		}
 	}
-	if strings.Join(globs, " ") != "**/*.mms **/mms.json **/*.{png,ogg,nbt}" {
+	if strings.Join(globs, " ") != "**/*.mms **/*.mmsbook **/mms.json **/*.{png,ogg,nbt}" {
 		t.Fatalf("watchers = %q", globs)
 	}
 
@@ -592,4 +594,195 @@ func TestKindCompletionRange(t *testing.T) {
 		return
 	}
 	t.Errorf("Feature not offered: %v", res["items"])
+}
+
+// A .mmsbook file on disk is part of its project: a Book reads it, and
+// its problems, completion and edits in the editor work in the file.
+func TestBookFiles(t *testing.T) {
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, "books"), 0o755)
+	os.WriteFile(filepath.Join(dir, "mms.json"), []byte(`{"namespace": "demo"}`), 0o644)
+	const main = "Book guide = { title = \"G\", author = \"A\", text = BookText(\"books/guide.mmsbook\") }\n"
+	os.WriteFile(filepath.Join(dir, "main.mms"), []byte(main), 0o644)
+	os.WriteFile(filepath.Join(dir, "books", "guide.mmsbook"), []byte("# Hello\n"), 0o644)
+	m, b := pathURI(filepath.Join(dir, "main.mms")), pathURI(filepath.Join(dir, "books", "guide.mmsbook"))
+
+	c := start(t)
+	c.result("initialize", map[string]any{"rootUri": pathURI(dir)})
+	c.notify("textDocument/didOpen", map[string]any{"textDocument": map[string]any{"uri": m, "languageId": "mms", "version": 1, "text": main}})
+	// Unsaved text in the editor is what the Book reads.
+	c.notify("textDocument/didOpen", map[string]any{"textDocument": map[string]any{"uri": b, "languageId": "mmsbook", "version": 1, "text": "# Hello\n{nope}x{/}\n"}})
+	c.result("mms/ping", nil)
+	var got []any
+	for _, n := range c.notes {
+		if p, ok := n["params"].(map[string]any); ok && n["method"] == "textDocument/publishDiagnostics" && p["uri"] == b {
+			got = p["diagnostics"].([]any)
+		}
+	}
+	if len(got) != 1 || !strings.Contains(got[0].(map[string]any)["message"].(string), "'nope' is not a style") {
+		t.Fatalf("book file diagnostics = %v", got)
+	}
+	comp := c.result("textDocument/completion", map[string]any{"textDocument": map[string]any{"uri": b}, "position": map[string]any{"line": 1, "character": 1},
+		"context": map[string]any{"triggerKind": 2, "triggerCharacter": "{"}}).(map[string]any)
+	if items := comp["items"].([]any); len(items) == 0 {
+		t.Error("no completions after { in the book file")
+	}
+	if f := c.result("textDocument/formatting", map[string]any{"textDocument": map[string]any{"uri": b}, "options": map[string]any{}}); f != nil {
+		t.Errorf("formatting a book file = %v", f)
+	}
+
+	// The output lists where each page starts in the book file.
+	c.notify("textDocument/didChange", map[string]any{"textDocument": map[string]any{"uri": b, "version": 2},
+		"contentChanges": []any{map[string]any{"text": "# Hello\n---\nPage two\n"}}})
+	out := c.result("mms/output", map[string]any{"uri": m}).(map[string]any)
+	items := out["items"].([]any)
+	if len(items) != 1 {
+		t.Fatalf("items = %v", items)
+	}
+	pages, _ := items[0].(map[string]any)["pages"].([]any)
+	if len(pages) != 2 {
+		t.Fatalf("pages = %v", pages)
+	}
+	for i, line := range []float64{0, 1} {
+		pg := pages[i].(map[string]any)
+		if pg["uri"] != b || pg["range"].(map[string]any)["start"].(map[string]any)["line"] != line {
+			t.Errorf("page %d = %v", i+1, pg)
+		}
+	}
+}
+
+// A CustomItem with only components writes no file; the output still
+// lists it with the stack its name stands for.
+func TestOutputCustomItems(t *testing.T) {
+	c := start(t)
+	c.result("initialize", map[string]any{})
+	a := "mem:///a.mms"
+	c.notify("mms/setFiles", map[string]any{"files": []any{
+		map[string]any{"uri": a, "text": "\nCustomItem ruby = {\n  base = stick\n  components = { max_stack_size = 1 }\n}\n"},
+	}})
+	out := c.result("mms/output", map[string]any{}).(map[string]any)
+	items := out["items"].([]any)
+	if len(items) != 1 {
+		t.Fatalf("items = %v", items)
+	}
+	it := items[0].(map[string]any)
+	if it["id"] != "mms:ruby" || it["uri"] != a {
+		t.Errorf("item = %v", it)
+	}
+	if text := it["text"].(string); !strings.Contains(text, `"id": "minecraft:stick"`) || !strings.Contains(text, `"max_stack_size": 1`) {
+		t.Errorf("stack = %s", text)
+	}
+	if it["snbt"] != "stick[max_stack_size=1]" {
+		t.Errorf("snbt = %v", it["snbt"])
+	}
+	r := it["range"].(map[string]any)
+	if r["start"].(map[string]any)["line"] != float64(1) || r["end"].(map[string]any)["line"] != float64(4) {
+		t.Errorf("range = %v", r)
+	}
+}
+
+// TestExtractAction checks the refactor.extract action: its edits, and
+// the mms.renameAt command a client that asks for it gets.
+func TestExtractAction(t *testing.T) {
+	c := start(t)
+	c.result("initialize", map[string]any{"initializationOptions": map[string]any{"renameAfterExtract": true}})
+	c.notify("initialized", map[string]any{})
+	uri := "file:///a.mms"
+	src := "DensityFunction hills = Noise({ base_octave = -6, amplitude_modifiers = [1] }, 1, 1)\n"
+	c.notify("textDocument/didOpen", map[string]any{"textDocument": map[string]any{"uri": uri, "languageId": "mms", "version": 1, "text": src}})
+	pos := map[string]any{"line": 0, "character": 35}
+	acts := c.result("textDocument/codeAction", map[string]any{"textDocument": map[string]any{"uri": uri}, "range": map[string]any{"start": pos, "end": pos},
+		"context": map[string]any{"diagnostics": []any{}, "only": []string{"refactor"}}}).([]any)
+	if len(acts) != 1 {
+		t.Fatalf("actions = %v", acts)
+	}
+	a := acts[0].(map[string]any)
+	if a["title"] != "Extract { ... } to a Noise declaration" || a["kind"] != "refactor.extract" {
+		t.Errorf("action = %v", a)
+	}
+	edits := a["edit"].(map[string]any)["changes"].(map[string]any)[uri].([]any)
+	if got := edits[0].(map[string]any)["newText"]; got != "Noise hills_noise = { base_octave = -6, amplitude_modifiers = [1] }\n\n" {
+		t.Errorf("declaration = %q", got)
+	}
+	if got := edits[1].(map[string]any)["newText"]; got != "hills_noise" {
+		t.Errorf("reference = %q", got)
+	}
+	cmd := a["command"].(map[string]any)
+	at := cmd["arguments"].([]any)[1].(map[string]any)
+	if cmd["command"] != "mms.renameAt" || at["line"] != float64(0) || at["character"] != float64(6) {
+		t.Errorf("command = %v", cmd)
+	}
+}
+
+// A structure file's jigsaw blocks come with its asset, for the jigsaw
+// connection preview.
+func TestOutputStructureJigsaws(t *testing.T) {
+	c := start(t)
+	c.result("initialize", map[string]any{})
+	data, err := nbt.Encode(map[string]any{
+		"size":    []any{int32(5), int32(4), int32(7)},
+		"palette": []any{map[string]any{"Name": "minecraft:jigsaw", "Properties": map[string]any{"orientation": "east_up"}}},
+		"blocks": []any{map[string]any{"pos": []any{int32(1), int32(2), int32(3)}, "state": int32(0),
+			"nbt": map[string]any{"id": "minecraft:jigsaw", "pool": "mms:rooms", "name": "mms:door", "target": "mms:door"}}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.notify("mms/setAssets", map[string]any{"files": []any{map[string]any{"path": "s/hall.nbt", "data": data}}})
+	c.notify("mms/setFiles", map[string]any{"files": []any{
+		map[string]any{"uri": "mem:///a.mms", "text": "TemplatePool rooms = { fallback = minecraft:empty, elements = [{ weight = 1, element = { element_type = minecraft:single_pool_element, location = Structure(\"s/hall.nbt\"), projection = rigid, processors = minecraft:empty } }] }\n"},
+	}})
+	out := c.result("mms/output", map[string]any{}).(map[string]any)
+	assets := out["assets"].([]any)
+	if len(assets) != 1 {
+		t.Fatalf("assets = %v", assets)
+	}
+	if size := fmt.Sprint(assets[0].(map[string]any)["size"]); size != "[5 4 7]" {
+		t.Errorf("size = %s", size)
+	}
+	js, _ := assets[0].(map[string]any)["jigsaws"].([]any)
+	if len(js) != 1 {
+		t.Fatalf("asset = %v", assets[0])
+	}
+	j := js[0].(map[string]any)
+	if j["pool"] != "mms:rooms" || j["name"] != "mms:door" || j["target"] != "mms:door" || fmt.Sprint(j["pos"]) != "[1 2 3]" || j["orientation"] != "east_up" || j["joint"] != "aligned" {
+		t.Errorf("jigsaw = %v", j)
+	}
+}
+
+// A project file that nothing uses is reported on the file itself, and
+// cleared once something uses it.
+func TestUnusedAssetDiagnostics(t *testing.T) {
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, "art"), 0o755)
+	os.WriteFile(filepath.Join(dir, "mms.json"), []byte(`{"namespace": "demo"}`), 0o644)
+	os.WriteFile(filepath.Join(dir, "art", "p.png"), []byte("\x89PNG\r\n\x1a\nrest"), 0o644)
+	os.WriteFile(filepath.Join(dir, "main.mms"), []byte("DensityFunction x = 1\n"), 0o644)
+	m, png := pathURI(filepath.Join(dir, "main.mms")), pathURI(filepath.Join(dir, "art", "p.png"))
+
+	c := start(t)
+	c.result("initialize", map[string]any{"rootUri": pathURI(dir)})
+	c.notify("textDocument/didOpen", map[string]any{"textDocument": map[string]any{"uri": m, "languageId": "mms", "version": 1, "text": "DensityFunction x = 1\n"}})
+	last := func() []any {
+		c.result("mms/ping", nil)
+		var got []any
+		for _, n := range c.notes {
+			if p, ok := n["params"].(map[string]any); ok && n["method"] == "textDocument/publishDiagnostics" && p["uri"] == png {
+				got = p["diagnostics"].([]any)
+			}
+		}
+		return got
+	}
+	got := last()
+	if len(got) != 1 || got[0].(map[string]any)["code"] != "lint/unused-asset" {
+		t.Fatalf("diagnostics on the file = %v", got)
+	}
+	if out := c.result("mms/output", map[string]any{"uri": m}).(map[string]any); fmt.Sprint(out["unusedAssets"]) != "[art/p.png]" {
+		t.Errorf("unusedAssets = %v", out["unusedAssets"])
+	}
+	src := "PaintingVariant p = { width = 1, height = 1, asset_id = Texture(\"art/p.png\") }\n"
+	c.notify("textDocument/didChange", map[string]any{"textDocument": map[string]any{"uri": m, "version": 2}, "contentChanges": []any{map[string]any{"text": src}}})
+	if got := last(); len(got) != 0 {
+		t.Errorf("still reported once used: %v", got)
+	}
 }

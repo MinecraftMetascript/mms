@@ -32,9 +32,20 @@ type Info struct {
 	Folder string
 	// Asset is set on an asset helper call such as Texture("a.png").
 	Asset *Asset
+	// Base is set where a custom item is used as a plain item id: the
+	// base item id written in its place.
+	Base string
 	// Props are the block state properties a multipart `when` object
 	// body can test, for completion.
 	Props map[string][]string
+	// InlineFn is set on a `{ ... }` block written where a function id is
+	// needed: its body is function code, compiled as a hoisted Function.
+	InlineFn bool
+	// Extract is the declaration kind (as written, e.g. "Noise") of an
+	// inline value that could be its own declaration referenced by id
+	// here: one that is hoisted, or one at a position that also takes an
+	// id of that kind. Editors offer to extract it.
+	Extract string
 
 	typed bool
 }
@@ -78,10 +89,24 @@ type Checker struct {
 	Files fs.FS
 	// Src is the checked file's text; quick fixes need it for layout.
 	Src []rune
+	// Texts returns the text of a project file the host has as a
+	// source, such as a .mmsbook file, by its path in the project, and
+	// the unit path it has; nil when there are none.
+	Texts func(path string) (unit, text string, ok bool)
+	// Extern holds problems found in other files, such as a .mmsbook
+	// file a Book reads, by path.
+	Extern map[string][]syntax.Diagnostic
 
 	// textureName is the id name Texture("...") gets when the call
 	// gives none; a CustomItem sets it to item/<name>.
 	textureName string
+	// Owner is the id of the declaration being checked; inline values
+	// hoisted out of it are named after it.
+	Owner string
+	// Hoisted are inline values written where an id is required, each
+	// to be written as its own resource (see hoist.go).
+	Hoisted []Hoisted
+	hoistN  map[string]int
 	// customOf is the custom item this checker expands, to catch an item
 	// that contains itself.
 	customOf string
@@ -369,6 +394,12 @@ func (c *Checker) union(e syntax.Expr, v tview) jsonv.Value {
 	if r, ok := c.inlineSound(e, v); ok {
 		return r
 	}
+	if id, ok := c.keyRequiredID(v); ok {
+		if r, ok := c.hoist(e, id); ok {
+			return r
+		}
+	}
+	c.markExtract(e, v)
 	var cands []tview
 	for _, m := range v.T.Members {
 		mv := c.norm(tview{T: m, Env: v.Env})
@@ -376,6 +407,7 @@ func (c *Checker) union(e syntax.Expr, v tview) jsonv.Value {
 			cands = append(cands, mv)
 		}
 	}
+	cands = c.preferInline(e, cands)
 	switch len(cands) {
 	case 0:
 		if name := callName(e); name != "" {
@@ -485,9 +517,9 @@ func (c *Checker) fits(e syntax.Expr, v tview) bool {
 			id := idOf(v.T)
 			return id.Present && id.Tags != ""
 		case *syntax.Call:
-			return c.assetFits(e, idOf(v.T))
+			return c.assetFits(e, idOf(v.T)) || c.hoistFits(e, idOf(v.T))
 		}
-		return false
+		return c.hoistFits(e, idOf(v.T))
 	case "boolean":
 		if n, ok := e.(*syntax.Number); ok {
 			return n.Text == "0" || n.Text == "1"
@@ -807,6 +839,9 @@ func (c *Checker) stringValue(e syntax.Expr, v tview) jsonv.Value {
 			return nil
 		}
 	}
+	if r, ok := c.hoist(e, id); ok {
+		return r
+	}
 	c.mismatch(e, v)
 	return nil
 }
@@ -824,6 +859,9 @@ func (c *Checker) resolveID(text string, id idInfo, e syntax.Expr) string {
 	if path != strings.ToLower(path) {
 		c.errorf("mms/invalid-name", e.Span(), "resource ids are lowercase: did you mean '%s'?", Snake(path))
 		return text
+	}
+	if IsAssetRegistry(reg) {
+		path = c.stripAssetExt(path, reg, e)
 	}
 	var sym *Symbol
 	if ns == "" {
@@ -843,9 +881,16 @@ func (c *Checker) resolveID(text string, id idInfo, e syntax.Expr) string {
 	in.ID = full
 	in.Symbol = sym
 	in.Bare, in.Folder = BareID, reg
-	if sym != nil && sym.Kind.MMS == customItemKind {
-		c.errorf("mms/custom-item", e.Span(), "'%s' is a CustomItem, which is its base item with extra components; this field takes a plain item id, so use the base item. Custom items work in item stacks, loot entries and ${...} in commands", text)
-		return full
+	if sym != nil && isItemKind(sym.Kind.MMS) {
+		// A plain item id has no components, so the custom item stands
+		// for its base item. The custom-item-base lint rule says so.
+		c.findSig(reg, sym.ID())
+		base := customItemBase(sym)
+		in.Base = base
+		if id.excluded(base) {
+			c.excludedID(base, id, e.Span())
+		}
+		return base
 	}
 	if id.excluded(full) {
 		c.excludedID(full, id, e.Span())

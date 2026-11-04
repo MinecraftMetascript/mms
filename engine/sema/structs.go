@@ -551,26 +551,53 @@ func hasField(fs []field, key string) bool {
 	return false
 }
 
-// positional returns the fields positional arguments fill, in order.
+// positional returns the fields positional arguments fill, in order:
+// required fields first, then optional ones (optional in the schema or
+// given a default by an overlay), each group in schema or overlay order.
+// The schema often lists an optional field between required ones, as
+// y_clamped_gradient does with tiling; left in place, it could not be
+// skipped positionally, so it would not really be optional.
 func (c *Checker) positional(cl *Callable) []field {
-	var out []field
+	var all []field
 	if cl.Ov != nil && len(cl.Ov.positional) > 0 {
 		for _, k := range cl.Ov.positional {
 			for _, f := range cl.Fields {
 				if f.Key == k {
-					out = append(out, f)
+					all = append(all, f)
 				}
 			}
 		}
-		return out
-	}
-	for _, f := range cl.Fields {
-		if f.KeyType != nil || (cl.Disp != nil && f.Key == cl.Disp.KeyField) {
-			continue
+	} else {
+		for _, f := range cl.Fields {
+			if f.KeyType != nil || (cl.Disp != nil && f.Key == cl.Disp.KeyField) {
+				continue
+			}
+			all = append(all, f)
 		}
-		out = append(out, f)
 	}
-	return out
+	var req, opt []field
+	for _, f := range all {
+		if isOptionalParam(cl, f) {
+			opt = append(opt, f)
+		} else {
+			req = append(req, f)
+		}
+	}
+	return append(req, opt...)
+}
+
+// isOptionalParam reports whether a call may leave the field out: the
+// schema marks it optional or an overlay gives it a default.
+func isOptionalParam(cl *Callable, f field) bool {
+	if f.Optional {
+		return true
+	}
+	if cl.Ov != nil {
+		if _, ok := cl.Ov.defaults[f.Key]; ok {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *Checker) acceptsList(v tview) bool {

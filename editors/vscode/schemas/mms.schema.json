@@ -30,9 +30,19 @@
       "markdownDescription": "Lint rule severities by rule id. Each rule can be `error`, `warning`, `info`, `hint` or `off`.",
       "type": "object",
       "properties": {
+        "book-overflow": {
+          "description": "A Book page with more text than the book screen shows: 14 lines of about 19 characters. The game cuts the rest off. Widths are measured with the vanilla font, so text outside ASCII is a close guess.\n\nDefault: `warning`.",
+          "markdownDescription": "A Book page with more text than the book screen shows: 14 lines of about 19 characters. The game cuts the rest off. Widths are measured with the vanilla font, so text outside ASCII is a close guess.\n\nDefault: `warning`.",
+          "$ref": "#/definitions/severity"
+        },
         "constant-expression": {
           "description": "An arithmetic expression of number literals can be written as its value.\n\nDefault: `hint`.",
           "markdownDescription": "An arithmetic expression of number literals can be written as its value.\n\nDefault: `hint`.",
+          "$ref": "#/definitions/severity"
+        },
+        "custom-item-base": {
+          "description": "A CustomItem used where the game takes a plain item id, such as a recipe ingredient or an item tag. It stands for its base item there, so it also matches the base item without the custom components.\n\nDefault: `hint`.",
+          "markdownDescription": "A CustomItem used where the game takes a plain item id, such as a recipe ingredient or an item tag. It stands for its base item there, so it also matches the base item without the custom components.\n\nDefault: `hint`.",
           "$ref": "#/definitions/severity"
         },
         "deprecated": {
@@ -43,6 +53,31 @@
         "external-asset": {
           "description": "An id of a texture, sound or structure in the project's namespace that no Texture, Sound or Structure call in the project provides. The pack still loads, but the file must come from another pack.\n\nDefault: `warning`.",
           "markdownDescription": "An id of a texture, sound or structure in the project's namespace that no Texture, Sound or Structure call in the project provides. The pack still loads, but the file must come from another pack.\n\nDefault: `warning`.",
+          "$ref": "#/definitions/severity"
+        },
+        "jigsaw-facing": {
+          "description": "A jigsaw block that can never join its target: every jigsaw block with its target name in its pool faces a way it cannot meet. The game turns pieces only about the y axis, so a block facing up joins only one facing down, and a sideways block only a sideways one.\n\nDefault: `warning`.",
+          "markdownDescription": "A jigsaw block that can never join its target: every jigsaw block with its target name in its pool faces a way it cannot meet. The game turns pieces only about the y axis, so a block facing up joins only one facing down, and a sideways block only a sideways one.\n\nDefault: `warning`.",
+          "$ref": "#/definitions/severity"
+        },
+        "jigsaw-fit": {
+          "description": "An internal jigsaw block (the block in front of it is inside its own piece, such as an arch mount on a road, or a jigsaw inset by a block by mistake) whose pool has pieces that stick out of the piece however they are turned. The game only places a piece joined at an internal jigsaw wholly inside its parent, so those pieces are never placed there. Height is not checked for terrain_matching pieces.\n\nDefault: `warning`.",
+          "markdownDescription": "An internal jigsaw block (the block in front of it is inside its own piece, such as an arch mount on a road, or a jigsaw inset by a block by mistake) whose pool has pieces that stick out of the piece however they are turned. The game only places a piece joined at an internal jigsaw wholly inside its parent, so those pieces are never placed there. Height is not checked for terrain_matching pieces.\n\nDefault: `warning`.",
+          "$ref": "#/definitions/severity"
+        },
+        "jigsaw-overlap": {
+          "description": "A jigsaw block that can never grow when its piece joins a given parent: every piece its pool and the pool's fallback could place there overlaps the parent or the piece itself, however it is turned, and the game never places overlapping pieces. A junction narrower than the roads around it is the usual cause. Only certain cases are reported: every piece involved is a rigid project structure file with a known size and facing, and no pool involved has an empty or feature element.\n\nDefault: `info`.",
+          "markdownDescription": "A jigsaw block that can never grow when its piece joins a given parent: every piece its pool and the pool's fallback could place there overlaps the parent or the piece itself, however it is turned, and the game never places overlapping pieces. A junction narrower than the roads around it is the usual cause. Only certain cases are reported: every piece involved is a rigid project structure file with a known size and facing, and no pool involved has an empty or feature element.\n\nDefault: `info`.",
+          "$ref": "#/definitions/severity"
+        },
+        "jigsaw-pool": {
+          "description": "A jigsaw block in a structure file that Structure(\"...\") includes draws from a pool in the project's namespace that no TemplatePool declares. The game skips the jigsaw, so the structure stops growing there. The quick fix declares the pool.\n\nDefault: `warning`.",
+          "markdownDescription": "A jigsaw block in a structure file that Structure(\"...\") includes draws from a pool in the project's namespace that no TemplatePool declares. The game skips the jigsaw, so the structure stops growing there. The quick fix declares the pool.\n\nDefault: `warning`.",
+          "$ref": "#/definitions/severity"
+        },
+        "jigsaw-target": {
+          "description": "A jigsaw block whose target no piece of its pool can join: none of the pool's structure files has a jigsaw block with that name, or the pool has no pieces. Only pools whose pieces are all the project's own structure files are checked.\n\nDefault: `warning`.",
+          "markdownDescription": "A jigsaw block whose target no piece of its pool can join: none of the pool's structure files has a jigsaw block with that name, or the pool has no pieces. Only pools whose pieces are all the project's own structure files are checked.\n\nDefault: `warning`.",
           "$ref": "#/definitions/severity"
         },
         "overrides-vanilla": {
@@ -61,8 +96,13 @@
           "$ref": "#/definitions/severity"
         },
         "unused": {
-          "description": "A worldgen piece, predicate or item modifier that nothing in the project references, so the game never uses it.\n\nDefault: `hint`.",
-          "markdownDescription": "A worldgen piece, predicate or item modifier that nothing in the project references, so the game never uses it.\n\nDefault: `hint`.",
+          "description": "A worldgen piece, predicate or item modifier that nothing in the project references, so the game never uses it. A TemplatePool counts as used when a jigsaw block in one of the project's structure files draws from it.\n\nDefault: `hint`.",
+          "markdownDescription": "A worldgen piece, predicate or item modifier that nothing in the project references, so the game never uses it. A TemplatePool counts as used when a jigsaw block in one of the project's structure files draws from it.\n\nDefault: `hint`.",
+          "$ref": "#/definitions/severity"
+        },
+        "unused-asset": {
+          "description": "A .png, .ogg or .nbt file in the project that no Texture, Sound or Structure call and no `icon` uses, so the packs leave it out. It is reported on the file itself (in VS Code's Problems panel, by `mms check`, and in the web editor's asset list), and not while the project has errors.\n\nDefault: `info`.",
+          "markdownDescription": "A .png, .ogg or .nbt file in the project that no Texture, Sound or Structure call and no `icon` uses, so the packs leave it out. It is reported on the file itself (in VS Code's Problems panel, by `mms check`, and in the web editor's asset list), and not while the project has errors.\n\nDefault: `info`.",
           "$ref": "#/definitions/severity"
         },
         "use-sugar": {

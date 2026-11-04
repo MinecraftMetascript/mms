@@ -24,6 +24,8 @@ func Parse(src string) *File {
 		}
 	}
 	toks, synthetic, closeDiags := closeUnbalanced(raw)
+	toks, missingDiags := markMissingValues(toks, synthetic)
+	closeDiags = append(closeDiags, missingDiags...)
 	stream := antlr.NewCommonTokenStream(&sliceSource{MMSLexer: lexer, toks: toks}, antlr.TokenDefaultChannel)
 	stream.Fill()
 	for _, t := range stream.GetAllTokens() {
@@ -211,6 +213,8 @@ func cleanMessage(msg string) string {
 		"extraneous input", "unexpected",
 		"mismatched input", "unexpected",
 		"no viable alternative at input", "cannot parse",
+		// MISSING is only ever inserted by recovery; never ask for it.
+		"{MISSING, ", "{",
 	)
 	return r.Replace(msg)
 }

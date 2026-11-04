@@ -3,6 +3,8 @@ import type { EditorView } from '@codemirror/view';
 import { Supervisor, type EngineStatus } from './supervisor';
 import { ProjectWorkspace } from './workspace';
 import { showDiagnostics } from '../editor/diagnostics';
+import type { InlayHint } from '../editor/inlay';
+import type { OutputJigsaw } from '@mms/preview';
 
 export interface Diagnostic {
 	range: { start: { line: number; character: number }; end: { line: number; character: number } };
@@ -19,6 +21,16 @@ export interface TextEdit {
 	newText: string;
 }
 
+/**
+ * A refactoring such as "Extract { ... } to a Noise declaration": its
+ * edits, and the default name it picked (renamed after applying).
+ */
+export interface Refactor {
+	title: string;
+	edits: TextEdit[];
+	name?: string;
+}
+
 /** A fix the engine attached to a diagnostic; safe fixes never change the pack. */
 export interface Fix {
 	title: string;
@@ -33,13 +45,47 @@ export interface OutputFile {
 	pack?: string;
 	uri?: string;
 	range?: Diagnostic['range'];
+	/** Written for an inline value where an id is required; range is that value's. */
+	implicit?: boolean;
+	/** Labels for parts of the file by JSON pointer, from doc comments, such as "/elements/2" of a template pool. */
+	labels?: Record<string, string>;
+	/** Set when this is a custom item's stack shown as JSON, not a pack file. */
+	item?: OutputItem;
 }
+
+/**
+ * A CustomItem: the item stack its name stands for. It is not a file of
+ * its own, so it is listed apart from the pack's files.
+ */
+export interface OutputItem {
+	id: string;
+	/** The stack as JSON: {id, components}. */
+	text: string;
+	/** The stack as a command writes it, such as stick[max_stack_size=1]. */
+	snbt: string;
+	uri: string;
+	range: Diagnostic['range'];
+	/** For a Book: where each page of its text starts, maybe in a .mmsbook file. */
+	pages?: { uri: string; range: Diagnostic['range'] }[];
+}
+
+/**
+ * The key the editor selects an output by. A data pack file keeps its
+ * path; a resource pack file is under resources/, since both packs have a
+ * pack.mcmeta; a custom item is item:<id>.
+ */
+export const outputKey = (f: OutputFile) => (f.pack === 'resources' ? `resources/${f.path}` : f.path);
+export const itemKey = (it: OutputItem) => `item:${it.id}`;
 
 /** A project file the pack copies, such as a texture: its output path and source. */
 export interface OutputAsset {
 	path: string;
 	src: string;
 	pack?: string;
+	/** For a structure file: its jigsaw blocks. */
+	jigsaws?: OutputJigsaw[];
+	/** For a structure file: its size in blocks, x y z. */
+	size?: [number, number, number];
 }
 
 export interface DocSymbol {
@@ -79,6 +125,9 @@ export class Engine {
 	diagnostics = $state<Record<string, Diagnostic[]>>({});
 	output = $state<OutputFile[]>([]);
 	outputAssets = $state<OutputAsset[]>([]);
+	outputItems = $state<OutputItem[]>([]);
+	/** Project files nothing uses, so the packs leave them out. */
+	unusedAssets = $state<string[]>([]);
 	hasErrors = $state(false);
 	symbols = $state<Record<string, DocSymbol[]>>({});
 
@@ -168,9 +217,11 @@ export class Engine {
 		try {
 			await this.client.initializing;
 			this.client.sync();
-			const out = await this.client.request<object, { files: OutputFile[]; assets?: OutputAsset[]; hasErrors: boolean }>('mms/output', {});
+			const out = await this.client.request<object, { files: OutputFile[]; assets?: OutputAsset[]; items?: OutputItem[]; unusedAssets?: string[]; hasErrors: boolean }>('mms/output', {});
 			this.output = out.files;
 			this.outputAssets = out.assets ?? [];
+			this.outputItems = out.items ?? [];
+			this.unusedAssets = out.unusedAssets ?? [];
 			this.hasErrors = out.hasErrors;
 			const syms: Record<string, DocSymbol[]> = {};
 			await Promise.all(
@@ -207,6 +258,16 @@ export class Engine {
 		return this.client.request<object, ResourceKind[]>('mms/resourceKinds', {});
 	}
 
+	/** Refactorings for a range of a file, such as extracting an inline value to a declaration. */
+	async refactors(uri: string, range: Diagnostic['range']): Promise<Refactor[]> {
+		this.client.sync();
+		const actions = await this.client.request<
+			object,
+			{ title: string; edit?: { changes?: Record<string, TextEdit[]> }; data?: { rename?: { name: string } } }[]
+		>('textDocument/codeAction', { textDocument: { uri }, range, context: { diagnostics: [], only: ['refactor'] } });
+		return (actions ?? []).map((a) => ({ title: a.title, edits: a.edit?.changes?.[uri] ?? [], name: a.data?.rename?.name }));
+	}
+
 	/** The edits that fix every safely fixable problem in a file. */
 	async fixAll(uri: string): Promise<TextEdit[]> {
 		const actions = await this.client.request<object, { edit?: { changes?: Record<string, TextEdit[]> } }[]>('textDocument/codeAction', {
@@ -233,6 +294,16 @@ export class Engine {
 			textDocument: { uri }
 		});
 		return res?.data ?? [];
+	}
+
+	/** Inlay hints for a document, such as a custom item's base item. */
+	async inlayHints(uri: string): Promise<InlayHint[]> {
+		this.client.sync();
+		const res = await this.client.request<object, InlayHint[] | null>('textDocument/inlayHint', {
+			textDocument: { uri },
+			range: { start: { line: 0, character: 0 }, end: { line: 1 << 30, character: 0 } }
+		});
+		return res ?? [];
 	}
 
 	dispose() {

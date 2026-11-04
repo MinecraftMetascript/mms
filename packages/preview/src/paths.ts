@@ -33,5 +33,54 @@ export function inspectable(path: string | null): { kind: InspectKind; id: strin
 	return { kind, id: `${m[1]}:${m[3]}` };
 }
 
-/** What the preview pane shows for an output path: a preview, an inspector, or nothing. */
-export const shows = (path: string | null) => previewable(path) ?? inspectable(path);
+const jigsawPattern = /^data\/([^/]+)\/worldgen\/(template_pool|structure)\/(.+)\.json$/;
+
+/**
+ * The template pool or structure a jigsaw connection graph starts from.
+ * Any structure qualifies by path; only a jigsaw one has a graph.
+ */
+export function jigsawable(path: string | null): { kind: 'pool' | 'structure'; id: string } | null {
+	const m = path ? jigsawPattern.exec(path) : null;
+	return m ? { kind: m[2] === 'template_pool' ? 'pool' : 'structure', id: `${m[1]}:${m[3]}` } : null;
+}
+
+const functionPattern = /^data\/([^/]+)\/function\/(.+)\.mcfunction$/;
+
+/** The function an output path names, which the function preview runs. */
+export function runnable(path: string | null): { kind: 'function'; id: string } | null {
+	const m = path ? functionPattern.exec(path) : null;
+	return m ? { kind: 'function', id: `${m[1]}:${m[2]}` } : null;
+}
+
+/** The key an editor selects a custom item or book by. */
+export const itemPath = (id: string) => `item:${id}`;
+
+/** Whether an item stack (as JSON) is a written book with content. */
+export const isBook = (stack: string) => /"(minecraft:)?written_book_content"\s*:/.test(stack);
+
+/** The book an output path names, if it is item:<id> of a book in items. */
+export function bookAt(path: string | null, items: readonly { id: string; text: string }[] = []): { kind: 'book'; id: string } | null {
+	if (!path?.startsWith('item:')) return null;
+	const it = items.find((it) => itemPath(it.id) === path);
+	return it && isBook(it.text) ? { kind: 'book', id: it.id } : null;
+}
+
+/**
+ * The page of a book at a source line, from 0: the last page starting at
+ * or before it in the same file, or null when the line is in none.
+ */
+export function bookPageAt(pages: readonly { uri: string; range: { start: { line: number } } }[] | undefined, uri: string, line: number): number | null {
+	let at: number | null = null;
+	pages?.forEach((p, i) => {
+		if (p.uri === uri && p.range.start.line <= line) at = i;
+	});
+	return at;
+}
+
+/**
+ * What the preview pane shows for an output path: a preview, an
+ * inspector, a jigsaw graph, a book, a function run, or nothing. Books
+ * need the items to tell.
+ */
+export const shows = (path: string | null, items?: readonly { id: string; text: string }[]) =>
+	previewable(path) ?? inspectable(path) ?? jigsawable(path) ?? bookAt(path, items) ?? runnable(path);

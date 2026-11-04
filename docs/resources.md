@@ -94,7 +94,7 @@ A structure that generates in new chunks takes four resources, each naming the n
 
 | Kind | Says |
 | --- | --- |
-| `StructureSet` | how far apart structures start, with `RandomSpread(spacing, separation, salt)` |
+| `StructureSet` | how far apart structures start, with `RandomSpread(spacing = 24, separation = 8, salt = 1)` |
 | `Structure` | the biomes, the height, and for `Jigsaw(...)` the pool to start from |
 | `TemplatePool` | the templates (`.nbt` files) to place, with their processors |
 | `ProcessorList` | rules that change blocks as a template is placed |
@@ -104,6 +104,31 @@ A template's chests can get a loot table from a `Rule` processor with `block_ent
 ## Density functions
 
 `+`, `-`, `*` and `/` build `add`, `sub`, `mul` and `div`. Arithmetic on constants is folded. A unary `-x` is `x * -1`.
+
+## Inline values where an id is needed
+
+Some fields need an id, and the game will not load an inline value there. Examples are a surface rule's `NoiseThreshold` noise, a biome source's biome, and a template pool's fallback. A density function's noise is in the same group. The schema allows it inline, but the game seeds each noise from its id, so an inline noise fails when the world loads.
+
+You can still write the value inline in those fields. MMS checks it as its own declaration, writes it under `mms_gen/`, and puts its id in the field:
+
+```mms
+DensityFunction hills = Noise({ base_octave = -6, amplitude_modifiers = [1, 1] }, 1, 1)
+```
+
+This writes `worldgen/noise/mms_gen/hills/noise.json` and gives `hills` the noise `<ns>:mms_gen/hills/noise`. A second inline value of the same kind in the same declaration is named `noise_2`, and so on. Each inline noise gets its own id, so two identical inline noises still produce different noise. To share one noise, declare it with a name. Where the game does take inline values, such as density functions, features and surface rules, they stay inline.
+
+To turn an inline value into a declaration of its own, put the cursor in it and open the code actions (Ctrl/⌘+. in VS Code, Zed and the web editor). **Extract { ... } to a Noise declaration** moves the value above the declaration that holds it, as `Noise hills_noise = { ... }`, and writes `hills_noise` in its place. The action is offered for every value the build would write under `mms_gen/`, and for any inline value where an id of its kind would also do, such as an inline density function or predicate. The new name is the holding declaration's name and the field's name (or the kind's, for an argument), with a number added if it is taken. VS Code and the web editor open the rename box on it straight away; in Zed, press F2 to rename it.
+
+A function id takes a block of commands the same way, compiled as a `Function` with no parameters:
+
+```mms
+Advancement found = {
+  criteria = { got = { trigger = inventory_changed } }
+  rewards = { function = {
+    /say found it
+  } }
+}
+```
 
 ## Asset files
 
@@ -128,11 +153,15 @@ Each call stands for the id the file gets in your namespace: its base name, lowe
 
 Inside the quotes, completion lists the project's files of the helper's type, in VS Code, Zed and the web editor. A path to a file that is not there is an error.
 
-Textures, sounds and [resource pack declarations](#resource-packs) go into a resource pack built next to the data pack: `build-resources/` (set `resourcePack.output` in `mms.json` to change it), `<name>-resources.zip` with `mms build --zip`, and `<world>/resources.zip` with `mms build --world`, which Minecraft loads as that world's resource pack. `"icon": "art/icon.png"` in `mms.json` becomes `pack.png` in both packs.
+Textures, sounds and [resource pack declarations](#resource-packs) go into a resource pack built next to the data pack: `build-resources/` (set `resourcePack.output` in `mms.json` to change it), `<name>-resources.zip` with `mms build --zip`, and `<world>/resourcepacks/resources.zip` with `mms build --world`, the world's bundled pack, which Minecraft applies by itself when you open the world (rejoin after a rebuild). It is not sent to LAN players; a server needs `resource-pack` in `server.properties`. `"icon": "art/icon.png"` in `mms.json` becomes `pack.png` in both packs.
+
+A world has only one bundled pack, so `--world` merges into it instead of overwriting it: build several projects into the same world and each keeps its files. Rebuilding a project replaces only the files it wrote last time, recorded in `mms-world-pack.json` inside the zip (Minecraft ignores it). Lang files, `sounds.json`, atlases and fonts that several projects write are merged: keys are combined and atlas sources and font providers are appended. Any other file two projects both write goes to the one built last, with a warning. A `resources.zip` that MMS did not write, such as a hand-made pack, is kept the same way. The description in `pack.mcmeta` lists every pack in the zip. Data packs already sit side by side, in `<world>/datapacks/<namespace>`.
+
+The last line `mms build --world` prints says what to do in the game, from what changed since the last build into that world: `next step: run /reload in the world` when only functions, loot tables, recipes, advancements, predicates, item modifiers, structure templates or tags of built-in registries (blocks, items, entity types...) changed, and `next step: exit and rejoin the world` when worldgen, dimensions, other registry entries (enchantments, variants, damage types, dialogs...), their tags or the resource pack changed, since Minecraft reads those only when the world is opened. `next step: none` means the build wrote the same files as before. The VS Code World view shows the same advice after each build.
 
 Where the game takes a sound event either by id or inline, as a jukebox song's `sound_event` does, `Sound(...)` writes it inline, `{ "sound_id": "my_pack:tune" }`: the game's sound event registry is fixed, so a pack's own sound cannot be named there by id.
 
-Once a file is included, its id can also be written plainly elsewhere, with its namespace, such as `asset_id = my_pack:sunset`. An id in your namespace that nothing provides is reported by the [`external-asset`](lint.md) lint rule.
+Once a file is included, its id can also be written plainly elsewhere, with its namespace, such as `asset_id = my_pack:sunset`. An id in your namespace that nothing provides is reported by the [`external-asset`](lint.md) lint rule. Ids never include the file extension: the game adds `.png`, `.ogg`, `.nbt` or `.json` itself, so `my_pack:sunset.png` would name `sunset.png.png`. MMS warns about an id written with one (`mms/asset-extension`, with a quick fix) and leaves it out of the output.
 
 The web editor holds asset files too: **+ Add texture or sound** under the sources adds `.png`, `.ogg` and `.nbt` files, which keep their file name as their path. **Download resources** appears next to **Download pack** once there is a resource pack. Project zips carry the asset files both ways.
 
@@ -193,6 +222,7 @@ This writes `models/item/ember_shard.json` (a flat `item/generated` model of the
 | `parent` | the generated model's parent: `item/generated` by default, `item/handheld` for tools |
 | `model` | an existing model to show instead of one made from `texture` |
 | `item_model` | an `ItemModel` id, or an item model body such as `{ model = Select(...) }`, instead of the generated one |
+| `on_right_click`, `on_hit`, ... | functions to run when a player uses the item; see [item hooks](functions.md#item-hooks) |
 | `components` | more item components, given to every use |
 
 Without `texture`, `model` or `item_model`, the item keeps its base item's look and only gets its name and components.
@@ -211,4 +241,71 @@ Function give {
 - **Loot entries**: `ember_shard` or `Item(name = ember_shard, ...)` drop the base item with a `set_components` modifier ahead of the others.
 - **Commands**: `${ember_shard}` writes `amethyst_shard[item_model="embers:ember_shard",item_name={...}]`.
 
-Anywhere else that takes an item id, such as a recipe ingredient or an item tag, a custom item is an error: the game matches those by item id only, so they need the base item. A `Model`, `ItemModel` or `Lang` entry that the custom item also writes is reported as a duplicate.
+Anywhere else that takes an item id, such as a recipe ingredient or an item tag, a custom item is written as its base item, so changing `base` updates every use. The game matches those fields by item id only, so `{ A = ember_shard }` in a recipe accepts any amethyst shard, not only ember shards. The [`custom-item-base`](lint.md) hint marks each such use, and editors show the base item after the name. A custom item's own `base` must be a vanilla item. A `Model`, `ItemModel` or `Lang` entry that the custom item also writes is reported as a duplicate.
+
+To run code when a player right-clicks with the item, hits with it, eats it and so on, set its `on_*` fields to functions; see [item hooks](functions.md#item-hooks).
+
+## Books
+
+A `Book` is a written book. Its pages are written in book markup, a small Markdown-like format, instead of text components:
+
+```
+Objective deaths = "deathCount"
+
+Book guide = {
+  title = "Library Guide"
+  author = "The Librarian"
+  text = [
+    "# Welcome",
+    "This world hides {gold}three diaries{/} in old chests.",
+    "Press {key:jump} to climb.",
+    "---",
+    "[Find a chest](run:/function library:chest \"Places a chest here\")",
+    "You have died ${deaths[@s]} times.",
+  ]
+}
+```
+
+`text` holds one string per line. A line of `---` starts a new page. Long text reads better from its own file: `text = BookText("books/diary.mmsbook")` reads a `.mmsbook` file in the project, where the editor checks and completes the markup and shows its problems in the file itself.
+
+| Field | |
+| --- | --- |
+| `title` | the title on the cover and the item's name, at most 32 characters |
+| `author` | shown as "by ..." under the title |
+| `generation` | `original` (the default), `copy`, `copy_of_copy` or `tattered`. The last two cannot be copied in a crafting table |
+| `text` | the pages in book markup, as strings or `BookText("....mmsbook")` |
+| `pages` | the pages as text components, for full control, instead of `text` |
+| `components` | more item components, such as `lore`, given to every use |
+
+The book's name stands for the book wherever a [custom item](#custom-items) name works: `guide` in a loot entry, `guide * 2` as a recipe result, and `${guide}` in `/give @s ${guide}`.
+
+### Book markup
+
+| Markup | Shows |
+| --- | --- |
+| `# Heading` | a bold line |
+| `**bold**`, `*italic*`, `__underlined__`, `~~struck~~`, `\|\|obfuscated\|\|` | styled text |
+| `{gold}...{/}` | a color: one of the 16 named colors, or `#ff8800` |
+| `{bold red}...{/}` | styles combined: `bold`, `italic`, `underlined`, `strikethrough`, `obfuscated`, colors, `shadow:#3f1f00` (or `#3f1f0080`, or `none`) and `font:uniform` |
+| `{key:jump}` | the key the reader has bound, such as Space |
+| `{sprite:item/diamond}` | an inline icon; `atlas:gui` picks another atlas |
+| `{head:Notch}` | a player's head |
+| `{t:block.minecraft.stone}` | a translated text |
+| `[text](page:2)` | turns to page 2 |
+| `[text](run:/function demo:start)` | runs a command as the reader; MMS checks the command |
+| `[text](suggest:/tp @s ~ ~10 ~)`, `[text](copy:12345)`, `[text](https://...)` | puts text in chat, copies it, or opens a web page |
+| `[text](hover:A red gem)`, `[text](page:2 "Next")` | hover text, alone or after a target |
+| `${kills[@s]}`, `${wave}` | a score or a Global, filled in when the reader first opens the book |
+| `\*` | the character itself |
+
+A book page shows 14 lines of about 19 characters. Text past the last line is cut off in game, so the [`book-overflow`](lint.md) warning marks where a page runs over, measured with the vanilla font. Add a `---` line there.
+
+### Previewing a book
+
+The web editor's Preview tab shows a book as the game does: the open book texture, the page in the vanilla font with its colors and styles, scrambled `||obfuscated||` text, inline sprites and heads, and the page arrows. Click a page link or the arrows to turn pages, and point at a link to see its hover text. Clicking a command, copy or web link says what it would do. Scores, Globals and selectors are filled in when the reader first opens the book, so the preview lists them with sample values to try. The preview opens on the page the cursor is in, including in a `.mmsbook` file.
+
+In VS Code, the Preview lens above a `Book` opens it in the preview panel, and each page of a `.mmsbook` file has a "Preview page N" lens.
+
+The font, book texture and English translations come from the game's 26.3 assets, downloaded on first use. Project fonts that use their own textures, project textures in sprites, and real player skins are not drawn: those show as boxes, the missing-texture square and the default skin.
+
+The [`library`](../examples/library/) example has a guide given on first join and diaries in a chest loot table.

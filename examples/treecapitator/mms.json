@@ -1,0 +1,5 @@
+{
+  "$schema": "https://minecraftmetascript.github.io/mms/mms.schema.json",
+  "namespace": "treecap",
+  "description": "Treecapitator: chop a tree's log with an axe and every connected log above it falls too"
+}

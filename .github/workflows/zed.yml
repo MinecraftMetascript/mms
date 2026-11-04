@@ -51,7 +51,8 @@ jobs:
       # that commit must hold the grammar as it is now.
       - name: Grammar rev is current
         run: |
-          rev=$(sed -n 's/^rev = "\(.*\)"/\1/p' extension.toml)
+          # The rev of [grammars.mms]; other grammars come from elsewhere.
+          rev=$(awk '/^\[grammars\.mms\]/ {f=1; next} /^\[/ {f=0} f && /^rev = / {gsub(/rev = |"/, ""); print}' extension.toml)
           git cat-file -e "$rev^{commit}" || { echo "extension.toml rev $rev is not a commit in this repository"; exit 1; }
           if ! git diff --quiet "$rev" HEAD -- ../tree-sitter-mms/grammar.js ../tree-sitter-mms/src; then
             echo "The grammar changed since $rev. Commit the grammar, then set rev in editors/zed/extension.toml to that commit."

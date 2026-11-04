@@ -6,7 +6,11 @@ import (
 	"testing"
 	"testing/fstest"
 
+	"github.com/minecraftmetascript/mms/engine/command"
+	"github.com/minecraftmetascript/mms/engine/jsonv"
+	"github.com/minecraftmetascript/mms/engine/sema"
 	"github.com/minecraftmetascript/mms/engine/spec"
+	"github.com/minecraftmetascript/mms/engine/syntax"
 )
 
 const customItemSrc = `CustomItem ruby = {
@@ -103,8 +107,8 @@ func TestCustomItemErrors(t *testing.T) {
 		{`CustomItem a = { base = stick, model = item/stick, item_model = stick }`, "item_model replaces the generated models"},
 		{`CustomItem a = { base = stick, parent = item/handheld }`, "add a texture"},
 		{`CustomItem a = { base = stick, name = { english = "A" } }`, "not a language code"},
-		{"CustomItem a = { base = stick }\nItemTag t = [a]", "is a CustomItem"},
-		{"CustomItem a = { base = stick }\nRecipe r = Shapeless([a], stick)", "is a CustomItem"},
+		{"CustomItem a = { base = stick }\nCustomItem b = { base = a }", "base must be a vanilla item, such as its base minecraft:stick"},
+		{"CustomItem a = { base = stick }\nRecipe r = Shapeless([a], stick)", ""},
 		{"CustomItem a = { base = stick, texture = Texture(\"art/a.png\") }\nItemModel a = { model = Model(model = item/stick) }", "already made by CustomItem"},
 		{"ItemModel a = { model = Model(model = item/stick) }\nCustomItem a = { base = stick, texture = Texture(\"art/a.png\") }", "makes ItemModel 'demo:a', which is already declared"},
 		{"CustomItem a = { base = stick, texture = Texture(\"art/a.png\") }\nModel item/a = { parent = item/generated }", "already made by CustomItem"},
@@ -116,6 +120,53 @@ func TestCustomItemErrors(t *testing.T) {
 		if d := diagText(r); !strings.Contains(d, tc.want) {
 			t.Errorf("%s\nwant %q in:\n%s", tc.src, tc.want, d)
 		}
+	}
+}
+
+// A custom item in a plain item id field, such as an ingredient or an
+// item tag, is written as its base item, with a hint that says so. When
+// the base changes, so do its uses.
+func TestCustomItemAsBase(t *testing.T) {
+	p := New(spec.MustDefault(), Config{Namespace: "demo"})
+	p.SetFile("items.mms", `CustomItem ember = { base = amethyst_shard, name = "Ember" }`)
+	p.SetFile("main.mms", "Recipe torch = Shaped([\"A\", \"B\"], { A = ember, B = stick }, torch)\nItemTag hot = [ember, blaze_rod]\n")
+	emitted := func() map[string]string {
+		r, err := p.Analyze(context.Background())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if d := diagText(r); d != "" {
+			t.Fatalf("unexpected diagnostics:\n%s", d)
+		}
+		var hints []string
+		for _, d := range r.Diagnostics("main.mms") {
+			if d.Code == "lint/custom-item-base" {
+				hints = append(hints, d.Message)
+				if len(d.Fixes) == 0 || d.Fixes[0].Safe {
+					t.Errorf("fixes: %+v", d.Fixes)
+				}
+			}
+		}
+		if len(hints) != 2 {
+			t.Errorf("want 2 custom-item-base hints, got %q", hints)
+		}
+		got := map[string]string{}
+		for _, f := range r.Emit() {
+			got[f.Path] = string(f.Data)
+		}
+		return got
+	}
+	got := emitted()
+	if s := got["data/demo/recipe/torch.json"]; !strings.Contains(s, `"A": "minecraft:amethyst_shard"`) {
+		t.Errorf("torch.json:\n%s", s)
+	}
+	if s := got["data/demo/tags/item/hot.json"]; !strings.Contains(s, `"minecraft:amethyst_shard"`) {
+		t.Errorf("hot.json:\n%s", s)
+	}
+	p.SetFile("items.mms", `CustomItem ember = { base = blaze_powder, name = "Ember" }`)
+	got = emitted()
+	if s := got["data/demo/recipe/torch.json"]; !strings.Contains(s, `"A": "minecraft:blaze_powder"`) {
+		t.Errorf("torch.json was not rechecked:\n%s", s)
 	}
 }
 
@@ -190,6 +241,373 @@ func TestCustomItemNameEscapes(t *testing.T) {
 			if got := strings.TrimSpace(string(f.Data)); strings.Contains(got, "\n") || !strings.Contains(got, `fallback:"A\nB"`) {
 				t.Errorf("give.mcfunction:\n%s", got)
 			}
+		}
+	}
+}
+
+// TestRightClick checks on_right_click: the item's consumable,
+// use_effects and marker, the using_item advancement, the once-per-press
+// reward function and the objective's setup.
+func TestRightClick(t *testing.T) {
+	p := New(spec.MustDefault(), Config{Namespace: "demo"})
+	p.SetFile("main.mms", `
+CustomItem wand = {
+  base = stick
+  name = "Wand"
+  on_right_click = zap
+  components = { custom_data = { kind = "wand" } }
+}
+Function zap {
+  /say zap
+}
+Function give {
+  /give @s ${wand}
+}
+`)
+	r, _ := p.Analyze(context.Background())
+	if d := diagText(r); d != "" {
+		t.Fatalf("unexpected diagnostics:\n%s", d)
+	}
+	got := dumpFiles(r.Emit())
+	for _, want := range []string{
+		`give @s stick[item_name={translate:"item.demo.wand",fallback:"Wand"},custom_data={kind:"wand",mms_item:"demo:wand"},consumable={consume_seconds:1000000,animation:"none",has_consume_particles:false},use_effects={can_sprint:true,speed_multiplier:1,interact_vibrations:false}]`,
+		"=== data/demo/advancement/mms_gen/item_hook/wand/press.json\n",
+		`"trigger": "minecraft:using_item"`,
+		`"items": "minecraft:stick"`,
+		`"mms_item": "demo:wand"`,
+		`"function": "demo:mms_gen/item_hook/wand/press"`,
+		"=== data/demo/function/mms_gen/item_hook/wand/press.mcfunction\nadvancement revoke @s only demo:mms_gen/item_hook/wand/press\nexecute if score @s mms_click.demo matches 1.. run return run scoreboard players set @s mms_click.demo 2\nscoreboard players set @s mms_click.demo 2\nfunction demo:zap\n",
+		"=== data/demo/function/zap.mcfunction\nsay zap\n",
+		"scoreboard objectives add mms_click.demo dummy\n",
+		"scoreboard players remove @a[scores={mms_click.demo=1..}] mms_click.demo 1\n",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("missing %q in:\n%s", want, got)
+		}
+	}
+	if strings.Contains(got, "/ray") {
+		t.Errorf("a ray without on_use_on_block or on_right_click_entity:\n%s", got)
+	}
+
+	errs := map[string]string{
+		"CustomItem w = { base = stick, on_right_click = nope }":                                                                                       "mms/unknown-id",
+		"CustomItem w = { base = stick, on_hit = f }\nObjective f":                                                                                     "mms/unknown-id",
+		"CustomItem w = { base = stick, on_kill = f }\nFunction f(n: int) {\n  /say hi\n}":                                                             "mms/custom-item",
+		"CustomItem w = { base = apple, on_consume = f, on_hold_right_click = f }\nFunction f {\n}":                                                    "mms/custom-item",
+		"CustomItem w = { base = stick, on_hit = f, consume_on_use = 1 }\nFunction f {\n}":                                                             "mms/custom-item",
+		"CustomItem w = { base = stick, on_right_click = f, damage_on_use = 1 }\nFunction f {\n}":                                                      "mms/custom-item",
+		"CustomItem w = { base = stick, on_right_click = f, damage_on_use = 1, components = { max_damage = 5, max_stack_size = 4 } }\nFunction f {\n}": "mms/custom-item",
+		"CustomItem w = { base = stick, on_right_click = f, components = { custom_data = \"{a:1}\" } }\nFunction f {\n  /say hi\n}":                    "mms/custom-item",
+	}
+	for src, want := range errs {
+		p := New(spec.MustDefault(), Config{Namespace: "demo"})
+		p.SetFile("main.mms", src)
+		r, _ := p.Analyze(context.Background())
+		var codes []string
+		for _, d := range r.Diagnostics("main.mms") {
+			if d.Severity == syntax.SeverityError {
+				codes = append(codes, d.Code)
+			}
+		}
+		if len(codes) == 0 || codes[0] != want {
+			t.Errorf("%q: errors %v, want %s", src, codes, want)
+		}
+	}
+}
+
+// TestItemHooks checks every on_* field: each writes an advancement that
+// matches the schema and functions whose commands the command checker
+// accepts.
+func TestItemHooks(t *testing.T) {
+	pack := spec.MustDefault()
+	p := New(pack, Config{Namespace: "demo"})
+	p.SetFile("main.mms", `
+CustomItem staff = {
+  base = iron_sword
+  on_right_click = f
+  on_hold_right_click = f
+  on_use_on_block = f
+  on_right_click_entity = f
+  on_hit = f
+  on_kill = f
+  on_pickup = f
+  on_break = f
+}
+CustomItem pie = { base = pumpkin_pie, on_consume = f }
+CustomItem wand = {
+  base = blaze_rod
+  on_right_click_entity = f
+  on_use_on_block = f
+  on_break = f
+  consume_on_use = 1
+  damage_on_use = 2
+  components = { max_damage = 10 }
+}
+Function g {
+  /give @s ${wand}
+}
+Function f {
+  /say hi
+}
+`)
+	r, _ := p.Analyze(context.Background())
+	if d := diagText(r); d != "" {
+		t.Fatalf("unexpected diagnostics:\n%s", d)
+	}
+	files := map[string]string{}
+	for _, f := range r.Emit() {
+		files[f.Path] = string(f.Data)
+	}
+	want := map[string]string{
+		"press":  "minecraft:using_item",
+		"hit":    "minecraft:player_hurt_entity",
+		"kill":   "minecraft:player_killed_entity",
+		"pickup": "minecraft:thrown_item_picked_up_by_player",
+		"break":  "minecraft:item_durability_changed",
+	}
+	for name, trigger := range want {
+		path := "data/demo/advancement/mms_gen/item_hook/staff/" + name + ".json"
+		if !strings.Contains(files[path], trigger) {
+			t.Errorf("%s lacks %s:\n%s", path, trigger, files[path])
+		}
+	}
+	if !strings.Contains(files["data/demo/advancement/mms_gen/item_hook/pie/consume.json"], "minecraft:consume_item") {
+		t.Errorf("no consume advancement")
+	}
+	for _, f := range []string{"press/ray", "press/ray/entity"} {
+		if files["data/demo/function/mms_gen/item_hook/staff/"+f+".mcfunction"] == "" {
+			t.Errorf("no %s function", f)
+		}
+	}
+	if !strings.Contains(files["data/demo/function/mms_gen/item_hook/staff/press.mcfunction"], "function demo:f\nexecute if score") {
+		t.Errorf("hold should run before the press check:\n%s", files["data/demo/function/mms_gen/item_hook/staff/press.mcfunction"])
+	}
+	wand := func(f string) string {
+		return files["data/demo/function/mms_gen/item_hook/wand/press/"+f+".mcfunction"]
+	}
+	for f, want := range map[string]string{
+		"ray/block":           "function demo:f\nfunction demo:mms_gen/item_hook/wand/press/cost\n",
+		"ray/entity":          "execute as @p[tag=mms_clicker] run function demo:mms_gen/item_hook/wand/press/cost\n",
+		"cost":                "execute if items entity @s weapon.mainhand blaze_rod[custom_data~{mms_item:\"demo:wand\"}] run return run function demo:mms_gen/item_hook/wand/press/cost/mainhand\n",
+		"cost/offhand":        "item modify entity @s weapon.offhand {type:\"minecraft:set_count\",count:-1,add:true}\nitem modify entity @s weapon.offhand {type:\"minecraft:set_damage\",damage:-0.25,add:true}\n",
+		"cost/mainhand/break": "item replace entity @s weapon.mainhand with air\nplaysound entity.item.break player @a\nfunction demo:f\n",
+	} {
+		if !strings.Contains(wand(f), want) {
+			t.Errorf("press/%s lacks %q:\n%s", f, want, wand(f))
+		}
+	}
+	if g := files["data/demo/function/g.mcfunction"]; !strings.Contains(g, "max_damage=10,max_stack_size=1") {
+		t.Errorf("a wand with durability should not stack: %s", g)
+	}
+	cc := command.New(pack)
+	for path, data := range files {
+		switch {
+		case strings.HasPrefix(path, "data/demo/advancement/mms_gen/item_hook/"):
+			v, err := jsonv.Parse([]byte(data))
+			if err != nil {
+				t.Fatalf("%s: %v", path, err)
+			}
+			if errs := sema.Validate(pack, p.Kinds, "advancement", v); len(errs) > 0 {
+				t.Errorf("%s: %v\n%s", path, errs, data)
+			}
+		case strings.HasPrefix(path, "data/demo/function/mms_gen/item_hook/"):
+			for _, line := range strings.Split(strings.TrimSpace(data), "\n") {
+				if res := cc.Check(line); res.Problem != nil {
+					t.Errorf("%s: %q: %s", path, line, res.Problem.Message)
+				}
+			}
+		}
+	}
+}
+
+// TestRightClickIncremental checks that a function declared, removed
+// and declared again in another file is picked up by the item.
+func TestRightClickIncremental(t *testing.T) {
+	p := New(spec.MustDefault(), Config{Namespace: "demo"})
+	p.SetFile("item.mms", "CustomItem wand = { base = stick, on_use_on_block = zap }\n")
+	p.SetFile("zap.mms", "Function zap {\n  /say zap\n}\n")
+	errs := func() int {
+		r, _ := p.Analyze(context.Background())
+		n := 0
+		for _, d := range r.Diagnostics("item.mms") {
+			if d.Severity == syntax.SeverityError {
+				n++
+			}
+		}
+		return n
+	}
+	if n := errs(); n != 0 {
+		t.Fatalf("%d errors with the function", n)
+	}
+	p.SetFile("zap.mms", "")
+	if n := errs(); n == 0 {
+		t.Fatal("no error without the function")
+	}
+	p.SetFile("zap.mms", "Function zap {\n  /say zap\n}\n")
+	if n := errs(); n != 0 {
+		t.Fatalf("%d errors after declaring the function again", n)
+	}
+}
+
+// TestItemHookInline checks an inline { ... } block in an on_* field:
+// hoisting compiles it as a Function and the hook calls it.
+func TestItemHookInline(t *testing.T) {
+	p := New(spec.MustDefault(), Config{Namespace: "demo"})
+	p.SetFile("main.mms", `
+CustomItem staff = {
+  base = stick
+  on_right_click = {
+    /say hi
+  }
+  on_hit = {
+    /say hit
+  }
+}
+Function give {
+  /give @s ${staff}
+}
+`)
+	r, _ := p.Analyze(context.Background())
+	if d := diagText(r); d != "" {
+		t.Fatalf("unexpected diagnostics:\n%s", d)
+	}
+	got := dumpFiles(r.Emit())
+	for _, want := range []string{
+		"=== data/demo/function/mms_gen/staff/function.mcfunction\nsay hi\n",
+		"=== data/demo/function/mms_gen/staff/function_2.mcfunction\nsay hit\n",
+		"scoreboard players set @s mms_click.demo 2\nfunction demo:mms_gen/staff/function\n",
+		"advancement revoke @s only demo:mms_gen/item_hook/staff/hit\nfunction demo:mms_gen/staff/function_2\n",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("missing %q in:\n%s", want, got)
+		}
+	}
+}
+
+// TestProjectileHooks checks on_projectile_hit_block and
+// on_projectile_hit_entity on a bow and on an arrow: the enchantment
+// that runs them (valid against the schema), the tick scan that stamps
+// it on new arrows' weapons, and the base check.
+func TestProjectileHooks(t *testing.T) {
+	pack := spec.MustDefault()
+	p := New(pack, Config{Namespace: "demo"})
+	p.SetFile("main.mms", `
+CustomItem storm_bow = { base = bow, on_projectile_hit_entity = f }
+CustomItem boom = {
+  base = tipped_arrow
+  on_projectile_hit_block = f
+  on_projectile_hit_entity = {
+    /say hit
+  }
+}
+Function f {
+  /say hi
+}
+`)
+	r, _ := p.Analyze(context.Background())
+	if d := diagText(r); d != "" {
+		t.Fatalf("unexpected diagnostics:\n%s", d)
+	}
+	files := map[string]string{}
+	for _, f := range r.Emit() {
+		files[f.Path] = string(f.Data)
+	}
+	for path, want := range map[string]string{
+		"data/demo/function/mms_gen/tick.mcfunction":                      "execute as @e[type=#minecraft:arrows,tag=!mms_shot.demo] run function demo:mms_gen/projectile/spotted\n",
+		"data/demo/function/mms_gen/projectile/spotted.mcfunction":        "tag @s add mms_shot.demo\nexecute if data entity @s item.components.\"minecraft:custom_data\"{mms_item:\"demo:boom\"} run function demo:mms_gen/item_hook/boom/projectile\nexecute if data entity @s weapon.components.\"minecraft:custom_data\"{mms_item:\"demo:storm_bow\"} run function demo:mms_gen/item_hook/storm_bow/projectile\n",
+		"data/demo/function/mms_gen/item_hook/boom/projectile.mcfunction": "data modify entity @s weapon.components.\"minecraft:enchantments\".\"demo:mms_gen/item_hook/boom/projectile\" set value 1\n",
+		"data/demo/enchantment/mms_gen/item_hook/boom/projectile.json":    `"function": "demo:f"`,
+	} {
+		if !strings.Contains(files[path], want) {
+			t.Errorf("%s lacks %q:\n%s", path, want, files[path])
+		}
+	}
+	if s := files["data/demo/enchantment/mms_gen/item_hook/storm_bow/projectile.json"]; strings.Contains(s, "hit_block") || !strings.Contains(s, "post_attack") {
+		t.Errorf("storm_bow enchantment:\n%s", s)
+	}
+	cc := command.New(pack)
+	for path, data := range files {
+		switch {
+		case strings.HasPrefix(path, "data/demo/enchantment/"):
+			v, err := jsonv.Parse([]byte(data))
+			if err != nil {
+				t.Fatalf("%s: %v", path, err)
+			}
+			if errs := sema.Validate(pack, p.Kinds, "enchantment", v); len(errs) > 0 {
+				t.Errorf("%s: %v\n%s", path, errs, data)
+			}
+		case strings.HasPrefix(path, "data/demo/function/mms_gen/"):
+			for _, line := range strings.Split(strings.TrimSpace(data), "\n") {
+				if res := cc.Check(line); res.Problem != nil {
+					t.Errorf("%s: %q: %s", path, line, res.Problem.Message)
+				}
+			}
+		}
+	}
+
+	p = New(pack, Config{Namespace: "demo"})
+	p.SetFile("main.mms", "CustomItem w = { base = stick, on_projectile_hit_block = f }\nFunction f {\n}")
+	r, _ = p.Analyze(context.Background())
+	if d := diagText(r); !strings.Contains(d, "mms/custom-item") {
+		t.Errorf("a stick with a projectile hook: %s", d)
+	}
+}
+
+// TestProjectileLand checks on_projectile_land on a splash potion: the
+// tick scans for thrown potions and for markers left behind, the marker
+// that rides each one and holds the function, and the base check.
+func TestProjectileLand(t *testing.T) {
+	pack := spec.MustDefault()
+	p := New(pack, Config{Namespace: "demo"})
+	p.SetFile("main.mms", `
+CustomItem bomb = { base = splash_potion, on_projectile_land = boom }
+Function boom {
+  /say boom
+}
+`)
+	r, _ := p.Analyze(context.Background())
+	if d := diagText(r); d != "" {
+		t.Fatalf("unexpected diagnostics:\n%s", d)
+	}
+	files := map[string]string{}
+	for _, f := range r.Emit() {
+		files[f.Path] = string(f.Data)
+	}
+	for path, want := range map[string]string{
+		"data/demo/function/mms_gen/tick.mcfunction":                      "execute as @e[type=splash_potion,tag=!mms_shot.demo] run function demo:mms_gen/projectile/spotted\nexecute as @e[type=lingering_potion,tag=!mms_shot.demo] run function demo:mms_gen/projectile/spotted\nexecute as @e[type=marker,tag=mms_land.demo,predicate=!demo:mms_gen/projectile/riding] at @s run function demo:mms_gen/projectile/land\n",
+		"data/demo/function/mms_gen/projectile/spotted.mcfunction":        "execute if data entity @s Item.components.\"minecraft:custom_data\"{mms_item:\"demo:bomb\"} run function demo:mms_gen/item_hook/bomb/land\n",
+		"data/demo/function/mms_gen/item_hook/bomb/land/mount.mcfunction": "data modify entity @s data.mms_land set value \"demo:boom\"\nride @s mount @n[tag=mms_new]\nexecute unless predicate demo:mms_gen/projectile/riding run kill @s\n",
+		"data/demo/function/mms_gen/item_hook/bomb/land.mcfunction":       "execute at @s summon marker run function demo:mms_gen/item_hook/bomb/land/mount\n",
+		"data/demo/function/mms_gen/projectile/land/run.mcfunction":       "$function $(mms_land)\n",
+		"data/demo/predicate/mms_gen/projectile/riding.json":              `"vehicle": {}`,
+	} {
+		if !strings.Contains(files[path], want) {
+			t.Errorf("%s lacks %q:\n%s", path, want, files[path])
+		}
+	}
+	cc := command.New(pack)
+	for path, data := range files {
+		if strings.HasPrefix(path, "data/demo/function/mms_gen/") {
+			for _, line := range strings.Split(strings.TrimSpace(data), "\n") {
+				if strings.HasPrefix(line, "$") {
+					continue
+				}
+				if res := cc.Check(line); res.Problem != nil {
+					t.Errorf("%s: %q: %s", path, line, res.Problem.Message)
+				}
+			}
+		}
+	}
+	for _, src := range []string{
+		"CustomItem w = { base = snowball, on_projectile_land = f }\nFunction f {\n}",
+		"CustomItem w = { base = tipped_arrow, on_projectile_land = f }\nFunction f {\n}",
+		"CustomItem w = { base = splash_potion, on_projectile_hit_block = f }\nFunction f {\n}",
+	} {
+		p := New(pack, Config{Namespace: "demo"})
+		p.SetFile("main.mms", src)
+		r, _ := p.Analyze(context.Background())
+		if d := diagText(r); !strings.Contains(d, "mms/custom-item") {
+			t.Errorf("%q: %s", src, d)
 		}
 	}
 }

@@ -1,8 +1,10 @@
 <script lang="ts">
-	import { resolve } from '$app/paths';
+	import { asset, resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { guides } from '#lib/docs/docs.ts';
+	import Logo from '#lib/components/Logo.svelte';
 	import OnThisPage from '#lib/docs/OnThisPage.svelte';
+	import { credits } from '#lib/credits.ts';
 	import type { LayoutProps } from './$types';
 
 	let { children }: LayoutProps = $props();
@@ -17,7 +19,7 @@
 
 <div class="min-h-dvh bg-bg">
 	<header class="sticky top-0 z-10 flex items-center gap-3 border-b border-line bg-panel px-4 py-2">
-		<a class="font-semibold tracking-tight" href={resolve('/docs')}>MMS docs</a>
+		<a class="flex items-center gap-2 font-semibold tracking-tight" href={resolve('/docs')}><Logo class="h-6 w-auto" /><span class="text-muted">docs</span></a>
 		<button class="ml-auto rounded px-2 py-1 text-sm hover:bg-hover md:hidden" onclick={() => (open = !open)} aria-expanded={open}>Contents</button>
 		<a class="rounded px-2 py-1 text-sm text-accent hover:bg-hover md:ml-auto" href={resolve('/')}>Open the editor</a>
 	</header>
@@ -42,4 +44,12 @@
 			<OnThisPage root={main} />
 		</aside>
 	</div>
+	<footer class="border-t border-line px-4 py-4 text-xs text-muted">
+		<p class="mx-auto max-w-7xl">
+			Built on
+			{#each credits as c, i (c.name)}<a class="text-accent hover:underline" href={c.url} target="_blank" rel="noopener">{c.name}</a> by <a class="hover:underline" href={c.byUrl} target="_blank" rel="noopener">{c.by}</a>{i < credits.length - 2 ? ', ' : i === credits.length - 2 ? ' and ' : '. '}{/each}
+			Previews are rendered with Deepslate.
+			<a class="text-accent hover:underline" href={asset('third-party-licenses.txt')} target="_blank">Third-party licenses</a>.
+		</p>
+	</footer>
 </div>

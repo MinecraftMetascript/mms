@@ -3,6 +3,7 @@ package project
 import (
 	"archive/zip"
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -28,6 +29,14 @@ type OutFile struct {
 	// Asset is the project file a copied asset comes from. Its Data is
 	// nil until ReadAssets.
 	Asset string
+	// Implicit marks a file written for an inline value where an id is
+	// required; Span is that value's. Editors follow the cursor to the
+	// declaration's own file, not to these.
+	Implicit bool
+	// Labels names parts of the file by JSON pointer, from doc comments
+	// in the source, such as "/elements/2" for a template pool element
+	// written under a `/** @label Worn road cap */` comment.
+	Labels map[string]string
 }
 
 // Emit lays out the data pack: one file per resource, merged tags, raw
@@ -69,31 +78,35 @@ func (r *Result) Emit() []OutFile {
 		}
 		hooks[name][ns] = append(hooks[name][ns], ls...)
 	}
+	clicks := map[string]bool{}      // namespaces with a right-click hook
+	spotted := map[string][]string{} // namespaces with projectile hooks: their spotted lines
+	thrown := map[string]bool{}      // namespaces with on_projectile_land
 	consts := map[string]map[int32]bool{}
 	ret := map[string]bool{}
 	used := map[string]bool{} // namespaces whose objective the code uses
 	fnFiles := map[string]bool{}
-	addFn := func(d *Decl) {
-		for id, ls := range d.Fn.Files {
+	addFnOut := func(o *fn.Output, d *Decl, sp syntax.Span, implicit bool) {
+		for id, ls := range o.Files {
 			if fnFiles[id] {
 				continue // identical OnLoad bodies share their functions
 			}
 			fnFiles[id] = true
 			fns, fpath := splitID(id)
-			out = append(out, OutFile{Path: "data/" + fns + "/function/" + fpath + ".mcfunction", Data: lines(ls), Unit: d.Unit.Path, Span: d.D.Sp})
+			out = append(out, OutFile{Path: "data/" + fns + "/function/" + fpath + ".mcfunction", Data: lines(ls), Unit: d.Unit.Path, Span: sp, Implicit: implicit})
 			markUsed(used, ls)
 		}
-		ns, _ := splitID(d.Fn.ID())
+		ns, _ := splitID(o.ID())
 		if consts[ns] == nil {
 			consts[ns] = map[int32]bool{}
 		}
-		for v := range d.Fn.Consts {
+		for v := range o.Consts {
 			consts[ns][v] = true
 		}
-		if d.Fn.Ret {
+		if o.Ret {
 			ret[ns] = true
 		}
 	}
+	addFn := func(d *Decl) { addFnOut(d.Fn, d, d.D.Sp, false) }
 	// langs holds each lang file, so CustomItem names join the Lang
 	// declaration of their language.
 	type langFile struct {
@@ -110,6 +123,14 @@ func (r *Result) Emit() []OutFile {
 		return l
 	}
 	for _, d := range r.Order {
+		for _, h := range d.Hoisted {
+			if h.Fn != nil {
+				addFnOut(h.Fn, d, h.Sp, true)
+				continue
+			}
+			hns, hpath := splitID(h.ID)
+			out = append(out, OutFile{Path: h.Kind.Dir(hns) + "/" + hpath + ".json", Data: jsonv.Marshal(h.Value), Unit: d.Unit.Path, Span: h.Sp, Implicit: true})
+		}
 		id := d.ID()
 		ns, path := splitID(id)
 		switch {
@@ -138,6 +159,28 @@ func (r *Result) Emit() []OutFile {
 			if it.ItemModel != nil {
 				out = append(out, OutFile{Path: "assets/" + ns + "/items/" + path + ".json", Data: jsonv.Marshal(it.ItemModel), Unit: d.Unit.Path, Span: d.D.Sp, Pack: sema.ResourcePack})
 			}
+			hf := sema.ItemHookOutput(d.ID(), it)
+			for hid, adv := range hf.Advancements {
+				hns, hpath := splitID(hid)
+				out = append(out, OutFile{Path: "data/" + hns + "/advancement/" + hpath + ".json", Data: jsonv.Marshal(adv), Unit: d.Unit.Path, Span: d.D.Sp})
+			}
+			for fid, ls := range hf.Functions {
+				fns, fpath := splitID(fid)
+				out = append(out, OutFile{Path: "data/" + fns + "/function/" + fpath + ".mcfunction", Data: lines(ls), Unit: d.Unit.Path, Span: d.D.Sp})
+			}
+			if hf.Click {
+				clicks[ns] = true
+			}
+			for eid, e := range hf.Enchantments {
+				ens, epath := splitID(eid)
+				out = append(out, OutFile{Path: "data/" + ens + "/enchantment/" + epath + ".json", Data: jsonv.Marshal(e), Unit: d.Unit.Path, Span: d.D.Sp})
+			}
+			if len(hf.Spotted) > 0 {
+				spotted[ns] = append(spotted[ns], hf.Spotted...)
+			}
+			if hf.Thrown {
+				thrown[ns] = true
+			}
 			for _, lc := range it.Languages() {
 				l := lang("assets/"+ns+"/lang/"+lc+".json", d)
 				if l.o.Get(it.LangKey) == nil {
@@ -155,6 +198,9 @@ func (r *Result) Emit() []OutFile {
 				continue
 			}
 			f := OutFile{Path: d.Kind.Dir(ns) + "/" + path + ".json", Data: jsonv.Marshal(d.Value), Unit: d.Unit.Path, Span: d.D.Sp}
+			if d.Kind.Folder() == "worldgen/template_pool" {
+				f.Labels = elementLabels(d)
+			}
 			if d.Kind.Assets != "" {
 				f.Pack = sema.ResourcePack
 			}
@@ -189,6 +235,23 @@ func (r *Result) Emit() []OutFile {
 	// are alive again (@e skips dead players). Both run at the player.
 	for ns := range hooks["first_join"] {
 		out = append(out, OutFile{Path: "data/" + ns + "/advancement/mms_gen/first_join.json", Data: jsonv.Marshal(sema.FirstJoinAdvancement(ns))})
+	}
+	for ns, ls := range spotted {
+		tick, fns, preds := sema.ProjectileSetup(ns, ls, thrown[ns])
+		hook("tick", ns, tick)
+		for fid, fl := range fns {
+			fns, fpath := splitID(fid)
+			out = append(out, OutFile{Path: "data/" + fns + "/function/" + fpath + ".mcfunction", Data: lines(fl)})
+		}
+		for pid, pv := range preds {
+			pns, ppath := splitID(pid)
+			out = append(out, OutFile{Path: "data/" + pns + "/predicate/" + ppath + ".json", Data: jsonv.Marshal(pv)})
+		}
+	}
+	for ns := range clicks {
+		load, tick := sema.ClickSetup(ns)
+		objectives[ns] = append(objectives[ns], load...)
+		hook("tick", ns, tick)
 	}
 	for ns, ls := range hooks["respawn"] {
 		obj := sema.RespawnObjective(ns)
@@ -335,4 +398,39 @@ func Zip(files []OutFile) ([]byte, error) {
 		return nil, err
 	}
 	return buf.Bytes(), nil
+}
+
+// elementLabels reads the doc comments above the entries of a declared
+// object's `elements` list, as labels keyed by JSON pointer: a template
+// pool can list one structure several times with different processors,
+// and a label tells them apart in the jigsaw preview.
+func elementLabels(d *Decl) map[string]string {
+	obj, ok := d.D.Value.(*syntax.Object)
+	if !ok || obj.Body == nil || d.Unit == nil || d.Unit.File == nil {
+		return nil
+	}
+	var out map[string]string
+	for _, it := range obj.Body.Items {
+		f, ok := it.(*syntax.FieldStmt)
+		if !ok || f.Key == nil || f.Key.Text != "elements" {
+			continue
+		}
+		list, ok := f.Value.(*syntax.List)
+		if !ok {
+			continue
+		}
+		for i, e := range list.Elems {
+			doc := syntax.DocAt(d.Unit.File, e.Span().Start)
+			if doc == "" {
+				continue
+			}
+			if l := syntax.ParseDoc(doc).Label(); l != "" {
+				if out == nil {
+					out = map[string]string{}
+				}
+				out[fmt.Sprintf("/elements/%d", i)] = l
+			}
+		}
+	}
+	return out
 }

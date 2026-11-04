@@ -21,6 +21,17 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: editors/vscode/package-lock.json
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: engine/go.mod
+          cache-dependency-path: engine/go.sum
       - run: npm ci
       - run: npm run check
       - run: npm run package
+      # One platform-specific build, with mms bundled, to check the packaging;
+      # the release builds every target.
+      - run: node scripts/package-targets.mjs linux-x64
+      - name: The bundled mms runs
+        run: |
+          mkdir vsix && unzip -q mms-linux-x64-*.vsix -d vsix
+          vsix/extension/bin/mms version

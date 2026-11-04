@@ -1,4 +1,4 @@
-// Two new-looking items, built on vanilla ones. Each CustomItem writes a
+// New-looking items, built on vanilla ones. Each CustomItem writes a
 // flat item model drawn from its texture, the item model definition that
 // the item_model component names, and its name in the lang file. Its
 // name then stands for the base item with those components, wherever an
@@ -9,11 +9,29 @@
 // assets/embers/textures/item/ember_shard.png in the resource pack. Only
 // files that code names are copied, so art/ can hold drafts too.
 
-/** An amethyst shard that glows like a coal. */
+/**
+ * An amethyst shard that glows like a coal. Right-clicking with it uses
+ * one shard up.
+ */
 CustomItem ember_shard = {
   base = amethyst_shard
   name = "Ember Shard"
   texture = Texture("art/ember_shard.png")
+  on_right_click = warm
+  consume_on_use = 1
+}
+
+/**
+ * A blaze rod that lights fires. Each fire costs one point of its 32
+ * durability, and the wand breaks when it runs out. It keeps the blaze
+ * rod's look: there is no texture, so no model is written.
+ */
+CustomItem ember_wand = {
+  base = blaze_rod
+  name = "Ember Wand"
+  on_use_on_block = kindle
+  damage_on_use = 1
+  components = { max_damage = 32 }
 }
 
 /** A music disc that plays the song in music.mms. */
@@ -41,3 +59,24 @@ Recipe ember_disc = Shaped(
   },
   ember_disc,
 )
+
+/**
+ * Right-clicking with an Ember Shard puffs out flames and keeps the
+ * player safe from fire for a few seconds. The shard's on_right_click
+ * runs it once per press, as and at the player; holding the button down
+ * does not repeat it. consume_on_use then takes the shard.
+ */
+Function warm {
+  /particle flame ^ ^1.5 ^1 0.2 0.2 0.2 0.05 20
+  /playsound item.firecharge.use player @a
+  /effect give @s fire_resistance 5
+}
+
+/**
+ * Right-clicking a block with the Ember Wand lights a fire on top of it,
+ * if there is room. on_use_on_block runs positioned at the centre of the
+ * block, and damage_on_use then wears the wand down.
+ */
+Function kindle {
+  /setblock ~ ~1 ~ fire keep
+}

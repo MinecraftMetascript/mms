@@ -1,0 +1,141 @@
+=== data/dungeon/structure/caps/hall_cap.nbt
+(copy of structures/caps/hall_cap.nbt)
+=== data/dungeon/structure/caps/room_cap.nbt
+(copy of structures/caps/room_cap.nbt)
+=== data/dungeon/structure/halls/hall.nbt
+(copy of structures/halls/hall.nbt)
+=== data/dungeon/structure/halls/short_hall.nbt
+(copy of structures/halls/short_hall.nbt)
+=== data/dungeon/structure/rooms/room.nbt
+(copy of structures/rooms/room.nbt)
+=== data/dungeon/structure/rooms/vault.nbt
+(copy of structures/rooms/vault.nbt)
+=== data/dungeon/structure/start.nbt
+(copy of structures/start.nbt)
+=== data/dungeon/worldgen/structure/dungeon.json
+{
+  "type": "minecraft:jigsaw",
+  "biomes": "#minecraft:is_overworld",
+  "step": "underground_structures",
+  "spawn_overrides": {},
+  "start_pool": "dungeon:start",
+  "size": 6,
+  "start_height": {
+    "type": "minecraft:constant",
+    "value": {
+      "above_bottom": 20
+    }
+  },
+  "max_distance_from_center": 80,
+  "use_expansion_hack": false
+}
+=== data/dungeon/worldgen/structure_set/dungeon.json
+{
+  "structures": [
+    {
+      "structure": "dungeon:dungeon",
+      "weight": 1
+    }
+  ],
+  "placement": {
+    "type": "minecraft:random_spread",
+    "salt": 20261102,
+    "spacing": 32,
+    "separation": 12
+  }
+}
+=== data/dungeon/worldgen/template_pool/caps.json
+{
+  "fallback": "minecraft:empty",
+  "elements": [
+    {
+      "weight": 1,
+      "element": {
+        "element_type": "minecraft:single_pool_element",
+        "projection": "rigid",
+        "location": "dungeon:caps/hall_cap",
+        "processors": "minecraft:empty"
+      }
+    },
+    {
+      "weight": 1,
+      "element": {
+        "element_type": "minecraft:single_pool_element",
+        "projection": "rigid",
+        "location": "dungeon:caps/room_cap",
+        "processors": "minecraft:empty"
+      }
+    }
+  ]
+}
+=== data/dungeon/worldgen/template_pool/halls.json
+{
+  "fallback": "dungeon:caps",
+  "elements": [
+    {
+      "weight": 3,
+      "element": {
+        "element_type": "minecraft:single_pool_element",
+        "projection": "rigid",
+        "location": "dungeon:halls/hall",
+        "processors": "minecraft:empty"
+      }
+    },
+    {
+      "weight": 1,
+      "element": {
+        "element_type": "minecraft:single_pool_element",
+        "projection": "rigid",
+        "location": "dungeon:halls/short_hall",
+        "processors": "minecraft:empty"
+      }
+    }
+  ]
+}
+=== data/dungeon/worldgen/template_pool/rooms.json
+{
+  "fallback": "dungeon:caps",
+  "elements": [
+    {
+      "weight": 2,
+      "element": {
+        "element_type": "minecraft:single_pool_element",
+        "projection": "rigid",
+        "location": "dungeon:rooms/room",
+        "processors": "minecraft:empty"
+      }
+    },
+    {
+      "weight": 1,
+      "element": {
+        "element_type": "minecraft:single_pool_element",
+        "projection": "rigid",
+        "location": "dungeon:rooms/vault",
+        "processors": "minecraft:empty"
+      }
+    }
+  ]
+}
+=== data/dungeon/worldgen/template_pool/start.json
+{
+  "fallback": "minecraft:empty",
+  "elements": [
+    {
+      "weight": 1,
+      "element": {
+        "element_type": "minecraft:single_pool_element",
+        "projection": "rigid",
+        "location": "dungeon:start",
+        "processors": "minecraft:empty"
+      }
+    }
+  ]
+}
+=== pack.mcmeta
+{
+  "pack": {
+    "description": "A jigsaw dungeon: rooms and halls joined by jigsaw blocks, with a connection preview",
+    "min_format": 121,
+    "max_format": 121
+  }
+}

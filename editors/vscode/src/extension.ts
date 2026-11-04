@@ -7,19 +7,29 @@
 // the fix, while "MMS: Restart Language Server" keeps working.
 //
 // The preview panel (preview.ts) shows the web editor's worldgen previews.
+// The MMS side bar has the World view (world.ts), which builds the pack
+// into a Minecraft world, and the Pack view (packView.ts), which lists the
+// generated files. Both panels read the pack from output.ts.
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { LanguageClient, type LanguageClientOptions, type ServerOptions } from 'vscode-languageclient/node';
+import { PackOutput } from './output';
+import { PackView } from './packView';
 import { Previews } from './preview';
+import { WorldView } from './world';
 
 const releasesUrl = 'https://github.com/MinecraftMetascript/mms/releases';
 const exe = process.platform === 'win32' ? 'mms.exe' : 'mms';
 
+// bundled is the mms that platform-specific builds of the extension carry in
+// bin/ (see scripts/package-targets.mjs). Set on activation.
+let bundled: string | undefined;
+
 let client: LanguageClient | undefined;
 let output: vscode.OutputChannel | undefined;
-let previews: Previews | undefined;
+let pack: PackOutput | undefined;
 // Starts and restarts run one at a time, so a restart pressed while the
 // server is still starting does not race it.
 let queue: Promise<void> = Promise.resolve();
@@ -70,6 +80,29 @@ function findMms(): string | undefined {
 
 type Resolved = { command: string } | { error: string };
 
+// findBundled returns the mms shipped inside the extension, if this build of
+// the extension has one. The universal build (and a build from source) has
+// none and falls back to PATH.
+function findBundled(): string | undefined {
+	if (!bundled || !isFile(bundled)) return undefined;
+	if (process.platform !== 'win32') {
+		// Unpacking a .vsix can drop the executable bit.
+		try {
+			fs.accessSync(bundled, fs.constants.X_OK);
+		} catch {
+			try {
+				fs.chmodSync(bundled, 0o755);
+			} catch (e) {
+				log(`cannot make ${bundled} executable: ${e instanceof Error ? e.message : String(e)}`);
+				return undefined;
+			}
+		}
+	}
+	return bundled;
+}
+
+// resolveServer picks the mms to run: mms.path if set, then the one bundled
+// with the extension, then mms on PATH (or where `go install` puts it).
 function resolveServer(): Resolved {
 	const configured = vscode.workspace.getConfiguration('mms').get<string>('path')?.trim();
 	if (configured) {
@@ -79,9 +112,11 @@ function resolveServer(): Resolved {
 		}
 		return { command: p };
 	}
+	const own = findBundled();
+	if (own) return { command: own };
 	const found = findMms();
 	if (found) return { command: found };
-	return { error: 'The mms executable was not found on your PATH or in ~/go/bin.' };
+	return { error: 'This build of the extension does not include mms for your platform, and the mms executable was not found on your PATH or in ~/go/bin.' };
 }
 
 function reportStartFailure(reason: string) {
@@ -117,6 +152,21 @@ async function stop() {
 	}
 }
 
+/**
+ * Puts the cursor on a name and opens the rename box, as after an
+ * "Extract to ... declaration" action: the server picks a default name and
+ * this lets the user type a better one straight away.
+ */
+async function renameAt(uri: string, position: { line: number; character: number }) {
+	const doc = await vscode.workspace.openTextDocument(vscode.Uri.parse(uri));
+	const shown = vscode.window.visibleTextEditors.find((e) => e.document === doc);
+	const editor = await vscode.window.showTextDocument(doc, { viewColumn: shown?.viewColumn });
+	const at = new vscode.Position(position.line, position.character);
+	editor.selection = new vscode.Selection(at, at);
+	editor.revealRange(new vscode.Range(at, at));
+	await vscode.commands.executeCommand('editor.action.rename');
+}
+
 async function start() {
 	await stop();
 	const resolved = resolveServer();
@@ -127,15 +177,20 @@ async function start() {
 	log(`starting ${resolved.command} lsp`);
 	const serverOptions: ServerOptions = { command: resolved.command, args: ['lsp'] };
 	const clientOptions: LanguageClientOptions = {
-		documentSelector: [{ scheme: 'file', language: 'mms' }],
+		documentSelector: [
+			{ scheme: 'file', language: 'mms' },
+			{ scheme: 'file', language: 'mmsbook' }
+		],
 		outputChannel: output,
+		// Extract-to-declaration actions then call mms.renameAt on the new name.
+		initializationOptions: { renameAfterExtract: true },
 		// The server registers its own file watchers (mms.json, sources
 		// and asset files), so no synchronize.fileEvents here.
 		middleware: {
 			// Each analysis ends with diagnostics; the preview then fetches the new pack.
 			handleDiagnostics(uri, diagnostics, next) {
 				next(uri, diagnostics);
-				previews?.scheduleRefresh();
+				pack?.scheduleRefresh();
 			}
 		}
 	};
@@ -144,6 +199,7 @@ async function start() {
 	try {
 		await c.start();
 		log('server started');
+		pack?.scheduleRefresh();
 	} catch (e) {
 		const msg = e instanceof Error ? e.message : String(e);
 		reportStartFailure(`Running ${resolved.command} failed (${msg}).`);
@@ -156,13 +212,20 @@ function restart(): Promise<void> {
 }
 
 export function activate(context: vscode.ExtensionContext) {
+	bundled = path.join(context.extensionPath, 'bin', exe);
 	output = vscode.window.createOutputChannel('MMS Language Server');
-	previews = new Previews(context, () => client);
+	pack = new PackOutput(() => client);
+	const previews = new Previews(context, pack);
+	const world = new WorldView(context, pack, resolveServer, (line) => log(line));
 	context.subscriptions.push(
 		output,
+		pack,
 		previews,
-		vscode.commands.registerCommand('mms.showPreview', () => previews?.show()),
-		vscode.commands.registerCommand('mms.previewDeclaration', (path: string) => previews?.show(path)),
+		world,
+		new PackView(pack, () => world.project()),
+		vscode.commands.registerCommand('mms.showPreview', () => previews.show()),
+		vscode.commands.registerCommand('mms.previewDeclaration', (path: string, page?: number) => previews.show(path, page)),
+		vscode.commands.registerCommand('mms.renameAt', renameAt),
 		vscode.commands.registerCommand('mms.restartServer', () => restart()),
 		vscode.commands.registerCommand('mms.showOutput', () => output?.show(true)),
 		vscode.workspace.onDidChangeConfiguration((e) => {

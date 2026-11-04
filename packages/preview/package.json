@@ -13,6 +13,7 @@
 		},
 		"./worker": "./src/preview/preview.worker.ts",
 		"./paths": "./src/paths.ts",
+		"./tree": "./src/tree.ts",
 		"./theme.css": "./theme.css"
 	},
 	"scripts": {

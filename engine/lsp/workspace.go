@@ -2,6 +2,7 @@ package lsp
 
 import (
 	"context"
+	"github.com/minecraftmetascript/mms/engine/sema"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -28,7 +29,7 @@ type workspace struct {
 
 // contains reports whether the .mms file at path belongs to w on disk.
 func (w *workspace) contains(path string) bool {
-	if !strings.HasSuffix(path, ".mms") {
+	if !strings.HasSuffix(path, ".mms") && !sema.IsBookFile(path) {
 		return false
 	}
 	for _, root := range append([]string{w.root}, w.extra...) {
@@ -94,6 +95,7 @@ func (s *Server) discover(defCfg project.Config) {
 		// Asset helpers in loose files read from the first such folder.
 		def.root, def.extra = loose[0], loose[1:]
 		def.proj.Files = os.DirFS(def.root)
+		def.proj.Root = pathURI(def.root) + "/"
 	}
 	for _, root := range loose {
 		// SourceFiles leaves out folders with their own mms.json.
@@ -121,6 +123,7 @@ func (s *Server) load(dir string) *workspace {
 	w := &workspace{dir: dir, root: dir, proj: project.New(s.pack, cfg)}
 	// Asset helpers such as Texture("a.png") read project files.
 	w.proj.Files = os.DirFS(dir)
+	w.proj.Root = pathURI(dir) + "/"
 	s.projects[dir] = w
 	paths, err := cfg.SourceFiles(dir)
 	if err != nil {

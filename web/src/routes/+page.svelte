@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Logo from '#lib/components/Logo.svelte';
 	import { onMount, tick } from 'svelte';
 	import { asset, resolve } from '$app/paths';
 	import { LSPPlugin } from '@codemirror/lsp-client';
@@ -7,12 +8,17 @@
 	import Editor from '#lib/editor/Editor.svelte';
 	import Sidebar from '#lib/components/Sidebar.svelte';
 	import JsonView from '#lib/components/JsonView.svelte';
-	import { Engine, type Diagnostic, type DocSymbol, type OutputFile } from '#lib/engine/engine.svelte.ts';
-	import { Project, pathOf, uriOf, starter } from '#lib/project/project.svelte.ts';
+	import { Engine, itemKey, outputKey, type Diagnostic, type DocSymbol, type OutputFile } from '#lib/engine/engine.svelte.ts';
+	import { Project, pathOf, uriOf, starter, type ProjectData } from '#lib/project/project.svelte.ts';
 	import { examples } from '#lib/project/examples.ts';
 	import { download, hasResourcePack, isDataPack, packZip, projectZip, readProjectZip, readZip, readZipAssets } from '#lib/project/zip.ts';
 	import PasteJson from '#lib/components/PasteJson.svelte';
-	import { PinButton, PreviewPane, shows } from '@mms/preview';
+	import ProjectsDialog from '#lib/components/ProjectsDialog.svelte';
+	import AboutDialog from '#lib/components/AboutDialog.svelte';
+	import { requestPersistence } from '#lib/project/store.ts';
+	import Dropdown from '#lib/components/Dropdown.svelte';
+	import { fixAllKeys, formatKeys, mod, quickFixKeys } from '#lib/editor/shortcuts.ts';
+	import { bookPageAt, PinButton, PreviewPane, shows } from '@mms/preview';
 	import PreviewWorker from '@mms/preview/worker?worker';
 
 	const project = new Project();
@@ -24,23 +30,15 @@
 	let rightTab = $state<'preview' | 'json'>('preview');
 	let cursor = $state<{ uri: string; line: number } | null>(null);
 	let theme = $state<'system' | 'light' | 'dark'>('system');
-	let menu = $state(false);
-	let menuRoot: HTMLDivElement | undefined = $state();
-	let menuButton: HTMLButtonElement | undefined = $state();
-
-	// Close the Project menu on a click outside it, or on Escape.
-	function onWindowPointerDown(e: PointerEvent) {
-		if (menu && menuRoot && !menuRoot.contains(e.target as Node)) menu = false;
-	}
-	function onWindowKeydown(e: KeyboardEvent) {
-		if (menu && e.key === 'Escape') {
-			menu = false;
-			menuButton?.focus();
-		}
+	const themes = { system: 'System', light: 'Light', dark: 'Dark' } as const;
+	function nextTheme() {
+		theme = theme === 'system' ? 'light' : theme === 'light' ? 'dark' : 'system';
 	}
 	let fileInput: HTMLInputElement;
 	let pasteJson = $state<ReturnType<typeof PasteJson> | null>(null);
 	let editor = $state<ReturnType<typeof Editor> | null>(null);
+	let projects = $state<ReturnType<typeof ProjectsDialog> | null>(null);
+	let about = $state<ReturnType<typeof AboutDialog> | null>(null);
 
 	onMount(() => {
 		try {
@@ -64,7 +62,16 @@
 			syncEngine();
 			loaded = true;
 		});
-		return () => e.dispose();
+		// Save before the tab goes away; the save timer may not get to run.
+		const flush = () => void project.flush();
+		const onHide = () => document.visibilityState === 'hidden' && flush();
+		window.addEventListener('pagehide', flush);
+		document.addEventListener('visibilitychange', onHide);
+		return () => {
+			window.removeEventListener('pagehide', flush);
+			document.removeEventListener('visibilitychange', onHide);
+			e.dispose();
+		};
 	});
 
 	// Keep the server's file set and config in step with the project.
@@ -114,22 +121,44 @@
 	const cursorOutput = $derived.by(() => {
 		if (!engine || !cursor) return null;
 		const c = cursor;
-		return engine.output.find((f) => f.uri === c.uri && f.range && within(f.range, c.line)) ?? null;
+		// Files hoisted from inline values share their declaration's lines;
+		// the declaration's own file is the one to show.
+		// A custom item shows the item stack its name stands for: it may
+		// write no file at all, and its files are only its look and name.
+		// A book's .mmsbook file shows the book that reads it.
+		const it = engine.outputItems.find((it) => (it.uri === c.uri && within(it.range, c.line)) || bookPageAt(it.pages, c.uri, c.line) !== null);
+		if (it) return itemKey(it);
+		const f = engine.output.find((f) => f.uri === c.uri && f.range && !f.implicit && within(f.range, c.line));
+		return f ? outputKey(f) : null;
 	});
 	$effect(() => {
-		if (cursorOutput) selectedOutput = cursorOutput.path;
+		if (cursorOutput) selectedOutput = cursorOutput;
 	});
-	const selectedFile = $derived(engine?.output.find((f) => f.path === selectedOutput) ?? null);
+	const selectedFile = $derived.by((): OutputFile | null => {
+		if (!engine || !selectedOutput) return null;
+		const f = engine.output.find((f) => outputKey(f) === selectedOutput);
+		if (f) return f;
+		const it = engine.outputItems.find((it) => itemKey(it) === selectedOutput);
+		return it ? { path: it.id, text: it.text, uri: it.uri, range: it.range, item: it } : null;
+	});
 
 	// A pinned output keeps the Preview tab on one declaration while the
 	// cursor moves elsewhere; it still redraws as the pack changes. The JSON
 	// tab keeps following the cursor.
 	let pinned = $state<string | null>(null);
 	const previewPath = $derived(pinned ?? selectedOutput);
-	const pinnable = $derived(shows(previewPath));
+	const pinnable = $derived(shows(previewPath, engine?.outputItems));
 	function togglePin() {
-		pinned = pinned ? null : previewPath && shows(previewPath) ? previewPath : null;
+		pinned = pinned ? null : previewPath && shows(previewPath, engine?.outputItems) ? previewPath : null;
 	}
+	// A book opens on the page the cursor is in, and stays there while
+	// the cursor is outside its text.
+	let bookPage = $state(0);
+	$effect(() => {
+		const it = engine?.outputItems.find((it) => itemKey(it) === previewPath);
+		const at = it && cursor ? bookPageAt(it.pages, cursor.uri, cursor.line) : null;
+		if (at !== null) bookPage = at;
+	});
 
 	async function reveal(uri: string, range: Diagnostic['range']) {
 		const path = pathOf(uri);
@@ -152,22 +181,28 @@
 	function selectOutput(path: string) {
 		selectedOutput = path;
 		// A pinned preview stays on screen; otherwise show JSON for outputs with no preview.
-		if (!pinned && !shows(path)) rightTab = 'json';
+		if (!pinned && !shows(path, engine?.outputItems)) rightTab = 'json';
 	}
 
+	// Opens data as a new saved project; the open one stays saved.
+	async function openAsNew(data: ProjectData) {
+		await project.create(data);
+		onswitch();
+		// Asked on a user action, since Firefox shows a prompt for it.
+		void requestPersistence(true);
+	}
+	// Another project opened: forget this one's preview state.
+	function onswitch() {
+		pinned = null;
+		selectedOutput = null;
+		cursor = null;
+	}
 	function openExample(id: string) {
 		const ex = examples.find((e) => e.id === id);
-		menu = false;
-		if (!ex) return;
-		if (!confirm(`Open the ${ex.id} example? It replaces the current project; export it first to keep a copy.`)) return;
-		pinned = null;
-		project.replace(structuredClone(ex.data));
+		if (ex) void openAsNew(structuredClone(ex.data));
 	}
 	function newProject() {
-		menu = false;
-		if (!confirm('Start a new project? It replaces the current one; export it first to keep a copy.')) return;
-		pinned = null;
-		project.replace(structuredClone(starter));
+		void openAsNew(structuredClone(starter));
 	}
 	async function importZip(e: Event) {
 		const file = (e.target as HTMLInputElement).files?.[0];
@@ -181,9 +216,9 @@
 				const res = await engine.importPack([...entries].map(([path, text]) => ({ path, text })));
 				if (!res.files.length) throw new Error('the pack has no resources MMS can import');
 				const skipped = res.skipped.length ? ` ${res.skipped.length} file(s) cannot be imported and will be left out.` : '';
-				if (!confirm(`Import ${res.count} resource(s) from the data pack ${file.name}?${skipped} It replaces the current project.`)) return;
+				if (skipped && !confirm(`Import ${res.count} resource(s) from the data pack ${file.name}?${skipped}`)) return;
 				const files = res.files.map((f) => ({ path: f.path, text: f.text }));
-				project.replace({
+				await openAsNew({
 					name: file.name.replace(/\.zip$/i, ''),
 					config: { namespace: res.namespace, description: res.description || 'Imported with MMS' },
 					files,
@@ -191,11 +226,7 @@
 				});
 				return;
 			}
-			const data = readProjectZip(file.name, entries, readZipAssets(bytes));
-			if (confirm(`Import ${data.files.length} file(s) from ${file.name}? It replaces the current project.`)) {
-				pinned = null;
-				project.replace(data);
-			}
+			await openAsNew(readProjectZip(file.name, entries, readZipAssets(bytes)));
 		} catch (err) {
 			alert(`Could not import ${file.name}: ${err instanceof Error ? err.message : err}`);
 		}
@@ -252,59 +283,43 @@
 	);
 </script>
 
-<svelte:window onpointerdown={onWindowPointerDown} onkeydown={onWindowKeydown} />
-
 <div class="flex h-dvh flex-col">
-	<header class="flex items-center gap-3 border-b border-line bg-panel px-3 py-2">
-		<span class="font-semibold tracking-tight">MMS</span>
-		<span class="hidden text-sm text-muted sm:inline">{project.name}</span>
-		<div class="relative ml-2" bind:this={menuRoot}>
-			<button class="rounded px-2 py-1 text-sm whitespace-nowrap hover:bg-hover" bind:this={menuButton} onclick={() => (menu = !menu)} aria-expanded={menu}>Project ▾</button>
-			{#if menu}
-				<div class="absolute top-full left-0 z-20 mt-1 w-64 rounded-md border border-line bg-panel p-1 text-sm shadow-lg">
-					<button class="block w-full rounded px-2 py-1.5 text-left hover:bg-hover" onclick={newProject}>New project</button>
-					<button class="block w-full rounded px-2 py-1.5 text-left hover:bg-hover" onclick={() => { menu = false; fileInput.click(); }}>
+	<header class="flex items-center gap-2 border-b border-line bg-panel px-3 py-2">
+		<span class="flex shrink-0 items-center"><Logo class="h-6 w-auto sm:hidden" wordmark={false} /><Logo class="hidden h-6 w-auto sm:block" /></span>
+		<button class="hidden max-w-48 truncate rounded px-2 py-1 text-sm text-muted hover:bg-hover hover:text-ink sm:inline" onclick={() => projects?.open()} title="Switch, rename or delete saved projects" aria-label="{project.name} (switch project)">{project.name}</button>
+		<div class="flex items-center sm:ml-2">
+			<Dropdown label="Project">
+				{#snippet children(close)}
+					<button class="block w-full rounded px-2 py-1.5 text-left hover:bg-hover" onclick={() => { close(); newProject(); }}>New project</button>
+					<button class="block w-full rounded px-2 py-1.5 text-left hover:bg-hover" onclick={() => { close(); projects?.open(); }}>Open project…</button>
+					<button class="block w-full rounded px-2 py-1.5 text-left hover:bg-hover" onclick={() => { close(); fileInput.click(); }}>
 						<span class="block">Import zip…</span>
 						<span class="block text-xs text-muted">An MMS project or a data pack</span>
 					</button>
-					<button class="block w-full rounded px-2 py-1.5 text-left hover:bg-hover" disabled={!project.activeFile} onclick={() => { menu = false; pasteJson?.open(); }}>Paste JSON as MMS…</button>
-					<button class="block w-full rounded px-2 py-1.5 text-left hover:bg-hover" disabled={!project.activeFile} onclick={() => { menu = false; editor?.fixAll(); }}>
-						<span class="block">Fix all in this file</span>
-						<span class="block text-xs text-muted">Applies safe fixes (Ctrl/⌘+Alt+F)</span>
-					</button>
-					<button class="block w-full rounded px-2 py-1.5 text-left hover:bg-hover" onclick={() => { menu = false; download(`${project.name || 'project'}-source.zip`, projectZip(project.data())); }}>Export project zip</button>
-					<div class="my-1 border-t border-line"></div>
-					<div class="px-2 pt-1 pb-0.5 text-[11px] font-medium tracking-wide text-muted uppercase">Examples</div>
+					<button class="block w-full rounded px-2 py-1.5 text-left hover:bg-hover" onclick={() => { close(); download(`${project.name || 'project'}-source.zip`, projectZip(project.data())); }}>Export project zip</button>
+					<!-- Phones have no room for the About button in the top bar. -->
+					<button class="block w-full rounded px-2 py-1.5 text-left hover:bg-hover sm:hidden" onclick={() => { close(); about?.open(); }}>About and credits</button>
+				{/snippet}
+			</Dropdown>
+			<Dropdown label="Examples" panelClass="w-72">
+				{#snippet children(close)}
 					{#each examples as ex (ex.id)}
-						<button class="block w-full rounded px-2 py-1.5 text-left hover:bg-hover" onclick={() => openExample(ex.id)}>
+						<button class="block w-full rounded px-2 py-1.5 text-left hover:bg-hover" onclick={() => { close(); openExample(ex.id); }}>
 							<span class="block">{ex.id}</span>
 							<span class="block text-xs text-muted">{ex.description}</span>
 						</button>
 					{/each}
-					<div class="my-1 border-t border-line"></div>
-					<label class="flex items-center justify-between px-2 py-1.5">
-						Theme
-						<select class="rounded border border-line bg-panel px-1 py-0.5 text-sm" bind:value={theme}>
-							<option value="system">System</option>
-							<option value="light">Light</option>
-							<option value="dark">Dark</option>
-						</select>
-					</label>
-				</div>
-			{/if}
+				{/snippet}
+			</Dropdown>
 		</div>
-		<button
-			class="rounded px-2 py-1 text-sm whitespace-nowrap hover:bg-hover disabled:opacity-50"
-			disabled={!editor || !project.activeFile}
-			onclick={() => editor?.format()}
-			title="Format this file (Ctrl/⌘+S or Shift+Alt+F)">Format</button
-		>
+		<ProjectsDialog bind:this={projects} {project} {onswitch} />
+		<AboutDialog bind:this={about} />
 		<input type="file" accept=".zip" class="hidden" bind:this={fileInput} onchange={importZip} />
 		{#if engine}
 			<PasteJson bind:this={pasteJson} {engine} uri={uriOf(project.active)} oninsert={insertDecl} />
 		{/if}
-		<div class="ml-auto flex items-center gap-2 text-sm">
-			<span class="flex items-center gap-1.5 text-muted" role="status">
+		<div class="ml-auto flex items-center gap-1 text-sm sm:gap-2">
+			<span class="flex items-center gap-1.5 text-muted" role="status" title={statusText}>
 				<span
 					class="inline-block size-2 rounded-full {engine?.status === 'ready'
 						? totals.errors
@@ -316,12 +331,30 @@
 				></span>
 				<span class="hidden sm:inline">{statusText}</span>
 			</span>
-			<a class="rounded px-2 py-1 hover:bg-hover" href={resolve('/docs')}>Docs</a>
+			<a class="rounded px-1.5 py-1 hover:bg-hover sm:px-2" href={resolve('/docs')}>Docs</a>
+			<button class="hidden rounded p-1.5 hover:bg-hover sm:inline-block" onclick={() => about?.open()} aria-label="About and credits" title="About MMS, and credits: previews by Deepslate"
+				><svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 8h.01" /></svg></button
+			>
+			<button
+				class="rounded p-1.5 hover:bg-hover"
+				onclick={nextTheme}
+				aria-label="Theme: {themes[theme]}"
+				title="Theme: {themes[theme]} (click to change)"
+				><svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+					{#if theme === 'light'}
+						<circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
+					{:else if theme === 'dark'}
+						<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" />
+					{:else}
+						<circle cx="12" cy="12" r="9" /><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor" />
+					{/if}
+				</svg></button
+			>
 			{#if engine?.status === 'failed'}
 				<button class="rounded px-2 py-1 text-accent hover:bg-hover" onclick={() => engine?.restart()} title={engine.statusDetail}>Restart</button>
 			{/if}
 			{#if resourcePack}
-				<button class="rounded border border-accent px-3 py-1 font-medium text-accent hover:bg-hover" title="The textures, sounds, models and translations, for the world's resources.zip" onclick={() => exportPack(true)}><span class="sm:hidden">Resources</span><span class="hidden sm:inline">Download resources</span></button>
+				<button class="rounded border border-accent px-3 py-1 font-medium text-accent hover:bg-hover" title="The textures, sounds, models and translations, as a resource pack; put it in a world as resourcepacks/resources.zip" onclick={() => exportPack(true)}><span class="sm:hidden">Resources</span><span class="hidden sm:inline">Download resources</span></button>
 			{/if}
 			<button class="rounded bg-accent px-3 py-1 font-medium text-white hover:opacity-90 disabled:opacity-50" disabled={!engine?.output.length} onclick={() => exportPack()}><span class="sm:hidden">Pack</span><span class="hidden sm:inline">Download pack</span></button>
 		</div>
@@ -334,11 +367,29 @@
 			{/if}
 		</aside>
 		<section class="flex min-h-0 flex-col border-b border-line md:border-r md:border-b-0">
-			<div class="flex items-center gap-2 border-b border-line bg-panel px-2 py-1 md:hidden">
-				<select class="min-w-0 flex-1 rounded border border-line bg-panel px-1 py-0.5 text-sm" bind:value={project.active} aria-label="File">
+			<div class="flex items-center gap-1 border-b border-line bg-panel px-2 py-1 text-sm">
+				<select class="min-w-0 flex-1 rounded border border-line bg-panel px-1 py-0.5 md:hidden" bind:value={project.active} aria-label="File">
 					{#each project.files as f (f.path)}<option value={f.path}>{f.path}</option>{/each}
 				</select>
-				<span class="text-xs text-muted">{statusText}</span>
+				<span class="hidden min-w-0 flex-1 truncate text-xs text-muted md:block" title={project.active}>{project.active}</span>
+				<button
+					class="rounded px-2 py-0.5 whitespace-nowrap hover:bg-hover disabled:opacity-50"
+					disabled={!engine || !project.activeFile}
+					onclick={() => pasteJson?.open()}
+					title="Convert vanilla JSON to an MMS declaration and add it to this file"><span class="sm:hidden">JSON…</span><span class="hidden sm:inline">Paste JSON…</span></button
+				>
+				<button
+					class="rounded px-2 py-0.5 whitespace-nowrap hover:bg-hover disabled:opacity-50"
+					disabled={!editor || !project.activeFile}
+					onclick={() => editor?.fixAll()}
+					title="Apply every safe fix in this file ({fixAllKeys}). {quickFixKeys} shows the fixes at the cursor.">Fix all</button
+				>
+				<button
+					class="rounded px-2 py-0.5 whitespace-nowrap hover:bg-hover disabled:opacity-50"
+					disabled={!editor || !project.activeFile}
+					onclick={() => editor?.format()}
+					title="Format this file ({mod}+S or {formatKeys})">Format</button
+				>
 			</div>
 			<div class="min-h-0 flex-1">
 			{#if engine && loaded && project.activeFile}
@@ -378,6 +429,9 @@
 					<div class="h-full" class:hidden={rightTab !== 'preview'}>
 						<PreviewPane
 							output={engine.output}
+							items={engine.outputItems}
+							assets={engine.outputAssets}
+							page={bookPage}
 							path={previewPath}
 							{pinned}
 							onunpin={() => (pinned = null)}

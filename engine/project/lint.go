@@ -24,12 +24,26 @@ type Rule struct {
 
 // Rules lists every lint rule, sorted by id.
 var Rules = []*Rule{
+	{ID: "book-overflow", Severity: syntax.SeverityWarning, run: lintBookOverflow,
+		Doc: "A Book page with more text than the book screen shows: 14 lines of about 19 characters. The game cuts the rest off. Widths are measured with the vanilla font, so text outside ASCII is a close guess."},
 	{ID: "constant-expression", Severity: syntax.SeverityHint, run: lintConstant,
 		Doc: "An arithmetic expression of number literals can be written as its value."},
+	{ID: "custom-item-base", Severity: syntax.SeverityHint, run: lintCustomBase,
+		Doc: "A CustomItem used where the game takes a plain item id, such as a recipe ingredient or an item tag. It stands for its base item there, so it also matches the base item without the custom components."},
 	{ID: "deprecated", Severity: syntax.SeverityWarning, all: lintDeprecated,
 		Doc: "A use of a declaration whose doc comment has a `@deprecated` tag."},
 	{ID: "external-asset", Severity: syntax.SeverityWarning, all: lintExternalAsset,
 		Doc: "An id of a texture, sound or structure in the project's namespace that no Texture, Sound or Structure call in the project provides. The pack still loads, but the file must come from another pack."},
+	{ID: "jigsaw-facing", Severity: syntax.SeverityWarning, all: lintJigsawFacing,
+		Doc: "A jigsaw block that can never join its target: every jigsaw block with its target name in its pool faces a way it cannot meet. The game turns pieces only about the y axis, so a block facing up joins only one facing down, and a sideways block only a sideways one."},
+	{ID: "jigsaw-fit", Severity: syntax.SeverityWarning, all: lintJigsawFit,
+		Doc: "An internal jigsaw block (the block in front of it is inside its own piece, such as an arch mount on a road, or a jigsaw inset by a block by mistake) whose pool has pieces that stick out of the piece however they are turned. The game only places a piece joined at an internal jigsaw wholly inside its parent, so those pieces are never placed there. Height is not checked for terrain_matching pieces."},
+	{ID: "jigsaw-overlap", Severity: syntax.SeverityInfo, all: lintJigsawOverlap,
+		Doc: "A jigsaw block that can never grow when its piece joins a given parent: every piece its pool and the pool's fallback could place there overlaps the parent or the piece itself, however it is turned, and the game never places overlapping pieces. A junction narrower than the roads around it is the usual cause. Only certain cases are reported: every piece involved is a rigid project structure file with a known size and facing, and no pool involved has an empty or feature element."},
+	{ID: "jigsaw-pool", Severity: syntax.SeverityWarning, all: lintJigsawPool,
+		Doc: "A jigsaw block in a structure file that Structure(\"...\") includes draws from a pool in the project's namespace that no TemplatePool declares. The game skips the jigsaw, so the structure stops growing there. The quick fix declares the pool."},
+	{ID: "jigsaw-target", Severity: syntax.SeverityWarning, all: lintJigsawTarget,
+		Doc: "A jigsaw block whose target no piece of its pool can join: none of the pool's structure files has a jigsaw block with that name, or the pool has no pieces. Only pools whose pieces are all the project's own structure files are checked."},
 	{ID: "overrides-vanilla", Severity: syntax.SeverityInfo, run: lintOverrides,
 		Doc: "A declaration in the minecraft namespace replaces the vanilla resource with the same id."},
 	{ID: "quoted-name", Severity: syntax.SeverityHint, run: lintQuoted,
@@ -39,7 +53,9 @@ var Rules = []*Rule{
 	{ID: "use-sugar", Severity: syntax.SeverityHint, run: lintSugar,
 		Doc: "An object literal that has a shorter MMS form: an item entry as its id, `1..3` for a uniform provider or bounds, `diamond * 4` for a stack, a trigger call for a criterion, and `&&`, `||` and `!` for conditions."},
 	{ID: "unused", Severity: syntax.SeverityHint, all: lintUnused,
-		Doc: "A worldgen piece, predicate or item modifier that nothing in the project references, so the game never uses it."},
+		Doc: "A worldgen piece, predicate or item modifier that nothing in the project references, so the game never uses it. A TemplatePool counts as used when a jigsaw block in one of the project's structure files draws from it."},
+	{ID: "unused-asset", Severity: syntax.SeverityInfo,
+		Doc: "A .png, .ogg or .nbt file in the project that no Texture, Sound or Structure call and no `icon` uses, so the packs leave it out. It is reported on the file itself (in VS Code's Problems panel, by `mms check`, and in the web editor's asset list), and not while the project has errors."},
 }
 
 // RuleByID returns a rule, or nil.
@@ -85,6 +101,7 @@ var unusedFolders = map[string]bool{
 	"predicate":                                        true,
 	"item_modifier":                                    true,
 	"worldgen/multi_noise_biome_source_parameter_list": true,
+	"worldgen/template_pool":                           true,
 }
 
 type lintRun struct {
@@ -92,7 +109,8 @@ type lintRun struct {
 	out  map[string][]syntax.Diagnostic
 	rule *Rule
 	sev  syntax.Severity
-	cur  *[]syntax.Diagnostic // where per-declaration findings go
+	cur  *[]syntax.Diagnostic           // where per-declaration findings go
+	ext  map[string][]syntax.Diagnostic // and those in other files
 }
 
 func (l *lintRun) report(d *Decl, sp syntax.Span, msg string, fixes ...syntax.Fix) {
@@ -123,8 +141,8 @@ func (r *Result) lint() map[string][]syntax.Diagnostic {
 			continue
 		}
 		if d.lintKey != key {
-			d.lints = nil
-			l.cur = &d.lints
+			d.lints, d.extLints = nil, map[string][]syntax.Diagnostic{}
+			l.cur, l.ext = &d.lints, d.extLints
 			for _, rule := range Rules {
 				if rule.run == nil {
 					continue
@@ -136,6 +154,11 @@ func (r *Result) lint() map[string][]syntax.Diagnostic {
 			d.lintKey = key
 		}
 		l.out[d.Unit.Path] = append(l.out[d.Unit.Path], d.lints...)
+		for path, ds := range d.extLints {
+			if r.Unit(path) != nil {
+				l.out[path] = append(l.out[path], ds...)
+			}
+		}
 	}
 	for _, rule := range Rules {
 		if rule.all == nil {
@@ -333,6 +356,24 @@ func lintNamespace(l *lintRun, d *Decl) {
 	})
 }
 
+func lintCustomBase(l *lintRun, d *Decl) {
+	syntax.Walk(d.D, func(n syntax.Node) bool {
+		in := d.Info[n]
+		if in == nil || in.Base == "" || in.Symbol == nil {
+			return true
+		}
+		name, base := in.Symbol.Path, strings.TrimPrefix(in.Base, "minecraft:")
+		fix := base
+		if l.r.Syms.Find("item", d.NS+":"+base) != nil {
+			fix = in.Base // a custom item of the same name would win
+		}
+		// Not Safe: the custom item keeps the recipe following its base.
+		l.report(d, n.Span(), fmt.Sprintf("'%s' stands for its base item %s here: this field takes a plain item id, so any %s matches, not only %s", name, base, base, name),
+			syntax.Fix{Title: "Write " + fix, Edits: []syntax.TextEdit{{Sp: n.Span(), Text: fix}}})
+		return true
+	})
+}
+
 func lintSugar(l *lintRun, d *Decl) {
 	src := d.Unit.File.Src
 	// Objects that are operands of an operator need parentheses when they
@@ -461,6 +502,12 @@ func lintUnused(l *lintRun) {
 			used[ref] = true
 		}
 	}
+	// A jigsaw block in a structure file draws from a pool by id.
+	for _, s := range l.jigsaws().uses {
+		for _, j := range s.jigsaws {
+			used["worldgen/template_pool|"+j.Pool] = true
+		}
+	}
 	var unused []*sema.Symbol
 	for _, s := range r.Syms.All() {
 		if s.NS == "minecraft" || !unusedFolders[s.Kind.Folder()] || used[s.Kind.Folder()+"|"+s.ID()] || used[s.ID()] || s.Decl.Name == nil {
@@ -562,5 +609,19 @@ func lintDeprecated(l *lintRun) {
 				Code: "lint/deprecated", Severity: l.sev, Sp: u.sp, Deprecated: true, Message: msg,
 			})
 		}
+	}
+}
+
+func lintBookOverflow(l *lintRun, d *Decl) {
+	if d.Item == nil {
+		return
+	}
+	for _, ov := range d.Item.Overflows {
+		msg := fmt.Sprintf("%spage %d runs to %d lines, but a book page shows 14, so the game cuts the rest off from here; start a new page with a --- line", ov.Where, ov.Page, ov.Lines)
+		if ov.File != "" {
+			l.ext[ov.File] = append(l.ext[ov.File], syntax.Diagnostic{Code: "lint/" + l.rule.ID, Severity: l.sev, Message: msg, Sp: ov.Sp})
+			continue
+		}
+		l.report(d, ov.Sp, msg)
 	}
 }

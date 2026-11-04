@@ -545,7 +545,7 @@ func (p *printer) expr(e syntax.Expr) doc {
 		}
 		return cat(lo, txt(".."), hi)
 	case *syntax.Member, *syntax.Call, *syntax.Index, *syntax.Trailing:
-		return p.chain(e)
+		return p.chain(e, 0)
 	}
 	return nil
 }
@@ -658,7 +658,10 @@ func (p *printer) binary(b *syntax.Binary) doc {
 // chain prints calls, member access, indexes and trailing blocks. A chain
 // with two or more `.method(...)` steps breaks before every dot when it
 // does not fit.
-func (p *printer) chain(e syntax.Expr) doc {
+//
+// maxFlat, when set, caps the flat width of the outermost call's argument
+// list once the enclosing list has broken (see nestedArgWidth).
+func (p *printer) chain(e syntax.Expr, maxFlat int) doc {
 	type step struct {
 		member bool
 		d      doc
@@ -690,7 +693,12 @@ loop:
 	for i := len(nodes) - 1; i >= 0; i-- {
 		switch x := nodes[i].(type) {
 		case *syntax.Call:
-			steps = append(steps, step{d: p.args(x.Args, x.ArgsSp.End)})
+			d := p.args(x.Args, x.ArgsSp.End)
+			if g, ok := d.(group); ok && i == 0 && maxFlat > 0 {
+				g.maxFlat = maxFlat
+				d = g
+			}
+			steps = append(steps, step{d: d})
 		case *syntax.Index:
 			var items []item
 			for _, a := range x.Args {
@@ -743,8 +751,65 @@ func (p *printer) indexArg(a *syntax.Arg) doc {
 }
 
 func (p *printer) arg(a *syntax.Arg) doc {
+	v := p.argValue(a.Value)
 	if a.Name != nil {
-		return cat(txt(a.Name.Text+" = "), p.expr(a.Value))
+		return cat(txt(a.Name.Text+" = "), v)
 	}
-	return p.expr(a.Value)
+	return v
+}
+
+// nestedArgWidth is the widest a nested call may print on one line as an
+// argument of a call that already broke one argument per line. A nested
+// call is one with two or more arguments, at least one of which holds
+// another call with two or more arguments. Past the width it breaks too,
+// so chains such as RangeChoice(..., RangeChoice(..., RangeChoice(...)))
+// step down one level per line instead of leaving a long tail of calls on
+// one line. Short ones like Add(Mul(a, b), c) and wrappers with one
+// argument like Not(...) keep the plain fits-or-breaks rule.
+const nestedArgWidth = 40
+
+// argValue prints an argument value, applying nestedArgWidth to a call
+// with calls in its arguments.
+func (p *printer) argValue(e syntax.Expr) doc {
+	if c, ok := e.(*syntax.Call); ok && len(c.Args) >= 2 && argsHaveCall(c.Args) {
+		return p.chain(c, nestedArgWidth)
+	}
+	return p.expr(e)
+}
+
+// argsHaveCall reports whether any argument contains a call with two or
+// more arguments.
+func argsHaveCall(args []*syntax.Arg) bool {
+	for _, a := range args {
+		if hasCall(a.Value) {
+			return true
+		}
+	}
+	return false
+}
+
+func hasCall(e syntax.Expr) bool {
+	switch e := e.(type) {
+	case *syntax.Call:
+		return len(e.Args) >= 2 || hasCall(e.Fn) || argsHaveCall(e.Args)
+	case *syntax.Paren:
+		return hasCall(e.X)
+	case *syntax.Unary:
+		return hasCall(e.X)
+	case *syntax.Binary:
+		return hasCall(e.L) || hasCall(e.R)
+	case *syntax.Range:
+		return e.Lo != nil && hasCall(e.Lo) || e.Hi != nil && hasCall(e.Hi)
+	case *syntax.Member:
+		return hasCall(e.X)
+	case *syntax.Index:
+		return hasCall(e.X)
+	case *syntax.List:
+		for _, x := range e.Elems {
+			if hasCall(x) {
+				return true
+			}
+		}
+	}
+	return false
 }

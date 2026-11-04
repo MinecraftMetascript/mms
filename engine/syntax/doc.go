@@ -1,8 +1,11 @@
 package syntax
 
 import (
+	"sort"
 	"strings"
 	"unicode"
+
+	"github.com/minecraftmetascript/mms/engine/syntax/parser"
 )
 
 // cleanDoc turns the text of a /** */ comment into its content: the
@@ -193,3 +196,32 @@ func (d Doc) Markdown() string {
 }
 
 func oneLine(s string) string { return strings.Join(strings.Fields(s), " ") }
+
+// DocAt returns the doc comment that directly precedes offset pos in f,
+// with only whitespace between, such as one above a list element.
+func DocAt(f *File, pos int) string {
+	i := sort.Search(len(f.Tokens), func(i int) bool { return f.Tokens[i].Sp.Start >= pos })
+	for i--; i >= 0; i-- {
+		t := f.Tokens[i]
+		switch t.Kind {
+		case parser.MMSLexerWS, parser.MMSLexerNEWLINE:
+			continue
+		case parser.MMSLexerDOC_COMMENT:
+			return cleanDoc(t.Text)
+		}
+		return ""
+	}
+	return ""
+}
+
+// Label is a short name for what a doc comment documents: its `@label`
+// tag, or else the first line of its description.
+func (d Doc) Label() string {
+	for _, t := range d.Other {
+		if t.Name == "label" && strings.TrimSpace(t.Text) != "" {
+			return strings.TrimSpace(t.Text)
+		}
+	}
+	first, _, _ := strings.Cut(strings.TrimSpace(d.Text), "\n")
+	return strings.TrimSpace(first)
+}

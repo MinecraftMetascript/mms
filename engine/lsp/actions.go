@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 
+	"github.com/minecraftmetascript/mms/engine/ide"
 	"github.com/minecraftmetascript/mms/engine/syntax"
 )
 
@@ -68,6 +69,24 @@ func (s *Server) codeAction(ctx context.Context, p struct {
 			}
 		}
 	}
+	if want("refactor.extract") {
+		for _, x := range w.session().Extractions(uri, from, to) {
+			// The name's position after the edits: the declaration is
+			// inserted at a line start, ahead of the replaced value.
+			at := l.pos(x.Edits[0].Span.Start)
+			at.Character += len(x.Kind) + 1
+			a := map[string]any{
+				"title": x.Title,
+				"kind":  "refactor.extract",
+				"edit":  map[string]any{"changes": map[string]any{uri: editsJSON(l, toSyntaxEdits(x.Edits))}},
+				"data":  map[string]any{"rename": map[string]any{"uri": uri, "position": at, "name": x.Name}},
+			}
+			if s.renameAfterExtract {
+				a["command"] = map[string]any{"title": "Rename", "command": "mms.renameAt", "arguments": []any{uri, at}}
+			}
+			out = append(out, a)
+		}
+	}
 	if want("source.fixAll.mms") {
 		// Fixes can expose more (an object inside one that became a call),
 		// so fix in rounds on the project, then put the text back.
@@ -89,4 +108,12 @@ func (s *Server) codeAction(ctx context.Context, p struct {
 		}
 	}
 	return out, nil
+}
+
+func toSyntaxEdits(edits []ide.Edit) []syntax.TextEdit {
+	out := make([]syntax.TextEdit, 0, len(edits))
+	for _, e := range edits {
+		out = append(out, syntax.TextEdit{Sp: e.Span, Text: e.Text})
+	}
+	return out
 }

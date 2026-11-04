@@ -1,0 +1,193 @@
+=== data/library/advancement/mms_gen/first_join.json
+{
+  "criteria": {
+    "join": {
+      "trigger": "minecraft:tick"
+    }
+  },
+  "rewards": {
+    "function": "library:mms_gen/first_join"
+  }
+}
+=== data/library/function/chest.mcfunction
+setblock ~ ~ ~ chest{LootTable:"library:old_chest"}
+=== data/library/function/mms_gen/first_join.mcfunction
+function library:mms_gen/first_join/f9e05114
+=== data/library/function/mms_gen/first_join/f9e05114.mcfunction
+give @s written_book[written_book_content={pages:[["",{text:"Welcome",bold:true},"\nThis world hides ",{text:"three diaries",color:"gold"}," in old chests.\n\nPress ",{keybind:"key.inventory"}," to see what you carry, and ",{keybind:"key.jump"}," to climb.\n\n",{text:"Contents",click_event:{action:"change_page",page:2},hover_event:{action:"show_text",value:"Turn to the contents"}}],["",{text:"Contents",bold:true},"\n",{text:"Find a chest",click_event:{action:"run_command",command:"function library:chest"},hover_event:{action:"show_text",value:"Places a chest here"}},"\n",{text:"About the diaries",click_event:{action:"change_page",page:3}},"\n\nYou have died ",{score:{name:"@s",objective:"deaths"}}," times. ",{text:"Careful.",color:"dark_gray"}],["",{text:"The diaries",bold:true},"\nA miner kept them while digging too deep. Each chest holds one; collect the set to learn what ",{text:"happened",obfuscated:true},"."]],title:"Library Guide",author:"The Librarian"}]
+=== data/library/function/mms_gen/load.mcfunction
+scoreboard objectives add deaths deathCount
+=== data/library/loot_table/old_chest.json
+{
+  "pools": [
+    {
+      "rolls": 1,
+      "entries": [
+        {
+          "type": "minecraft:item",
+          "name": "minecraft:written_book",
+          "modifier": [
+            {
+              "type": "minecraft:set_components",
+              "components": {
+                "written_book_content": {
+                  "pages": [
+                    [
+                      "",
+                      {
+                        "text": "Day 12",
+                        "bold": true
+                      },
+                      "\nThe lamps went out again at the bottom of the shaft. We relit them with the last of the ",
+                      {
+                        "text": "dry",
+                        "italic": true
+                      },
+                      " matches.\n\nTomas says the stone down here is ",
+                      {
+                        "text": "warm",
+                        "bold": true
+                      },
+                      "."
+                    ],
+                    [
+                      "",
+                      "Something knocks behind the east wall. Three knocks, a pause, three knocks.\n\n",
+                      {
+                        "text": "We do not knock back.",
+                        "color": "dark_red"
+                      }
+                    ]
+                  ],
+                  "title": "Diary, Day 12",
+                  "author": "A Miner",
+                  "generation": 3
+                }
+              }
+            }
+          ]
+        },
+        {
+          "type": "minecraft:item",
+          "name": "minecraft:written_book",
+          "modifier": [
+            {
+              "type": "minecraft:set_components",
+              "components": {
+                "written_book_content": {
+                  "pages": [
+                    [
+                      "",
+                      {
+                        "text": "Day 13",
+                        "bold": true
+                      },
+                      "\nTomas did not come up with the morning shift.\n\nWe found his pick by the east wall. The wall has a hole in it now, about the size of a ",
+                      {
+                        "type": "object",
+                        "object": "player",
+                        "player": {
+                          "name": "Steve"
+                        }
+                      },
+                      "."
+                    ]
+                  ],
+                  "title": "Diary, Day 13",
+                  "author": "A Miner",
+                  "generation": 3
+                }
+              }
+            }
+          ]
+        },
+        {
+          "type": "minecraft:item",
+          "name": "minecraft:written_book",
+          "modifier": [
+            {
+              "type": "minecraft:set_components",
+              "components": {
+                "written_book_content": {
+                  "pages": [
+                    [
+                      "",
+                      {
+                        "text": "Day 14",
+                        "bold": true
+                      },
+                      "\nI can hear it digging ",
+                      {
+                        "text": "towards",
+                        "italic": true
+                      },
+                      " the camp.\n\nIf you are reading this, seal the shaft. Do not go down past the ",
+                      {
+                        "type": "object",
+                        "object": "atlas",
+                        "sprite": "minecraft:block/deepslate"
+                      },
+                      " deepslate.\n\n",
+                      {
+                        "text": "It knows the way up now.",
+                        "obfuscated": true
+                      }
+                    ]
+                  ],
+                  "title": "Diary, Day 14",
+                  "author": "A Miner",
+                  "generation": 3
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "rolls": {
+        "type": "minecraft:uniform",
+        "min": 1,
+        "max": 3
+      },
+      "entries": [
+        {
+          "type": "minecraft:item",
+          "name": "minecraft:torch"
+        },
+        {
+          "type": "minecraft:item",
+          "name": "minecraft:coal"
+        },
+        {
+          "type": "minecraft:item",
+          "name": "minecraft:paper",
+          "modifier": [
+            {
+              "type": "minecraft:set_count",
+              "count": {
+                "type": "minecraft:uniform",
+                "min": 1,
+                "max": 4
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+=== data/minecraft/tags/function/load.json
+{
+  "values": [
+    "library:mms_gen/load"
+  ]
+}
+=== pack.mcmeta
+{
+  "pack": {
+    "description": "Written books: a guide for new players and lore found in chests",
+    "min_format": 121,
+    "max_format": 121
+  }
+}

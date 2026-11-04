@@ -279,7 +279,17 @@ module.exports = grammar({
 
     tag: ($) => seq('#', choice($.identifier, $.resource_location)),
     selector: ($) => seq('@', $.identifier),
-    coordinates: ($) => prec.right(repeat1(seq(choice('~', '^'), optional(seq(optional('-'), $.number))))),
+    // The offset is joined to its ~ or ^ (~-1, ^1.5), so ^ ^-0.7 is one
+    // coordinate list, not a subtraction.
+    coordinates: ($) =>
+      prec.right(
+        repeat1(
+          seq(
+            choice('~', '^'),
+            optional(seq(optional(token.immediate(prec(1, '-'))), alias(token.immediate(/\d+(\.\d+)?/), $.number))),
+          ),
+        ),
+      ),
 
     boolean: (_) => choice('true', 'false'),
 

@@ -2,10 +2,13 @@
 	import { onMount } from 'svelte';
 	import type { OutputFile } from '../types';
 	import {
+		facings,
 		modesOf,
 		previewable,
 		previewFile,
+		screenAxes,
 		topDown,
+		type Facing,
 		type PreviewFile,
 		type PreviewKind,
 		type PreviewMode,
@@ -13,6 +16,8 @@
 		type PreviewResponse,
 		type PreviewView
 	} from './protocol';
+	import { VOID } from './colors';
+	import { colorize, cssGradient, formatValue, paletteOf, palettes, position, rangeFor, solidPalette, type PaletteId, type Range } from './colormaps';
 
 	interface Props {
 		output: OutputFile[];
@@ -36,14 +41,18 @@
 
 	// A target the pack no longer has (renamed or deleted) shows nothing.
 	const info = $derived(target && output.some((f) => f.path === target) ? previewable(target) : null);
+	// Each view starts with the camera at the origin facing north (x to the right).
 	const defaults: Record<PreviewKind | 'biomes', PreviewView> = {
-		noise: { x: 0, y: 0, scale: 4 },
-		density_function: { x: 0, y: 64, scale: 2 },
-		noise_settings: { x: 0, y: 64, scale: 2 },
-		material_rule: { x: 0, y: 64, scale: 0.5 },
-		dimension: { x: 0, y: 64, scale: 2 },
-		biomes: { x: 0, y: 0, scale: 8 }
+		noise: { x: 0, y: 0, z: 0, facing: 'north', scale: 4 },
+		density_function: { x: 0, y: 64, z: 0, facing: 'north', scale: 2 },
+		noise_settings: { x: 0, y: 64, z: 0, facing: 'north', scale: 2 },
+		material_rule: { x: 0, y: 64, z: 0, facing: 'north', scale: 0.5 },
+		dimension: { x: 0, y: 64, z: 0, facing: 'north', scale: 2 },
+		biomes: { x: 0, y: 64, z: 0, facing: 'north', scale: 8 }
 	};
+	const facingLetters: Record<Facing, string> = { north: 'N', east: 'E', south: 'S', west: 'W' };
+	/** The compass letter of the way a world x/z step points. */
+	const compass = (dx: number, dz: number) => (dx > 0 ? 'E' : dx < 0 ? 'W' : dz > 0 ? 'S' : 'N');
 	const modeNames: Record<PreviewMode, string> = { density: 'Density', blocks: 'Blocks', biomes: 'Biomes', iso: '3D' };
 	const kindNames: Record<PreviewKind, string> = {
 		noise: 'noise',
@@ -60,20 +69,78 @@
 	let view = $state<PreviewView>({ ...defaults.density_function });
 	// The 3D view's own camera: x and y are the world x and z at the centre,
 	// scale is a block's size in pixels (0 until the first render fits it).
-	let isoView = $state<PreviewView>({ x: 0, y: 0, scale: 0 });
+	let isoView = $state<PreviewView>({ x: 0, y: 0, z: 0, facing: 'north', scale: 0 });
+	const isoAt = (v: PreviewView): PreviewView => ({ x: Math.round(v.x), y: Math.round(v.z), z: 0, facing: 'north', scale: 0 });
 	let seed = $state('0');
 	let error = $state('');
 	let busy = $state(false);
 	let last: Extract<PreviewResponse, { type: 'rendered' }> | null = $state(null);
 	let hover = $state<{ px: number; py: number } | null>(null);
-	let lock = $state<{ x: number; y: number } | null>(null);
+	type Point = { x: number; y: number; z: number };
+	let lock = $state<Point | null>(null);
 	let seq = 0;
 	let lastTarget: string | null = null;
 	let mode = $state<PreviewMode>('density');
 	let biome = $state('minecraft:plains');
 	let terrain = $state('minecraft:overworld');
-	let biomeY = $state(64);
 	const flat = $derived(info ? topDown(info.kind, mode) : false);
+
+	// Density colouring: a palette per kind, remembered in this browser, and
+	// the range it spans (the values in view, -1 to 1, or the user's own).
+	type DensityKind = 'noise' | 'density_function' | 'noise_settings';
+	const paletteDefaults: Record<DensityKind, PaletteId> = { noise: 'grayscale', density_function: 'viridis', noise_settings: 'solid' };
+	const paletteKey = (k: DensityKind) => `mms.preview.palette.${k}`;
+	function storedPalette(k: DensityKind): PaletteId {
+		try {
+			const v = localStorage.getItem(paletteKey(k)) as PaletteId | null;
+			if (v && (v === 'solid' ? k === 'noise_settings' : palettes.some((p) => p.id === v))) return v;
+		} catch {
+			// Storage can be unavailable (private windows, some webviews).
+		}
+		return paletteDefaults[k];
+	}
+	let paletteIds = $state<Record<DensityKind, PaletteId>>({
+		noise: storedPalette('noise'),
+		density_function: storedPalette('density_function'),
+		noise_settings: storedPalette('noise_settings')
+	});
+	const densityKind = $derived(info && mode === 'density' && info.kind !== 'material_rule' && info.kind !== 'dimension' ? (info.kind as DensityKind) : null);
+	const palette = $derived(densityKind ? paletteOf(paletteIds[densityKind]) : null);
+	const paletteChoices = $derived(densityKind === 'noise_settings' ? [solidPalette, ...palettes] : palettes);
+	function setPalette(id: PaletteId) {
+		if (!densityKind) return;
+		paletteIds[densityKind] = id;
+		try {
+			localStorage.setItem(paletteKey(densityKind), id);
+		} catch {
+			// Not remembered; still applies now.
+		}
+		draw();
+	}
+	type RangeMode = 'auto' | 'unit' | 'custom';
+	let rangeMode = $state<RangeMode>('auto');
+	let customRange = $state<Range>({ lo: -1, hi: 1 });
+	/** The range the palette spans for the current render. */
+	const valueRange = $derived.by((): Range | null => {
+		if (!palette || !last || last.labels) return null;
+		const fixed = rangeMode === 'unit' ? { lo: -1, hi: 1 } : rangeMode === 'custom' ? customRange : undefined;
+		return rangeFor(palette, last.min, last.max, fixed);
+	});
+	function setRangeMode(m: RangeMode) {
+		if (m === 'custom' && rangeMode !== 'custom' && last && Number.isFinite(last.min)) {
+			// Start from what is shown, so switching doesn't jump.
+			const r = valueRange ?? { lo: -1, hi: 1 };
+			customRange = { lo: +r.lo.toPrecision(3), hi: +r.hi.toPrecision(3) };
+		}
+		rangeMode = m;
+		draw();
+	}
+	function setCustom(end: 'lo' | 'hi', text: string) {
+		const v = Number(text);
+		if (text.trim() === '' || !Number.isFinite(v)) return;
+		customRange = { ...customRange, [end]: v };
+		draw();
+	}
 	// CSS pixels per rendered pixel; terrain is costly to sample, so coarser.
 	// The isometric view is drawn with polygons, so it renders at device pixels.
 	const resolution = $derived(
@@ -192,13 +259,14 @@
 		const wasFlat = flat;
 		mode = m;
 		if (topDown(info.kind, m) !== wasFlat) {
-			view = defaultView(info.kind, m);
+			// Keep the camera where it is, at the new view's zoom.
+			view = { ...view, scale: defaultView(info.kind, m).scale };
 			lock = null;
 		}
 		view.scale = Math.min(view.scale, maxScale);
 		if (m === 'iso') {
-			// Start the 3D view over the slice's x, with the slice (z = 0) through the middle.
-			isoView = { x: Math.round(view.x), y: 0, scale: 0 };
+			// Start the 3D view over the camera.
+			isoView = isoAt(view);
 			lock = null;
 		}
 		last = null;
@@ -245,7 +313,7 @@
 				height,
 				view: $state.snapshot(mode === 'iso' ? isoView : view),
 				seed,
-				options: { biome, terrain, y: biomeY }
+				options: { biome, terrain }
 			} satisfies PreviewRequest);
 		});
 	}
@@ -261,6 +329,8 @@
 			ctx.drawImage(last.bitmap, 0, 0);
 			if (shown && shown !== last.bitmap) shown.close();
 			shown = last.bitmap;
+		} else if (palette && palette.id !== 'solid' && valueRange && mode === 'density') {
+			ctx.putImageData(new ImageData(colorize(last.values, palette, valueRange, VOID), last.width, last.height), 0, 0);
 		} else {
 			ctx.putImageData(new ImageData(last.pixels, last.width, last.height), 0, 0);
 		}
@@ -274,8 +344,8 @@
 			ctx.stroke();
 			ctx.setLineDash([]);
 		}
-		if (lock) {
-			const [px, py] = toPixel(lock.x, lock.y);
+		if (lock && inView(lock)) {
+			const [px, py] = toPixel(lock);
 			ctx.strokeStyle = '#ef4444';
 			ctx.lineWidth = 1.5;
 			ctx.beginPath();
@@ -284,20 +354,75 @@
 		}
 	}
 
-	function toWorld(px: number, py: number): [number, number] {
-		const w = last?.width ?? 0;
-		const h = last?.height ?? 0;
-		const x = view.x + (px - w / 2) * view.scale;
-		// Side views have y up; the noise view has z down.
-		const y = flat ? view.y + (py - h / 2) * view.scale : view.y - (py - h / 2) * view.scale;
-		return [Math.floor(x), Math.floor(y)];
+	/**
+	 * The interaction code works in the screen's plane: u along the screen's
+	 * right and v down it (top-down) or up it (side views, where v is y).
+	 * These map the camera and world points into it and back.
+	 */
+	function planeOf(c: { x: number; y: number; z: number }, facing = view.facing): [number, number] {
+		const a = screenAxes(facing);
+		const u = c.x * a.rx + c.z * a.rz;
+		return [u, flat ? c.x * a.dx + c.z * a.dz : c.y];
 	}
-	function toPixel(x: number, y: number): [number, number] {
+	/** Moves the camera to plane point (u, v), keeping the slice's depth (or a top-down view's y). */
+	function setPlane(u: number, v: number) {
+		const a = screenAxes(view.facing);
+		if (flat) {
+			view.x = u * a.rx + v * a.dx;
+			view.z = u * a.rz + v * a.dz;
+		} else {
+			if (a.rx) view.x = u * a.rx;
+			else view.z = u * a.rz;
+			view.y = v;
+		}
+	}
+	/** The world block under a canvas point. */
+	function toWorld(px: number, py: number): Point {
+		const [u, v] = flatWorld(px, py, view.scale, ...planeOf(view));
+		const a = screenAxes(view.facing);
+		if (flat) return { x: Math.floor(u * a.rx + v * a.dx), y: Math.floor(view.y), z: Math.floor(u * a.rz + v * a.dz) };
+		return a.rx
+			? { x: Math.floor(u * a.rx), y: Math.floor(v), z: Math.floor(view.z) }
+			: { x: Math.floor(view.x), y: Math.floor(v), z: Math.floor(u * a.rz) };
+	}
+	/** The canvas point at the middle of a world block. */
+	function toPixel(p: Point): [number, number] {
 		const w = last?.width ?? 0;
 		const h = last?.height ?? 0;
-		const px = (x - view.x) / view.scale + w / 2;
-		const py = flat ? (y - view.y) / view.scale + h / 2 : (view.y - y) / view.scale + h / 2;
-		return [px, py];
+		const [u, v] = planeOf({ x: p.x + 0.5, y: p.y + 0.5, z: p.z + 0.5 });
+		const [cu, cv] = planeOf(view);
+		return [(u - cu) / view.scale + w / 2, flat ? (v - cv) / view.scale + h / 2 : (cv - v) / view.scale + h / 2];
+	}
+	/** Whether a world block is in the slice or map shown (a side view shows one depth, a map one y). */
+	function inView(p: Point): boolean {
+		const a = screenAxes(view.facing);
+		if (flat) return true;
+		return a.rx ? p.z === Math.floor(view.z) : p.x === Math.floor(view.x);
+	}
+	function coords(p: Point): string {
+		return flat ? `x ${p.x}, z ${p.z}` : `x ${p.x}, y ${p.y}, z ${p.z}`;
+	}
+	const axes = $derived(screenAxes(view.facing));
+	function coordTitle(axis: 'x' | 'y' | 'z'): string {
+		if (axis === 'y') return flat ? 'The height the map is sampled at' : 'The height at the middle of the view';
+		if (flat) return `The ${axis} at the middle of the map`;
+		const depth = axes.rx ? 'z' : 'x';
+		return axis === depth ? `The slice is at this ${axis} (turn to slice along the other axis)` : `The ${axis} at the middle of the slice`;
+	}
+	/** Turns the camera a quarter turn (1 clockwise, -1 anticlockwise) or to a facing, about its own position. */
+	function face(to: Facing | 1 | -1) {
+		const next = typeof to === 'string' ? to : facings[(facings.indexOf(view.facing) + to + 4) % 4];
+		if (next === view.facing) return;
+		view.facing = next;
+		request();
+		draw();
+	}
+	/** Sets one camera coordinate from an input, ignoring what isn't a number yet. */
+	function setCoord(axis: 'x' | 'y' | 'z', value: string) {
+		const n = Number(value);
+		if (value.trim() === '' || !Number.isFinite(n)) return;
+		view[axis] = n;
+		request();
 	}
 
 	let drag: { x: number; y: number; vx: number; vy: number; moved: boolean } | null = null;
@@ -338,31 +463,30 @@
 			const s = Math.min(48, Math.max(last?.minScale ?? 2, start.scale * factor));
 			const [wx, wz] = isoWorld(from.px, from.py, start.scale, start.vx, start.vy);
 			const [ox, oz] = isoWorld(to.px, to.py, s, 0, 0);
-			isoView = { x: wx - ox, y: wz - oz, scale: s };
+			isoView = { ...isoView, x: wx - ox, y: wz - oz, scale: s };
 		} else {
 			const scale = Math.min(maxScale, Math.max(1 / 16, start.scale / factor));
 			const [wx, wy] = flatWorld(from.px, from.py, start.scale, start.vx, start.vy);
 			const [ox, oy] = flatWorld(to.px, to.py, scale, 0, 0);
 			view.scale = scale;
-			view.x = wx - ox;
-			view.y = wy - oy;
+			setPlane(wx - ox, wy - oy);
 		}
 		request();
 	}
 	function startDrag(at: { x: number; y: number }) {
-		const v = mode === 'iso' ? isoView : view;
-		drag = { x: at.x, y: at.y, vx: v.x, vy: v.y, moved: pinched };
+		const [vx, vy] = mode === 'iso' ? [isoView.x, isoView.y] : planeOf(view);
+		drag = { x: at.x, y: at.y, vx, vy, moved: pinched };
 	}
 	function startPinch() {
 		const [a, b] = [...pointers.values()];
 		const pa = pointer({ clientX: a.x, clientY: a.y });
 		const pb = pointer({ clientX: b.x, clientY: b.y });
-		const v = mode === 'iso' ? isoView : view;
+		const [vx, vy] = mode === 'iso' ? [isoView.x, isoView.y] : planeOf(view);
 		pinch = {
 			dist: Math.hypot(pa.px - pb.px, pa.py - pb.py) || 1,
 			mid: { px: (pa.px + pb.px) / 2, py: (pa.py + pb.py) / 2 },
-			vx: v.x,
-			vy: v.y,
+			vx,
+			vy,
 			scale: mode === 'iso' ? isoScale() : view.scale
 		};
 		pinched = true;
@@ -401,8 +525,7 @@
 			request();
 			return;
 		}
-		view.x = drag.vx - dx * view.scale;
-		view.y = flat ? drag.vy - dy * view.scale : drag.vy + dy * view.scale;
+		setPlane(drag.vx - dx * view.scale, flat ? drag.vy - dy * view.scale : drag.vy + dy * view.scale);
 		request();
 	}
 	function up(e: PointerEvent) {
@@ -422,8 +545,8 @@
 		}
 		if (e.type === 'pointerup' && drag && !drag.moved && !pinched && mode !== 'iso') {
 			const p = pointer(e);
-			const [x, y] = toWorld(p.px, p.py);
-			lock = lock && lock.x === x && lock.y === y ? null : { x, y };
+			const at = toWorld(p.px, p.py);
+			lock = lock && lock.x === at.x && lock.y === at.y && lock.z === at.z ? null : at;
 			draw();
 		}
 		drag = null;
@@ -433,8 +556,8 @@
 		const p = pointer(e);
 		// Trackpad pinches arrive as ctrl+wheel with small deltas; scale them up to match.
 		const f = Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0015));
-		const v = mode === 'iso' ? isoView : view;
-		zoomTo(p, p, { vx: v.x, vy: v.y, scale: mode === 'iso' ? isoScale() : view.scale }, f);
+		const [vx, vy] = mode === 'iso' ? [isoView.x, isoView.y] : planeOf(view);
+		zoomTo(p, p, { vx, vy, scale: mode === 'iso' ? isoScale() : view.scale }, f);
 	}
 
 	/** A sampled value, or the block or biome it indexes. */
@@ -450,18 +573,26 @@
 		const iy = Math.floor(at.py);
 		if (ix < 0 || iy < 0 || ix >= last.width || iy >= last.height) return '';
 		const v = last.values[iy * last.width + ix];
-		const [x, y] = toWorld(at.px, at.py);
-		const coord = flat ? `x ${x}, z ${y}` : `x ${x}, y ${y}`;
+		const coord = coords(toWorld(at.px, at.py));
 		return Number.isNaN(v) ? coord : `${coord} · ${show(v)}`;
+	});
+	/** The value under the pointer, for the scale's marker. */
+	const hoverValue = $derived.by(() => {
+		const at = hover;
+		if (!at || !last || mode !== 'density') return NaN;
+		const ix = Math.floor(at.px);
+		const iy = Math.floor(at.py);
+		if (ix < 0 || iy < 0 || ix >= last.width || iy >= last.height) return NaN;
+		return last.values[iy * last.width + ix];
 	});
 	const lockValue = $derived.by(() => {
 		if (!lock || !last) return '';
-		const [px, py] = toPixel(lock.x, lock.y);
+		const [px, py] = toPixel(lock);
 		const ix = Math.floor(px);
 		const iy = Math.floor(py);
-		if (ix < 0 || iy < 0 || ix >= last.width || iy >= last.height) return `${lock.x}, ${lock.y}`;
+		if (!inView(lock) || ix < 0 || iy < 0 || ix >= last.width || iy >= last.height) return coords(lock);
 		const v = last.values[iy * last.width + ix];
-		return `${lock.x}, ${lock.y} · ${Number.isNaN(v) ? '–' : show(v)}`;
+		return `${coords(lock)} · ${Number.isNaN(v) ? '–' : show(v)}`;
 	});
 </script>
 
@@ -497,16 +628,82 @@
 					</select>
 				</label>
 			{/if}
-			{#if mode === 'biomes'}
+			{#if palette}
 				<label class="flex items-center gap-1">
-					Y
-					<input
-						type="number"
-						class="w-16 rounded border border-line bg-panel px-1.5 py-0.5 text-ink"
-						bind:value={biomeY}
-						oninput={() => request()}
-					/>
+					Palette
+					<select
+						aria-label="Palette"
+						class="rounded border border-line bg-panel px-1 py-0.5 text-ink"
+						value={palette.id}
+						onchange={(e) => setPalette(e.currentTarget.value as PaletteId)}
+					>
+						{#each paletteChoices as p (p.id)}<option value={p.id}>{p.name}</option>{/each}
+					</select>
 				</label>
+				{#if palette.id !== 'solid'}
+					<label class="flex items-center gap-1" title="The values the palette spans: those in view, -1 to 1, or your own">
+						Range
+						<select
+							aria-label="Range"
+							class="rounded border border-line bg-panel px-1 py-0.5 text-ink"
+							value={rangeMode}
+							onchange={(e) => setRangeMode(e.currentTarget.value as RangeMode)}
+						>
+							<option value="auto">Auto (in view)</option>
+							<option value="unit">−1 to 1</option>
+							<option value="custom">Custom</option>
+						</select>
+					</label>
+					{#if rangeMode === 'custom'}
+						<input
+							type="number"
+							step="any"
+							aria-label="Range from"
+							class="w-16 rounded border border-line bg-panel px-1.5 py-0.5 text-ink"
+							value={customRange.lo}
+							oninput={(e) => setCustom('lo', e.currentTarget.value)}
+						/>
+						<input
+							type="number"
+							step="any"
+							aria-label="Range to"
+							class="w-16 rounded border border-line bg-panel px-1.5 py-0.5 text-ink"
+							value={customRange.hi}
+							oninput={(e) => setCustom('hi', e.currentTarget.value)}
+						/>
+					{/if}
+				{/if}
+			{/if}
+			{#if mode !== 'iso'}
+				<div class="flex items-center gap-1" role="group" aria-label="Camera">
+					{#each ['x', 'y', 'z'] as const as axis (axis)}
+						<label class="flex items-center gap-1" title={coordTitle(axis)}>
+							{axis.toUpperCase()}
+							<input
+								type="number"
+								aria-label="Camera {axis}"
+								class="w-16 rounded border border-line bg-panel px-1.5 py-0.5 text-ink"
+								value={Math.round(view[axis])}
+								oninput={(e) => setCoord(axis, e.currentTarget.value)}
+							/>
+						</label>
+					{/each}
+				</div>
+				<div class="flex items-center gap-0.5" role="group" aria-label="Facing">
+					<button class="rounded px-1 py-0.5 hover:bg-hover" title="Turn left" aria-label="Turn left" onclick={() => face(-1)}>⟲</button>
+					<div class="flex overflow-hidden rounded border border-line">
+						{#each facings as f (f)}
+							<button
+								class="px-1.5 py-0.5 {view.facing === f ? 'bg-accent text-white' : 'hover:bg-hover'}"
+								title="Face {f}"
+								aria-label="Face {f}"
+								aria-pressed={view.facing === f}
+								onclick={() => face(f)}>{facingLetters[f]}</button
+							>
+						{/each}
+					</div>
+					<button class="rounded px-1 py-0.5 hover:bg-hover" title="Turn right" aria-label="Turn right" onclick={() => face(1)}>⟳</button>
+				</div>
 			{/if}
 			<label class="ml-auto flex items-center gap-1">
 				Seed
@@ -519,8 +716,11 @@
 			<button
 				class="rounded px-1.5 py-0.5 hover:bg-hover"
 				onclick={() => {
-					if (mode === 'iso') isoView = { x: Math.round(view.x), y: 0, scale: 0 };
-					else view = defaultView(info.kind, mode);
+					if (mode === 'iso') isoView = isoAt(view);
+					else {
+						view = defaultView(info.kind, mode);
+						lock = null;
+					}
 					request();
 				}}>Reset view</button
 			>
@@ -553,6 +753,11 @@
 				{#if busy && (!last || mode !== 'density')}<span>Rendering…</span>{/if}
 			</div>
 		{/if}
+		{#if info && last && mode !== 'iso'}
+			<div class="pointer-events-none absolute top-2 left-2 rounded bg-black/60 px-2 py-1 font-mono text-[11px] text-white" aria-label="Camera facing">
+				Facing {view.facing} · ← {compass(-axes.rx, -axes.rz)} {compass(axes.rx, axes.rz)} →
+			</div>
+		{/if}
 		{#if info && last?.notice}
 			<div class="pointer-events-none absolute inset-x-3 top-3 rounded bg-black/60 px-3 py-2 text-xs text-white">{last.notice}</div>
 		{/if}
@@ -564,9 +769,47 @@
 				{#if last.legend.length > 12}<span class="text-white/70">+{last.legend.length - 12} more</span>{/if}
 			</div>
 		{/if}
-		{#if info && last && last.min !== Infinity}
-			<div class="pointer-events-none absolute right-2 bottom-2 rounded bg-black/60 px-2 py-1 font-mono text-[11px] text-white">
-				{last.min.toFixed(3)} … {last.max.toFixed(3)}
+		{#if info && last}
+			<div class="pointer-events-none absolute right-2 bottom-2 flex flex-col items-end gap-1">
+				{#if palette && valueRange && palette.id !== 'solid'}
+					{@const r = valueRange}
+					{@const flatField = last.min === last.max}
+					<div class="flex w-56 flex-col gap-1 rounded bg-black/60 px-2 py-1.5 font-mono text-[11px] text-white" aria-label="Value scale">
+						<div class="relative h-3 rounded-sm" style:background={cssGradient(palette)}>
+							{#if r.lo < 0 && r.hi > 0}
+								<span class="absolute inset-y-0 w-px bg-white/80 mix-blend-difference" style:left="{position(0, r) * 100}%" title="0"></span>
+							{/if}
+							{#if !Number.isNaN(hoverValue)}
+								<span class="absolute -top-1 -bottom-1 w-0.5 -translate-x-1/2 rounded bg-white shadow-[0_0_0_1px_black]" style:left="{position(hoverValue, r) * 100}%"></span>
+							{/if}
+						</div>
+						<div class="relative flex justify-between">
+							<span>{formatValue(r.lo, r)}</span>
+							{#if r.lo < 0 && r.hi > 0 && position(0, r) > 0.2 && position(0, r) < 0.8}
+								<span class="absolute -translate-x-1/2" style:left="{position(0, r) * 100}%">0</span>
+							{/if}
+							<span>{formatValue(r.hi, r)}</span>
+						</div>
+						<div class="text-white/70">
+							{#if last.min === Infinity}
+								no values in view
+							{:else if flatField}
+								flat: {last.min.toFixed(3)} everywhere in view
+							{:else}
+								in view {last.min.toFixed(3)} … {last.max.toFixed(3)}
+							{/if}
+						</div>
+					</div>
+				{:else if last.min !== Infinity}
+					<div class="rounded bg-black/60 px-2 py-1 font-mono text-[11px] text-white">
+						{last.min.toFixed(3)} … {last.max.toFixed(3)}
+					</div>
+				{/if}
+				<!-- Every preview here is rendered with Misode's Deepslate. -->
+				<p class="pointer-events-auto rounded bg-black/40 px-1.5 py-0.5 text-[10px] text-white/80 hover:text-white" data-credit="deepslate">
+					Rendered with <a class="underline-offset-2 hover:underline" href="https://github.com/misode/deepslate" target="_blank" rel="noopener">Deepslate</a>
+					by <a class="underline-offset-2 hover:underline" href="https://github.com/misode" target="_blank" rel="noopener">Misode</a>
+				</p>
 			</div>
 		{/if}
 	</div>

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { basicSetup } from 'codemirror';
 	import { EditorState, Compartment } from '@codemirror/state';
-	import { EditorView, keymap } from '@codemirror/view';
+	import { EditorView, closeHoverTooltips, keymap } from '@codemirror/view';
 	import { indentWithTab } from '@codemirror/commands';
 	import { acceptCompletion, startCompletion } from '@codemirror/autocomplete';
 	import { indentUnit } from '@codemirror/language';
@@ -9,12 +9,14 @@
 	import { onMount, untrack } from 'svelte';
 	import type { Engine } from '../engine/engine.svelte';
 	import { uriOf } from '../project/project.svelte';
-	import { mmsHighlight, mmsLanguage } from './language';
+	import { bookHighlight, bookLanguage, mmsHighlight, mmsLanguage } from './language';
 	import { semanticHighlighting } from './semantic';
+	import { inlayHints } from './inlay';
 	import { forEachDiagnostic } from '@codemirror/lint';
-	import { findReferences, jumpToDefinition } from '@codemirror/lsp-client';
+	import { LSPPlugin, findReferences, jumpToDefinition } from '@codemirror/lsp-client';
 	import { inlineRename, renameInline } from './rename';
-	import ContextMenu, { type MenuEntries } from './ContextMenu.svelte';
+	import ContextMenu, { type MenuEntries, type MenuItem } from './ContextMenu.svelte';
+	import { fixAllKeys, formatKeys } from './shortcuts';
 
 	interface Props {
 		engine: Engine;
@@ -41,10 +43,6 @@
 	let shown = '';
 	let menu: ContextMenu | undefined = $state();
 
-	const mac = typeof navigator !== 'undefined' && /Mac|iP(hone|ad)/.test(navigator.platform);
-	const mod = mac ? '⌘' : 'Ctrl';
-	const alt = mac ? '⌥' : 'Alt';
-
 	/** The right-click menu: language actions, then fixes for problems under the cursor. */
 	function openMenu(v: EditorView, e: MouseEvent) {
 		// Shift+right-click keeps the browser's own menu (copy, paste, spellcheck).
@@ -53,26 +51,92 @@
 		const at = v.posAtCoords({ x: e.clientX, y: e.clientY });
 		const sel = v.state.selection.main;
 		if (at != null && (at < sel.from || at > sel.to)) v.dispatch({ selection: { anchor: at } });
+		const fixes = fixesAt(v);
+		refactorsAt(v).then((refactors) => {
+			const items: MenuEntries = [
+				{ label: 'Go to definition', keys: 'F12', run: run(v, jumpToDefinition) },
+				{ label: 'Find references', keys: 'Shift+F12', run: run(v, findReferences) },
+				{ label: 'Rename symbol', keys: 'F2', run: run(v, renameInline) },
+				null,
+				{ label: 'Format document', keys: formatKeys, run: run(v, formatCommand) },
+				{ label: 'Fix all in this file', keys: fixAllKeys, run: run(v, fixAllCommand) }
+			];
+			if (fixes.length) items.push(null, ...fixes);
+			if (refactors.length) items.push(null, ...refactors);
+			menu?.show({ x: e.clientX, y: e.clientY }, items, () => v.focus());
+		});
+		return true;
+	}
+	const run = (v: EditorView, cmd: (v: EditorView) => boolean) => () => {
+		v.focus();
+		cmd(v);
+	};
+
+	/** Quick fixes for the problems under the cursor. */
+	function fixesAt(v: EditorView): MenuItem[] {
 		const head = v.state.selection.main.head;
-		const run = (cmd: (v: EditorView) => boolean) => () => {
-			v.focus();
-			cmd(v);
-		};
-		const fixes: MenuEntries = [];
+		const fixes: MenuItem[] = [];
 		forEachDiagnostic(v.state, (d, from, to) => {
 			if (head < from || head > to) return;
 			for (const a of d.actions ?? []) fixes.push({ label: a.name, run: () => (v.focus(), a.apply(v, from, to)) });
 		});
-		const items: MenuEntries = [
-			{ label: 'Go to definition', keys: 'F12', run: run(jumpToDefinition) },
-			{ label: 'Find references', keys: 'Shift+F12', run: run(findReferences) },
-			{ label: 'Rename symbol', keys: 'F2', run: run(renameInline) },
-			null,
-			{ label: 'Format document', keys: `Shift+${alt}+F`, run: run(formatCommand) },
-			{ label: 'Fix all in this file', keys: `${mod}+${alt}+F`, run: run(fixAllCommand) }
-		];
-		if (fixes.length) items.push(null, ...fixes);
-		menu?.show({ x: e.clientX, y: e.clientY }, items, () => v.focus());
+		return fixes;
+	}
+
+	/**
+	 * Refactorings for the selection, such as extracting an inline value to
+	 * its own declaration. Applying one then opens the rename box on the
+	 * new declaration's name, as VS Code does.
+	 */
+	async function refactorsAt(v: EditorView): Promise<MenuItem[]> {
+		const plugin = LSPPlugin.get(v);
+		if (!plugin) return [];
+		const uri = uriOf(shown);
+		const sel = v.state.selection.main;
+		const range = { start: plugin.toPosition(sel.from), end: plugin.toPosition(sel.to) };
+		let refactors;
+		try {
+			refactors = await engine.refactors(uri, range);
+		} catch {
+			return [];
+		}
+		// Edits typed while the request ran would shift the positions.
+		if (v.state.selection.main.from !== sel.from || uriOf(shown) !== uri) return [];
+		return refactors.map((r) => ({
+			label: r.title,
+			run: () => {
+				v.focus();
+				// The declaration is inserted at a line start ahead of the value
+				// it replaces, so the first edit's start is where its text begins.
+				const head = r.edits[0];
+				const insertAt = head ? plugin.fromPosition(head.range.start) : -1;
+				applyEdits(v, r.edits);
+				const nameAt = r.name && head ? head.newText.indexOf(' ' + r.name) : -1;
+				if (insertAt < 0 || nameAt < 0) return;
+				const at = insertAt + nameAt + 1;
+				v.dispatch({ selection: { anchor: at }, scrollIntoView: true });
+				renameInline(v);
+			}
+		}));
+	}
+
+	/** Cmd/Ctrl+. : a menu of quick fixes and refactorings at the cursor, as in VS Code and Zed. */
+	function quickFixCommand(v: EditorView) {
+		const at = v.coordsAtPos(v.state.selection.main.head);
+		if (!at) return false;
+		// The lint tooltip under the cursor would cover the menu.
+		v.dispatch({ effects: closeHoverTooltips });
+		const fixes = fixesAt(v);
+		refactorsAt(v).then((refactors) => {
+			const items: MenuEntries = [...fixes];
+			if (refactors.length) {
+				if (items.length) items.push(null);
+				items.push(...refactors);
+			}
+			if (!items.length) items.push({ label: 'No quick fixes here', disabled: true, run: () => {} });
+			items.push(null, { label: 'Fix all in this file', keys: fixAllKeys, run: run(v, fixAllCommand) });
+			menu?.show({ x: at.left, y: at.bottom + 2 }, items, () => v.focus());
+		});
 		return true;
 	}
 	const theme = new Compartment();
@@ -88,6 +152,7 @@
 	}
 
 	function stateFor(p: string, doc: string) {
+		const book = p.endsWith('.mmsbook');
 		return EditorState.create({
 			doc,
 			extensions: [
@@ -95,15 +160,18 @@
 				indentUnit.of('  '),
 				EditorView.lineWrapping,
 				EditorState.tabSize.of(2),
-				mmsLanguage,
-				mmsHighlight,
-				engine.client.plugin(uriOf(p), 'mms'),
+				...(book ? [bookLanguage, bookHighlight] : [mmsLanguage, mmsHighlight]),
+				engine.client.plugin(uriOf(p), book ? 'mmsbook' : 'mms'),
 				semanticHighlighting((uri) => engine.semanticTokens(uri)),
+				inlayHints((uri) => engine.inlayHints(uri)),
 				inlineRename(),
 				keymap.of([
 					{ key: 'Mod-s', run: formatCommand, preventDefault: true },
-					{ key: 'Shift-Alt-f', run: formatCommand, preventDefault: true },
+					// Option+Shift+F types "Ï" on macOS, so Format is Cmd+Shift+I there.
+					// Cmd+Option+F (Fix all) is fine: with Cmd held, nothing is typed.
+					{ key: 'Shift-Alt-f', mac: 'Shift-Mod-i', run: formatCommand, preventDefault: true },
 					{ key: 'Mod-Alt-f', run: fixAllCommand, preventDefault: true },
+					{ key: 'Mod-.', run: quickFixCommand, preventDefault: true },
 					// Ctrl+Space (from basicSetup) is taken by the OS on macOS (input
 					// source switching) and by some IMEs elsewhere, so offer the
 					// VS Code and Zed alternatives too: Cmd/Ctrl+I and Alt/Option+Space.
