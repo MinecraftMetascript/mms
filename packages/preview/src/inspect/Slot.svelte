@@ -3,6 +3,7 @@
 	import type { Obj } from './common';
 	import { customsOfBase, emptyItems, itemsKey, look, type ItemContext } from './items';
 	import type { Slot } from './recipe';
+	import { vanillaIcon } from './vanillaIcons';
 
 	interface Props {
 		slot: Slot;
@@ -15,6 +16,20 @@
 	const items = getContext<() => ItemContext>(itemsKey) ?? (() => emptyItems);
 	const looks = $derived(slot?.map((id, i) => look(id, i === 0 ? components : undefined, items())) ?? []);
 	const first = $derived(looks[0]);
+	// A vanilla item's icon draws once the game's models and atlas load.
+	let drawn = $state<{ key: string; url: string | null } | null>(null);
+	const vanillaKey = $derived(first?.vanilla ? `${first.vanilla.id}|${first.vanilla.model ?? ''}` : '');
+	$effect(() => {
+		const v = first?.vanilla;
+		const key = vanillaKey;
+		if (!v) return;
+		let stale = false;
+		vanillaIcon(v.id, v.model).then((url) => {
+			if (!stale) drawn = { key, url };
+		});
+		return () => (stale = true);
+	});
+	const icon = $derived(first?.icon ?? (drawn && drawn.key === vanillaKey ? drawn.url : null));
 	const title = $derived.by(() => {
 		if (!looks.length) return '';
 		if (looks.length > 1) return looks.map((l) => l.title.split('\n')[0]).join(' or ');
@@ -32,8 +47,8 @@
 	aria-label={looks.map((l) => l.name).join(' or ') || 'empty slot'}
 >
 	{#if first}
-		{#if first.icon}
-			<img class="{big ? 'size-12' : 'size-10'} [image-rendering:pixelated]" src={first.icon} alt="" />
+		{#if icon}
+			<img class="{big ? 'size-12' : 'size-10'} [image-rendering:pixelated]" src={icon} alt="" />
 		{:else}
 			<span class="line-clamp-3 break-words {first.id.startsWith('#') ? 'text-accent' : ''}">{first.name}</span>
 		{/if}

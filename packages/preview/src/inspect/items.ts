@@ -66,6 +66,8 @@ export interface ItemLook {
 	name: string;
 	/** An image URL for the tile, when the pack has the texture. */
 	icon?: string;
+	/** With no pack icon: the vanilla item (and item_model) whose icon to draw. */
+	vanilla?: { id: string; model?: string };
 	/** The CustomItem this stack is, by its declaration id. */
 	custom?: string;
 	/** True when the name comes from the stack's components. */
@@ -174,10 +176,13 @@ export function look(id: string, components: Obj | undefined, ctx: ItemContext):
 	const name = nameComp !== undefined ? plainText(nameComp, ctx.lang) : '';
 	const model = comp(components, 'item_model');
 	const icon = typeof model === 'string' ? iconOf(model, ctx) : undefined;
+	// No item_model keeps the base's look; a vanilla one draws that model.
+	// A pack model we can't follow to a texture shows the name instead.
+	const vanilla = icon ? undefined : model === undefined ? { id } : typeof model === 'string' && full(model).startsWith('minecraft:') ? { id, model } : undefined;
 	const shown = name || base;
 	const lines = [shown];
 	if (custom) lines.push(`Custom item ${custom}`);
 	if (name || custom) lines.push(`Base: ${base} (${full(id)})`);
 	else lines[0] = `${base} (${full(id)})`;
-	return { id, name: shown, icon, custom, named: !!name, title: lines.join('\n') };
+	return { id, name: shown, icon, vanilla, custom, named: !!name, title: lines.join('\n') };
 }

@@ -402,6 +402,7 @@ test('a recipe making a custom item shows its name and texture', async ({ page }
 	// The ingredient is the base id, which the custom item also fits.
 	const shard = page.getByLabel('Crafting grid').getByRole('img', { name: 'Amethyst Shard' });
 	await expect(shard).toHaveAttribute('title', /including the custom item Ember Shard/);
+	await expect(page.getByLabel('Crafting grid').getByRole('img', { name: 'Blaze Powder' }).locator('img')).toHaveAttribute('src', /^data:image\/png/, { timeout: 30_000 });
 	await page.screenshot({ path: 'test-results/recipe-custom-item.png' });
 
 	// A custom item that keeps its base's look shows its name as text.
@@ -437,6 +438,10 @@ test('loot tables, recipes and biomes show in the inspector', async ({ page }) =
 	await page.locator('.cm-line').nth(1).click();
 	await expect(page.getByLabel('Crafting grid').getByRole('img', { name: 'Emerald' })).toHaveCount(8);
 	await expect(page.getByLabel('Result')).toHaveText('Emerald Block');
+	// Vanilla items draw their game icons: a flat item and a 3D block.
+	await expect(page.getByLabel('Crafting grid').getByRole('img', { name: 'Emerald' }).first().locator('img')).toHaveAttribute('src', /^data:image\/png/, { timeout: 30_000 });
+	await expect(inspector.getByRole('img', { name: 'Emerald Block' }).locator('img')).toHaveAttribute('src', /^data:image\/png/);
+	await page.screenshot({ path: 'test-results/recipe-vanilla-icons.png' });
 
 	await page.locator('.cm-line').nth(2).click();
 	await expect(inspector).toContainText('Temperature');
