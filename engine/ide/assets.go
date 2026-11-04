@@ -16,6 +16,14 @@ func (s *Session) assetPathCompletion(f *syntax.File, off int) (items []Item, re
 		return nil, replace, false
 	}
 	helper := assetHelperBefore(f, start-1)
+	if helper == "BookText" {
+		for _, u := range s.R.Units {
+			if sema.IsBookFile(u.Path) {
+				items = append(items, Item{Label: u.Path, Kind: sema.CandFile, Detail: "book text", Sort: sortKey(len(items))})
+			}
+		}
+		return items, syntax.Span{Start: start, End: end}, true
+	}
 	ext, what, ok := sema.AssetFileType(helper)
 	if !ok {
 		return nil, replace, false

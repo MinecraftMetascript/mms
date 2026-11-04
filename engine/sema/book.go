@@ -122,8 +122,8 @@ func bookType(p *spec.Pack) *spec.Type {
 			Desc: "The author shown under the title: \"by <author>\"."},
 		{Kind: "pair", Key: "generation", Optional: true, Type: gen,
 			Desc: "How many times the book has been copied: `original` (the default), `copy`, `copy_of_copy` or `tattered`. The last two cannot be copied."},
-		{Kind: "pair", Key: "text", Optional: true, Type: &spec.Type{Kind: "list", Item: str},
-			Desc: "The book's text in book markup, one string per line, or `BookText(\"books/guide.md\")` to read it from a file. A line of `---` starts the next page.\n\n" + bookMarkupDoc},
+		{Kind: "pair", Key: "text", Optional: true, Type: bookTextType,
+			Desc: "The book's text in book markup, one string per line, or `BookText(\"books/guide.mmsbook\")` to read it from a file. A line of `---` starts the next page.\n\n" + bookMarkupDoc},
 		{Kind: "pair", Key: "pages", Optional: true, Type: &spec.Type{Kind: "list", Item: text},
 			Desc: "The pages as text components, for full control. Use `text` instead for book markup."},
 		{Kind: "pair", Key: "components", Optional: true, Type: &spec.Type{Kind: "reference", Path: "::java::world::component::DataComponentPatch"},
@@ -132,6 +132,13 @@ func bookType(p *spec.Pack) *spec.Type {
 	got, _ := bookTypes.LoadOrStore(p, t)
 	return got.(*spec.Type)
 }
+
+// bookTextType is the type of a Book's text field. Completion knows it by
+// identity to offer BookText("...") there.
+var bookTextType = &spec.Type{Kind: "list", Item: &spec.Type{Kind: "string"}}
+
+// bookTextDoc documents BookText in completion.
+const bookTextDoc = "```mms\nBookText(path: string)\n```\n\nReads the book's text from a `.mmsbook` file in the project, such as `BookText(\"books/guide.mmsbook\")`. The editor checks and completes the markup in that file."
 
 func ptr[T any](v T) *T { return &v }
 

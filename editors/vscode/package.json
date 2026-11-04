@@ -175,7 +175,12 @@
         "editor.formatOnSave": true,
         "editor.tabSize": 2,
         "editor.insertSpaces": true,
-        "editor.semanticHighlighting.enabled": true
+        "editor.semanticHighlighting.enabled": true,
+        "editor.quickSuggestions": { "other": "on", "comments": "off", "strings": "on" }
+      },
+      "[mmsbook]": {
+        "editor.quickSuggestions": { "other": "on", "comments": "off", "strings": "on" },
+        "editor.wordBasedSuggestions": "off"
       }
     }
   },
