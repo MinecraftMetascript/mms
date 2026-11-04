@@ -1,9 +1,10 @@
 // Groups the World view's structures into folders, so a world with
-// hundreds of saved pieces stays readable. A name is split at `/` and `_`
-// (village/house_small_1 → village/ › house_ › small_ › 1), and a folder is
-// only made where two or more structures share it: a lone structure is
-// shown directly, and a folder holding one subfolder is merged into it
-// (house_small_). Only the list is grouped; files and ids keep their names.
+// hundreds of saved pieces stays readable. A structure id's path is split at
+// `/`, like the folders it is saved in (village/houses/small → village ›
+// houses › small), and a folder is only made where two or more structures
+// share it: a lone structure is shown directly, and a folder holding one
+// subfolder is merged into it (village/houses). Only the list is grouped;
+// files and ids keep their names.
 
 export interface Leaf<T> {
 	kind: 'leaf';
@@ -14,7 +15,7 @@ export interface Group<T> {
 	kind: 'group';
 	/** Unique among all groups, for remembering which are open. */
 	key: string;
-	/** The shared prefix this group adds, with its separator, such as `house_`. */
+	/** The folder's name, without a trailing separator, such as `houses` or `village/houses` when merged. */
 	label: string;
 	children: Node<T>[];
 	/** Every item under this group, at any depth. */
@@ -24,12 +25,15 @@ export interface Group<T> {
 export type Node<T> = Leaf<T> | Group<T>;
 
 /**
- * Splits a name after each `/` and `_` (and the `:` of a namespaced id),
- * keeping the separators: a_b/c → ["a_", "b/", "c"].
+ * Splits a name after each `/` (and the `:` of a namespaced id), keeping
+ * the separators: ns:a/b_c → ["ns:", "a/", "b_c"].
  */
 export function segments(name: string): string[] {
-	return name.match(/[^:/_]*(?:[:/_]|$)/g)!.filter(Boolean);
+	return name.match(/[^:/]*(?:[:/]|$)/g)!.filter(Boolean);
 }
+
+/** A folder's shown name: its path without the trailing separator. */
+const folderName = (raw: string) => raw.replace(/[:/]$/, '');
 
 /**
  * The folder tree of items named by name(item). Items keep their order
@@ -63,11 +67,11 @@ function build<T>(entries: Entry<T>[], depth: number, prefix: string): Node<T>[]
 			continue;
 		}
 		const key = prefix + seg;
-		let g: Group<T> = { kind: 'group', key, label: seg, children: build(list, depth + 1, key), items: list.map((e) => e.item) };
-		// A folder whose only content is one folder reads as one: house_ › small_ → house_small_.
+		let g: Group<T> = { kind: 'group', key, label: folderName(seg), children: build(list, depth + 1, key), items: list.map((e) => e.item) };
+		// A folder whose only content is one folder reads as one: village › houses → village/houses.
 		while (g.children.length === 1 && g.children[0].kind === 'group') {
 			const inner: Group<T> = g.children[0];
-			g = { ...inner, label: g.label + inner.label };
+			g = { ...inner, label: folderName(inner.key.slice(prefix.length)) };
 		}
 		out.push(g);
 	}

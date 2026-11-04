@@ -34,7 +34,7 @@
 	const label: Record<WorldStructureRow['status'], string> = { new: 'New', imported: 'Imported', changed: 'Changed in world' };
 	const waiting = $derived(s?.structures.filter((r) => r.status !== 'imported').length ?? 0);
 	const unused = $derived((s?.structures.filter((r) => r.unused).length ?? 0) + (s?.unusedFiles.length ?? 0));
-	// The structures as folders, split at / and _ in their names, so big
+	// The structures as folders, split at / in their ids, so big
 	// packs of pieces stay readable. With several namespaces the namespace
 	// is the top folder.
 	const groups = $derived.by(() => {
