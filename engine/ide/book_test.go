@@ -110,3 +110,42 @@ func TestBookStringHover(t *testing.T) {
 		t.Errorf("hover = %q", h)
 	}
 }
+
+// A Book's text field offers BookText(...), whose path lists the
+// project's .mmsbook files.
+func TestBookTextCompletion(t *testing.T) {
+	p := project.New(spec.MustDefault(), project.Config{Namespace: "test"})
+	p.SetFile("books/guide.mmsbook", "# Hi\n")
+	p.SetFile("books/lore.mmsbook", "Old\n")
+	for _, tc := range []struct {
+		name, src string
+		want      []string
+	}{
+		{"value", "Book b = {\n  text = |\n}\n", []string{"BookText"}},
+		{"path", "Book b = {\n  text = BookText(\"|\")\n}\n", []string{"books/guide.mmsbook", "books/lore.mmsbook"}},
+		{"unclosed path", "Book b = {\n  text = BookText(\"bo|\n}\n", []string{"books/guide.mmsbook"}},
+	} {
+		off := strings.Index(tc.src, "|")
+		src := tc.src[:off] + tc.src[off+1:]
+		p.SetFile("main.mms", src)
+		r, err := p.Analyze(context.Background())
+		if err != nil {
+			t.Fatal(err)
+		}
+		s := &Session{P: p, R: r}
+		items, _ := s.Completion("main.mms", len([]rune(src[:off])))
+		if got := labels(items); !has(got, tc.want...) {
+			t.Errorf("%s: completions %v lack %v", tc.name, got, tc.want)
+		}
+		if tc.name == "path" {
+			if !s.TriggerApplies("main.mms", len([]rune(src[:off])), `"`) {
+				t.Errorf("%s: \" does not open completion", tc.name)
+			}
+			for _, it := range items {
+				if strings.HasSuffix(it.Label, ".mms") {
+					t.Errorf("%s: offers %s", tc.name, it.Label)
+				}
+			}
+		}
+	}
+}

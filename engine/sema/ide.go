@@ -101,6 +101,10 @@ func (c *Checker) valueCandidates(v tview, depth int) []Candidate {
 				out = append(out, Candidate{Label: "If", Kind: CandCallable, Insert: "If($1) {\n\t$0\n}", Detail: "condition", Rank: 0})
 			}
 		}
+	case "list":
+		if v.T == bookTextType {
+			out = append(out, Candidate{Label: "BookText", Kind: CandCallable, Insert: `BookText("$1")`, Detail: ".mmsbook file", Doc: bookTextDoc, Rank: 0})
+		}
 	case "string":
 		if id := idOf(v.T); id.Present {
 			out = append(out, c.idCandidates(id)...)
