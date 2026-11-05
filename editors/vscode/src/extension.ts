@@ -8,9 +8,10 @@
 //
 // The preview panel (preview.ts) shows the web editor's worldgen previews.
 // The MMS side bar has the World view (world.ts), which builds the pack
-// into a Minecraft world, and the Pack view (packView.ts), which lists the
-// generated files, and the Jigsaw view (jigsaw.ts), which copies give
-// commands for set-up jigsaw blocks. The panels read the pack from output.ts.
+// into a Minecraft world, the Pack view (packView.ts), which lists the
+// generated files, the Structures view (also world.ts), which imports
+// structures saved in the game, and the Jigsaw view (jigsaw.ts), which
+// copies give commands for set-up jigsaw blocks. The panels read the pack from output.ts.
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';

@@ -1,9 +1,10 @@
 <script lang="ts">
-	// The World view's page: the project, its world, the Build button with
-	// the last build's result and what to do in the game next, and the
-	// structures saved in the structure world (the build world unless a
-	// separate one is chosen). The extension (src/world.ts) owns the
-	// state and sends all of it after each change. Actions are buttons,
+	// The page of two side bar views, chosen by the body's data-page. World:
+	// the project, its world, the Build button with the last build's result
+	// and what to do in the game next. Structures: the structures saved in
+	// the structure world (the build world unless a separate one is chosen).
+	// The extension (src/world.ts) owns the state and sends all of it to
+	// both after each change. Actions are buttons,
 	// drawn with the theme's button colours, and results are cards without
 	// them, so the two never look alike. Each structure row shows at most
 	// one button, for the one thing to do next (Import, or Copy call for a
@@ -12,6 +13,7 @@
 	import type { FromWorld, ToWorld, WorldDimensionRow, WorldState, WorldStructureRow } from '../src/messages';
 	import { group, type Group, type Node } from './groups';
 
+	const page = document.body.dataset.page === 'structures' ? 'structures' : 'world';
 	const vscode = acquireVsCodeApi<WorldState>();
 	let s = $state<WorldState | undefined>(vscode.getState());
 	// Buttons that just copied something say so for a moment.
@@ -179,7 +181,7 @@
 	<p class="muted pad">Loading…</p>
 {:else if !s.project}
 	<p class="pad">No MMS project in this workspace. Open a folder with an <code>mms.json</code>, or create one with <code>mms init</code>.</p>
-{:else}
+{:else if page === 'world'}
 	<section>
 		<div class="row">
 			<span class="icon" aria-hidden="true">▣</span>
@@ -210,9 +212,6 @@
 			<p>Choose a Minecraft world to build this project's pack into. The data pack goes in the world's datapacks folder, and a resource pack, if the project has one, in resourcepacks/resources.zip.</p>
 			<button class="primary wide" onclick={() => send({ type: 'run', action: 'chooseWorld' })}>Choose world…</button>
 			<p class="muted small">Worlds come from the Minecraft launcher's and Prism Launcher's saves folders, or browse to any world folder.</p>
-			{#if !s.structureWorld}
-				<button class="secondary small-btn" onclick={() => send({ type: 'run', action: 'chooseStructureWorld' })}>Only import structures from a world…</button>
-			{/if}
 		</section>
 	{:else}
 		<section>
@@ -305,66 +304,68 @@
 		</section>
 	{/if}
 
-	{#if s.structureWorld}
-		{@const from = s.structureWorld}
-		<section>
-			<div class="head">
-				<h2 class="grow">Structures</h2>
-				{#if waiting}
-					<button class="secondary small-btn" title="Import the new and changed structures into the project" onclick={() => send({ type: 'run', action: 'importWaiting' })}>Import {waiting}</button>
-				{/if}
-				<button class="icon-btn" title="Refresh" aria-label="Refresh" onclick={() => send({ type: 'run', action: 'refresh' })}>↻</button>
-			</div>
-			{#if from.separate}
-				<div class="row">
-					<span class="icon" aria-hidden="true">◍</span>
-					<div class="grow">
-						<div class="muted small">From</div>
-						<div class="name" title={from.path}>{from.name}</div>
-						{#if from.folder}<div class="muted small">{from.folder}</div>{/if}
-					</div>
-					<button class="secondary small-btn" title="Choose another world to import structures from" onclick={() => send({ type: 'run', action: 'chooseStructureWorld' })}>Change</button>
-					<button class="icon-btn more" title="More actions" aria-label="More actions for the structure world" aria-haspopup="menu" onclick={(e) => openMenu(e, [
-						{ label: 'Open generated folder', run: () => send({ type: 'run', action: 'revealStructureWorld' }) },
-						{ label: s?.world ? 'Use the build world instead' : 'Forget this world', run: () => send({ type: 'run', action: 'sameStructureWorld' }) }
-					])}>⋯</button>
+{:else if !s.structureWorld}
+	<section>
+		<p>Structures saved with structure blocks show here, to import into the project for jigsaw template pools. They come from the world the pack builds into, or from a separate world you build pieces in.</p>
+		<button class="primary wide" onclick={() => send({ type: 'run', action: 'chooseStructureWorld' })}>Choose world…</button>
+	</section>
+{:else}
+	{@const from = s.structureWorld}
+	<section>
+		{#if from.separate}
+			<div class="row">
+				<span class="icon" aria-hidden="true">◍</span>
+				<div class="grow">
+					<div class="muted small">From</div>
+					<div class="name" title={from.path}>{from.name}</div>
+					{#if from.folder}<div class="muted small">{from.folder}</div>{/if}
 				</div>
-				<p class="muted small">Builds never write to this world.</p>
-			{:else}
-				<p class="muted small">
-					From the build world.
-					<button class="link" title="Save structures in one world and build the pack into another" onclick={() => send({ type: 'run', action: 'chooseStructureWorld' })}>Use a separate world…</button>
-				</p>
-			{/if}
-			{#if !s.structures.length && !s.unusedFiles.length}
-				<p class="muted small">None saved yet. Save one with a structure block in SAVE mode; it shows up here to import into the project for a template pool.</p>
-			{:else}
-				<p class="muted small">
+				<button class="secondary small-btn" title="Choose another world to import structures from" onclick={() => send({ type: 'run', action: 'chooseStructureWorld' })}>Change</button>
+				<button class="icon-btn more" title="More actions" aria-label="More actions for the structure world" aria-haspopup="menu" onclick={(e) => openMenu(e, [
+					{ label: 'Open generated folder', run: () => send({ type: 'run', action: 'revealStructureWorld' }) },
+					{ label: s?.world ? 'Use the build world instead' : 'Forget this world', run: () => send({ type: 'run', action: 'sameStructureWorld' }) }
+				])}>⋯</button>
+			</div>
+			<p class="muted small">Builds never write to this world.</p>
+		{:else}
+			<p class="muted small">
+				From the build world, <span title={from.path}>{from.name}</span>.
+				<button class="link" title="Save structures in one world and build the pack into another" onclick={() => send({ type: 'run', action: 'chooseStructureWorld' })}>Use a separate world…</button>
+			</p>
+		{/if}
+		{#if !s.structures.length && !s.unusedFiles.length}
+			<p class="muted small">None saved yet. Save one with a structure block in SAVE mode; it shows up here to import into the project for a template pool.</p>
+		{:else}
+			<div class="head">
+				<p class="muted small grow">
 					{s.structures.length ? (waiting ? `${waiting} to import` : 'All imported') : ''}
 					{#if unused}
 						{s.structures.length ? ' · ' : ''}<span class="warn-text">{unused} not used</span>
 					{/if}
 					{#if s.unusedPaused}(The not-used check waits until the project has no errors.){/if}
 				</p>
-				<ul class="tree" role="tree">
-					{@render tree(groups, '', 0)}
-					{#each s.unusedFiles as rel (rel)}
-						{@const items: MenuItem[] = [{ label: 'Show file in Explorer', run: () => send({ type: 'revealFile', rel }) }]}
-						<li>
-							<div class="item" style:--depth={0} tabindex="0" role="treeitem" aria-selected="false" title={`${rel}\nNot saved in ${from.name}, and no Structure(...) call uses it, so the pack leaves it out.`} oncontextmenu={(e) => openMenu(e, items)}>
-								<span class="twistie"></span>
-								<span class="label warn-text missing">{rel}</span>
-								<span class="desc"><span class="warn-text">not used</span> · not in world</span>
-								<span class="actions-inline">
-									<button class="icon-btn" title="More actions" aria-label="More actions for {rel}" aria-haspopup="menu" onclick={(e) => openMenu(e, items)}>{@render icon('more')}</button>
-								</span>
-							</div>
-						</li>
-					{/each}
-				</ul>
-			{/if}
-		</section>
-	{/if}
+				{#if waiting}
+					<button class="secondary small-btn" title="Import the new and changed structures into the project" onclick={() => send({ type: 'run', action: 'importWaiting' })}>Import {waiting}</button>
+				{/if}
+			</div>
+			<ul class="tree" role="tree">
+				{@render tree(groups, '', 0)}
+				{#each s.unusedFiles as rel (rel)}
+					{@const items: MenuItem[] = [{ label: 'Show file in Explorer', run: () => send({ type: 'revealFile', rel }) }]}
+					<li>
+						<div class="item" style:--depth={0} tabindex="0" role="treeitem" aria-selected="false" title={`${rel}\nNot saved in ${from.name}, and no Structure(...) call uses it, so the pack leaves it out.`} oncontextmenu={(e) => openMenu(e, items)}>
+							<span class="twistie"></span>
+							<span class="label warn-text missing">{rel}</span>
+							<span class="desc"><span class="warn-text">not used</span> · not in world</span>
+							<span class="actions-inline">
+								<button class="icon-btn" title="More actions" aria-label="More actions for {rel}" aria-haspopup="menu" onclick={(e) => openMenu(e, items)}>{@render icon('more')}</button>
+							</span>
+						</div>
+					</li>
+				{/each}
+			</ul>
+		{/if}
+	</section>
 {/if}
 
 <svelte:window onclick={closeMenu} onblur={closeMenu} onresize={closeMenu} onkeydown={menuKey} />

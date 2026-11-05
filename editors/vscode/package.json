@@ -97,8 +97,9 @@
     },
     "views": {
       "mms": [
-        { "id": "mms.world", "type": "webview", "name": "World", "icon": "icons/sidebar.svg", "initialSize": 3 },
+        { "id": "mms.world", "type": "webview", "name": "World", "icon": "icons/sidebar.svg", "initialSize": 2 },
         { "id": "mms.pack", "name": "Pack", "icon": "icons/sidebar.svg", "initialSize": 2 },
+        { "id": "mms.structures", "type": "webview", "name": "Structures", "icon": "icons/sidebar.svg", "initialSize": 3 },
         { "id": "mms.jigsaw", "type": "webview", "name": "Jigsaw", "icon": "icons/sidebar.svg", "initialSize": 3 }
       ]
     },
@@ -136,7 +137,8 @@
       { "command": "mms.previewOutput", "title": "Open Preview", "icon": "$(open-preview)" },
       { "command": "mms.revealOutputSource", "title": "Go to Source", "icon": "$(go-to-file)" },
       { "command": "mms.renameAt", "title": "MMS: Rename Extracted Declaration" },
-      { "command": "mms.importStructures", "title": "MMS: Import Structures from World…", "icon": "$(cloud-download)" }
+      { "command": "mms.importStructures", "title": "MMS: Import Structures from World…", "icon": "$(cloud-download)" },
+      { "command": "mms.refreshStructures", "title": "Refresh", "icon": "$(refresh)" }
     ],
     "menus": {
       "editor/title": [
@@ -144,7 +146,8 @@
       ],
       "view/title": [
         { "command": "mms.buildToWorld", "when": "view == mms.world && mms.hasWorld", "group": "navigation@1" },
-        { "command": "mms.chooseWorld", "when": "view == mms.world && mms.hasProject", "group": "navigation@2" }
+        { "command": "mms.chooseWorld", "when": "view == mms.world && mms.hasProject", "group": "navigation@2" },
+        { "command": "mms.refreshStructures", "when": "view == mms.structures && mms.hasStructureWorld", "group": "navigation@1" }
       ],
       "view/item/context": [
         { "command": "mms.previewOutput", "when": "view == mms.pack && viewItem =~ /preview/", "group": "inline@1" },
@@ -162,6 +165,7 @@
         { "command": "mms.chooseWorld", "when": "mms.hasProject" },
         { "command": "mms.chooseProject", "when": "mms.hasProject" },
         { "command": "mms.revealWorld", "when": "false" },
+        { "command": "mms.refreshStructures", "when": "false" },
         { "command": "mms.forgetWorld", "when": "false" },
         { "command": "mms.openOutput", "when": "false" },
         { "command": "mms.previewOutput", "when": "false" },
