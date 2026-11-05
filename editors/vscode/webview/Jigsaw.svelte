@@ -119,9 +119,11 @@
 		{ label: 'Remove from Recent', run: () => send({ type: 'forget', config: $state.snapshot(r.config) }) },
 		{ label: 'Clear Recent', danger: true, run: () => send({ type: 'forgetAll' }) }
 	];
-	// A structure file keeps no label: a jigsaw block has no name of its
-	// own. A block set up like one copied from Recent gets that one's label.
+	// A block placed from a named item keeps the name in the structure
+	// file; one without gets the label of a block set up the same way in
+	// Recent.
 	const labelled = (c: JigsawConfig): JigsawConfig => {
+		if (c.label) return c;
 		const r = s?.recent.find((r) => r.config.label && sameBlock(r.config, c, ns));
 		return r ? { ...c, label: r.config.label } : c;
 	};
@@ -141,8 +143,10 @@
 		for (const e of s?.existing ?? []) {
 			const rows = by.get(e.id) ?? [];
 			const same = rows.find((r) => sameBlock(r.config, e.config, ns));
-			if (same) same.at.push(e);
-			else rows.push({ key: `${e.src}|${e.pos.join(',')}`, config: labelled(e.config), src: e.src, at: [e] });
+			if (same) {
+				same.at.push(e);
+				if (!same.config.label && e.config.label) same.config.label = e.config.label;
+			} else rows.push({ key: `${e.src}|${e.pos.join(',')}`, config: labelled(e.config), src: e.src, at: [e] });
 			by.set(e.id, rows);
 		}
 		return [...by].sort(([a], [b]) => a.localeCompare(b));

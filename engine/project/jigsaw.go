@@ -1,6 +1,7 @@
 package project
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/fs"
 	"slices"
@@ -37,6 +38,10 @@ type Jigsaw struct {
 	// FinalState is the block the jigsaw block turns into once the
 	// structure is placed, such as minecraft:air.
 	FinalState string
+	// Label is the name of the item the block was placed from (its
+	// item_name or custom_name), which the block entity keeps among its
+	// components; empty when it has none.
+	Label string
 }
 
 // structureCache holds parsed structure files by path, size and
@@ -144,6 +149,13 @@ func Jigsaws(root map[string]any) []Jigsaw {
 		j := Jigsaw{Pool: nbtID(data["pool"]), Name: nbtID(data["name"]), Target: nbtID(data["target"]), Orientation: orientation}
 		j.Joint, _ = data["joint"].(string)
 		j.FinalState, _ = data["final_state"].(string)
+		if comps, ok := data["components"].(map[string]any); ok {
+			for _, k := range []string{"minecraft:custom_name", "minecraft:item_name"} {
+				if j.Label = textOf(comps[k]); j.Label != "" {
+					break
+				}
+			}
+		}
 		if j.Joint == "" && orientation != "" {
 			if strings.HasPrefix(orientation, "up_") || strings.HasPrefix(orientation, "down_") {
 				j.Joint = "rollable"
@@ -161,6 +173,35 @@ func Jigsaws(root map[string]any) []Jigsaw {
 		out = append(out, j)
 	}
 	return out
+}
+
+// textOf reads the plain text of a text component in NBT: a string, a
+// compound with text (and extra), or a list of those; older files hold
+// it as JSON in a string.
+func textOf(v any) string {
+	switch t := v.(type) {
+	case string:
+		if strings.HasPrefix(t, "{") || strings.HasPrefix(t, "[") || strings.HasPrefix(t, "\"") {
+			var j any
+			if json.Unmarshal([]byte(t), &j) == nil {
+				return textOf(j)
+			}
+		}
+		return t
+	case map[string]any:
+		out := textOf(t["text"])
+		if extra, ok := t["extra"].([]any); ok {
+			out += textOf(extra)
+		}
+		return out
+	case []any:
+		var sb strings.Builder
+		for _, e := range t {
+			sb.WriteString(textOf(e))
+		}
+		return sb.String()
+	}
+	return ""
 }
 
 // nbtID reads an id string, adding the minecraft namespace; absent or

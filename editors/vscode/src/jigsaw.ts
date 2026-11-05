@@ -123,7 +123,7 @@ export class JigsawView implements vscode.Disposable, vscode.WebviewViewProvider
 					id,
 					pos: j.pos,
 					orientation: j.orientation,
-					config: { label: '', pool: field(j.pool), target: field(j.target), name: field(j.name), finalState: j.final_state ?? 'minecraft:air', joint: j.joint === 'aligned' ? 'aligned' : 'rollable' }
+					config: { label: j.label ?? '', pool: field(j.pool), target: field(j.target), name: field(j.name), finalState: j.final_state ?? 'minecraft:air', joint: j.joint === 'aligned' ? 'aligned' : 'rollable' }
 				};
 				state.existing.push(existing);
 			}

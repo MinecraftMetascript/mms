@@ -352,3 +352,29 @@ func TestJigsawHoleErrors(t *testing.T) {
 		t.Fatalf("got:\n%s\nwant:\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
 	}
 }
+
+// A jigsaw block placed from a named item keeps the name among its
+// components, as a plain string, a compound or (older) JSON text.
+func TestJigsawLabel(t *testing.T) {
+	palette := []any{map[string]any{"id": "minecraft:jigsaw", "properties": map[string]any{"orientation": "north_up"}}}
+	block := func(x int32, comps map[string]any) any {
+		data := map[string]any{"id": "minecraft:jigsaw", "name": "demo:a", "target": "demo:b", "pool": "demo:p"}
+		if comps != nil {
+			data["components"] = comps
+		}
+		return map[string]any{"pos": []any{x, int32(0), int32(0)}, "state": int32(0), "nbt": data}
+	}
+	root := map[string]any{"palette": palette, "blocks": []any{
+		block(0, map[string]any{"minecraft:item_name": "Hall exit"}),
+		block(1, map[string]any{"minecraft:custom_name": map[string]any{"text": "Road ", "extra": []any{"end"}}}),
+		block(2, map[string]any{"minecraft:item_name": `{"text":"Arch"}`}),
+		block(3, nil),
+	}}
+	var got []string
+	for _, j := range Jigsaws(root) {
+		got = append(got, j.Label)
+	}
+	if want := []string{"Hall exit", "Road end", "Arch", ""}; fmt.Sprint(got) != fmt.Sprint(want) {
+		t.Fatalf("labels %q, want %q", got, want)
+	}
+}

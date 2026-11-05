@@ -980,6 +980,9 @@ func (s *Server) output(_ context.Context, p struct {
 						if j.FinalState != "" {
 							m["final_state"] = j.FinalState
 						}
+						if j.Label != "" {
+							m["label"] = j.Label
+						}
 						list = append(list, m)
 					}
 					a["jigsaws"] = list
