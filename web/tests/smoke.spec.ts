@@ -162,6 +162,12 @@ test('density previews use the picked palette over the range in view', async ({ 
 	await expect.poll(async () => (await pixel(0.5, 0.98))[0]).toBeGreaterThan(110);
 	await expect(scale).toContainText('-1.00');
 
+	// Looking down, a y gradient is the same everywhere: the value at the camera's y.
+	await page.getByRole('button', { name: 'Top', exact: true }).click();
+	await page.getByLabel('Camera y').fill('256');
+	await expect(scale).toContainText('flat: 0.500 everywhere in view', { timeout: 20_000 });
+	await page.getByRole('button', { name: 'Top', exact: true }).click();
+
 	// The palette is remembered.
 	await page.reload();
 	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
@@ -206,6 +212,28 @@ test('dimensions, noise settings and surface rules preview as terrain', async ({
 	await page.getByRole('button', { name: 'Turn right' }).click();
 	await expect(page.getByLabel('Camera facing')).toContainText('Facing south · ← E W →');
 	await expect(failed).toBeHidden();
+
+	// Top looks straight down from the top of the world; hovering gives the block's own height.
+	await page.getByRole('button', { name: 'Top', exact: true }).click();
+	await expect(page.getByRole('button', { name: 'Top', exact: true })).toHaveAttribute('aria-pressed', 'true');
+	await expect(page.getByLabel('Camera facing')).toContainText('Looking down, top is S · ← E W →');
+	await expect(page.getByText('Rendering…')).toBeHidden({ timeout: 60_000 });
+	await expect(failed).toBeHidden();
+	// Sky islands have gaps, so look for a spot with a block under it.
+	const named = page.getByText(/x -?\d+, y -?\d+, z -?\d+ · \w+/);
+	await expect
+		.poll(async () => {
+			for (let i = 0; i < 25 && !(await named.isVisible()); i++) {
+				await page.mouse.move(box.x + box.width * (0.1 + 0.2 * (i % 5)), box.y + box.height * (0.1 + 0.2 * Math.floor(i / 5)));
+			}
+			return named.isVisible();
+		})
+		.toBe(true);
+	// Back to the side view, at the height it had.
+	const topY = await page.getByLabel('Camera y').inputValue();
+	await page.getByRole('button', { name: 'Top', exact: true }).click();
+	await expect(page.getByLabel('Camera facing')).toContainText('Facing south');
+	expect(await page.getByLabel('Camera y').inputValue()).not.toBe(topY);
 
 	// A surface rule is drawn on the noise settings that use it.
 	await page.getByRole('button', { name: 'terrain.mms' }).click();

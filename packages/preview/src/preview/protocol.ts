@@ -22,9 +22,22 @@ export const modesOf: Record<PreviewKind, PreviewMode[]> = {
 	carver: ['blocks', 'map', 'iso']
 };
 
-/** Whether a view looks down on x/z (otherwise it is a side view: a vertical slice through the camera). */
-export function topDown(kind: PreviewKind, mode: PreviewMode): boolean {
-	return kind === 'noise' || mode === 'biomes' || mode === 'map';
+/**
+ * Whether a view can be switched to look straight down. These take x, y
+ * and z, so they show a side view by default; a 2D noise and a biome map
+ * are top-down already, and the 3D view has its own camera.
+ */
+export function canLookDown(kind: PreviewKind, mode: PreviewMode): boolean {
+	// A carver has its own top-down map.
+	return kind !== 'noise' && kind !== 'carver' && (mode === 'density' || mode === 'blocks');
+}
+
+/**
+ * Whether a view looks down on x/z (otherwise it is a side view: a vertical
+ * slice through the camera). `down` is the viewer's top-down switch.
+ */
+export function topDown(kind: PreviewKind, mode: PreviewMode, down = false): boolean {
+	return kind === 'noise' || mode === 'biomes' || mode === 'map' || (down && canLookDown(kind, mode));
 }
 
 /** The way a 2D view's camera faces. Always along an axis, so a side view slices along x or z. */
@@ -65,6 +78,12 @@ export interface PreviewView {
 	facing: Facing;
 	/** Blocks per pixel (for the isometric view, a block's size in pixels). */
 	scale: number;
+	/**
+	 * Looks straight down instead of at a side slice (see canLookDown).
+	 * Density is sampled at y; blocks show the first block at or below y,
+	 * as if everything above y were cut away.
+	 */
+	down?: boolean;
 }
 
 export interface PreviewOptions {
@@ -118,6 +137,8 @@ export type PreviewResponse =
 			scale?: number;
 			/** For the isometric view: the smallest block size it allows (it fills the canvas with chunks). */
 			minScale?: number;
+			/** For a top-down block view: the y of the block shown at each pixel (NaN for none). */
+			heights?: Float32Array<ArrayBuffer>;
 			/** For the isometric view: the image itself, drawn in the worker (pixels is then empty). */
 			bitmap?: ImageBitmap;
 			/** More of this render follows (chunks are still being built). */

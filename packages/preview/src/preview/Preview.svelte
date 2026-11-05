@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import type { OutputFile } from '../types';
 	import {
+		canLookDown,
 		facings,
 		modesOf,
 		previewable,
@@ -86,7 +87,15 @@
 	let mode = $state<PreviewMode>('density');
 	let biome = $state('minecraft:plains');
 	let terrain = $state('minecraft:overworld');
-	const flat = $derived(info ? topDown(info.kind, mode) : false);
+	// The top-down switch, for views that otherwise show a side slice. It
+	// stays on across targets and modes, and applies where it can.
+	let lookDown = $state(false);
+	const canDown = $derived(info ? canLookDown(info.kind, mode) : false);
+	const flat = $derived(info ? topDown(info.kind, mode, lookDown) : false);
+	/** Top-down terrain: the first block at or below the camera's y. */
+	const topBlocks = $derived(flat && canDown && mode === 'blocks');
+	/** The side view's y while top-down terrain looks down from the top of the world. */
+	let sideY: number | null = null;
 
 	// Density colouring: a palette per kind, remembered in this browser, and
 	// the range it spans (the values in view, -1 to 1, or the user's own).
@@ -149,9 +158,46 @@
 	const resolution = $derived(
 		mode === 'iso' ? 1 / Math.min(2, globalThis.devicePixelRatio || 1) : mode === 'density' || mode === 'map' ? (info?.kind === 'noise_settings' ? 4 : 2) : 3
 	);
-	// Terrain is built a chunk at a time, so zooming out far gets slow.
-	// A carver map carves every chunk in view from the 17 × 17 chunks around it, so it stops there too.
-	const maxScale = $derived(mode === 'density' ? 64 : mode === 'biomes' ? 64 : 4);
+	/**
+	 * The furthest a 2D view zooms out, in blocks per pixel. Terrain is built
+	 * a chunk at a time, so zooming out far gets slow, and top-down terrain
+	 * needs every chunk in view: it stops at about 150 of them.
+	 */
+	function maxScale(): number {
+		if (mode === 'density' || mode === 'biomes') return 64;
+		if (!topBlocks || !box) return 4;
+		const w = Math.max(16, box.clientWidth / resolution);
+		const h = Math.max(16, box.clientHeight / resolution);
+		// (w·s/16 + 1)(h·s/16 + 1) chunks at s blocks per pixel.
+		const a = (w * h) / 256;
+		const b = (w + h) / 16;
+		const c = 1 - 150;
+		return Math.min(4, (-b + Math.sqrt(b * b - 4 * a * c)) / (2 * a));
+	}
+	/**
+	 * Fits the camera to whether it now shows top-down terrain: that looks
+	 * down from the top of the world (lower Y to cut into it), and going
+	 * back to a side view puts the camera's height back.
+	 */
+	function fitTop(wasTopBlocks: boolean) {
+		if (topBlocks && !wasTopBlocks) {
+			sideY = view.y;
+			view.y = (last?.maxY ?? 320) - 1;
+		} else if (!topBlocks && wasTopBlocks && sideY !== null) {
+			view.y = sideY;
+			sideY = null;
+		}
+		view.scale = Math.min(view.scale, maxScale());
+	}
+	function setDown(on: boolean) {
+		if (!info || on === lookDown) return;
+		const was = topBlocks;
+		lookDown = on;
+		fitTop(was);
+		lock = null;
+		last = null;
+		request();
+	}
 
 	// Biomes a surface rule can be tested against: the pack's own, those its
 	// rules name in Biome() conditions, and a few vanilla ones. With refs,
@@ -259,6 +305,8 @@
 			if (!sameKind) {
 				mode = modesOf[info.kind][0];
 				view = defaultView(info.kind, mode);
+				sideY = null;
+				fitTop(false);
 				lock = null;
 				last = null;
 			}
@@ -275,13 +323,14 @@
 	function setMode(m: PreviewMode) {
 		if (!info || m === mode) return;
 		const wasFlat = flat;
+		const wasTopBlocks = topBlocks;
 		mode = m;
-		if (topDown(info.kind, m) !== wasFlat) {
+		if (topDown(info.kind, m, lookDown) !== wasFlat) {
 			// Keep the camera where it is, at the new view's zoom.
 			view = { ...view, scale: defaultView(info.kind, m).scale };
 			lock = null;
 		}
-		view.scale = Math.min(view.scale, maxScale);
+		fitTop(wasTopBlocks);
 		if (m === 'iso') {
 			// Start the 3D view over the camera.
 			isoView = isoAt(view);
@@ -320,7 +369,7 @@
 			const width = Math.max(16, Math.floor(box.clientWidth / resolution));
 			const height = Math.max(16, Math.floor(box.clientHeight / resolution));
 			busy = true;
-			if (mode === 'iso') startHelpers();
+			if (mode === 'iso' || topBlocks) startHelpers();
 			worker.postMessage({
 				type: 'render',
 				seq: ++seq,
@@ -329,7 +378,7 @@
 				id: info.id,
 				width,
 				height,
-				view: $state.snapshot(mode === 'iso' ? isoView : view),
+				view: mode === 'iso' ? $state.snapshot(isoView) : { ...$state.snapshot(view), down: lookDown && canDown },
 				seed,
 				options: { biome, terrain }
 			} satisfies PreviewRequest);
@@ -352,7 +401,7 @@
 		} else {
 			ctx.putImageData(new ImageData(last.pixels, last.width, last.height), 0, 0);
 		}
-		if (last.seaLevel !== undefined && mode === 'density') {
+		if (last.seaLevel !== undefined && mode === 'density' && !flat) {
 			const py = (view.y - last.seaLevel) / view.scale + last.height / 2;
 			ctx.strokeStyle = 'rgba(30, 80, 160, 0.6)';
 			ctx.setLineDash([4, 3]);
@@ -398,7 +447,12 @@
 	function toWorld(px: number, py: number): Point {
 		const [u, v] = flatWorld(px, py, view.scale, ...planeOf(view));
 		const a = screenAxes(view.facing);
-		if (flat) return { x: Math.floor(u * a.rx + v * a.dx), y: Math.floor(view.y), z: Math.floor(u * a.rz + v * a.dz) };
+		if (flat) {
+			// Top-down terrain shows a block at its own height; maps are at the camera's.
+			const i = Math.floor(py) * (last?.width ?? 0) + Math.floor(px);
+			const y = last?.heights?.[i];
+			return { x: Math.floor(u * a.rx + v * a.dx), y: y === undefined || Number.isNaN(y) ? Math.floor(view.y) : y, z: Math.floor(u * a.rz + v * a.dz) };
+		}
 		return a.rx
 			? { x: Math.floor(u * a.rx), y: Math.floor(v), z: Math.floor(view.z) }
 			: { x: Math.floor(view.x), y: Math.floor(v), z: Math.floor(u * a.rz) };
@@ -418,11 +472,14 @@
 		return a.rx ? p.z === Math.floor(view.z) : p.x === Math.floor(view.x);
 	}
 	function coords(p: Point): string {
-		return flat ? `x ${p.x}, z ${p.z}` : `x ${p.x}, y ${p.y}, z ${p.z}`;
+		return flat && !topBlocks ? `x ${p.x}, z ${p.z}` : `x ${p.x}, y ${p.y}, z ${p.z}`;
 	}
 	const axes = $derived(screenAxes(view.facing));
 	function coordTitle(axis: 'x' | 'y' | 'z'): string {
-		if (axis === 'y') return flat ? 'The height the map is sampled at' : 'The height at the middle of the view';
+		if (axis === 'y') {
+			if (topBlocks) return 'The height the camera looks down from: blocks above it are cut away';
+			return flat ? 'The height the map is sampled at' : 'The height at the middle of the view';
+		}
 		if (flat) return `The ${axis} at the middle of the map`;
 		const depth = axes.rx ? 'z' : 'x';
 		return axis === depth ? `The slice is at this ${axis} (turn to slice along the other axis)` : `The ${axis} at the middle of the slice`;
@@ -483,7 +540,7 @@
 			const [ox, oz] = isoWorld(to.px, to.py, s, 0, 0);
 			isoView = { ...isoView, x: wx - ox, y: wz - oz, scale: s };
 		} else {
-			const scale = Math.min(maxScale, Math.max(1 / 16, start.scale / factor));
+			const scale = Math.min(maxScale(), Math.max(1 / 16, start.scale / factor));
 			const [wx, wy] = flatWorld(from.px, from.py, start.scale, start.vx, start.vy);
 			const [ox, oy] = flatWorld(to.px, to.py, scale, 0, 0);
 			view.scale = scale;
@@ -721,6 +778,14 @@
 						{/each}
 					</div>
 					<button class="rounded px-1 py-0.5 hover:bg-hover" title="Turn right" aria-label="Turn right" onclick={() => face(1)}>⟳</button>
+					{#if canDown}
+						<button
+							class="ml-1 rounded border border-line px-1.5 py-0.5 {lookDown ? 'bg-accent text-white' : 'hover:bg-hover'}"
+							title={lookDown ? 'Back to a side view' : 'Look straight down from the camera'}
+							aria-pressed={lookDown}
+							onclick={() => setDown(!lookDown)}>Top</button
+						>
+					{/if}
 				</div>
 			{/if}
 			<label class="ml-auto flex items-center gap-1">
@@ -737,6 +802,8 @@
 					if (mode === 'iso') isoView = isoAt(view);
 					else {
 						view = defaultView(info.kind, mode);
+						sideY = null;
+						fitTop(false);
 						lock = null;
 					}
 					request();
@@ -773,11 +840,12 @@
 		{/if}
 		{#if info && last && mode !== 'iso'}
 			<div class="pointer-events-none absolute top-2 left-2 rounded bg-black/60 px-2 py-1 font-mono text-[11px] text-white" aria-label="Camera facing">
-				Facing {view.facing} · ← {compass(-axes.rx, -axes.rz)} {compass(axes.rx, axes.rz)} →
+				{#if flat && canDown}Looking down, top is {compass(-axes.dx, -axes.dz)} ·{:else}Facing {view.facing} ·{/if}
+				← {compass(-axes.rx, -axes.rz)} {compass(axes.rx, axes.rz)} →
 			</div>
 		{/if}
 		{#if info && last?.notice}
-			<div class="pointer-events-none absolute inset-x-3 top-3 rounded bg-black/60 px-3 py-2 text-xs text-white">{last.notice}</div>
+			<div class="pointer-events-none absolute inset-x-3 rounded bg-black/60 px-3 py-2 text-xs text-white {mode === 'iso' ? 'top-3' : 'top-10'}">{last.notice}</div>
 		{/if}
 		{#if info && last?.legend}
 			<div class="pointer-events-none absolute top-2 right-2 flex max-h-[60%] flex-col gap-0.5 overflow-hidden rounded bg-black/60 px-2 py-1 text-[11px] text-white" aria-label={info.kind === 'carver' ? 'Heights in view' : 'Biomes in view'}>

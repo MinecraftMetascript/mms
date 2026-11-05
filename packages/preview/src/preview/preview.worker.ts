@@ -1064,6 +1064,137 @@ async function renderIso(req: RenderRequest, t: Terrain, key: string, extra?: (n
 	return frame();
 }
 
+/**
+ * Draws the terrain from straight above: each column shows the first block
+ * at or below the camera's y, as if everything above it were cut away, so
+ * a high camera shows the surface and a low one shows caves. Columns are
+ * shaded against the one above them on screen, the way maps are, so slopes
+ * read. It needs whole chunks, so it shares the 3D view's (and its helpers).
+ */
+async function renderTop(req: RenderRequest, t: Terrain, key: string): Promise<Rendered> {
+	const { width, height, view } = req;
+	const h = t.settings.noise.height;
+	const minY = t.settings.noise.minY;
+	if (key !== isoKey) {
+		isoKey = key;
+		isoChunks.clear();
+		isoArea = null;
+		isoImage = null;
+	}
+	refreshIso = null;
+	const plane = planeOf(width, height, view);
+	const from = Math.min(h - 1, Math.floor(view.y) - minY);
+	// The chunks the canvas covers (its corners bound them, as it only turns by quarters).
+	const xs = [plane.x(0, 0), plane.x(width - 1, height - 1)];
+	const zs = [plane.z(0, 0), plane.z(width - 1, height - 1)];
+	const cx0 = Math.floor(Math.min(...xs) / 16), cx1 = Math.floor(Math.max(...xs) / 16);
+	const cz0 = Math.floor(Math.min(...zs) / 16), cz1 = Math.floor(Math.max(...zs) / 16);
+	const byDistance = (a: [number, number], b: [number, number]) =>
+		Math.hypot(a[0] * 16 + 8 - view.x, a[1] * 16 + 8 - view.z) - Math.hypot(b[0] * 16 + 8 - view.x, b[1] * 16 + 8 - view.z);
+	const shown: [number, number][] = [];
+	const ring: [number, number][] = [];
+	for (let cx = cx0 - 1; cx <= cx1 + 1; cx++) {
+		for (let cz = cz0 - 1; cz <= cz1 + 1; cz++) {
+			(cx < cx0 || cx > cx1 || cz < cz0 || cz > cz1 ? ring : shown).push([cx, cz]);
+		}
+	}
+	shown.sort(byDistance);
+	ring.sort(byDistance);
+
+	// The top block of each column at or below the camera, per chunk (-1 for none).
+	const tops = new Map<IsoChunk, Int16Array>();
+	/** The index above the world bottom of the block shown at x, z; -1 for none, -2 if not built. */
+	const topAt = (x: number, z: number): number => {
+		const c = isoChunks.get(`${x >> 4},${z >> 4}`);
+		if (!c) return -2;
+		let col = tops.get(c);
+		if (!col) tops.set(c, (col = new Int16Array(256).fill(-3)));
+		const i = (x & 15) * 16 + (z & 15);
+		if (col[i] === -3) {
+			let y = from;
+			const base = i * h;
+			while (y >= 0 && isEmpty(c.data[base + y])) y--;
+			col[i] = y;
+		}
+		return col[i];
+	};
+	const frame = (): Rendered => {
+		tops.clear();
+		const pixels = new Uint8ClampedArray(width * height * 4);
+		const values = new Float32Array(width * height).fill(NaN);
+		const heights = new Float32Array(width * height).fill(NaN);
+		// The heights in view, so higher ground can be drawn a little lighter.
+		let lo = Infinity;
+		let hi = -Infinity;
+		for (let py = 0; py < height; py++) {
+			for (let px = 0; px < width; px++) {
+				const y = topAt(Math.floor(plane.x(px, py)), Math.floor(plane.z(px, py)));
+				if (y < 0) continue;
+				if (y < lo) lo = y;
+				if (y > hi) hi = y;
+			}
+		}
+		const span = Math.max(16, hi - lo);
+		let any = false;
+		for (let py = 0; py < height; py++) {
+			for (let px = 0; px < width; px++) {
+				const i = py * width + px;
+				const x = Math.floor(plane.x(px, py));
+				const z = Math.floor(plane.z(px, py));
+				const y = topAt(x, z);
+				if (y < 0) {
+					put(pixels, i * 4, y === -2 ? CAVE : VOID);
+					continue;
+				}
+				const c = isoChunks.get(`${x >> 4},${z >> 4}`)!;
+				const b = c.data[((x & 15) * 16 + (z & 15)) * h + y];
+				// Lit from the top of the screen, as maps are: a column lower
+				// than the one above it is in shade, a higher one catches light.
+				const above = topAt(x - plane.dx, z - plane.dz);
+				const slope = above < 0 || above === y ? 1 : above > y ? 0.82 : 1.1;
+				values[i] = b;
+				heights[i] = minY + y;
+				put(pixels, i * 4, blockColor(palette[b]), slope * (0.8 + (0.3 * (y - lo)) / span));
+				any = true;
+			}
+		}
+		const notice = !any && missing.length === 0 ? `No blocks at or below y ${Math.floor(view.y)} here.` : undefined;
+		return {
+			type: 'rendered', seq: req.seq, width, height, pixels, values, heights,
+			min: Infinity, max: -Infinity, labels: palette.slice(), notice,
+			seaLevel: t.settings.seaLevel, minY, maxY: minY + h
+		};
+	};
+
+	let missing = shown.filter(([cx, cz]) => !touch(`${cx},${cz}`));
+	let built = shown.length - missing.length;
+	if (missing.length > 0 && helpers.length === 0) {
+		// No helpers: build here, showing chunks as they finish.
+		for (const [cx, cz] of missing) {
+			if (built > 0) post({ ...frame(), partial: true });
+			await breathe();
+			if (req.seq !== latest) throw new Superseded();
+			keep(`${cx},${cz}`, isoChunkOf(await buildIsoChunk(t, cx, cz), h));
+			built++;
+		}
+	} else if (missing.length > 0) {
+		const wanted = plan(req, missing, ring);
+		let waiting = missing.length;
+		const all = Promise.all(missing.map(([cx, cz]) => wanted.get(`${cx},${cz}`)!.then(() => void (waiting--, built++))));
+		all.catch(() => {});
+		let posted = -1;
+		while (waiting > 0) {
+			if (built !== posted && built > 0) post({ ...frame(), partial: true });
+			posted = built;
+			await Promise.race([all, sleep(150)]);
+			if (req.seq !== latest) throw new Superseded();
+		}
+		await all; // rethrows a helper's error
+	}
+	missing = [];
+	return frame();
+}
+
 /** Marks a built chunk as recently used; whether it is built. */
 function touch(at: string): boolean {
 	const c = isoChunks.get(at);
@@ -1451,6 +1582,12 @@ async function render(req: RenderRequest): Promise<PreviewResponse> {
 	}
 
 	if (req.kind === 'dimension' || req.kind === 'material_rule' || (req.kind === 'noise_settings' && req.mode !== 'density')) {
+		if (req.mode === 'blocks' && view.down) {
+			// Built from whole chunks, the same ones the 3D view uses.
+			const asIso = { ...req, mode: 'iso' as const };
+			const { terrain, key } = await terrainOf(asIso);
+			return renderTop(asIso, terrain, key);
+		}
 		const { terrain, key } = await terrainOf(req);
 		if (req.mode === 'iso') return renderIso(req, terrain, key);
 		await warm(req, terrain, key);
@@ -1475,7 +1612,7 @@ async function render(req: RenderRequest): Promise<PreviewResponse> {
 	}
 
 	if (req.kind === 'density_function') {
-		// Side view: the slice through the camera, y up.
+		// Side view: the slice through the camera, y up (or top-down, at the camera's y).
 		const fn = await withVanilla(() => {
 			const rs = new RandomState(NoiseGeneratorSettings.create({}), seed);
 			// A reference holder, so the visitor binds noises and caches by id.
@@ -1483,9 +1620,9 @@ async function render(req: RenderRequest): Promise<PreviewResponse> {
 			return df.mapAll(rs.createVisitor(false));
 		});
 		for (let py = 0; py < height; py++) {
-			const y = plane.y(py);
+			const y = view.down ? view.y : plane.y(py);
 			for (let px = 0; px < width; px++) {
-				const [x, z] = plane.at(plane.along(px));
+				const [x, z] = view.down ? [plane.x(px, py), plane.z(px, py)] : plane.at(plane.along(px));
 				const v = fn.compute(DensityFunction.context(x, y, z));
 				values[py * width + px] = v;
 				track(v);
@@ -1494,7 +1631,7 @@ async function render(req: RenderRequest): Promise<PreviewResponse> {
 		return { type: 'rendered', seq: req.seq, width, height, pixels, values, min, max };
 	}
 
-	// Noise settings, density mode: the terrain's final density, a side view.
+	// Noise settings, density mode: the terrain's final density.
 	const { settings, router } = await withVanilla(() => {
 		const settings = WorldgenRegistries.NOISE_SETTINGS.getOrThrow(id);
 		const rs = speedUp(new RandomState(settings, seed));
@@ -1503,13 +1640,15 @@ async function render(req: RenderRequest): Promise<PreviewResponse> {
 	const minY = settings.noise.minY;
 	const maxY = minY + settings.noise.height;
 	const sea = settings.seaLevel;
+	// A side view, or top-down at the camera's y.
+	const yAt = (py: number) => (view.down ? view.y : plane.y(py));
 	for (let py = 0; py < height; py++) {
-		const y = plane.y(py);
+		const y = yAt(py);
 		for (let px = 0; px < width; px++) {
 			const i = py * width + px;
 			let v = NaN;
 			if (y >= minY && y < maxY) {
-				const [x, z] = plane.at(plane.along(px));
+				const [x, z] = view.down ? [plane.x(px, py), plane.z(px, py)] : plane.at(plane.along(px));
 				v = router.finalDensity.compute(DensityFunction.context(x, y, z));
 				track(v);
 			}
@@ -1521,7 +1660,7 @@ async function render(req: RenderRequest): Promise<PreviewResponse> {
 	// The viewer draws the other palettes from the values.
 	const solidMax = Math.max(max, 1e-9);
 	for (let py = 0; py < height; py++) {
-		const y = plane.y(py);
+		const y = yAt(py);
 		for (let px = 0; px < width; px++) {
 			const i = py * width + px;
 			const o = i * 4;
@@ -1545,6 +1684,7 @@ async function render(req: RenderRequest): Promise<PreviewResponse> {
 function post(res: Rendered) {
 	const transfer: Transferable[] = [res.pixels.buffer, res.values.buffer];
 	if (res.bitmap) transfer.push(res.bitmap);
+	if (res.heights) transfer.push(res.heights.buffer);
 	(self as unknown as Worker).postMessage(res, transfer);
 }
 
