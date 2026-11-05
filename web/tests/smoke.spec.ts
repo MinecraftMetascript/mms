@@ -1042,3 +1042,47 @@ test('a function runs in the function preview', async ({ page }) => {
 	await expect(run.getByText('tick 20')).toBeVisible();
 	expect(errors).toEqual([]);
 });
+
+test('a carver previews as a slice, a map and in 3D', async ({ page }) => {
+	const errors: string[] = [];
+	page.on('pageerror', (e) => errors.push(e.message));
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	await replaceText(
+		page,
+		`Carver caves = {
+  type = cave
+  probability = 0.15
+  y = Uniform(AboveBottom(8), Absolute(180))
+  count = VeryBiasedToBottom(0, 14)
+  thickness = Trapezoid(0, 3, 1)
+  room_vertical_radius_multiplier = Uniform(0.1, 0.9)
+  horizontal_radius_multiplier = Uniform(0.7, 1.4)
+  vertical_radius_multiplier = Uniform(0.8, 1.3)
+  floor_level = -0.7
+}
+Biome meadow = {
+  temperature = 0.7
+  downfall = 0.6
+  has_precipitation = true
+  effects = { water_color = "#3f76e4" }
+  carvers = [features_first, caves]
+  features = []
+}
+Carver features_first = { type = canyon, probability = 0, y = 40, vertical_rotation = 0, shape = { distance_factor = 1, thickness = 2, width_smoothness = 3, horizontal_radius_factor = 1, vertical_radius_default_factor = 1, vertical_radius_center_factor = 0, y_scale = 3 } }
+`
+	);
+	await expect(status(page)).toHaveText(/No problems|warning/);
+	await page.locator('.cm-line').first().click();
+	await expect(page.getByText('my_pack:caves')).toBeVisible();
+	const caption = page.locator('[data-caption]');
+	// The carver is second in the biome's list, which the game adds to the seed.
+	await expect(caption).toContainText('second carver of my_pack:meadow', { timeout: 30_000 });
+	await expect(caption).toContainText('Pink: carved air');
+	await page.getByRole('button', { name: 'Map', exact: true }).click();
+	await expect(caption).toContainText('highest block cut', { timeout: 30_000 });
+	await expect(page.getByLabel('Heights in view')).toContainText(/top y -?\d+ to -?\d+/);
+	await page.getByRole('button', { name: '3D', exact: true }).click();
+	await expect(caption).toContainText('Only the space the carver cuts', { timeout: 30_000 });
+	expect(errors).toEqual([]);
+});

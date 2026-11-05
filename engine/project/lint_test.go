@@ -51,6 +51,11 @@ Function f {
 	if got := strings.Join(lintCodes(t, Config{Namespace: "demo"}, src3), " "); got != "lint/overrides-vanilla@2" {
 		t.Errorf("tag lint = %s, want lint/overrides-vanilla@2", got)
 	}
+	// Carvers and features (26.x folders worldgen/carver and worldgen/feature) only load through a biome or another feature.
+	src4 := "Carver spare = { type = canyon, probability = 0.1, y = 40, vertical_rotation = 0, shape = { distance_factor = 1, thickness = 2, width_smoothness = 3, horizontal_radius_factor = 1, vertical_radius_default_factor = 1, vertical_radius_center_factor = 0, y_scale = 3 } }\n"
+	if got := strings.Join(lintCodes(t, Config{Namespace: "demo"}, src4), " "); !strings.Contains(got, "lint/unused@1") {
+		t.Errorf("carver lint = %s, want lint/unused@1", got)
+	}
 	if err := (Config{Namespace: "x", Lint: map[string]string{"nope": "off"}}).Validate(); err == nil {
 		t.Error("unknown rule accepted")
 	}

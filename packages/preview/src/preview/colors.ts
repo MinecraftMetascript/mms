@@ -161,8 +161,40 @@ function vanillaName(id: string): string | null {
 	return id.slice(0, i) === 'minecraft' ? id.slice(i + 1) : null;
 }
 
+/**
+ * Carver previews mark what a carver cut with these ids: `carved air`,
+ * `carved water` and `carved lava` in the terrain slice, and height bands
+ * (`carved y <lo> to <hi>`) where only the carved space is drawn.
+ */
+export const CARVED = 'carved ';
+const carved: Record<string, Rgb> = {
+	'carved air': [236, 96, 168],
+	'carved water': [96, 176, 244],
+	'carved lava': [255, 150, 30]
+};
+const bandStops: Rgb[] = [
+	[68, 1, 84],
+	[59, 82, 139],
+	[33, 145, 140],
+	[94, 201, 98],
+	[253, 231, 37]
+];
+/** The colour of a carved height band by its lowest y, low (purple) to high (yellow) over y -64 to 320. */
+export function bandColor(y: number): Rgb {
+	const t = Math.max(0, Math.min(1, (y + 64) / 384)) * (bandStops.length - 1);
+	const i = Math.min(bandStops.length - 2, Math.floor(t));
+	const k = t - i;
+	const a = bandStops[i];
+	const b = bandStops[i + 1];
+	return [Math.round(a[0] + (b[0] - a[0]) * k), Math.round(a[1] + (b[1] - a[1]) * k), Math.round(a[2] + (b[2] - a[2]) * k)];
+}
+
 /** A colour for a block id such as `minecraft:stone`. */
 export function blockColor(id: string): Rgb {
+	if (id.startsWith(CARVED)) {
+		const band = /^carved y (-?\d+)/.exec(id);
+		return band ? bandColor(Number(band[1])) : (carved[id] ?? carved['carved air']);
+	}
 	const name = vanillaName(id);
 	if (name !== null) {
 		const c = blocks[name];

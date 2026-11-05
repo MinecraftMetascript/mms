@@ -116,6 +116,32 @@ A template's chests can get a loot table from a `Rule` processor with `block_ent
 
 `+`, `-`, `*` and `/` build `add`, `sub`, `mul` and `div`. Arithmetic on constants is folded. A unary `-x` is `x * -1`.
 
+## Carvers
+
+A `Carver` is a 26.x carver (`worldgen/carver`), listed by id in a biome's `carvers`. Since 26.1 a carver no longer has `lava_level`, `replaceable` or `debug_settings`: it cuts every block except those in `#minecraft:uncarvable` (bedrock), and the aquifer decides what fills the space (air, water, or lava deep down).
+
+```mms
+Carver big_caves = {
+  type = cave
+  probability = 0.15
+  y = Uniform(AboveBottom(8), Absolute(180))
+  count = VeryBiasedToBottom(0, 14)
+  thickness = Trapezoid(0, 3, 1)
+  room_vertical_radius_multiplier = Uniform(0.1, 0.9)
+  horizontal_radius_multiplier = Uniform(0.7, 1.4)
+  vertical_radius_multiplier = Uniform(0.8, 1.3)
+  floor_level = Uniform(-1, -0.4)
+}
+```
+
+The Preview tab (and the Preview lens in VS Code) runs the carver for the seed you enter, in three ways:
+
+- **Blocks**: a slice of the terrain with the carver applied. Carved air is pink; water and lava an aquifer put in carved space are light blue and orange. Pick the noise settings it cuts into under **Terrain**; it starts on those of a dimension with a biome that lists the carver.
+- **Map**: a top-down map of where the carver cuts, coloured by the highest block cut in each column. It ignores the terrain, so it also shows the parts that would be in the air.
+- **3D**: only the space the carver cuts, coloured by height.
+
+The game adds a carver's position in its biome's `carvers` list to the seed, so the preview uses the position in the first of your biomes that lists it; the caption says which. With the same seed and list position, the caves match the game's. The preview does not turn dirt under a carved grass block back into grass, as the game does.
+
 ## Inline values where an id is needed
 
 Some fields need an id, and the game will not load an inline value there. Examples are a surface rule's `NoiseThreshold` noise, a biome source's biome, and a template pool's fallback. A density function's noise is in the same group. The schema allows it inline, but the game seeds each noise from its id, so an inline noise fails when the world loads.

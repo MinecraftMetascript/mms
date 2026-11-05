@@ -36,32 +36,35 @@
 		output,
 		target,
 		createWorker,
-		hint = 'Put the cursor in a noise, density function, noise settings, surface rule or dimension declaration to preview it.'
+		hint = 'Put the cursor in a noise, density function, noise settings, surface rule, dimension or carver declaration to preview it.'
 	}: Props = $props();
 
 	// A target the pack no longer has (renamed or deleted) shows nothing.
 	const info = $derived(target && output.some((f) => f.path === target) ? previewable(target) : null);
 	// Each view starts with the camera at the origin facing north (x to the right).
-	const defaults: Record<PreviewKind | 'biomes', PreviewView> = {
+	const defaults: Record<PreviewKind | 'biomes' | 'map', PreviewView> = {
 		noise: { x: 0, y: 0, z: 0, facing: 'north', scale: 4 },
 		density_function: { x: 0, y: 64, z: 0, facing: 'north', scale: 2 },
 		noise_settings: { x: 0, y: 64, z: 0, facing: 'north', scale: 2 },
 		material_rule: { x: 0, y: 64, z: 0, facing: 'north', scale: 0.5 },
 		dimension: { x: 0, y: 64, z: 0, facing: 'north', scale: 2 },
-		biomes: { x: 0, y: 64, z: 0, facing: 'north', scale: 8 }
+		carver: { x: 0, y: 40, z: 0, facing: 'north', scale: 1 },
+		biomes: { x: 0, y: 64, z: 0, facing: 'north', scale: 8 },
+		map: { x: 0, y: 0, z: 0, facing: 'north', scale: 1 }
 	};
 	const facingLetters: Record<Facing, string> = { north: 'N', east: 'E', south: 'S', west: 'W' };
 	/** The compass letter of the way a world x/z step points. */
 	const compass = (dx: number, dz: number) => (dx > 0 ? 'E' : dx < 0 ? 'W' : dz > 0 ? 'S' : 'N');
-	const modeNames: Record<PreviewMode, string> = { density: 'Density', blocks: 'Blocks', biomes: 'Biomes', iso: '3D' };
+	const modeNames: Record<PreviewMode, string> = { density: 'Density', blocks: 'Blocks', biomes: 'Biomes', iso: '3D', map: 'Map' };
 	const kindNames: Record<PreviewKind, string> = {
 		noise: 'noise',
 		density_function: 'density function',
 		noise_settings: 'noise settings',
 		material_rule: 'surface rule',
-		dimension: 'dimension'
+		dimension: 'dimension',
+		carver: 'carver'
 	};
-	const defaultView = (kind: PreviewKind, mode: PreviewMode) => ({ ...defaults[mode === 'biomes' ? 'biomes' : kind] });
+	const defaultView = (kind: PreviewKind, mode: PreviewMode) => ({ ...defaults[mode === 'biomes' || mode === 'map' ? mode : kind] });
 
 	let canvas: HTMLCanvasElement;
 	let box: HTMLDivElement;
@@ -144,9 +147,10 @@
 	// CSS pixels per rendered pixel; terrain is costly to sample, so coarser.
 	// The isometric view is drawn with polygons, so it renders at device pixels.
 	const resolution = $derived(
-		mode === 'iso' ? 1 / Math.min(2, globalThis.devicePixelRatio || 1) : mode === 'density' ? (info?.kind === 'noise_settings' ? 4 : 2) : 3
+		mode === 'iso' ? 1 / Math.min(2, globalThis.devicePixelRatio || 1) : mode === 'density' || mode === 'map' ? (info?.kind === 'noise_settings' ? 4 : 2) : 3
 	);
 	// Terrain is built a chunk at a time, so zooming out far gets slow.
+	// A carver map carves every chunk in view from the 17 × 17 chunks around it, so it stops there too.
 	const maxScale = $derived(mode === 'density' ? 64 : mode === 'biomes' ? 64 : 4);
 
 	// Biomes a surface rule can be tested against: the pack's own, those its
@@ -197,6 +201,19 @@
 		return { first: [...own][0], all: [...all].sort() };
 	});
 	const terrainChoices = $derived(['minecraft:overworld', ...parsed.filter((f) => f.kind === 'noise_settings').map((f) => f.id)]);
+	/**
+	 * The terrain a carver is drawn on: the noise settings of a dimension
+	 * with a biome that lists it, else the overworld's.
+	 */
+	function carverTerrain(id: string): string {
+		const biomes = parsed.filter((f) => f.kind === 'biome' && f.text.includes(`"${id}"`)).map((f) => f.id);
+		for (const d of parsed) {
+			if (d.kind !== 'dimension' || !biomes.some((b) => d.text.includes(`"${b}"`))) continue;
+			const settings = (d.json as { generator?: { settings?: unknown } }).generator?.settings;
+			if (typeof settings === 'string' && terrainChoices.includes(settings)) return settings;
+		}
+		return 'minecraft:overworld';
+	}
 
 	onMount(() => {
 		worker = createWorker();
@@ -250,6 +267,7 @@
 				const user = parsed.find((f) => f.kind === 'noise_settings' && f.text.includes(`"${info.id}"`));
 				terrain = user?.id ?? 'minecraft:overworld';
 			}
+			if (info.kind === 'carver') terrain = carverTerrain(info.id);
 		}
 		request();
 	});
@@ -612,15 +630,15 @@
 					{/each}
 				</div>
 			{/if}
-			{#if info.kind === 'material_rule'}
-				<label class="flex items-center gap-1">
+			{#if info.kind === 'material_rule' || info.kind === 'carver'}
+				<label class="flex items-center gap-1" title={info.kind === 'carver' ? 'The noise settings the carver cuts into, which also set the heights it can reach' : undefined}>
 					Terrain
 					<select aria-label="Terrain" class="rounded border border-line bg-panel px-1 py-0.5 text-ink" bind:value={terrain} onchange={() => request()}>
 						{#each terrainChoices as t (t)}<option value={t}>{t.replace(/^minecraft:/, '')}</option>{/each}
 					</select>
 				</label>
 			{/if}
-			{#if (mode === 'blocks' || mode === 'iso') && info.kind !== 'dimension'}
+			{#if (mode === 'blocks' || (mode === 'iso' && info.kind !== 'carver')) && info.kind !== 'dimension'}
 				<label class="flex items-center gap-1" title="The biome Biome() conditions in surface rules see">
 					Biome
 					<select aria-label="Biome" class="rounded border border-line bg-panel px-1 py-0.5 text-ink" bind:value={biome} onchange={() => request()}>
@@ -762,7 +780,7 @@
 			<div class="pointer-events-none absolute inset-x-3 top-3 rounded bg-black/60 px-3 py-2 text-xs text-white">{last.notice}</div>
 		{/if}
 		{#if info && last?.legend}
-			<div class="pointer-events-none absolute top-2 right-2 flex max-h-[60%] flex-col gap-0.5 overflow-hidden rounded bg-black/60 px-2 py-1 text-[11px] text-white" aria-label="Biomes in view">
+			<div class="pointer-events-none absolute top-2 right-2 flex max-h-[60%] flex-col gap-0.5 overflow-hidden rounded bg-black/60 px-2 py-1 text-[11px] text-white" aria-label={info.kind === 'carver' ? 'Heights in view' : 'Biomes in view'}>
 				{#each last.legend.slice(0, 12) as b (b.id)}
 					<span class="flex items-center gap-1.5"><span class="inline-block h-2.5 w-2.5 rounded-sm" style:background={b.color}></span>{b.id.replace(/^minecraft:/, '')}</span>
 				{/each}
@@ -804,6 +822,9 @@
 					<div class="rounded bg-black/60 px-2 py-1 font-mono text-[11px] text-white">
 						{last.min.toFixed(3)} … {last.max.toFixed(3)}
 					</div>
+				{/if}
+				{#if last.caption}
+					<p class="max-w-72 rounded bg-black/60 px-2 py-1 text-right text-[11px] text-white" data-caption>{last.caption}</p>
 				{/if}
 				<!-- Every preview here is rendered with Misode's Deepslate. -->
 				<p class="pointer-events-auto rounded bg-black/40 px-1.5 py-0.5 text-[10px] text-white/80 hover:text-white" data-credit="deepslate">

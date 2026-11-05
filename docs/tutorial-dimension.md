@@ -193,5 +193,6 @@ In VS Code, tick **Reset changed dimensions** under **Build into world** in the 
 
 - Use a `multi_noise` biome source and the router's `temperature` and `vegetation` entries for several biomes.
 - Add features to the biome's `features` lists.
+- Add caves or canyons with a `Carver` in the biome's `carvers` list, and check them in the carver preview (see [Carvers](resources.md#carvers)).
 - Turn on aquifers by adding an `aquifers` block to the settings.
 - Import a vanilla dimension with `mms import` to see a complete one written in MMS.

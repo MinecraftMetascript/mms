@@ -7,8 +7,10 @@ export type { PreviewKind } from '../paths';
  * - blocks: a terrain slice from the chunk generator, with aquifers and surface rules
  * - biomes: a top-down map of a dimension's biome source
  * - iso: an isometric block diagram of a couple of chunks of terrain
+ *   (for a carver, of the space it carves)
+ * - map: a top-down map of where a carver cuts
  */
-export type PreviewMode = 'density' | 'blocks' | 'biomes' | 'iso';
+export type PreviewMode = 'density' | 'blocks' | 'biomes' | 'iso' | 'map';
 
 /** The modes each kind offers, the first being the default. */
 export const modesOf: Record<PreviewKind, PreviewMode[]> = {
@@ -16,12 +18,13 @@ export const modesOf: Record<PreviewKind, PreviewMode[]> = {
 	density_function: ['density'],
 	noise_settings: ['blocks', 'iso', 'density'],
 	material_rule: ['blocks', 'iso'],
-	dimension: ['biomes', 'blocks', 'iso']
+	dimension: ['biomes', 'blocks', 'iso'],
+	carver: ['blocks', 'map', 'iso']
 };
 
 /** Whether a view looks down on x/z (otherwise it is a side view: a vertical slice through the camera). */
 export function topDown(kind: PreviewKind, mode: PreviewMode): boolean {
-	return kind === 'noise' || mode === 'biomes';
+	return kind === 'noise' || mode === 'biomes' || mode === 'map';
 }
 
 /** The way a 2D view's camera faces. Always along an axis, so a side view slices along x or z. */
@@ -67,7 +70,7 @@ export interface PreviewView {
 export interface PreviewOptions {
 	/** The biome surface rules see, for kinds without a biome source. */
 	biome: string;
-	/** The noise settings a surface rule is drawn on. */
+	/** The noise settings a surface rule or carver is drawn on. */
 	terrain: string;
 }
 
@@ -109,7 +112,7 @@ export type PreviewResponse =
 			max: number;
 			/** Block or biome ids that values index, for block and biome modes. */
 			labels?: string[];
-			/** For biome maps: the biomes in view with their colours, most common first. */
+			/** For biome maps: the biomes in view with their colours, most common first. For carvers: the height bands in view. */
 			legend?: { id: string; color: string }[];
 			/** For the isometric view: the block size in pixels it was drawn at. */
 			scale?: number;
@@ -121,6 +124,8 @@ export type PreviewResponse =
 			partial?: boolean;
 			/** Something to tell the viewer about an otherwise empty render. */
 			notice?: string;
+			/** A short note on how to read the render, such as what a colour means. */
+			caption?: string;
 			/** For terrain: the sea level and world height. */
 			seaLevel?: number;
 			minY?: number;

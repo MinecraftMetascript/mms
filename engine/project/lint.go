@@ -92,16 +92,16 @@ func ParseSeverity(s string) (syntax.Severity, bool) {
 // from another resource or a command. Loot tables, recipes, advancements
 // and the like are loaded by the game itself.
 var unusedFolders = map[string]bool{
-	"worldgen/density_function":                        true,
-	"worldgen/noise":                                   true,
-	"worldgen/configured_feature":                      true,
-	"worldgen/placed_feature":                          true,
-	"worldgen/configured_carver":                       true,
-	"worldgen/processor_list":                          true,
-	"worldgen/material_rule":                           true,
-	"worldgen/material_condition":                      true,
-	"predicate":                                        true,
-	"item_modifier":                                    true,
+	"worldgen/density_function":   true,
+	"worldgen/noise":              true,
+	"worldgen/feature":            true,
+	"worldgen/placed_feature":     true,
+	"worldgen/carver":             true,
+	"worldgen/processor_list":     true,
+	"worldgen/material_rule":      true,
+	"worldgen/material_condition": true,
+	"predicate":                   true,
+	"item_modifier":               true,
 	"worldgen/multi_noise_biome_source_parameter_list": true,
 	"worldgen/template_pool":                           true,
 }

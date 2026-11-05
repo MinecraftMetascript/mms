@@ -1,11 +1,11 @@
 // Which generated files the previews and inspectors show, by output path.
 // Free of DOM types, so the VS Code extension host can use it too.
 
-export type PreviewKind = 'noise' | 'density_function' | 'noise_settings' | 'material_rule' | 'dimension';
-/** The registry folders the preview worker reads. */
-export type PreviewFileKind = PreviewKind | 'material_condition' | 'tag/worldgen/biome';
+export type PreviewKind = 'noise' | 'density_function' | 'noise_settings' | 'material_rule' | 'dimension' | 'carver';
+/** The registry folders the preview worker reads. Biomes are read for the carvers they list. */
+export type PreviewFileKind = PreviewKind | 'material_condition' | 'tag/worldgen/biome' | 'biome';
 
-const previewPattern = /^data\/([^/]+)\/(worldgen\/(?:noise|density_function|noise_settings|material_rule|material_condition)|dimension|tags\/worldgen\/biome)\/(.+)\.json$/;
+const previewPattern = /^data\/([^/]+)\/(worldgen\/(?:noise|density_function|noise_settings|material_rule|material_condition|carver|biome)|dimension|tags\/worldgen\/biome)\/(.+)\.json$/;
 
 /** The registry folder and id of an output path the preview worker reads, or null. */
 export function previewFile(path: string): { kind: PreviewFileKind; id: string } | null {
@@ -18,7 +18,7 @@ export function previewFile(path: string): { kind: PreviewFileKind; id: string }
 /** The preview kind and id of an output path, or null if it has no preview. */
 export function previewable(path: string | null): { kind: PreviewKind; id: string } | null {
 	const f = path ? previewFile(path) : null;
-	return f && f.kind !== 'material_condition' && f.kind !== 'tag/worldgen/biome' ? { kind: f.kind, id: f.id } : null;
+	return f && f.kind !== 'material_condition' && f.kind !== 'tag/worldgen/biome' && f.kind !== 'biome' ? { kind: f.kind, id: f.id } : null;
 }
 
 /** Which inspector, if any, shows a generated file. */

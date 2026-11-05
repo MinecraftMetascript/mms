@@ -20,7 +20,8 @@ import {
 	WorldgenRegistries,
 	type MaterialRule
 } from 'deepslate';
-import { biomeColor, blockColor, CAVE, SKY, VOID, type Rgb } from './colors';
+import { bandColor, biomeColor, blockColor, CARVED, CAVE, SKY, VOID, type Rgb } from './colors';
+import { carvedRange, CarverRun, readCarver, type CarverContext, type Mask } from './carver';
 import { speedUp } from './fastDensity';
 import { screenAxes, vanillaSummary, type PreviewFile, type PreviewRequest, type PreviewResponse, type PreviewView } from './protocol';
 
@@ -28,7 +29,7 @@ import { screenAxes, vanillaSummary, type PreviewFile, type PreviewRequest, type
 // ids; minecraft: ids the pack references but does not define come from
 // mcmeta's per-registry bundles, fetched on demand and kept for the session.
 
-type Folder = Exclude<PreviewFile['kind'], 'dimension'>;
+type Folder = Exclude<PreviewFile['kind'], 'dimension' | 'carver' | 'biome'>;
 type RenderRequest = Extract<PreviewRequest, { type: 'render' }>;
 type Rendered = Extract<PreviewResponse, { type: 'rendered' }>;
 
@@ -48,6 +49,9 @@ const biomeTags = WorldgenRegistries.BIOME.getTagRegistry();
 
 let userFiles: PreviewFile[] = [];
 let dimensions = new Map<string, unknown>();
+/** Carvers and biomes by id; the carvers are run here, not by Deepslate. */
+let carvers = new Map<string, unknown>();
+let biomeFiles: PreviewFile[] = [];
 let version = 0; // bumped when the files change, to drop cached terrain
 /**
  * Bumped only when files that shape the terrain change (noises, density
@@ -100,7 +104,7 @@ function registerAll() {
 		for (const [path, json] of Object.entries(bundle)) register(folder, `minecraft:${path}`, json);
 	}
 	for (const f of userFiles) {
-		if (f.kind !== 'dimension') register(f.kind, f.id, f.json);
+		if (f.kind in registries || f.kind === 'tag/worldgen/biome') register(f.kind as Folder, f.id, f.json);
 	}
 }
 
@@ -197,6 +201,10 @@ interface Terrain {
 	biomeAt: (x: number, y: number, z: number) => Identifier;
 	/** What the terrain's shape depends on, so filled chunks can be shared across surface rule edits. */
 	shape: string;
+	/** For a carver: the carver run over this terrain. */
+	carve?: Carving;
+	/** For a carver's 3D view: draw only the space the carver cuts, not the terrain. */
+	carvedOnly?: boolean;
 }
 
 type Generator = { globalFluidPicker: unknown; getWorldgenContext(): unknown };
@@ -238,7 +246,229 @@ function buildStrip(t: Terrain, alongX: boolean, depth: number, chunk: number): 
 		const [bx, bz] = columns[i];
 		for (let y = 0; y < height; y++) out[i * height + y] = stateIndex(blocks.getBlockState(BlockPos.create(bx, minY + y, bz)));
 	}
+	if (t.carve) applyCarving(t, t.carve, blocks, noiseChunk.aquifer, columns, out);
 	return out;
+}
+
+// ---- Carvers ------------------------------------------------------------
+
+/** A carver run over a terrain, with the masks of chunks it has carved. */
+interface Carving {
+	run: CarverRun;
+	masks: Map<string, Mask>;
+}
+
+/** The carving mask of a chunk, kept for a few chunks since a slice asks for each one per strip. */
+function maskOf(c: Carving, cx: number, cz: number): Mask {
+	const key = `${cx},${cz}`;
+	let m = c.masks.get(key);
+	if (!m) {
+		m = new Uint8Array(256 * c.run.context.height);
+		c.run.carve(cx, cz, m);
+		if (c.masks.size >= 32) c.masks.delete(c.masks.keys().next().value!);
+		c.masks.set(key, m);
+	}
+	return m;
+}
+
+/**
+ * Applies the carving mask to the given columns of a filled chunk, as the
+ * game's applyCarvingMask does: each masked block that isn't uncarvable
+ * (bedrock) becomes what the aquifer puts there at density 0 (air, water
+ * or lava), unless the aquifer keeps it solid. Carved blocks are marked
+ * in `out` (column-major strips of the world height) with the carved ids.
+ */
+function applyCarving(t: Terrain, c: Carving, chunk: Chunk, aquifer: { computeSubstance(x: number, y: number, z: number, d: number): BlockState | undefined }, columns: [number, number][], out: Uint16Array) {
+	const minY = t.settings.noise.minY;
+	const height = t.settings.noise.height;
+	const ctx = c.run.context;
+	const [lo, hi] = carvedRange(ctx);
+	const pos = chunk.pos;
+	const mask = maskOf(c, pos[0], pos[1]);
+	columns.forEach(([bx, bz], i) => {
+		const base = ((bx - pos[0] * 16) * 16 + (bz - pos[1] * 16)) * ctx.height - ctx.minY;
+		for (let y = Math.min(hi, minY + height - 1); y >= Math.max(lo, minY); y--) {
+			if (!mask[base + y]) continue;
+			const at = BlockPos.create(bx, y, bz);
+			const old = chunk.getBlockState(at);
+			if (old.getName().equals(BEDROCK)) continue;
+			const sub = aquifer.computeSubstance(bx, y, bz, 0);
+			// Air carved to air (the sky, a noise cave) looks the same as before, so it isn't marked.
+			if (!sub || sub.equals(old)) continue;
+			chunk.setBlockState(at, sub);
+			const name = sub.getName().path;
+			out[i * height + (y - minY)] = indexOf(CARVED + (name === 'water' || name === 'lava' ? name : 'air'));
+		}
+	});
+}
+const BEDROCK = Identifier.create('bedrock');
+
+/** Which slot of its biome's carver list a carver is in (the game adds it to the seed), and where that was found. */
+function carverSlot(id: string): { slot: number; biome?: string } {
+	const short = id.replace(/^minecraft:/, '');
+	for (const b of biomeFiles) {
+		const list = (b.json as { carvers?: unknown })?.carvers;
+		const items = Array.isArray(list) ? list : [list];
+		const i = items.findIndex((v) => typeof v === 'string' && (v === id || v === short || v.replace(/^minecraft:/, '') === short));
+		if (i >= 0) return { slot: i, biome: b.id };
+	}
+	return { slot: 0 };
+}
+
+function carverContext(settings: NoiseGeneratorSettings): CarverContext {
+	return { minY: settings.noise.minY, height: settings.noise.height };
+}
+
+/** The carver a request previews, run with the request's seed over the given terrain. */
+function carvingOf(req: RenderRequest, settings: NoiseGeneratorSettings): { carving: Carving; caption: string } {
+	const json = carvers.get(req.id);
+	if (json === undefined) throw new Error(`Missing carver ${req.id}`);
+	const carver = readCarver(json);
+	const { slot, biome } = carverSlot(req.id);
+	const run = new CarverRun(carver, seedOf(req.seed), slot, carverContext(settings));
+	const ordinal = ['first', 'second', 'third', 'fourth', 'fifth'][slot] ?? `#${slot + 1}`;
+	const caption = biome
+		? `Seeded as the ${ordinal} carver of ${biome.replace(/^minecraft:/, '')}, as in game`
+		: 'No biome lists this carver; seeded as if first in its list';
+	return { carving: { run, masks: new Map() }, caption };
+}
+
+/** The height band a carved block at y is drawn in, for views that show only the carved space. */
+const BAND = 16;
+function bandId(y: number): string {
+	const lo = Math.floor(y / BAND) * BAND;
+	return `${CARVED}y ${lo} to ${lo + BAND - 1}`;
+}
+
+/** A chunk of only the space a carver cuts, coloured by height, indexed ((x * 16 + z) * height + y). */
+function buildCarvedChunk(t: Terrain, cx: number, cz: number): Uint16Array<ArrayBuffer> {
+	const c = t.carve!;
+	const ctx = c.run.context;
+	const height = t.settings.noise.height;
+	const minY = t.settings.noise.minY;
+	const mask = maskOf(c, cx, cz);
+	const out = new Uint16Array(256 * height).fill(indexOf('minecraft:air'));
+	const bands = new Map<number, number>();
+	for (let col = 0; col < 256; col++) {
+		const base = col * ctx.height - ctx.minY;
+		for (let y = minY; y < minY + height; y++) {
+			if (!mask[base + y]) continue;
+			const k = Math.floor(y / BAND);
+			let b = bands.get(k);
+			if (b === undefined) bands.set(k, (b = indexOf(bandId(y))));
+			out[col * height + (y - minY)] = b;
+		}
+	}
+	return out;
+}
+
+/** The palette indices a built chunk uses, worked out once per chunk. */
+const chunkBands = new WeakMap<IsoChunk, Set<number>>();
+function bandsOf(c: IsoChunk): Set<number> {
+	let b = chunkBands.get(c);
+	if (!b) {
+		b = new Set();
+		for (let i = 0; i < c.data.length; i++) if (!isEmpty(c.data[i])) b.add(c.data[i]);
+		chunkBands.set(c, b);
+	}
+	return b;
+}
+
+/** The height bands among palette indices, highest first, for a legend. */
+function bandLegend(used: Iterable<number>): { id: string; color: string }[] {
+	const out: { id: string; y: number; color: string }[] = [];
+	for (const b of used) {
+		const m = /^carved y (-?\d+) to (-?\d+)$/.exec(palette[b] ?? '');
+		if (m) out.push({ id: `y ${m[1]} to ${m[2]}`, y: Number(m[1]), color: `rgb(${bandColor(Number(m[1])).join(' ')})` });
+	}
+	return out.sort((a, b) => b.y - a.y).map(({ id, color }) => ({ id, color }));
+}
+
+/** Per chunk of a carver map: each column's highest and lowest carved y (lowest > highest when none). */
+const mapChunks = new Map<string, Int16Array>();
+let mapKey = '';
+
+/**
+ * A top-down map of where a carver cuts, ignoring the terrain: each
+ * column is coloured by the highest block carved in it.
+ */
+async function renderCarverMap(req: RenderRequest, c: Carving, key: string, caption: string): Promise<Rendered> {
+	const { width, height, view } = req;
+	if (key !== mapKey) {
+		mapKey = key;
+		mapChunks.clear();
+	}
+	const ctx = c.run.context;
+	const values = new Float32Array(width * height).fill(NaN);
+	const pixels = new Uint8ClampedArray(width * height * 4);
+	const plane = planeOf(width, height, view);
+	const labels: string[] = ['not carved'];
+	const labelIndex = new Map<number, number>();
+	const tops = new Map<number, number>();
+	const mask = new Uint8Array(256 * ctx.height);
+	const [lo, hi] = carvedRange(ctx);
+	let started = performance.now();
+	let carvedAny = false;
+	for (let py = 0; py < height; py++) {
+		for (let px = 0; px < width; px++) {
+			const x = Math.floor(plane.x(px, py));
+			const z = Math.floor(plane.z(px, py));
+			const cx = x >> 4;
+			const cz = z >> 4;
+			const k = `${cx},${cz}`;
+			let cols = mapChunks.get(k);
+			if (!cols) {
+				if (performance.now() - started > 40) {
+					await breathe();
+					if (req.seq !== latest) throw new Superseded();
+					started = performance.now();
+				}
+				cols = new Int16Array(512);
+				const carved = c.run.carve(cx, cz, mask);
+				for (let col = 0; col < 256; col++) {
+					let top = lo - 1;
+					let bottom = hi + 1;
+					if (carved > 0) {
+						const base = col * ctx.height - ctx.minY;
+						for (let y = hi; y >= lo; y--) if (mask[base + y]) { top = y; break; }
+						for (let y = lo; y <= top; y++) if (mask[base + y]) { bottom = y; break; }
+					}
+					cols[col * 2] = top;
+					cols[col * 2 + 1] = bottom;
+				}
+				if (mapChunks.size > 8192) mapChunks.delete(mapChunks.keys().next().value!);
+				mapChunks.set(k, cols);
+			}
+			const col = (x & 15) * 16 + (z & 15);
+			const top = cols[col * 2];
+			const bottom = cols[col * 2 + 1];
+			const i = py * width + px;
+			if (bottom > top) {
+				values[i] = 0;
+				// Chunk borders, faintly, so start chunks and reach are easy to judge.
+				const edge = (x & 15) === 0 || (z & 15) === 0;
+				put(pixels, i * 4, VOID, edge && view.scale <= 1 ? 1.4 : 1);
+				continue;
+			}
+			carvedAny = true;
+			const lk = top * 1024 + bottom;
+			let li = labelIndex.get(lk);
+			if (li === undefined) {
+				li = labels.length;
+				labels.push(top === bottom ? `carved at y ${top}` : `carved y ${bottom} to ${top}`);
+				labelIndex.set(lk, li);
+			}
+			values[i] = li;
+			const band = Math.floor(top / BAND);
+			tops.set(band, (tops.get(band) ?? 0) + 1);
+			put(pixels, i * 4, bandColor(band * BAND));
+		}
+	}
+	const legend = [...tops.keys()]
+		.sort((a, b) => b - a)
+		.map((band) => ({ id: `top y ${band * BAND} to ${band * BAND + BAND - 1}`, color: `rgb(${bandColor(band * BAND).join(' ')})` }));
+	const notice = carvedAny ? undefined : 'Nothing carved here. Drag to pan, or try another seed.';
+	return { type: 'rendered', seq: req.seq, width, height, pixels, values, min: Infinity, max: -Infinity, labels, legend, notice, caption: `Coloured by the highest block cut, before terrain. ${caption}` };
 }
 
 /**
@@ -703,6 +933,7 @@ function plan(req: RenderRequest, visible: [number, number][], ring: [number, nu
  * first time they are missing (re-registering everything only then).
  */
 async function buildIsoChunk(t: Terrain, cx: number, cz: number): Promise<Uint16Array<ArrayBuffer>> {
+	if (t.carvedOnly) return buildCarvedChunk(t, cx, cz);
 	try {
 		return buildChunk3D(t, cx, cz);
 	} catch (e) {
@@ -743,7 +974,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
  * margin larger than the canvas, so a pan only moves it until it leaves the
  * margin or more chunks arrive.
  */
-async function renderIso(req: RenderRequest, t: Terrain, key: string): Promise<Rendered> {
+async function renderIso(req: RenderRequest, t: Terrain, key: string, extra?: (notice?: string) => Partial<Rendered>): Promise<Rendered> {
 	const { width, height } = req;
 	const h = t.settings.noise.height;
 	if (key !== isoKey) {
@@ -792,7 +1023,8 @@ async function renderIso(req: RenderRequest, t: Terrain, key: string): Promise<R
 		return {
 			type: 'rendered', seq: req.seq, width, height,
 			pixels: new Uint8ClampedArray(0), values: new Float32Array(0),
-			min: Infinity, max: -Infinity, scale: s, minScale: sMin, bitmap, notice
+			min: Infinity, max: -Infinity, scale: s, minScale: sMin, bitmap, notice,
+			...extra?.(notice)
 		};
 	};
 	// Once the ring is built, redraw the image in the background so the next pan doesn't wait.
@@ -1130,6 +1362,8 @@ async function renderBiomes(req: RenderRequest, dim: Dimension, rs: RandomState)
 
 /** The last terrain set up, so panning doesn't rebuild its random state each frame. */
 let cached: { key: string; t: Terrain } | null = null;
+/** What a carver render says about its seeding, by terrain key. */
+const captions = new Map<string, string>();
 
 /** The terrain a block view draws: a dimension's, or noise settings with a surface rule. */
 async function terrainOf(req: RenderRequest): Promise<{ terrain: Terrain; key: string }> {
@@ -1153,12 +1387,20 @@ async function terrainOf(req: RenderRequest): Promise<{ terrain: Terrain; key: s
 					};
 				})
 			: await withVanilla((): Terrain => {
-					const settingsId = req.kind === 'material_rule' ? Identifier.parse(req.options.terrain || 'minecraft:overworld') : id;
+					const onTerrain = req.kind === 'material_rule' || req.kind === 'carver';
+					const settingsId = onTerrain ? Identifier.parse(req.options.terrain || 'minecraft:overworld') : id;
 					const settings = WorldgenRegistries.NOISE_SETTINGS.getOrThrow(settingsId);
 					const rule = req.kind === 'material_rule' ? WorldgenRegistries.MATERIAL_RULE.getOrThrow(id) : settings.materialRule;
 					const rs = speedUp(new RandomState(settings, seed));
 					const shape = [shapeVersion, req.seed, 'noise_settings', settingsId].join('|');
-					return { settings, rule, rs, biomeAt: () => fixedBiome, shape };
+					const t: Terrain = { settings, rule, rs, biomeAt: () => fixedBiome, shape };
+					if (req.kind === 'carver') {
+						const { carving, caption } = carvingOf(req, settings);
+						t.carve = carving;
+						t.carvedOnly = req.mode === 'iso';
+						captions.set(key, caption);
+					}
+					return t;
 				});
 	cached = { key, t: terrain };
 	return { terrain, key };
@@ -1186,6 +1428,26 @@ async function render(req: RenderRequest): Promise<PreviewResponse> {
 			return { dim, rs };
 		});
 		return renderBiomes(req, dim, rs);
+	}
+
+	if (req.kind === 'carver') {
+		const { terrain, key } = await terrainOf(req);
+		const caption = captions.get(key) ?? '';
+		if (req.mode === 'map') return renderCarverMap(req, terrain.carve!, key, caption);
+		if (req.mode === 'iso') {
+			return renderIso(req, terrain, key, (notice) => {
+				const used = new Set<number>();
+				for (const c of isoChunks.values()) for (const b of bandsOf(c)) used.add(b);
+				return {
+					legend: bandLegend(used),
+					caption: `Only the space the carver cuts, before terrain. ${caption}`,
+					notice: notice && 'Nothing carved here. Drag to pan, or try another seed.'
+				};
+			});
+		}
+		await warm(req, terrain, key);
+		const r = await renderTerrain(req, terrain, key);
+		return { ...r, caption: `Pink: carved air; light blue and orange: water and lava an aquifer put in carved space. ${caption}` };
 	}
 
 	if (req.kind === 'dimension' || req.kind === 'material_rule' || (req.kind === 'noise_settings' && req.mode !== 'density')) {
@@ -1289,6 +1551,8 @@ function post(res: Rendered) {
 function setup(files: PreviewFile[]) {
 	userFiles = files;
 	dimensions = new Map(files.filter((f) => f.kind === 'dimension').map((f) => [f.id, f.json]));
+	carvers = new Map(files.filter((f) => f.kind === 'carver').map((f) => [f.id, f.json]));
+	biomeFiles = files.filter((f) => f.kind === 'biome');
 	version++;
 	const shape = shapeOf(files);
 	if (shape !== shapeSignature) {
