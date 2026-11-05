@@ -82,8 +82,28 @@ export type ToExtension =
 export type NextAction = 'reload' | 'rejoin' | 'none';
 
 export type WorldResult =
-	| { ok: true; files: number; at: string; next?: { action: NextAction; line: string; changed?: string }; resources: boolean }
-	| { ok: false; message: string; detail: string; at: string; problems: boolean };
+	| {
+			ok: true;
+			files: number;
+			at: string;
+			next?: { action: NextAction; line: string; changed?: string };
+			resources: boolean;
+			/** Dimensions whose saved chunks the build took out, so they generate again. */
+			reset?: string[];
+			/** Dimensions it was asked to reset that had no chunks yet. */
+			unvisited?: string[];
+	  }
+	| { ok: false; message: string; detail: string; at: string; problems: boolean; worldOpen?: boolean };
+
+/** A dimension the project's pack declares. */
+export interface WorldDimensionRow {
+	/** Such as mypack:caves. */
+	id: string;
+	/** The overworld, nether or end, which the build never resets by itself. */
+	vanilla: boolean;
+	/** Whether the build world has saved chunks for it. */
+	generated: boolean;
+}
 
 /** A structure a structure block saved in the world. */
 export interface WorldStructureRow {
@@ -116,6 +136,10 @@ export interface WorldState {
 	structureWorld?: { name: string; folder?: string; path: string; separate: boolean };
 	building: boolean;
 	buildOnSave: boolean;
+	/** Reset the project's dimensions whose worldgen changed on each build (mms build --reset-dimensions). */
+	resetDimensions: boolean;
+	/** The pack's dimensions, shown with the build world. */
+	dimensions: WorldDimensionRow[];
 	result?: WorldResult;
 	structures: WorldStructureRow[];
 	/** Project .nbt files no Structure(...) call names that are not saves of the structure world. */
@@ -134,6 +158,9 @@ export type FromWorld =
 				| 'chooseStructureWorld' | 'sameStructureWorld' | 'revealStructureWorld';
 	  }
 	| { type: 'buildOnSave'; on: boolean }
+	| { type: 'resetDimensions'; on: boolean }
+	/** Build, and reset this one dimension (a WorldDimensionRow's id) whatever changed. */
+	| { type: 'resetDimension'; id: string }
 	/** file is a WorldStructureRow's file. */
 	| { type: 'import'; file: string }
 	| { type: 'copyCall'; file: string }

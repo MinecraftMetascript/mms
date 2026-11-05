@@ -9,7 +9,7 @@
 	// one button, for the one thing to do next (Import, or Copy call for a
 	// structure no pool uses); the rest are in its ⋯ menu, which a
 	// right-click also opens, so the list stays mostly text.
-	import type { FromWorld, ToWorld, WorldState, WorldStructureRow } from '../src/messages';
+	import type { FromWorld, ToWorld, WorldDimensionRow, WorldState, WorldStructureRow } from '../src/messages';
 	import { group, type Group, type Node } from './groups';
 
 	const vscode = acquireVsCodeApi<WorldState>();
@@ -74,6 +74,11 @@
 			{ label: 'Delete from world…', danger: true, run: () => send({ type: 'deleteFromWorld', file: r.file }) }
 		];
 	}
+
+	function dimensionMenu(d: WorldDimensionRow): MenuItem[] {
+		return [{ label: d.vanilla ? `Reset ${d.id} terrain…` : 'Reset terrain…', danger: d.vanilla, run: () => send({ type: 'resetDimension', id: d.id }) }];
+	}
+	const ownDimensions = $derived(s?.dimensions.filter((d) => !d.vanilla).length ?? 0);
 
 	// "5 min ago", for when a structure was saved; the full time is in the tooltip.
 	let now = $state(Date.now());
@@ -218,6 +223,12 @@
 				<input type="checkbox" checked={s.buildOnSave} onchange={(e) => send({ type: 'buildOnSave', on: e.currentTarget.checked })} />
 				Build on save
 			</label>
+			{#if ownDimensions}
+				<label class="check small" title="Each build deletes the saved chunks of the project's dimensions whose worldgen changed, so they generate again when you go there. Leave the world before building. The overworld, nether and end are never reset this way. Old chunks are kept in the world's mms-reset folder until the next reset.">
+					<input type="checkbox" checked={s.resetDimensions} onchange={(e) => send({ type: 'resetDimensions', on: e.currentTarget.checked })} />
+					Reset changed dimensions
+				</label>
+			{/if}
 
 			{#if s.result && !s.building}
 				{@const r = s.result}
@@ -229,6 +240,9 @@
 						<button class="icon-btn" title="Dismiss" aria-label="Dismiss" onclick={() => send({ type: 'run', action: 'dismiss' })}>✕</button>
 					</div>
 					{#if r.ok}
+						{#if r.reset?.length}
+							<div class="small" title="The old chunks are in the world's mms-reset folder until the next reset.">Reset {r.reset.join(', ')}: {r.reset.length === 1 ? 'it generates' : 'they generate'} again when you go there.</div>
+						{/if}
 						{#if r.next?.action === 'reload'}
 							<div class="next">
 								<div class="next-title">Next, in the game: run <code>/reload</code></div>
@@ -246,12 +260,16 @@
 							<div class="muted small">Run <code>/reload</code> in the game to load the data pack.{r.resources ? ' Rejoin the world to load the resource pack.' : ''}</div>
 						{/if}
 					{:else}
+						{#if r.worldOpen}
+							<div class="muted small">Minecraft has the world open, and would save its loaded chunks again. Save and quit to title, then build again. Nothing was written.</div>
+						{:else}
 						<div class="actions">
 							{#if r.problems}
 								<button class="secondary" onclick={() => send({ type: 'run', action: 'showProblems' })}>Show problems</button>
 							{/if}
 							<button class="secondary" onclick={() => send({ type: 'run', action: 'showOutput' })}>Show output</button>
 						</div>
+						{/if}
 						{#if r.detail}
 							<details>
 								<summary class="small">Build output</summary>
@@ -261,6 +279,29 @@
 					{/if}
 				</div>
 			{/if}
+		</section>
+	{/if}
+
+	{#if s.world && s.dimensions.length}
+		<section>
+			<div class="head"><h2 class="grow">Dimensions</h2></div>
+			<ul class="tree" role="tree">
+				{#each s.dimensions as d (d.id)}
+					<li>
+						<div class="item" style:--depth={0} tabindex="0" role="treeitem" aria-selected="false"
+							title={[d.id, d.generated ? `Has saved chunks in ${s.world.name}. Reset terrain deletes them so it generates again.` : `Not visited in ${s.world.name} yet, so it generates from the current pack.`, d.vanilla ? 'A vanilla dimension: never reset by Reset changed dimensions.' : ''].filter(Boolean).join('\n')}
+							oncontextmenu={(e) => openMenu(e, dimensionMenu(d))}
+							onkeydown={(e) => { if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) openMenu(e as unknown as MouseEvent, dimensionMenu(d)); }}>
+							<span class="twistie"></span>
+							<span class="label">{d.id}</span>
+							<span class="desc">{d.generated ? 'generated' : 'not visited'}{d.vanilla ? ' · vanilla' : ''}</span>
+							<span class="actions-inline">
+								<button class="icon-btn" title="More actions" aria-label="More actions for {d.id}" aria-haspopup="menu" onclick={(e) => openMenu(e, dimensionMenu(d))}>{@render icon('more')}</button>
+							</span>
+						</div>
+					</li>
+				{/each}
+			</ul>
 		</section>
 	{/if}
 
