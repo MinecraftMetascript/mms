@@ -216,7 +216,10 @@ function anchor(json: unknown): (c: CarverContext) => number {
 	if (o.above_bottom !== undefined) return (c) => c.minY + num(o.above_bottom);
 	if (o.below_top !== undefined) return (c) => c.minY + c.height - 1 - num(o.below_top);
 	if (o.relative_to_sea_level !== undefined) return (c) => c.seaLevel + num(o.relative_to_sea_level);
-	return () => 0;
+	// Fail when used, not when read: a constant or weighted-list provider never resolves its anchors.
+	return () => {
+		throw new Error(`Unknown vertical anchor ${JSON.stringify(json)}`);
+	};
 }
 
 export function heightProvider(json: unknown): HeightProvider {
