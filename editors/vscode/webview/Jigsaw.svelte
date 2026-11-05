@@ -129,7 +129,7 @@
 	};
 	// A row of In structures: the blocks of one piece set up the same way,
 	// which differ only in where they are.
-	type Same = { key: string; config: JigsawConfig; src: string; at: JigsawExisting[] };
+	type Same = { key: string; config: JigsawConfig; saved: boolean; src: string; at: JigsawExisting[] };
 	const existingMenu = (e: Same): MenuItem[] => [
 		{ label: 'Load into the form', run: () => load(e.config) },
 		{ label: 'Copy give command', run: () => copy(e.key, e.config) },
@@ -145,8 +145,12 @@
 			const same = rows.find((r) => sameBlock(r.config, e.config, ns));
 			if (same) {
 				same.at.push(e);
-				if (!same.config.label && e.config.label) same.config.label = e.config.label;
-			} else rows.push({ key: `${e.src}|${e.pos.join(',')}`, config: labelled(e.config), src: e.src, at: [e] });
+				// A label saved in the file wins over one taken from Recent.
+				if (e.config.label && !same.saved) {
+					same.config = { ...same.config, label: e.config.label };
+					same.saved = true;
+				}
+			} else rows.push({ key: `${e.src}|${e.pos.join(',')}`, config: { ...labelled(e.config) }, saved: !!e.config.label, src: e.src, at: [e] });
 			by.set(e.id, rows);
 		}
 		return [...by].sort(([a], [b]) => a.localeCompare(b));
