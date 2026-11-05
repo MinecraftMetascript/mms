@@ -316,7 +316,7 @@ function carverSlot(id: string): { slot: number; biome?: string } {
 }
 
 function carverContext(settings: NoiseGeneratorSettings): CarverContext {
-	return { minY: settings.noise.minY, height: settings.noise.height };
+	return { minY: settings.noise.minY, height: settings.noise.height, seaLevel: settings.seaLevel };
 }
 
 /** The carver a request previews, run with the request's seed over the given terrain. */
@@ -1529,6 +1529,8 @@ async function terrainOf(req: RenderRequest): Promise<{ terrain: Terrain; key: s
 						const { carving, caption } = carvingOf(req, settings);
 						t.carve = carving;
 						t.carvedOnly = req.mode === 'iso';
+						// The carved space sits at other heights than the terrain, so the 3D view centres it separately.
+						if (t.carvedOnly) t.shape = `${shape}|carver|${req.id}`;
 						captions.set(key, caption);
 					}
 					return t;

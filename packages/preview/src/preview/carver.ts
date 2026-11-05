@@ -110,10 +110,11 @@ const HALF_PI_F = f(Math.PI / 2);
 
 // ---- Providers --------------------------------------------------------
 
-/** What height anchors resolve against: the generator's lowest y and height. */
+/** What height anchors resolve against: the generator's lowest y, height and sea level. */
 export interface CarverContext {
 	minY: number;
 	height: number;
+	seaLevel: number;
 }
 
 type Json = Record<string, unknown>;
@@ -214,6 +215,7 @@ function anchor(json: unknown): (c: CarverContext) => number {
 	if (o.absolute !== undefined) return () => num(o.absolute);
 	if (o.above_bottom !== undefined) return (c) => c.minY + num(o.above_bottom);
 	if (o.below_top !== undefined) return (c) => c.minY + c.height - 1 - num(o.below_top);
+	if (o.relative_to_sea_level !== undefined) return (c) => c.seaLevel + num(o.relative_to_sea_level);
 	return () => 0;
 }
 
