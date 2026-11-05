@@ -27,15 +27,15 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import * as vscode from 'vscode';
-import type { FromWorld, ToWorld, WorldResult, WorldState } from './messages';
+import type { FromWorld, ToWorld, WorldDimensionRow, WorldResult, WorldState } from './messages';
 import { key, type PackOutput } from './output';
 import { findStructures, importPath, importStructure, status, structureCall, type Status, type WorldStructure } from './structures';
 import { findWorlds, readWorld, savesFolders, type World } from './worlds';
 
 /** The outcome of the last build, shown under the button. */
 type Result =
-	| { ok: true; project: string; world: string; files: number; resources: boolean; next: NextStep | undefined; at: Date }
-	| { ok: false; project: string; world: string; message: string; detail: string; problems: boolean; at: Date };
+	| { ok: true; project: string; world: string; files: number; resources: boolean; next: NextStep | undefined; reset: string[]; unvisited: string[]; at: Date }
+	| { ok: false; project: string; world: string; message: string; detail: string; problems: boolean; worldOpen: boolean; at: Date };
 
 /**
  * What the player does in the game for the build to take effect, from the
@@ -50,6 +50,39 @@ export function nextStep(stdout: string): NextStep | undefined {
 	if (!m) return undefined;
 	const action = m[1] === 'none' ? 'none' : m[1] === 'exit and rejoin' ? 'rejoin' : 'reload';
 	return { action, line: m[0].replace(/^next step: /, '') };
+}
+
+/**
+ * The dimensions a build reset, from its "reset <id>: ..." lines: those
+ * it took chunks out of, and those that had none yet.
+ */
+export function resetLines(stdout: string): { reset: string[]; unvisited: string[] } {
+	const reset: string[] = [];
+	const unvisited: string[] = [];
+	for (const m of stdout.matchAll(/^reset (\S+): (.*)$/gm)) (m[2].startsWith('nothing to reset') ? unvisited : reset).push(m[1]);
+	return { reset, unvisited };
+}
+
+/** The dimensions a pack declares: data/<ns>/dimension/<path>.json. */
+export function packDimensions(paths: string[]): string[] {
+	const ids = new Set<string>();
+	for (const p of paths) {
+		const m = /^data\/([^/]+)\/dimension\/(.+)\.json$/.exec(p);
+		if (m) ids.add(`${m[1]}:${m[2]}`);
+	}
+	return [...ids].sort();
+}
+
+const vanillaDimensions = new Set(['minecraft:overworld', 'minecraft:the_nether', 'minecraft:the_end']);
+
+/** Whether a world has saved chunks for a dimension, in the 26.1+ layout or the older one. */
+function generated(world: string, id: string): boolean {
+	const [ns, name] = id.split(':');
+	const dirs = [path.join(world, 'dimensions', ns, ...name.split('/'))];
+	if (id === 'minecraft:overworld') dirs.push(world);
+	if (id === 'minecraft:the_nether') dirs.push(path.join(world, 'DIM-1'));
+	if (id === 'minecraft:the_end') dirs.push(path.join(world, 'DIM1'));
+	return dirs.some((d) => fs.existsSync(path.join(d, 'region')));
 }
 
 export class WorldView implements vscode.Disposable, vscode.WebviewViewProvider {
@@ -154,6 +187,16 @@ export class WorldView implements vscode.Disposable, vscode.WebviewViewProvider 
 			await vscode.workspace.getConfiguration('mms').update('buildOnSave', m.on, vscode.ConfigurationTarget.Workspace);
 			return;
 		}
+		if (m.type === 'resetDimensions') {
+			const project = this.project();
+			if (!project) return;
+			const on = { ...this.context.workspaceState.get<Record<string, boolean>>('mms.resetDimensions') };
+			if (m.on) on[key(vscode.Uri.file(project))] = true;
+			else delete on[key(vscode.Uri.file(project))];
+			await this.context.workspaceState.update('mms.resetDimensions', on);
+			return this.redraw();
+		}
+		if (m.type === 'resetDimension') return this.resetDimension(m.id);
 		if (m.type === 'import' || m.type === 'copyCall' || m.type === 'deleteFromWorld') {
 			const world = this.structureWorld();
 			const s = world && findStructures(world).find((f) => f.file === m.file);
@@ -214,6 +257,24 @@ export class WorldView implements vscode.Disposable, vscode.WebviewViewProvider 
 		}
 	}
 
+	/** Whether builds of the project reset the dimensions whose worldgen changed. */
+	private resetsDimensions(project = this.project()): boolean {
+		return !!project && !!this.context.workspaceState.get<Record<string, boolean>>('mms.resetDimensions')?.[key(vscode.Uri.file(project))];
+	}
+
+	/** After a confirm, builds and resets one dimension, whether or not its worldgen changed. */
+	private async resetDimension(id: string) {
+		const world = this.world();
+		if (!world) return;
+		const name = readWorld(world)?.name ?? path.basename(world);
+		const vanilla = vanillaDimensions.has(id);
+		const detail = vanilla
+			? `This deletes every chunk of ${id} in ${name}, with everything built there, so it generates again from the pack. Leave the world first. The old chunks are kept in the world's mms-reset folder until the next reset.`
+			: `Its chunks generate again from the pack's current worldgen the next time someone goes there. Leave the world first. The old chunks are kept in the world's mms-reset folder until the next reset.`;
+		const ok = await vscode.window.showWarningMessage(`Reset ${id} in ${name}?`, { modal: true, detail }, vanilla ? `Delete ${id} chunks` : 'Reset terrain');
+		if (ok) await this.build([id]);
+	}
+
 	private revealWorld() {
 		const w = this.world();
 		if (w) void vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(path.join(w, 'datapacks')));
@@ -227,6 +288,8 @@ export class WorldView implements vscode.Disposable, vscode.WebviewViewProvider 
 		const state: WorldState = {
 			building: this.building,
 			buildOnSave: vscode.workspace.getConfiguration('mms').get<boolean>('buildOnSave') ?? false,
+			resetDimensions: this.resetsDimensions(project),
+			dimensions: [],
 			structures: [],
 			unusedFiles: [],
 			unusedPaused: this.output.hasErrors
@@ -239,6 +302,9 @@ export class WorldView implements vscode.Disposable, vscode.WebviewViewProvider 
 			// A result is shown only under the project and world it was built for.
 			const r = this.result;
 			state.result = r && r.project === project && r.world === world ? view(r) : undefined;
+			state.dimensions = packDimensions(this.output.files.filter((f) => !f.pack).map((f) => f.path)).map(
+				(id): WorldDimensionRow => ({ id, vanilla: vanillaDimensions.has(id), generated: generated(world, id) })
+			);
 		}
 		if (!from) return state;
 		state.structureWorld = { ...describe(from), separate: this.separateStructureWorld(project) };
@@ -496,8 +562,12 @@ export class WorldView implements vscode.Disposable, vscode.WebviewViewProvider 
 		this.update();
 	}
 
-	/** Builds the project into its world. */
-	async build(): Promise<void> {
+	/**
+	 * Builds the project into its world. With reset, it also resets those
+	 * dimensions; else it resets the changed ones when the project's
+	 * checkbox is on.
+	 */
+	async build(reset?: string[]): Promise<void> {
 		const project = this.project();
 		if (!project) {
 			void vscode.window.showWarningMessage('Open a folder with an mms.json to build its pack into a world.');
@@ -522,7 +592,10 @@ export class WorldView implements vscode.Disposable, vscode.WebviewViewProvider 
 		await Promise.all(vscode.workspace.textDocuments.filter((d) => d.isDirty && key(d.uri).startsWith(here)).map((d) => d.save()));
 		this.building = true;
 		this.update();
-		const args = ['build', '--world', world, project];
+		const args = ['build', '--world', world];
+		if (reset?.length) args.push(`--reset-dimensions=${reset.join(',')}`);
+		else if (this.resetsDimensions(project)) args.push('--reset-dimensions');
+		args.push(project);
 		this.log(`running ${mms.command} ${args.join(' ')}`);
 		const run = await new Promise<{ code: number; stdout: string; stderr: string }>((resolve) => {
 			execFile(mms.command, args, { cwd: project, windowsHide: true }, (err, stdout, stderr) => {
@@ -538,7 +611,7 @@ export class WorldView implements vscode.Disposable, vscode.WebviewViewProvider 
 			const files = [...run.stdout.matchAll(/(\d+) files?/g)].reduce((n, m) => n + Number(m[1]), 0);
 			const resources = /resource pack/.test(run.stdout);
 			const next = nextStep(run.stdout);
-			this.result = { ok: true, project, world, files, resources, next, at: new Date() };
+			this.result = { ok: true, project, world, files, resources, next, ...resetLines(run.stdout), at: new Date() };
 			// The view shows the result and what to do in the game; the
 			// status bar says it briefly, which also covers a build on save
 			// with the side bar closed.
@@ -546,8 +619,14 @@ export class WorldView implements vscode.Disposable, vscode.WebviewViewProvider 
 			void vscode.window.setStatusBarMessage(`$(check) MMS: built into ${name}${todo}`, this.view?.visible ? 5000 : 15000);
 		} else {
 			const errors = /(\d+) errors?; nothing written/.exec(run.stderr);
-			const message = errors ? `${errors[1]} ${errors[1] === '1' ? 'error' : 'errors'}; nothing written` : 'Build failed';
-			this.result = { ok: false, project, world, message, detail: run.stderr.trim(), problems: !!errors, at: new Date() };
+			// A reset waits for the world to be closed; nothing was written.
+			const open = / is open in Minecraft; leave the world to reset (.*), then build again/.exec(run.stderr);
+			const message = errors
+				? `${errors[1]} ${errors[1] === '1' ? 'error' : 'errors'}; nothing written`
+				: open
+					? `Leave the world to reset ${open[1]}`
+					: 'Build failed';
+			this.result = { ok: false, project, world, message, detail: run.stderr.trim(), problems: !!errors, worldOpen: !!open, at: new Date() };
 			// A failure the view shows needs no notification; with the view
 			// hidden, one says so.
 			if (!this.view?.visible) {
@@ -644,7 +723,7 @@ function describe(world: string): { name: string; folder?: string; path: string 
 /** A build result as the view shows it. */
 function view(r: Result): WorldResult {
 	const at = r.at.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
-	if (!r.ok) return { ok: false, message: r.message, detail: r.detail, problems: r.problems, at };
+	if (!r.ok) return { ok: false, message: r.message, detail: r.detail, problems: r.problems, worldOpen: r.worldOpen, at };
 	const next = r.next && { action: r.next.action, line: r.next.line, changed: /; (.*) changed\b/.exec(r.next.line)?.[1] };
-	return { ok: true, files: r.files, at, next, resources: r.resources };
+	return { ok: true, files: r.files, at, next, resources: r.resources, reset: r.reset, unvisited: r.unvisited };
 }

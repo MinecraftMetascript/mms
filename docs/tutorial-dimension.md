@@ -175,6 +175,20 @@ mms build --world ~/.minecraft/saves/MyWorld
 
 Custom dimensions load when a world starts, so restart the world, not just `/reload`, then run `/function sky:visit`.
 
+### Seeing worldgen changes
+
+The game never generates a chunk twice: once you have visited a place, a change to the terrain only shows in chunks you have not been to yet. To look at the same place again with your changes, leave the world and build with `--reset-dimensions`:
+
+```sh
+mms build --world ~/.minecraft/saves/MyWorld --reset-dimensions
+```
+
+It deletes the saved chunks of each project dimension whose worldgen changed in this build, following ids: editing a noise that a density function in the dimension's noise settings uses counts, and so does a structure set that can place a structure in one of the dimension's biomes. The seed stays the same, so you see what your change did to the same terrain. The overworld, nether and end are never reset this way; name a dimension to reset it whatever changed, as in `--reset-dimensions=sky:islands` (or `minecraft:the_nether`, which deletes everything built there).
+
+The old chunks move to the world's `mms-reset` folder, which keeps only the latest reset, so you can put them back. The build refuses to reset while Minecraft has the world open, because the game would save the chunks it has loaded again; save and quit to title first. If you logged out inside the dimension, you come back at the same place in fresh terrain, which may be inside a hill.
+
+In VS Code, tick **Reset changed dimensions** under **Build into world** in the MMS side bar, or use **Reset terrain…** in a dimension's ⋯ menu.
+
 ## Next steps
 
 - Use a `multi_noise` biome source and the router's `temperature` and `vegetation` entries for several biomes.

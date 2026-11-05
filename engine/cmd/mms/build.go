@@ -123,12 +123,18 @@ func runBuild(args []string, stdout, stderr io.Writer) int {
 	out := fl.String("out", "", "output folder (default: mms.json output, or build); a resource pack goes next to it, in <out>-resources")
 	zipPath := fl.String("zip", "", "write a zip archive instead of a folder; a resource pack goes in <name>-resources.zip")
 	world := fl.String("world", "", "install into a world: writes <world>/datapacks/<namespace>, and merges the resource pack into <world>/resourcepacks/resources.zip, keeping other projects' files")
+	var reset resetFlag
+	fl.Var(&reset, "reset-dimensions", "with -world: delete the saved chunks of the project's dimensions whose worldgen changed, so they generate again; or of the dimensions named, as -reset-dimensions=ns:a,ns:b. Old chunks go to <world>/"+project.ResetFolder+"; the world must be closed")
 	if err := fl.Parse(args); err != nil {
 		return 2
 	}
 	dir := "."
 	if fl.NArg() > 0 {
 		dir = fl.Arg(0)
+	}
+	if reset.set && *world == "" {
+		fmt.Fprintln(stderr, "mms: -reset-dimensions needs -world")
+		return 2
 	}
 	p, err := load(dir)
 	if err != nil {
@@ -185,6 +191,18 @@ func runBuild(args []string, stdout, stderr io.Writer) int {
 		if err != nil {
 			return fail(err)
 		}
+		var resetIDs []string
+		if reset.set {
+			if resetIDs = reset.ids; resetIDs == nil {
+				resetIDs = project.ChangedDimensions(before, data)
+			}
+			// Checked before anything is written, so the next build sees
+			// the same changes and resets the same dimensions.
+			if len(resetIDs) > 0 && worldInUse(*world) {
+				fmt.Fprintf(stderr, "mms: %s is open in Minecraft; leave the world to reset %s, then build again (nothing written)\n", *world, strings.Join(resetIDs, ", "))
+				return 1
+			}
+		}
 		if err := project.WriteDir(target, data); err != nil {
 			return fail(err)
 		}
@@ -218,6 +236,22 @@ func runBuild(args []string, stdout, stderr io.Writer) int {
 			}
 			fmt.Fprintln(stdout, note)
 			resChanged = !bytes.Equal(oldZip, m.Zip)
+		}
+		if reset.set {
+			done, err := project.ResetDimensions(*world, resetIDs)
+			for _, d := range done {
+				if len(d.Moved) == 0 {
+					fmt.Fprintf(stdout, "reset %s: nothing to reset, it has not been visited yet\n", d.ID)
+				} else {
+					fmt.Fprintf(stdout, "reset %s: it generates again when visited; moved its old chunks to %s\n", d.ID, filepath.Join(*world, project.ResetFolder))
+				}
+			}
+			if err != nil {
+				return fail(err)
+			}
+			if len(resetIDs) == 0 {
+				fmt.Fprintln(stdout, "reset: no dimension's worldgen changed")
+			}
 		}
 		fmt.Fprintln(stdout, project.PlanApply(before, data, resChanged).Message())
 		return 0
@@ -309,4 +343,45 @@ func pluralize(n int, s string) string {
 func worldResourcePack(world string) (path, note string) {
 	return filepath.Join(world, "resourcepacks", "resources.zip"),
 		"Minecraft applies it when the world is opened"
+}
+
+// resetFlag is -reset-dimensions: alone it means the dimensions whose
+// worldgen changed; with a value, the dimensions it lists.
+type resetFlag struct {
+	set bool
+	ids []string
+}
+
+func (f *resetFlag) String() string { return strings.Join(f.ids, ",") }
+
+func (f *resetFlag) IsBoolFlag() bool { return true }
+
+func (f *resetFlag) Set(v string) error {
+	f.set = true
+	switch v {
+	case "true", "changed":
+		f.ids = nil
+		return nil
+	case "false", "":
+		f.set = false
+		return nil
+	}
+	f.ids = nil
+	for _, id := range strings.Split(v, ",") {
+		id = strings.TrimSpace(id)
+		if id == "" {
+			continue
+		}
+		if !strings.Contains(id, ":") {
+			id = "minecraft:" + id
+		}
+		if err := project.CheckDimensionID(id); err != nil {
+			return err
+		}
+		f.ids = append(f.ids, id)
+	}
+	if len(f.ids) == 0 {
+		return fmt.Errorf("no dimension ids in %q", v)
+	}
+	return nil
 }
