@@ -118,7 +118,7 @@ A template's chests can get a loot table from a `Rule` processor with `block_ent
 
 ## Carvers
 
-A `Carver` is a 26.x carver (`worldgen/carver`), listed by id in a biome's `carvers`. Since 26.1 a carver no longer has `lava_level`, `replaceable` or `debug_settings`: it cuts every block except those in `#minecraft:uncarvable` (bedrock), and the aquifer decides what fills the space (air, water, or lava deep down).
+A `Carver` is a 26.3 carver (`worldgen/carver`), listed by id in a biome's `carvers`. Since 26.3 a carver no longer has `lava_level`, `replaceable` or `debug_settings`: it cuts every block except those in `#minecraft:uncarvable` (bedrock), and the aquifer decides what fills the space (air, water, or lava deep down).
 
 ```mms
 Carver big_caves = {
