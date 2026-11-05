@@ -74,7 +74,7 @@ export type ToExtension =
 	/** Go to a declaration's source. */
 	| { type: 'reveal'; uri: string; range: Range };
 
-// The World view's page (webview/World.svelte). The extension owns the
+// The World and Structures views' page (webview/World.svelte). The extension owns the
 // state and sends all of it after each change; the page only draws it and
 // sends back what was clicked.
 
@@ -154,7 +154,7 @@ export type FromWorld =
 	| { type: 'ready' }
 	| {
 			type: 'run';
-			action: 'build' | 'chooseWorld' | 'chooseProject' | 'revealWorld' | 'forgetWorld' | 'showProblems' | 'showOutput' | 'copyReload' | 'dismiss' | 'refresh' | 'importWaiting'
+			action: 'build' | 'chooseWorld' | 'chooseProject' | 'revealWorld' | 'forgetWorld' | 'showProblems' | 'showOutput' | 'copyReload' | 'dismiss' | 'importWaiting'
 				| 'chooseStructureWorld' | 'sameStructureWorld' | 'revealStructureWorld';
 	  }
 	| { type: 'buildOnSave'; on: boolean }

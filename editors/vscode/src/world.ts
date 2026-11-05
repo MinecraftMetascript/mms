@@ -11,11 +11,14 @@
 // in the game next, stays in the view instead of a notification. A
 // notification is only shown when the view is hidden.
 //
-// Under the world, Structures lists what structure blocks saved in it
-// (structures.ts), so pieces built in the game can be pulled into the
-// project for jigsaw template pools, and pulled again after each re-save.
-// Imported pieces that no Structure(...) call names (the unused-asset lint)
-// are marked there.
+// The Structures view, next to it, lists what structure blocks saved in
+// the structure world (structures.ts), so pieces built in the game can be
+// pulled into the project for jigsaw template pools, and pulled again after
+// each re-save. Imported pieces that no Structure(...) call names (the
+// unused-asset lint) are marked there. It is its own view so the World view
+// stays short (the world, Build and its result) and each can be moved,
+// collapsed or hidden on its own. Both views are drawn by the same page and
+// fed the same state by this class, which owns both worlds.
 //
 // Structures can come from a separate world: a creative world the pieces
 // are built in, while the pack is built into another one. Builds then never
@@ -85,8 +88,11 @@ function generated(world: string, id: string): boolean {
 	return dirs.some((d) => fs.existsSync(path.join(d, 'region')));
 }
 
-export class WorldView implements vscode.Disposable, vscode.WebviewViewProvider {
-	private view: vscode.WebviewView | undefined;
+/** The two side bar views this class draws: World (mms.world) and Structures (mms.structures). */
+type Page = 'world' | 'structures';
+
+export class WorldView implements vscode.Disposable {
+	private readonly views = new Map<Page, vscode.WebviewView>();
 	/** Every folder with an mms.json in the workspace. */
 	private projects: string[] = [];
 	private building = false;
@@ -108,7 +114,8 @@ export class WorldView implements vscode.Disposable, vscode.WebviewViewProvider 
 		// An imported structure changing in the project changes its status.
 		const nbt = vscode.workspace.createFileSystemWatcher('**/*.nbt');
 		this.subscriptions.push(
-			vscode.window.registerWebviewViewProvider('mms.world', this),
+			vscode.window.registerWebviewViewProvider('mms.world', { resolveWebviewView: (v) => this.resolve(v, 'world') }),
+			vscode.window.registerWebviewViewProvider('mms.structures', { resolveWebviewView: (v) => this.resolve(v, 'structures') }),
 			watcher,
 			watcher.onDidCreate(() => void this.findProjects()),
 			watcher.onDidDelete(() => void this.findProjects()),
@@ -130,7 +137,8 @@ export class WorldView implements vscode.Disposable, vscode.WebviewViewProvider 
 			vscode.commands.registerCommand('mms.revealWorld', () => this.revealWorld()),
 			vscode.commands.registerCommand('mms.forgetWorld', () => this.setWorld(undefined)),
 			vscode.commands.registerCommand('mms.importStructures', () => this.chooseStructures()),
-			vscode.commands.registerCommand('mms.chooseStructureWorld', () => this.chooseWorld('structures'))
+			vscode.commands.registerCommand('mms.chooseStructureWorld', () => this.chooseWorld('structures')),
+			vscode.commands.registerCommand('mms.refreshStructures', () => this.redraw())
 		);
 		void this.findProjects();
 	}
@@ -168,16 +176,16 @@ export class WorldView implements vscode.Disposable, vscode.WebviewViewProvider 
 		return w && fs.existsSync(path.join(w, 'level.dat')) ? w : undefined;
 	}
 
-	resolveWebviewView(view: vscode.WebviewView) {
-		this.view = view;
+	private resolve(view: vscode.WebviewView, page: Page) {
+		this.views.set(page, view);
 		const root = vscode.Uri.joinPath(this.context.extensionUri, 'out', 'world');
 		view.webview.options = { enableScripts: true, enableCommandUris: false, localResourceRoots: [root] };
-		view.webview.html = this.html(view.webview, root);
+		view.webview.html = this.html(view.webview, root, page);
 		view.webview.onDidReceiveMessage((m: FromWorld) => void this.receive(m), undefined, this.subscriptions);
 		// A hidden view misses posts; it is sent the state again when shown.
 		view.onDidChangeVisibility(() => view.visible && this.redraw(), undefined, this.subscriptions);
 		view.onDidDispose(() => {
-			if (this.view === view) this.view = undefined;
+			if (this.views.get(page) === view) this.views.delete(page);
 		});
 	}
 
@@ -237,8 +245,6 @@ export class WorldView implements vscode.Disposable, vscode.WebviewViewProvider 
 				return vscode.env.clipboard.writeText('/reload');
 			case 'dismiss':
 				this.result = undefined;
-				return this.redraw();
-			case 'refresh':
 				return this.redraw();
 			case 'chooseStructureWorld':
 				return this.chooseWorld('structures');
@@ -328,12 +334,19 @@ export class WorldView implements vscode.Disposable, vscode.WebviewViewProvider 
 		return state;
 	}
 
-	private redraw() {
-		if (!this.view) return;
-		void this.view.webview.postMessage({ type: 'state', state: this.state() } satisfies ToWorld);
+	/** Whether that view is open and on screen. */
+	private shown(page: Page): boolean {
+		return !!this.views.get(page)?.visible;
 	}
 
-	private html(webview: vscode.Webview, root: vscode.Uri): string {
+	private redraw() {
+		if (!this.views.size) return;
+		const state = this.state();
+		for (const v of this.views.values()) void v.webview.postMessage({ type: 'state', state } satisfies ToWorld);
+	}
+
+	/** The page for one of the views; the same script draws either, from the body's data-page. */
+	private html(webview: vscode.Webview, root: vscode.Uri, page: Page): string {
 		const nonce = Array.from({ length: 32 }, () => Math.floor(Math.random() * 36).toString(36)).join('');
 		const script = webview.asWebviewUri(vscode.Uri.joinPath(root, 'world.js'));
 		const style = webview.asWebviewUri(vscode.Uri.joinPath(root, 'world.css'));
@@ -345,9 +358,9 @@ export class WorldView implements vscode.Disposable, vscode.WebviewViewProvider 
 <meta http-equiv="Content-Security-Policy" content="${csp}">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="${style}">
-<title>World</title>
+<title>${page === 'world' ? 'World' : 'Structures'}</title>
 </head>
-<body>
+<body data-page="${page}">
 <div id="app"></div>
 <script type="module" nonce="${nonce}" src="${script}"></script>
 </body>
@@ -403,7 +416,7 @@ export class WorldView implements vscode.Disposable, vscode.WebviewViewProvider 
 		// notification only when the view is hidden (an import from the
 		// command palette).
 		if (!done.length) return;
-		if (this.view?.visible) {
+		if (this.shown('structures')) {
 			void vscode.window.setStatusBarMessage(`$(check) Imported ${done.length === 1 ? done[0].rel : `${done.length} structures`}`, 4000);
 		} else if (done.length === 1) {
 			const [d] = done;
@@ -616,7 +629,7 @@ export class WorldView implements vscode.Disposable, vscode.WebviewViewProvider 
 			// status bar says it briefly, which also covers a build on save
 			// with the side bar closed.
 			const todo = next?.action === 'reload' ? '; run /reload' : next?.action === 'rejoin' ? '; rejoin the world' : next ? '; nothing changed' : '';
-			void vscode.window.setStatusBarMessage(`$(check) MMS: built into ${name}${todo}`, this.view?.visible ? 5000 : 15000);
+			void vscode.window.setStatusBarMessage(`$(check) MMS: built into ${name}${todo}`, this.shown('world') ? 5000 : 15000);
 		} else {
 			const errors = /(\d+) errors?; nothing written/.exec(run.stderr);
 			// A reset waits for the world to be closed; nothing was written.
@@ -629,7 +642,7 @@ export class WorldView implements vscode.Disposable, vscode.WebviewViewProvider 
 			this.result = { ok: false, project, world, message, detail: run.stderr.trim(), problems: !!errors, worldOpen: !!open, at: new Date() };
 			// A failure the view shows needs no notification; with the view
 			// hidden, one says so.
-			if (!this.view?.visible) {
+			if (!this.shown('world')) {
 				const last = run.stderr.trim().split('\n').pop()?.replace(/^mms: /, '') ?? '';
 				void vscode.window
 					.showErrorMessage(errors ? `MMS: ${message} to ${name}. Fix the problems and build again.` : `MMS: building into ${name} failed: ${last}`, errors ? 'Show problems' : 'Show output')
