@@ -594,9 +594,9 @@ func (c *Checker) IfArgInfo(in *Info, index int) *Info {
 	if in == nil || in.Type.Name != tMaterialRule {
 		return nil
 	}
-	name := tMaterialCond
+	name := tMaterialCondRef
 	if index > 0 {
-		name = tMaterialRule
+		name = tMaterialRuleRef
 	}
 	return &Info{Type: c.norm(tview{T: &spec.Type{Kind: "reference", Path: name}}), typed: true}
 }

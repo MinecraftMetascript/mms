@@ -50,6 +50,15 @@ func TestCompletionMatrix(t *testing.T) {
 		{name: "method", src: "DensityFunction x = Noise(minecraft:ridge).|", want: []string{"XzScale", "YScale"}},
 		{name: "surface If condition", src: "SurfaceRule r = If(|)", want: []string{"AboveWater", "StoneDepth"}, not: []string{"Sequence"}},
 		{name: "surface If rule", src: "SurfaceRule r = If(AboveWater(), |)", want: []string{"Block", "Sequence"}},
+		{name: "surface If condition before block", src: "SurfaceRule r = If(|) {\n}", want: []string{"AboveWater", "StoneDepth"}, not: []string{"Sequence"}},
+		{name: "surface If condition before rule", src: "SurfaceRule r = If(|) { Block(stone) }", want: []string{"AboveWater"}, not: []string{"Block"}},
+		{name: "surface If condition in list", src: "SurfaceRule r = [\n  If(|) { Block(stone) },\n]", want: []string{"AboveWater"}},
+		{name: "surface If condition in material_rule", src: "NoiseSettings ns = {\n  material_rule = [\n    If(|) {\n    }\n  ]\n}", want: []string{"AboveWater", "Biome"}, not: []string{"aquifers"}},
+		{name: "surface If declared condition", src: "SurfaceCondition wet = AboveWater()\nSurfaceRule r = If(|) {\n}", want: []string{"wet", "Biome"}},
+		{name: "surface If declared condition operand", src: "SurfaceCondition wet = AboveWater()\nSurfaceRule r = If(wet && |) {\n}", want: []string{"wet", "Biome"}},
+		{name: "surface If block body", src: "SurfaceRule stone_top = Block(stone)\nSurfaceRule r = If(AboveWater()) {\n  |\n}", want: []string{"stone_top", "Block", "If"}, not: []string{"AboveWater"}},
+		{name: "surface If block body prefix", src: "SurfaceRule stone_top = Block(stone)\nSurfaceRule r = If(AboveWater()) {\n  sto|\n}", want: []string{"stone_top"}, replace: "sto"},
+		{name: "surface If rule declared", src: "SurfaceRule stone_top = Block(stone)\nSurfaceRule r = If(AboveWater(), |)", want: []string{"stone_top", "Block"}},
 
 		// Objects and nested maps.
 		{name: "object fields", src: "Biome b = {\n  |\n}", want: []string{"effects", "temperature"}},
