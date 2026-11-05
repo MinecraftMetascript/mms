@@ -587,11 +587,29 @@ func (c *Checker) CallInfo(call *syntax.Call, in *Info) *Info {
 	return &Info{Type: found.Struct, Callable: found, Fields: found.Fields, Disp: found.Disp, typed: true}
 }
 
+// holdsRule reports whether v is a surface rule or a union with one, such
+// as MaterialRuleRef, which a list item or a field expects: a half-written
+// If there keeps that outer type, since no member fits it yet.
+func (c *Checker) holdsRule(v tview) bool {
+	v = c.norm(v)
+	if v.Name == tMaterialRule {
+		return true
+	}
+	if v.T != nil && v.T.Kind == "union" {
+		for _, m := range v.T.Members {
+			if c.norm(tview{T: m, Env: v.Env}).Name == tMaterialRule {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // IfArgInfo is the expected type of a surface rule If(cond, rule)'s
 // argument at index, for completion: a condition, then a rule. in is the
 // Info of the If call.
 func (c *Checker) IfArgInfo(in *Info, index int) *Info {
-	if in == nil || in.Type.Name != tMaterialRule {
+	if in == nil || !c.holdsRule(in.Type) {
 		return nil
 	}
 	name := tMaterialCondRef
