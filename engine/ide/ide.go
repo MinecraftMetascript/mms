@@ -397,6 +397,13 @@ func (s *Session) complete(a *at, off int) []sema.Candidate {
 			}
 		case *syntax.Trailing:
 			if n.Block.Sp.Contains(off) && off > n.Block.Sp.Start {
+				// A surface rule's If(cond) { rule }: the block is the rule,
+				// which may also name a declared or vanilla rule.
+				if c, ok := n.X.(*syntax.Call); ok && isIdent(c.Fn, "If") {
+					if ai := a.c.IfArgInfo(a.info(n), 1); ai != nil {
+						return a.c.ValueCandidates(ai)
+					}
+				}
 				if in := a.info(n); in.HasType() {
 					return a.c.ValueCandidates(in)
 				}
@@ -1201,4 +1208,9 @@ func (s *Session) InlayHints(path string) []InlayHint {
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Off < out[j].Off })
 	return out
+}
+
+func isIdent(e syntax.Expr, name string) bool {
+	id, ok := e.(*syntax.Ident)
+	return ok && id.Name == name
 }

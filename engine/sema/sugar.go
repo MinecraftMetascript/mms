@@ -18,8 +18,12 @@ const (
 	tDensityRef   = "::java::data::worldgen::density_function::DensityFunctionRef"
 	tMaterialRule = "::java::data::worldgen::material_rule::MaterialRule"
 	tMaterialCond = "::java::data::worldgen::material_condition::MaterialCondition"
-	tAnchor       = "::java::data::worldgen::VerticalAnchor"
-	tFullBlock    = "::java::util::block_state::FullBlockState"
+	// The Ref types are a declared id or an inline value, as the
+	// condition rule's if_true and then_run take them.
+	tMaterialRuleRef = "::java::data::worldgen::material_rule::MaterialRuleRef"
+	tMaterialCondRef = "::java::data::worldgen::material_condition::MaterialConditionRef"
+	tAnchor          = "::java::data::worldgen::VerticalAnchor"
+	tFullBlock       = "::java::util::block_state::FullBlockState"
 
 	tLootCondition = "::java::data::loot::condition::LootCondition"
 	// tLootConditionRef is an alias of tLootCondition used by loot tables.
@@ -447,10 +451,21 @@ func ruleIf(c *Checker, e syntax.Expr, v tview) jsonv.Value {
 	}
 	in := c.info(name)
 	in.Type = v
+	if trailing != nil && base != nil {
+		// Completion inside `If(|) { ... }` reads the call's type.
+		bi := c.info(base)
+		if !bi.typed {
+			bi.Type, bi.typed = v, true
+		}
+	}
 	if len(args) != 2 {
-		if len(args) == 1 {
-			// Still check the condition, so hover, completion and
-			// signature help work while the body is unwritten.
+		// Still check what is there, so hover, completion and signature
+		// help work while the If is half written: the condition, or the
+		// trailing rule of an If whose condition is empty.
+		switch {
+		case len(args) == 1 && trailing != nil && len(base.Args) == 0:
+			c.check(args[0], c.norm(tview{T: &spec.Type{Kind: "reference", Path: tMaterialRuleRef}}))
+		case len(args) == 1:
 			c.checkIfCond(args[0])
 		}
 		c.errorf("mms/missing-value", name.Sp, "If needs a condition and a rule: If(cond) { rule }")
@@ -473,7 +488,7 @@ func (c *Checker) checkIfCond(e syntax.Expr) {
 			return
 		}
 	}
-	c.check(e, c.norm(tview{T: &spec.Type{Kind: "reference", Path: tMaterialCond}}))
+	c.check(e, c.norm(tview{T: &spec.Type{Kind: "reference", Path: tMaterialCondRef}}))
 }
 
 func lowerIf(cond, rule syntax.Expr, sp syntax.Span) syntax.Expr {
