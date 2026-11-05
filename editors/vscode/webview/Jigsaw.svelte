@@ -5,7 +5,7 @@
 	// World view's. Clicking a row loads it into the form; its copy icon
 	// copies its command straight away. The extension (src/jigsaw.ts) sends
 	// the lists; the form lives here and is kept across reloads.
-	import { CHAT_LIMIT, fullId, giveCommand } from '../src/jigsawGive';
+	import { CHAT_LIMIT, fullId, giveCommand, sameBlock } from '../src/jigsawGive';
 	import type { FromJigsaw, JigsawConfig, JigsawExisting, JigsawRecent, JigsawState, ToJigsaw } from '../src/messages';
 
 	type Saved = { state?: JigsawState; form?: JigsawConfig };
@@ -119,20 +119,43 @@
 		{ label: 'Remove from Recent', run: () => send({ type: 'forget', config: $state.snapshot(r.config) }) },
 		{ label: 'Clear Recent', danger: true, run: () => send({ type: 'forgetAll' }) }
 	];
-	const existingMenu = (e: JigsawExisting): MenuItem[] => [
+	// A block placed from a named item keeps the name in the structure
+	// file; one without gets the label of a block set up the same way in
+	// Recent.
+	const labelled = (c: JigsawConfig): JigsawConfig => {
+		if (c.label) return c;
+		const r = s?.recent.find((r) => r.config.label && sameBlock(r.config, c, ns));
+		return r ? { ...c, label: r.config.label } : c;
+	};
+	// A row of In structures: the blocks of one piece set up the same way,
+	// which differ only in where they are.
+	type Same = { key: string; config: JigsawConfig; saved: boolean; src: string; at: JigsawExisting[] };
+	const existingMenu = (e: Same): MenuItem[] => [
 		{ label: 'Load into the form', run: () => load(e.config) },
-		{ label: 'Copy give command', run: () => copy(key(e), e.config) },
+		{ label: 'Copy give command', run: () => copy(e.key, e.config) },
 		'sep',
 		{ label: 'Show file in Explorer', run: () => send({ type: 'revealFile', src: e.src }) }
 	];
-	const key = (e: JigsawExisting) => `${e.src}|${e.pos.join(',')}`;
 
-	// In structures: one folder per structure file.
+	// In structures: one folder per structure file, duplicates rolled up.
 	const pieces = $derived.by(() => {
-		const by = new Map<string, JigsawExisting[]>();
-		for (const e of s?.existing ?? []) by.set(e.id, [...(by.get(e.id) ?? []), e]);
+		const by = new Map<string, Same[]>();
+		for (const e of s?.existing ?? []) {
+			const rows = by.get(e.id) ?? [];
+			const same = rows.find((r) => sameBlock(r.config, e.config, ns));
+			if (same) {
+				same.at.push(e);
+				// A label saved in the file wins over one taken from Recent.
+				if (e.config.label && !same.saved) {
+					same.config = { ...same.config, label: e.config.label };
+					same.saved = true;
+				}
+			} else rows.push({ key: `${e.src}|${e.pos.join(',')}`, config: { ...labelled(e.config) }, saved: !!e.config.label, src: e.src, at: [e] });
+			by.set(e.id, rows);
+		}
 		return [...by].sort(([a], [b]) => a.localeCompare(b));
 	});
+	const where = (e: JigsawExisting) => `${e.pos.join(' ')}${e.orientation ? `, facing ${e.orientation.replace('_', ', top ')}` : ''}`;
 	let open = $state<Record<string, boolean>>({});
 
 	// "5 min ago", for Recent.
@@ -265,18 +288,19 @@
 							<summary class="item" style:--depth={0} title={`${id}\n${list[0].src}`}>
 								<span class="twistie" aria-hidden="true"></span>
 								<span class="label folder">{shown(id)}</span>
-								<span class="desc">{list.length}</span>
+								<span class="desc" title="{list.reduce((n, r) => n + r.at.length, 0)} jigsaw blocks">⧉{list.reduce((n, r) => n + r.at.length, 0)}</span>
 							</summary>
 							<ul class="tree">
-								{#each list as e (key(e))}
+								{#each list as e (e.key)}
 									{@const items = existingMenu(e)}
 									<li>
-										<div class="item" style:--depth={1} title={`${tip(e.config)}\nAt ${e.pos.join(' ')}${e.orientation ? `, facing ${e.orientation.replace('_', ', top ')}` : ''}\nClick to load it into the form.`} tabindex="0" role="treeitem" aria-selected="false" onclick={() => load(e.config)} onkeydown={(ev) => rowKey(ev, e.config, items)} oncontextmenu={(ev) => openMenu(ev, items)}>
+										<div class="item" style:--depth={1} title={`${e.config.label ? `${e.config.label}\n` : ''}${tip(e.config)}\n${e.at.length === 1 ? `At ${where(e.at[0])}` : `${e.at.length} blocks set up this way, at:\n${e.at.map((a) => `  ${where(a)}`).join('\n')}`}\nClick to load it into the form.`} tabindex="0" role="treeitem" aria-selected="false" onclick={() => load(e.config)} onkeydown={(ev) => rowKey(ev, e.config, items)} oncontextmenu={(ev) => openMenu(ev, items)}>
 											<span class="twistie"></span>
-											<span class="label">{shown(e.config.name)}</span>
-											<span class="desc">{leads(e.config)}</span>
+											<span class="label">{e.config.label || shown(fullId(e.config.name, ns))}</span>
+											<span class="desc">{e.config.label ? `${shown(fullId(e.config.name, ns))} ` : ''}{leads(e.config)}</span>
+											{#if e.at.length > 1}<span class="count" title="{e.at.length} jigsaw blocks set up this way">⧉{e.at.length}</span>{/if}
 											<span class="actions-inline">
-												<button class="icon-btn" title="Copy give command" aria-label="Copy the give command for this block" onclick={(ev) => { ev.stopPropagation(); copy(key(e), e.config); }}>{@render icon(copied === key(e) ? 'check' : 'copy')}</button>
+												<button class="icon-btn" title="Copy give command" aria-label="Copy the give command for this block" onclick={(ev) => { ev.stopPropagation(); copy(e.key, e.config); }}>{@render icon(copied === e.key ? 'check' : 'copy')}</button>
 												<button class="icon-btn" title="More actions" aria-label="More actions" aria-haspopup="menu" onclick={(ev) => openMenu(ev, items)}>{@render icon('more')}</button>
 											</span>
 										</div>
@@ -551,6 +575,16 @@
 		height: 20px;
 		padding: 0;
 		border-radius: 4px;
+	}
+	/* How many blocks a rolled-up row stands for, as the jigsaw preview's piece cards show it. */
+	.count {
+		flex: 0 0 auto;
+		font-size: 10px;
+		color: var(--vscode-descriptionForeground);
+	}
+	.item:hover .count,
+	.item:focus-within .count {
+		display: none;
 	}
 	.warn-text {
 		color: var(--vscode-editorWarning-foreground);
