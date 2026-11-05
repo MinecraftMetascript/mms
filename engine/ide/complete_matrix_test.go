@@ -58,6 +58,9 @@ func TestCompletionMatrix(t *testing.T) {
 		{name: "surface If declared condition operand", src: "SurfaceCondition wet = AboveWater()\nSurfaceRule r = If(wet && |) {\n}", want: []string{"wet", "Biome"}},
 		{name: "surface If block body", src: "SurfaceRule stone_top = Block(stone)\nSurfaceRule r = If(AboveWater()) {\n  |\n}", want: []string{"stone_top", "Block", "If"}, not: []string{"AboveWater"}},
 		{name: "surface If block body prefix", src: "SurfaceRule stone_top = Block(stone)\nSurfaceRule r = If(AboveWater()) {\n  sto|\n}", want: []string{"stone_top"}, replace: "sto"},
+		{name: "surface If condition no block in list", src: "SurfaceRule r = [\n  If(|)\n  Block(stone)\n]", want: []string{"AboveWater", "StoneDepth"}, not: []string{"Sequence"}},
+		{name: "surface If condition no block in field", src: "NoiseSettings ns = {\n  material_rule = If(|)\n  sea_level = 0\n}", want: []string{"AboveWater"}, not: []string{"aquifers"}},
+		{name: "surface If condition no block nested", src: "SurfaceRule r = If(AboveWater()) {\n  If(|)\n}", want: []string{"AboveWater"}, not: []string{"Block"}},
 		{name: "surface If rule declared", src: "SurfaceRule stone_top = Block(stone)\nSurfaceRule r = If(AboveWater(), |)", want: []string{"stone_top", "Block"}},
 
 		// Objects and nested maps.
