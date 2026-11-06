@@ -730,7 +730,7 @@ func TestOutputStructureJigsaws(t *testing.T) {
 	}
 	c.notify("mms/setAssets", map[string]any{"files": []any{map[string]any{"path": "s/hall.nbt", "data": data}}})
 	c.notify("mms/setFiles", map[string]any{"files": []any{
-		map[string]any{"uri": "mem:///a.mms", "text": "TemplatePool rooms = { fallback = minecraft:empty, elements = [{ weight = 1, element = { element_type = minecraft:single_pool_element, location = Structure(\"s/hall.nbt\"), projection = rigid, processors = minecraft:empty } }] }\n"},
+		map[string]any{"uri": "mem:///a.mms", "text": "TemplatePool rooms = { fallback = minecraft:empty, elements = [{ weight = 1, element = { element_type = minecraft:single_pool_element, location = StructureFile(\"s/hall.nbt\"), projection = rigid, processors = minecraft:empty } }] }\n"},
 	}})
 	out := c.result("mms/output", map[string]any{}).(map[string]any)
 	assets := out["assets"].([]any)

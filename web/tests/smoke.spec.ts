@@ -992,7 +992,7 @@ test('a jigsaw structure previews which pieces join which, and marks dead ends',
 	await page.getByRole('button', { name: /Examples/ }).click();
 	await page.getByRole('button', { name: /jigsaw/ }).click();
 	await expect(status(page)).toHaveText(/No problems/);
-	await page.locator('.cm-line', { hasText: 'Structure dungeon = Jigsaw(' }).click();
+	await page.locator('.cm-line', { hasText: 'JigsawStructure dungeon {' }).click();
 	const graph = page.getByLabel('Jigsaw connections');
 	await expect(graph).toContainText('Jigsaw structure');
 	await expect(graph).toContainText('size 6');
@@ -1015,7 +1015,7 @@ test('a jigsaw structure previews which pieces join which, and marks dead ends',
 	// preview is pinned, since the edit moves the cursor away.
 	await page.getByRole('button', { name: /^Pin/ }).click();
 	const src = readFileSync(new URL('../../examples/jigsaw/dungeon.mms', import.meta.url), 'utf8');
-	await replaceText(page, src.replace('TemplatePool rooms = {', 'TemplatePool rooms2 = {'));
+	await replaceText(page, src.replace('rooms = { fallback', 'rooms2 = { fallback'));
 	await expect(graph.getByLabel('Problems')).toContainText('2 dead ends');
 	await expect(graph.getByLabel('Pool dungeon:rooms')).toContainText('No TemplatePool declares this');
 
@@ -1044,7 +1044,7 @@ test('a project file nothing uses is marked unused in the asset list', async ({ 
 	const vault = page.getByRole('listitem').filter({ hasText: 'structures/rooms/vault.nbt' });
 	await expect(vault).not.toContainText('unused');
 	const src = readFileSync(new URL('../../examples/jigsaw/dungeon.mms', import.meta.url), 'utf8');
-	await replaceText(page, src.replace('Structure("structures/rooms/vault.nbt", "rooms/vault")', 'Structure("structures/rooms/room.nbt", "rooms/room")'));
+	await replaceText(page, src.replace('Piece("rooms/vault")', 'Piece("rooms/room")'));
 	await expect(vault).toContainText('unused');
 	await expect(vault).toHaveAttribute('title', /Not used/);
 });

@@ -1,6 +1,7 @@
 package eval
 
 import (
+	"hash/fnv"
 	"math"
 	"regexp"
 	"strings"
@@ -25,6 +26,7 @@ var intrinsics = map[string]intrinsic{
 	"replace":     replace,
 	"named":       named,
 	"kind_of":     kindOf,
+	"hash":        hash,
 }
 
 // kept are externs whose calls stay as written, with their arguments
@@ -277,4 +279,22 @@ func kindOf(c *ctx, x *syntax.Call, args []argValue) Value {
 		k = "commands"
 	}
 	return &Str{p, k}
+}
+
+// hash turns a string into a whole number from 0 to 2^31 - 1 that stays
+// the same from build to build, such as a structure set's salt from its id.
+func hash(c *ctx, x *syntax.Call, args []argValue) Value {
+	p := c.pos(x.Sp)
+	vs, ok := knownArgs(c, x, args, "hash", 1)
+	if !ok {
+		return &Num{p, 0, true}
+	}
+	s, ok := text(vs[0])
+	if !ok {
+		c.errorf("mms/intrinsic-args", x.Sp, "hash takes a string")
+		return &Num{p, 0, true}
+	}
+	h := fnv.New32a()
+	h.Write([]byte(s))
+	return &Num{p, float64(h.Sum32() & 0x7fffffff), true}
 }

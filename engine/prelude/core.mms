@@ -45,6 +45,8 @@ extern Template replace(text: string, old: string, new: string): string
 extern Template named(asset: any, name: string): any
 /** The kind of a value: "none", "bool", "number", "string", "name", "list", "object", "range", "commands", or "runtime" for a value only known when the pack runs. */
 extern Template kind_of(value: any): string
+/** A whole number from 0 to 2147483647 made from a string, the same in every build: `hash("dungeon:dungeon")`. */
+extern Template hash(text: string): int
 
 /** Sends `message` to the chat of each player `target` selects: `tell(@a, "Wave ${wave} begins")`. The message is text markup, and `${...}` in it shows a score, a Global, a selector's names or a constant. */
 extern Template tell(target: Selector, message: Text): Commands

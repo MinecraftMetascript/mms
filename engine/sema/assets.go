@@ -15,7 +15,7 @@ import (
 )
 
 // Asset files: Texture("art/sunset.png"), Sound("music/tune.ogg") and
-// Structure("builds/house.nbt") name a file anywhere in the project. The
+// StructureFile("builds/house.nbt") name a file anywhere in the project. The
 // call stands for the id the file gets in the pack, and the build copies
 // the file to the path that id implies. Files nothing uses are never
 // copied (decision D69).
@@ -30,7 +30,7 @@ const (
 
 // Asset is one use of an asset helper, recorded in the call's Info.
 type Asset struct {
-	Helper string   // "Texture", "Sound" or "Structure"
+	Helper string   // "Texture", "Sound" or "StructureFile"
 	Src    string   // project-relative source file
 	ID     string   // ns:name, the value written to the JSON
 	Out    string   // pack-relative output path
@@ -55,14 +55,14 @@ var assetHelpers = map[string]*assetHelper{
 		registries: []string{"sound_event", "weighed_sound_event"}, ext: ".ogg", magic: []byte("OggS"), what: "an Ogg Vorbis sound", pack: ResourcePack,
 		out: func(ns, _, name string) string { return "assets/" + ns + "/sounds/" + name + ".ogg" },
 	},
-	"Structure": {
+	"StructureFile": {
 		registries: []string{"structure"}, ext: ".nbt", magic: []byte{0x1f, 0x8b}, what: "a gzipped structure (.nbt)", pack: DataPack,
 		out: func(ns, _, name string) string { return "data/" + ns + "/structure/" + name + ".nbt" },
 	},
 }
 
 // AssetHelperNames lists the helpers, for completion and docs.
-var AssetHelperNames = []string{"Sound", "Structure", "Texture"}
+var AssetHelperNames = []string{"Sound", "StructureFile", "Texture"}
 
 // assetRegistries are id registries whose ids name files rather than
 // data pack resources: MMS cannot declare them, so an id in the
@@ -127,7 +127,7 @@ func assetName(src string) string {
 	return sb.String()
 }
 
-// assetCall checks Texture(path, name?), Sound(...) or Structure(...) at
+// assetCall checks Texture(path, name?), Sound(...) or StructureFile(...) at
 // an id position and returns the id it stands for.
 func (c *Checker) assetCall(e syntax.Expr, v tview) jsonv.Value {
 	call := e.(*syntax.Call)

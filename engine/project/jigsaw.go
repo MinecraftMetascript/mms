@@ -21,7 +21,7 @@ import (
 // piece to join onto. Nothing checks this until the game generates the
 // structure, where a missing pool or a target no piece has just stops
 // the structure growing, without an error. These rules read the jigsaw
-// blocks of the structure files Structure("...") includes and check them
+// blocks of the structure files StructureFile("...") includes and check them
 // against the project's TemplatePool declarations.
 
 // Jigsaw is one jigsaw block of a structure file.
@@ -218,7 +218,7 @@ func nbtID(v any) string {
 }
 
 // structureUse is a structure file the project includes, at its first
-// Structure("...") call.
+// StructureFile("...") call.
 type structureUse struct {
 	assetUse
 	jigsaws []Jigsaw
@@ -255,7 +255,7 @@ func (r *Result) jigsawModel() *jigsawModel {
 	m := &jigsawModel{byID: map[string]*structureUse{}, pools: map[string]*poolPieces{}, declared: map[string]bool{r.cfg.Namespace: true}}
 	seen := map[string]bool{}
 	for _, u := range r.assets {
-		if u.Helper != "Structure" || seen[u.Src] {
+		if u.Helper != "StructureFile" || seen[u.Src] {
 			continue
 		}
 		seen[u.Src] = true

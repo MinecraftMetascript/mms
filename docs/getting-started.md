@@ -92,9 +92,9 @@ These JSDoc-style tags are understood:
 
   ```
   elements = [
-    WeightedElement(50, SinglePoolElement(rigid, Structure("structures/road_cap.nbt"), [])),
+    WeightedElement(50, SinglePoolElement(rigid, StructureFile("structures/road_cap.nbt"), [])),
     /** @label Worn road cap */
-    WeightedElement(10, SinglePoolElement(rigid, Structure("structures/road_cap.nbt"), road_wear_medium)),
+    WeightedElement(10, SinglePoolElement(rigid, StructureFile("structures/road_cap.nbt"), road_wear_medium)),
   ]
   ```
 

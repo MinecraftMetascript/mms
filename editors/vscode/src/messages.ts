@@ -118,7 +118,7 @@ export interface WorldStructureRow {
 	saved: string;
 	/** When it was saved, in ms since the epoch, for "saved 5 min ago". */
 	savedMs: number;
-	/** Imported, but no Structure(...) call names the project copy (lint/unused-asset). */
+	/** Imported, but no StructureFile(...) call names the project copy (lint/unused-asset). */
 	unused: boolean;
 	/** Its id in the pack, when it was saved under another namespace. */
 	packId?: string;
@@ -142,7 +142,7 @@ export interface WorldState {
 	dimensions: WorldDimensionRow[];
 	result?: WorldResult;
 	structures: WorldStructureRow[];
-	/** Project .nbt files no Structure(...) call names that are not saves of the structure world. */
+	/** Project .nbt files no StructureFile(...) call names that are not saves of the structure world. */
 	unusedFiles: string[];
 	/** The unused check waits for a project without errors. */
 	unusedPaused: boolean;

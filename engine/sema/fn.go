@@ -1388,6 +1388,13 @@ func (f *fc) interpolate(out *fn.Block, cmd *syntax.CommandStmt) {
 			i = j
 			continue
 		}
+		if id := f.declID(e); id != "" {
+			// A declaration's name is its id, as a command's resource
+			// argument: /locate structure ${dungeon}
+			line.WriteString(id)
+			i = j
+			continue
+		}
 		v := f.expr(&pre, e)
 		if v == nil {
 			return
@@ -1407,6 +1414,37 @@ func (f *fc) interpolate(out *fn.Block, cmd *syntax.CommandStmt) {
 		return
 	}
 	out.Add(fn.Macro{Line: line.String(), Args: args})
+}
+
+// declID returns the id of the resource declaration a bare name in
+// ${...} names, when it is not a variable, or "".
+func (f *fc) declID(e syntax.Expr) string {
+	var id string
+	switch x := e.(type) {
+	case *syntax.Ident:
+		if _, ok := f.lookup(x.Name); ok || f.c.findSig("Global", f.ns+":"+x.Name) != nil {
+			return ""
+		}
+		id = f.ns + ":" + x.Name
+	case *syntax.ResLoc:
+		if f.c.findSig("Global", x.Text) != nil {
+			return ""
+		}
+		id = x.Text
+		if !strings.Contains(id, ":") {
+			id = f.ns + ":" + id
+		}
+	default:
+		return ""
+	}
+	sym := f.c.otherKind("", id)
+	if sym == nil {
+		return ""
+	}
+	in := f.c.info(e)
+	in.Symbol = sym
+	in.ID = id
+	return id
 }
 
 // parseExpr parses an interpolated expression at offset off in the file,

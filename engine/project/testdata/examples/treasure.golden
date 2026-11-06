@@ -291,7 +291,7 @@ loot give @s loot treasure:chests/buried
   ],
   "placement": {
     "type": "minecraft:random_spread",
-    "salt": 20261031,
+    "salt": 563732532,
     "spacing": 24,
     "separation": 8
   }
