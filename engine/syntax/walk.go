@@ -14,8 +14,8 @@ func Children(n Node) []Node {
 	case *File:
 	case *Decl:
 		add(n.Kind)
-		if n.Name != nil {
-			add(n.Name)
+		for _, name := range n.Names() {
+			add(name)
 		}
 		if n.Type != nil {
 			add(n.Type)
@@ -26,9 +26,16 @@ func Children(n Node) []Node {
 		if n.Value != nil {
 			add(n.Value)
 		}
+		if n.TypeValue != nil {
+			add(n.TypeValue)
+		}
 		if n.Body != nil {
 			add(n.Body)
 		}
+	case *Name:
+		addParts(&out, n.Parts)
+	case *TemplatedName:
+		addParts(&out, n.Parts)
 	case *ParamList:
 		for _, p := range n.Params {
 			add(p)
@@ -38,6 +45,71 @@ func Children(n Node) []Node {
 		if n.Type != nil {
 			add(n.Type)
 		}
+		if n.Default != nil {
+			add(n.Default)
+		}
+	case *TypeName:
+		for _, a := range n.Args {
+			add(a)
+		}
+	case *TypeOptional:
+		add(n.X)
+	case *TypeList:
+		add(n.Elem)
+	case *TypeMap:
+		add(n.Key, n.Value)
+	case *TypeUnion:
+		for _, a := range n.Arms {
+			add(a)
+		}
+	case *TypeParen:
+		add(n.X)
+	case *ConstStmt:
+		add(n.Name)
+		if n.Type != nil {
+			add(n.Type)
+		}
+		if n.Value != nil {
+			add(n.Value)
+		}
+	case *FieldDecl:
+		add(n.Name)
+		if n.Type != nil {
+			add(n.Type)
+		}
+		if n.Default != nil {
+			add(n.Default)
+		}
+	case *SectionStmt:
+		add(n.Word, n.Body)
+	case *AsStmt:
+		add(n.Type, n.Value)
+		if n.Hint != nil {
+			add(n.Hint)
+		}
+	case *ExpectStmt:
+		add(n.X)
+	case *RunStmt:
+		add(n.X)
+	case *Spread:
+		add(n.X)
+	case *IfExpr:
+		add(n.Cond, n.Then)
+		if n.Else != nil {
+			add(n.Else)
+		}
+	case *RunExpr:
+		add(n.Body)
+	case *Comprehension:
+		add(n.Var)
+		if n.Var2 != nil {
+			add(n.Var2)
+		}
+		add(n.Iter)
+		if n.Cond != nil {
+			add(n.Cond)
+		}
+		add(n.Body)
 	case *Block:
 		for _, it := range n.Items {
 			add(it)
@@ -58,7 +130,11 @@ func Children(n Node) []Node {
 	case *WhileStmt:
 		add(n.Cond, n.Body)
 	case *ForStmt:
-		add(n.Var, n.Iter, n.Body)
+		add(n.Var)
+		if n.Var2 != nil {
+			add(n.Var2)
+		}
+		add(n.Iter, n.Body)
 	case *ReturnStmt:
 		if n.Value != nil {
 			add(n.Value)
@@ -114,6 +190,14 @@ func Children(n Node) []Node {
 	return out
 }
 
+func addParts(out *[]Node, ps []NamePart) {
+	for _, p := range ps {
+		if p.X != nil {
+			*out = append(*out, p.X)
+		}
+	}
+}
+
 func isNilNode(n Node) bool {
 	switch n := n.(type) {
 	case *Name:
@@ -121,6 +205,8 @@ func isNilNode(n Node) bool {
 	case *Ident:
 		return n == nil
 	case *Block:
+		return n == nil
+	case *Call:
 		return n == nil
 	}
 	return false
@@ -136,8 +222,8 @@ func Walk(n Node, fn func(Node) bool) {
 		return
 	}
 	if f, ok := n.(*File); ok {
-		for _, d := range f.Decls {
-			Walk(d, fn)
+		for _, it := range f.Items {
+			Walk(it, fn)
 		}
 		return
 	}
@@ -156,8 +242,8 @@ func PathAt(f *File, off int) []Node {
 		path = append(path, n)
 		var kids []Node
 		if file, ok := n.(*File); ok {
-			for _, d := range file.Decls {
-				kids = append(kids, d)
+			for _, it := range file.Items {
+				kids = append(kids, it)
 			}
 		} else {
 			kids = Children(n)

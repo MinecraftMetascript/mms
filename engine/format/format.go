@@ -46,19 +46,33 @@ func Source(src string) (string, error) {
 // the result; File assumes the file has no syntax errors.
 func File(f *syntax.File) string {
 	p := newPrinter(f)
+	// Print every item first, in order, so comments are taken in source
+	// order; then join them, with a blank line around any item that
+	// prints on more than one line.
+	type printed struct {
+		lead       leadingComments
+		body, tail doc
+		multi      bool
+	}
+	items := make([]printed, len(f.Items))
+	for i, it := range f.Items {
+		lead := p.leading(it.Span().Start, i == 0)
+		body := p.stmt(it)
+		items[i] = printed{lead: lead, body: body, tail: p.trailing(it.Span().End),
+			multi: strings.Contains(render(body, Width), "\n")}
+	}
 	var parts []doc
-	for i, d := range f.Decls {
-		lead := p.leading(d.Span().Start, i == 0)
+	for i, it := range items {
 		if i > 0 {
 			parts = append(parts, hard)
-			if p.blankBefore(lead, d.Span().Start) || multiLine(f, f.Decls[i-1]) || multiLine(f, d) {
+			if p.blankBefore(it.lead, f.Items[i].Span().Start) || items[i-1].multi || it.multi {
 				parts = append(parts, hard)
 			}
 		}
-		parts = append(parts, lead.doc, p.decl(d), p.trailing(d.Span().End))
+		parts = append(parts, it.lead.doc, it.body, it.tail)
 	}
-	rest := p.leading(len(f.Src)+1, len(f.Decls) == 0)
-	if len(f.Decls) > 0 && len(rest.comments) > 0 {
+	rest := p.leading(len(f.Src)+1, len(f.Items) == 0)
+	if len(f.Items) > 0 && len(rest.comments) > 0 {
 		parts = append(parts, hard)
 		if rest.blank {
 			parts = append(parts, hard)
@@ -72,14 +86,21 @@ func File(f *syntax.File) string {
 	return out + "\n"
 }
 
-func multiLine(f *syntax.File, d *syntax.Decl) bool {
-	sp := d.Span()
-	for _, r := range f.Src[sp.Start:min(sp.End, len(f.Src))] {
+// oneLine reports whether a span of the source holds no newline.
+func oneLine(f *syntax.File, sp syntax.Span) bool {
+	for _, r := range f.Src[max(sp.Start, 0):min(sp.End, len(f.Src))] {
 		if r == '\n' {
-			return true
+			return false
 		}
 	}
-	return d.Body != nil && len(d.Body.Items) > 0
+	return true
+}
+
+// flatBody reports whether a declaration body may stay on one line: it
+// was written on one line and holds only fields, as in
+// `LootTable chests/gems { pools = [gem_pool] }`.
+func flatBody(f *syntax.File, b *syntax.Block) bool {
+	return len(b.Items) > 0 && oneLine(f, b.Span()) && !hasStatements(b)
 }
 
 type printer struct {
@@ -282,45 +303,94 @@ func (p *printer) lineStart(off int) int {
 }
 
 func (p *printer) decl(d *syntax.Decl) doc {
-	parts := []doc{txt(d.Kind.Name)}
-	if d.Name != nil {
-		parts = append(parts, txt(" "+d.Name.Text))
+	head := d.Kind.Name
+	switch {
+	case d.Extern:
+		head = "extern " + head
+	case d.Primary:
+		head = "primary " + head
+	}
+	parts := []doc{txt(head)}
+	for i, n := range d.Names() {
+		if i > 0 {
+			parts = append(parts, txt(","))
+		}
+		parts = append(parts, txt(" "+n.Text))
 	}
 	if d.Params != nil {
 		parts = append(parts, p.params(d.Params))
 	}
 	if d.Type != nil {
-		parts = append(parts, txt(": "+d.Type.Text))
+		parts = append(parts, txt(": "+syntax.TypeText(d.Type)))
+	}
+	if d.TypeValue != nil {
+		parts = append(parts, txt(" = "+syntax.TypeText(d.TypeValue)))
 	}
 	if d.Value != nil {
-		parts = append(parts, txt(" = "), p.expr(d.Value))
+		parts = append(parts, p.assigned(d.Value))
 	}
 	if d.Body != nil {
-		parts = append(parts, txt(" "), p.block(d.Body, true))
+		parts = append(parts, txt(" "), p.block(d.Body, !flatBody(p.f, d.Body)))
 	}
 	return concat(parts)
 }
 
+// assigned prints ` = value`. A value that cannot break, such as a long
+// string, moves to its own indented line when it does not fit after the
+// '='.
+func (p *printer) assigned(v syntax.Expr) doc {
+	switch v.(type) {
+	case *syntax.String, *syntax.Number, *syntax.Ident, *syntax.ResLoc, *syntax.TemplatedName:
+		return grp(txt(" ="), ind(ln, p.expr(v)))
+	}
+	return cat(txt(" = "), p.expr(v))
+}
+
 func (p *printer) params(pl *syntax.ParamList) doc {
-	var ps []doc
+	var items []item
 	for _, prm := range pl.Params {
-		s := prm.Name.Text
-		if prm.Type != nil {
-			s += ": " + prm.Type.Text
-		}
-		ps = append(ps, txt(s))
+		items = append(items, p.item(prm, func() doc { return p.param(prm) }))
 	}
-	if len(ps) == 0 {
-		return txt("()")
+	return p.bracketed("(", ")", items, pl.Span().End, false)
+}
+
+func (p *printer) param(prm *syntax.Param) doc {
+	s := ""
+	if prm.Name != nil {
+		s = prm.Name.Text
 	}
-	return grp(txt("("), ind(soft, join(cat(txt(","), ln), ps), whenBroken(txt(","))), soft, txt(")"))
+	if prm.Type != nil {
+		s += ": " + syntax.TypeText(prm.Type)
+	}
+	if prm.Default != nil {
+		return cat(txt(s+" = "), p.expr(prm.Default))
+	}
+	return txt(s)
+}
+
+// typed prints `name: Type = value`, the shape of const, let and field
+// declarations.
+func (p *printer) typed(word string, name *syntax.Name, t syntax.TypeExpr, v syntax.Expr) doc {
+	s := word
+	if name != nil {
+		s += name.Text
+	}
+	if t != nil {
+		s += ": " + syntax.TypeText(t)
+	}
+	if v == nil {
+		return txt(s)
+	}
+	return cat(txt(s), p.assigned(v))
 }
 
 // block prints `{ ... }`. Statement blocks and declaration bodies always
 // break; value blocks stay on one line when they fit.
 func (p *printer) block(b *syntax.Block, forceBreak bool) doc {
 	if !forceBreak {
-		forceBreak = hasStatements(b)
+		// Statements always go one per line. A value block with several
+		// items stays on one line only when the author wrote it so.
+		forceBreak = hasStatements(b) || len(b.Items) > 1 && !oneLine(p.f, b.Span())
 	}
 	if len(b.Items) == 0 {
 		inner := p.dangling(b.Span().End)
@@ -352,12 +422,16 @@ func (p *printer) block(b *syntax.Block, forceBreak bool) doc {
 }
 
 // lnOrComma separates block items: ", " when flat, a newline when broken.
-func lnOrComma() doc { return ifBreak{broken: hard, flat: txt(", ")} }
+func lnOrComma() doc { return ifBreak{broken: ln, flat: txt(", ")} }
 
 func hasStatements(b *syntax.Block) bool {
 	for _, it := range b.Items {
-		switch it.(type) {
-		case *syntax.FieldStmt, *syntax.ExprStmt:
+		switch it := it.(type) {
+		case *syntax.FieldStmt:
+		case *syntax.ExprStmt:
+			if _, ok := it.X.(*syntax.RunExpr); ok {
+				return true
+			}
 		default:
 			return true
 		}
@@ -367,21 +441,32 @@ func hasStatements(b *syntax.Block) bool {
 
 func (p *printer) stmt(s syntax.Stmt) doc {
 	switch s := s.(type) {
+	case *syntax.Decl:
+		return p.decl(s)
 	case *syntax.LetStmt:
-		parts := []doc{txt("let " + s.Name.Text)}
-		if s.Type != nil {
-			parts = append(parts, txt(": "+s.Type.Text))
+		return p.typed("let ", s.Name, s.Type, s.Value)
+	case *syntax.ConstStmt:
+		return p.typed("const ", s.Name, s.Type, s.Value)
+	case *syntax.FieldDecl:
+		return p.typed("", s.Name, s.Type, s.Default)
+	case *syntax.SectionStmt:
+		return cat(txt(s.Word.Name+" "), p.block(s.Body, true))
+	case *syntax.AsStmt:
+		d := cat(txt("as "+syntax.TypeText(s.Type)), p.assigned(s.Value))
+		if s.Hint != nil {
+			d = cat(d, txt(" hint"), p.args(s.Hint.Args, s.Hint.ArgsSp.End))
 		}
-		if s.Value != nil {
-			parts = append(parts, txt(" = "), p.expr(s.Value))
-		}
-		return concat(parts)
+		return d
+	case *syntax.ExpectStmt:
+		return cat(txt("expect "), p.expr(s.X))
+	case *syntax.RunStmt:
+		return cat(txt("run "), p.expr(s.X))
 	case *syntax.IfStmt:
 		return p.ifStmt(s)
 	case *syntax.WhileStmt:
 		return cat(txt("while ("), p.expr(s.Cond), txt(") "), p.block(s.Body, true))
 	case *syntax.ForStmt:
-		return cat(txt("for "+s.Var.Text+" in "), p.expr(s.Iter), txt(" "), p.block(s.Body, true))
+		return cat(txt("for "+forVars(s.Var, s.Var2)+" in "), p.expr(s.Iter), txt(" "), p.block(s.Body, true))
 	case *syntax.ReturnStmt:
 		if s.Value == nil {
 			return txt("return")
@@ -408,14 +493,34 @@ func (p *printer) stmt(s syntax.Stmt) doc {
 }
 
 func (p *printer) ifStmt(s *syntax.IfStmt) doc {
-	parts := []doc{txt("if ("), p.expr(s.Cond), txt(") "), p.block(s.Then, true)}
+	parts := []doc{txt("if ("), p.expr(s.Cond), txt(") "), p.branch(s.Then)}
 	switch e := s.Else.(type) {
 	case *syntax.IfStmt:
 		parts = append(parts, txt(" else "), p.ifStmt(e))
 	case *syntax.Block:
-		parts = append(parts, txt(" else "), p.block(e, true))
+		parts = append(parts, txt(" else "), p.branch(e))
 	}
 	return concat(parts)
+}
+
+// branch prints an if statement's branch: a block, or the single call of
+// a bare one, as in `if (x) error(...)`.
+func (p *printer) branch(b *syntax.Block) doc {
+	if b.Bare && len(b.Items) == 1 {
+		return p.stmt(b.Items[0])
+	}
+	return p.block(b, true)
+}
+
+func forVars(a, b *syntax.Name) string {
+	s := "?"
+	if a != nil {
+		s = a.Text
+	}
+	if b != nil {
+		s += ", " + b.Text
+	}
+	return s
 }
 
 var bareKey = regexp.MustCompile(`^([a-zA-Z_][a-zA-Z0-9_]*|[a-z0-9_.-]+:[a-z0-9_./-]+|[a-zA-Z_][a-zA-Z0-9_]*(/[a-z0-9_./-]+)+)$`)
@@ -429,10 +534,17 @@ func fieldKey(s *syntax.FieldStmt) string {
 
 // precedence of binary operators, higher binds tighter.
 var precedence = map[string]int{
-	"->": 1, "||": 2, "&&": 3, "==": 4, "!=": 4,
-	"<": 5, "<=": 5, ">": 5, ">=": 5, "..": 6,
-	"+": 7, "-": 7, "*": 8, "/": 8, "%": 8,
+	"->": 1, "??": 2, "||": 3, "&&": 4, "==": 5, "!=": 5,
+	"<": 6, "<=": 6, ">": 6, ">=": 6, "..": 7,
+	"+": 8, "-": 8, "*": 9, "/": 9, "%": 9,
 }
+
+// Precedence of the other forms, on the same scale.
+const (
+	precRange = 7
+	precUnary = 10
+	precChain = 11
+)
 
 func (p *printer) expr(e syntax.Expr) doc {
 	switch e := e.(type) {
@@ -466,16 +578,35 @@ func (p *printer) expr(e syntax.Expr) doc {
 	case *syntax.Object:
 		return p.block(e.Body, false)
 	case *syntax.Unary:
-		return cat(txt(e.Op), p.operand(e.X, 9))
+		return cat(txt(e.Op), p.operand(e.X, precUnary))
+	case *syntax.TemplatedName:
+		return txt(e.Text)
+	case *syntax.Spread:
+		return cat(txt("..."), p.expr(e.X))
+	case *syntax.RunExpr:
+		return cat(txt("run "), p.block(e.Body, true))
+	case *syntax.IfExpr:
+		d := cat(txt("if ("), p.expr(e.Cond), txt(")"), ind(ln, p.expr(e.Then)))
+		if e.Else != nil {
+			d = cat(d, ln, txt("else"), ind(ln, p.expr(e.Else)))
+		}
+		return grp(d)
+	case *syntax.Comprehension:
+		head := []doc{txt("for " + forVars(e.Var, e.Var2) + " in "), p.expr(e.Iter)}
+		if e.Cond != nil {
+			head = append(head, txt(" if "), p.expr(e.Cond))
+		}
+		head = append(head, txt(":"))
+		return grp(txt("["), ind(soft, concat(head), ind(ln, p.expr(e.Body))), soft, txt("]"))
 	case *syntax.Binary:
 		return p.binary(e)
 	case *syntax.Range:
 		var lo, hi doc
 		if e.Lo != nil {
-			lo = p.operand(e.Lo, 7)
+			lo = p.operand(e.Lo, precRange+1)
 		}
 		if e.Hi != nil {
-			hi = p.operand(e.Hi, 7)
+			hi = p.operand(e.Hi, precRange+1)
 		}
 		return cat(lo, txt(".."), hi)
 	case *syntax.Member, *syntax.Call, *syntax.Index, *syntax.Trailing:
@@ -554,8 +685,11 @@ func (p *printer) operand(x syntax.Expr, prec int) doc {
 	if b, ok := x.(*syntax.Binary); ok && precedence[b.Op] < prec {
 		return cat(txt("("), p.expr(x), txt(")"))
 	}
-	if r, ok := x.(*syntax.Range); ok && 6 < prec {
+	if r, ok := x.(*syntax.Range); ok && precRange < prec {
 		return cat(txt("("), p.expr(r), txt(")"))
+	}
+	if s, ok := x.(*syntax.Spread); ok && prec > 0 {
+		return cat(txt("("), p.expr(s), txt(")"))
 	}
 	return p.expr(x)
 }
@@ -584,6 +718,12 @@ func (p *printer) binary(b *syntax.Binary) doc {
 		return grp(parts[0], ind(parts[1:]...))
 	case "->":
 		return cat(p.operand(b.L, prec+1), txt(" -> "), p.operand(b.R, prec))
+	}
+	// An object or list on the right hugs the operator and breaks inside
+	// itself: `components + {` on one line.
+	switch b.R.(type) {
+	case *syntax.Object, *syntax.List:
+		return cat(p.operand(b.L, prec), txt(" "+b.Op+" "), p.operand(b.R, prec+1))
 	}
 	// Left-associative arithmetic and comparisons: break after the operator.
 	return grp(p.operand(b.L, prec), txt(" "+b.Op), ind(ln, p.operand(b.R, prec+1)))
@@ -621,7 +761,7 @@ loop:
 			break loop
 		}
 	}
-	head := []doc{p.operand(base, 10)}
+	head := []doc{p.operand(base, precChain)}
 	var steps []step
 	members := 0
 	for i := len(nodes) - 1; i >= 0; i-- {

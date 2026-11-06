@@ -84,8 +84,8 @@ func closeUnbalanced(toks []antlr.Token) ([]antlr.Token, map[antlr.Token]bool, [
 			out = append(out, t)
 			continue
 		}
-		if len(stack) > 0 && tt == parser.MMSLexerIDENT && t.GetColumn() == 0 && t.GetLine() > prevLine {
-			if n := nextDefault(i); n != nil && (n.GetTokenType() == parser.MMSLexerIDENT || n.GetTokenType() == parser.MMSLexerRESLOC) {
+		if len(stack) > 0 && t.GetColumn() == 0 && t.GetLine() > prevLine {
+			if n := nextDefault(i); n != nil && startsTopItem(tt, n.GetTokenType()) {
 				closeAll(t)
 			}
 		}
@@ -108,6 +108,18 @@ func closeUnbalanced(toks []antlr.Token) ([]antlr.Token, map[antlr.Token]bool, [
 	return out, synthetic, diags
 }
 
+// startsTopItem reports whether a token pair in column 0 starts a top-level
+// item: `Kind name`, or `const`, `for` or `extern` followed by a word.
+func startsTopItem(first, second int) bool {
+	switch first {
+	case parser.MMSLexerIDENT:
+		return parser.IsNameToken(second)
+	case parser.MMSLexerCONST, parser.MMSLexerFOR, parser.MMSLexerEXTERN:
+		return second == parser.MMSLexerIDENT
+	}
+	return false
+}
+
 // sliceSource replays a token slice. It embeds the lexer only to satisfy
 // antlr.TokenSource's unexported methods.
 type sliceSource struct {
@@ -128,7 +140,9 @@ func (s *sliceSource) NextToken() antlr.Token {
 // left out: the next token closes a bracket or is a comma, or the next
 // line starts another `key = ...`. Without it the parser reads
 // `default_block =` followed by `default_fluid = water` as
-// `default_block = default_fluid` and then fails on the second '='.
+// `default_block = default_fluid` and then fails on the second '='. The
+// same goes for an '=' at the end of the file, or followed by a line that
+// starts a new top-level item (`Kind name` in column 0).
 // No expression contains a bare '=', so a key followed by '=' on a later
 // line always starts a new field or statement.
 func markMissingValues(toks []antlr.Token, synthetic map[antlr.Token]bool) ([]antlr.Token, []Diagnostic) {
@@ -152,12 +166,21 @@ func markMissingValues(toks []antlr.Token, synthetic map[antlr.Token]bool) ([]an
 		}
 		next := toks[def[k+1]]
 		switch next.GetTokenType() {
-		case parser.MMSLexerRBRACE, parser.MMSLexerRPAREN, parser.MMSLexerRBRACK, parser.MMSLexerCOMMA:
+		case parser.MMSLexerRBRACE, parser.MMSLexerRPAREN, parser.MMSLexerRBRACK, parser.MMSLexerCOMMA,
+			// Statements never start a value.
+			parser.MMSLexerCOMMAND, parser.MMSLexerLET, parser.MMSLexerCONST, parser.MMSLexerWHILE,
+			parser.MMSLexerRETURN, parser.MMSLexerBREAK, parser.MMSLexerCONTINUE:
 			missing[i] = true
 		case parser.MMSLexerIDENT, parser.MMSLexerRESLOC, parser.MMSLexerSTRING:
 			if next.GetLine() > eq.GetLine() && kind(k+2) == parser.MMSLexerASSIGN {
 				missing[i] = true
 			}
+		case antlr.TokenEOF:
+			missing[i] = true
+		}
+		// A new top-level item on a later line is never the value.
+		if next.GetLine() > eq.GetLine() && next.GetColumn() == 0 && startsTopItem(next.GetTokenType(), kind(k+2)) {
+			missing[i] = true
 		}
 	}
 	if len(missing) == 0 {
@@ -183,4 +206,52 @@ func markMissingValues(toks []antlr.Token, synthetic map[antlr.Token]bool) ([]an
 		})
 	}
 	return out, diags
+}
+
+// separateLines inserts a SEP token between two words on different lines
+// inside braces, where the first ends a statement and the second starts
+// the next: `x` then `y = 1`, or `JigsawHole a` then `JigsawHole b`. Without
+// it the parser could read the pair as one declaration, `x y = 1`. Inside
+// brackets and parentheses a newline never separates statements, so
+// nothing is inserted there.
+func separateLines(toks []antlr.Token, synthetic map[antlr.Token]bool) []antlr.Token {
+	var (
+		out   []antlr.Token
+		stack []int
+		prev  antlr.Token
+	)
+	for _, t := range toks {
+		if t.GetChannel() != antlr.TokenDefaultChannel {
+			out = append(out, t)
+			continue
+		}
+		tt := t.GetTokenType()
+		if prev != nil && len(stack) > 0 && stack[len(stack)-1] == parser.MMSLexerLBRACE &&
+			t.GetLine() > prev.GetLine() && endsWord(prev.GetTokenType()) && parser.IsNameToken(tt) {
+			sep := antlr.CommonTokenFactoryDEFAULT.Create(&antlr.TokenSourceCharStreamPair{},
+				parser.MMSLexerSEP, "", antlr.TokenDefaultChannel, prev.GetStop()+1, prev.GetStop(), prev.GetLine(), prev.GetColumn())
+			synthetic[sep] = true
+			out = append(out, sep)
+		}
+		switch {
+		case closerFor[tt].text != "":
+			stack = append(stack, tt)
+		case isCloser(tt):
+			for j := len(stack) - 1; j >= 0; j-- {
+				if closerFor[stack[j]].kind == tt {
+					stack = stack[:j]
+					break
+				}
+			}
+		}
+		out = append(out, t)
+		prev = t
+	}
+	return out
+}
+
+// endsWord reports whether a token is a word that can end a statement and
+// be mistaken for a declaration's kind.
+func endsWord(t int) bool {
+	return t == parser.MMSLexerIDENT || t == parser.MMSLexerRESLOC || t == parser.MMSLexerTNAME
 }

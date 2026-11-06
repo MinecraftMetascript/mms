@@ -460,11 +460,11 @@ func SymbolHead(kind, id string, d *syntax.Decl) string {
 			head += "(" + strings.Join(ps, ", ") + ")"
 		}
 		if d.Type != nil {
-			head += ": " + d.Type.Text
+			head += ": " + syntax.TypeText(d.Type)
 		}
 	case "Global":
 		if d.Type != nil {
-			head += ": " + d.Type.Text
+			head += ": " + syntax.TypeText(d.Type)
 		}
 	}
 	return head

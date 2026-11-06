@@ -1,0 +1,189 @@
+Decl Blueprint CustomItem
+  Block
+    FieldDecl base: Id<item>
+    FieldDecl name: LangText?
+    FieldDecl texture: Texture?
+    FieldDecl parent: Model
+      ResLoc item/generated
+    FieldDecl model: Model?
+    FieldDecl components: ItemComponents
+      Object
+        Block
+    FieldDecl on_right_click: Function?
+    FieldDecl on_hit: Function?
+    Let lang_key
+      String "item.${self.namespace}.${self.path}"
+    Let clicks
+      Binary !=
+        Ident on_right_click
+        Ident none
+    Let item_components
+      Binary +
+        Ident components
+        Object
+          Block
+            Field item_model
+              Member .id
+                Ident self
+            Field item_name
+              IfExpr
+                Binary !=
+                  Ident name
+                  Ident none
+                Call
+                  Ident Translate
+                  Ident lang_key
+                  Arg fallback =
+                    Call
+                      Ident english
+                      Ident name
+            Field consumable
+              IfExpr
+                Binary &&
+                  Ident clicks
+                  Binary ==
+                    Member .consumable
+                      Ident components
+                    Ident none
+                Ident never_finished_consumable
+            Field custom_data
+              IfExpr
+                Binary ||
+                  Ident clicks
+                  Binary !=
+                    Ident on_hit
+                    Ident none
+                Object
+                  Block
+                    Field mms_item
+                      String "${self.id}"
+    Section check
+      Block
+        If
+          Binary &&
+            Binary !=
+              Ident texture
+              Ident none
+            Binary !=
+              Ident model
+              Ident none
+          Block
+            Call
+              Ident error
+              Ident model
+              String "Set texture or model, not both"
+        If
+          Binary &&
+            Ident clicks
+            Binary !=
+              Member .consumable
+                Ident components
+              Ident none
+          Block
+            Call
+              Ident warn
+              Ident on_right_click
+              String "right-click"
+              String "A consumable of your own changes how the click is detected"
+    As ItemStack
+      Object
+        Block
+          Field id
+            Ident base
+          Field components
+            Ident item_components
+    As LootPoolEntry
+      Call
+        Ident Item
+        Arg name =
+          Ident base
+        Arg functions =
+          List
+            Call
+              Ident SetComponents
+              Ident item_components
+    As Id<item>
+      Ident base
+      Hint
+        String "custom-item-base"
+        String "Matches any ${base}, not only ${self.path}"
+    Section emit
+      Block
+        If
+          Binary &&
+            Binary ==
+              Ident model
+              Ident none
+            Binary !=
+              Ident texture
+              Ident none
+          Block
+            Decl Model item/${self.path} (templated)
+              Lit "item/"
+              Interp
+                Member .path
+                  Ident self
+              Block
+                Field parent
+                  Ident parent
+                Field textures
+                  Object
+                    Block
+                      Field layer0
+                        Ident texture
+        Decl ItemModel ${self.path} (templated)
+          Interp
+            Member .path
+              Ident self
+          Block
+            Field model
+              Call
+                Ident Plain
+                Binary ??
+                  Ident model
+                  TemplatedName item/${self.path}
+                    Lit "item/"
+                    Interp
+                      Member .path
+                        Ident self
+        For lang, text
+          Call
+            Ident by_language
+            Ident name
+          Block
+            Decl Lang ${lang} (templated)
+              Interp
+                Ident lang
+              Block
+                Field ${lang_key}
+                  Ident text
+        If
+          Ident clicks
+          Block
+            Decl RightClickHook mms_gen/item_hook/${self.path}/right_click (templated)
+              Lit "mms_gen/item_hook/"
+              Interp
+                Member .path
+                  Ident self
+              Lit "/right_click"
+              Block
+                Field item
+                  Ident self
+                Field run
+                  Ident on_right_click
+        If
+          Binary !=
+            Ident on_hit
+            Ident none
+          Block
+            Decl HitHook mms_gen/item_hook/${self.path}/hit (templated)
+              Lit "mms_gen/item_hook/"
+              Interp
+                Member .path
+                  Ident self
+              Lit "/hit"
+              Block
+                Field item
+                  Ident self
+                Field run
+                  Ident on_hit

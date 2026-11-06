@@ -3,13 +3,20 @@
 // doc-comment lookup can see them (docs/plan.md, "ANTLR setup").
 lexer grammar MMSLexer;
 
-// MISSING is never lexed. Recovery inserts it where a field's value was
-// left out (`key =` followed by the next field), so the parser does not
-// read the next field as the value.
-tokens { MISSING }
+// MISSING and SEP are never lexed. Recovery inserts MISSING where a
+// field's value was left out (`key =` followed by the next field), so the
+// parser does not read the next field as the value. SEP ends a statement
+// whose last word is followed by a word on a later line, so `x` then `y = 1`
+// on the next line stay two statements instead of reading as a
+// declaration `x y = 1` (see separateLines).
+tokens { MISSING, SEP }
 
-// Keywords are lowercase statement words only. Declaration kinds and
-// helpers are ordinary PascalCase identifiers resolved against the spec.
+// Keywords are lowercase words only. Declaration kinds and helpers are
+// ordinary PascalCase identifiers resolved later.
+CONST    : 'const';
+// `Type` is the one PascalCase keyword: its body is types, not values.
+TYPE     : 'Type';
+EXTERN   : 'extern';
 LET      : 'let';
 IF       : 'if';
 ELSE     : 'else';
@@ -19,6 +26,17 @@ IN       : 'in';
 RETURN   : 'return';
 BREAK    : 'break';
 CONTINUE : 'continue';
+// Words that start a part of a Blueprint or Test body. They are still
+// accepted as field keys, argument names, member names and declaration
+// names (the parser's `word` rule), since game data uses some of them
+// (`setup`, and `run` in hook declarations).
+PRIMARY  : 'primary';
+AS       : 'as';
+CHECK    : 'check';
+EMIT     : 'emit';
+SETUP    : 'setup';
+EXPECT   : 'expect';
+RUN      : 'run';
 TRUE     : 'true';
 FALSE    : 'false';
 
@@ -43,12 +61,19 @@ RESLOC
     | IDENT_START IDENT_CHAR* ('/' PATH_CHAR+)+
     ;
 
+// A templated name: a name or resource location with `${...}` pieces, as
+// in `${w}_crate` or `item/${self.path}`. Only declaration names and name
+// expressions use it; strings and commands have their own interpolation.
+TNAME : TNAME_CHAR* INTERP (TNAME_CHAR | INTERP)*;
+
 IDENT  : IDENT_START IDENT_CHAR*;
 NUMBER : DIGIT+ ('.' DIGIT+)? ([eE] [+-]? DIGIT+)?;
 STRING : '"' (ESC | ~["\\\r\n])* '"' | '\'' (ESC | ~['\\\r\n])* '\'';
 
 ARROW   : '->';
+ELLIPSIS: '...';
 DOTDOT  : '..';
+QQ      : '??';
 PLUS_EQ : '+=';
 MINUS_EQ: '-=';
 STAR_EQ : '*=';
@@ -60,6 +85,8 @@ LE      : '<=';
 GE      : '>=';
 ANDAND  : '&&';
 OROR    : '||';
+PIPE    : '|';
+QUESTION: '?';
 
 LBRACE  : '{';
 RBRACE  : '}';
@@ -92,4 +119,6 @@ fragment IDENT_CHAR  : [a-zA-Z0-9_];
 fragment NS_CHAR     : [a-z0-9_.-];
 fragment PATH_CHAR   : [a-z0-9_./-];
 fragment DIGIT       : [0-9];
+fragment TNAME_CHAR  : [a-zA-Z0-9_./:-];
+fragment INTERP      : '${' ~[}\r\n]* '}';
 fragment ESC         : '\\' .;

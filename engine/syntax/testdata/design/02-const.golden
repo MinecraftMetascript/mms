@@ -1,0 +1,13 @@
+Const dungeon_spacing
+  Type: int
+  Number 32
+Const woods
+  List
+    Ident oak
+    Ident spruce
+    Ident birch
+    Ident jungle
+    Ident acacia
+    Ident dark_oak
+    Ident mangrove
+    Ident cherry

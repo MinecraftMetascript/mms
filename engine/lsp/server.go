@@ -55,7 +55,7 @@ type Server struct {
 	assets   fstest.MapFS
 	shutdown bool
 	// watchFiles is set when the client lets the server register file
-	// watchers itself (Zed, Neovim and Helix rely on this; VS Code does
+	// watchers itself (Neovim and Helix rely on this; VS Code does
 	// too).
 	watchFiles bool
 	// renameAfterExtract is set when the client handles the mms.renameAt
