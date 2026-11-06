@@ -109,7 +109,7 @@ func (s *Session) Completion(path string, off int) ([]Item, syntax.Span) {
 		return nil, syntax.Span{Start: off, End: off}
 	}
 	f := a.u.File
-	// The path of Texture("..."), Sound("...") or Structure("...") lists
+	// The path of Texture("..."), Sound("...") or StructureFile("...") lists
 	// the project's files of that type.
 	if items, replace, ok := s.assetPathCompletion(f, off); ok {
 		return items, replace
@@ -803,7 +803,7 @@ func (s *Session) Hover(path string, off int) (string, syntax.Span) {
 		n := a.path[i]
 		if in := a.info(n); in != nil {
 			if md := a.c.Hover(in); md != "" {
-				if in.Asset != nil && in.Asset.Helper == "Structure" {
+				if in.Asset != nil && in.Asset.Helper == "StructureFile" {
 					md += s.jigsawHover(in.Asset.Src)
 				}
 				return md, n.Span()
@@ -818,7 +818,7 @@ func (s *Session) Hover(path string, off int) (string, syntax.Span) {
 }
 
 // jigsawHover lists a structure file's jigsaw blocks, for the hover of
-// its Structure("...") call.
+// its StructureFile("...") call.
 func (s *Session) jigsawHover(src string) string {
 	js, ok := project.StructureJigsaws(s.P.Files, src)
 	if !ok || len(js) == 0 {

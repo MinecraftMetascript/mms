@@ -57,7 +57,7 @@ func TestJigsawPoolMissing(t *testing.T) {
 		"s/base.nbt":   {Data: piece(t, "demo:tops|demo:bottom|demo:top", "minecraft:village/plains/streets|minecraft:a|minecraft:b", "other:x|demo:y|demo:z")},
 		"s/notnbt.nbt": {Data: nbtBytes},
 	}
-	_, r := assetProject(t, files, pool("starts", `Structure("s/base.nbt", "base")`)+pool("junk", `Structure("s/notnbt.nbt")`))
+	_, r := assetProject(t, files, pool("starts", `StructureFile("s/base.nbt", "base")`)+pool("junk", `StructureFile("s/notnbt.nbt")`))
 	got := jigsawDiags(r)
 	want := "lint/jigsaw-pool: 's/base.nbt' has a jigsaw block at 1 0 0 that draws from the pool 'demo:tops', which no TemplatePool declares; the structure stops growing there\n"
 	if got != want {
@@ -89,7 +89,7 @@ func TestJigsawTarget(t *testing.T) {
 		"s/top.nbt":    {Data: piece(t, "minecraft:empty|demo:top|minecraft:empty")},
 		"s/roof.nbt":   {Data: piece(t, "minecraft:empty|demo:roof|minecraft:empty")},
 	}
-	src := pool("starts", `Structure("s/base.nbt", "base")`) + pool("tops", `Structure("s/top.nbt", "top")`, `Structure("s/roof.nbt", "roof")`)
+	src := pool("starts", `StructureFile("s/base.nbt", "base")`) + pool("tops", `StructureFile("s/top.nbt", "top")`, `StructureFile("s/roof.nbt", "roof")`)
 	_, r := assetProject(t, files, src)
 	got := jigsawDiags(r)
 	want := "lint/jigsaw-target: 's/base.nbt' has a jigsaw block at 2 0 0 that targets 'demo:sideways' in the pool 'demo:tops', but no piece of that pool has a jigsaw block named 'demo:sideways', so the pieces never connect (the pieces' jigsaw names: demo:roof, demo:top)\n"
@@ -97,7 +97,7 @@ func TestJigsawTarget(t *testing.T) {
 		t.Fatalf("got:\n%s\nwant:\n%s", got, want)
 	}
 	// A pool with a piece from elsewhere is not checked: its jigsaws are unknown.
-	src = pool("starts", `Structure("s/base.nbt", "base")`) + pool("tops", `Structure("s/top.nbt", "top")`, `minecraft:shipwreck/rightsideup_backhalf`)
+	src = pool("starts", `StructureFile("s/base.nbt", "base")`) + pool("tops", `StructureFile("s/top.nbt", "top")`, `minecraft:shipwreck/rightsideup_backhalf`)
 	_, r = assetProject(t, files, src)
 	if got := jigsawDiags(r); got != "" {
 		t.Fatalf("unknown piece: got %s", got)
@@ -163,7 +163,7 @@ func TestJigsawFacingAndSide(t *testing.T) {
 		"s/room.nbt":   {Data: orientedPiece(t, [3]int32{7, 5, 7}, "3,1,0|north_up|minecraft:empty|demo:entry|minecraft:empty")},
 		"s/cellar.nbt": {Data: orientedPiece(t, [3]int32{5, 4, 5}, "2,3,2|up_south|minecraft:empty|demo:hatch|minecraft:empty")},
 	}
-	src := pool("halls", `Structure("s/hall.nbt", "hall")`) + pool("rooms", `Structure("s/room.nbt", "room")`) + pool("cellar", `Structure("s/cellar.nbt", "cellar")`)
+	src := pool("halls", `StructureFile("s/hall.nbt", "hall")`) + pool("rooms", `StructureFile("s/room.nbt", "room")`) + pool("cellar", `StructureFile("s/cellar.nbt", "cellar")`)
 	_, r := assetProject(t, files, src)
 	got := jigsawDiags(r)
 	want := "lint/jigsaw-facing: 's/hall.nbt' has a jigsaw block at 2 4 4 facing up that targets 'demo:entry' in the pool 'demo:rooms', but every jigsaw block named 'demo:entry' there faces sideways (north); it can only join one facing down, so the pieces never connect\n" +
@@ -181,7 +181,7 @@ func TestJigsawFitArch(t *testing.T) {
 		"s/arch5.nbt": {Data: orientedPiece(t, [3]int32{7, 5, 3}, "3,0,1|down_north|minecraft:empty|demo:arch|minecraft:empty")},
 		"s/arch6.nbt": {Data: orientedPiece(t, [3]int32{7, 6, 3}, "3,0,1|down_north|minecraft:empty|demo:arch|minecraft:empty")},
 	}
-	src := pool("roads", `Structure("s/road.nbt", "road")`) + pool("arches", `Structure("s/arch5.nbt", "arch5")`, `Structure("s/arch6.nbt", "arch6")`)
+	src := pool("roads", `StructureFile("s/road.nbt", "road")`) + pool("arches", `StructureFile("s/arch5.nbt", "arch5")`, `StructureFile("s/arch6.nbt", "arch6")`)
 	_, r := assetProject(t, files, src)
 	got := jigsawDiags(r)
 	want := "lint/jigsaw-fit: 's/road.nbt' has an internal jigsaw block at 3 0 8 facing up (it is not on the piece's top, so the block in front of it is inside the 7×6×16 piece), so a piece from 'demo:arches' that joins it must fit inside this piece: 'demo:arch6' (7×6×3) sticks out 1 up, so it is never placed there. If it should join outward, move it to the top\n"
@@ -198,16 +198,16 @@ func TestPoolElementLabels(t *testing.T) {
 TemplatePool caps = {
   fallback = minecraft:empty
   elements = [
-    { weight = 5, element = { element_type = minecraft:single_pool_element, location = Structure("s/cap.nbt", "cap"), projection = rigid, processors = minecraft:empty } },
+    { weight = 5, element = { element_type = minecraft:single_pool_element, location = StructureFile("s/cap.nbt", "cap"), projection = rigid, processors = minecraft:empty } },
     /** @label Worn road cap */
-    { weight = 1, element = { element_type = minecraft:single_pool_element, location = Structure("s/cap.nbt", "cap"), projection = rigid, processors = worn } },
+    { weight = 1, element = { element_type = minecraft:single_pool_element, location = StructureFile("s/cap.nbt", "cap"), projection = rigid, processors = worn } },
     // a plain comment is not a label
-    { weight = 1, element = { element_type = minecraft:single_pool_element, location = Structure("s/cap.nbt", "cap"), projection = rigid, processors = worn } },
+    { weight = 1, element = { element_type = minecraft:single_pool_element, location = StructureFile("s/cap.nbt", "cap"), projection = rigid, processors = worn } },
     /**
      * Heavily worn.
      * More text.
      */
-    { weight = 1, element = { element_type = minecraft:single_pool_element, location = Structure("s/cap.nbt", "cap"), projection = rigid, processors = worn } },
+    { weight = 1, element = { element_type = minecraft:single_pool_element, location = StructureFile("s/cap.nbt", "cap"), projection = rigid, processors = worn } },
   ]
 }
 `
@@ -251,9 +251,9 @@ func TestJigsawOverlapNarrowJunction(t *testing.T) {
 		return `{ weight = 1, element = { element_type = minecraft:single_pool_element, location = ` + loc + `, projection = rigid, processors = minecraft:empty } }`
 	}
 	src := func(tee string) string {
-		return "TemplatePool roads = {\n  fallback = caps\n  elements = [" + el(`Structure("s/straight.nbt", "straight")`) + ", " + el(`Structure("s/`+tee+`.nbt", "`+tee+`")`) + "]\n}\n" +
-			"TemplatePool straights = {\n  fallback = caps\n  elements = [" + el(`Structure("s/straight.nbt", "straight")`) + "]\n}\n" +
-			"TemplatePool caps = {\n  fallback = minecraft:empty\n  elements = [" + el(`Structure("s/cap.nbt", "cap")`) + "]\n}\n"
+		return "TemplatePool roads = {\n  fallback = caps\n  elements = [" + el(`StructureFile("s/straight.nbt", "straight")`) + ", " + el(`StructureFile("s/`+tee+`.nbt", "`+tee+`")`) + "]\n}\n" +
+			"TemplatePool straights = {\n  fallback = caps\n  elements = [" + el(`StructureFile("s/straight.nbt", "straight")`) + "]\n}\n" +
+			"TemplatePool caps = {\n  fallback = minecraft:empty\n  elements = [" + el(`StructureFile("s/cap.nbt", "cap")`) + "]\n}\n"
 	}
 	files := fstest.MapFS{
 		"s/straight.nbt": {Data: orientedPiece(t, [3]int32{7, 6, 7}, road(0, 0, 3, "west"), road(6, 0, 3, "east"))},
@@ -281,7 +281,7 @@ func TestJigsawHole(t *testing.T) {
 		"s/base.nbt":   {Data: piece(t, "demo:tops|demo:bottom|demo:top", "demo:tops|demo:botom|demo:top", "minecraft:empty|other:x|minecraft:empty")},
 		"s/top.nbt":    {Data: piece(t, "minecraft:empty|demo:top|minecraft:empty")},
 	}
-	src := pool("starts", `Structure("s/base.nbt", "base")`) + pool("tops", `Structure("s/top.nbt", "top")`)
+	src := pool("starts", `StructureFile("s/base.nbt", "base")`) + pool("tops", `StructureFile("s/top.nbt", "top")`)
 	// No holes declared: nothing is checked.
 	_, r := assetProject(t, files, src)
 	if got := jigsawDiags(r); got != "" {
@@ -376,5 +376,88 @@ func TestJigsawLabel(t *testing.T) {
 	}
 	if want := []string{"Hall exit", "Road end", "Arch", ""}; fmt.Sprint(got) != fmt.Sprint(want) {
 		t.Fatalf("labels %q, want %q", got, want)
+	}
+}
+
+// JigsawStructure writes the structure set, the structure and its pools,
+// and the jigsaw rules check the pieces Piece reads.
+func TestJigsawStructure(t *testing.T) {
+	files := fstest.MapFS{
+		"structures/start.nbt": {Data: piece(t, "demo:halls|demo:exit|demo:entry")},
+		"structures/hall.nbt":  {Data: piece(t, "demo:rooms|demo:entry|demo:exit")},
+	}
+	src := `JigsawStructure dungeon {
+  biomes = #minecraft:is_overworld
+  step = underground_structures
+  spacing = 32
+  separation = 12
+  height = AboveBottom(20)
+  depth = 6
+  start = start
+  pools = {
+    start = [Piece("start")]
+    halls = { fallback = minecraft:empty, elements = [Piece("hall", 3)] }
+  }
+}
+Function f {
+  /locate structure ${dungeon}
+}
+`
+	_, r := assetProject(t, files, src)
+	got := jigsawDiags(r)
+	if !strings.Contains(got, "lint/jigsaw-pool: 'structures/hall.nbt' has a jigsaw block at 1 0 0 that draws from the pool 'demo:rooms'") {
+		t.Errorf("want the missing rooms pool reported:\n%s", got)
+	}
+	for _, d := range r.Diagnostics("main.mms") {
+		if d.Severity == syntax.SeverityError {
+			t.Errorf("%s: %s", d.Code, d.Message)
+		}
+		if d.Code == "lint/jigsaw-pool" && !strings.HasPrefix(src[d.Sp.Start:], `Piece("hall", 3)`) {
+			t.Errorf("jigsaw-pool at %q, want the Piece call", src[d.Sp.Start:d.Sp.End])
+		}
+	}
+	set := emitted(t, r, "data/demo/worldgen/structure_set/dungeon.json")
+	for _, want := range []string{`"structure": "demo:dungeon"`, `"spacing": 32`, `"salt": `} {
+		if !strings.Contains(set, want) {
+			t.Errorf("structure set lacks %s:\n%s", want, set)
+		}
+	}
+	st := emitted(t, r, "data/demo/worldgen/structure/dungeon.json")
+	for _, want := range []string{`"type": "minecraft:jigsaw"`, `"start_pool": "demo:start"`, `"size": 6`, `"above_bottom": 20`, `"max_distance_from_center": 80`} {
+		if !strings.Contains(st, want) {
+			t.Errorf("structure lacks %s:\n%s", want, st)
+		}
+	}
+	if strings.Contains(st, "project_start_to_heightmap") || strings.Contains(st, "terrain_adaptation") {
+		t.Errorf("unset fields written:\n%s", st)
+	}
+	halls := emitted(t, r, "data/demo/worldgen/template_pool/halls.json")
+	if !strings.Contains(halls, `"location": "demo:hall"`) || !strings.Contains(halls, `"weight": 3`) {
+		t.Errorf("halls pool:\n%s", halls)
+	}
+	if fn := emitted(t, r, "data/demo/function/f.mcfunction"); !strings.Contains(fn, "locate structure demo:dungeon") {
+		t.Errorf("function:\n%s", fn)
+	}
+	emitted(t, r, "data/demo/structure/hall.nbt")
+}
+
+func TestJigsawStructureChecks(t *testing.T) {
+	for _, tc := range []struct{ fields, want string }{
+		{"spacing = 8\n  separation = 8", "separation must be less than spacing"},
+		{"spacing = 32\n  separation = 12\n  depth = 30", "depth is from 1 to 20"},
+		{"spacing = 32\n  separation = 12\n  biomes = plains", ""},
+		{"spacing = 32\n  separation = 12\n  biomes = [plains, desert]", ""},
+		{"spacing = 32\n  separation = 12\n  biomes = 3", "expected"},
+	} {
+		biomes := "biomes = #minecraft:is_overworld\n  "
+		if strings.Contains(tc.fields, "biomes") {
+			biomes = ""
+		}
+		src := "JigsawStructure d {\n  " + biomes + tc.fields + "\n  step = surface_structures\n  height = Constant(Absolute(64))\n  start = d\n  pools = { d = [] }\n}\n"
+		_, r := assetProject(t, fstest.MapFS{}, src)
+		got := diagText(r)
+		if tc.want == "" && got != "" || tc.want != "" && !strings.Contains(got, tc.want) {
+			t.Errorf("%s: got %q, want %q", tc.fields, got, tc.want)
+		}
 	}
 }

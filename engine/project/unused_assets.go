@@ -8,7 +8,7 @@ import (
 var assetExts = []string{".png", ".ogg", ".nbt"}
 
 // UnusedAssets lists the project's .png, .ogg and .nbt files that no
-// Texture, Sound or Structure call and no icon uses, so the packs leave
+// Texture, Sound or StructureFile call and no icon uses, so the packs leave
 // them out, with the severity of the unused-asset rule. A file has no
 // source line to report at, so editors show these on the file itself.
 // The list is empty when the rule is off, and while the project has
@@ -35,5 +35,5 @@ func (r *Result) UnusedAssets() ([]string, syntax.Severity) {
 
 // UnusedAssetMessage says why a file is reported as unused.
 func UnusedAssetMessage(path string) string {
-	return "'" + path + "' is not used: no Texture, Sound or Structure call names it, so the pack leaves it out"
+	return "'" + path + "' is not used: no Texture, Sound or StructureFile call names it, so the pack leaves it out"
 }

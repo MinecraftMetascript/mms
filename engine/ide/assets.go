@@ -7,7 +7,7 @@ import (
 )
 
 // assetPathCompletion offers project files for the path argument of an
-// asset helper, Texture("|"), Sound("|") or Structure("|"), listing the
+// asset helper, Texture("|"), Sound("|") or StructureFile("|"), listing the
 // files with the extension the helper takes. It also works before the
 // closing quote is typed. ok is false when off is not in such a string.
 func (s *Session) assetPathCompletion(f *syntax.File, off int) (items []Item, replace syntax.Span, ok bool) {

@@ -56,8 +56,8 @@
           "$ref": "#/definitions/severity"
         },
         "external-asset": {
-          "description": "An id of a texture, sound or structure in the project's namespace that no Texture, Sound or Structure call in the project provides. The pack still loads, but the file must come from another pack.\n\nDefault: `warning`.",
-          "markdownDescription": "An id of a texture, sound or structure in the project's namespace that no Texture, Sound or Structure call in the project provides. The pack still loads, but the file must come from another pack.\n\nDefault: `warning`.",
+          "description": "An id of a texture, sound or structure in the project's namespace that no Texture, Sound or StructureFile call in the project provides. The pack still loads, but the file must come from another pack.\n\nDefault: `warning`.",
+          "markdownDescription": "An id of a texture, sound or structure in the project's namespace that no Texture, Sound or StructureFile call in the project provides. The pack still loads, but the file must come from another pack.\n\nDefault: `warning`.",
           "$ref": "#/definitions/severity"
         },
         "jigsaw-facing": {
@@ -71,8 +71,8 @@
           "$ref": "#/definitions/severity"
         },
         "jigsaw-hole": {
-          "description": "A jigsaw block in a structure file that Structure(\"...\") includes whose name or target is in a namespace with JigsawHole declarations, but is not one of them: most likely a typo made in the game's jigsaw screen. The quick fix declares it. Projects that declare no JigsawHole in a namespace are not checked there.\n\nDefault: `warning`.",
-          "markdownDescription": "A jigsaw block in a structure file that Structure(\"...\") includes whose name or target is in a namespace with JigsawHole declarations, but is not one of them: most likely a typo made in the game's jigsaw screen. The quick fix declares it. Projects that declare no JigsawHole in a namespace are not checked there.\n\nDefault: `warning`.",
+          "description": "A jigsaw block in a structure file that StructureFile(\"...\") includes whose name or target is in a namespace with JigsawHole declarations, but is not one of them: most likely a typo made in the game's jigsaw screen. The quick fix declares it. Projects that declare no JigsawHole in a namespace are not checked there.\n\nDefault: `warning`.",
+          "markdownDescription": "A jigsaw block in a structure file that StructureFile(\"...\") includes whose name or target is in a namespace with JigsawHole declarations, but is not one of them: most likely a typo made in the game's jigsaw screen. The quick fix declares it. Projects that declare no JigsawHole in a namespace are not checked there.\n\nDefault: `warning`.",
           "$ref": "#/definitions/severity"
         },
         "jigsaw-overlap": {
@@ -81,8 +81,8 @@
           "$ref": "#/definitions/severity"
         },
         "jigsaw-pool": {
-          "description": "A jigsaw block in a structure file that Structure(\"...\") includes draws from a pool in the project's namespace that no TemplatePool declares. The game skips the jigsaw, so the structure stops growing there. The quick fix declares the pool.\n\nDefault: `warning`.",
-          "markdownDescription": "A jigsaw block in a structure file that Structure(\"...\") includes draws from a pool in the project's namespace that no TemplatePool declares. The game skips the jigsaw, so the structure stops growing there. The quick fix declares the pool.\n\nDefault: `warning`.",
+          "description": "A jigsaw block in a structure file that StructureFile(\"...\") includes draws from a pool in the project's namespace that no TemplatePool declares. The game skips the jigsaw, so the structure stops growing there. The quick fix declares the pool.\n\nDefault: `warning`.",
+          "markdownDescription": "A jigsaw block in a structure file that StructureFile(\"...\") includes draws from a pool in the project's namespace that no TemplatePool declares. The game skips the jigsaw, so the structure stops growing there. The quick fix declares the pool.\n\nDefault: `warning`.",
           "$ref": "#/definitions/severity"
         },
         "jigsaw-target": {
@@ -111,8 +111,8 @@
           "$ref": "#/definitions/severity"
         },
         "unused-asset": {
-          "description": "A .png, .ogg or .nbt file in the project that no Texture, Sound or Structure call and no `icon` uses, so the packs leave it out. It is reported on the file itself (in VS Code's Problems panel, by `mms check`, and in the web editor's asset list), and not while the project has errors.\n\nDefault: `info`.",
-          "markdownDescription": "A .png, .ogg or .nbt file in the project that no Texture, Sound or Structure call and no `icon` uses, so the packs leave it out. It is reported on the file itself (in VS Code's Problems panel, by `mms check`, and in the web editor's asset list), and not while the project has errors.\n\nDefault: `info`.",
+          "description": "A .png, .ogg or .nbt file in the project that no Texture, Sound or StructureFile call and no `icon` uses, so the packs leave it out. It is reported on the file itself (in VS Code's Problems panel, by `mms check`, and in the web editor's asset list), and not while the project has errors.\n\nDefault: `info`.",
+          "markdownDescription": "A .png, .ogg or .nbt file in the project that no Texture, Sound or StructureFile call and no `icon` uses, so the packs leave it out. It is reported on the file itself (in VS Code's Problems panel, by `mms check`, and in the web editor's asset list), and not while the project has errors.\n\nDefault: `info`.",
           "$ref": "#/definitions/severity"
         },
         "use-shorthand": {

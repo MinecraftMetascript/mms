@@ -26,7 +26,7 @@ func TestBuildAssets(t *testing.T) {
 JukeboxSong tune = { sound_event = Sound("music/tune.ogg"), description = "Tune", length_in_seconds = 30, comparator_output = 3 }
 TemplatePool houses = {
   fallback = minecraft:empty
-  elements = [{ weight = 1, element = { element_type = "minecraft:single_pool_element", location = Structure("builds/house.nbt"), projection = "rigid", processors = "minecraft:empty" } }]
+  elements = [{ weight = 1, element = { element_type = "minecraft:single_pool_element", location = StructureFile("builds/house.nbt"), projection = "rigid", processors = "minecraft:empty" } }]
 }
 `,
 	}

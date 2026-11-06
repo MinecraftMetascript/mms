@@ -150,7 +150,7 @@ func lintExternalAsset(l *lintRun) {
 		declared[d.NS] = true
 	}
 	declarable := map[string]string{"model": "Model", "item_definition": "ItemModel", "equipment": "Equipment", "atlas": "Atlas", "font": "Font", "post_effect": "PostEffect"}
-	helperFor := map[string]string{"texture": "Texture", "sound_event": "Sound", "weighed_sound_event": "Sound", "structure": "Structure"}
+	helperFor := map[string]string{"texture": "Texture", "sound_event": "Sound", "weighed_sound_event": "Sound", "structure": "StructureFile"}
 	for _, d := range l.r.Order {
 		if hasErrors(d.Diags) {
 			continue

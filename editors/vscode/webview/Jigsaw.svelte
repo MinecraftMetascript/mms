@@ -279,7 +279,7 @@
 			<h2 class="grow">In structures</h2>
 		</div>
 		{#if !pieces.length}
-			<p class="muted small">No jigsaw blocks in the pack's structure files yet. Pieces that Structure(...) calls use are listed here.</p>
+			<p class="muted small">No jigsaw blocks in the pack's structure files yet. Pieces that StructureFile(...) calls use are listed here.</p>
 		{:else}
 			<ul class="tree" role="tree">
 				{#each pieces as [id, list] (id)}
