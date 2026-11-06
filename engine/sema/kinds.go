@@ -193,6 +193,6 @@ func (ks *Kinds) ForFolder(folder string) (Kind, bool) {
 
 // JigsawHoleKind names a jigsaw block name: `JigsawHole road_end`. It
 // writes nothing; editors list the declared holes where a jigsaw block's
-// name or target is chosen, and the jigsaw-hole lint checks the names
+// name or target is chosen, and the jigsaw-unknown-name lint checks the names
 // structure files use against them.
 const JigsawHoleKind = "JigsawHole"

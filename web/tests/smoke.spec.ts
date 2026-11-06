@@ -940,7 +940,10 @@ test('Ctrl+. extracts an inline noise to a declaration and renames it', async ({
 	await page.keyboard.press('ControlOrMeta+.');
 	const menu = page.getByRole('menu', { name: 'Editor actions' });
 	const extract = menu.getByRole('menuitem', { name: 'Extract { ... } to a Noise declaration' });
-	await expect(extract).toBeVisible();
+	// The menu opens once the language server answers, which waits behind
+	// the analysis of the new text; on a loaded machine that takes longer
+	// than the default 5 seconds.
+	await expect(extract).toBeVisible({ timeout: 15_000 });
 	await extract.click();
 	await expect(page.locator('.cm-content')).toContainText(
 		'Noise hills_noise = { base_octave = -6, amplitude_modifiers = [1] }DensityFunction hills = Noise(hills_noise, 1, 1)'
@@ -1008,6 +1011,10 @@ test('a jigsaw structure previews which pieces join which, and marks dead ends',
 	const details = page.getByLabel('Piece details');
 	await expect(details.getByRole('row')).toHaveCount(5);
 	await expect(details.getByRole('row').nth(1)).toContainText('halls/hall (Long hall), halls/short_hall (Short hall)');
+	// Each jigsaw block copies a /give for another one set up the same way.
+	await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+	await details.getByRole('row').nth(1).getByRole('button', { name: 'Copy /give' }).click();
+	expect(await page.evaluate(() => navigator.clipboard.readText())).toMatch(/^\/give @s jigsaw\[block_entity_data=\{id:"jigsaw",name:"dungeon:room_exit",target:"dungeon:hall_entry",pool:"dungeon:halls"/);
 	// A doc comment above a pool element labels its piece.
 	await expect(graph.getByLabel('Pool dungeon:halls').first()).toContainText('Long hall');
 

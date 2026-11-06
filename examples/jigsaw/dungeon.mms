@@ -50,7 +50,7 @@ JigsawStructure dungeon {
 }
 
 // The names the pieces' jigsaw blocks join by. Declaring them lists them
-// in the editor's Jigsaw view, and the jigsaw-hole lint reports a jigsaw
+// in the editor's Jigsaw view, and the jigsaw-unknown-name lint reports a jigsaw
 // block whose name or target is not one of them, such as a typo made in
 // the game's jigsaw screen.
 

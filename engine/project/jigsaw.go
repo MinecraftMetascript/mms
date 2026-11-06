@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/fs"
+	"regexp"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -365,9 +367,14 @@ func lintJigsawPool(l *lintRun) {
 	}
 }
 
-// newPoolFix adds an empty TemplatePool at the end of the file of the
-// Structure call, when that file ends in the pool's namespace.
+// newPoolFix adds the missing pool: an entry of the pools of the
+// JigsawStructure the piece is in, or else an empty TemplatePool at the
+// end of the file of the StructureFile call, when that file ends in the
+// pool's namespace.
 func (r *Result) newPoolFix(s *structureUse, ns, name string) (syntax.Fix, bool) {
+	if fix, ok := r.poolsEntryFix(s, ns, name); ok {
+		return fix, true
+	}
 	var last *Decl
 	for _, d := range r.Order {
 		if d.Unit == s.decl.Unit {
@@ -385,6 +392,65 @@ func (r *Result) newPoolFix(s *structureUse, ns, name string) (syntax.Fix, bool)
 	end := len(src)
 	return syntax.Fix{Title: fmt.Sprintf("Declare TemplatePool %s", name), Edits: []syntax.TextEdit{{Sp: syntax.Span{Start: end, End: end}, Text: text}}}, true
 }
+
+// poolsEntryFix adds `name = []` to the pools of the JigsawStructure
+// whose body holds the piece.
+func (r *Result) poolsEntryFix(s *structureUse, ns, name string) (syntax.Fix, bool) {
+	for _, in := range r.Instances {
+		if in.Unit != s.decl.Unit || in.NS != ns || in.D.Kind == nil || in.D.Kind.Name != "JigsawStructure" || in.D.Body == nil ||
+			s.sp.Start < in.D.Sp.Start || s.sp.End > in.D.Sp.End {
+			continue
+		}
+		for _, it := range in.D.Body.Items {
+			f, ok := it.(*syntax.FieldStmt)
+			if !ok || f.Key == nil || f.Key.Text != "pools" {
+				continue
+			}
+			obj, ok := f.Value.(*syntax.Object)
+			if !ok || !obj.Body.Closed {
+				return syntax.Fix{}, false
+			}
+			src := in.Unit.File.Src
+			key := name
+			if !plainKey.MatchString(key) {
+				key = strconv.Quote(key)
+			}
+			end := obj.Sp.End - 1 // the closing brace
+			i := end
+			for i > obj.Sp.Start && (src[i-1] == ' ' || src[i-1] == '\t') {
+				i--
+			}
+			var edit syntax.TextEdit
+			if src[i-1] == '\n' {
+				// One entry per line: a line like the last entry's.
+				indent := "  "
+				if n := len(obj.Body.Items); n > 0 {
+					st := obj.Body.Items[n-1].Span().Start
+					j := st
+					for j > 0 && (src[j-1] == ' ' || src[j-1] == '\t') {
+						j--
+					}
+					indent = string(src[j:st])
+				}
+				edit = syntax.TextEdit{Sp: syntax.Span{Start: i, End: i}, Text: indent + key + " = []\n"}
+			} else {
+				// All on one line: after the last entry.
+				text := ", " + key + " = []"
+				if len(obj.Body.Items) == 0 {
+					text = " " + key + " = []"
+				}
+				if i == end {
+					text += " "
+				}
+				edit = syntax.TextEdit{Sp: syntax.Span{Start: i, End: i}, Text: text}
+			}
+			return syntax.Fix{Title: fmt.Sprintf("Add the pool %s to %s's pools", name, in.D.NameText()), Edits: []syntax.TextEdit{edit}}, true
+		}
+	}
+	return syntax.Fix{}, false
+}
+
+var plainKey = regexp.MustCompile(`^[a-z_][a-z0-9_]*$`)
 
 // lintJigsawTarget reports a jigsaw block whose target no piece of its
 // pool has: no jigsaw block in those pieces carries that name, so no
@@ -825,10 +891,10 @@ func lintJigsawOverlap(l *lintRun) {
 	}
 }
 
-// lintJigsawHole reports a jigsaw block whose name or target is in a
+// lintJigsawUnknownName reports a jigsaw block whose name or target is in a
 // namespace that declares JigsawHoles but is not one of them. Holes
 // are opt-in: a namespace without any is not checked.
-func lintJigsawHole(l *lintRun) {
+func lintJigsawUnknownName(l *lintRun) {
 	holes, nsHas := map[string]bool{}, map[string]bool{}
 	for _, s := range l.r.Syms.All() {
 		if s.Kind.MMS == sema.JigsawHoleKind {

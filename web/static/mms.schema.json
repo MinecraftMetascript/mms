@@ -70,11 +70,6 @@
           "markdownDescription": "An internal jigsaw block (the block in front of it is inside its own piece, such as an arch mount on a road, or a jigsaw inset by a block by mistake) whose pool has pieces that stick out of the piece however they are turned. The game only places a piece joined at an internal jigsaw wholly inside its parent, so those pieces are never placed there. Height is not checked for terrain_matching pieces.\n\nDefault: `warning`.",
           "$ref": "#/definitions/severity"
         },
-        "jigsaw-hole": {
-          "description": "A jigsaw block in a structure file that StructureFile(\"...\") includes whose name or target is in a namespace with JigsawHole declarations, but is not one of them: most likely a typo made in the game's jigsaw screen. The quick fix declares it. Projects that declare no JigsawHole in a namespace are not checked there.\n\nDefault: `warning`.",
-          "markdownDescription": "A jigsaw block in a structure file that StructureFile(\"...\") includes whose name or target is in a namespace with JigsawHole declarations, but is not one of them: most likely a typo made in the game's jigsaw screen. The quick fix declares it. Projects that declare no JigsawHole in a namespace are not checked there.\n\nDefault: `warning`.",
-          "$ref": "#/definitions/severity"
-        },
         "jigsaw-overlap": {
           "description": "A jigsaw block that can never grow when its piece joins a given parent: every piece its pool and the pool's fallback could place there overlaps the parent or the piece itself, however it is turned, and the game never places overlapping pieces. A junction narrower than the roads around it is the usual cause. Only certain cases are reported: every piece involved is a rigid project structure file with a known size and facing, and no pool involved has an empty or feature element.\n\nDefault: `info`.",
           "markdownDescription": "A jigsaw block that can never grow when its piece joins a given parent: every piece its pool and the pool's fallback could place there overlaps the parent or the piece itself, however it is turned, and the game never places overlapping pieces. A junction narrower than the roads around it is the usual cause. Only certain cases are reported: every piece involved is a rigid project structure file with a known size and facing, and no pool involved has an empty or feature element.\n\nDefault: `info`.",
@@ -88,6 +83,11 @@
         "jigsaw-target": {
           "description": "A jigsaw block whose target no piece of its pool can join: none of the pool's structure files has a jigsaw block with that name, or the pool has no pieces. Only pools whose pieces are all the project's own structure files are checked.\n\nDefault: `warning`.",
           "markdownDescription": "A jigsaw block whose target no piece of its pool can join: none of the pool's structure files has a jigsaw block with that name, or the pool has no pieces. Only pools whose pieces are all the project's own structure files are checked.\n\nDefault: `warning`.",
+          "$ref": "#/definitions/severity"
+        },
+        "jigsaw-unknown-name": {
+          "description": "A jigsaw block in a structure file that StructureFile(\"...\") includes whose name or target is in a namespace with JigsawHole declarations, but is not one of them: most likely a typo made in the game's jigsaw screen. The quick fix declares it. Projects that declare no JigsawHole in a namespace are not checked there.\n\nDefault: `warning`.",
+          "markdownDescription": "A jigsaw block in a structure file that StructureFile(\"...\") includes whose name or target is in a namespace with JigsawHole declarations, but is not one of them: most likely a typo made in the game's jigsaw screen. The quick fix declares it. Projects that declare no JigsawHole in a namespace are not checked there.\n\nDefault: `warning`.",
           "$ref": "#/definitions/severity"
         },
         "overrides-vanilla": {
