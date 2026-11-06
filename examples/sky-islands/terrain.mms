@@ -42,6 +42,7 @@ NoiseSettings islands = {
   material_rule = surface
   spawn_target = []
   noise_router = {
+    // mms-ignore density-no-beardifier
     final_density = islands
     temperature = 0
     vegetation = 0

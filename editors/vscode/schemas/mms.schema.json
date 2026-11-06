@@ -45,6 +45,31 @@
           "markdownDescription": "A CustomItem used where the game takes a plain item id, such as a recipe ingredient or an item tag. It stands for its base item there, so it also matches the base item without the custom components.\n\nDefault: `hint`.",
           "$ref": "#/definitions/severity"
         },
+        "density-nested-interpolation": {
+          "description": "An Interpolated density function used inside another Interpolated in a noise router. The inner one is interpolated again from the outer cell's corners; vanilla never does this. Interpolate once, around the whole terrain.\n\nDefault: `warning`.",
+          "markdownDescription": "An Interpolated density function used inside another Interpolated in a noise router. The inner one is interpolated again from the outer cell's corners; vanilla never does this. Interpolate once, around the whole terrain.\n\nDefault: `warning`.",
+          "$ref": "#/definitions/severity"
+        },
+        "density-no-beardifier": {
+          "description": "A noise settings' final_density with no Beardifier(). Since 26.3 the game no longer adds it by itself, so structures that adapt the terrain (villages, strongholds, ancient cities) are not blended in. Fine for a dimension without them. Not reported when final_density uses a density function the project does not declare.\n\nDefault: `hint`.",
+          "markdownDescription": "A noise settings' final_density with no Beardifier(). Since 26.3 the game no longer adds it by itself, so structures that adapt the terrain (villages, strongholds, ancient cities) are not blended in. Fine for a dimension without them. Not reported when final_density uses a density function the project does not declare.\n\nDefault: `hint`.",
+          "$ref": "#/definitions/severity"
+        },
+        "density-no-interpolation": {
+          "description": "A noise settings' final_density that samples a noise or spline but has no Interpolated anywhere, so the noise is sampled at every block. Vanilla interpolates its terrain in 4 x 8 cells (8 x 4 in the End). Not reported when final_density uses a density function the project does not declare.\n\nDefault: `info`.",
+          "markdownDescription": "A noise settings' final_density that samples a noise or spline but has no Interpolated anywhere, so the noise is sampled at every block. Vanilla interpolates its terrain in 4 x 8 cells (8 x 4 in the End). Not reported when final_density uses a density function the project does not declare.\n\nDefault: `info`.",
+          "$ref": "#/definitions/severity"
+        },
+        "density-square": {
+          "description": "`x * x` in a density function, which computes `x` twice. `Square(x)` computes it once and gives the same value.\n\nDefault: `hint`.",
+          "markdownDescription": "`x * x` in a density function, which computes `x` twice. `Square(x)` computes it once and gives the same value.\n\nDefault: `hint`.",
+          "$ref": "#/definitions/severity"
+        },
+        "density-uncached-shared": {
+          "description": "A density function that samples a noise or spline and is computed two or more times per block by one noise router (counting every path that reaches it), without Cache. Each use computes it again. Wrapping its value in Cache(...) computes it once per position; vanilla caches every shared function. Cache only remembers one position, so a 2D function (y_scale = 0) is still computed again at each height.\n\nDefault: `info`.",
+          "markdownDescription": "A density function that samples a noise or spline and is computed two or more times per block by one noise router (counting every path that reaches it), without Cache. Each use computes it again. Wrapping its value in Cache(...) computes it once per position; vanilla caches every shared function. Cache only remembers one position, so a 2D function (y_scale = 0) is still computed again at each height.\n\nDefault: `info`.",
+          "$ref": "#/definitions/severity"
+        },
         "deprecated": {
           "description": "A use of a declaration whose doc comment has a `@deprecated` tag.\n\nDefault: `warning`.",
           "markdownDescription": "A use of a declaration whose doc comment has a `@deprecated` tag.\n\nDefault: `warning`.",

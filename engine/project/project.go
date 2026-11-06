@@ -161,6 +161,7 @@ type Result struct {
 	orderErr map[string][]syntax.Diagnostic // feature order cycles
 	langErr  map[string][]syntax.Diagnostic // CustomItem names a Lang also has
 	jigsaw   *jigsawModel                   // structure files' jigsaw blocks, for the jigsaw rules
+	dfs      *dfModel                       // density functions, for the density rules
 	files    fs.FS
 	lintMu   sync.Mutex
 	lintDone bool

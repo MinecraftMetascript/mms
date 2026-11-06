@@ -98,6 +98,16 @@ func TestVanillaRoundTrip(t *testing.T) {
 			}
 		}
 	}
+	// Vanilla worldgen is the reference for the density function rules:
+	// it caches every shared function and interpolates every terrain.
+	for _, u := range r.Units {
+		for _, d := range r.Diagnostics(u.Path) {
+			if strings.HasPrefix(d.Code, "lint/density-") {
+				line, _ := u.File.LineCol(d.Sp.Start)
+				t.Errorf("%s:%d %s %s", u.Path, line, d.Code, d.Message)
+			}
+		}
+	}
 	built := map[string]bool{}
 	mismatch := 0
 	for _, f := range r.Emit() {
