@@ -175,18 +175,8 @@ export type FromWorld =
 // copies the give command the page builds.
 
 /** How a jigsaw block is set up, as its screen in the game shows it. */
-export interface JigsawConfig {
-	/** The item's name in the hotbar, and the recent list's; may be empty. */
-	label: string;
-	/** Target pool. */
-	pool: string;
-	/** Target name: the jigsaw block of the next piece to join onto. */
-	target: string;
-	name: string;
-	/** Turns into, once the structure is placed. */
-	finalState: string;
-	joint: 'rollable' | 'aligned';
-}
+import type { JigsawConfig } from '@mms/preview/jigsaw/give';
+export type { JigsawConfig };
 
 export interface JigsawPoolRow {
 	id: string;

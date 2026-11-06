@@ -56,11 +56,14 @@ export function importPath(s: WorldStructure, projectNs: string | undefined, fol
 }
 
 /**
- * The helper call that puts an imported structure in the pack. The id name
+ * The call that puts an imported structure in the pack. The id name
  * keeps the folders of the path; without it the id would be the bare
  * file name.
  */
 export function structureCall(rel: string, s: WorldStructure): string {
+	// Piece("tower/base") reads structures/tower/base.nbt as a pool entry,
+	// with the id tower/base.
+	if (rel === `structures/${s.path}.nbt`) return `Piece("${s.path}")`;
 	const base = s.path.split('/').pop()!;
 	const defaultName = base.toLowerCase().replace(/[^a-z0-9_.-]/g, '_');
 	return s.path === defaultName ? `StructureFile("${rel}")` : `StructureFile("${rel}", "${s.path}")`;

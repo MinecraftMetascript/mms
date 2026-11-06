@@ -7,6 +7,8 @@
 	// are marked.
 	import { type JigsawGraph, type Link, type Piece } from './graph';
 	import { jigsawMarkdown, jigsawMermaid, joinsText } from './export';
+	import { giveCommand } from './give';
+	import type { OutputJigsaw } from '../types';
 
 	let { graph }: { graph: JigsawGraph } = $props();
 
@@ -209,13 +211,15 @@
 	const detail = $derived(pieceAt(picked));
 	/** The pieces a jigsaw block can join, in words. */
 	const joins = (l: Link) => joinsText(graph, detail!.piece, l, strip);
+	/** The /give command for another jigsaw block set up like this one. */
+	const give = (j: OutputJigsaw) =>
+		giveCommand({ label: j.label ?? '', pool: j.pool, target: j.target, name: j.name, finalState: j.final_state ?? '', joint: j.joint === 'aligned' ? 'aligned' : 'rollable' }, undefined);
 
 	// Copy the graph as text to share it: a Markdown report (with a
 	// Mermaid chart) or just the Mermaid chart.
 	let copied = $state<string | null>(null);
 	let copyTimer: ReturnType<typeof setTimeout> | undefined;
-	async function copy(what: 'markdown' | 'mermaid') {
-		const text = what === 'markdown' ? jigsawMarkdown(graph) : jigsawMermaid(graph);
+	async function copy(what: string, text = what === 'markdown' ? jigsawMarkdown(graph) : jigsawMermaid(graph)) {
 		let ok = false;
 		try {
 			await navigator.clipboard.writeText(text);
@@ -379,7 +383,7 @@
 			{:else}
 				<table class="w-full border-collapse">
 					<thead class="text-left text-muted">
-						<tr><th class="py-0.5 font-normal">At</th><th class="font-normal" title="The way it points, then the way its top points">Facing</th><th class="font-normal">Name</th><th class="font-normal">Pool</th><th class="font-normal">Target</th><th class="font-normal">Joins</th></tr>
+						<tr><th class="py-0.5 font-normal">At</th><th class="font-normal" title="The way it points, then the way its top points">Facing</th><th class="font-normal">Name</th><th class="font-normal">Pool</th><th class="font-normal">Target</th><th class="font-normal">Joins</th><th><span class="sr-only">Give</span></th></tr>
 					</thead>
 					<tbody>
 						{#each p.jigsaws as j, ji (ji)}
@@ -391,6 +395,13 @@
 								<td class="pr-2 font-mono">{strip(j.pool)}</td>
 								<td class="pr-2 font-mono">{strip(j.target)}</td>
 								<td class={l?.dead ? 'text-red-600 dark:text-red-400' : ''}>{l ? joins(l) : 'nothing: it only receives'}</td>
+								<td class="pl-2 whitespace-nowrap">
+									<button
+										class="rounded border border-line px-1.5 hover:bg-line/40"
+										title={`Copies ${give(j)}: a jigsaw block set up the same way, to place in the game in creative mode`}
+										onclick={() => copy(`give${ji}`, give(j))}>{copied === `give${ji}` ? 'Copied' : 'Copy /give'}</button
+									>
+								</td>
 							</tr>
 						{/each}
 					</tbody>

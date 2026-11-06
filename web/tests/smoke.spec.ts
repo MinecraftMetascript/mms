@@ -1008,6 +1008,10 @@ test('a jigsaw structure previews which pieces join which, and marks dead ends',
 	const details = page.getByLabel('Piece details');
 	await expect(details.getByRole('row')).toHaveCount(5);
 	await expect(details.getByRole('row').nth(1)).toContainText('halls/hall (Long hall), halls/short_hall (Short hall)');
+	// Each jigsaw block copies a /give for another one set up the same way.
+	await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+	await details.getByRole('row').nth(1).getByRole('button', { name: 'Copy /give' }).click();
+	expect(await page.evaluate(() => navigator.clipboard.readText())).toMatch(/^\/give @s jigsaw\[block_entity_data=\{id:"jigsaw",name:"dungeon:room_exit",target:"dungeon:hall_entry",pool:"dungeon:halls"/);
 	// A doc comment above a pool element labels its piece.
 	await expect(graph.getByLabel('Pool dungeon:halls').first()).toContainText('Long hall');
 

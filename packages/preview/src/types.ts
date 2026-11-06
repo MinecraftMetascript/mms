@@ -57,6 +57,10 @@ export interface OutputJigsaw {
 	orientation?: string;
 	/** rollable or aligned: whether a piece joined to an up or down facing block may turn. */
 	joint?: string;
+	/** The block it turns into once the structure is placed, such as minecraft:air. */
+	final_state?: string;
+	/** The name of the item it was placed from, if it had one. */
+	label?: string;
 }
 
 /** A project file the pack copies, such as a texture or a structure. */
