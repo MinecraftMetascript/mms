@@ -2,6 +2,8 @@ package eval
 
 import (
 	"math"
+	"regexp"
+	"strings"
 
 	"github.com/minecraftmetascript/mms/engine/syntax"
 )
@@ -18,6 +20,21 @@ var intrinsics = map[string]intrinsic{
 	"len":         length,
 	"by_language": byLanguage,
 	"english":     english,
+	"contains":    contains,
+	"matches":     matches,
+	"replace":     replace,
+	"named":       named,
+	"kind_of":     kindOf,
+}
+
+// Intrinsics lists the names of the intrinsics, for the test that each
+// has an extern declaration in the prelude.
+func Intrinsics() []string {
+	out := make([]string, 0, len(intrinsics))
+	for n := range intrinsics {
+		out = append(out, n)
+	}
+	return out
 }
 
 // builtins are always in scope.
@@ -109,4 +126,147 @@ func english(c *ctx, x *syntax.Call, args []argValue) Value {
 		return &None{pos: c.pos(x.Sp)}
 	}
 	return v
+}
+
+// args checks that a call has n arguments known at compile time.
+func knownArgs(c *ctx, x *syntax.Call, args []argValue, name string, n int) ([]Value, bool) {
+	if len(args) != n {
+		c.errorf("mms/intrinsic-args", x.Sp, name+" takes "+map[int]string{1: "one argument", 2: "two arguments", 3: "three arguments"}[n])
+		return nil, false
+	}
+	out := make([]Value, n)
+	for i, a := range args {
+		if !known(a.v) && !isData(a.v) {
+			c.errorf("mms/intrinsic-args", a.x.Value.Span(), name+" takes values known at compile time, not "+kindName(a.v))
+			return nil, false
+		}
+		out[i] = a.v
+	}
+	return out, true
+}
+
+// contains reports whether a list holds a value.
+func contains(c *ctx, x *syntax.Call, args []argValue) Value {
+	p := c.pos(x.Sp)
+	vs, ok := knownArgs(c, x, args, "contains", 2)
+	if !ok {
+		return &Bool{p, false}
+	}
+	l, isList := vs[0].(*List)
+	if !isList {
+		if _, none := vs[0].(*None); none {
+			return &Bool{p, false}
+		}
+		c.errorf("mms/intrinsic-args", args[0].x.Value.Span(), "contains takes a list, not "+kindName(vs[0]))
+		return &Bool{p, false}
+	}
+	for _, e := range l.Elems {
+		if known(e) && equal(e, vs[1]) {
+			return &Bool{p, true}
+		}
+	}
+	return &Bool{p, false}
+}
+
+var patterns = map[string]*regexp.Regexp{}
+
+// matches reports whether a string matches a regular expression as a
+// whole.
+func matches(c *ctx, x *syntax.Call, args []argValue) Value {
+	p := c.pos(x.Sp)
+	vs, ok := knownArgs(c, x, args, "matches", 2)
+	if !ok {
+		return &Bool{p, false}
+	}
+	s, ok1 := text(vs[0])
+	pat, ok2 := vs[1].(*Str)
+	if !ok1 || !ok2 {
+		c.errorf("mms/intrinsic-args", x.Sp, "matches takes a string and a pattern string")
+		return &Bool{p, false}
+	}
+	re := patterns[pat.S]
+	if re == nil {
+		var err error
+		if re, err = regexp.Compile("^(?:" + pat.S + ")$"); err != nil {
+			c.errorf("mms/intrinsic-args", args[1].x.Value.Span(), "not a regular expression: "+err.Error())
+			return &Bool{p, false}
+		}
+		patterns[pat.S] = re
+	}
+	return &Bool{p, re.MatchString(s)}
+}
+
+// replace replaces every old in a string with new.
+func replace(c *ctx, x *syntax.Call, args []argValue) Value {
+	p := c.pos(x.Sp)
+	vs, ok := knownArgs(c, x, args, "replace", 3)
+	if !ok {
+		return &Str{p, ""}
+	}
+	s, ok1 := text(vs[0])
+	o, ok2 := text(vs[1])
+	n, ok3 := text(vs[2])
+	if !ok1 || !ok2 || !ok3 {
+		c.errorf("mms/intrinsic-args", x.Sp, "replace takes three strings")
+		return &Str{p, ""}
+	}
+	return &Str{p, strings.ReplaceAll(s, o, n)}
+}
+
+// named gives an asset call that has no id name one: a CustomItem's
+// Texture("art/ruby.png") becomes the texture item/ruby.
+func named(c *ctx, x *syntax.Call, args []argValue) Value {
+	if len(args) != 2 {
+		c.errorf("mms/intrinsic-args", x.Sp, "named takes an asset and an id name")
+		return &None{pos: c.pos(x.Sp)}
+	}
+	n, ok := text(args[1].v)
+	if !ok {
+		c.errorf("mms/intrinsic-args", args[1].x.Value.Span(), "an id name is a string")
+		return args[0].v
+	}
+	code, ok := args[0].v.(*Code)
+	if !ok {
+		return args[0].v
+	}
+	call, ok := code.X.(*syntax.Call)
+	if !ok || len(call.Args) != 1 {
+		return code
+	}
+	nc := *call
+	nc.Args = append(append([]*syntax.Arg(nil), call.Args...), &syntax.Arg{Value: &syntax.String{Value: n, Sp: call.Sp}, Sp: call.Sp})
+	return &Code{code.pos, &nc}
+}
+
+// kindOf names the kind of a value: "none", "bool", "number", "string",
+// "name", "list", "object", "range", "commands", or "runtime" for a
+// value only known when the pack runs.
+func kindOf(c *ctx, x *syntax.Call, args []argValue) Value {
+	p := c.pos(x.Sp)
+	v, ok := oneArg(c, x, args, "kind_of")
+	if !ok {
+		return &Str{p, "none"}
+	}
+	k := "runtime"
+	switch v.(type) {
+	case *None:
+		k = "none"
+	case *Bool:
+		k = "bool"
+	case *Num:
+		k = "number"
+	case *Str:
+		k = "string"
+	case *Word:
+		k = "name"
+	case *List:
+		k = "list"
+	case *Record:
+		k = "object"
+	case *RangeV:
+		k = "range"
+	case *Stmts:
+		k = "commands"
+	}
+	return &Str{p, k}
 }

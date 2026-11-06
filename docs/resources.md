@@ -215,7 +215,7 @@ In a model's `textures`, a value is a texture id, `"#name"` for another slot, or
 Data packs cannot add items, but they can give a vanilla item a new look and name with its `item_model` and `item_name` components. That takes a model, an item model, a translation and the same components at every use. `CustomItem` writes all of it from one declaration:
 
 ```
-CustomItem ember_shard = {
+CustomItem ember_shard {
   base = amethyst_shard
   name = "Ember Shard"
   texture = Texture("art/ember_shard.png")

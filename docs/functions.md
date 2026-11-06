@@ -196,7 +196,7 @@ OnRespawn {
 A [custom item](resources.md)'s `on_*` fields each name a function to run when something happens with the item. The functions take no parameters and can be in any file. A field can also hold the commands themselves in a `{ ... }` block, written like a function body (each command on its own line). That block is compiled as a function of its own, under `mms_gen/<item>/`. They run as the player, at the player unless the table says otherwise:
 
 ```
-CustomItem ember_wand = {
+CustomItem ember_wand {
   base = stick
   name = "Ember Wand"
   on_right_click = cast_ember
@@ -239,7 +239,7 @@ Every hook marks the item with `mms_item: "<namespace>:<name>"` in its `custom_d
 **Use cost.** Two more fields make each right-click use cost something:
 
 ```
-CustomItem ember_wand = {
+CustomItem ember_wand {
   base = blaze_rod
   on_use_on_block = kindle
   damage_on_use = 1
@@ -262,7 +262,7 @@ A base item that already does something on right click keeps doing it, and then 
 - **An `arrow`, `tipped_arrow` or `spectral_arrow`**: the item itself, once it is shot from any bow, crossbow or dispenser. Prefer `tipped_arrow`: Infinity makes plain `arrow` items free, and a tipped arrow can be coloured with `potion_contents.custom_color`.
 
 ```
-CustomItem explosive_arrow = {
+CustomItem explosive_arrow {
   base = tipped_arrow
   name = "Explosive Arrow"
   on_projectile_hit_block = boom
@@ -281,7 +281,7 @@ On a block hit the function runs as the arrow, at the point it hit, so `execute 
 **Thrown potions.** `on_projectile_land` works on a `splash_potion` or `lingering_potion` base, and runs where the thrown potion lands, whatever it hits:
 
 ```
-CustomItem blast_potion = {
+CustomItem blast_potion {
   base = splash_potion
   name = "Blast Potion"
   on_projectile_land = boom

@@ -1020,7 +1020,7 @@ func (s *Server) output(_ context.Context, p struct {
 	// and name. Listing the stack lets an editor show every custom item,
 	// including one with just components.
 	items := []map[string]any{}
-	for _, d := range w.res.Order {
+	for _, d := range append(append([]*project.Decl(nil), w.res.Order...), w.res.Instances...) {
 		if d.Item == nil || d.Item.Stack == nil || d.Unit == nil {
 			continue
 		}

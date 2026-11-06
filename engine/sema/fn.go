@@ -1392,6 +1392,14 @@ func (f *fc) interpolate(out *fn.Block, cmd *syntax.CommandStmt) {
 		if e == nil {
 			return
 		}
+		if st := f.c.ConvertedStack(e); st != nil {
+			// A Blueprint instance that converts to an item stack is
+			// that stack, as a command's item argument:
+			// /give @s ${ember_shard} 4
+			line.WriteString(StackSNBT(st))
+			i = j
+			continue
+		}
 		if s := f.customItem(e); s != nil {
 			// A custom item is its base item with its components, as a
 			// command's item argument: /give @s ${ember_shard} 4

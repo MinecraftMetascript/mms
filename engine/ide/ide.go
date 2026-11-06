@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/minecraftmetascript/mms/engine/command"
+	"github.com/minecraftmetascript/mms/engine/format"
 	"github.com/minecraftmetascript/mms/engine/jsonv"
 	"github.com/minecraftmetascript/mms/engine/project"
 	"github.com/minecraftmetascript/mms/engine/sema"
@@ -267,18 +268,18 @@ func (s *Session) complete(a *at, off int) []sema.Candidate {
 		if prev := prevToken(f, start); prev != nil && prev.Kind == parser.MMSLexerIDENT && lineOf(f, prev.Sp.End) == lineOf(f, off) {
 			return nil
 		}
-		return s.P.Kinds.DeclKinds()
+		return s.declKinds()
 	}
 	d, _ := a.path[1].(*syntax.Decl)
 	if d != nil && d.Kind.Sp.Contains(off) {
-		return s.P.Kinds.DeclKinds()
+		return s.declKinds()
 	}
 	if d != nil && d.Name != nil && d.Name.Sp.Contains(off) {
 		// A name on a later line than its kind is a new declaration's
 		// kind: in `X x = foo` + newline + `Fe|`, the value `foo` reads
 		// as the kind of a declaration named `Fe`.
 		if l1, _ := f.LineCol(d.Kind.Sp.End); l1 != lineOf(f, off) {
-			return s.P.Kinds.DeclKinds()
+			return s.declKinds()
 		}
 		return nil
 	}
@@ -463,7 +464,7 @@ func (a *at) code() bool { return a.fn != nil }
 
 // codeRoot finds the function code holding the cursor: the innermost
 // inline function block on the path, such as CustomItem's
-// `on_right_click = { ... }` or an advancement's `function = { ... }`,
+// `on_right_click = run { ... }` or an advancement's `function = { ... }`,
 // else the declaration when its kind holds code.
 func (a *at) codeRoot() *syntax.Decl {
 	if a.decl == nil {
@@ -472,6 +473,9 @@ func (a *at) codeRoot() *syntax.Decl {
 	for i := len(a.path) - 1; i >= 2; i-- {
 		if o, ok := a.path[i].(*syntax.Object); ok && o.Body != nil && a.info(o) != nil && a.info(o).InlineFn {
 			return &syntax.Decl{Body: o.Body, Sp: o.Sp}
+		}
+		if r, ok := a.path[i].(*syntax.RunExpr); ok && r.Body != nil {
+			return &syntax.Decl{Body: r.Body, Sp: r.Sp}
 		}
 	}
 	if sema.IsCodeKind(a.decl.Kind) {
@@ -763,10 +767,16 @@ func (s *Session) Hover(path string, off int) (string, syntax.Span) {
 		return "", syntax.Span{} // a const or a top-level for
 	}
 	inner := a.path[len(a.path)-1]
+	if a.decl != nil && a.decl.Blueprint != nil && d.Name != nil && d.Name.Sp.Contains(off) {
+		return instanceHover(d), d.Name.Sp
+	}
 	if a.decl != nil && d.Name != nil && d.Name.Sp.Contains(off) {
 		return s.declHover(a.decl), d.Name.Sp
 	}
 	if d.Kind.Sp.Contains(off) {
+		if bp := s.blueprint(d); bp != nil {
+			return "```mms\nBlueprint " + d.Kind.Name + "\n```\n" + sema.DocMarkdown(bp.D.Doc), d.Kind.Sp
+		}
 		k := a.decl
 		if k != nil && k.Kind.Resource != "" {
 			where := "."
@@ -946,7 +956,7 @@ func (a *at) inCommand(off int) (syntax.Node, *sema.Info) {
 	var best syntax.Node
 	var bestIn *sema.Info
 	for n, in := range a.decl.Info {
-		if in.Symbol == nil && in.Local == nil {
+		if in.Symbol == nil && in.Local == nil && in.Converted == nil {
 			continue
 		}
 		switch n.(type) {
@@ -980,6 +990,9 @@ func (s *Session) current(sym *sema.Symbol) *sema.Symbol {
 
 // Definition returns where the symbol at off is declared.
 func (s *Session) Definition(path string, off int) []Location {
+	if cv := s.convertedAt(path, off); cv != nil && cv.Decl != nil && cv.Decl.Name != nil {
+		return []Location{{Path: cv.Path, Span: cv.Decl.Name.Sp}}
+	}
 	sym := s.target(path, off)
 	if sym == nil || sym.Decl.Name == nil {
 		return nil
@@ -1201,6 +1214,16 @@ func (s *Session) InlayHints(path string) []InlayHint {
 			continue
 		}
 		for n, in := range dr.Info {
+			if cv := in.Converted; cv != nil && cv.Hint != "" {
+				// A Blueprint instance read as one of its `as`
+				// conversions, which says why with a hint.
+				to := format.Expr(cv.X)
+				if r := []rune(to); len(r) > 30 {
+					to = string(r[:29]) + "…"
+				}
+				out = append(out, InlayHint{Off: n.Span().End, Label: "→ " + to, Tooltip: cv.Hint})
+				continue
+			}
 			if in.Base == "" || in.Symbol == nil {
 				continue
 			}

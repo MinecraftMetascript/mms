@@ -23,7 +23,7 @@ RightClickHook mms_gen/item_hook/bell/right_click {
 # at items.mms:16:12, def 07-custom-item.mms:43:5 < Blueprint CustomItem (at items.mms:16:12, def 07-custom-item.mms:2:1)
 ItemModel both { model = Plain(item/x) }
 --- diagnostics
-19:3 error check: Set texture or model, not both
+19:3 error mms/custom-item: Set texture or model, not both
 20:3 error mms/unknown-field: CustomItem has no field 'colour'
 23:12 error mms/missing-field: CustomItem nothing needs 'base'
 === provenance of copied nodes

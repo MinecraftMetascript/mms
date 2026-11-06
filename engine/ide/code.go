@@ -265,7 +265,7 @@ func (s *Session) interpolationCompletion(a *at, base, off int) ([]Item, syntax.
 	}
 	cands := s.codeValues(a, start)
 	for _, sym := range s.R.Syms.All() {
-		if sym.Kind.MMS != "CustomItem" && sym.Kind.MMS != "Book" {
+		if sym.Kind.MMS != "Book" {
 			continue
 		}
 		name := sym.Path
@@ -273,6 +273,10 @@ func (s *Session) interpolationCompletion(a *at, base, off int) ([]Item, syntax.
 			name = sym.ID()
 		}
 		cands = append(cands, sema.Candidate{Label: name, Kind: sema.CandID, Detail: sym.Kind.MMS, Doc: sema.DocMarkdown(sym.Decl.Doc), Rank: 80})
+	}
+	for _, c := range a.c.StackCandidates() {
+		c.Rank = 80
+		cands = append(cands, c)
 	}
 	items := make([]Item, 0, len(cands))
 	for i, c := range cands {

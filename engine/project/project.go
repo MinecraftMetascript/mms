@@ -161,13 +161,17 @@ type Result struct {
 	Decls map[*syntax.Decl]*Decl
 	// Order lists declarations in file and source order.
 	Order []*Decl
+	// Instances are the Blueprint instances the user wrote, in order,
+	// checked for the editor (see instanceDecls). They write nothing.
+	Instances []*Decl
 
 	collect  map[string][]syntax.Diagnostic
 	typeErr  map[string][]syntax.Diagnostic // Template arguments, Blueprint fields, typed consts
 	assets   []assetUse
 	assetErr map[string][]syntax.Diagnostic
 	orderErr map[string][]syntax.Diagnostic // feature order cycles
-	langErr  map[string][]syntax.Diagnostic // CustomItem names a Lang also has
+	emitted  map[*syntax.Decl]bool          // declarations Blueprint instances emitted
+	langErr  map[string][]syntax.Diagnostic // keys two Lang declarations set
 	jigsaw   *jigsawModel                   // structure files' jigsaw blocks, for the jigsaw rules
 	files    fs.FS
 	lintMu   sync.Mutex
@@ -199,7 +203,10 @@ type Decl struct {
 	// written as its own resource.
 	Hoisted []sema.Hoisted
 	Info    map[syntax.Node]*sema.Info
-	Diags   []syntax.Diagnostic
+	// Blueprint is set on a Blueprint instance's body, checked for the
+	// editor only.
+	Blueprint *eval.Blueprint
+	Diags     []syntax.Diagnostic
 	// Extern are problems in other files, such as a Book's .mmsbook
 	// file, by path.
 	Extern map[string][]syntax.Diagnostic
@@ -318,6 +325,7 @@ func (p *Project) Analyze(ctx context.Context) (*Result, error) {
 	syms, collect := sema.Collect(units, p.Kinds, p.Config.Namespace)
 	tenv := types.New(p.Pack, p.Kinds, ev)
 	syms.Types = tenv.Types
+	syms.Hidden = preludeEmitted(ev)
 	syms.Conversions = tenv.Conversions(ev, p.Config.Namespace)
 	r := &Result{Syms: syms, Units: units, Decls: map[*syntax.Decl]*Decl{}, collect: collect, pack: p.Pack, cfg: p.Config, files: p.Files, Eval: ev}
 	r.typeErr = tenv.Check(ev, p.Config.Namespace, func(ns string) *sema.Checker {
@@ -360,9 +368,14 @@ func (p *Project) Analyze(ctx context.Context) (*Result, error) {
 			r.Order = append(r.Order, dr)
 		}
 	}
+	r.instanceDecls(tenv, func(ns string) *sema.Checker {
+		c := sema.NewChecker(p.Pack, p.Kinds, syms, ns)
+		c.Files = p.Files
+		return c
+	})
 	r.collectAssets()
 	r.checkFeatureOrder()
-	r.checkCustomItemLang()
+	r.checkLangKeys()
 	p.mu.Lock()
 	p.last = r
 	p.mu.Unlock()
@@ -475,8 +488,6 @@ func (p *Project) checkDecl(u *sema.Unit, d *syntax.Decl, k sema.Kind, syms *sem
 			dr.Fn = fn.Generate(*f)
 			dr.Lines = []string{"function " + id}
 		}
-	case k.MMS == "CustomItem":
-		dr.Item = c.CustomItem(d, dr.ID())
 	case k.MMS == "Book":
 		dr.Item = c.Book(d, dr.ID())
 	case k.MMS == "Objective":

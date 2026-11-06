@@ -13,7 +13,7 @@
  * An amethyst shard that glows like a coal. Right-clicking with it uses
  * one shard up.
  */
-CustomItem ember_shard = {
+CustomItem ember_shard {
   base = amethyst_shard
   name = "Ember Shard"
   texture = Texture("art/ember_shard.png")
@@ -26,7 +26,7 @@ CustomItem ember_shard = {
  * durability, and the wand breaks when it runs out. It keeps the blaze
  * rod's look: there is no texture, so no model is written.
  */
-CustomItem ember_wand = {
+CustomItem ember_wand {
   base = blaze_rod
   name = "Ember Wand"
   on_use_on_block = kindle
@@ -35,7 +35,7 @@ CustomItem ember_wand = {
 }
 
 /** A music disc that plays the song in music.mms. */
-CustomItem ember_disc = {
+CustomItem ember_disc {
   base = music_disc_13
   name = "Music Disc"
   texture = Texture("art/ember_disc.png")
