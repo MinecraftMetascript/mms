@@ -1,0 +1,4 @@
+-- prelude.mms --
+extern Template cos(degrees: float): float
+extern Template sin(degrees: float): float
+-- 09-siege-functions.mms -- design

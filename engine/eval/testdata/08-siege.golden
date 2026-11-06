@@ -1,0 +1,42 @@
+=== prelude.mms (changed: true)
+=== 09-siege-functions.mms (changed: true)
+# at 09-siege-functions.mms:9:1
+Storage game: SiegeState
+# at 09-siege-functions.mms:23:10
+Function next_wave {
+  if (game.wave >= 10) {
+    tell(@a, "{gold}**Victory!**{/} The banner holds.")
+    return
+  }
+  game.wave += 1
+  /execute at @e[tag=siege.spawn] run summon zombie ~ ~ ~ {Tags:["siege.enemy"]}
+  /execute at @e[tag=siege.spawn] run summon skeleton ~ ~ ~ {Tags:["siege.enemy"]}
+  /execute at @e[tag=siege.spawn] run summon spider ~ ~ ~ {Tags:["siege.enemy"]}
+  /execute at @e[tag=siege.spawn] run summon creeper ~ ~ ~ {Tags:["siege.enemy"]}
+  if (game.wave % 5 == 0 && !exists(@e[tag=siege.boss, limit=1])) {
+    /summon wither_skeleton ~ ~ ~ {Tags:["siege.boss"]}
+    game.boss_alive = true
+  }
+  As(@a).At(@s) {
+    /particle flame ^2 ^1 ^0
+    /particle flame ^1.854368 ^1 ^0.749213
+    /particle flame ^1.414214 ^1 ^1.414214
+    /particle flame ^0.781462 ^1 ^1.84101
+    /particle flame ^0 ^1 ^2
+    /particle flame ^-0.749213 ^1 ^1.854368
+    /particle flame ^-1.414214 ^1 ^1.414214
+    /particle flame ^-1.84101 ^1 ^0.781462
+    /particle flame ^-2 ^1 ^0
+    /particle flame ^-1.854368 ^1 ^-0.749213
+    /particle flame ^-1.414214 ^1 ^-1.414214
+    /particle flame ^-0.781462 ^1 ^-1.84101
+    /particle flame ^0 ^1 ^-2
+    /particle flame ^0.749213 ^1 ^-1.854368
+    /particle flame ^1.414214 ^1 ^-1.414214
+    /particle flame ^1.84101 ^1 ^-0.781462
+  }
+  tell(@a, "Wave {red}${game.wave}{/} of 10 begins")
+}
+=== provenance of copied nodes
+09-siege-functions.mms:24:20 from 09-siege-functions.mms:11 < const max_wave (at 09-siege-functions.mms:24:20, def 09-siege-functions.mms:11:1): 1 node, 10
+09-siege-functions.mms:32:37 from 09-siege-functions.mms:12 < const boss (at 09-siege-functions.mms:32:37, def 09-siege-functions.mms:12:1): 1 node, @e[tag=siege.boss, limit=1]

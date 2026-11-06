@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/minecraftmetascript/mms/engine/eval"
 	"github.com/minecraftmetascript/mms/engine/fn"
 	"github.com/minecraftmetascript/mms/engine/jsonv"
 	"github.com/minecraftmetascript/mms/engine/sema"
@@ -40,6 +41,8 @@ type Project struct {
 	// analysis, so their checked results can be carried over.
 	moved map[*syntax.Decl]syntax.Moved
 	last  *Result
+	// evalCache remembers which declarations need no expansion.
+	evalCache eval.Cache
 }
 
 // New returns an empty project.
@@ -149,6 +152,9 @@ func (p *Project) Paths() []string {
 
 // Result is one analysis of the whole project.
 type Result struct {
+	// Eval is the expansion of const, for, Template and Blueprint
+	// declarations, with the provenance of what they wrote.
+	Eval  *eval.Result
 	Syms  *sema.Table
 	Units []*sema.Unit
 	Decls map[*syntax.Decl]*Decl
@@ -234,6 +240,11 @@ func (r *Result) Diagnostics(path string) []syntax.Diagnostic {
 	}
 	var out []syntax.Diagnostic
 	out = append(out, u.File.Diags...)
+	if r.Eval != nil {
+		if f := r.Eval.Files[path]; f != nil {
+			out = append(out, f.Diags...)
+		}
+	}
 	out = append(out, r.collect[path]...)
 	out = append(out, r.assetErr[path]...)
 	out = append(out, r.orderErr[path]...)
@@ -291,8 +302,9 @@ func (p *Project) Analyze(ctx context.Context) (*Result, error) {
 	p.mu.Unlock()
 	sort.Slice(units, func(i, j int) bool { return units[i].Path < units[j].Path })
 
+	units, ev := expand(units, p.Config.Namespace, &p.evalCache)
 	syms, collect := sema.Collect(units, p.Kinds, p.Config.Namespace)
-	r := &Result{Syms: syms, Units: units, Decls: map[*syntax.Decl]*Decl{}, collect: collect, pack: p.Pack, cfg: p.Config, files: p.Files}
+	r := &Result{Syms: syms, Units: units, Decls: map[*syntax.Decl]*Decl{}, collect: collect, pack: p.Pack, cfg: p.Config, files: p.Files, Eval: ev}
 	r.symKey = symbolKey(syms)
 	sameSyms := prev != nil && prev.symKey == r.symKey
 	for _, u := range units {

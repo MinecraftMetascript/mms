@@ -1,0 +1,5 @@
+-- 02-const.mms -- design
+-- 03-const-values.mms -- design
+-- use.mms --
+LootTable chests/far { pools = [Pool(dungeon_spacing / 8, #gems)] }
+SurfaceRule top = grass_top

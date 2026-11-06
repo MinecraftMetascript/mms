@@ -86,9 +86,26 @@ func File(f *syntax.File) string {
 	return out + "\n"
 }
 
+// Expr prints one expression on a single line, as in a `${...}` piece
+// that the evaluator writes back into a command.
+func Expr(x syntax.Expr) string {
+	p := newPrinter(&syntax.File{})
+	return render(p.expr(x), 1<<30)
+}
+
+// srcRange returns src[a:b], clipped to src. Nodes the evaluator builds
+// can carry spans of another file, or of none.
+func srcRange(src []rune, a, b int) []rune {
+	a, b = max(a, 0), min(b, len(src))
+	if a >= b {
+		return nil
+	}
+	return src[a:b]
+}
+
 // oneLine reports whether a span of the source holds no newline.
 func oneLine(f *syntax.File, sp syntax.Span) bool {
-	for _, r := range f.Src[max(sp.Start, 0):min(sp.End, len(f.Src))] {
+	for _, r := range srcRange(f.Src, sp.Start, sp.End) {
 		if r == '\n' {
 			return false
 		}
@@ -194,7 +211,7 @@ func (p *printer) tokenFrom(off int) int {
 // whitespace between them) lies between offsets a and b.
 func (p *printer) blankBetween(a, b int) bool {
 	newlines := 0
-	for _, r := range p.f.Src[max(a, 0):min(b, len(p.f.Src))] {
+	for _, r := range srcRange(p.f.Src, a, b) {
 		switch r {
 		case '\n':
 			newlines++

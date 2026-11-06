@@ -1,0 +1,57 @@
+=== 02-const.mms (changed: false)
+=== 06-top-level-for.mms (changed: true)
+# at 06-top-level-for.mms:4:10 < for w = oak (at 06-top-level-for.mms:2:1, def 06-top-level-for.mms:2:1)
+Recipe oak_crate = Shaped(["PPP", "P P", "PPP"], { P = "oak_planks" }, barrel)
+# at 06-top-level-for.mms:6:13 < for w = oak (at 06-top-level-for.mms:2:1, def 06-top-level-for.mms:2:1)
+LootTable blocks/oak_crate {
+  pools = [Pool(1, "oak_crate")]
+}
+# at 06-top-level-for.mms:4:10 < for w = spruce (at 06-top-level-for.mms:2:1, def 06-top-level-for.mms:2:1)
+Recipe spruce_crate = Shaped(["PPP", "P P", "PPP"], { P = "spruce_planks" }, barrel)
+# at 06-top-level-for.mms:6:13 < for w = spruce (at 06-top-level-for.mms:2:1, def 06-top-level-for.mms:2:1)
+LootTable blocks/spruce_crate {
+  pools = [Pool(1, "spruce_crate")]
+}
+# at 06-top-level-for.mms:4:10 < for w = birch (at 06-top-level-for.mms:2:1, def 06-top-level-for.mms:2:1)
+Recipe birch_crate = Shaped(["PPP", "P P", "PPP"], { P = "birch_planks" }, barrel)
+# at 06-top-level-for.mms:6:13 < for w = birch (at 06-top-level-for.mms:2:1, def 06-top-level-for.mms:2:1)
+LootTable blocks/birch_crate {
+  pools = [Pool(1, "birch_crate")]
+}
+# at 06-top-level-for.mms:4:10 < for w = jungle (at 06-top-level-for.mms:2:1, def 06-top-level-for.mms:2:1)
+Recipe jungle_crate = Shaped(["PPP", "P P", "PPP"], { P = "jungle_planks" }, barrel)
+# at 06-top-level-for.mms:6:13 < for w = jungle (at 06-top-level-for.mms:2:1, def 06-top-level-for.mms:2:1)
+LootTable blocks/jungle_crate {
+  pools = [Pool(1, "jungle_crate")]
+}
+# at 06-top-level-for.mms:4:10 < for w = acacia (at 06-top-level-for.mms:2:1, def 06-top-level-for.mms:2:1)
+Recipe acacia_crate = Shaped(["PPP", "P P", "PPP"], { P = "acacia_planks" }, barrel)
+# at 06-top-level-for.mms:6:13 < for w = acacia (at 06-top-level-for.mms:2:1, def 06-top-level-for.mms:2:1)
+LootTable blocks/acacia_crate {
+  pools = [Pool(1, "acacia_crate")]
+}
+# at 06-top-level-for.mms:4:10 < for w = dark_oak (at 06-top-level-for.mms:2:1, def 06-top-level-for.mms:2:1)
+Recipe dark_oak_crate = Shaped(["PPP", "P P", "PPP"], { P = "dark_oak_planks" }, barrel)
+# at 06-top-level-for.mms:6:13 < for w = dark_oak (at 06-top-level-for.mms:2:1, def 06-top-level-for.mms:2:1)
+LootTable blocks/dark_oak_crate {
+  pools = [Pool(1, "dark_oak_crate")]
+}
+# at 06-top-level-for.mms:4:10 < for w = mangrove (at 06-top-level-for.mms:2:1, def 06-top-level-for.mms:2:1)
+Recipe mangrove_crate = Shaped(["PPP", "P P", "PPP"], { P = "mangrove_planks" }, barrel)
+# at 06-top-level-for.mms:6:13 < for w = mangrove (at 06-top-level-for.mms:2:1, def 06-top-level-for.mms:2:1)
+LootTable blocks/mangrove_crate {
+  pools = [Pool(1, "mangrove_crate")]
+}
+# at 06-top-level-for.mms:4:10 < for w = cherry (at 06-top-level-for.mms:2:1, def 06-top-level-for.mms:2:1)
+Recipe cherry_crate = Shaped(["PPP", "P P", "PPP"], { P = "cherry_planks" }, barrel)
+# at 06-top-level-for.mms:6:13 < for w = cherry (at 06-top-level-for.mms:2:1, def 06-top-level-for.mms:2:1)
+LootTable blocks/cherry_crate {
+  pools = [Pool(1, "cherry_crate")]
+}
+=== more.mms (changed: true)
+# at more.mms:1:1
+Namespace other
+# at more.mms:8:13 < for color, wool = "red", 14 (at more.mms:5:1, def more.mms:5:1)
+ItemTag warm/red = ["red_wool"]
+# at more.mms:10:13 < for color, wool = "blue", 11 (at more.mms:5:1, def more.mms:5:1)
+ItemTag cool/blue = ["blue_wool"]

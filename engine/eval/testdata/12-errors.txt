@@ -1,0 +1,36 @@
+-- errors.mms --
+Template forever(n: int): int = forever(n + 1)
+LootTable loop { pools = [forever(0)] }
+
+const a = b
+const b = [a]
+
+let top = 1
+
+Blueprint Thing {
+  size: int
+  emit {
+    primary Model other_name { parent = item/generated }
+    Model ${self.path} { parent = item/generated }
+  }
+}
+Thing thing { size = 1 }
+
+for x in some_global {
+  Model ${x} {}
+}
+
+Function f {
+  let n = 3
+  Model ${n}_x {}
+}
+
+const wide = 0..3
+for i in wide {
+  Objective count_${i}
+}
+
+Template huge(): [int] = [for i in 0..100000000: i]
+ItemTag too_big = huge()
+
+ItemTag fine = [diamond]

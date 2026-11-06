@@ -1,0 +1,13 @@
+-- prelude.mms --
+Type LangText = string | {string: string}
+extern Template by_language(text: LangText?): {string: string}
+extern Template english(text: LangText): string
+-- 07-custom-item.mms -- design
+-- 08-wand.mms -- design
+-- slow.mms --
+Wand slow_wand {
+  name = "Slow Wand"
+  texture = Texture("art/slow.png")
+  cast = shoot_fireball
+  cooldown = 0
+}

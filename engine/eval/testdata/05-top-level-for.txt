@@ -1,0 +1,15 @@
+-- 02-const.mms -- design
+-- 06-top-level-for.mms -- design
+-- more.mms --
+Namespace other
+
+const colors = { red = 14, blue = 11 }
+
+for color, wool in colors {
+  const id = "${color}_wool"
+  if (wool > 12) {
+    ItemTag warm/${color} = [id]
+  } else {
+    ItemTag cool/${color} = [id]
+  }
+}

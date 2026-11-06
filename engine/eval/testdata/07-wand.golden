@@ -1,0 +1,73 @@
+=== prelude.mms (changed: true)
+=== 07-custom-item.mms (changed: true)
+=== 08-wand.mms (changed: true)
+# at 08-wand.mms:28:1
+Objective wand_cooldown
+# at 08-wand.mms:29:1
+OnTick {
+  /scoreboard players remove @a[scores={wand_cooldown=1..}] wand_cooldown 1
+}
+# at 08-wand.mms:33:6, def 07-custom-item.mms:41:7 < Blueprint Wand (at 08-wand.mms:33:6, def 08-wand.mms:2:1) < Blueprint CustomItem (at 08-wand.mms:33:6, def 07-custom-item.mms:2:1)
+Model item/fire_wand {
+  parent = item/handheld
+  textures = { layer0 = Texture("art/fire_wand.png") }
+}
+# at 08-wand.mms:33:6, def 07-custom-item.mms:43:5 < Blueprint Wand (at 08-wand.mms:33:6, def 08-wand.mms:2:1) < Blueprint CustomItem (at 08-wand.mms:33:6, def 07-custom-item.mms:2:1)
+ItemModel fire_wand { model = Plain(item/fire_wand) }
+# at 08-wand.mms:33:6, def 07-custom-item.mms:45:7 < Blueprint Wand (at 08-wand.mms:33:6, def 08-wand.mms:2:1) < Blueprint CustomItem (at 08-wand.mms:33:6, def 07-custom-item.mms:2:1) < for lang, text = "en_us", "Fire Wand" (at 08-wand.mms:33:6, def 07-custom-item.mms:44:5)
+Lang en_us { "item.demo.fire_wand" = "Fire Wand" }
+# at 08-wand.mms:33:6, def 07-custom-item.mms:48:7 < Blueprint Wand (at 08-wand.mms:33:6, def 08-wand.mms:2:1) < Blueprint CustomItem (at 08-wand.mms:33:6, def 07-custom-item.mms:2:1)
+RightClickHook mms_gen/item_hook/fire_wand/right_click {
+  item = demo:fire_wand
+  run = run {
+    if (wand_cooldown[@s] > 0) {
+      return
+    }
+    wand_cooldown[@s] = 20
+    shoot_fireball()
+  }
+}
+# at 08-wand.mms:39:1
+Recipe fire_wand = Shapeless([stick, blaze_powder], fire_wand)
+=== slow.mms (changed: true)
+# at slow.mms:1:6, def 07-custom-item.mms:41:7 < Blueprint Wand (at slow.mms:1:6, def 08-wand.mms:2:1) < Blueprint CustomItem (at slow.mms:1:6, def 07-custom-item.mms:2:1)
+Model item/slow_wand { parent = item/handheld, textures = { layer0 = Texture("art/slow.png") } }
+# at slow.mms:1:6, def 07-custom-item.mms:43:5 < Blueprint Wand (at slow.mms:1:6, def 08-wand.mms:2:1) < Blueprint CustomItem (at slow.mms:1:6, def 07-custom-item.mms:2:1)
+ItemModel slow_wand { model = Plain(item/slow_wand) }
+# at slow.mms:1:6, def 07-custom-item.mms:45:7 < Blueprint Wand (at slow.mms:1:6, def 08-wand.mms:2:1) < Blueprint CustomItem (at slow.mms:1:6, def 07-custom-item.mms:2:1) < for lang, text = "en_us", "Slow Wand" (at slow.mms:1:6, def 07-custom-item.mms:44:5)
+Lang en_us { "item.demo.slow_wand" = "Slow Wand" }
+# at slow.mms:1:6, def 07-custom-item.mms:48:7 < Blueprint Wand (at slow.mms:1:6, def 08-wand.mms:2:1) < Blueprint CustomItem (at slow.mms:1:6, def 07-custom-item.mms:2:1)
+RightClickHook mms_gen/item_hook/slow_wand/right_click {
+  item = demo:slow_wand
+  run = run {
+    if (wand_cooldown[@s] > 0) {
+      return
+    }
+    wand_cooldown[@s] = 0
+    shoot_fireball()
+  }
+}
+--- diagnostics
+5:3 error check: A cooldown is at least one tick
+=== provenance of copied nodes
+08-wand.mms:33:6 from 07-custom-item.mms:15 < Blueprint Wand (at 08-wand.mms:33:6, def 08-wand.mms:2:1) < Blueprint CustomItem (at 08-wand.mms:33:6, def 07-custom-item.mms:2:1): 1 node, "item.demo.fire_wand"
+08-wand.mms:33:6 from 07-custom-item.mms:19 < Blueprint Wand (at 08-wand.mms:33:6, def 08-wand.mms:2:1) < Blueprint CustomItem (at 08-wand.mms:33:6, def 07-custom-item.mms:2:1): 1 node, Translate
+08-wand.mms:33:6 from 07-custom-item.mms:2 < Blueprint Wand (at 08-wand.mms:33:6, def 08-wand.mms:2:1) < Blueprint CustomItem (at 08-wand.mms:33:6, def 07-custom-item.mms:2:1): 1 node, demo:fire_wand
+08-wand.mms:33:6 from 07-custom-item.mms:41 < Blueprint Wand (at 08-wand.mms:33:6, def 08-wand.mms:2:1) < Blueprint CustomItem (at 08-wand.mms:33:6, def 07-custom-item.mms:2:1): 1 node, { layer0 = Texture("art/fire_wand.png") }
+08-wand.mms:33:6 from 07-custom-item.mms:43 < Blueprint Wand (at 08-wand.mms:33:6, def 08-wand.mms:2:1) < Blueprint CustomItem (at 08-wand.mms:33:6, def 07-custom-item.mms:2:1): 3 nodes, Plain(item/fire_wand)
+08-wand.mms:33:6 from 08-wand.mms:18 < Blueprint Wand (at 08-wand.mms:33:6, def 08-wand.mms:2:1): 1 node, item/handheld
+08-wand.mms:33:6 from 08-wand.mms:19 < Blueprint Wand (at 08-wand.mms:33:6, def 08-wand.mms:2:1): 1 node, run {...
+08-wand.mms:33:6 from 08-wand.mms:20 < Blueprint Wand (at 08-wand.mms:33:6, def 08-wand.mms:2:1): 5 nodes, wand_cooldown[@s] > 0
+08-wand.mms:33:6 from 08-wand.mms:21 < Blueprint Wand (at 08-wand.mms:33:6, def 08-wand.mms:2:1): 3 nodes, wand_cooldown[@s]
+08-wand.mms:33:6 from 08-wand.mms:22 < Blueprint Wand (at 08-wand.mms:33:6, def 08-wand.mms:2:1): 1 node, shoot_fireball()
+08-wand.mms:33:6 from 08-wand.mms:7 < Blueprint Wand (at 08-wand.mms:33:6, def 08-wand.mms:2:1): 1 node, 20
+slow.mms:1:6 from 07-custom-item.mms:15 < Blueprint Wand (at slow.mms:1:6, def 08-wand.mms:2:1) < Blueprint CustomItem (at slow.mms:1:6, def 07-custom-item.mms:2:1): 1 node, "item.demo.slow_wand"
+slow.mms:1:6 from 07-custom-item.mms:19 < Blueprint Wand (at slow.mms:1:6, def 08-wand.mms:2:1) < Blueprint CustomItem (at slow.mms:1:6, def 07-custom-item.mms:2:1): 1 node, Translate
+slow.mms:1:6 from 07-custom-item.mms:2 < Blueprint Wand (at slow.mms:1:6, def 08-wand.mms:2:1) < Blueprint CustomItem (at slow.mms:1:6, def 07-custom-item.mms:2:1): 1 node, demo:slow_wand
+slow.mms:1:6 from 07-custom-item.mms:41 < Blueprint Wand (at slow.mms:1:6, def 08-wand.mms:2:1) < Blueprint CustomItem (at slow.mms:1:6, def 07-custom-item.mms:2:1): 1 node, { layer0 = Texture("art/slow.png") }
+slow.mms:1:6 from 07-custom-item.mms:43 < Blueprint Wand (at slow.mms:1:6, def 08-wand.mms:2:1) < Blueprint CustomItem (at slow.mms:1:6, def 07-custom-item.mms:2:1): 3 nodes, Plain(item/slow_wand)
+slow.mms:1:6 from 08-wand.mms:18 < Blueprint Wand (at slow.mms:1:6, def 08-wand.mms:2:1): 1 node, item/handheld
+slow.mms:1:6 from 08-wand.mms:19 < Blueprint Wand (at slow.mms:1:6, def 08-wand.mms:2:1): 1 node, run {...
+slow.mms:1:6 from 08-wand.mms:20 < Blueprint Wand (at slow.mms:1:6, def 08-wand.mms:2:1): 5 nodes, wand_cooldown[@s] > 0
+slow.mms:1:6 from 08-wand.mms:21 < Blueprint Wand (at slow.mms:1:6, def 08-wand.mms:2:1): 3 nodes, wand_cooldown[@s]
+slow.mms:1:6 from 08-wand.mms:22 < Blueprint Wand (at slow.mms:1:6, def 08-wand.mms:2:1): 1 node, shoot_fireball()
