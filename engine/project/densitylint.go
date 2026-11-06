@@ -455,7 +455,7 @@ func (l *lintRun) reportNested(rt router, slot, owner string, reported map[strin
 	if owner != "" {
 		if od := l.densities().decls[owner]; od != nil && od.D.Name != nil {
 			d, sp = od, od.D.Name.Sp
-			msg = fmt.Sprintf("%s is Interpolated, and is used inside another Interpolated (from the noise router of %s). Interpolate once, around the whole terrain",
+			msg = fmt.Sprintf("%s contains an Interpolated, and is used inside another Interpolated (from the noise router of %s). Interpolate once, around the whole terrain",
 				shortID(owner, od.NS), shortID(rt.decl.ID(), od.NS))
 		}
 	}
