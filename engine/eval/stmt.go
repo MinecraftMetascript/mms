@@ -447,15 +447,31 @@ func (c *ctx) apply(t *Template, x *syntax.Call) Value {
 	ac := *c
 	ac.compile = true
 	args := ac.argValues(x.Args)
+	if !c.compile {
+		// A Global or Storage field given in function code is its value
+		// when the code runs, as a local is.
+		for i, a := range x.Args {
+			if c.namesValue(a.Value) {
+				args[i].v = c.reduce(a.Value)
+			}
+		}
+	}
 	site := c.span(x.Sp)
 	tc := &ctx{e: c.e, path: c.path, defPath: t.Path, site: &site, sc: &scope{}, ns: c.ns, compile: true,
 		depth: c.depth + 1, fr: append(append([]Frame(nil), c.fr...), Frame{Kind: FrameTemplate, Name: name,
 			Call: Origin{c.path, site}, Def: Origin{t.Path, t.D.Sp}})}
+	var call *Call
 	if c.site == nil {
-		call := &Call{Path: c.path, Template: t, X: x, Args: map[string]syntax.Expr{}}
+		call = &Call{Path: c.path, Template: t, X: x, Args: map[string]syntax.Expr{}}
 		for param, i := range argIndex(t.D, x) {
 			if a := c.lower(args[i].v); a != nil {
 				call.Args[param] = a
+			}
+			if _, code := args[i].v.(*Code); code && !c.compile && isName(args[i].x.Value) {
+				if call.Runtime == nil {
+					call.Runtime = map[string]bool{}
+				}
+				call.Runtime[param] = true
 			}
 		}
 		c.e.r.Calls = append(c.e.r.Calls, call)
@@ -473,6 +489,9 @@ func (c *ctx) apply(t *Template, x *syntax.Call) Value {
 	case t.D.Body != nil:
 		st := &Stmts{pos: tc.pos(t.D.Body.Sp)}
 		tc.stmts(t.D.Body.Items, &st.Items)
+		if call != nil {
+			call.Expanded = st.Items
+		}
 		return st
 	}
 	c.errorf("mms/template-body", x.Sp, "Template '"+name+"' has no body")
@@ -605,4 +624,34 @@ func argIndex(d *syntax.Decl, x *syntax.Call) map[string]int {
 		}
 	}
 	return out
+}
+
+// namesValue reports whether x is a Global or Storage, or a field of
+// one, that no compile-time name hides.
+func (c *ctx) namesValue(x syntax.Expr) bool {
+	switch x := x.(type) {
+	case *syntax.Ident:
+		if _, ok, _ := c.sc.lookup(x.Name); ok || c.e.r.Consts[x.Name] != nil {
+			return false
+		}
+		return c.e.values[x.Name]
+	case *syntax.Member:
+		return c.namesValue(x.X)
+	case *syntax.Paren:
+		return c.namesValue(x.X)
+	}
+	return false
+}
+
+// isName reports whether x is a name or a field of one: `y`, `game.wave`.
+func isName(x syntax.Expr) bool {
+	switch x := x.(type) {
+	case *syntax.Ident:
+		return true
+	case *syntax.Member:
+		return isName(x.X)
+	case *syntax.Paren:
+		return isName(x.X)
+	}
+	return false
 }

@@ -22,10 +22,10 @@ import (
 // writes worldgen/noise/mms_gen/hills/noise.json and refers to it as
 // <ns>:mms_gen/hills/noise.
 //
-// A function id takes a block of commands, compiled as a Function with
-// no parameters:
+// A function id takes `run { }`, a block of commands compiled as a
+// Function with no parameters:
 //
-//	rewards = { function = {
+//	rewards = { function = run {
 //	  /say found it
 //	} }
 
@@ -76,8 +76,11 @@ func (c *Checker) hoistable(e syntax.Expr, k Kind) bool {
 		return false
 	}
 	if k.MMS == "Function" {
-		_, ok := e.(*syntax.Object)
-		return ok
+		switch e.(type) {
+		case *syntax.RunExpr, *syntax.Object:
+			return true
+		}
+		return false
 	}
 	return c.fits(e, c.kindRoot(k))
 }
@@ -124,18 +127,34 @@ func (c *Checker) hoistFunction(e syntax.Expr, k Kind) jsonv.Value {
 	for p, ok := e.(*syntax.Paren); ok; p, ok = e.(*syntax.Paren) {
 		e = p.X
 	}
-	obj := e.(*syntax.Object)
+	var body *syntax.Block
+	var sp syntax.Span
+	switch x := e.(type) {
+	case *syntax.RunExpr:
+		body, sp = x.Body, x.Sp
+	case *syntax.Object:
+		// A plain block: commands go in `run { }`, so a block always
+		// means the same thing.
+		if !c.trial {
+			c.errorf("mms/syntax", x.Sp, "an inline function is written run { ... }")
+			c.Diags[len(c.Diags)-1].Fixes = []syntax.Fix{{Title: "Write run { ... }", Safe: true, Edits: []syntax.TextEdit{{Sp: syntax.Span{Start: x.Sp.Start, End: x.Sp.Start}, Text: "run "}}}}
+		}
+		return nil
+	}
+	if body == nil {
+		body = &syntax.Block{Sp: sp}
+	}
 	if c.trial {
 		return jsonv.String(c.NS + ":mms_gen/inline")
 	}
 	c.info(e).InlineFn = true
 	hid := c.hoistID(k)
-	d := &syntax.Decl{Kind: &syntax.Ident{Name: k.Name, Sp: obj.Sp}, Body: obj.Body, Sp: obj.Sp}
+	d := &syntax.Decl{Kind: &syntax.Ident{Name: k.Name, Sp: sp}, Body: body, Sp: sp}
 	f := c.CompileFunction(d, hid, c.Src)
 	if f == nil {
 		return nil
 	}
-	c.Hoisted = append(c.Hoisted, Hoisted{Kind: k, ID: hid, Fn: fn.Generate(*f), Sp: obj.Sp})
+	c.Hoisted = append(c.Hoisted, Hoisted{Kind: k, ID: hid, Fn: fn.Generate(*f), Sp: sp})
 	in := c.info(e)
 	in.ID = hid
 	in.Extract = k.Name

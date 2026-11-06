@@ -69,6 +69,18 @@ func TestExamples(t *testing.T) {
 					}
 				}
 			}
+			// Every example's Tests pass.
+			if !r.HasErrors() {
+				res, err := r.RunTests(nil)
+				if err != nil {
+					t.Fatal(err)
+				}
+				for _, x := range res {
+					if !x.Pass {
+						t.Errorf("Test %s: %s", x.Name, x.Message)
+					}
+				}
+			}
 			got := dumpFiles(r.Emit())
 			golden := filepath.Join("testdata", "examples", name+".golden")
 			if update {

@@ -93,6 +93,17 @@ func Expr(x syntax.Expr) string {
 	return render(p.expr(x), 1<<30)
 }
 
+// Stmts prints statements one after another, as the code a Commands
+// Template writes at its call.
+func Stmts(items []syntax.Stmt) string {
+	p := newPrinter(&syntax.File{})
+	var out []string
+	for _, it := range items {
+		out = append(out, strings.TrimRight(render(p.stmt(it), Width), " \n"))
+	}
+	return strings.Join(out, "\n")
+}
+
 // srcRange returns src[a:b], clipped to src. Nodes the evaluator builds
 // can carry spans of another file, or of none.
 func srcRange(src []rune, a, b int) []rune {

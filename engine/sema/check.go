@@ -43,7 +43,7 @@ type Info struct {
 	// Props are the block state properties a multipart `when` object
 	// body can test, for completion.
 	Props map[string][]string
-	// InlineFn is set on a `{ ... }` block written where a function id is
+	// InlineFn is set on a `run { ... }` block written where a function id is
 	// needed: its body is function code, compiled as a hoisted Function.
 	InlineFn bool
 	// Extract is the declaration kind (as written, e.g. "Noise") of an

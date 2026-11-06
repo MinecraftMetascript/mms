@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/minecraftmetascript/mms/engine/command"
+	"github.com/minecraftmetascript/mms/engine/eval"
 	"github.com/minecraftmetascript/mms/engine/format"
 	"github.com/minecraftmetascript/mms/engine/jsonv"
 	"github.com/minecraftmetascript/mms/engine/project"
@@ -494,16 +495,13 @@ func (a *at) code() bool { return a.fn != nil }
 
 // codeRoot finds the function code holding the cursor: the innermost
 // inline function block on the path, such as CustomItem's
-// `on_right_click = run { ... }` or an advancement's `function = { ... }`,
+// `on_right_click = run { ... }` or an advancement's `function = run { ... }`,
 // else the declaration when its kind holds code.
 func (a *at) codeRoot() *syntax.Decl {
 	if a.decl == nil {
 		return nil
 	}
 	for i := len(a.path) - 1; i >= 2; i-- {
-		if o, ok := a.path[i].(*syntax.Object); ok && o.Body != nil && a.info(o) != nil && a.info(o).InlineFn {
-			return &syntax.Decl{Body: o.Body, Sp: o.Sp}
-		}
 		if r, ok := a.path[i].(*syntax.RunExpr); ok && r.Body != nil {
 			return &syntax.Decl{Body: r.Body, Sp: r.Sp}
 		}
@@ -785,6 +783,19 @@ func commaBetween(f *syntax.File, from, to int) bool {
 
 // Hover returns Markdown for the node at off and the span it describes.
 func (s *Session) Hover(path string, off int) (string, syntax.Span) {
+	md, sp := s.hover(path, off)
+	for _, c := range s.commandCalls(path) {
+		if fsp := c.X.Fn.Span(); fsp.Contains(off) {
+			if md != "" {
+				md += "\n\n---\n\n"
+			}
+			return md + inlinedText(c, true), fsp
+		}
+	}
+	return md, sp
+}
+
+func (s *Session) hover(path string, off int) (string, syntax.Span) {
 	if md, sp, ok := s.bookHover(path, off); ok {
 		return md, sp
 	}
@@ -1259,8 +1270,47 @@ func (s *Session) InlayHints(path string) []InlayHint {
 			}
 		}
 	}
+	// A Commands Template writes its code where it is called.
+	for _, c := range s.commandCalls(path) {
+		out = append(out, InlayHint{Off: c.X.Sp.End, Label: "inlined", Tooltip: inlinedText(c, false)})
+	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Off < out[j].Off })
 	return out
+}
+
+// commandCalls lists the calls in a file of Templates that return
+// Commands, which write their statements in place.
+func (s *Session) commandCalls(path string) []*eval.Call {
+	if s.R.Eval == nil {
+		return nil
+	}
+	var out []*eval.Call
+	for _, c := range s.R.Eval.Calls {
+		if c.Path == path && c.X != nil && c.Template != nil && c.Template.D.Body != nil {
+			out = append(out, c)
+		}
+	}
+	return out
+}
+
+// maxInlined is how many lines of a Template's expansion hover shows.
+const maxInlined = 20
+
+// inlinedText says what a Commands Template call writes, as markdown for
+// hover or as plain text for an inlay's tooltip.
+func inlinedText(c *eval.Call, md bool) string {
+	code := format.Stmts(c.Expanded)
+	if lines := strings.Split(code, "\n"); len(lines) > maxInlined {
+		code = strings.Join(lines[:maxInlined], "\n") + fmt.Sprintf("\n// … %d more lines", len(lines)-maxInlined)
+	}
+	name := c.Template.D.NameText()
+	if code == "" {
+		return "Template " + name + " is inlined here at compile time, and writes nothing for these arguments."
+	}
+	if md {
+		return "Inlined at compile time: Template `" + name + "` writes\n\n```mms\n" + code + "\n```"
+	}
+	return "Template " + name + " is inlined here at compile time:\n" + code
 }
 
 func isIdent(e syntax.Expr, name string) bool {

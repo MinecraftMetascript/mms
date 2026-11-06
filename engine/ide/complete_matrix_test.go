@@ -131,13 +131,13 @@ func TestCompletionMatrix(t *testing.T) {
 
 		// Inline function blocks, where a function id is needed: the same
 		// as a Function body.
-		{name: "inline command start", src: "Advancement a = { rewards = { function = {\n  /|\n} } }", want: []string{"say", "scoreboard"}},
-		{name: "inline command name", src: "Advancement a = { rewards = { function = {\n  /scoreb|\n} } }", want: []string{"scoreboard"}, replace: "scoreb"},
-		{name: "inline statement", src: "Advancement a = { rewards = { function = {\n  /say hi\n  |\n} } }", want: []string{"As", "let", "return"}, not: []string{"experience", "loot"}},
-		{name: "inline local", src: "Advancement a = { rewards = { function = {\n  let x = 1\n  let y = |\n} } }", want: []string{"x", "true"}, not: []string{"As"}},
-		{name: "inline interpolation", src: "Advancement a = { rewards = { function = {\n  let x = 1\n  /say ${|}\n} } }", want: []string{"x"}},
-		{name: "inline execute selector", src: "Advancement a = { rewards = { function = {\n  As(|)\n} } }", want: []string{"@a", "@s"}},
-		{name: "inline execute chain", src: "Advancement a = { rewards = { function = {\n  As(@a).|\n} } }", want: []string{"At", "Positioned"}},
+		{name: "inline command start", src: "Advancement a = { rewards = { function = run {\n  /|\n} } }", want: []string{"say", "scoreboard"}},
+		{name: "inline command name", src: "Advancement a = { rewards = { function = run {\n  /scoreb|\n} } }", want: []string{"scoreboard"}, replace: "scoreb"},
+		{name: "inline statement", src: "Advancement a = { rewards = { function = run {\n  /say hi\n  |\n} } }", want: []string{"As", "let", "return"}, not: []string{"experience", "loot"}},
+		{name: "inline local", src: "Advancement a = { rewards = { function = run {\n  let x = 1\n  let y = |\n} } }", want: []string{"x", "true"}, not: []string{"As"}},
+		{name: "inline interpolation", src: "Advancement a = { rewards = { function = run {\n  let x = 1\n  /say ${|}\n} } }", want: []string{"x"}},
+		{name: "inline execute selector", src: "Advancement a = { rewards = { function = run {\n  As(|)\n} } }", want: []string{"@a", "@s"}},
+		{name: "inline execute chain", src: "Advancement a = { rewards = { function = run {\n  As(@a).|\n} } }", want: []string{"At", "Positioned"}},
 		{name: "item hook command", src: "CustomItem w {\n  base = stick\n  on_right_click = run {\n    /|\n  }\n}", want: []string{"say", "give"}},
 		{name: "item hook statement", src: "CustomItem w {\n  base = stick\n  on_right_click = run {\n    |\n  }\n}", want: []string{"As", "let"}, not: []string{"on_hit", "components"}},
 		{name: "item hook execute block", src: "CustomItem w {\n  base = stick\n  on_hit = run {\n    As(@a) {\n      /|\n    }\n  }\n}", want: []string{"say"}},
