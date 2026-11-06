@@ -1227,17 +1227,7 @@ func (s *Session) InlayHints(path string) []InlayHint {
 					to = string(r[:29]) + "…"
 				}
 				out = append(out, InlayHint{Off: n.Span().End, Label: "→ " + to, Tooltip: cv.Hint})
-				continue
 			}
-			if in.Base == "" || in.Symbol == nil {
-				continue
-			}
-			base := strings.TrimPrefix(in.Base, "minecraft:")
-			out = append(out, InlayHint{
-				Off:     n.Span().End,
-				Label:   "→ " + base,
-				Tooltip: "A plain item id has no components, so " + in.Symbol.Path + " is written as " + in.Base + " here and any " + base + " matches.",
-			})
 		}
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Off < out[j].Off })

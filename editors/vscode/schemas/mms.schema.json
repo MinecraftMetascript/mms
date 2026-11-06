@@ -46,13 +46,8 @@
           "$ref": "#/definitions/severity"
         },
         "custom-item-as-base": {
-          "description": "A CustomItem used where the game takes a plain item id, such as a recipe ingredient or an item tag. It stands for its base item there, so it also matches the base item without the custom components.\n\nDefault: `hint`.",
-          "markdownDescription": "A CustomItem used where the game takes a plain item id, such as a recipe ingredient or an item tag. It stands for its base item there, so it also matches the base item without the custom components.\n\nDefault: `hint`.",
-          "$ref": "#/definitions/severity"
-        },
-        "custom-item-base": {
-          "description": "A CustomItem used where the game takes a plain item id, such as a recipe ingredient or an item tag. It stands for its base item there, so it also matches the base item without the custom components.\n\nDefault: `hint`.",
-          "markdownDescription": "A CustomItem used where the game takes a plain item id, such as a recipe ingredient or an item tag. It stands for its base item there, so it also matches the base item without the custom components.\n\nDefault: `hint`.",
+          "description": "A Book used where the game takes a plain item id, such as a recipe ingredient or an item tag. It stands for written_book there, so any written book matches.\n\nDefault: `hint`.",
+          "markdownDescription": "A Book used where the game takes a plain item id, such as a recipe ingredient or an item tag. It stands for written_book there, so any written book matches.\n\nDefault: `hint`.",
           "$ref": "#/definitions/severity"
         },
         "deprecated": {

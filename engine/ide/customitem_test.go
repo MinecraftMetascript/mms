@@ -63,7 +63,7 @@ func TestCustomItemInlayHint(t *testing.T) {
 
 func TestColorHover(t *testing.T) {
 	for _, tc := range []struct{ src, want string }{
-		{`Book b = { title = "T", author = "A", pages = [{ text = "x", shadow_co|lor = "#FF0000" }] }`, `"#AARRGGBB"`},
+		{`Book b { title = "T", author = "A", pages = [{ text = "x", shadow_co|lor = "#FF0000" }] }`, `"#AARRGGBB"`},
 		{`Biome b { effects = { water_co|lor = "#3F76E4" } }`, `"#RRGGBB"`},
 	} {
 		s, off := session(t, tc.src)

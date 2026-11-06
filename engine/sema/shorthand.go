@@ -130,6 +130,12 @@ type sugarRule struct {
 }
 
 func (c *Checker) sugar(e syntax.Expr, v tview) *sugarRule {
+	if v.T == bookTextType {
+		return &sugarRule{bookTextRule}
+	}
+	if v.T != nil && v.T.Kind == "list" && callName(e) == "book_pages" {
+		return &sugarRule{bookPagesRule}
+	}
 	switch v.Name {
 	case tMaterialRule:
 		switch e.(type) {
@@ -145,14 +151,6 @@ func (c *Checker) sugar(e syntax.Expr, v tview) *sugarRule {
 	case tFullBlock:
 		if _, ok := e.(*syntax.Index); ok {
 			return &sugarRule{blockWithState}
-		}
-	case tLootEntry:
-		if c.isCustomItem(e) || c.usesCustomField(e, "name") {
-			return &sugarRule{customEntryRule}
-		}
-	case tItemStack:
-		if c.isCustomItem(e) || c.usesCustomField(e, "id") {
-			return &sugarRule{customStackRule}
 		}
 	case tRGB, tRGBA, tStringRGB, tStringARGB:
 		if isColorHexString(e) {

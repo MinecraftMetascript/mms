@@ -263,7 +263,7 @@ A `Book` is a written book. Its pages are written in book markup, a small Markdo
 ```
 Objective deaths = "deathCount"
 
-Book guide = {
+Book guide {
   title = "Library Guide"
   author = "The Librarian"
   text = [
@@ -302,6 +302,8 @@ pages = [
 ```
 
 The book's name stands for the book wherever a [custom item](#custom-items) name works: `guide` in a loot entry, `guide * 2` as a recipe result, and `${guide}` in `/give @s ${guide}`.
+
+`Book` is a Blueprint in the prelude, like `CustomItem`. It lays out its text with `book_pages(text)`, which also works anywhere else a list of pages goes, such as the `pages` of a `SetWrittenBookPages` loot function: `pages = book_pages(TextFile("books/diary.mmsbook"))`.
 
 ### Text markup
 

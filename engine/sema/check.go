@@ -32,9 +32,6 @@ type Info struct {
 	Folder string
 	// Asset is set on an asset helper call such as Texture("a.png").
 	Asset *Asset
-	// Base is set where a custom item is used as a plain item id: the
-	// base item id written in its place.
-	Base string
 	// Converted is set where a Blueprint instance's name is checked as
 	// one of its `as` conversions.
 	Converted *Conversion
@@ -101,6 +98,11 @@ type Checker struct {
 	// source, such as a .mmsbook file, by its path in the project, and
 	// the unit path it has; nil when there are none.
 	Texts func(path string) (unit, text string, ok bool)
+	// Book is the layout of the last Book text checked, for the editor
+	// and the book-overflow lint.
+	Book *BookLayout
+	// BookDiags are the problems in the Book text checked.
+	BookDiags []syntax.Diagnostic
 	// Extern holds problems found in other files, such as a .mmsbook
 	// file a Book reads, by path.
 	Extern map[string][]syntax.Diagnostic
@@ -115,9 +117,6 @@ type Checker struct {
 	// to be written as its own resource (see hoist.go).
 	Hoisted []Hoisted
 	hoistN  map[string]int
-	// customOf is the custom item this checker expands, to catch an item
-	// that contains itself.
-	customOf string
 
 	trial bool
 	errs  int
@@ -922,17 +921,6 @@ func (c *Checker) resolveID(text string, id idInfo, e syntax.Expr) string {
 	in.ID = full
 	in.Symbol = sym
 	in.Bare, in.Folder = BareID, reg
-	if sym != nil && isItemKind(sym.Kind.MMS) {
-		// A plain item id has no components, so the custom item stands
-		// for its base item. The custom-item-base lint rule says so.
-		c.findSig(reg, sym.ID())
-		base := customItemBase(sym)
-		in.Base = base
-		if id.excluded(base) {
-			c.excludedID(base, id, e.Span())
-		}
-		return base
-	}
 	if id.excluded(full) {
 		c.excludedID(full, id, e.Span())
 		return full
