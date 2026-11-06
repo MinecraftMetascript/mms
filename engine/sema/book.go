@@ -105,7 +105,7 @@ const bookMarkupDoc = "Markup: `# heading`, `**bold**`, `*italic*`, `__underline
 	"`${kills[@s]}` for a score or Global, `\\` before a character to write it as is."
 
 // BookLayout is a book's text laid out as pages, for the editor and the
-// book-overflow lint.
+// book-page-overflow lint.
 type BookLayout struct {
 	// Overflows are pages that run past the bottom of the page.
 	Overflows []BookOverflow

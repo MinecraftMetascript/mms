@@ -865,3 +865,27 @@ func TestRunTests(t *testing.T) {
 		t.Errorf("one: %v", one)
 	}
 }
+
+// TestExpand checks mms/expand: at a position it gives what the call there
+// expands to, and without one it lists every expansion in the file.
+func TestExpand(t *testing.T) {
+	c := start(t)
+	c.result("initialize", map[string]any{})
+	c.notify("initialized", map[string]any{})
+	uri := "file:///a.mms"
+	src := "Template twice(n: int): int = n * 2\nDensityFunction d = twice(3)\n"
+	c.notify("textDocument/didOpen", map[string]any{"textDocument": map[string]any{"uri": uri, "languageId": "mms", "version": 1, "text": src}})
+	one, _ := c.result("mms/expand", pos(uri, 1, 21)).(map[string]any)
+	if one == nil || one["text"] != "6" || one["title"] != "Template twice" {
+		t.Errorf("expand at twice = %v", one)
+	}
+	if none := c.result("mms/expand", pos(uri, 0, 0)); none != nil {
+		t.Errorf("expand at the Template = %v", none)
+	}
+	// The list holds command Templates and Blueprint instances, not
+	// value Templates.
+	all, ok := c.result("mms/expand", map[string]any{"textDocument": map[string]any{"uri": uri}}).([]any)
+	if !ok || len(all) != 0 {
+		t.Errorf("expansions = %v", all)
+	}
+}

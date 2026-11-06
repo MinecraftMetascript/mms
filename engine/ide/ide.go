@@ -1243,6 +1243,9 @@ type InlayHint struct {
 	Off     int // where the label goes
 	Label   string
 	Tooltip string
+	// Type marks an inferred type, `: int`, which sits right after the
+	// name.
+	Type bool
 }
 
 // InlayHints lists the inlay hints in a file, in order: the base item
@@ -1270,11 +1273,45 @@ func (s *Session) InlayHints(path string) []InlayHint {
 			}
 		}
 	}
+	out = append(out, s.typeHints(u)...)
 	// A Commands Template writes its code where it is called.
 	for _, c := range s.commandCalls(path) {
 		out = append(out, InlayHint{Off: c.X.Sp.End, Label: "inlined", Tooltip: inlinedText(c, false)})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Off < out[j].Off })
+	return out
+}
+
+// typeHints shows the inferred type after a `const` or `let` name that
+// has none written: `let n = 0` reads `let n: int = 0`.
+func (s *Session) typeHints(u *sema.Unit) []InlayHint {
+	var out []InlayHint
+	hint := func(n *syntax.Name, t string) {
+		if n != nil && t != "" {
+			out = append(out, InlayHint{Off: n.Sp.End, Label: ": " + t, Tooltip: "Inferred type", Type: true})
+		}
+	}
+	for _, it := range u.File.Items {
+		if k, ok := it.(*syntax.ConstStmt); ok && k.Name != nil && k.Type == nil && s.R.Eval != nil {
+			if c := s.R.Eval.Consts[k.Name.Text]; c != nil && c.S == k {
+				hint(k.Name, eval.TypeOf(c.Value()))
+			}
+		}
+	}
+	for _, d := range u.File.Decls {
+		dr := s.R.Decls[d]
+		if dr == nil || d.Body == nil {
+			continue
+		}
+		syntax.Walk(d.Body, func(n syntax.Node) bool {
+			if l, ok := n.(*syntax.LetStmt); ok && l.Name != nil && l.Type == nil {
+				if in := dr.Info[l.Name]; in != nil && in.Local != nil {
+					hint(l.Name, in.Local.Type)
+				}
+			}
+			return true
+		})
+	}
 	return out
 }
 

@@ -13,4 +13,4 @@ mms build --world ~/.minecraft/saves/MyWorld
 
 Join the world for the guide, then use its "Find a chest" link, or run `/function library:chest`, to place a chest of old things. `/loot give @s loot library:old_chest` gives its contents straight away.
 
-In the web editor, the cursor on a `tell`, `title` or `actionbar` line, or in `text/rules.mmstext`, previews the message as the game shows it. In VS Code or the web editor, `.mmsbook` and `.mmstext` files get completion after `{`, `](` and `${`, hover on tags and links, and errors in place. A page with more text than the book screen shows gets a `book-overflow` warning where the text is cut off.
+In the web editor, the cursor on a `tell`, `title` or `actionbar` line, or in `text/rules.mmstext`, previews the message as the game shows it. In VS Code or the web editor, `.mmsbook` and `.mmstext` files get completion after `{`, `](` and `${`, hover on tags and links, and errors in place. A page with more text than the book screen shows gets a `book-page-overflow` warning where the text is cut off.

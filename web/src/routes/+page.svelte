@@ -9,7 +9,7 @@
 	import Sidebar from '#lib/components/Sidebar.svelte';
 	import JsonView from '#lib/components/JsonView.svelte';
 	import TestsView from '#lib/components/TestsView.svelte';
-	import { Engine, itemKey, outputKey, type Diagnostic, type DocSymbol, type OutputFile } from '#lib/engine/engine.svelte.ts';
+	import { Engine, itemKey, outputKey, type Diagnostic, type DocSymbol, type Expansion, type OutputFile } from '#lib/engine/engine.svelte.ts';
 	import { Project, pathOf, uriOf, starter, type ProjectData } from '#lib/project/project.svelte.ts';
 	import { examples } from '#lib/project/examples.ts';
 	import { download, hasResourcePack, isDataPack, packZip, projectZip, readProjectZip, readZip, readZipAssets } from '#lib/project/zip.ts';
@@ -28,8 +28,8 @@
 	let viewWaiters: ((v: EditorView) => void)[] = [];
 	let loaded = $state(false);
 	let selectedOutput = $state<string | null>(null);
-	let rightTab = $state<'preview' | 'json' | 'tests'>('preview');
-	let cursor = $state<{ uri: string; line: number } | null>(null);
+	let rightTab = $state<'preview' | 'json' | 'expanded' | 'tests'>('preview');
+	let cursor = $state<{ uri: string; line: number; character: number } | null>(null);
 	let theme = $state<'system' | 'light' | 'dark'>('system');
 	const themes = { system: 'System', light: 'Light', dark: 'Dark' } as const;
 	function nextTheme() {
@@ -111,8 +111,9 @@
 
 	// Follow the cursor: the declaration under it picks the preview and JSON.
 	function trackCursor(v: EditorView) {
-		const line = v.state.doc.lineAt(v.state.selection.main.head).number - 1;
-		cursor = { uri: uriOf(project.active), line };
+		const head = v.state.selection.main.head;
+		const l = v.state.doc.lineAt(head);
+		cursor = { uri: uriOf(project.active), line: l.number - 1, character: head - l.from };
 	}
 	const cursorExt = EditorView.updateListener.of((u) => {
 		if (u.selectionSet || u.docChanged) trackCursor(u.view);
@@ -160,6 +161,21 @@
 	});
 	$effect(() => {
 		if (rightTab === 'tests' && !engine?.hasTests) rightTab = 'preview';
+	});
+	// The Expanded tab shows what the Template call or Blueprint instance
+	// at the cursor writes, refreshed as the cursor moves and the code changes.
+	let expansion = $state<Expansion | null>(null);
+	$effect(() => {
+		const c = cursor;
+		void engine?.output; // a new analysis
+		if (rightTab !== 'expanded' || !engine || !c) return;
+		let live = true;
+		void engine.expand(c.uri, { line: c.line, character: c.character }).then((x) => {
+			if (live) expansion = x;
+		});
+		return () => {
+			live = false;
+		};
 	});
 	const previewPath = $derived(pinned ?? selectedOutput);
 	const pinnable = $derived(shows(previewPath, engine?.outputItems, engine?.outputTexts));
@@ -439,7 +455,7 @@
 		</section>
 		<section class="flex min-h-0 flex-col bg-panel">
 			<div class="flex border-b border-line text-xs" role="tablist">
-				{#each [['preview', 'Preview'], ['json', 'JSON'], ...(engine?.hasTests ? [['tests', testsLabel]] : [])] as [id, label] (id)}
+				{#each [['preview', 'Preview'], ['json', 'JSON'], ['expanded', 'Expanded'], ...(engine?.hasTests ? [['tests', testsLabel]] : [])] as [id, label] (id)}
 					<button
 						role="tab"
 						aria-selected={rightTab === id}
@@ -470,6 +486,16 @@
 					<div class="h-full" class:hidden={rightTab !== 'json'}>
 						<JsonView file={selectedFile} onsource={(f: OutputFile) => f.uri && f.range && reveal(f.uri, f.range)} />
 					</div>
+					{#if rightTab === 'expanded'}
+						<div class="flex h-full min-h-0 flex-col text-sm" aria-label="Expanded">
+							{#if expansion}
+								<p class="border-b border-line px-3 py-1.5 text-xs text-muted">What <span class="font-mono text-ink">{expansion.title}</span> writes</p>
+								<pre class="min-h-0 flex-1 overflow-auto px-3 py-2 font-mono text-[12.5px] leading-5" data-testid="expanded-text">{expansion.text || '(nothing)'}</pre>
+							{:else}
+								<p class="p-4 text-sm text-muted">Put the cursor in a Template call or a Blueprint declaration, such as a CustomItem, to see the code it writes.</p>
+							{/if}
+						</div>
+					{/if}
 					{#if rightTab === 'tests'}
 						<div class="h-full">
 							<TestsView tests={engine.tests} error={engine.testsError} onsource={reveal} />

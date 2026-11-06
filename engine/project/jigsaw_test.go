@@ -60,14 +60,14 @@ func TestJigsawPoolMissing(t *testing.T) {
 	}
 	_, r := assetProject(t, files, pool("starts", `StructureFile("s/base.nbt", "base")`)+pool("junk", `StructureFile("s/notnbt.nbt")`))
 	got := jigsawDiags(r)
-	want := "lint/jigsaw-pool: 's/base.nbt' has a jigsaw block at 1 0 0 that draws from the pool 'demo:tops', which no TemplatePool declares; the structure stops growing there\n"
+	want := "lint/jigsaw-unknown-pool: 's/base.nbt' has a jigsaw block at 1 0 0 that draws from the pool 'demo:tops', which no TemplatePool declares; the structure stops growing there\n"
 	if got != want {
 		t.Fatalf("got:\n%s\nwant:\n%s", got, want)
 	}
 	// The fix declares the pool, which then has no pieces.
 	var fixed string
 	for _, d := range r.Diagnostics("main.mms") {
-		if d.Code == "lint/jigsaw-pool" {
+		if d.Code == "lint/jigsaw-unknown-pool" {
 			if len(d.Fixes) == 0 || d.Fixes[0].Title != "Declare TemplatePool tops" {
 				t.Fatalf("fixes: %+v", d.Fixes)
 			}
@@ -77,7 +77,7 @@ func TestJigsawPoolMissing(t *testing.T) {
 	}
 	_, r = assetProject(t, files, fixed)
 	got = jigsawDiags(r)
-	want = "lint/jigsaw-target: 's/base.nbt' has a jigsaw block at 1 0 0 that draws from the pool 'demo:tops', which has no structure pieces yet, so nothing joins there\n"
+	want = "lint/jigsaw-unreachable-target: 's/base.nbt' has a jigsaw block at 1 0 0 that draws from the pool 'demo:tops', which has no structure pieces yet, so nothing joins there\n"
 	if got != want {
 		t.Fatalf("after fix, got:\n%s\nwant:\n%s", got, want)
 	}
@@ -93,7 +93,7 @@ func TestJigsawTarget(t *testing.T) {
 	src := pool("starts", `StructureFile("s/base.nbt", "base")`) + pool("tops", `StructureFile("s/top.nbt", "top")`, `StructureFile("s/roof.nbt", "roof")`)
 	_, r := assetProject(t, files, src)
 	got := jigsawDiags(r)
-	want := "lint/jigsaw-target: 's/base.nbt' has a jigsaw block at 2 0 0 that targets 'demo:sideways' in the pool 'demo:tops', but no piece of that pool has a jigsaw block named 'demo:sideways', so the pieces never connect (the pieces' jigsaw names: demo:roof, demo:top)\n"
+	want := "lint/jigsaw-unreachable-target: 's/base.nbt' has a jigsaw block at 2 0 0 that targets 'demo:sideways' in the pool 'demo:tops', but no piece of that pool has a jigsaw block named 'demo:sideways', so the pieces never connect (the pieces' jigsaw names: demo:roof, demo:top)\n"
 	if got != want {
 		t.Fatalf("got:\n%s\nwant:\n%s", got, want)
 	}
@@ -406,15 +406,15 @@ Function f {
 `
 	_, r := assetProject(t, files, src)
 	got := jigsawDiags(r)
-	if !strings.Contains(got, "lint/jigsaw-pool: 'structures/hall.nbt' has a jigsaw block at 1 0 0 that draws from the pool 'demo:rooms'") {
+	if !strings.Contains(got, "lint/jigsaw-unknown-pool: 'structures/hall.nbt' has a jigsaw block at 1 0 0 that draws from the pool 'demo:rooms'") {
 		t.Errorf("want the missing rooms pool reported:\n%s", got)
 	}
 	for _, d := range r.Diagnostics("main.mms") {
 		if d.Severity == syntax.SeverityError {
 			t.Errorf("%s: %s", d.Code, d.Message)
 		}
-		if d.Code == "lint/jigsaw-pool" && !strings.HasPrefix(src[d.Sp.Start:], `Piece("hall", 3)`) {
-			t.Errorf("jigsaw-pool at %q, want the Piece call", src[d.Sp.Start:d.Sp.End])
+		if d.Code == "lint/jigsaw-unknown-pool" && !strings.HasPrefix(src[d.Sp.Start:], `Piece("hall", 3)`) {
+			t.Errorf("jigsaw-unknown-pool at %q, want the Piece call", src[d.Sp.Start:d.Sp.End])
 		}
 	}
 	set := emitted(t, r, "data/demo/worldgen/structure_set/dungeon.json")
@@ -444,7 +444,7 @@ Function f {
 	// The fix for the missing pool adds it to pools.
 	var fixed string
 	for _, d := range r.Diagnostics("main.mms") {
-		if d.Code == "lint/jigsaw-pool" && len(d.Fixes) > 0 {
+		if d.Code == "lint/jigsaw-unknown-pool" && len(d.Fixes) > 0 {
 			fixed = applyEdits(src, d.Fixes[0].Edits)
 		}
 	}
@@ -452,7 +452,7 @@ Function f {
 		t.Errorf("fixed:\n%s", fixed)
 	}
 	_, r = assetProject(t, files, fixed)
-	if got := jigsawDiags(r); strings.Contains(got, "jigsaw-pool") {
+	if got := jigsawDiags(r); strings.Contains(got, "jigsaw-unknown-pool") {
 		t.Errorf("after the fix:\n%s", got)
 	}
 
@@ -460,7 +460,7 @@ Function f {
 	one := strings.Replace(src, "pools = {\n    start = [Piece(\"start\")]\n    halls = { fallback = minecraft:empty, elements = [Piece(\"hall\", 3)] }\n  }", `pools = { start = [Piece("start")], halls = [Piece("hall")] }`, 1)
 	_, r = assetProject(t, files, one)
 	for _, d := range r.Diagnostics("main.mms") {
-		if d.Code == "lint/jigsaw-pool" {
+		if d.Code == "lint/jigsaw-unknown-pool" {
 			if got := applyEdits(one, d.Fixes[0].Edits); !strings.Contains(got, `halls = [Piece("hall")], rooms = [] }`) {
 				t.Errorf("one line fixed:\n%s", got)
 			}

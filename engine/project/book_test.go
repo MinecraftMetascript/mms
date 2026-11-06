@@ -190,7 +190,7 @@ func TestBookOverflow(t *testing.T) {
 	_, r := bookProject(t, src, nil)
 	var got []syntax.Diagnostic
 	for _, d := range r.Diagnostics("main.mms") {
-		if d.Code == "lint/book-overflow" {
+		if d.Code == "lint/book-page-overflow" {
 			got = append(got, d)
 		}
 	}
@@ -237,7 +237,7 @@ func TestBookFile(t *testing.T) {
 	p.SetFile("books/diary.mmsbook", strings.Repeat("line\n", 15))
 	r, _ = p.Analyze(context.Background())
 	ds = r.Diagnostics("books/diary.mmsbook")
-	if len(ds) != 1 || ds[0].Code != "lint/book-overflow" || ds[0].Sp.Start != 70 {
+	if len(ds) != 1 || ds[0].Code != "lint/book-page-overflow" || ds[0].Sp.Start != 70 {
 		t.Fatalf("overflow in the file = %+v", ds)
 	}
 }
