@@ -54,6 +54,10 @@ func (s *Session) Extractions(path string, from, to int) []Extraction {
 		name := uniqueName(taken, extractName(top, a.path[i-1], in.Extract, s))
 		taken[name] = true
 		body := reindent(src, sp)
+		if r, ok := e.(*syntax.RunExpr); ok && r.Body != nil {
+			// A Function declaration takes the block, without `run`.
+			body = reindent(src, r.Body.Sp)
+		}
 		head := in.Extract + " " + name + " = "
 		if in.InlineFn {
 			head = in.Extract + " " + name + " "

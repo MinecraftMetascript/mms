@@ -70,7 +70,6 @@ func (c *Checker) CompileTest(d *syntax.Decl, id string, src []rune) (*fn.Func, 
 	f.push()
 	body := &fn.Block{}
 	var expects []TestExpect
-	ran := false
 	for i, it := range d.Body.Items {
 		switch s := it.(type) {
 		case *syntax.SectionStmt:
@@ -92,7 +91,6 @@ func (c *Checker) CompileTest(d *syntax.Decl, id string, src []rune) (*fn.Func, 
 				}
 			}
 		case *syntax.RunStmt:
-			ran = true
 			f.stmt(body, &syntax.ExprStmt{X: s.X, Sp: s.Sp})
 		case *syntax.ExpectStmt:
 			if s.X == nil {
@@ -108,9 +106,6 @@ func (c *Checker) CompileTest(d *syntax.Decl, id string, src []rune) (*fn.Func, 
 		default:
 			c.errorf("mms/misplaced", it.Span(), "a Test holds a setup { } block, then run and expect lines: `run next_wave()`, `expect game.wave == 2`")
 		}
-	}
-	if !ran {
-		c.errorf("mms/missing-value", d.Name.Sp, "Test %s runs nothing; add `run some_function()`", d.Name.Text)
 	}
 	if len(expects) == 0 {
 		c.errorf("mms/missing-value", d.Name.Sp, "Test %s checks nothing; add `expect` lines, as in `expect game.wave == 2`", d.Name.Text)

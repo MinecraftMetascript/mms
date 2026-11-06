@@ -32,6 +32,12 @@ Test wrong_count {
   run next_wave()
   expect exists(@e[tag=siege.enemy])
 }
+Function double(n: int): int {
+  return n * 2
+}
+Test pure {
+  expect double(21) == 42
+}
 Test off_by_one {
   setup {
     let start = 5
@@ -66,6 +72,9 @@ func TestTests(t *testing.T) {
 	if x := got["wrong_count"]; x.Pass || x.Expect != 1 || x.Message != "expected exists(@e[tag=siege.enemy])" {
 		t.Errorf("wrong_count: %+v", x)
 	}
+	if x := got["pure"]; !x.Pass {
+		t.Errorf("pure: %+v", x)
+	}
 	if x := got["off_by_one"]; x.Pass || x.Message != "expected game.wave == start, but game.wave is 6 and start is 5" {
 		t.Errorf("off_by_one: %+v", x)
 	}
@@ -78,7 +87,6 @@ func TestTests(t *testing.T) {
 func TestTestErrors(t *testing.T) {
 	for _, tc := range []struct{ src, want string }{
 		{"Function f {\n}\nTest t {\n  run f()\n}", "checks nothing"},
-		{"Test t {\n  expect 1 == 1\n}", "runs nothing"},
 		{"Function f {\n}\nTest t {\n  run f()\n  setup {\n  }\n  expect true\n}", "setup comes first"},
 		{"Function f {\n}\nTest t {\n  run f()\n  let x = 1\n  expect true\n}", "a Test holds a setup"},
 		{"Function f {\n}\nTest t {\n  run f()\n  expect 1\n}", "expected a condition"},
@@ -96,5 +104,35 @@ func TestTestErrors(t *testing.T) {
 		if len(msgs) == 0 || !strings.Contains(strings.Join(msgs, "\n"), tc.want) {
 			t.Errorf("%q: errors %q, want %q", tc.src, msgs, tc.want)
 		}
+	}
+}
+
+// A Global, a local or a Storage field given to a Commands Template in
+// function code is its value when the code runs.
+func TestTemplateRuntimeArgs(t *testing.T) {
+	_, r := bookProject(t, `Global g: int = 5
+Type S { wave: int = 7 }
+Storage game: S
+Global out: int = 0
+Template add(x: int): Commands {
+  out += x
+}
+Function f {
+  let y = 3
+  add(g)
+  add(y)
+  add(game.wave)
+}
+Test sums {
+  run f()
+  expect out == 15
+}
+`, nil)
+	if d := diagText(r); d != "" {
+		t.Fatal(d)
+	}
+	res, err := r.RunTests(nil)
+	if err != nil || len(res) != 1 || !res[0].Pass {
+		t.Errorf("%v %+v", err, res)
 	}
 }

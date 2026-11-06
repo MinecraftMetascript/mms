@@ -204,6 +204,11 @@ type Call struct {
 	// Args maps each parameter given to its argument, evaluated and at
 	// the user's spans.
 	Args map[string]syntax.Expr
+	// Runtime are the parameters given a function value (a variable, a
+	// Global or a Storage field), which the function compiler checks.
+	Runtime map[string]bool
+	// Expanded are the statements a Commands Template wrote at the call.
+	Expanded []syntax.Stmt
 }
 
 type evaluator struct {
@@ -216,12 +221,15 @@ type evaluator struct {
 	// emitted holds the declarations Blueprints emitted, by namespace
 	// and text.
 	emitted map[string]bool
+	// values are the names of Globals and Storages, which function code
+	// passes to a Template as the values they hold when the code runs.
+	values map[string]bool
 }
 
 // Run expands units, which must be in a stable order.
 func Run(units []Unit, opt Options) *Result {
 	e := &evaluator{r: &Result{Files: map[string]*FileOut{}, Consts: map[string]*Const{}, Templates: map[string]*Template{},
-		Blueprints: map[string]*Blueprint{}, Types: map[string]*TypeDef{}, Nodes: map[syntax.Node]Prov{}}, budget: opt.Budget}
+		Blueprints: map[string]*Blueprint{}, Types: map[string]*TypeDef{}, Nodes: map[syntax.Node]Prov{}}, budget: opt.Budget, values: map[string]bool{}}
 	if e.budget <= 0 {
 		e.budget = DefaultBudget
 	}
@@ -241,6 +249,9 @@ func Run(units []Unit, opt Options) *Result {
 		}
 		for n := range e.r.Blueprints {
 			names = append(names, "b"+n)
+		}
+		for n := range e.values {
+			names = append(names, "v"+n)
 		}
 		sort.Strings(names)
 		e.key = strings.Join(names, "\x00")
@@ -323,6 +334,8 @@ func (e *evaluator) collect(u Unit) {
 					continue
 				}
 				e.r.Templates[name] = &Template{Path: u.Path, D: it}
+			case "Global", "Storage":
+				e.values[name] = true
 			case "Type":
 				if _, dup := e.r.Types[name]; dup {
 					errorf(it.Name.Sp, "Type '"+name+"' is already declared")

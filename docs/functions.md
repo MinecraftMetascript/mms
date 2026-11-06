@@ -185,6 +185,27 @@ A call looks like `add(1, 2)`, or `other_ns:add(1, 2)` for a function in another
 
 Parameters are `int`, `bool` or `string`. Functions return `int` or `bool`. To hand a string back, assign it to a Global.
 
+## Command templates
+
+A `Template` that returns `Commands` writes its body where it is called, at compile time. Its loops unroll and its `${...}` pieces are filled in, so it costs no function call in the game:
+
+```mms
+/** A ring of particles around the executor. */
+Template particle_ring(p: Id<particle>, radius: int, points: int = 8): Commands {
+  for i in 0..points - 1 {
+    /particle ${p} ^${radius * cos(i * 360 / points)} ^1 ^${radius * sin(i * 360 / points)}
+  }
+}
+
+Function celebrate {
+  As(@a).At(@s) {
+    particle_ring(flame, 2)
+  }
+}
+```
+
+Its call looks like a function call, so the editor marks it with an `inlined` hint. Hovering the hint or the name shows the commands it writes. Arguments are compile-time values. A variable, a `Global` or a `Storage` field is passed as its value when the function runs, so the template can use it in commands and code but not in a compile-time loop.
+
 ## Execute blocks
 
 A chain of execute helpers followed by a block runs the block under `execute`:
@@ -380,7 +401,7 @@ Test second_wave_spawns_four {
 }
 ```
 
-Each test runs in a fresh world after the pack's load functions. `setup` holds function code and commands, and its `let` variables stay in scope for the `expect` lines. `run` calls a function. `expect` checks a condition, and the test stops at the first one that fails. A failing comparison of ints shows both sides: `expected game.wave == start, but game.wave is 6 and start is 5`. A test can have several `run` and `expect` lines, in any order after `setup`.
+Each test runs in a fresh world after the pack's load functions. `setup` holds function code and commands, and its `let` variables stay in scope for the `expect` lines. `run` calls a function, and a test of a function that returns a value can skip it: `expect fib(10) == 55`. `expect` checks a condition, and the test stops at the first one that fails. A failing comparison of ints shows both sides: `expected game.wave == start, but game.wave is 6 and start is 5`. A test can have several `run` and `expect` lines, in any order after `setup`.
 
 `mms test` runs every test and exits with 1 when one fails. `-run <regexp>` runs the tests whose names match, and `-v` lists the passing tests too and prints what each test's commands said. The web editor shows a Tests tab once the project has a test, and runs the tests after every edit. VS Code lists them in its Testing view. All three run the same interpreter, so they give the same results.
 
