@@ -940,7 +940,10 @@ test('Ctrl+. extracts an inline noise to a declaration and renames it', async ({
 	await page.keyboard.press('ControlOrMeta+.');
 	const menu = page.getByRole('menu', { name: 'Editor actions' });
 	const extract = menu.getByRole('menuitem', { name: 'Extract { ... } to a Noise declaration' });
-	await expect(extract).toBeVisible();
+	// The menu opens once the language server answers, which waits behind
+	// the analysis of the new text; on a loaded machine that takes longer
+	// than the default 5 seconds.
+	await expect(extract).toBeVisible({ timeout: 15_000 });
 	await extract.click();
 	await expect(page.locator('.cm-content')).toContainText(
 		'Noise hills_noise = { base_octave = -6, amplitude_modifiers = [1] }DensityFunction hills = Noise(hills_noise, 1, 1)'
