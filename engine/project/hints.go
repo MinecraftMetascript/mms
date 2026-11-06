@@ -3,6 +3,7 @@ package project
 import (
 	"sort"
 
+	"github.com/minecraftmetascript/mms/engine/eval"
 	"github.com/minecraftmetascript/mms/engine/format"
 	"github.com/minecraftmetascript/mms/engine/prelude"
 	"github.com/minecraftmetascript/mms/engine/syntax"
@@ -12,6 +13,42 @@ import (
 // instance's name is checked as that conversion. Each hint in the
 // prelude is a lint rule of its own, documented by the `as` doc comment;
 // a project's own hints are reported under their rule name as hints.
+
+// hintRules are the rules made from the prelude's hints.
+var hintRules = map[string]bool{}
+
+func isHintRule(r *Rule) bool { return hintRules[r.ID] }
+
+// emittedDecl reports whether a Blueprint instance emitted d.
+func (r *Result) emittedDecl(d *syntax.Decl) bool {
+	if r.Eval == nil {
+		return false
+	}
+	if r.emitted == nil {
+		r.emitted = map[*syntax.Decl]bool{}
+		for _, f := range r.Eval.Files {
+			for _, od := range f.Decls {
+				if od.Instance != nil {
+					r.emitted[od.D] = true
+				}
+			}
+		}
+	}
+	return r.emitted[d]
+}
+
+// preludeEmitted are the declarations the prelude's Blueprints emitted.
+func preludeEmitted(ev *eval.Result) map[*syntax.Decl]bool {
+	out := map[*syntax.Decl]bool{}
+	for _, f := range ev.Files {
+		for _, od := range f.Decls {
+			if od.Instance != nil && prelude.Is(od.Instance.Blueprint.Path) {
+				out[od.D] = true
+			}
+		}
+	}
+	return out
+}
 
 func init() {
 	for _, f := range prelude.Parse() {
@@ -29,6 +66,7 @@ func init() {
 					continue
 				}
 				id := s.Value
+				hintRules[id] = true
 				Rules = append(Rules, &Rule{ID: id, Severity: syntax.SeverityHint, Doc: as.Doc,
 					run: func(l *lintRun, d *Decl) { lintHints(l, d, id) }})
 			}

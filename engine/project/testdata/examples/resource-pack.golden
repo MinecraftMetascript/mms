@@ -27,7 +27,7 @@
 === assets/glow/items/lantern_charm.json
 {
   "model": {
-    "type": "minecraft:model",
+    "type": "model",
     "model": "glow:block/glowstone_warm"
   }
 }

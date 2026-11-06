@@ -30,6 +30,7 @@ func (c *ctx) instance(d *syntax.Decl, n *syntax.Name, bp *Blueprint, from *synt
 		c.errorf("mms/blueprint-body", d.Value.Span(), "a "+bpName+" takes a { } body, not '='")
 	}
 
+	inst.User = c.site == nil
 	// The fields the declaration sets, evaluated where it is written.
 	given := &Record{pos: c.pos(n.Sp)}
 	if d.Body != nil {
@@ -216,7 +217,12 @@ func checkRule(sev syntax.Severity) intrinsic {
 				sp = fsp
 			}
 		}
+		// A rule without a name is reported under the Blueprint's:
+		// mms/custom-item for CustomItem.
 		code := "check"
+		if c.inst != nil {
+			code = "mms/" + kebab(c.inst.Blueprint.D.NameText())
+		}
 		if len(args) == 3 {
 			r, ok := args[1].v.(*Str)
 			if !ok {
@@ -233,4 +239,19 @@ func checkRule(sev syntax.Severity) intrinsic {
 		c.e.report(c.path, syntax.Diagnostic{Code: code, Severity: sev, Message: msg.S, Sp: sp})
 		return &None{pos: p}
 	}
+}
+
+// kebab spells a PascalCase name in kebab case: CustomItem is custom-item.
+func kebab(s string) string {
+	var b strings.Builder
+	for i, r := range s {
+		if r >= 'A' && r <= 'Z' {
+			if i > 0 {
+				b.WriteByte('-')
+			}
+			r += 'a' - 'A'
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
 }

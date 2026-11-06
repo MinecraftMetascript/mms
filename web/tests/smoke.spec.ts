@@ -405,7 +405,7 @@ test('lint fixes apply from the editor', async ({ page }) => {
 test('a custom item in a recipe ingredient shows its base item', async ({ page }) => {
 	await page.goto('./');
 	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
-	await replaceText(page, 'CustomItem ember = { base = amethyst_shard, name = "Ember" }\nRecipe r = Shapeless([ember, stick], torch)\n');
+	await replaceText(page, 'CustomItem ember { base = amethyst_shard, name = "Ember" }\nRecipe r = Shapeless([ember, stick], torch)\n');
 	await expect(page.locator('.cm-inlay-hint')).toHaveText('→ amethyst_shard');
 	await expect(page.locator('.cm-lintRange-hint')).toHaveCount(1);
 	await page.screenshot({ path: 'test-results/custom-item-base.png' });
@@ -888,7 +888,7 @@ test('a book file in an example is checked and completed in place', async ({ pag
 test('the Pack tab lists custom items and splits the two packs', async ({ page }) => {
 	await page.goto('./');
 	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
-	await replaceText(page, 'CustomItem ruby = {\n  base = stick\n  components = { max_stack_size = 1 }\n}\nCustomItem charm = {\n  base = torch\n  name = "Charm"\n}\n');
+	await replaceText(page, 'CustomItem ruby {\n  base = stick\n  components = { max_stack_size = 1 }\n}\nCustomItem charm {\n  base = torch\n  name = "Charm"\n}\n');
 	await expect(status(page)).toHaveText(/No problems/);
 	await page.getByRole('tab', { name: 'Pack' }).click();
 	// ruby writes no file, but is listed with the stack its name stands for.

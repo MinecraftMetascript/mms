@@ -47,18 +47,18 @@
       {
         "effect": {
           "type": "minecraft:run_function",
-          "function": "arrows:ender_block"
+          "function": "arrows:mms_gen/item_hook/ender_arrow/projectile/hit_block"
         }
       }
     ],
     "minecraft:post_attack": [
       {
-        "enchanted": "attacker",
-        "affected": "victim",
         "effect": {
           "type": "minecraft:run_function",
-          "function": "arrows:ender_entity"
-        }
+          "function": "arrows:mms_gen/item_hook/ender_arrow/projectile/hit_entity"
+        },
+        "enchanted": "attacker",
+        "affected": "victim"
       }
     ]
   }
@@ -91,18 +91,18 @@
       {
         "effect": {
           "type": "minecraft:run_function",
-          "function": "arrows:explode_here"
+          "function": "arrows:mms_gen/item_hook/explosive_arrow/projectile/hit_block"
         }
       }
     ],
     "minecraft:post_attack": [
       {
-        "enchanted": "attacker",
-        "affected": "victim",
         "effect": {
           "type": "minecraft:run_function",
-          "function": "arrows:explode"
-        }
+          "function": "arrows:mms_gen/item_hook/explosive_arrow/projectile/hit_entity"
+        },
+        "enchanted": "attacker",
+        "affected": "victim"
       }
     ]
   }
@@ -135,18 +135,18 @@
       {
         "effect": {
           "type": "minecraft:run_function",
-          "function": "arrows:strike"
+          "function": "arrows:mms_gen/item_hook/thunder_bow/projectile/hit_block"
         }
       }
     ],
     "minecraft:post_attack": [
       {
-        "enchanted": "attacker",
-        "affected": "victim",
         "effect": {
           "type": "minecraft:run_function",
-          "function": "arrows:strike"
-        }
+          "function": "arrows:mms_gen/item_hook/thunder_bow/projectile/hit_entity"
+        },
+        "enchanted": "attacker",
+        "affected": "victim"
       }
     ]
   }
@@ -192,11 +192,17 @@ $summon falling_block ~ ~ ~ {BlockState:{Name:"minecraft:structure_void"},Time:1
 tag @s add mms_new
 execute at @s summon marker run function arrows:mms_gen/item_hook/blast_potion/land/mount
 tag @s remove mms_new
+=== data/arrows/function/mms_gen/item_hook/blast_potion/land/landed.mcfunction
+execute if entity @s[tag=mms_land.arrows.mms_gen.item_hook.blast_potion.land] run function arrows:mms_gen/item_hook/blast_potion/land/run
 === data/arrows/function/mms_gen/item_hook/blast_potion/land/mount.mcfunction
 tag @s add mms_land.arrows
-data modify entity @s data.mms_land set value "arrows:explode"
+tag @s add mms_land.arrows.mms_gen.item_hook.blast_potion.land
 ride @s mount @n[tag=mms_new]
 execute unless predicate arrows:mms_gen/projectile/riding run kill @s
+=== data/arrows/function/mms_gen/item_hook/blast_potion/land/run.mcfunction
+function arrows:explode
+=== data/arrows/function/mms_gen/item_hook/blast_potion/land/spot.mcfunction
+execute if data entity @s Item.components."minecraft:custom_data"{mms_item:"arrows:blast_potion"} run function arrows:mms_gen/item_hook/blast_potion/land
 === data/arrows/function/mms_gen/item_hook/cow_wand/press.mcfunction
 advancement revoke @s only arrows:mms_gen/item_hook/cow_wand/press
 execute if score @s mms_click.arrows matches 1.. run return run scoreboard players set @s mms_click.arrows 2
@@ -205,12 +211,30 @@ function arrows:shoot_cow
 === data/arrows/function/mms_gen/item_hook/ender_arrow/projectile.mcfunction
 execute unless data entity @s weapon run data modify entity @s weapon set value {id:"minecraft:bow",count:1}
 data modify entity @s weapon.components."minecraft:enchantments"."arrows:mms_gen/item_hook/ender_arrow/projectile" set value 1
+=== data/arrows/function/mms_gen/item_hook/ender_arrow/projectile/hit_block.mcfunction
+function arrows:ender_block
+=== data/arrows/function/mms_gen/item_hook/ender_arrow/projectile/hit_entity.mcfunction
+function arrows:ender_entity
+=== data/arrows/function/mms_gen/item_hook/ender_arrow/projectile/spot.mcfunction
+execute if data entity @s item.components."minecraft:custom_data"{mms_item:"arrows:ender_arrow"} run function arrows:mms_gen/item_hook/ender_arrow/projectile
 === data/arrows/function/mms_gen/item_hook/explosive_arrow/projectile.mcfunction
 execute unless data entity @s weapon run data modify entity @s weapon set value {id:"minecraft:bow",count:1}
 data modify entity @s weapon.components."minecraft:enchantments"."arrows:mms_gen/item_hook/explosive_arrow/projectile" set value 1
+=== data/arrows/function/mms_gen/item_hook/explosive_arrow/projectile/hit_block.mcfunction
+function arrows:explode_here
+=== data/arrows/function/mms_gen/item_hook/explosive_arrow/projectile/hit_entity.mcfunction
+function arrows:explode
+=== data/arrows/function/mms_gen/item_hook/explosive_arrow/projectile/spot.mcfunction
+execute if data entity @s item.components."minecraft:custom_data"{mms_item:"arrows:explosive_arrow"} run function arrows:mms_gen/item_hook/explosive_arrow/projectile
 === data/arrows/function/mms_gen/item_hook/thunder_bow/projectile.mcfunction
 execute unless data entity @s weapon run data modify entity @s weapon set value {id:"minecraft:bow",count:1}
 data modify entity @s weapon.components."minecraft:enchantments"."arrows:mms_gen/item_hook/thunder_bow/projectile" set value 1
+=== data/arrows/function/mms_gen/item_hook/thunder_bow/projectile/hit_block.mcfunction
+function arrows:strike
+=== data/arrows/function/mms_gen/item_hook/thunder_bow/projectile/hit_entity.mcfunction
+function arrows:strike
+=== data/arrows/function/mms_gen/item_hook/thunder_bow/projectile/spot.mcfunction
+execute if data entity @s weapon.components."minecraft:custom_data"{mms_item:"arrows:thunder_bow"} run function arrows:mms_gen/item_hook/thunder_bow/projectile
 === data/arrows/function/mms_gen/load.mcfunction
 scoreboard objectives add mms_click.arrows dummy
 scoreboard objectives add mms.arrows dummy
@@ -219,21 +243,16 @@ execute unless data storage arrows:mms g.launch_motion run data modify storage a
 execute unless data storage arrows:mms g.launch_yaw run data modify storage arrows:mms g.launch_yaw set value ""
 execute in minecraft:overworld run forceload add 0 0
 === data/arrows/function/mms_gen/projectile/land.mcfunction
-function arrows:mms_gen/projectile/land/run with entity @s data
+function #arrows:mms_gen/projectile/landed
 kill @s
-=== data/arrows/function/mms_gen/projectile/land/run.mcfunction
-$function $(mms_land)
-=== data/arrows/function/mms_gen/projectile/spotted.mcfunction
+=== data/arrows/function/mms_gen/projectile/spotted_new.mcfunction
 tag @s add mms_shot.arrows
-execute if data entity @s Item.components."minecraft:custom_data"{mms_item:"arrows:blast_potion"} run function arrows:mms_gen/item_hook/blast_potion/land
-execute if data entity @s item.components."minecraft:custom_data"{mms_item:"arrows:ender_arrow"} run function arrows:mms_gen/item_hook/ender_arrow/projectile
-execute if data entity @s item.components."minecraft:custom_data"{mms_item:"arrows:explosive_arrow"} run function arrows:mms_gen/item_hook/explosive_arrow/projectile
-execute if data entity @s weapon.components."minecraft:custom_data"{mms_item:"arrows:thunder_bow"} run function arrows:mms_gen/item_hook/thunder_bow/projectile
+function #arrows:mms_gen/projectile/spotted
 === data/arrows/function/mms_gen/tick.mcfunction
 execute as @e[type=splash_potion,tag=!arrows.thrown] run function arrows:throw_further
-execute as @e[type=#minecraft:arrows,tag=!mms_shot.arrows] run function arrows:mms_gen/projectile/spotted
-execute as @e[type=splash_potion,tag=!mms_shot.arrows] run function arrows:mms_gen/projectile/spotted
-execute as @e[type=lingering_potion,tag=!mms_shot.arrows] run function arrows:mms_gen/projectile/spotted
+execute as @e[type=#minecraft:arrows,tag=!mms_shot.arrows] run function arrows:mms_gen/projectile/spotted_new
+execute as @e[type=splash_potion,tag=!mms_shot.arrows] run function arrows:mms_gen/projectile/spotted_new
+execute as @e[type=lingering_potion,tag=!mms_shot.arrows] run function arrows:mms_gen/projectile/spotted_new
 execute as @e[type=marker,tag=mms_land.arrows,predicate=!arrows:mms_gen/projectile/riding] at @s run function arrows:mms_gen/projectile/land
 scoreboard players remove @a[scores={mms_click.arrows=1..}] mms_click.arrows 1
 === data/arrows/function/read_vector.mcfunction
@@ -419,6 +438,21 @@ execute store result entity @s Motion[2] double 0.00175 run data get entity @s M
     }
   }
 }
+=== data/arrows/tags/function/mms_gen/projectile/landed.json
+{
+  "values": [
+    "arrows:mms_gen/item_hook/blast_potion/land/landed"
+  ]
+}
+=== data/arrows/tags/function/mms_gen/projectile/spotted.json
+{
+  "values": [
+    "arrows:mms_gen/item_hook/explosive_arrow/projectile/spot",
+    "arrows:mms_gen/item_hook/ender_arrow/projectile/spot",
+    "arrows:mms_gen/item_hook/thunder_bow/projectile/spot",
+    "arrows:mms_gen/item_hook/blast_potion/land/spot"
+  ]
+}
 === data/minecraft/tags/function/load.json
 {
   "values": [
@@ -441,16 +475,16 @@ execute store result entity @s Motion[2] double 0.00175 run data get entity @s M
 }
 === assets/arrows/lang/en_us.json
 {
-  "item.minecraft.tipped_arrow.effect.arrows.explosive": "Explosive Arrow",
-  "item.minecraft.tipped_arrow.effect.arrows.ender": "Ender Arrow",
-  "item.minecraft.tipped_arrow.effect.arrows.levitation": "Arrow of Levitation",
-  "item.minecraft.splash_potion.effect.arrows.blast": "Blast Potion",
   "item.arrows.explosive_arrow": "Explosive Arrow",
   "item.arrows.ender_arrow": "Ender Arrow",
   "item.arrows.levitation_arrow": "Arrow of Levitation",
   "item.arrows.thunder_bow": "Thunder Bow",
   "item.arrows.blast_potion": "Blast Potion",
-  "item.arrows.cow_wand": "Cow Wand"
+  "item.arrows.cow_wand": "Cow Wand",
+  "item.minecraft.tipped_arrow.effect.arrows.explosive": "Explosive Arrow",
+  "item.minecraft.tipped_arrow.effect.arrows.ender": "Ender Arrow",
+  "item.minecraft.tipped_arrow.effect.arrows.levitation": "Arrow of Levitation",
+  "item.minecraft.splash_potion.effect.arrows.blast": "Blast Potion"
 }
 === pack.mcmeta
 {

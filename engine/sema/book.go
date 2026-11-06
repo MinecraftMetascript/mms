@@ -36,7 +36,7 @@ const bookKind = "Book"
 
 // isItemKind reports whether a language kind's name stands for an item
 // stack: a CustomItem or a Book.
-func isItemKind(k string) bool { return k == customItemKind || k == bookKind }
+func isItemKind(k string) bool { return k == bookKind }
 
 // BookPageStart is where a page of a Book's text starts: File is the
 // .mmsbook unit it is in, empty for the declaring file.

@@ -658,7 +658,7 @@ func TestOutputCustomItems(t *testing.T) {
 	c.result("initialize", map[string]any{})
 	a := "mem:///a.mms"
 	c.notify("mms/setFiles", map[string]any{"files": []any{
-		map[string]any{"uri": a, "text": "\nCustomItem ruby = {\n  base = stick\n  components = { max_stack_size = 1 }\n}\n"},
+		map[string]any{"uri": a, "text": "\nCustomItem ruby {\n  base = stick\n  components = { max_stack_size = 1 }\n}\n"},
 	}})
 	out := c.result("mms/output", map[string]any{}).(map[string]any)
 	items := out["items"].([]any)

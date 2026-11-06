@@ -10,7 +10,7 @@
 //   item.minecraft.tipped_arrow.effect.<custom_name> (see lang.mms).
 
 /** Explodes where it lands, whether it hits a block or a mob. */
-CustomItem explosive_arrow = {
+CustomItem explosive_arrow {
   base = tipped_arrow
   name = "Explosive Arrow"
   components = {
@@ -24,7 +24,7 @@ CustomItem explosive_arrow = {
 }
 
 /** Teleports whoever shot it to where it lands, like an ender pearl. */
-CustomItem ender_arrow = {
+CustomItem ender_arrow {
   base = tipped_arrow
   name = "Ender Arrow"
   components = {
@@ -43,7 +43,7 @@ CustomItem ender_arrow = {
  * potion_duration_scale is 1 so that the effect lasts as long as written
  * (a tipped arrow normally gives an eighth of its potion's time).
  */
-CustomItem levitation_arrow = {
+CustomItem levitation_arrow {
   base = tipped_arrow
   name = "Arrow of Levitation"
   components = {
@@ -67,7 +67,7 @@ CustomItem levitation_arrow = {
  * arrow is. On a bow or crossbow, the projectile hooks follow the arrows
  * it shoots.
  */
-CustomItem thunder_bow = {
+CustomItem thunder_bow {
   base = bow
   name = "Thunder Bow"
   on_projectile_hit_block = strike
@@ -78,7 +78,7 @@ CustomItem thunder_bow = {
  * A splash potion that explodes where it lands. Thrown potions keep no
  * bow, so on_projectile_land follows the potion itself instead.
  */
-CustomItem blast_potion = {
+CustomItem blast_potion {
   base = splash_potion
   name = "Blast Potion"
   components = {
@@ -91,7 +91,7 @@ CustomItem blast_potion = {
 }
 
 /** A stick that fires cows. See launch.mms. */
-CustomItem cow_wand = {
+CustomItem cow_wand {
   base = stick
   name = "Cow Wand"
   on_right_click = shoot_cow

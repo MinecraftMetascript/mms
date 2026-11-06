@@ -173,7 +173,7 @@ $data modify entity @e[type=text_display,tag=barrels.this,limit=1] text set valu
 === data/barrels/function/close/_macro7.mcfunction
 $data modify entity @e[type=text_display,tag=barrels.this,limit=1] text set value {text:"$(a0)",color:"white"}
 === data/barrels/function/give.mcfunction
-give @s item_frame[item_name={translate:"item.barrels.storage_barrel",fallback:"Storage Barrel"},item_model="minecraft:barrel",entity_data={id:"minecraft:item_frame",Tags:["barrels.place"],Invisible:true}] 4
+give @s item_frame[item_model="minecraft:barrel",item_name={translate:"item.barrels.storage_barrel",fallback:"Storage Barrel"},entity_data={id:"minecraft:item_frame",Tags:["barrels.place"],Invisible:true}] 4
 === data/barrels/function/give_drop.mcfunction
 item replace entity @e[type=item,tag=barrels.drop,limit=1] contents from entity @e[type=item_display,tag=barrels.this,limit=1] contents
 item modify entity @e[type=item,tag=barrels.drop,limit=1] contents barrels:take_amount
@@ -385,11 +385,11 @@ return run execute on target if entity @s[tag=barrels.user]
             {
               "type": "minecraft:set_components",
               "components": {
+                "item_model": "minecraft:barrel",
                 "item_name": {
                   "translate": "item.barrels.storage_barrel",
                   "fallback": "Storage Barrel"
                 },
-                "item_model": "minecraft:barrel",
                 "entity_data": {
                   "id": "minecraft:item_frame",
                   "Tags": [
@@ -430,11 +430,11 @@ return run execute on target if entity @s[tag=barrels.user]
   "result": {
     "id": "minecraft:item_frame",
     "components": {
+      "item_model": "minecraft:barrel",
       "item_name": {
         "translate": "item.barrels.storage_barrel",
         "fallback": "Storage Barrel"
       },
-      "item_model": "minecraft:barrel",
       "entity_data": {
         "id": "minecraft:item_frame",
         "Tags": [

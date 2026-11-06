@@ -5,6 +5,7 @@ import (
 	"github.com/minecraftmetascript/mms/engine/prelude"
 	"github.com/minecraftmetascript/mms/engine/sema"
 	"github.com/minecraftmetascript/mms/engine/syntax"
+	"github.com/minecraftmetascript/mms/engine/types"
 )
 
 // expand runs the evaluator over the project's MMS files. A file whose
@@ -50,6 +51,14 @@ func expand(units []*sema.Unit, ns string, cache *eval.Cache) ([]*sema.Unit, *ev
 			file.Decls[j] = d.D
 			file.Items = append(file.Items, d.D)
 		}
+		// A Blueprint instance the user wrote comes last, so the editor
+		// finds it before what it emitted: its body is checked for the
+		// editor against the Blueprint's fields (see instanceDecls).
+		for _, inst := range r.Instances {
+			if inst.User && inst.Path == u.Path {
+				file.Items = append(file.Items, inst.D)
+			}
+		}
 		out[i] = &sema.Unit{Path: u.Path, File: &file}
 	}
 	return out, r
@@ -64,4 +73,39 @@ func definition(d *syntax.Decl) bool {
 		return true
 	}
 	return false
+}
+
+// instanceDecls checks the body of each Blueprint instance the user wrote
+// against the Blueprint's fields, for the editor: completion, hover and
+// definitions inside it read the Info. Its diagnostics are dropped, since
+// the evaluator and types.Check report the instance's problems, and the
+// result writes nothing: it is in Decls but not in Order.
+func (r *Result) instanceDecls(tenv *types.Env, newChecker types.Checkers) {
+	units := map[string]*sema.Unit{}
+	for _, u := range r.Units {
+		units[u.Path] = u
+	}
+	for _, inst := range r.Eval.Instances {
+		u := units[inst.Path]
+		if !inst.User || u == nil || inst.D.Body == nil {
+			continue
+		}
+		ns := r.cfg.Namespace
+		if v, ok := inst.Self.Vals[1].(*eval.Str); ok {
+			ns = v.S
+		}
+		c := newChecker(ns)
+		obj := &syntax.Object{Body: inst.D.Body, Sp: inst.D.Body.Sp}
+		c.CheckType(obj, tenv.InstanceType(inst.Blueprint), inst.Blueprint.D.NameText())
+		d := &Decl{Unit: u, D: inst.D, NS: ns, Info: c.Info, Deps: c.Deps, Blueprint: inst.Blueprint}
+		// The item stack the name stands for, if it stands for one, for
+		// an editor to list and preview.
+		if inst.Name != nil {
+			if st := c.ConvertedStack(&syntax.ResLoc{Text: d.ID(), Sp: inst.Name.Sp}); st != nil {
+				d.Item = &sema.CustomItemOut{Stack: st}
+			}
+		}
+		r.Decls[inst.D] = d
+		r.Instances = append(r.Instances, d)
+	}
 }

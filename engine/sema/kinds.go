@@ -35,6 +35,10 @@ func (k Kind) Dir(ns string) string {
 	return "data/" + ns + "/" + k.Folder()
 }
 
+// Merges reports whether declarations of the kind with the same id are
+// one file: a language's lang entries.
+func (k Kind) Merges() bool { return k.Resource == "lang" && k.Assets != "" }
+
 // IsResource reports whether the declaration emits a JSON file.
 func (k Kind) IsResource() bool { return k.Resource != "" }
 

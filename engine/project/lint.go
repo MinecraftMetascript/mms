@@ -145,8 +145,12 @@ func (r *Result) lint() map[string][]syntax.Diagnostic {
 		if d.lintKey != key {
 			d.lints, d.extLints = nil, map[string][]syntax.Diagnostic{}
 			l.cur, l.ext = &d.lints, d.extLints
+			// A Blueprint's output is checked, but its style is the
+			// Blueprint's: the user wrote only the instance. Hints on
+			// conversions still apply.
+			emitted := r.emittedDecl(d.D)
 			for _, rule := range Rules {
-				if rule.run == nil {
+				if rule.run == nil || emitted && !isHintRule(rule) {
 					continue
 				}
 				if l.rule, l.sev = rule, r.severity(rule); l.sev != 0 {

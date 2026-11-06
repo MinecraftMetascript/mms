@@ -69,11 +69,11 @@ func (c *Checker) ValueCandidates(in *Info) []Candidate {
 }
 
 func (c *Checker) valueCandidates(v tview, depth int) []Candidate {
+	out := c.instanceCandidates(v)
 	v = c.norm(v)
 	if v.T == nil || depth > 6 {
-		return nil
+		return out
 	}
-	var out []Candidate
 	switch v.T.Kind {
 	case "union":
 		for _, m := range v.T.Members {
@@ -130,7 +130,7 @@ func (c *Checker) idCandidates(id idInfo) []Candidate {
 	reg := c.registryName(id.Registry)
 	if id.Tags != "required" {
 		for _, s := range c.Syms.All() {
-			if s.Kind.Folder() == reg {
+			if s.Kind.Folder() == reg && !c.Syms.Hidden[s.Decl] {
 				out = append(out, Candidate{Label: c.shortID(s.ID()), Kind: CandID, Detail: s.Kind.Name, Doc: DocMarkdown(s.Decl.Doc), Deprecated: Deprecated(s.Decl), Rank: 0})
 			}
 		}
@@ -140,7 +140,7 @@ func (c *Checker) idCandidates(id idInfo) []Candidate {
 	}
 	if id.Tags != "" {
 		for _, s := range c.Syms.All() {
-			if s.Kind.TagOf == reg {
+			if s.Kind.TagOf == reg && !c.Syms.Hidden[s.Decl] {
 				out = append(out, Candidate{Label: "#" + c.shortID(s.ID()), Kind: CandID, Detail: reg + " tag", Doc: DocMarkdown(s.Decl.Doc), Deprecated: Deprecated(s.Decl), Rank: 1})
 			}
 		}

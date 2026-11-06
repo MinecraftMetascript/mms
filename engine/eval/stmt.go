@@ -41,7 +41,18 @@ func (c *ctx) stmt(it syntax.Stmt, out *[]syntax.Stmt) {
 			if st.Primary {
 				c.markPrimary(st, res, first)
 			}
-			*c.emit = append(*c.emit, res...)
+			plain := st.Kind != nil && c.e.r.Blueprints[st.Kind.Name] == nil
+			for _, d := range res {
+				// Emitting the same declaration twice writes it once:
+				// every custom item with a click hook needs the click
+				// objective, but the namespace gets one.
+				// A Blueprint instance's own output was weeded where
+				// it was emitted.
+				if plain && !d.Primary && c.inst != nil && c.e.emittedBefore(c.ns, d.D) {
+					continue
+				}
+				*c.emit = append(*c.emit, d)
+			}
 			return
 		}
 		add(c.cloneStmt(st))
@@ -96,6 +107,22 @@ func (c *ctx) stmt(it syntax.Stmt, out *[]syntax.Stmt) {
 	case *syntax.AssignStmt:
 		add(&syntax.AssignStmt{Target: c.lower(c.target(st.Target)), Op: st.Op, Value: c.lower(c.reduce(st.Value)), Sp: c.span(st.Sp)})
 	case *syntax.ExprStmt:
+		// Calling a Function value that holds `run { ... }` runs its
+		// statements in place: `action()` in a Blueprint's emitted code.
+		if call, ok := st.X.(*syntax.Call); ok && len(call.Args) == 0 && !c.compile {
+			if id, ok := call.Fn.(*syntax.Ident); ok {
+				if v, ok, _ := c.sc.lookup(id.Name); ok {
+					if code, ok := v.(*Code); ok {
+						if run, ok := code.X.(*syntax.RunExpr); ok && run.Body != nil {
+							for _, s := range run.Body.Items {
+								add(syntax.CloneStmt(s))
+							}
+							return
+						}
+					}
+				}
+			}
+		}
 		v := c.reduce(st.X)
 		switch v := v.(type) {
 		case *Stmts:

@@ -15,6 +15,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/minecraftmetascript/mms/engine/format"
 	"github.com/minecraftmetascript/mms/engine/syntax"
 )
 
@@ -174,6 +175,8 @@ type Instance struct {
 	// the user's spans, when the declaration is user code (not emitted
 	// by another Blueprint).
 	Written map[string]syntax.Expr
+	// User is set when the declaration is user code.
+	User bool
 	// Conversions are the instance's `as` conversions, in order: what
 	// its name means where each type is expected.
 	Conversions []*Conversion
@@ -210,6 +213,9 @@ type evaluator struct {
 	over   bool
 	cache  *Cache
 	key    string
+	// emitted holds the declarations Blueprints emitted, by namespace
+	// and text.
+	emitted map[string]bool
 }
 
 // Run expands units, which must be in a stable order.
@@ -253,6 +259,20 @@ func Run(units []Unit, opt Options) *Result {
 		sort.SliceStable(f.Diags, func(i, j int) bool { return f.Diags[i].Sp.Start < f.Diags[j].Sp.Start })
 	}
 	return e.r
+}
+
+// emittedBefore reports whether a Blueprint already emitted the same
+// declaration in namespace ns, and records it.
+func (e *evaluator) emittedBefore(ns string, d *syntax.Decl) bool {
+	key := ns + "\x00" + format.File(&syntax.File{Items: []syntax.Stmt{d}, Decls: []*syntax.Decl{d}})
+	if e.emitted[key] {
+		return true
+	}
+	if e.emitted == nil {
+		e.emitted = map[string]bool{}
+	}
+	e.emitted[key] = true
+	return false
 }
 
 func (e *evaluator) report(path string, d syntax.Diagnostic) {

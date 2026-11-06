@@ -3,7 +3,7 @@
  * The CustomItem writes the item model definition that points at the
  * block model, and the "Lantern Charm" name in the English lang file.
  */
-CustomItem lantern_charm = {
+CustomItem lantern_charm {
   base = torch
   name = "Lantern Charm"
   model = block/glowstone_warm

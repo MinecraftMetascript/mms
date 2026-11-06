@@ -48,7 +48,7 @@ RightClickHook mms_gen/item_hook/slow_wand/right_click {
   }
 }
 --- diagnostics
-5:3 error check: A cooldown is at least one tick
+5:3 error mms/wand: A cooldown is at least one tick
 === provenance of copied nodes
 08-wand.mms:33:6 from 07-custom-item.mms:15 < Blueprint Wand (at 08-wand.mms:33:6, def 08-wand.mms:2:1) < Blueprint CustomItem (at 08-wand.mms:33:6, def 07-custom-item.mms:2:1): 1 node, "item.demo.fire_wand"
 08-wand.mms:33:6 from 07-custom-item.mms:17 < Blueprint Wand (at 08-wand.mms:33:6, def 08-wand.mms:2:1) < Blueprint CustomItem (at 08-wand.mms:33:6, def 07-custom-item.mms:2:1): 2 nodes, { item_model = demo:fire_wand, item_name = Tr...

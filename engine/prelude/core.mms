@@ -19,8 +19,6 @@ extern Blueprint OnFirstJoin
 extern Blueprint OnRespawn
 /** Code that runs as and at a player each time they meet a trigger: `OnAdvancement name = Trigger(...) { ... }` writes the advancement, its reward function and the revoke. */
 extern Blueprint OnAdvancement
-/** A vanilla item with its own look and name: `CustomItem ember_shard { base = amethyst_shard, name = "Ember Shard", texture = Texture("art/ember_shard.png") }` writes the model, the item model and the lang entry, and its name stands for the item in item stacks, loot entries and `${...}` in commands. */
-extern Blueprint CustomItem
 /** A written book with pages in book markup: `Book guide = { title = "Guide", author = "The Garrison", text = ["# Welcome", "Plant the **banner** on gold."] }`. Its name stands for the book in item stacks, loot entries and `${...}` in commands. */
 extern Blueprint Book
 /** A name for jigsaw blocks, used only by the editor: `JigsawHole road_end` lists `<namespace>:road_end` in the Jigsaw view's Name and Target lists, so pieces built in the game join by names spelled the same way. It writes no file. */
@@ -47,3 +45,5 @@ extern Template matches(text: string, pattern: string): bool
 extern Template replace(text: string, old: string, new: string): string
 /** An asset call such as Texture("art/ruby.png") with an id name, unless it has one: named(texture, "item/ruby"). */
 extern Template named(asset: any, name: string): any
+/** The kind of a value: "none", "bool", "number", "string", "name", "list", "object", "range", "commands", or "runtime" for a value only known when the pack runs. */
+extern Template kind_of(value: any): string

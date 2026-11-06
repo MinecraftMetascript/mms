@@ -145,9 +145,35 @@ func (e *Env) Conversions(r *eval.Result, ns string) map[string][]*sema.Conversi
 			for _, cv := range in.Conversions {
 				t, _ := e.Resolve(cv.Path, cv.Type)
 				out[id] = append(out[id], &sema.Conversion{Type: t, X: cv.X, Rule: cv.Rule, Hint: cv.Hint,
-					Sig: syntax.TypeText(cv.Type) + "=" + format.Expr(cv.X) + "|" + cv.Rule + "|" + cv.Hint})
+					Sig:  syntax.TypeText(cv.Type) + "=" + format.Expr(cv.X) + "|" + cv.Rule + "|" + cv.Hint,
+					Kind: inst.Blueprint.D.NameText(), Decl: inst.D, Path: inst.Path})
 			}
 		}
 	}
 	return out
+}
+
+// InstanceType is the struct type of a Blueprint's fields, for the editor
+// to complete and describe an instance body. A Function field takes a
+// function id there, or a `run { }` body, which the editor reads as code.
+func (e *Env) InstanceType(bp *eval.Blueprint) *spec.Type {
+	t := &spec.Type{Kind: "struct"}
+	for _, f := range bp.Fields {
+		if f.Name == nil {
+			continue
+		}
+		ft, opt := e.Resolve(bp.Path, f.Type)
+		if n, ok := unwrapOptional(f.Type).(*syntax.TypeName); ok && n.Name == "Function" {
+			ft = idType("function")
+		}
+		t.Fields = append(t.Fields, &spec.Field{Kind: "pair", Key: f.Name.Text, Type: ft, Desc: f.Doc, Optional: opt || f.Default != nil})
+	}
+	return t
+}
+
+func unwrapOptional(t syntax.TypeExpr) syntax.TypeExpr {
+	if o, ok := t.(*syntax.TypeOptional); ok {
+		return o.X
+	}
+	return t
 }

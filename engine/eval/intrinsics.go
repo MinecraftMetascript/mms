@@ -24,6 +24,7 @@ var intrinsics = map[string]intrinsic{
 	"matches":     matches,
 	"replace":     replace,
 	"named":       named,
+	"kind_of":     kindOf,
 }
 
 // Intrinsics lists the names of the intrinsics, for the test that each
@@ -235,4 +236,37 @@ func named(c *ctx, x *syntax.Call, args []argValue) Value {
 	nc := *call
 	nc.Args = append(append([]*syntax.Arg(nil), call.Args...), &syntax.Arg{Value: &syntax.String{Value: n, Sp: call.Sp}, Sp: call.Sp})
 	return &Code{code.pos, &nc}
+}
+
+// kindOf names the kind of a value: "none", "bool", "number", "string",
+// "name", "list", "object", "range", "commands", or "runtime" for a
+// value only known when the pack runs.
+func kindOf(c *ctx, x *syntax.Call, args []argValue) Value {
+	p := c.pos(x.Sp)
+	v, ok := oneArg(c, x, args, "kind_of")
+	if !ok {
+		return &Str{p, "none"}
+	}
+	k := "runtime"
+	switch v.(type) {
+	case *None:
+		k = "none"
+	case *Bool:
+		k = "bool"
+	case *Num:
+		k = "number"
+	case *Str:
+		k = "string"
+	case *Word:
+		k = "name"
+	case *List:
+		k = "list"
+	case *Record:
+		k = "object"
+	case *RangeV:
+		k = "range"
+	case *Stmts:
+		k = "commands"
+	}
+	return &Str{p, k}
 }

@@ -114,11 +114,16 @@ type Checker struct {
 	// that contains itself.
 	customOf string
 
-	trial  bool
-	errs   int
-	depth  int
-	memo   map[memoKey]int
-	parent *Checker
+	trial bool
+	errs  int
+	depth int
+	memo  map[memoKey]int
+	// merging holds the objects mergeConvert is checking on their own.
+	merging map[syntax.Node]bool
+	// converting holds the instances whose conversions are being
+	// checked, to catch one that contains itself.
+	converting map[string]bool
+	parent     *Checker
 }
 
 type memoKey struct {
@@ -268,6 +273,9 @@ func (c *Checker) check(e syntax.Expr, v tview) jsonv.Value {
 		return nil // already reported by the parser
 	}
 	if r, ok := c.convert(e, v); ok {
+		return r
+	}
+	if r, ok := c.mergeConvert(e, v); ok {
 		return r
 	}
 	if r := c.sugar(e, v); r != nil {
@@ -485,7 +493,7 @@ func (c *Checker) trialErrors(e syntax.Expr, v tview) int {
 	if n, ok := root.memo[k]; ok {
 		return n
 	}
-	t := &Checker{Pack: c.Pack, Kinds: c.Kinds, Syms: c.Syms, NS: c.NS, trial: true, depth: c.depth, parent: root, Deps: c.Deps, Files: c.Files}
+	t := &Checker{Pack: c.Pack, Kinds: c.Kinds, Syms: c.Syms, NS: c.NS, trial: true, depth: c.depth, parent: root, Deps: c.Deps, Files: c.Files, converting: c.converting}
 	t.check(e, v)
 	root.memo[k] = t.errs
 	return t.errs
