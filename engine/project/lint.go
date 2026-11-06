@@ -28,8 +28,6 @@ var Rules = []*Rule{
 		Doc: "A Book page with more text than the book screen shows: 14 lines of about 19 characters. The game cuts the rest off. Widths are measured with the vanilla font, so text outside ASCII is a close guess."},
 	{ID: "constant-expression", Severity: syntax.SeverityHint, run: lintConstant,
 		Doc: "An arithmetic expression of number literals can be written as its value."},
-	{ID: "custom-item-base", Severity: syntax.SeverityHint, run: lintCustomBase,
-		Doc: "A CustomItem used where the game takes a plain item id, such as a recipe ingredient or an item tag. It stands for its base item there, so it also matches the base item without the custom components."},
 	{ID: "deprecated", Severity: syntax.SeverityWarning, all: lintDeprecated,
 		Doc: "A use of a declaration whose doc comment has a `@deprecated` tag."},
 	{ID: "external-asset", Severity: syntax.SeverityWarning, all: lintExternalAsset,
@@ -164,6 +162,26 @@ func (r *Result) lint() map[string][]syntax.Diagnostic {
 		}
 		l.out[d.Unit.Path] = append(l.out[d.Unit.Path], d.lints...)
 		for path, ds := range d.extLints {
+			if r.Unit(path) != nil {
+				l.out[path] = append(l.out[path], ds...)
+			}
+		}
+	}
+	// A Book's text is checked on its instance, which is not in Order.
+	for _, d := range r.Instances {
+		if d.Item == nil || d.Item.Book == nil {
+			continue
+		}
+		var found []syntax.Diagnostic
+		ext := map[string][]syntax.Diagnostic{}
+		l.cur, l.ext = &found, ext
+		if l.rule = ruleByID("book-overflow"); l.rule != nil {
+			if l.sev = r.severity(l.rule); l.sev != 0 {
+				l.rule.run(l, d)
+			}
+		}
+		l.out[d.Unit.Path] = append(l.out[d.Unit.Path], found...)
+		for path, ds := range ext {
 			if r.Unit(path) != nil {
 				l.out[path] = append(l.out[path], ds...)
 			}
@@ -376,24 +394,6 @@ func lintNamespace(l *lintRun, d *Decl) {
 		}
 		l.report(d, sp, "'minecraft:' is the default namespace here",
 			syntax.Fix{Title: "Write " + short, Edits: []syntax.TextEdit{{Sp: sp, Text: short}}, Safe: true})
-		return true
-	})
-}
-
-func lintCustomBase(l *lintRun, d *Decl) {
-	syntax.Walk(d.D, func(n syntax.Node) bool {
-		in := d.Info[n]
-		if in == nil || in.Base == "" || in.Symbol == nil {
-			return true
-		}
-		name, base := in.Symbol.Path, strings.TrimPrefix(in.Base, "minecraft:")
-		fix := base
-		if l.r.Syms.Find("item", d.NS+":"+base) != nil {
-			fix = in.Base // a custom item of the same name would win
-		}
-		// Not Safe: the custom item keeps the recipe following its base.
-		l.report(d, n.Span(), fmt.Sprintf("'%s' stands for its base item %s here: this field takes a plain item id, so any %s matches, not only %s", name, base, base, name),
-			syntax.Fix{Title: "Write " + fix, Edits: []syntax.TextEdit{{Sp: n.Span(), Text: fix}}})
 		return true
 	})
 }
@@ -634,10 +634,10 @@ func lintDeprecated(l *lintRun) {
 }
 
 func lintBookOverflow(l *lintRun, d *Decl) {
-	if d.Item == nil {
+	if d.Item == nil || d.Item.Book == nil {
 		return
 	}
-	for _, ov := range d.Item.Overflows {
+	for _, ov := range d.Item.Book.Overflows {
 		msg := fmt.Sprintf("%spage %d runs to %d lines, but a book page shows 14, so the game cuts the rest off from here; start a new page with a --- line", ov.Where, ov.Page, ov.Lines)
 		if ov.File != "" {
 			l.ext[ov.File] = append(l.ext[ov.File], syntax.Diagnostic{Code: "lint/" + l.rule.ID, Severity: l.sev, Message: msg, Sp: ov.Sp})
@@ -645,4 +645,13 @@ func lintBookOverflow(l *lintRun, d *Decl) {
 		}
 		l.report(d, ov.Sp, msg)
 	}
+}
+
+func ruleByID(id string) *Rule {
+	for _, r := range Rules {
+		if r.ID == id {
+			return r
+		}
+	}
+	return nil
 }

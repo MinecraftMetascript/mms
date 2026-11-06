@@ -64,7 +64,7 @@ func TestTextHasNoPages(t *testing.T) {
 	}{
 		{adv(`"One\n---\nTwo"`), nil, "main.mms", "a page break works only in a book's text"},
 		{adv(`"[Next](page:2)"`), nil, "main.mms", "a page link works only in a book's text"},
-		{"Book b = { title = \"T\", author = \"A\", text = TextFile(\"b.mmstext\") }\n", map[string]string{"b.mmstext": "One\n---\nTwo\n"}, "b.mmstext", "a page break works only"},
+		{"Book b { title = \"T\", author = \"A\", text = TextFile(\"b.mmstext\") }\n", map[string]string{"b.mmstext": "One\n---\nTwo\n"}, "b.mmstext", "a page break works only"},
 	} {
 		_, r := bookProject(t, tc.src, tc.files)
 		var msgs []string
@@ -88,7 +88,7 @@ func TestTextFile(t *testing.T) {
 	if got := emitted(t, r, "data/demo/advancement/a.json"); !strings.Contains(got, `"color": "red"`) {
 		t.Errorf("output:\n%s", got)
 	}
-	src = "Book b = { title = \"T\", author = \"A\", text = TextFile(\"b.mmstext\") }\nLootTable l { pools = [Pool(1, [b])] }\n"
+	src = "Book b { title = \"T\", author = \"A\", text = TextFile(\"b.mmstext\") }\nLootTable l { pools = [Pool(1, [b])] }\n"
 	_, r = bookProject(t, src, map[string]string{"b.mmstext": "**Hello**\n"})
 	if d := diagText(r); d != "" {
 		t.Fatal(d)

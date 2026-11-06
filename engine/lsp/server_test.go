@@ -602,7 +602,7 @@ func TestBookFiles(t *testing.T) {
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, "books"), 0o755)
 	os.WriteFile(filepath.Join(dir, "mms.json"), []byte(`{"namespace": "demo"}`), 0o644)
-	const main = "Book guide = { title = \"G\", author = \"A\", text = TextFile(\"books/guide.mmsbook\") }\n"
+	const main = "Book guide { title = \"G\", author = \"A\", text = TextFile(\"books/guide.mmsbook\") }\n"
 	os.WriteFile(filepath.Join(dir, "main.mms"), []byte(main), 0o644)
 	os.WriteFile(filepath.Join(dir, "books", "guide.mmsbook"), []byte("# Hello\n"), 0o644)
 	m, b := pathURI(filepath.Join(dir, "main.mms")), pathURI(filepath.Join(dir, "books", "guide.mmsbook"))

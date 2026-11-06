@@ -67,7 +67,7 @@ func SigOf(d *syntax.Decl) FuncSig {
 // SymSig is the signature part of a symbol that other declarations
 // depend on; it is "" for most kinds.
 func SymSig(s *Symbol) string {
-	if s.Kind.MMS == "Function" || s.Kind.MMS == "Global" || isItemKind(s.Kind.MMS) {
+	if s.Kind.MMS == "Function" || s.Kind.MMS == "Global" {
 		return symSig(s)
 	}
 	return ""
@@ -78,9 +78,6 @@ func SymSig(s *Symbol) string {
 func symSig(s *Symbol) string {
 	if s == nil || s.Decl == nil {
 		return ""
-	}
-	if isItemKind(s.Kind.MMS) {
-		return customItemSig(s)
 	}
 	if s.Kind.MMS == "Global" {
 		if s.Decl.Type == nil {
@@ -683,23 +680,6 @@ func (f *fc) variable(e syntax.Expr) *local {
 		f.c.errorf("mms/unsupported", e.Span(), "expected a variable")
 	}
 	return nil
-}
-
-// customItem returns the custom item an interpolated name refers to,
-// when no variable has that name.
-func (f *fc) customItem(e syntax.Expr) *Symbol {
-	if id, ok := e.(*syntax.Ident); ok {
-		if _, ok := f.lookup(id.Name); ok {
-			return nil
-		}
-		if f.c.Syms.Find("Global", f.ns+":"+id.Name) != nil {
-			return nil
-		}
-	}
-	if !f.c.isCustomItem(e) {
-		return nil
-	}
-	return f.c.customItemRef(e)
 }
 
 func (f *fc) global(id string, e syntax.Expr) *local {
@@ -1405,15 +1385,6 @@ func (f *fc) interpolate(out *fn.Block, cmd *syntax.CommandStmt) {
 			// that stack, as a command's item argument:
 			// /give @s ${ember_shard} 4
 			line.WriteString(StackSNBT(st))
-			i = j
-			continue
-		}
-		if s := f.customItem(e); s != nil {
-			// A custom item is its base item with its components, as a
-			// command's item argument: /give @s ${ember_shard} 4
-			if st := f.c.customStack(s, e.Span()); st != nil {
-				line.WriteString(StackSNBT(st))
-			}
 			i = j
 			continue
 		}

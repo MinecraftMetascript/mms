@@ -102,9 +102,11 @@ func (r *Result) instanceDecls(tenv *types.Env, newChecker types.Checkers) {
 		// an editor to list and preview.
 		if inst.Name != nil {
 			if st := c.ConvertedStack(&syntax.ResLoc{Text: d.ID(), Sp: inst.Name.Sp}); st != nil {
-				d.Item = &sema.CustomItemOut{Stack: st}
+				d.Item = &sema.CustomItemOut{Stack: st, Book: c.Book}
 			}
 		}
+		// A Book's text is checked only here: its markup problems.
+		d.Diags, d.Extern = c.BookDiags, c.Extern
 		r.Decls[inst.D] = d
 		r.Instances = append(r.Instances, d)
 	}

@@ -19,8 +19,6 @@ extern Blueprint OnFirstJoin
 extern Blueprint OnRespawn
 /** Code that runs as and at a player each time they meet a trigger: `OnAdvancement name = Trigger(...) { ... }` writes the advancement, its reward function and the revoke. */
 extern Blueprint OnAdvancement
-/** A written book with pages in book markup: `Book guide = { title = "Guide", author = "The Garrison", text = ["# Welcome", "Plant the **banner** on gold."] }`. Its name stands for the book in item stacks, loot entries and `${...}` in commands. */
-extern Blueprint Book
 /** A name for jigsaw blocks, used only by the editor: `JigsawHole road_end` lists `<namespace>:road_end` in the Jigsaw view's Name and Target lists, so pieces built in the game join by names spelled the same way. It writes no file. */
 extern Blueprint JigsawHole
 

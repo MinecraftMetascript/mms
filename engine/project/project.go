@@ -274,6 +274,12 @@ func (r *Result) Diagnostics(path string) []syntax.Diagnostic {
 		}
 		out = append(out, d.Extern[path]...)
 	}
+	for _, d := range r.Instances {
+		if d.Unit == u {
+			out = append(out, d.Diags...)
+		}
+		out = append(out, d.Extern[path]...)
+	}
 	out = append(out, r.Lints()[path]...)
 	sort.SliceStable(out, func(i, j int) bool { return out[i].Sp.Start < out[j].Sp.Start })
 	return out
@@ -330,7 +336,7 @@ func (p *Project) Analyze(ctx context.Context) (*Result, error) {
 	r := &Result{Syms: syms, Units: units, Decls: map[*syntax.Decl]*Decl{}, collect: collect, pack: p.Pack, cfg: p.Config, files: p.Files, Eval: ev}
 	r.typeErr = tenv.Check(ev, p.Config.Namespace, func(ns string) *sema.Checker {
 		c := sema.NewChecker(p.Pack, p.Kinds, syms, ns)
-		c.Files = p.Files
+		c.Files, c.Texts = p.Files, p.bookText
 		return c
 	})
 	r.symKey = symbolKey(syms)
@@ -370,7 +376,7 @@ func (p *Project) Analyze(ctx context.Context) (*Result, error) {
 	}
 	r.instanceDecls(tenv, func(ns string) *sema.Checker {
 		c := sema.NewChecker(p.Pack, p.Kinds, syms, ns)
-		c.Files = p.Files
+		c.Files, c.Texts = p.Files, p.bookText
 		return c
 	})
 	r.collectAssets()
@@ -488,8 +494,6 @@ func (p *Project) checkDecl(u *sema.Unit, d *syntax.Decl, k sema.Kind, syms *sem
 			dr.Fn = fn.Generate(*f)
 			dr.Lines = []string{"function " + id}
 		}
-	case k.MMS == "Book":
-		dr.Item = c.Book(d, dr.ID())
 	case k.MMS == "Objective":
 		dr.Lines = objective(c, d)
 	case k.MMS == "Global":

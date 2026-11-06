@@ -197,6 +197,9 @@ func (e *Env) named(path string, t *syntax.TypeName) *spec.Type {
 	if opaque[t.Name] {
 		return &spec.Type{Kind: "any"}
 	}
+	if t.Name == "BookText" {
+		return sema.BookTextType()
+	}
 	if t.Name == "Id" {
 		if len(t.Args) != 1 {
 			e.errorf(path, t.Sp, "Id takes one registry: Id<item>")

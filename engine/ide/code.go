@@ -264,16 +264,6 @@ func (s *Session) interpolationCompletion(a *at, base, off int) ([]Item, syntax.
 		end++
 	}
 	cands := s.codeValues(a, start)
-	for _, sym := range s.R.Syms.All() {
-		if sym.Kind.MMS != "Book" {
-			continue
-		}
-		name := sym.Path
-		if sym.NS != a.decl.NS {
-			name = sym.ID()
-		}
-		cands = append(cands, sema.Candidate{Label: name, Kind: sema.CandID, Detail: sym.Kind.MMS, Doc: sema.DocMarkdown(sym.Decl.Doc), Rank: 80})
-	}
 	for _, c := range a.c.StackCandidates() {
 		c.Rank = 80
 		cands = append(cands, c)

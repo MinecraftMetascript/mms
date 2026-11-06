@@ -1038,9 +1038,9 @@ func (s *Server) output(_ context.Context, p struct {
 		}
 		// Where a Book's pages start, in its text or its .mmsbook file,
 		// so a preview can open on the page at the cursor.
-		if len(d.Item.PageStarts) > 0 {
-			pages := make([]map[string]any, 0, len(d.Item.PageStarts))
-			for _, ps := range d.Item.PageStarts {
+		if d.Item.Book != nil && len(d.Item.Book.PageStarts) > 0 {
+			pages := make([]map[string]any, 0, len(d.Item.Book.PageStarts))
+			for _, ps := range d.Item.Book.PageStarts {
 				unit := ps.File
 				if unit == "" {
 					unit = d.Unit.Path

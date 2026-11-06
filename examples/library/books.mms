@@ -7,7 +7,7 @@
 Objective deaths = "deathCount"
 
 /** Given to every player the first time they join. */
-Book guide = {
+Book guide {
   title = "Library Guide"
   author = "The Librarian"
   text = [
@@ -30,9 +30,9 @@ Book guide = {
 }
 
 /** One of the miner's diaries, worn by time. */
-Book diary_12 = { title = "Diary, Day 12", author = "A Miner", generation = tattered, text = TextFile("books/day_12.mmsbook") }
-Book diary_13 = { title = "Diary, Day 13", author = "A Miner", generation = tattered, text = TextFile("books/day_13.mmsbook") }
-Book diary_14 = { title = "Diary, Day 14", author = "A Miner", generation = tattered, text = TextFile("books/day_14.mmsbook") }
+Book diary_12 { title = "Diary, Day 12", author = "A Miner", generation = tattered, text = TextFile("books/day_12.mmsbook") }
+Book diary_13 { title = "Diary, Day 13", author = "A Miner", generation = tattered, text = TextFile("books/day_13.mmsbook") }
+Book diary_14 { title = "Diary, Day 14", author = "A Miner", generation = tattered, text = TextFile("books/day_14.mmsbook") }
 
 /** A chest of old things: one diary, and some clutter. */
 LootTable old_chest {
