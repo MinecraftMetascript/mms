@@ -45,3 +45,26 @@ func TestEditorOnExpandedCode(t *testing.T) {
 		}
 	}
 }
+
+// TestConversionInlayHint checks that a Blueprint instance's name read as
+// a hinted `as` conversion shows what it became.
+func TestConversionInlayHint(t *testing.T) {
+	p := project.New(spec.MustDefault(), project.Config{Namespace: "demo"})
+	p.SetFile("a.mms", `Blueprint Gem {
+  base: Id<item>
+  as Id<item> = base hint("gem-base", "Matches any ${base}")
+  emit { Function gems/${self.path} { /say ${base} } }
+}
+Gem ruby { base = emerald }
+ItemTag shiny = [ruby]
+`)
+	r, err := p.Analyze(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := &Session{P: p, R: r}
+	hs := s.InlayHints("a.mms")
+	if len(hs) != 1 || hs[0].Label != "→ emerald" || hs[0].Tooltip != "Matches any emerald" {
+		t.Fatalf("inlay hints: %+v", hs)
+	}
+}

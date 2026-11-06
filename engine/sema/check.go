@@ -35,6 +35,9 @@ type Info struct {
 	// Base is set where a custom item is used as a plain item id: the
 	// base item id written in its place.
 	Base string
+	// Converted is set where a Blueprint instance's name is checked as
+	// one of its `as` conversions.
+	Converted *Conversion
 	// Props are the block state properties a multipart `when` object
 	// body can test, for completion.
 	Props map[string][]string

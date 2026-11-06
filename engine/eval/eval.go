@@ -310,6 +310,9 @@ func (e *evaluator) collect(u Unit) {
 				}
 				e.r.Types[name] = &TypeDef{Path: u.Path, D: it}
 			case "Blueprint":
+				if it.Extern {
+					continue // a kind the compiler builds in Go
+				}
 				if _, dup := e.r.Blueprints[name]; dup {
 					errorf(it.Name.Sp, "Blueprint '"+name+"' is already declared")
 					continue

@@ -153,6 +153,7 @@ func (r *Result) lint() map[string][]syntax.Diagnostic {
 					rule.run(l, d)
 				}
 			}
+			lintHints(l, d, "")
 			d.lintKey = key
 		}
 		l.out[d.Unit.Path] = append(l.out[d.Unit.Path], d.lints...)

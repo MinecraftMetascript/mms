@@ -85,11 +85,11 @@ Gem ruby { base = emerald }
 		}
 		return strings.Join(msgs, "; ")
 	}
-	if got := hint(); got != "gem-base Matches any emerald" {
+	if got := hint(); got != "lint/gem-base Matches any emerald" {
 		t.Fatalf("before the edit: %q", got)
 	}
 	p.SetFile("gem.mms", strings.Replace(p.texts["gem.mms"], "emerald", "diamond", 1))
-	if got := hint(); got != "gem-base Matches any diamond" {
+	if got := hint(); got != "lint/gem-base Matches any diamond" {
 		t.Fatalf("after the edit: %q", got)
 	}
 }

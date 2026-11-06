@@ -4,6 +4,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/minecraftmetascript/mms/engine/prelude"
 	"github.com/minecraftmetascript/mms/engine/spec"
 )
 
@@ -15,8 +16,9 @@ type Kind struct {
 	Resource string
 	// TagOf is the registry a tag kind lists ("block", "worldgen/biome").
 	TagOf string
-	// MMS is set for language-level kinds: Namespace, Function, Objective,
-	// Global, CustomItem, Book, JigsawHole and the event hooks (OnLoad, OnTick, OnFirstJoin,
+	// MMS is set for the language's own kinds, which the prelude declares
+	// with `extern Blueprint`: Namespace, Function, Objective, Global,
+	// Book, JigsawHole and the event hooks (OnLoad, OnTick, OnFirstJoin,
 	// OnRespawn, OnAdvancement).
 	MMS string
 	// Assets is the folder under assets/<ns>/ for resource-pack kinds
@@ -52,13 +54,6 @@ func (k Kind) Folder() string {
 	return k.Resource
 }
 
-var mmsKinds = map[string]bool{
-	"Namespace": true, "Function": true, "Objective": true, "Global": true,
-	"OnLoad": true, "OnTick": true,
-	"OnFirstJoin": true, "OnRespawn": true, "OnAdvancement": true,
-	"CustomItem": true, "Book": true, "JigsawHole": true,
-}
-
 // kindAliases name resource kinds whose MMS names differ from the folder,
 // mostly names the old language used.
 var kindAliases = map[string]string{
@@ -85,7 +80,9 @@ type Kinds struct {
 // NewKinds indexes the pack's resource kinds and registries.
 func NewKinds(p *spec.Pack) *Kinds {
 	ks := &Kinds{pack: p, byName: map[string]Kind{}, tagRegs: map[string]string{}}
-	for name := range mmsKinds {
+	// The language's own kinds are those the prelude declares with
+	// `extern Blueprint`.
+	for name := range prelude.Kinds() {
 		ks.byName[name] = Kind{Name: name, MMS: name}
 	}
 	// A resource kind is named after its last path segment, unless two

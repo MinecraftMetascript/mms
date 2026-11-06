@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/minecraftmetascript/mms/engine/command"
+	"github.com/minecraftmetascript/mms/engine/format"
 	"github.com/minecraftmetascript/mms/engine/jsonv"
 	"github.com/minecraftmetascript/mms/engine/project"
 	"github.com/minecraftmetascript/mms/engine/sema"
@@ -1201,6 +1202,16 @@ func (s *Session) InlayHints(path string) []InlayHint {
 			continue
 		}
 		for n, in := range dr.Info {
+			if cv := in.Converted; cv != nil && cv.Hint != "" {
+				// A Blueprint instance read as one of its `as`
+				// conversions, which says why with a hint.
+				to := format.Expr(cv.X)
+				if r := []rune(to); len(r) > 30 {
+					to = string(r[:29]) + "…"
+				}
+				out = append(out, InlayHint{Off: n.Span().End, Label: "→ " + to, Tooltip: cv.Hint})
+				continue
+			}
 			if in.Base == "" || in.Symbol == nil {
 				continue
 			}

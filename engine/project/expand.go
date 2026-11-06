@@ -2,6 +2,7 @@ package project
 
 import (
 	"github.com/minecraftmetascript/mms/engine/eval"
+	"github.com/minecraftmetascript/mms/engine/prelude"
 	"github.com/minecraftmetascript/mms/engine/sema"
 	"github.com/minecraftmetascript/mms/engine/syntax"
 )
@@ -11,7 +12,12 @@ import (
 // declarations, with the same text and tokens; every other unit is
 // returned as it was, so its checked results carry over.
 func expand(units []*sema.Unit, ns string, cache *eval.Cache) ([]*sema.Unit, *eval.Result) {
-	in := make([]eval.Unit, 0, len(units))
+	in := make([]eval.Unit, 0, len(units)+4)
+	// The prelude comes first, as a library would: its Templates, Types
+	// and Blueprints are in scope everywhere. It writes nothing itself.
+	for _, f := range prelude.Parse() {
+		in = append(in, eval.Unit{Path: f.Path, File: f.File})
+	}
 	for _, u := range units {
 		if !sema.IsBookFile(u.Path) {
 			in = append(in, eval.Unit{Path: u.Path, File: u.File})

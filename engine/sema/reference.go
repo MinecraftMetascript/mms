@@ -4,6 +4,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/minecraftmetascript/mms/engine/prelude"
 	"github.com/minecraftmetascript/mms/engine/spec"
 )
 
@@ -61,22 +62,7 @@ type RefParam struct {
 
 // KindDoc is the description of a language-level kind such as Function
 // or CustomItem.
-func KindDoc(name string) string { return mmsKindDocs[name] }
-
-var mmsKindDocs = map[string]string{
-	"Namespace":     "Sets the namespace for the declarations after it in the file.",
-	"Function":      "A function: commands, variables and control flow, compiled to .mcfunction files.",
-	"Objective":     "A scoreboard objective, created by the generated load function.",
-	"Global":        "A value for the whole pack, set when the pack first loads.",
-	"OnLoad":        "Code that runs when the pack loads, from #minecraft:load.",
-	"OnTick":        "Code that runs every tick, from #minecraft:tick.",
-	"OnFirstJoin":   "Code that runs once for each player, the first time they are in the world with the pack, as and at that player.",
-	"OnRespawn":     "Code that runs as and at a player right after they respawn.",
-	"CustomItem":    "A vanilla item with its own look and name: `CustomItem ember_shard = { base = amethyst_shard, name = \"Ember Shard\", texture = Texture(\"art/ember_shard.png\") }` writes the model, the item model and the lang entry, and its name stands for the item in item stacks, loot entries and `${...}` in commands.",
-	"Book":          "A written book with pages in book markup: `Book guide = { title = \"Guide\", author = \"The Garrison\", text = [\"# Welcome\", \"Plant the **banner** on gold.\"] }`. Its name stands for the book in item stacks, loot entries and `${...}` in commands.",
-	"JigsawHole":    "A name for jigsaw blocks, used only by the editor: `JigsawHole road_end` lists `<namespace>:road_end` in the Jigsaw view's Name and Target lists, so pieces built in the game join by names spelled the same way. It writes no file.",
-	"OnAdvancement": "Code that runs as and at a player each time they meet a trigger: `OnAdvancement name = Trigger(...) { ... }` writes the advancement, its reward function and the revoke.",
-}
+func KindDoc(name string) string { return prelude.Kinds()[name].Doc }
 
 // BuildReference walks every type reachable from the pack's resources and
 // lists the helpers that can build each one.
@@ -91,7 +77,7 @@ func BuildReference(p *spec.Pack, ks *Kinds) Reference {
 		}
 		if k.MMS != "" {
 			rk.Folder = ""
-			rk.Doc = mmsKindDocs[name]
+			rk.Doc = KindDoc(name)
 		} else if k.TagOf != "" {
 			rk.Doc = "A tag of " + k.TagOf + " entries. Other tags of the same registry follow `Tag` the same way."
 		}

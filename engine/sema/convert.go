@@ -92,9 +92,8 @@ func (c *Checker) converted(e syntax.Expr, fits func(*spec.Type) bool) syntax.Ex
 		if cv.Type == nil || !fits(cv.Type) {
 			continue
 		}
-		if cv.Hint != "" && !c.trial {
-			c.Diags = append(c.Diags, syntax.Diagnostic{Code: cv.Rule, Severity: syntax.SeverityHint, Message: cv.Hint, Sp: e.Span()})
-		}
+		// The hint, if any, is a lint rule's finding: see Info.Converted.
+		c.info(e).Converted = cv
 		return syntax.CloneExprAt(cv.X, e.Span())
 	}
 	return nil
