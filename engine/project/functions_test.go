@@ -420,11 +420,11 @@ func TestExampleFunctions(t *testing.T) {
 	vm := load(t, r, "adv")
 	call(t, vm, "adv:demo")
 	want := []string{
-		`"Hello, Steve!"`,
+		"Hello, Steve!",
 		"fib(10) is 55",
 		"gcd(84, 36) is 12",
 		"2^10 is 1024",
-		`"Primes: 2 3 5 7 11 13 17 19 23 29 (10 in total)"`, // tellraw keeps its JSON text
+		"Primes: 2 3 5 7 11 13 17 19 23 29 (10 in total)",
 	}
 	if strings.Join(vm.Said, "\n") != strings.Join(want, "\n") {
 		t.Errorf("said:\n%s\nwant:\n%s", strings.Join(vm.Said, "\n"), strings.Join(want, "\n"))

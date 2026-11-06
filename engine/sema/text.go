@@ -3,6 +3,7 @@ package sema
 import (
 	"strings"
 
+	"github.com/minecraftmetascript/mms/engine/fn"
 	"github.com/minecraftmetascript/mms/engine/jsonv"
 	"github.com/minecraftmetascript/mms/engine/syntax"
 )
@@ -51,6 +52,12 @@ func textFile(c *Checker, e syntax.Expr, v tview) jsonv.Value {
 // mark left open, such as the * of "5 * 3", is the character itself; its
 // spans are returned for the accidental-markup lint.
 func (c *Checker) textMarkup(src *bookSrc) (jsonv.Value, []syntax.Span) {
+	return c.textMarkupIn(src, nil, nil)
+}
+
+// textMarkupIn is textMarkup for text shown from function f, whose
+// variables ${...} can read; values it computes are worked out in pre.
+func (c *Checker) textMarkupIn(src *bookSrc, f *fc, pre *[]fn.Op) (jsonv.Value, []syntax.Span) {
 	// A first pass, whose problems are dropped, finds the marks left open.
 	trial := newBookParser(c.bookSub())
 	trial.plainText = true
@@ -67,6 +74,7 @@ func (c *Checker) textMarkup(src *bookSrc) (jsonv.Value, []syntax.Span) {
 		}
 	}
 	p := newBookParser(c)
+	p.fn, p.pre = f, pre
 	p.plainText = true
 	p.literal = map[*bookSrc]map[int]bool{src: lit}
 	p.text(src)

@@ -67,7 +67,7 @@ Function welcome(name: string) {
   if (name == "Notch") {
     line += " Nice to meet you."
   }
-  /tellraw @a "${line}"
+  tell(@a, "${line}")
 }
 ```
 
@@ -85,6 +85,24 @@ Function report(points: int) {
 - **Constant values** (literals, constant arithmetic) are written into the command at compile time.
 - **Run-time values** turn the line into a [macro](https://minecraft.wiki/w/Function_(Java_Edition)#Macros): the values are copied into storage, and a one-line macro function runs the command.
 - **Quotes:** a string with a `"` in it will break a command that wraps it in quotes, just as it would in a hand-written macro.
+
+## Text commands
+
+`tell`, `title` and `actionbar` show [text markup](resources.md#text-markup) to players:
+
+```
+Global wave = 1
+
+Function start_wave {
+  tell(@a, "{red}Wave ${wave}{/} begins. [Rules](run:/function siege:rules)")
+  title(@a, "{gold}Wave ${wave}", subtitle = "{gray}*hold the banner*")
+  actionbar(@s, "**${kills[@s]}** kills")
+}
+```
+
+- `tell(target, message)` writes `/tellraw`, `title(target, message, subtitle = ...)` writes `/title ... title` (after `subtitle`, when it is given), and `actionbar(target, message)` writes `/title ... actionbar`.
+- The message is a string of markup, a `const` or `Template` of type `Text`, or `TextFile("text/rules.mmstext")`.
+- `${...}` in the message is part of the text component, filled in by the game when the message is shown: a score, a Global, a variable, a selector such as `${@s}` (the names it finds), or a constant. A computed value such as `${n * 2}` is worked out just before the command. No macro is needed.
 
 ## Control flow
 

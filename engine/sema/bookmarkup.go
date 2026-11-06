@@ -23,7 +23,8 @@ import (
 //	[Next](page:2)                a link: page:N, run:/command,
 //	                              suggest:/command, copy:text, hover:text
 //	                              or https://...; [text](target "hover")
-//	${kills[@s]}                  a score, a Global or a constant
+//	${kills[@s]}                  a score, a Global, a constant, or ${@s} a
+//	                              selector's names
 //	---                           a line of its own: the next page
 //
 // A backslash makes the next character plain text.
@@ -118,6 +119,10 @@ type bookParser struct {
 	// literal holds the offsets, by source, of marks read as the
 	// characters themselves.
 	literal map[*bookSrc]map[int]bool
+	// fn is the function the text is shown from, for a tell message:
+	// ${...} can then read its variables, and computes a value into pre.
+	fn  *fc
+	pre *[]fn.Op
 }
 
 func newBookParser(c *Checker) *bookParser {
@@ -671,8 +676,9 @@ func isHexColor(s string, digits int) bool {
 	return true
 }
 
-// expr handles ${...} over the runes [start, end): a score, a Global or a
-// constant, which the game fills in when the book is first opened.
+// expr handles ${...} over the runes [start, end): a score, a Global, a
+// selector or a constant, which the game fills in when the text is shown
+// (a book's when it is first opened).
 func (p *bookParser) expr(src *bookSrc, start, end int, click *jsonv.Object, hover string) {
 	text := string(src.text[start:end])
 	c := p.c
@@ -686,22 +692,41 @@ func (p *bookParser) expr(src *bookSrc, start, end int, click *jsonv.Object, hov
 		p.report(src, code, src.at(s, e), src.where(s)+msg)
 	}
 	if strings.TrimSpace(text) == "" || len(file.Diags) > 0 || len(file.Decls) != 1 || file.Decls[0].Value == nil {
-		report(syntax.Span{}, "mms/syntax", "expected a score, a Global or a constant inside ${...}")
+		report(syntax.Span{}, "mms/syntax", "expected a score, a Global, a selector or a constant inside ${...}")
+		return
+	}
+	if sel := selectorText(file.Decls[0].Value); sel != "" {
+		// ${@s} is the names of the entities a selector finds.
+		o := &jsonv.Object{}
+		o.Set("selector", jsonv.String(sel))
+		p.addObj(src, start-2, o, 48, click, hover)
 		return
 	}
 	sub := c.bookSub()
 	sub.Src = []rune(head + text)
 	f := &fc{c: sub, src: sub.Src, ns: c.NS, obj: fn.Objective(c.NS), names: map[string]int{}}
 	f.push()
+	if o := p.fn; o != nil {
+		// The function's own variables, in a copy so a temporary used here
+		// does not clash with the function's.
+		f.ns, f.path, f.obj, f.names, f.temps = o.ns, o.path, o.obj, o.names, o.temps
+		f.selfID, f.frame, f.strings = o.selfID, o.frame, o.strings
+		f.scopes = append(append([]map[string]local(nil), o.scopes...), map[string]local{})
+	}
 	var pre []fn.Op
 	v := f.expr(&pre, file.Decls[0].Value)
+	if o := p.fn; o != nil {
+		o.temps, o.frame, o.strings = f.temps, f.frame, f.strings
+	}
 	for _, d := range sub.Diags {
 		report(d.Sp, d.Code, d.Message)
 	}
 	if v == nil || len(sub.Diags) > 0 {
 		return
 	}
-	if len(pre) > 0 {
+	if len(pre) > 0 && p.pre != nil {
+		*p.pre = append(*p.pre, pre...)
+	} else if len(pre) > 0 {
 		report(syntax.Span{}, "mms/book", "a book can show a score, a Global or a constant, not a computed value; work it out in a function and keep it in a Global")
 		return
 	}

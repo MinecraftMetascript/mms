@@ -65,8 +65,7 @@ scoreboard players set #greet._f1 mms.adv 0
 execute if score #greet._t2 mms.adv matches 0 run scoreboard players set #greet._f1 mms.adv 1
 execute if score #greet._f1 mms.adv matches 1 run function adv:greet/_if2
 execute unless score #greet._f1 mms.adv matches 1 run function adv:greet/_else4
-data modify storage adv:mms m.a0 set from storage adv:mms l."greet".greeting
-function adv:greet/_macro6 with storage adv:mms m
+tellraw @a {nbt:"l.\"greet\".greeting",storage:"adv:mms"}
 === data/adv/function/greet/_else4.mcfunction
 data modify storage adv:mms m.a0 set from storage adv:mms l."greet".greeting
 function adv:greet/_macro5 with storage adv:mms m
@@ -81,8 +80,6 @@ $data modify storage adv:mms l."greet"._s0 set value "Hello, $(a1)"
 $data modify storage adv:mms l."greet"._s3 set value "$(a0). Thanks for the game!"
 === data/adv/function/greet/_macro5.mcfunction
 $data modify storage adv:mms l."greet"._s4 set value "$(a0)!"
-=== data/adv/function/greet/_macro6.mcfunction
-$tellraw @a "$(a0)"
 === data/adv/function/is_prime.mcfunction
 execute if score #is_prime.n mms.adv matches ..1 run return 0
 scoreboard players set #is_prime.d mms.adv 2
@@ -154,8 +151,7 @@ function adv:primes_up_to/_macro6 with storage adv:mms m
 data modify storage adv:mms m.a0 set from storage adv:mms l."primes_up_to"._s5
 function adv:primes_up_to/_macro7 with storage adv:mms m
 data modify storage adv:mms g.last_report set from storage adv:mms l."primes_up_to"._s6
-data modify storage adv:mms m.a0 set from storage adv:mms g.last_report
-function adv:primes_up_to/_macro8 with storage adv:mms m
+tellraw @a {nbt:"g.last_report",storage:"adv:mms"}
 === data/adv/function/primes_up_to/_continue2.mcfunction
 scoreboard players set #cf mms.adv 0
 scoreboard players add #primes_up_to.n mms.adv 1
@@ -173,8 +169,6 @@ $data modify storage adv:mms l."primes_up_to"._s4 set value "$(a0) ("
 $data modify storage adv:mms l."primes_up_to"._s5 set value "$(a0)$(a1)"
 === data/adv/function/primes_up_to/_macro7.mcfunction
 $data modify storage adv:mms l."primes_up_to"._s6 set value "$(a0) in total)"
-=== data/adv/function/primes_up_to/_macro8.mcfunction
-$tellraw @a "$(a0)"
 === data/adv/function/primes_up_to/_while0.mcfunction
 execute unless score #primes_up_to.n mms.adv <= #primes_up_to._t0 mms.adv run return 0
 scoreboard players operation #is_prime.n mms.adv = #primes_up_to.n mms.adv

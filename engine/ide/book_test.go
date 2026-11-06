@@ -159,3 +159,36 @@ func TestTextStringCompletion(t *testing.T) {
 		t.Errorf("completions = %v", labels(items))
 	}
 }
+
+// Markup completes and hovers in a tell message.
+func TestTellCompletion(t *testing.T) {
+	src := "Function f {\n  tell(@a, \"Hi {gol|\")\n}\n"
+	s, off := session(t, src)
+	items, _ := s.Completion("main.mms", off)
+	if !has(labels(items), "gold") {
+		t.Errorf("completions = %v", labels(items))
+	}
+	s, off = session(t, "Function f {\n  actionbar(@s, \"Press {key:inv|entory}\")\n}\n")
+	if h, _ := s.Hover("main.mms", off); !strings.Contains(h, "key.inventory") {
+		t.Errorf("hover = %q", h)
+	}
+	s, off = session(t, "Function f {\n  te|\n}\n")
+	if items, _ := s.Completion("main.mms", off); !has(labels(items), "tell") {
+		t.Errorf("statement completions lack tell: %v", labels(items))
+	}
+}
+
+func TestTellHover(t *testing.T) {
+	s, off := session(t, "Function f {\n  te|ll(@a, \"hi\")\n}\n")
+	if h, _ := s.Hover("main.mms", off); !strings.Contains(h, "tell(target: Selector, message: Text)") {
+		t.Errorf("hover = %q", h)
+	}
+}
+
+func TestTellSignature(t *testing.T) {
+	s, off := session(t, "Function f {\n  title(@a, \"hi\", |)\n}\n")
+	h, ok := s.Signature("main.mms", off)
+	if !ok || h.Active != 2 || !strings.HasPrefix(h.Label, "title(") {
+		t.Errorf("signature = %+v", h)
+	}
+}

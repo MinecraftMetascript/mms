@@ -334,6 +334,7 @@ Advancement first_gem = {
 | `[text](suggest:/tp @s ~ ~10 ~)`, `[text](copy:12345)`, `[text](https://...)` | puts text in chat, copies it, or opens a web page |
 | `[text](hover:A red gem)`, `[text](page:2 "Next")` | hover text, alone or after a target |
 | `${kills[@s]}`, `${wave}` | a score or a Global, filled in when the text is shown (for a book, when the reader first opens it) |
+| `${@s}` | the names of the entities a selector finds, filled in the same way |
 | `\*` | the character itself |
 
 A book page shows 14 lines of about 19 characters. Text past the last line is cut off in game, so the [`book-overflow`](lint.md) warning marks where a page runs over, measured with the vanilla font. Add a `---` line there.

@@ -32,7 +32,7 @@ Objective found = dummy
 Function find {
   found[@s] += 1
   /loot give @s loot gems:chests/gems
-  /tellraw @s "You have found ${found[@s]} gem chests"
+  tell(@s, "You have found ${found[@s]} gem chests")
 }
 ```
 

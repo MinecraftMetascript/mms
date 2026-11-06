@@ -77,9 +77,9 @@ Function status {
   /execute store result score #enemies cs_tmp if entity @e[tag=cs_enemy]
   let enemies = cs_tmp["#enemies"]
   if (banner_placed) {
-    /tellraw @s "Banner: ${banner_hp} / ${banner_max} health, ${enemies} enemies alive"
+    tell(@s, "Banner: ${banner_hp} / ${banner_max} health, ${enemies} enemies alive")
   } else {
-    /tellraw @s "No banner is planted, ${enemies} enemies alive"
+    tell(@s, "No banner is planted, ${enemies} enemies alive")
   }
 }
 
@@ -96,5 +96,5 @@ Function reset {
   /bossbar set siege:banner players
   banner_placed = false
   banner_hp = banner_max
-  /tellraw @a "Cave Siege reset"
+  tell(@a, "Cave Siege reset")
 }

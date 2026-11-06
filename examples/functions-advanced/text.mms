@@ -15,7 +15,7 @@ Function primes_up_to(max: int) {
     count += 1
   }
   last_report = line + " (" + count + " in total)"
-  /tellraw @a "${last_report}"
+  tell(@a, "${last_report}")
 }
 
 /** Says hello in a way that depends on the name. */
@@ -26,7 +26,7 @@ Function greet(name: string) {
   } else {
     greeting += "!"
   }
-  /tellraw @a "${greeting}"
+  tell(@a, "${greeting}")
 }
 
 /** /function adv:demo shows everything above. */

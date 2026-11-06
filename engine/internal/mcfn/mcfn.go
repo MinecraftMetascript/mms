@@ -18,7 +18,7 @@ type VM struct {
 	Functions map[string][]string // id -> lines
 	Scores    map[string]map[string]int32
 	Storage   map[string]map[string]any // storage id -> top-level compound
-	Said      []string                  // `say` and `tellraw` output
+	Said      []string                  // `say` output, and `tellraw` as plain text
 	Steps     int                       // commands run
 	MaxSteps  int
 	depth     int
@@ -132,7 +132,14 @@ func (vm *VM) exec(line string) (result, error) {
 		vm.Said = append(vm.Said, strings.Join(w[1:], " "))
 		return result{value: 1, ok: true}, nil
 	case "tellraw":
-		vm.Said = append(vm.Said, strings.Join(w[2:], " "))
+		if len(w) < 3 {
+			return result{}, fmt.Errorf("tellraw needs a target and a message")
+		}
+		t, err := vm.text(strings.Join(w[2:], " "))
+		if err != nil {
+			return result{}, err
+		}
+		vm.Said = append(vm.Said, t)
 		return result{value: 1, ok: true}, nil
 	case "scoreboard":
 		return vm.scoreboard(w)

@@ -41,7 +41,7 @@ Function found_banner {
   if (banner_placed) {
     /setblock ~ ~ ~ air
     give_banner()
-    /tellraw @s "There is already a Siege Banner planted"
+    tell(@s, "There is already a Siege Banner planted")
     return
   }
   /execute align xyz positioned ~0.5 ~ ~0.5 run function siege:create_core
@@ -61,7 +61,7 @@ Function create_core {
   /bossbar set siege:banner max ${banner_max}
   /bossbar set siege:banner value ${banner_hp}
   /bossbar set siege:banner players @a
-  /tellraw @a "The Siege Banner is planted. Defend it!"
+  tell(@a, "The Siege Banner is planted. Defend it!")
 }
 
 /** Runs once a second while the banner is planted. */
@@ -113,7 +113,7 @@ Function remove_carrot {
 
 /** The banner reached 0 health: the siege is lost. */
 Function banner_falls {
-  /title @a title "The banner has fallen"
+  title(@a, "The banner has fallen")
   /execute at @e[tag=cs_core,limit=1] run playsound minecraft:entity.wither.death master @a ~ ~ ~ 1 0.6
   reset()
 }
