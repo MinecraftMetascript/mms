@@ -55,22 +55,26 @@ tellraw @s "Welcome to the sky islands"
 }
 === data/sky/worldgen/density_function/islands.json
 {
-  "type": "minecraft:sub",
-  "left": {
+  "type": "minecraft:interpolated",
+  "input": {
     "type": "minecraft:sub",
     "left": {
-      "type": "minecraft:noise",
-      "noise": "sky:island_noise",
-      "xz_scale": 1,
-      "y_scale": 2
+      "type": "minecraft:sub",
+      "left": {
+        "type": "minecraft:noise",
+        "noise": "sky:island_noise",
+        "xz_scale": 1,
+        "y_scale": 2
+      },
+      "right": {
+        "type": "minecraft:square",
+        "input": "sky:height"
+      }
     },
-    "right": {
-      "type": "minecraft:mul",
-      "left": "sky:height",
-      "right": "sky:height"
-    }
+    "right": 0.3
   },
-  "right": 0.3
+  "cell_size_xz": 4,
+  "cell_size_y": 8
 }
 === data/sky/worldgen/material_rule/surface.json
 {

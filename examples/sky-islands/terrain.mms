@@ -14,7 +14,14 @@ DensityFunction height = Gradient(
   to_value = 1,
 )
 
-DensityFunction islands = Noise(island_noise, 1, 2) - height * height - 0.3
+// Interpolated samples the noise only at the corners of 4 × 8 cells and
+// blends in between, like vanilla's own terrain. Much faster than sampling
+// every block.
+//
+// There is no Beardifier(): islands have no villages to sit on. An
+// overworld-style pack should add one, since 26.3 no longer adds it to
+// final_density by itself.
+DensityFunction islands = Interpolated(Noise(island_noise, 1, 2) - Square(height) - 0.3, 4, 8)
 
 // 4. What the surface is made of.
 SurfaceRule surface = [

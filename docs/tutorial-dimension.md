@@ -88,14 +88,20 @@ DensityFunction height = Gradient(
   to_value = 1,
 )
 
-DensityFunction islands = Noise(island_noise, 1, 2) - height * height - 0.3
+DensityFunction islands = Interpolated(
+  Noise(island_noise, 1, 2) - Square(height) - 0.3,
+  4,
+  8,
+)
 ```
 
 - `island_noise` is smooth 3D noise. A lower `base_octave` gives bigger shapes.
 - `height` is a gradient from -1 to 1 over the height of the world. Squared, it is 0 in the middle and 1 at the ends.
 - `islands` subtracts that from the noise. Solid blocks appear only where the noise is high and the height is near y = 128. Raising `0.3` makes the islands smaller and further apart.
+- `Interpolated` works out the inside only at the corners of 4 × 8 block cells and blends in between, as vanilla does for its own terrain. Sampling a 3D noise at every block is much slower and looks no better.
+- There is no `Beardifier()`, because the islands have no villages to fit around. Add one to an overworld-style `final_density`: 26.3 no longer adds it by itself.
 
-The infix arithmetic compiles to `sub` and `mul` density functions. See [Writing resources](resources.md#density-functions).
+The infix arithmetic compiles to `sub` density functions, and `Square(height)` to `square`, which computes `height` once instead of twice for `height * height`. See [Writing resources](resources.md#density-functions).
 
 ## 5. The surface
 

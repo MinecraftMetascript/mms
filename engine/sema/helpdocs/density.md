@@ -11,9 +11,9 @@ Samples a noise at the block's position, scaled per axis. The result is roughly 
 - noise: The noise, by id: a `Noise` declaration or a vanilla one such as `minecraft:ridge`.
 - xz_scale: Multiplies x and z before sampling. Below 1 stretches the noise out horizontally; above 1 squeezes it.
 - y_scale: Multiplies y before sampling. `0` makes the noise the same at every height (2D).
-- shift_x: Added to x before sampling, so the noise doesn't line up with others. Vanilla uses `ShiftA`.
+- shift_x: Added to x before sampling, so the noise doesn't line up with others. Vanilla uses `ShiftA`, saved as `minecraft:shift_x`. Reference that id to line up with vanilla's climate (and so its coastlines).
 - shift_y: Added to y before sampling.
-- shift_z: Added to z before sampling. Vanilla uses `ShiftB`.
+- shift_z: Added to z before sampling. Vanilla uses `ShiftB`, saved as `minecraft:shift_z`. `ShiftB` samples with x and z swapped, so the two shifts don't move together.
 
 ```mms
 Noise hills = { base_octave = -7, amplitude_modifiers = [1, 1] }
@@ -40,7 +40,7 @@ DensityFunction raised = Noise(minecraft:ridge, 1, 0) + 0.2
 `left - right`. Usually written with `-`.
 
 ## minecraft:density_function/mul
-`left * right`. Usually written with `*`. Vanilla stops computing `right` where `left` is 0.
+`left * right`. Usually written with `*`.
 
 ## minecraft:density_function/div
 `left / right`. Usually written with `/`.
@@ -83,7 +83,7 @@ The natural logarithm of `input`.
 `-1`, `0` or `1`, following the sign of `input`.
 
 ## minecraft:density_function/half_negative
-`input`, with negative values halved. Vanilla uses it to soften cave walls.
+`input`, with negative values halved. Vanilla uses it once, on the `jagged` noise in `overworld/sloped_cheese`, so mountain peaks go up further than they dip down.
 
 ## minecraft:density_function/quarter_negative
 `input`, with negative values divided by four.
@@ -134,7 +134,9 @@ DensityFunction ground = Gradient(
 ```
 
 ## minecraft:density_function/interpolated
-Computes `input` only at the corners of cells and blends between them. Smoother and much faster than sampling every block; vanilla wraps its terrain in it.
+Computes `input` only at the corners of cells and blends between them. Smoother and much faster than sampling every block; vanilla wraps its terrain in it. Vanilla's cells are 4 × 8 (overworld, nether, caves), 8 × 4 (the End) and 16 × 1 (`chunk_surface_level`).
+
+Put thresholds (`RangeChoice`, thin `Abs` tubes) outside it: interpolation blurs a sign change across the whole cell.
 
 - input: The function to interpolate.
 - cell_size_xz: Cell width, in blocks.
@@ -178,7 +180,7 @@ Like `ShiftA`, with x and z swapped. Vanilla uses it as `shift_z` of its climate
 The 3D terrain noise from before 1.18, which vanilla still uses as the base of overworld and nether terrain.
 
 ## minecraft:density_function/end_outer_islands
-The End's island terrain: the main island in the middle, and scattered islands beyond 1024 blocks.
+The End's outer islands only, scattered beyond 1024 blocks. The main island is built separately from `DistanceToPoint`; see vanilla `minecraft:end/islands`.
 
 ## minecraft:density_function/beardifier
 Adds density around structures that adapt the terrain, such as villages and ancient cities. Vanilla adds it to `final_density`.
