@@ -3,6 +3,17 @@ import { expect, test, type Page } from '@playwright/test';
 
 const status = (page: Page) => page.getByRole('status');
 
+// clickLine clicks the editor line containing text, scrolling down to it:
+// CodeMirror renders only the lines near the viewport.
+async function clickLine(page: Page, text: string) {
+	const line = page.locator('.cm-line', { hasText: text });
+	for (let i = 0; i < 50 && (await line.count()) === 0; i++) {
+		await page.locator('.cm-scroller').first().evaluate((el) => el.scrollBy(0, 200));
+		await page.waitForTimeout(100);
+	}
+	await line.first().click();
+}
+
 async function replaceText(page: Page, text: string) {
 	await page.locator('.cm-content').click();
 	await page.keyboard.press('ControlOrMeta+a');
@@ -421,7 +432,7 @@ test('a recipe making a custom item shows its name and texture', async ({ page }
 	await page.getByRole('button', { name: /embers/ }).click();
 	await expect(status(page)).toHaveText(/No problems/);
 	await page.getByRole('button', { name: 'items.mms' }).click();
-	await page.locator('.cm-line', { hasText: 'Recipe ember_shard' }).click();
+	await clickLine(page, 'Recipe ember_shard');
 	const inspector = page.getByLabel('Inspector');
 	await expect(inspector.getByLabel('Result')).toHaveText('2 × Ember Shard');
 	const result = inspector.getByRole('img', { name: 'Ember Shard' });
@@ -434,7 +445,7 @@ test('a recipe making a custom item shows its name and texture', async ({ page }
 	await page.screenshot({ path: 'test-results/recipe-custom-item.png' });
 
 	// A custom item that keeps its base's look shows its name as text.
-	await page.locator('.cm-line', { hasText: 'Recipe ember_disc' }).click();
+	await clickLine(page, 'Recipe ember_disc');
 	await expect(inspector.getByLabel('Result')).toHaveText('Music Disc');
 	await expect(inspector.getByRole('img', { name: 'Music Disc' }).locator('img')).toHaveCount(1);
 	expect(errors).toEqual([]);
