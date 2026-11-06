@@ -188,7 +188,7 @@ var primitives = map[string]string{
 // opaque are language types whose values the evaluator and the function
 // compiler check rather than the schema: functions, commands and asset
 // files.
-var opaque = map[string]bool{"Function": true, "Commands": true, "Texture": true, "Sound": true, "StructureFile": true}
+var opaque = map[string]bool{"Function": true, "Commands": true, "Texture": true, "Sound": true, "StructureFile": true, "Selector": true}
 
 func (e *Env) named(path string, t *syntax.TypeName) *spec.Type {
 	if k, ok := primitives[t.Name]; ok {

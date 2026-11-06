@@ -47,3 +47,10 @@ extern Template replace(text: string, old: string, new: string): string
 extern Template named(asset: any, name: string): any
 /** The kind of a value: "none", "bool", "number", "string", "name", "list", "object", "range", "commands", or "runtime" for a value only known when the pack runs. */
 extern Template kind_of(value: any): string
+
+/** Sends `message` to the chat of each player `target` selects: `tell(@a, "Wave ${wave} begins")`. The message is text markup, and `${...}` in it shows a score, a Global, a selector's names or a constant. */
+extern Template tell(target: Selector, message: Text): Commands
+/** Shows `message` in large text in the middle of the screen of each player `target` selects, with `subtitle` under it. */
+extern Template title(target: Selector, message: Text, subtitle: Text?): Commands
+/** Shows `message` just above the hotbar of each player `target` selects. */
+extern Template actionbar(target: Selector, message: Text): Commands

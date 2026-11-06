@@ -434,6 +434,7 @@ func (s *Session) complete(a *at, off int) []sema.Candidate {
 func (s *Session) statementCandidates(a *at, off int) []sema.Candidate {
 	out := locals(a.u.File, a.fn, off)
 	out = append(out, sema.ExecCandidates(true)...)
+	out = append(out, sema.TextCommandCandidates()...)
 	for i, kw := range []string{"let", "if", "while", "for", "return"} {
 		out = append(out, sema.Candidate{Label: kw, Kind: sema.CandKeyword, Rank: 100 + i})
 	}
@@ -884,6 +885,10 @@ func (s *Session) Signature(path string, off int) (SignatureHelp, bool) {
 		h.Doc = a.c.SignatureDoc(a.info(call))
 		if h.Label == "" {
 			h = s.functionSignature(a.info(call.Fn))
+		}
+		if id, ok := call.Fn.(*syntax.Ident); ok && h.Label == "" && a.code() {
+			h.Label, h.Params, h.Doc = sema.TextCommandSignature(id.Name)
+			h.ParamDocs = make([]string, len(h.Params))
 		}
 		if h.Label == "" {
 			return SignatureHelp{}, false

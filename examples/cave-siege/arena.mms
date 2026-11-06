@@ -17,13 +17,13 @@ Function arena_maze {
   /setblock ~2 ~-1 ~3 minecraft:emerald_block
   /setblock ~2 ~-1 ~21 minecraft:gold_block
   /time set midnight
-  /tellraw @s "Maze built. Place the banner on the gold block, then spawn enemies on the emerald block."
+  tell(@s, "Maze built. Place the banner on the gold block, then spawn enemies on the emerald block.")
 }
 
 /** Walls the planted banner in with a 5 by 5 cobblestone box, to test the breakers. */
 Function seal_banner {
   /execute at @e[tag=cs_core,limit=1] run fill ~-2 ~-1 ~-2 ~2 ~2 ~2 minecraft:cobblestone outline
-  /tellraw @s "Banner sealed in cobblestone. Enemies should get stuck, then dig in."
+  tell(@s, "Banner sealed in cobblestone. Enemies should get stuck, then dig in.")
 }
 
 /** Walls the planted banner in with obsidian, the slowest block breakers can dig. */

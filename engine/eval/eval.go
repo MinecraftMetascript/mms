@@ -406,7 +406,7 @@ func (e *evaluator) expand(u Unit, ns string) {
 			}
 			if definitionKind(it.Kind.Name) {
 				same = false
-				if it.Kind.Name == "Template" && it.Extern && intrinsics[it.NameText()] == nil {
+				if it.Kind.Name == "Template" && it.Extern && intrinsics[it.NameText()] == nil && !kept[it.NameText()] {
 					c.errorf("mms/unknown-intrinsic", it.Name.Sp, "there is no intrinsic named '"+it.NameText()+"'")
 				}
 				continue

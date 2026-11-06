@@ -161,7 +161,7 @@ The names on the right are resolved by the field they are in: `type` names a `Di
 ```
 Function visit {
   /execute in sky:islands run tp @s 0 160 0
-  /tellraw @s "Welcome to the sky islands"
+  tell(@s, "Welcome to the sky islands")
 }
 ```
 

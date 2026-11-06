@@ -13,7 +13,7 @@ Objective basics_points = dummy
 Objective basics_online = dummy
 
 OnLoad {
-  /tellraw @a "Points game loaded"
+  tell(@a, "Points game loaded")
 }
 
 OnTick {
@@ -39,7 +39,7 @@ Function on_kill {
 
 Function reward {
   /give @s diamond
-  /tellraw @s "Reward! You have ${basics_points[@s]} points"
+  tell(@s, "Reward! You have ${basics_points[@s]} points")
 }
 
 /** Counts down from 3, then reports the totals. */
@@ -54,5 +54,5 @@ Function status {
   if (players > 0) {
     average = total_kills / players
   }
-  /tellraw @s "${total_kills} kills in total, ${average} per player"
+  tell(@s, "${total_kills} kills in total, ${average} per player")
 }

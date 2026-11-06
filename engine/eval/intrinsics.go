@@ -27,11 +27,18 @@ var intrinsics = map[string]intrinsic{
 	"kind_of":     kindOf,
 }
 
+// kept are externs whose calls stay as written, with their arguments
+// evaluated, for the function compiler: tell(@a, "Hi").
+var kept = map[string]bool{"tell": true, "title": true, "actionbar": true}
+
 // Intrinsics lists the names of the intrinsics, for the test that each
 // has an extern declaration in the prelude.
 func Intrinsics() []string {
 	out := make([]string, 0, len(intrinsics))
 	for n := range intrinsics {
+		out = append(out, n)
+	}
+	for n := range kept {
 		out = append(out, n)
 	}
 	return out

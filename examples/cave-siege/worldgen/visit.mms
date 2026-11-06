@@ -3,7 +3,7 @@
 /** Takes you to siege:caves, the cave world as its own dimension, in the starter cavern. */
 Function visit_caves {
   /execute in siege:caves run spreadplayers 0 0 0 8 under 40 false @s
-  /tellraw @s "Welcome to the caves. The starter cavern is at x 0, z 0."
+  tell(@s, "Welcome to the caves. The starter cavern is at x 0, z 0.")
 }
 
 /**

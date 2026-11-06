@@ -1136,6 +1136,14 @@ func (f *fc) call(pre *[]fn.Op, e *syntax.Call, wantValue bool) *val {
 		return nil
 	}
 	sym := c.findSig("function", id)
+	if x, ok := e.Fn.(*syntax.Ident); ok && sym == nil && textCommands[x.Name] {
+		if wantValue {
+			c.errorf("mms/type-mismatch", e.Sp, "%s is a command, not a value", x.Name)
+			return nil
+		}
+		f.textCommand(pre, x.Name, e)
+		return nil
+	}
 	if sym == nil || sym.Kind.MMS != "Function" {
 		c.errorf("mms/unknown-name", e.Fn.Span(), "no Function named '%s' is declared", id)
 		return nil
