@@ -1,0 +1,98 @@
+Decl Type SiegeState
+  Block
+    FieldDecl wave: int
+      Number 0
+    FieldDecl queue: [Id<entity_type>]
+      List
+    FieldDecl boss_alive: bool
+      Bool false
+Decl Storage game: SiegeState
+Const max_wave
+  Number 10
+Const boss
+  Index
+    Selector e
+    Arg tag =
+      Member .boss
+        Ident siege
+    Arg limit =
+      Number 1
+Const wave_mobs
+  List
+    Ident zombie
+    Ident skeleton
+    Ident spider
+    Ident creeper
+Decl Template particle_ring: Commands(p: Id<particle>, radius: float, points: int = ...)
+  Default points
+    Number 16
+  Block
+    For i
+      Range
+        Number 0
+        Binary -
+          Ident points
+          Number 1
+      Block
+        Let a
+          Binary /
+            Binary *
+              Ident i
+              Number 360
+            Ident points
+        Command "particle ${p} ^${radius * cos(a)} ^1 ^${radius * sin(a)}"
+Decl Function next_wave
+  Block
+    If
+      Binary >=
+        Member .wave
+          Ident game
+        Ident max_wave
+      Block
+        Call
+          Ident tell
+          Selector a
+          String "{gold}**Victory!**{/} The banner holds."
+        Return
+    Assign +=
+      Member .wave
+        Ident game
+      Number 1
+    For mob
+      Ident wave_mobs
+      Block
+        Command "execute at @e[tag=siege.spawn] run summon ${mob} ~ ~ ~ {Tags:[\"siege.enemy\"]}"
+    If
+      Binary &&
+        Binary ==
+          Binary %
+            Member .wave
+              Ident game
+            Number 5
+          Number 0
+        Unary !
+          Call
+            Ident exists
+            Ident boss
+      Block
+        Command "summon wither_skeleton ~ ~ ~ {Tags:[\"siege.boss\"]}"
+        Assign =
+          Member .boss_alive
+            Ident game
+          Bool true
+    Trailing
+      Call
+        Member .At
+          Call
+            Ident As
+            Selector a
+        Selector s
+      Block
+        Call
+          Ident particle_ring
+          Ident flame
+          Number 2
+    Call
+      Ident tell
+      Selector a
+      String "Wave {red}${game.wave}{/} of ${max_wave} begins"

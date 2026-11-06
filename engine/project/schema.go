@@ -9,7 +9,7 @@ import (
 
 // SchemaURL is where the docs site serves the mms.json JSON Schema.
 // `mms init` writes it as "$schema" so editors without the VS Code
-// extension (Zed, JetBrains, ...) still validate and complete mms.json.
+// extension (JetBrains, ...) still validate and complete mms.json.
 const SchemaURL = "https://minecraftmetascript.github.io/mms/mms.schema.json"
 
 // schemaNode is the subset of JSON Schema that ConfigSchema uses. VS Code

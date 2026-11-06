@@ -206,11 +206,11 @@ func locals(f *syntax.File, d *syntax.Decl, off int) []sema.Candidate {
 	return out
 }
 
-func typeSuffix(t *syntax.Name) string {
+func typeSuffix(t syntax.TypeExpr) string {
 	if t == nil {
 		return ""
 	}
-	return ": " + t.Text
+	return ": " + syntax.TypeText(t)
 }
 
 // typeCandidates are the value types of Globals, parameters and locals.

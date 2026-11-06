@@ -1,0 +1,51 @@
+Const gem_pool
+  Type: LootPool
+  Call
+    Ident Pool
+    Range
+      Number 1
+      Number 3
+    Tag gems
+Const stormy
+  Type: Predicate
+  Binary &&
+    Call
+      Ident WeatherCheck
+      Arg thundering =
+        Bool true
+    Call
+      Ident TimeCheck
+      Arg clock =
+        Ident overworld
+      Arg value =
+        Range
+          Number 13000
+          -
+Const grass_top
+  Type: SurfaceRule
+  Trailing
+    Call
+      Ident If
+      Call
+        Ident StoneDepth
+        Ident Floor
+    Block
+      Call
+        Ident Block
+        Ident grass_block
+Decl LootTable chests/gems
+  Block
+    Field pools
+      List
+        Ident gem_pool
+Decl LootTable chests/storm_gems
+  Block
+    Field pools
+      List
+        Object
+          Block
+            Spread
+              Ident gem_pool
+            Field conditions
+              List
+                Ident stormy

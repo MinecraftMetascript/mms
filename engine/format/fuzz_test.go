@@ -11,7 +11,8 @@ import (
 // unsafe result (which would mean a printer bug), and is idempotent.
 func FuzzSource(f *testing.F) {
 	seeds, _ := filepath.Glob("testdata/*.mms")
-	for _, path := range seeds {
+	design, _ := filepath.Glob("../syntax/testdata/design/*.mms")
+	for _, path := range append(seeds, design...) {
 		src, _ := os.ReadFile(path)
 		f.Add(string(src))
 	}

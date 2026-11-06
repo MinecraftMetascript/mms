@@ -49,6 +49,7 @@ func Reparse(src string, prev []Chunk) (*File, []Chunk, map[*Decl]Moved) {
 			cf = shiftFile(cf, start, nil)
 		}
 		chunks = append(chunks, Chunk{Text: text, Off: start, File: cf})
+		f.Items = append(f.Items, cf.Items...)
 		f.Decls = append(f.Decls, cf.Decls...)
 		f.Tokens = append(f.Tokens, cf.Tokens...)
 		f.Diags = append(f.Diags, cf.Diags...)
@@ -173,5 +174,5 @@ func startsDecl(src []rune, i int) bool {
 	for i < len(src) && (src[i] == ' ' || src[i] == '\t') {
 		i++
 	}
-	return i < len(src) && (isChar(src[i]) || src[i] == '.' || src[i] == '-')
+	return i < len(src) && (isChar(src[i]) || src[i] == '.' || src[i] == '-' || src[i] == '$')
 }

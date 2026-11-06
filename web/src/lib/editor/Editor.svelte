@@ -120,7 +120,7 @@
 		}));
 	}
 
-	/** Cmd/Ctrl+. : a menu of quick fixes and refactorings at the cursor, as in VS Code and Zed. */
+	/** Cmd/Ctrl+. : a menu of quick fixes and refactorings at the cursor, as in VS Code. */
 	function quickFixCommand(v: EditorView) {
 		const at = v.coordsAtPos(v.state.selection.main.head);
 		if (!at) return false;
@@ -174,7 +174,7 @@
 					{ key: 'Mod-.', run: quickFixCommand, preventDefault: true },
 					// Ctrl+Space (from basicSetup) is taken by the OS on macOS (input
 					// source switching) and by some IMEs elsewhere, so offer the
-					// VS Code and Zed alternatives too: Cmd/Ctrl+I and Alt/Option+Space.
+					// VS Code's alternatives too: Cmd/Ctrl+I and Alt/Option+Space.
 					{ key: 'Mod-i', run: startCompletion, preventDefault: true },
 					{ key: 'Alt-Space', run: startCompletion, preventDefault: true },
 					// Tab accepts an open completion, otherwise indents; Shift+Tab unindents.

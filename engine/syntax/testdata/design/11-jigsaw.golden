@@ -1,0 +1,59 @@
+Decl JigsawHole room_exit, hall_entry, hall_exit, room_entry
+Decl JigsawStructure dungeon
+  Block
+    Field biomes
+      Tag minecraft:is_overworld
+    Field step
+      Ident underground_structures
+    Field spacing
+      Number 32
+    Field separation
+      Number 12
+    Field height
+      Call
+        Ident AboveBottom
+        Number 20
+    Field depth
+      Number 6
+    Field start
+      Ident start
+    Field pools
+      Object
+        Block
+          Field start
+            List
+              Call
+                Ident Piece
+                String "start"
+          Field halls
+            Call
+              Ident Pool
+              Arg fallback =
+                Ident caps
+              Call
+                Ident Piece
+                String "halls/hall"
+                Number 3
+              Call
+                Ident Piece
+                String "halls/short_hall"
+          Field rooms
+            Call
+              Ident Pool
+              Arg fallback =
+                Ident caps
+              Call
+                Ident Piece
+                String "rooms/room"
+                Number 2
+              Call
+                Ident Piece
+                String "rooms/vault"
+          Field caps
+            List
+              Call
+                Ident Piece
+                String "caps/hall_cap"
+              Call
+                Ident Piece
+                String "caps/room_cap"

@@ -7,7 +7,6 @@ MMS is a small language that compiles to Minecraft Java Edition data packs. You 
 - **In the browser:** the [editor](https://minecraftmetascript.github.io/mms/) needs no install. Projects are saved in your browser (click the project name to switch between them), and **Download pack** gives you the data pack as a zip.
 - **Command line:** download `mms` for your system from the [releases page](https://github.com/MinecraftMetascript/mms/releases). Or, with Go installed, run `go install github.com/minecraftmetascript/mms/engine/cmd/mms@latest`.
 - **VS Code:** install the `.vsix` for your system from the same release, such as `mms-win32-x64-1.0.0.vsix` or `mms-darwin-arm64-1.0.0.vsix`, through **Extensions → … → Install from VSIX**. It includes `mms`, so you do not need the command line to use the editor. (The universal `mms-1.0.0.vsix` does not, and runs `mms` from your `PATH` or `mms.path`.)
-- **Zed:** install `editors/zed` from a checkout with **zed: install dev extension** (see [its README](https://github.com/MinecraftMetascript/mms/tree/main/editors/zed#readme)). It uses `mms` from your `PATH`, or downloads the latest release for you.
 
 ## A first project
 
@@ -16,7 +15,7 @@ mkdir gems && cd gems
 mms init -namespace gems
 ```
 
-`mms init` writes `mms.json` (the namespace, the pack description, the output folder) and a starter file. Its `$schema` line points at the [mms.json schema](https://minecraftmetascript.github.io/mms/mms.schema.json), so editors with JSON Schema support (VS Code, Zed, JetBrains) complete, describe and check every field. The VS Code extension knows the schema even without that line. Every `.mms` file in the folder belongs to the project. Put this in `gems.mms`:
+`mms init` writes `mms.json` (the namespace, the pack description, the output folder) and a starter file. Its `$schema` line points at the [mms.json schema](https://minecraftmetascript.github.io/mms/mms.schema.json), so editors with JSON Schema support (VS Code, JetBrains) complete, describe and check every field. The VS Code extension knows the schema even without that line. Every `.mms` file in the folder belongs to the project. Put this in `gems.mms`:
 
 ```
 /** Gems that drop from the gem chest. */

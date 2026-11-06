@@ -77,9 +77,10 @@ func (s *Session) SemanticTokens(path string) []SemToken {
 			set(t.Sp, TokNumber, 0)
 		case parser.MMSLexerCOMMAND:
 			set(t.Sp, TokMacro, 0)
-		case parser.MMSLexerLET, parser.MMSLexerIF, parser.MMSLexerELSE, parser.MMSLexerWHILE, parser.MMSLexerFOR,
-			parser.MMSLexerIN, parser.MMSLexerRETURN, parser.MMSLexerBREAK, parser.MMSLexerCONTINUE,
-			parser.MMSLexerTRUE, parser.MMSLexerFALSE:
+		case parser.MMSLexerCONST, parser.MMSLexerEXTERN, parser.MMSLexerLET, parser.MMSLexerIF, parser.MMSLexerELSE,
+			parser.MMSLexerWHILE, parser.MMSLexerFOR, parser.MMSLexerIN, parser.MMSLexerRETURN, parser.MMSLexerBREAK,
+			parser.MMSLexerCONTINUE, parser.MMSLexerPRIMARY, parser.MMSLexerAS, parser.MMSLexerCHECK, parser.MMSLexerEMIT,
+			parser.MMSLexerSETUP, parser.MMSLexerEXPECT, parser.MMSLexerRUN, parser.MMSLexerTRUE, parser.MMSLexerFALSE:
 			set(t.Sp, TokKeyword, 0)
 		}
 	}

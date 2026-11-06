@@ -10,7 +10,7 @@ import (
 
 func chunkSources(t testing.TB) []string {
 	var out []string
-	for _, pat := range []string{"testdata/*.mms", "../sema/testdata/*.mms", "../../examples/*/*.mms", "../format/testdata/*.mms"} {
+	for _, pat := range []string{"testdata/*.mms", "testdata/design/*.mms", "../sema/testdata/*.mms", "../../examples/*/*.mms", "../format/testdata/*.mms"} {
 		paths, _ := filepath.Glob(pat)
 		for _, p := range paths {
 			b, err := os.ReadFile(p)

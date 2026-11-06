@@ -1,0 +1,47 @@
+Decl ItemTag gems
+  List
+    Ident diamond
+    Ident emerald
+    Ident amethyst_shard
+Decl LootTable chests/gems
+  Block
+    Field pools
+      List
+        Call
+          Ident Pool
+          Range
+            Number 1
+            Number 3
+          Tag gems
+Decl Recipe gem_block
+  Call
+    Ident Shaped
+    List
+      String "GG"
+      String "GG"
+    Object
+      Block
+        Field G
+          Tag gems
+    Ident emerald_block
+Decl Advancement found
+  Block
+    Field criteria
+      Object
+        Block
+          Field got
+            Call
+              Ident InventoryChanged
+              Arg items =
+                List
+                  Object
+                    Block
+                      Field items
+                        Tag gems
+    Field rewards
+      Object
+        Block
+          Field function
+            Run
+              Block
+                Command "say found it"

@@ -53,13 +53,13 @@ func SigOf(d *syntax.Decl) FuncSig {
 				fp.Name = p.Name.Text
 			}
 			if p.Type != nil {
-				fp.Type = p.Type.Text
+				fp.Type = syntax.TypeText(p.Type)
 			}
 			s.Params = append(s.Params, fp)
 		}
 	}
 	if d.Type != nil {
-		s.Ret = d.Type.Text
+		s.Ret = syntax.TypeText(d.Type)
 	}
 	return s
 }
@@ -86,7 +86,7 @@ func symSig(s *Symbol) string {
 		if s.Decl.Type == nil {
 			return tInt
 		}
-		return s.Decl.Type.Text
+		return syntax.TypeText(s.Decl.Type)
 	}
 	// Callers also depend on what the function calls, which decides
 	// whether a call is recursive.
@@ -298,14 +298,14 @@ func (c *Checker) CompileFunction(d *syntax.Decl, id string, src []rune) *fn.Fun
 	return &fn.Func{ID: id, Body: body}
 }
 
-func (f *fc) valueType(t string, at *syntax.Name) bool {
+func (f *fc) valueType(t string, at syntax.TypeExpr) bool {
 	switch t {
 	case tInt, tBool, tString:
 		return true
 	}
 	sp := syntax.Span{}
 	if at != nil {
-		sp = at.Sp
+		sp = at.Span()
 	}
 	f.c.errorf("mms/unknown-type", sp, "unknown type '%s'; function values are int, bool or string", t)
 	return false
@@ -409,7 +409,7 @@ func (f *fc) stmt(out *fn.Block, s syntax.Stmt) {
 		}
 		typ := ""
 		if s.Type != nil {
-			typ = s.Type.Text
+			typ = syntax.TypeText(s.Type)
 			if !f.valueType(typ, s.Type) {
 				typ = tInt
 			}
@@ -1215,9 +1215,9 @@ func (c *Checker) Global(d *syntax.Decl) []string {
 	}
 	typ := tInt
 	if d.Type != nil {
-		typ = d.Type.Text
+		typ = syntax.TypeText(d.Type)
 		if typ != tInt && typ != tBool && typ != tString {
-			c.errorf("mms/unknown-type", d.Type.Sp, "unknown type '%s'; globals are int, bool or string", typ)
+			c.errorf("mms/unknown-type", d.Type.Span(), "unknown type '%s'; globals are int, bool or string", typ)
 			return nil
 		}
 	}
