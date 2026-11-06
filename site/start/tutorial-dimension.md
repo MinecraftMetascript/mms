@@ -1,6 +1,6 @@
 # Tutorial: a custom dimension
 
-This tutorial builds a dimension of floating islands, step by step. The finished project is [`examples/sky-islands`](../examples/sky-islands/), split into `dimension.mms`, `terrain.mms` and `visit.mms`. In the web editor, open it from **Examples**. The tests build it on every change, so it stays in step with the language.
+This tutorial builds a dimension of floating islands, step by step. The finished project is [`examples/sky-islands`](../../examples/sky-islands/), split into `dimension.mms`, `terrain.mms` and `visit.mms`. In the web editor, open it from **Examples**. The tests build it on every change, so it stays in step with the language.
 
 A dimension is made of several resources that refer to each other by id:
 
@@ -95,7 +95,7 @@ DensityFunction islands = Noise(island_noise, 1, 2) - height * height - 0.3
 - `height` is a gradient from -1 to 1 over the height of the world. Squared, it is 0 in the middle and 1 at the ends.
 - `islands` subtracts that from the noise. Solid blocks appear only where the noise is high and the height is near y = 128. Raising `0.3` makes the islands smaller and further apart.
 
-The infix arithmetic compiles to `sub` and `mul` density functions. See [Writing resources](resources.md#density-functions).
+The infix arithmetic compiles to `sub` and `mul` density functions. See [Writing resources](../guides/resources.md#density-functions).
 
 ## 5. The surface
 

@@ -3,8 +3,6 @@ package project
 import (
 	"encoding/json"
 	"fmt"
-
-	"github.com/minecraftmetascript/mms/engine/syntax"
 )
 
 // SchemaURL is where the docs site serves the mms.json JSON Schema.
@@ -50,14 +48,10 @@ func ConfigSchema() []byte {
 	def := DefaultConfig()
 	no := false
 
-	severityNames := map[syntax.Severity]string{
-		syntax.SeverityError: "error", syntax.SeverityWarning: "warning",
-		syntax.SeverityInfo: "info", syntax.SeverityHint: "hint",
-	}
 	lint := map[string]*schemaNode{}
 	for _, r := range Rules {
 		lint[r.ID] = md(&schemaNode{Ref: "#/definitions/severity"},
-			fmt.Sprintf("%s\n\nDefault: `%s`.", r.Doc, severityNames[r.Severity]))
+			fmt.Sprintf("%s\n\nDefault: `%s`.", r.Doc, SeverityName(r.Severity)))
 	}
 
 	s := &schemaNode{

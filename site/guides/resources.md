@@ -108,9 +108,9 @@ A jigsaw block joins pieces by name: its target is the name of a jigsaw block in
 JigsawHole hall_exit
 ```
 
-This declares `<namespace>:hall_exit`. The editors list the declared holes where a jigsaw block's name or target is chosen (VS Code's **Jigsaw** view, which copies a `/give` command for a set-up jigsaw block). Once a namespace declares a hole, the `jigsaw-hole` lint reports a jigsaw block in a structure file whose name or target in that namespace is not declared, with the closest declared hole and a fix that declares it. The [`jigsaw`](../examples/jigsaw/) example declares its holes.
+This declares `<namespace>:hall_exit`. The editors list the declared holes where a jigsaw block's name or target is chosen (VS Code's **Jigsaw** view, which copies a `/give` command for a set-up jigsaw block). Once a namespace declares a hole, the `jigsaw-hole` lint reports a jigsaw block in a structure file whose name or target in that namespace is not declared, with the closest declared hole and a fix that declares it. The [`jigsaw`](../../examples/jigsaw/) example declares its holes.
 
-A template's chests can get a loot table from a `Rule` processor with `block_entity_modifier = AppendLoot(chests/buried)`. That works on vanilla templates too, so a structure can reuse one without its own `.nbt` file. The [`treasure`](../examples/treasure/) example does this in `worldgen.mms`.
+A template's chests can get a loot table from a `Rule` processor with `block_entity_modifier = AppendLoot(chests/buried)`. That works on vanilla templates too, so a structure can reuse one without its own `.nbt` file. The [`treasure`](../../examples/treasure/) example does this in `worldgen.mms`.
 
 ## Density functions
 
@@ -176,7 +176,7 @@ Once a file is included, its id can also be written plainly elsewhere, with its 
 
 The web editor holds asset files too: **+ Add texture or sound** under the sources adds `.png`, `.ogg` and `.nbt` files, which keep their file name as their path. **Download resources** appears next to **Download pack** once there is a resource pack. Project zips carry the asset files both ways.
 
-The [`embers`](../examples/embers/) example ships its own art: [custom items](#custom-items) with their own textures, a painting, a music disc with its own song, translations and a pack icon.
+The [`embers`](../../examples/embers/) example ships its own art: [custom items](#custom-items) with their own textures, a painting, a music disc with its own song, translations and a pack icon.
 
 ## Resource packs
 
@@ -208,7 +208,7 @@ A block state is named after the block it replaces, such as `minecraft:glowstone
 
 In a model's `textures`, a value is a texture id, `"#name"` for another slot, or `Texture("file.png", "block/name")`, which copies the file to `textures/block/name.png`. A texture id can name a vanilla texture, such as `block/stone`.
 
-`sounds.json` is still generated from `Sound(...)`, and textures cannot have `.png.mcmeta` animation yet. The [`resource-pack`](../examples/resource-pack/) example shows each kind with vanilla textures; [`embers`](../examples/embers/) uses files of its own.
+`sounds.json` is still generated from `Sound(...)`, and textures cannot have `.png.mcmeta` animation yet. The [`resource-pack`](../../examples/resource-pack/) example shows each kind with vanilla textures; [`embers`](../../examples/embers/) uses files of its own.
 
 ## Custom items
 
@@ -349,4 +349,4 @@ In VS Code, the Preview lens above a `Book` opens it in the preview panel, and e
 
 The font, book texture and English translations come from the game's 26.3 assets, downloaded on first use. Project fonts that use their own textures, project textures in sprites, and real player skins are not drawn: those show as boxes, the missing-texture square and the default skin.
 
-The [`library`](../examples/library/) example has a guide given on first join and diaries in a chest loot table.
+The [`library`](../../examples/library/) example has a guide given on first join and diaries in a chest loot table.
