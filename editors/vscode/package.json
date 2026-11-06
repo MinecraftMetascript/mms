@@ -137,6 +137,8 @@
       { "command": "mms.previewOutput", "title": "Open Preview", "icon": "$(open-preview)" },
       { "command": "mms.revealOutputSource", "title": "Go to Source", "icon": "$(go-to-file)" },
       { "command": "mms.renameAt", "title": "MMS: Rename Extracted Declaration" },
+      { "command": "mms.expandAtCursor", "title": "MMS: Expand at Cursor" },
+      { "command": "mms.showExpansion", "title": "MMS: Show Expansion" },
       { "command": "mms.importStructures", "title": "MMS: Import Structures from World…", "icon": "$(cloud-download)" },
       { "command": "mms.refreshStructures", "title": "Refresh", "icon": "$(refresh)" }
     ],
@@ -159,6 +161,8 @@
         { "command": "mms.showPreview", "when": "editorLangId == mms || editorLangId == mmsbook" },
         { "command": "mms.previewDeclaration", "when": "false" },
         { "command": "mms.renameAt", "when": "false" },
+        { "command": "mms.showExpansion", "when": "false" },
+        { "command": "mms.expandAtCursor", "when": "editorLangId == mms" },
         { "command": "mms.importStructures", "when": "mms.hasStructureWorld" },
         { "command": "mms.chooseStructureWorld", "when": "mms.hasProject" },
         { "command": "mms.buildToWorld", "when": "mms.hasProject" },

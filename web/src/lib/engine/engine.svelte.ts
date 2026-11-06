@@ -70,6 +70,13 @@ export interface OutputItem {
 }
 
 /** A message tell, title or actionbar shows, at the command or over the .mmstext file it reads. */
+/** What a Template call or Blueprint instance writes, as `mms/expand` returns it. */
+export interface Expansion {
+	title: string;
+	text: string;
+	range: Diagnostic['range'];
+}
+
 /** One Test's outcome, as `mms/runTests` returns it. */
 export interface TestOutcome {
 	name: string;
@@ -301,6 +308,17 @@ export class Engine {
 	async resourceKinds(): Promise<ResourceKind[]> {
 		await this.client.initializing;
 		return this.client.request<object, ResourceKind[]>('mms/resourceKinds', {});
+	}
+
+	/** What the Template call or Blueprint instance at a position writes, or null. */
+	async expand(uri: string, position: { line: number; character: number }): Promise<Expansion | null> {
+		if (!this.client.connected) return null;
+		this.client.sync();
+		try {
+			return await this.client.request<object, Expansion | null>('mms/expand', { textDocument: { uri }, position });
+		} catch {
+			return null;
+		}
 	}
 
 	/** Refactorings for a range of a file, such as extracting an inline value to a declaration. */

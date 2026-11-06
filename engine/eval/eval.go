@@ -209,6 +209,8 @@ type Call struct {
 	Runtime map[string]bool
 	// Expanded are the statements a Commands Template wrote at the call.
 	Expanded []syntax.Stmt
+	// Result is the value a value Template gave, lowered, or nil.
+	Result syntax.Expr
 }
 
 type evaluator struct {

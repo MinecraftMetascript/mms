@@ -365,7 +365,7 @@ Advancement first_gem = {
 | `${@s}` | the names of the entities a selector finds, filled in the same way |
 | `\*` | the character itself |
 
-A book page shows 14 lines of about 19 characters. Text past the last line is cut off in game, so the [`book-overflow`](lint.md) warning marks where a page runs over, measured with the vanilla font. Add a `---` line there.
+A book page shows 14 lines of about 19 characters. Text past the last line is cut off in game, so the [`book-page-overflow`](lint.md) warning marks where a page runs over, measured with the vanilla font. Add a `---` line there.
 
 ### Previewing a book
 

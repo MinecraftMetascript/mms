@@ -1132,3 +1132,16 @@ test('Test declarations run in the Tests tab and follow edits', async ({ page })
 	await expect(page.getByTestId('tests-summary')).toHaveText('1 test passed', { timeout: 15_000 });
 	await expect(page.getByRole('tab', { name: 'Tests', exact: true })).toBeVisible();
 });
+
+test('the Expanded tab shows what a template call or blueprint writes', async ({ page }) => {
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	await replaceText(page, 'Template ring(p: Id<particle>, points: int = 2): Commands {\n  for i in 0..points - 1 {\n    /particle ${p} ^${i} ^1 ^0\n  }\n}\nFunction f {\n  let n = 0\n  ring(flame)\n}\n');
+	// The call gets an `inlined` hint and the let its inferred type.
+	await expect(page.locator('.cm-inlay-hint', { hasText: 'inlined' })).toBeVisible({ timeout: 15_000 });
+	await expect(page.locator('.cm-inlay-type')).toHaveText(': int');
+	await page.getByRole('tab', { name: 'Expanded' }).click();
+	await page.locator('.cm-line', { hasText: 'ring(flame)' }).click();
+	await expect(page.getByTestId('expanded-text')).toHaveText('/particle flame ^0 ^1 ^0\n/particle flame ^1 ^1 ^0');
+	await expect(page.getByLabel('Expanded')).toContainText('Template ring');
+});

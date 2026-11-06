@@ -75,6 +75,18 @@ func TestTextHasNoPages(t *testing.T) {
 			t.Errorf("%q: diagnostics %q lack %q", tc.src, msgs, tc.want)
 		}
 	}
+	// In a .mmstext file, the fix removes the --- line.
+	_, r := bookProject(t, "Book b { title = \"T\", author = \"A\", text = TextFile(\"b.mmstext\") }\n", map[string]string{"b.mmstext": "One\n---\nTwo\n"})
+	for _, d := range r.Diagnostics("b.mmstext") {
+		if d.Code != "mms/page-break-in-text" {
+			continue
+		}
+		if len(d.Fixes) != 1 || d.Fixes[0].Edits[0].Sp != (syntax.Span{Start: 4, End: 8}) {
+			t.Errorf("fix: %+v", d.Fixes)
+		}
+		return
+	}
+	t.Errorf("no page-break-in-text in b.mmstext: %v", r.Diagnostics("b.mmstext"))
 }
 
 // TextFile reads a .mmstext file where a text component goes, and a Book

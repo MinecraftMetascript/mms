@@ -220,6 +220,7 @@ func init() {
 		"workspace/didChangeWatchedFiles":  typed((*Server).didChangeWatched),
 		"mms/output":                       typed((*Server).output),
 		"mms/runTests":                     typed((*Server).runTests),
+		"mms/expand":                       typed((*Server).expand),
 		"textDocument/codeAction":          typed((*Server).codeAction),
 		"mms/setConfig":                    typed((*Server).setConfig),
 		"mms/setFiles":                     typed((*Server).setFiles),
@@ -871,10 +872,11 @@ func (s *Server) inlayHint(_ context.Context, p struct {
 	hints := w.session().InlayHints(p.TextDocument.URI)
 	out := make([]map[string]any, 0, len(hints))
 	for _, h := range hints {
-		out = append(out, map[string]any{
-			"position": l.pos(h.Off),
-			"label":    h.Label, "tooltip": h.Tooltip, "paddingLeft": true,
-		})
+		m := map[string]any{"position": l.pos(h.Off), "label": h.Label, "tooltip": h.Tooltip, "paddingLeft": !h.Type}
+		if h.Type {
+			m["kind"] = 1 // InlayHintKind.Type
+		}
+		out = append(out, m)
 	}
 	return out, nil
 }
@@ -1206,4 +1208,36 @@ func (s *Server) runTests(_ context.Context, p struct {
 		tests = append(tests, m)
 	}
 	return map[string]any{"tests": tests}, nil
+}
+
+// expand returns what a Template call or Blueprint instance writes: at
+// a position, the innermost one there (or null); without one, every
+// Blueprint instance and Commands Template call in the file, for the
+// Expand lens.
+func (s *Server) expand(_ context.Context, p struct {
+	TextDocument docID     `json:"textDocument"`
+	Position     *Position `json:"position"`
+}) (any, *respError) {
+	uri := p.TextDocument.URI
+	if p.Position != nil {
+		sess, l, off, ok := s.locate(posParams{TextDocument: p.TextDocument, Position: *p.Position})
+		if !ok {
+			return nil, nil
+		}
+		x, ok := sess.Expand(p.TextDocument.URI, off)
+		if !ok {
+			return nil, nil
+		}
+		return map[string]any{"title": x.Title, "text": x.Text, "range": l.rng(x.Sp)}, nil
+	}
+	w := s.at(uri)
+	if w == nil || w.res == nil {
+		return []any{}, nil
+	}
+	l := s.lines(uri)
+	out := []map[string]any{}
+	for _, x := range w.session().Expansions(uri) {
+		out = append(out, map[string]any{"title": x.Title, "text": x.Text, "range": l.rng(x.Sp)})
+	}
+	return out, nil
 }

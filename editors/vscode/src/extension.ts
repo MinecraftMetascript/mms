@@ -12,12 +12,14 @@
 // generated files, the Structures view (also world.ts), which imports
 // structures saved in the game, and the Jigsaw view (jigsaw.ts), which
 // copies give commands for set-up jigsaw blocks. The panels read the pack from output.ts.
-// Test declarations show in VS Code's Testing view (tests.ts).
+// Test declarations show in VS Code's Testing view (tests.ts), and an
+// Expand lens shows what a template call or blueprint writes (expand.ts).
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { LanguageClient, type LanguageClientOptions, type ServerOptions } from 'vscode-languageclient/node';
+import { Expands } from './expand';
 import { JigsawView } from './jigsaw';
 import { PackOutput } from './output';
 import { PackView } from './packView';
@@ -230,6 +232,7 @@ export function activate(context: vscode.ExtensionContext) {
 		new PackView(pack, () => world.project()),
 		new JigsawView(context, pack, () => world.project()),
 		new Tests(() => client),
+		new Expands(() => client, pack.onDidChange),
 		vscode.commands.registerCommand('mms.showPreview', () => previews.show()),
 		vscode.commands.registerCommand('mms.previewDeclaration', (path: string, page?: number) => previews.show(path, page)),
 		vscode.commands.registerCommand('mms.renameAt', renameAt),

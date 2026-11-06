@@ -485,6 +485,9 @@ func (c *ctx) apply(t *Template, x *syntax.Call) Value {
 		if c.e.over {
 			return &Code{p, &syntax.Bad{Sp: site}}
 		}
+		if call != nil {
+			call.Result = tc.lower(v)
+		}
 		return v
 	case t.D.Body != nil:
 		st := &Stmts{pos: tc.pos(t.D.Body.Sp)}

@@ -150,6 +150,21 @@ func (p *bookParser) report(src *bookSrc, code string, sp syntax.Span, msg strin
 	c.Extern[src.extern] = append(c.Extern[src.extern], syntax.Diagnostic{Code: code, Severity: syntax.SeverityError, Message: msg, Sp: sp})
 }
 
+// fix attaches a quick fix to the error report just added.
+func (p *bookParser) fix(src *bookSrc, f syntax.Fix) {
+	c := p.c
+	if c.trial {
+		return
+	}
+	ds := c.Diags
+	if src.extern != "" {
+		ds = c.Extern[src.extern]
+	}
+	if len(ds) > 0 {
+		ds[len(ds)-1].Fixes = append(ds[len(ds)-1].Fixes, f)
+	}
+}
+
 func (p *bookParser) page() *bookPage {
 	if len(p.pages) == 0 {
 		p.pages = append(p.pages, &bookPage{})
@@ -246,7 +261,12 @@ func (p *bookParser) line(src *bookSrc, start, end int) {
 	t := src.text
 	if strings.TrimSpace(string(t[start:end])) == "---" {
 		if src.noPages {
-			p.errorf(src, start, end, "a page break works only in a book's text; this text has no pages")
+			p.report(src, "mms/page-break-in-text", src.at(start, end), src.where(start)+"a page break works only in a book's text; this text has no pages")
+			cut := end
+			if cut < len(t) && t[cut] == '\n' {
+				cut++
+			}
+			p.fix(src, syntax.Fix{Title: "Remove the --- line", Safe: true, Edits: []syntax.TextEdit{{Sp: src.at(start, cut)}}})
 			return
 		}
 		p.pages = append(p.pages, &bookPage{src: src, off: start})

@@ -7,21 +7,24 @@ export interface InlayHint {
 	position: { line: number; character: number };
 	label: string;
 	tooltip?: string;
+	/** 1 for an inferred type, which sits right after the name. */
+	kind?: number;
 }
 
 class HintWidget extends WidgetType {
 	constructor(
 		readonly label: string,
-		readonly tooltip: string
+		readonly tooltip: string,
+		readonly type: boolean
 	) {
 		super();
 	}
 	eq(o: HintWidget) {
-		return o.label === this.label && o.tooltip === this.tooltip;
+		return o.label === this.label && o.tooltip === this.tooltip && o.type === this.type;
 	}
 	toDOM() {
 		const el = document.createElement('span');
-		el.className = 'cm-inlay-hint';
+		el.className = this.type ? 'cm-inlay-hint cm-inlay-type' : 'cm-inlay-hint';
 		el.textContent = this.label;
 		if (this.tooltip) el.title = this.tooltip;
 		return el;
@@ -79,7 +82,7 @@ export function inlayHints(fetch: (uri: string) => Promise<InlayHint[]>, delay =
 					if (h.position.line >= doc.lines) continue;
 					const at = Math.min(plugin.fromPosition(h.position, doc), doc.line(h.position.line + 1).to);
 					if (at < last) continue;
-					b.add(at, at, Decoration.widget({ widget: new HintWidget(h.label, h.tooltip ?? ''), side: 1 }));
+					b.add(at, at, Decoration.widget({ widget: new HintWidget(h.label, h.tooltip ?? '', h.kind === 1), side: 1 }));
 					last = at;
 				}
 				this.decorations = b.finish().map(plugin.unsyncedChanges);

@@ -85,6 +85,12 @@ body {
 	color: var(--c-muted);
 	font-size: 0.9em;
 }
+/* An inferred type reads as part of the code: `let n: int`. */
+.editor .cm-inlay-hint.cm-inlay-type {
+	margin-left: 0;
+	padding: 0;
+	background: none;
+}
 .cm-tooltip {
 	background: var(--c-panel) !important;
 	color: var(--c-ink);
