@@ -1,0 +1,65 @@
+=== 04-template.mms (changed: true)
+# at 04-template.mms:9:14
+TemplatePool halls {
+  fallback = caps
+  elements = [
+    WeightedElement(
+      3,
+      SinglePoolElement(
+        rigid,
+        StructureFile("structures/halls/hall.nbt", "halls/hall"),
+        minecraft:empty,
+      ),
+    ),
+    WeightedElement(
+      1,
+      SinglePoolElement(
+        rigid,
+        StructureFile("structures/halls/short_hall.nbt", "halls/short_hall"),
+        minecraft:empty,
+      ),
+    ),
+  ]
+}
+=== use.mms (changed: true)
+# at use.mms:1:14
+TemplatePool rooms {
+  fallback = caps
+  elements = [
+    WeightedElement(
+      1,
+      SinglePoolElement(
+        rigid,
+        StructureFile("structures/rooms/room.nbt", "rooms/room"),
+        rooms_decay,
+      ),
+    ),
+    WeightedElement(
+      2,
+      SinglePoolElement(
+        rigid,
+        StructureFile("structures/rooms/vault.nbt", "rooms/vault"),
+        minecraft:empty,
+      ),
+    ),
+  ]
+}
+# at use.mms:5:14
+TemplatePool broken {
+  fallback = caps
+  elements = [, , ]
+}
+--- diagnostics
+7:15 error mms/missing-arg: Template 'Piece' needs 'path'
+7:55 error mms/too-many-args: Template 'Piece' takes 3 arguments
+7:70 error mms/unknown-arg: Template 'Piece' has no parameter 'size'
+=== provenance of copied nodes
+04-template.mms:11:15 from 04-template.mms:5 < Template Piece (at 04-template.mms:11:15, def 04-template.mms:2:1): 1 node, minecraft:empty
+04-template.mms:11:15 from 04-template.mms:7 < Template Piece (at 04-template.mms:11:15, def 04-template.mms:2:1): 8 nodes, SinglePoolElement(rigid, StructureFile("struc...
+04-template.mms:11:39 from 04-template.mms:4 < Template Piece (at 04-template.mms:11:39, def 04-template.mms:2:1): 1 node, 1
+04-template.mms:11:39 from 04-template.mms:5 < Template Piece (at 04-template.mms:11:39, def 04-template.mms:2:1): 1 node, minecraft:empty
+04-template.mms:11:39 from 04-template.mms:7 < Template Piece (at 04-template.mms:11:39, def 04-template.mms:2:1): 8 nodes, SinglePoolElement(rigid, StructureFile("struc...
+use.mms:3:15 from 04-template.mms:4 < Template Piece (at use.mms:3:15, def 04-template.mms:2:1): 1 node, 1
+use.mms:3:15 from 04-template.mms:7 < Template Piece (at use.mms:3:15, def 04-template.mms:2:1): 8 nodes, SinglePoolElement(rigid, StructureFile("struc...
+use.mms:3:62 from 04-template.mms:5 < Template Piece (at use.mms:3:62, def 04-template.mms:2:1): 1 node, minecraft:empty
+use.mms:3:62 from 04-template.mms:7 < Template Piece (at use.mms:3:62, def 04-template.mms:2:1): 8 nodes, SinglePoolElement(rigid, StructureFile("struc...

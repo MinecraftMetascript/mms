@@ -1,0 +1,31 @@
+-- prelude.mms --
+Type LangText = string | {string: string}
+extern Template by_language(text: LangText?): {string: string}
+extern Template english(text: LangText): string
+-- 07-custom-item.mms -- design
+-- items.mms --
+CustomItem ruby {
+  base = emerald
+  name = "Ruby"
+  texture = Texture("art/ruby.png")
+}
+
+CustomItem bell {
+  base = gold_nugget
+  name = { en_us = "Bell", de_de = "Glocke" }
+  model = item/bell_model
+  on_right_click = run {
+    /playsound block.bell.use player @s
+  }
+}
+
+CustomItem both {
+  base = stick
+  texture = Texture("a.png")
+  model = item/x
+  colour = 3
+}
+
+CustomItem nothing {
+  name = "No base"
+}

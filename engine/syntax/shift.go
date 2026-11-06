@@ -24,11 +24,17 @@ func shiftFile(f *File, delta int, nodes map[Node]Node) *File {
 }
 
 type shifter struct {
-	d int
-	m map[Node]Node
+	d   int
+	m   map[Node]Node
+	fix *Span // when set, every span becomes this one
 }
 
-func (s shifter) sp(sp Span) Span { return Span{sp.Start + s.d, sp.End + s.d} }
+func (s shifter) sp(sp Span) Span {
+	if s.fix != nil {
+		return *s.fix
+	}
+	return Span{sp.Start + s.d, sp.End + s.d}
+}
 
 func (s shifter) rec(old, new Node) {
 	if s.m != nil {

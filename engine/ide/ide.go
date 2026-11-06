@@ -758,7 +758,10 @@ func (s *Session) Hover(path string, off int) (string, syntax.Span) {
 	if a == nil || len(a.path) < 2 {
 		return "", syntax.Span{}
 	}
-	d := a.path[1].(*syntax.Decl)
+	d, ok := a.path[1].(*syntax.Decl)
+	if !ok || d.Kind == nil {
+		return "", syntax.Span{} // a const or a top-level for
+	}
 	inner := a.path[len(a.path)-1]
 	if a.decl != nil && d.Name != nil && d.Name.Sp.Contains(off) {
 		return s.declHover(a.decl), d.Name.Sp
@@ -909,7 +912,10 @@ func (s *Session) target(path string, off int) *sema.Symbol {
 	if a == nil || len(a.path) < 2 {
 		return nil
 	}
-	d := a.path[1].(*syntax.Decl)
+	d, ok := a.path[1].(*syntax.Decl)
+	if !ok {
+		return nil
+	}
 	if d.Name != nil && d.Name.Sp.Contains(off) {
 		for _, sym := range s.R.Syms.All() {
 			if sym.Decl == d {
