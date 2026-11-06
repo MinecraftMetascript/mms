@@ -402,7 +402,7 @@ func TestRegistersWatchers(t *testing.T) {
 			}
 		}
 	}
-	if strings.Join(globs, " ") != "**/*.mms **/*.mmsbook **/mms.json **/*.{png,ogg,nbt}" {
+	if strings.Join(globs, " ") != "**/*.mms **/*.mmsbook **/*.mmstext **/mms.json **/*.{png,ogg,nbt}" {
 		t.Fatalf("watchers = %q", globs)
 	}
 

@@ -13,6 +13,7 @@ import (
 	"github.com/minecraftmetascript/mms/engine/eval"
 	"github.com/minecraftmetascript/mms/engine/format"
 	"github.com/minecraftmetascript/mms/engine/jsonv"
+	"github.com/minecraftmetascript/mms/engine/prelude"
 	"github.com/minecraftmetascript/mms/engine/project"
 	"github.com/minecraftmetascript/mms/engine/sema"
 	"github.com/minecraftmetascript/mms/engine/syntax"
@@ -784,6 +785,11 @@ func commaBetween(f *syntax.File, from, to int) bool {
 // Hover returns Markdown for the node at off and the span it describes.
 func (s *Session) Hover(path string, off int) (string, syntax.Span) {
 	md, sp := s.hover(path, off)
+	if md == "" || strings.HasPrefix(md, "Expected:") {
+		if emd, esp, ok := s.evalHover(path, off); ok {
+			md, sp = emd, esp
+		}
+	}
 	for _, c := range s.commandCalls(path) {
 		if fsp := c.X.Fn.Span(); fsp.Contains(off) {
 			if md != "" {
@@ -908,6 +914,9 @@ type SignatureHelp struct {
 
 // Signature returns signature help for the call around off.
 func (s *Session) Signature(path string, off int) (SignatureHelp, bool) {
+	if h, ok := s.templateSignature(path, off); ok {
+		return h, true
+	}
 	a := s.at(path, off)
 	if a == nil {
 		return SignatureHelp{}, false
@@ -1035,6 +1044,12 @@ func (s *Session) current(sym *sema.Symbol) *sema.Symbol {
 
 // Definition returns where the symbol at off is declared.
 func (s *Session) Definition(path string, off int) []Location {
+	if n, ok := s.evalNameAt(path, off); ok {
+		if strings.HasPrefix(n.Path, prelude.Prefix) {
+			return nil
+		}
+		return []Location{{Path: n.Path, Span: n.Def}}
+	}
 	if cv := s.convertedAt(path, off); cv != nil && cv.Decl != nil && cv.Decl.Name != nil {
 		return []Location{{Path: cv.Path, Span: cv.Decl.Name.Sp}}
 	}
@@ -1048,6 +1063,15 @@ func (s *Session) Definition(path string, off int) []Location {
 // References returns every use of the symbol at off, with its declaration
 // first when includeDecl is set.
 func (s *Session) References(path string, off int, includeDecl bool) []Location {
+	if n, ok := s.evalNameAt(path, off); ok {
+		var out []Location
+		for _, l := range s.evalUses(n) {
+			if includeDecl || l != (Location{Path: n.Path, Span: n.Def}) {
+				out = append(out, l)
+			}
+		}
+		return out
+	}
 	sym := s.target(path, off)
 	if sym == nil {
 		return nil
@@ -1098,6 +1122,17 @@ type Edit struct {
 
 // PrepareRename returns the span of the renamable name at off.
 func (s *Session) PrepareRename(path string, off int) (syntax.Span, bool) {
+	if n, ok := s.evalNameAt(path, off); ok {
+		if strings.HasPrefix(n.Path, prelude.Prefix) {
+			return syntax.Span{}, false
+		}
+		for _, l := range s.evalUses(n) {
+			if l.Path == path && within(l.Span, off) {
+				return l.Span, true
+			}
+		}
+		return syntax.Span{}, false
+	}
 	sym := s.target(path, off)
 	if sym == nil {
 		return syntax.Span{}, false
@@ -1110,6 +1145,9 @@ func (s *Session) PrepareRename(path string, off int) (syntax.Span, bool) {
 // Rename renames the symbol at off to newPath (a resource path such as
 // `hills` or `terrain/hills`), editing the declaration and every use.
 func (s *Session) Rename(path string, off int, newPath string) ([]Edit, string) {
+	if n, ok := s.evalNameAt(path, off); ok {
+		return s.renameEval(n, newPath)
+	}
 	sym := s.target(path, off)
 	if sym == nil {
 		return nil, "nothing to rename here"

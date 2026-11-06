@@ -388,5 +388,6 @@ export const tokenTypes = [
 	'property',
 	'enumMember',
 	'namespace',
-	'macro'
+	'macro',
+	'parameter'
 ];

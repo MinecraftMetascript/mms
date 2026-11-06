@@ -158,7 +158,10 @@ type Result struct {
 	Eval  *eval.Result
 	Syms  *sema.Table
 	Units []*sema.Unit
-	Decls map[*syntax.Decl]*Decl
+	// Source holds each file as parsed, before expansion: with its
+	// const, Template, Blueprint and for items and the calls as written.
+	Source map[string]*syntax.File
+	Decls  map[*syntax.Decl]*Decl
 	// Order lists declarations in file and source order.
 	Order []*Decl
 	// Instances are the Blueprint instances the user wrote, in order,
@@ -331,6 +334,10 @@ func (p *Project) Analyze(ctx context.Context) (*Result, error) {
 	p.mu.Unlock()
 	sort.Slice(units, func(i, j int) bool { return units[i].Path < units[j].Path })
 
+	source := make(map[string]*syntax.File, len(units))
+	for _, u := range units {
+		source[u.Path] = u.File
+	}
 	units, ev := expand(units, p.Config.Namespace, &p.evalCache)
 	syms, collect := sema.Collect(units, p.Kinds, p.Config.Namespace)
 	tenv := types.New(p.Pack, p.Kinds, ev)
@@ -341,7 +348,7 @@ func (p *Project) Analyze(ctx context.Context) (*Result, error) {
 	}
 	syms.Hidden = preludeEmitted(ev)
 	syms.Conversions = tenv.Conversions(ev, p.Config.Namespace)
-	r := &Result{Syms: syms, Units: units, Decls: map[*syntax.Decl]*Decl{}, collect: collect, pack: p.Pack, cfg: p.Config, files: p.Files, Eval: ev}
+	r := &Result{Syms: syms, Units: units, Source: source, Decls: map[*syntax.Decl]*Decl{}, collect: collect, pack: p.Pack, cfg: p.Config, files: p.Files, Eval: ev}
 	r.typeErr = tenv.Check(ev, p.Config.Namespace, func(ns string) *sema.Checker {
 		c := sema.NewChecker(p.Pack, p.Kinds, syms, ns)
 		c.Files, c.Texts = p.Files, p.bookText

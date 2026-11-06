@@ -19,6 +19,7 @@
     "workspaceContains:**/mms.json",
     "onLanguage:mms",
     "onLanguage:mmsbook",
+    "onLanguage:mmstext",
     "onWebviewPanel:mms.preview"
   ],
   "contributes": {
@@ -38,6 +39,12 @@
         "aliases": ["MMS Book"],
         "extensions": [".mmsbook"],
         "configuration": "./language-configuration-book.json"
+      },
+      {
+        "id": "mmstext",
+        "aliases": ["MMS Text"],
+        "extensions": [".mmstext"],
+        "configuration": "./language-configuration-book.json"
       }
     ],
     "jsonValidation": [
@@ -56,6 +63,11 @@
         "language": "mmsbook",
         "scopeName": "text.mmsbook",
         "path": "./syntaxes/mmsbook.tmLanguage.json"
+      },
+      {
+        "language": "mmstext",
+        "scopeName": "text.mmstext",
+        "path": "./syntaxes/mmstext.tmLanguage.json"
       }
     ],
     "configuration": {
@@ -144,7 +156,7 @@
     ],
     "menus": {
       "editor/title": [
-        { "command": "mms.showPreview", "when": "editorLangId == mms || editorLangId == mmsbook", "group": "navigation" }
+        { "command": "mms.showPreview", "when": "editorLangId == mms || editorLangId == mmsbook || editorLangId == mmstext", "group": "navigation" }
       ],
       "view/title": [
         { "command": "mms.buildToWorld", "when": "view == mms.world && mms.hasWorld", "group": "navigation@1" },
@@ -158,7 +170,7 @@
         { "command": "mms.revealOutputSource", "when": "view == mms.pack && viewItem =~ /source/", "group": "1_output@2" }
       ],
       "commandPalette": [
-        { "command": "mms.showPreview", "when": "editorLangId == mms || editorLangId == mmsbook" },
+        { "command": "mms.showPreview", "when": "editorLangId == mms || editorLangId == mmsbook || editorLangId == mmstext" },
         { "command": "mms.previewDeclaration", "when": "false" },
         { "command": "mms.renameAt", "when": "false" },
         { "command": "mms.showExpansion", "when": "false" },
@@ -177,7 +189,7 @@
       ]
     },
     "keybindings": [
-      { "command": "mms.showPreview", "key": "ctrl+k v", "mac": "cmd+k v", "when": "editorLangId == mms || editorLangId == mmsbook" }
+      { "command": "mms.showPreview", "key": "ctrl+k v", "mac": "cmd+k v", "when": "editorLangId == mms || editorLangId == mmsbook || editorLangId == mmstext" }
     ],
     "configurationDefaults": {
       "[mms]": {
@@ -188,6 +200,10 @@
         "editor.quickSuggestions": { "other": "on", "comments": "off", "strings": "on" }
       },
       "[mmsbook]": {
+        "editor.quickSuggestions": { "other": "on", "comments": "off", "strings": "on" },
+        "editor.wordBasedSuggestions": "off"
+      },
+      "[mmstext]": {
         "editor.quickSuggestions": { "other": "on", "comments": "off", "strings": "on" },
         "editor.wordBasedSuggestions": "off"
       }

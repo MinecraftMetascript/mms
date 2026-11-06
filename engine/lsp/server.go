@@ -268,7 +268,7 @@ type initializeParams struct {
 // watchedGlobs are the files whose changes on disk the server needs to
 // hear about: sources edited outside the editor (a git checkout, say),
 // and the assets that Texture, Sound and Structure read.
-var watchedGlobs = []string{"**/*.mms", "**/*" + sema.BookFileExt, "**/" + project.ConfigFile, "**/*.{png,ogg,nbt}"}
+var watchedGlobs = []string{"**/*.mms", "**/*" + sema.BookFileExt, "**/*" + sema.TextFileExt, "**/" + project.ConfigFile, "**/*.{png,ogg,nbt}"}
 
 // registerWatchers asks the client to send workspace/didChangeWatchedFiles
 // for watchedGlobs. Clients only watch files a server registers for, so

@@ -186,7 +186,8 @@ async function start() {
 	const clientOptions: LanguageClientOptions = {
 		documentSelector: [
 			{ scheme: 'file', language: 'mms' },
-			{ scheme: 'file', language: 'mmsbook' }
+			{ scheme: 'file', language: 'mmsbook' },
+			{ scheme: 'file', language: 'mmstext' }
 		],
 		outputChannel: output,
 		// Extract-to-declaration actions then call mms.renameAt on the new name.
