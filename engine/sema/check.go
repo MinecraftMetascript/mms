@@ -101,6 +101,8 @@ type Checker struct {
 	// Book is the layout of the last Book text checked, for the editor
 	// and the book-overflow lint.
 	Book *BookLayout
+	// Shown are the messages the function's text commands show.
+	Shown []ShownText
 	// BookDiags are the problems in the Book text checked.
 	BookDiags []syntax.Diagnostic
 	// Extern holds problems found in other files, such as a .mmsbook

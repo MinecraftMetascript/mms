@@ -15,6 +15,16 @@ import (
 // the prelude. Their message is text markup, written into the command as
 // a text component.
 
+// ShownText is a message a text command shows, for an editor's chat
+// preview: Kind is "chat", "title" or "actionbar". Sp is the command, or
+// the whole of File when the message is read from that file.
+type ShownText struct {
+	Kind              string
+	Message, Subtitle jsonv.Value
+	File              string
+	Sp                syntax.Span
+}
+
 // textCommands are the prelude's text commands, by name.
 var textCommands = map[string]bool{"tell": true, "title": true, "actionbar": true}
 
@@ -117,9 +127,16 @@ func (f *fc) textCommand(pre *[]fn.Op, name string, e *syntax.Call) {
 		c.errorf("mms/type-mismatch", args["target"].Span(), "expected a selector such as @a or @s")
 		return
 	}
-	message := f.textArg(pre, args["message"])
+	message, file, n := f.textArg(pre, args["message"])
 	if message == nil {
 		return
+	}
+	shown := ShownText{Kind: name, Message: message, File: file, Sp: e.Sp}
+	if name == "tell" {
+		shown.Kind = "chat"
+	}
+	if file != "" {
+		shown.Sp = syntax.Span{Start: 0, End: n}
 	}
 	switch name {
 	case "tell":
@@ -129,14 +146,16 @@ func (f *fc) textCommand(pre *[]fn.Op, name string, e *syntax.Call) {
 	case "title":
 		// The subtitle shows with the next title, so it goes first.
 		if sub := args["subtitle"]; sub != nil && !isNone(sub) {
-			st := f.textArg(pre, sub)
+			st, _, _ := f.textArg(pre, sub)
 			if st == nil {
 				return
 			}
+			shown.Subtitle = st
 			*pre = append(*pre, fn.Cmd{Text: "title " + target + " subtitle " + componentSNBT(st)})
 		}
 		*pre = append(*pre, fn.Cmd{Text: "title " + target + " title " + componentSNBT(message)})
 	}
+	c.Shown = append(c.Shown, shown)
 }
 
 var textCommandExample = map[string]string{
@@ -151,33 +170,39 @@ func isNone(e syntax.Expr) bool {
 }
 
 // textArg reads a text argument: a string of markup, or TextFile(...).
-func (f *fc) textArg(pre *[]fn.Op, e syntax.Expr) jsonv.Value {
+// For a project file read in the editor, it also returns the file and
+// its length.
+func (f *fc) textArg(pre *[]fn.Op, e syntax.Expr) (jsonv.Value, string, int) {
 	c := f.c
 	switch e := e.(type) {
 	case *syntax.String:
 		in := c.info(e)
 		in.Markup = true
 		if !strings.ContainsAny(e.Value, markupRunes) {
-			return jsonv.String(e.Value)
+			return jsonv.String(e.Value), "", 0
 		}
 		src := c.stringSrc(e)
 		src.noPages = true
 		v, accidental := c.textMarkupIn(src, f, pre)
 		in.Accidental = accidental
-		return v
+		return v, "", 0
 	case *syntax.Call:
 		if id, ok := e.Fn.(*syntax.Ident); ok && id.Name == "TextFile" {
 			src := c.bookFile(e)
 			if src == nil {
-				return nil
+				return nil, "", 0
 			}
 			src.noPages = true
 			v, _ := c.textMarkupIn(src, f, pre)
-			return v
+			file := src.extern
+			if file == "" {
+				file = src.file
+			}
+			return v, file, len(src.text)
 		}
 	}
 	c.errorf("mms/type-mismatch", e.Span(), `expected text: a string of markup such as "{gold}Hello", or TextFile("path")`)
-	return nil
+	return nil, "", 0
 }
 
 // componentSNBT writes a text component as a command takes it:

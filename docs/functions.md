@@ -104,6 +104,8 @@ Function start_wave {
 - The message is a string of markup, a `const` or `Template` of type `Text`, or `TextFile("text/rules.mmstext")`.
 - `${...}` in the message is part of the text component, filled in by the game when the message is shown: a score, a Global, a variable, a selector such as `${@s}` (the names it finds), or a constant. A computed value such as `${n * 2}` is worked out just before the command. No macro is needed.
 
+In the web editor, the Preview tab shows the message at the cursor as the game shows it: in chat, as a title with its subtitle, or above the hotbar, with values to try for the scores and selectors in it. The cursor in a `.mmstext` file that a text command reads shows that message.
+
 ## Control flow
 
 ```

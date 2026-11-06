@@ -810,3 +810,36 @@ func TestOutputJigsawHoles(t *testing.T) {
 		}
 	}
 }
+
+// mms/output lists the messages text commands show, for a chat preview:
+// at the command, or over the whole .mmstext file it reads.
+func TestOutputTexts(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "mms.json"), []byte(`{"namespace": "demo"}`), 0o644)
+	const main = "Function f {\n  tell(@a, \"{gold}Hi\")\n  title(@a, \"Big\", subtitle = \"small\")\n  tell(@s, TextFile(\"rules.mmstext\"))\n}\n"
+	os.WriteFile(filepath.Join(dir, "main.mms"), []byte(main), 0o644)
+	os.WriteFile(filepath.Join(dir, "rules.mmstext"), []byte("**Rules**\nBe nice.\n"), 0o644)
+	m, r := pathURI(filepath.Join(dir, "main.mms")), pathURI(filepath.Join(dir, "rules.mmstext"))
+	c := start(t)
+	c.result("initialize", map[string]any{"rootUri": pathURI(dir)})
+	c.notify("textDocument/didOpen", map[string]any{"textDocument": map[string]any{"uri": m, "languageId": "mms", "version": 1, "text": main}})
+	c.notify("textDocument/didOpen", map[string]any{"textDocument": map[string]any{"uri": r, "languageId": "mmsbook", "version": 1, "text": "**Rules**\nBe nice.\n"}})
+	out := c.result("mms/output", map[string]any{}).(map[string]any)
+	texts := out["texts"].([]any)
+	if len(texts) != 3 {
+		t.Fatalf("texts = %v", texts)
+	}
+	first := texts[0].(map[string]any)
+	if first["kind"] != "chat" || !strings.Contains(first["text"].(string), "gold") || first["uri"] != m {
+		t.Errorf("first = %v", first)
+	}
+	if line := first["range"].(map[string]any)["start"].(map[string]any)["line"]; line != float64(1) {
+		t.Errorf("first starts on line %v", line)
+	}
+	if second := texts[1].(map[string]any); second["kind"] != "title" || second["subtitle"] != `"small"` {
+		t.Errorf("second = %v", second)
+	}
+	if third := texts[2].(map[string]any); third["uri"] != r || !strings.Contains(third["text"].(string), "bold") {
+		t.Errorf("third = %v", third)
+	}
+}
