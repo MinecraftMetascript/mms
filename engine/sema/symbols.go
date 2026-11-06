@@ -21,6 +21,7 @@ type Symbol struct {
 	Kind     Kind
 	Decl     *syntax.Decl
 	Unit     *Unit
+	table    *Table
 }
 
 // ID returns "ns:path".
@@ -40,6 +41,9 @@ type Table struct {
 	// Types are the types the project declares with `Type`, by the
 	// path the type checker gives them ("::mms::Name").
 	Types map[string]*spec.Type
+	// TypeDecls are the project's Type declarations by name, for the
+	// defaults of a record's fields.
+	TypeDecls map[string]*syntax.Decl
 	// Conversions are the `as` conversions of Blueprint instances, by
 	// the instance's id.
 	Conversions map[string][]*Conversion
@@ -51,7 +55,7 @@ func key(folder, id string) string { return folder + "|" + id }
 // folder: an objective, a global and a jigsaw hole may share a name with
 // a function or anything else.
 func ownKey(k Kind) bool {
-	return k.MMS == "Objective" || k.MMS == "Global" || k.MMS == JigsawHoleKind
+	return k.MMS == "Objective" || k.MMS == "Global" || k.MMS == "Storage" || k.MMS == JigsawHoleKind
 }
 
 // Find returns the symbol of a resource folder ("worldgen/noise") and id.
@@ -156,7 +160,7 @@ func Collect(units []*Unit, kinds *Kinds, defaultNS string) (*Table, map[string]
 				})
 				continue
 			}
-			sym := &Symbol{NS: sns, Path: path, Kind: k, Decl: d, Unit: u}
+			sym := &Symbol{NS: sns, Path: path, Kind: k, Decl: d, Unit: u, table: t}
 			kk := key(k.Folder(), sym.ID())
 			if ownKey(k) {
 				kk = key(k.MMS, sym.ID())

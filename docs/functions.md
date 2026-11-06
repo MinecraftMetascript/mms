@@ -45,6 +45,48 @@ Function on_death {
 - **Locals** (`let`) belong to their function. A name in an inner block can shadow an outer one.
 - **Objective scores** are written `objective[holder]`. The holder is a selector, or a fake player name in quotes, such as `kills["#total"]`.
 
+### Storage records
+
+A `Storage` keeps a record, a `Type` with fields, in command storage. Functions read and write its `int`, `bool` and `string` fields by name:
+
+```mms
+/** The state of a siege. */
+Type SiegeState {
+  wave: int = 0
+  boss_alive: bool
+  /** Mobs still to spawn this wave. */
+  queue: [Id<entity_type>] = []
+}
+
+/** Kept in storage siege:mms game. */
+Storage game: SiegeState
+
+Function next_wave {
+  game.wave += 1
+  game.boss_alive = game.wave % 5 == 0
+  tell(@a, "Wave ${game.wave} begins")
+}
+```
+
+The load function sets each missing field to its default, or to `0`, `false` or `""` when it has none. A `/reload` keeps the values, and a field added later starts at its default. The record is at `<namespace>:mms <name>`, so `/data get storage siege:mms game` shows it in the game. Fields of other types, such as `queue`, are stored and given their defaults, but functions do not read them yet. Completion after `game.` lists the fields, and hovering one shows its type and doc comment.
+
+A field costs a storage read and write each time a function uses it. A `Global` is a score, so it is cheaper in a tight loop.
+
+### Selectors
+
+`exists(target)` tells whether a selector finds any entity, and `count(target)` how many it finds:
+
+```mms
+const boss = @e[tag=siege.boss, limit=1]
+
+Function check {
+  if (!exists(boss)) {
+    /summon wither_skeleton ~ ~ ~ {Tags:["siege.boss"]}
+  }
+  let zombies = count(@e[type=zombie, distance=..16])
+}
+```
+
 ### Operators
 
 | Operators | Meaning |

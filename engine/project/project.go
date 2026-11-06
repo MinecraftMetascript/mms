@@ -333,6 +333,10 @@ func (p *Project) Analyze(ctx context.Context) (*Result, error) {
 	syms, collect := sema.Collect(units, p.Kinds, p.Config.Namespace)
 	tenv := types.New(p.Pack, p.Kinds, ev)
 	syms.Types = tenv.Types
+	syms.TypeDecls = map[string]*syntax.Decl{}
+	for name, td := range ev.Types {
+		syms.TypeDecls[name] = td.D
+	}
 	syms.Hidden = preludeEmitted(ev)
 	syms.Conversions = tenv.Conversions(ev, p.Config.Namespace)
 	r := &Result{Syms: syms, Units: units, Decls: map[*syntax.Decl]*Decl{}, collect: collect, pack: p.Pack, cfg: p.Config, files: p.Files, Eval: ev}
@@ -358,6 +362,11 @@ func (p *Project) Analyze(ctx context.Context) (*Result, error) {
 				// With different declared names, a result still holds if
 				// every name it looked up resolves the same way.
 				if dr != nil && !sameSyms && (dr.Deps == nil || !sema.DepsHold(syms, dr.Deps)) {
+					dr = nil
+				}
+				// A Storage reads its Type's defaults, which are cheap to
+				// read again and not among its dependencies.
+				if dr != nil && k.MMS == "Storage" {
 					dr = nil
 				}
 				// An asset file it read was added, removed or changed.
@@ -500,6 +509,8 @@ func (p *Project) checkDecl(u *sema.Unit, d *syntax.Decl, k sema.Kind, syms *sem
 		dr.Lines = objective(c, d)
 	case k.MMS == "Global":
 		dr.Lines = c.Global(d)
+	case k.MMS == "Storage":
+		dr.Lines = c.Storage(d)
 	case k.MMS == sema.JigsawHoleKind:
 		c.JigsawHole(d)
 	}

@@ -360,6 +360,9 @@ func (s *Session) complete(a *at, off int) []sema.Candidate {
 				if a.code() && sema.IsExecChain(p.X) {
 					return sema.ExecCandidates(false)
 				}
+				if fs := a.c.StorageFieldCandidates(p.X); a.code() && fs != nil {
+					return fs
+				}
 				return a.methods(p)
 			case *syntax.FieldStmt:
 				if i >= 2 {
@@ -379,6 +382,9 @@ func (s *Session) complete(a *at, off int) []sema.Candidate {
 			if n.Name == nil || !n.Name.Sp.Contains(off) {
 				if a.code() && sema.IsExecChain(n.X) {
 					return sema.ExecCandidates(false)
+				}
+				if fs := a.c.StorageFieldCandidates(n.X); a.code() && fs != nil {
+					return fs
 				}
 				return a.methods(n)
 			}
