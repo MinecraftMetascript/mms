@@ -93,6 +93,9 @@ func TestCompletionMatrix(t *testing.T) {
 
 		// Function bodies.
 		{name: "statement", src: "Function f {\n  /say hi\n  |\n}", want: []string{"As", "let", "if"}},
+		{name: "test line", src: "Function f {\n}\nTest t {\n  run f()\n  |\n}", want: []string{"expect", "run", "setup"}, not: []string{"let", "As"}},
+		{name: "test setup", src: "Global g: int = 0\nFunction f {\n}\nTest t {\n  setup {\n    |\n  }\n  run f()\n}", want: []string{"let", "g"}, not: []string{"expect"}},
+		{name: "test expect value", src: "Global g: int = 0\nFunction f {\n}\nTest t {\n  run f()\n  expect g == |\n}", want: []string{"g"}},
 		{name: "statement local", src: "Function f {\n  let x = 1\n  x|\n}", want: []string{"x", "As"}, replace: "x"},
 		{name: "statement global", src: "Global g: int = 0\nFunction f {\n  g|\n}", want: []string{"g"}, replace: "g"},
 		{name: "statement keyword prefix", src: "Function f {\n  ret|\n}", want: []string{"return"}, replace: "ret"},

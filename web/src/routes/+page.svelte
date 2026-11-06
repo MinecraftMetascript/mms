@@ -8,6 +8,7 @@
 	import Editor from '#lib/editor/Editor.svelte';
 	import Sidebar from '#lib/components/Sidebar.svelte';
 	import JsonView from '#lib/components/JsonView.svelte';
+	import TestsView from '#lib/components/TestsView.svelte';
 	import { Engine, itemKey, outputKey, type Diagnostic, type DocSymbol, type OutputFile } from '#lib/engine/engine.svelte.ts';
 	import { Project, pathOf, uriOf, starter, type ProjectData } from '#lib/project/project.svelte.ts';
 	import { examples } from '#lib/project/examples.ts';
@@ -27,7 +28,7 @@
 	let viewWaiters: ((v: EditorView) => void)[] = [];
 	let loaded = $state(false);
 	let selectedOutput = $state<string | null>(null);
-	let rightTab = $state<'preview' | 'json'>('preview');
+	let rightTab = $state<'preview' | 'json' | 'tests'>('preview');
 	let cursor = $state<{ uri: string; line: number } | null>(null);
 	let theme = $state<'system' | 'light' | 'dark'>('system');
 	const themes = { system: 'System', light: 'Light', dark: 'Dark' } as const;
@@ -152,6 +153,14 @@
 	// cursor moves elsewhere; it still redraws as the pack changes. The JSON
 	// tab keeps following the cursor.
 	let pinned = $state<string | null>(null);
+	// The Tests tab shows how many tests fail, so a failure is seen from the other tabs.
+	const testsLabel = $derived.by(() => {
+		const failed = engine?.tests.filter((t) => !t.pass).length ?? 0;
+		return failed ? `Tests (${failed} failed)` : 'Tests';
+	});
+	$effect(() => {
+		if (rightTab === 'tests' && !engine?.hasTests) rightTab = 'preview';
+	});
 	const previewPath = $derived(pinned ?? selectedOutput);
 	const pinnable = $derived(shows(previewPath, engine?.outputItems, engine?.outputTexts));
 	function togglePin() {
@@ -430,7 +439,7 @@
 		</section>
 		<section class="flex min-h-0 flex-col bg-panel">
 			<div class="flex border-b border-line text-xs" role="tablist">
-				{#each [['preview', 'Preview'], ['json', 'JSON']] as [id, label] (id)}
+				{#each [['preview', 'Preview'], ['json', 'JSON'], ...(engine?.hasTests ? [['tests', testsLabel]] : [])] as [id, label] (id)}
 					<button
 						role="tab"
 						aria-selected={rightTab === id}
@@ -461,6 +470,11 @@
 					<div class="h-full" class:hidden={rightTab !== 'json'}>
 						<JsonView file={selectedFile} onsource={(f: OutputFile) => f.uri && f.range && reveal(f.uri, f.range)} />
 					</div>
+					{#if rightTab === 'tests'}
+						<div class="h-full">
+							<TestsView tests={engine.tests} error={engine.testsError} onsource={reveal} />
+						</div>
+					{/if}
 				{/if}
 			</div>
 		</section>

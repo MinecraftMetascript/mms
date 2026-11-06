@@ -55,7 +55,7 @@ func key(folder, id string) string { return folder + "|" + id }
 // folder: an objective, a global and a jigsaw hole may share a name with
 // a function or anything else.
 func ownKey(k Kind) bool {
-	return k.MMS == "Objective" || k.MMS == "Global" || k.MMS == "Storage" || k.MMS == JigsawHoleKind
+	return k.MMS == "Objective" || k.MMS == "Global" || k.MMS == "Storage" || k.MMS == "Test" || k.MMS == JigsawHoleKind
 }
 
 // Find returns the symbol of a resource folder ("worldgen/noise") and id.

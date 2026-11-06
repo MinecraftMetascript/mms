@@ -352,6 +352,40 @@ CustomItem blast_potion {
 
 A thrown potion keeps no weapon, so no enchantment runs for it. Instead the tick function puts a marker on each new one, riding it, with the function's id in its `data`. The game drops a projectile's passengers where it removes it, so a marker that is no longer riding anything (`<namespace>:mms_gen/projectile/riding`) marks the spot. The function runs as that marker, at it, and the marker is removed afterwards. The spot is where the potion was at the end of its last tick of flight, so up to about half a block short, and the function can't tell what the potion hit or who threw it. The potion still splashes as usual.
 
+## Tests
+
+A `Test` checks functions without starting the game. It has a `setup { }` block, then `run` and `expect` lines:
+
+```mms
+Type SiegeState { wave: int = 0 }
+Storage game: SiegeState
+
+Function next_wave {
+  game.wave += 1
+  for i in 1..game.wave * 2 {
+    As(@e[tag=siege.spawn]).At(@s) {
+      /summon zombie ~ ~ ~ {Tags:["siege.enemy"]}
+    }
+  }
+}
+
+Test second_wave_spawns_four {
+  setup {
+    game.wave = 1
+    /summon marker 0 64 0 {Tags:["siege.spawn"]}
+  }
+  run next_wave()
+  expect game.wave == 2
+  expect count(@e[tag=siege.enemy]) == 4
+}
+```
+
+Each test runs in a fresh world after the pack's load functions. `setup` holds function code and commands, and its `let` variables stay in scope for the `expect` lines. `run` calls a function. `expect` checks a condition, and the test stops at the first one that fails. A failing comparison of ints shows both sides: `expected game.wave == start, but game.wave is 6 and start is 5`. A test can have several `run` and `expect` lines, in any order after `setup`.
+
+`mms test` runs every test and exits with 1 when one fails. `-run <regexp>` runs the tests whose names match, and `-v` lists the passing tests too and prints what each test's commands said. The web editor shows a Tests tab once the project has a test, and runs the tests after every edit. VS Code lists them in its Testing view. All three run the same interpreter, so they give the same results.
+
+Tests compile to functions under `<namespace>:mms_test/` that the pack never includes. The interpreter runs the commands that functions compile to (scoreboard, storage, `execute`, `function`, `return`, `say` and `tellraw`) and keeps entities that `summon` creates, with their type, tags and position, for `kill`, `tag`, `execute as`, `execute at` and `if entity`. Selectors are `@e` and `@s`, with `type`, `tag`, `limit` and `sort=arbitrary`. There are no players, blocks or ticks, so `@a` selects no one. A command or selector argument the interpreter does not know fails the test and names it, so a test never passes by skipping a command.
+
 ## How it compiles
 
 Values live on one scoreboard objective per namespace, `mms.<namespace>`:

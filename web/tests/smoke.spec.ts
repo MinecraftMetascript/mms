@@ -1112,3 +1112,20 @@ test('a tell or title previews its message as the game shows it', async ({ page 
 	await expect(text.getByLabel('Subtitle')).toHaveText('well held');
 	expect(errors).toEqual([]);
 });
+
+test('Test declarations run in the Tests tab and follow edits', async ({ page }) => {
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	await replaceText(page, 'Global n: int = 0\nFunction bump {\n  n += 1\n  /say bumped\n}\nTest bumps {\n  run bump()\n  expect n == 2\n}\n');
+	const tab = page.getByRole('tab', { name: 'Tests (1 failed)' });
+	await expect(tab).toBeVisible({ timeout: 15_000 });
+	await tab.click();
+	await expect(page.getByTestId('tests-summary')).toHaveText('1 of 1 test failed');
+	await expect(page.getByText('expected n == 2, but n is 1')).toBeVisible();
+	await expect(page.getByText('bumped', { exact: true })).toBeVisible();
+	await page.getByRole('button', { name: 'bumps: failed' }).click();
+	await expect(page.locator('.cm-activeLine')).toContainText('expect n == 2');
+	await replaceText(page, 'Global n: int = 0\nFunction bump {\n  n += 2\n}\nTest bumps {\n  run bump()\n  expect n == 2\n}\n');
+	await expect(page.getByTestId('tests-summary')).toHaveText('1 test passed', { timeout: 15_000 });
+	await expect(page.getByRole('tab', { name: 'Tests', exact: true })).toBeVisible();
+});

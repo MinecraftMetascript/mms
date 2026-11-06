@@ -124,7 +124,7 @@ Every value is checked against the 26.3 schema as you type. Completion offers th
 
 ## Formatting and lint
 
-`mms fmt` (and format-on-save in the editors) prints every file in one style, so there is nothing to configure. `mms check` reports errors and [lint](lint.md) findings, and `mms fix` applies the fixes that are always safe.
+`mms fmt` (and format-on-save in the editors) prints every file in one style, so there is nothing to configure. `mms check` reports errors and [lint](lint.md) findings, and `mms fix` applies the fixes that are always safe. `mms test` runs the project's [`Test` declarations](functions.md#tests).
 
 ## Next
 
