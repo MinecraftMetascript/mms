@@ -289,7 +289,7 @@ func TestJigsawHole(t *testing.T) {
 	}
 	_, r = assetProject(t, files, src+"/** The underside. */\nJigsawHole bottom\nJigsawHole top\n")
 	got := jigsawDiags(r)
-	want := "lint/jigsaw-hole: 's/base.nbt' has a jigsaw block at 2 0 0 whose name is 'demo:botom', which is not a declared JigsawHole (did you mean 'demo:bottom'?)\n"
+	want := "lint/jigsaw-unknown-name: 's/base.nbt' has a jigsaw block at 2 0 0 whose name is 'demo:botom', which is not a declared JigsawHole (did you mean 'demo:bottom'?)\n"
 	if got != want {
 		t.Fatalf("got:\n%s\nwant:\n%s", got, want)
 	}
@@ -300,7 +300,7 @@ func TestJigsawHole(t *testing.T) {
 	}
 	var fixed string
 	for _, d := range r.Diagnostics("main.mms") {
-		if d.Code == "lint/jigsaw-hole" {
+		if d.Code == "lint/jigsaw-unknown-name" {
 			if len(d.Fixes) == 0 || d.Fixes[0].Title != "Declare JigsawHole botom" {
 				t.Fatalf("fixes: %+v", d.Fixes)
 			}
@@ -317,7 +317,7 @@ func TestJigsawHole(t *testing.T) {
 	_, r = assetProject(t, files, src+"JigsawHole bottom\nJigsawHole top\nJigsawHole minecraft:side\nNamespace other\n")
 	found := 0
 	for _, d := range r.Diagnostics("main.mms") {
-		if d.Code != "lint/jigsaw-hole" {
+		if d.Code != "lint/jigsaw-unknown-name" {
 			continue
 		}
 		if strings.Contains(d.Message, "minecraft:empty") {
@@ -329,7 +329,7 @@ func TestJigsawHole(t *testing.T) {
 		found++
 	}
 	if found != 1 {
-		t.Fatalf("want 1 jigsaw-hole finding, got %d", found)
+		t.Fatalf("want 1 jigsaw-unknown-name finding, got %d", found)
 	}
 }
 

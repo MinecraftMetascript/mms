@@ -135,7 +135,7 @@ A jigsaw block joins pieces by name: its target is the name of a jigsaw block in
 JigsawHole hall_exit
 ```
 
-This declares `<namespace>:hall_exit`. The editors list the declared holes where a jigsaw block's name or target is chosen (VS Code's **Jigsaw** view, which copies a `/give` command for a set-up jigsaw block). Once a namespace declares a hole, the `jigsaw-hole` lint reports a jigsaw block in a structure file whose name or target in that namespace is not declared, with the closest declared hole and a fix that declares it. The [`jigsaw`](../examples/jigsaw/) example declares its holes.
+This declares `<namespace>:hall_exit`. The editors list the declared holes where a jigsaw block's name or target is chosen (VS Code's **Jigsaw** view, which copies a `/give` command for a set-up jigsaw block). Once a namespace declares a hole, the `jigsaw-unknown-name` lint reports a jigsaw block in a structure file whose name or target in that namespace is not declared, with the closest declared hole and a fix that declares it. The [`jigsaw`](../examples/jigsaw/) example declares its holes.
 
 A template's chests can get a loot table from a `Rule` processor with `block_entity_modifier = AppendLoot(chests/buried)`. That works on vanilla templates too, so a structure can reuse one without its own `.nbt` file. The [`treasure`](../examples/treasure/) example does this in `worldgen.mms`.
 

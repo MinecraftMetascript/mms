@@ -825,10 +825,10 @@ func lintJigsawOverlap(l *lintRun) {
 	}
 }
 
-// lintJigsawHole reports a jigsaw block whose name or target is in a
+// lintJigsawUnknownName reports a jigsaw block whose name or target is in a
 // namespace that declares JigsawHoles but is not one of them. Holes
 // are opt-in: a namespace without any is not checked.
-func lintJigsawHole(l *lintRun) {
+func lintJigsawUnknownName(l *lintRun) {
 	holes, nsHas := map[string]bool{}, map[string]bool{}
 	for _, s := range l.r.Syms.All() {
 		if s.Kind.MMS == sema.JigsawHoleKind {
