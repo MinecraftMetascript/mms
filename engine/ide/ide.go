@@ -235,7 +235,7 @@ func (s *Session) TriggerApplies(path string, off int, ch string) bool {
 	f := a.u.File
 	if start, _, ok := assetPathString(f, off); ok {
 		h := assetHelperBefore(f, start-1)
-		if _, _, ok := sema.AssetFileType(h); ok || h == "BookText" {
+		if _, _, ok := sema.AssetFileType(h); ok || h == "TextFile" {
 			return true
 		}
 	}

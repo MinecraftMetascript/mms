@@ -1,7 +1,7 @@
 import { isSourcePath, type AssetFile, type ProjectData } from './project.svelte';
 
 // The repository's examples, bundled at build time, with their subfolders.
-const raw = import.meta.glob('../../../../examples/**/*.{mms,mmsbook,json}', {
+const raw = import.meta.glob('../../../../examples/**/*.{mms,mmsbook,mmstext,json}', {
 	query: '?raw',
 	import: 'default',
 	eager: true

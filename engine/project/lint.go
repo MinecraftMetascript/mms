@@ -48,6 +48,8 @@ var Rules = []*Rule{
 		Doc: "A jigsaw block whose target no piece of its pool can join: none of the pool's structure files has a jigsaw block with that name, or the pool has no pieces. Only pools whose pieces are all the project's own structure files are checked."},
 	{ID: "overrides-vanilla", Severity: syntax.SeverityInfo, run: lintOverrides,
 		Doc: "A declaration in the minecraft namespace replaces the vanilla resource with the same id."},
+	{ID: "accidental-markup", Severity: syntax.SeverityHint, run: lintAccidental,
+		Doc: "A style mark in text that is never closed, such as the `*` of \"5 * 3\", so it is written as the character itself. The fix puts a backslash before it, which says so."},
 	{ID: "quoted-name", Severity: syntax.SeverityHint, run: lintQuoted,
 		Doc: "An id or enum name in quotes can be written bare: `minecraft:stone` or `stone` rather than \"minecraft:stone\"."},
 	{ID: "redundant-namespace", Severity: syntax.SeverityHint, run: lintNamespace,
@@ -322,6 +324,21 @@ func contains(list []string, s string) bool {
 		}
 	}
 	return false
+}
+
+func lintAccidental(l *lintRun, d *Decl) {
+	syntax.Walk(d.D, func(n syntax.Node) bool {
+		in := d.Info[n]
+		if in == nil {
+			return true
+		}
+		for _, sp := range in.Accidental {
+			mark := string(d.Unit.File.Src[sp.Start:sp.End])
+			l.report(d, sp, "this "+mark+" is never closed, so it is the character itself; write \\"+mark+" to say so",
+				syntax.Fix{Title: "Write \\" + mark, Edits: []syntax.TextEdit{{Sp: syntax.Span{Start: sp.Start, End: sp.Start}, Text: "\\"}}, Safe: true})
+		}
+		return true
+	})
 }
 
 func lintQuoted(l *lintRun, d *Decl) {

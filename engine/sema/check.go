@@ -38,6 +38,11 @@ type Info struct {
 	// Converted is set where a Blueprint instance's name is checked as
 	// one of its `as` conversions.
 	Converted *Conversion
+	// Markup is set on a string read as text markup, and Accidental holds
+	// the style marks in it read as the characters themselves, such as
+	// the * of "5 * 3", for the accidental-markup lint.
+	Markup     bool
+	Accidental []syntax.Span
 	// Props are the block state properties a multipart `when` object
 	// body can test, for completion.
 	Props map[string][]string

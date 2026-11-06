@@ -103,7 +103,7 @@ func (c *Checker) valueCandidates(v tview, depth int) []Candidate {
 		}
 	case "list":
 		if v.T == bookTextType {
-			out = append(out, Candidate{Label: "BookText", Kind: CandCallable, Insert: `BookText("$1")`, Detail: ".mmsbook file", Doc: bookTextDoc, Rank: 0})
+			out = append(out, Candidate{Label: "TextFile", Kind: CandCallable, Insert: `TextFile("$1")`, Detail: ".mmstext or .mmsbook file", Doc: bookTextDoc, Rank: 0})
 		}
 	case "string":
 		if id := idOf(v.T); id.Present {

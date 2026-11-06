@@ -50,18 +50,26 @@ type BookOverflow struct {
 	Page, Lines int
 	// Sp is where the first hidden line starts, or the text's span.
 	Sp syntax.Span
-	// Where is the BookText file position for a message, when the
+	// Where is the TextFile file position for a message, when the
 	// problem is reported at the call.
 	Where string
 	// File is the .mmsbook file Sp is in, "" for the declaration's file.
 	File string
 }
 
-// IsBookFile reports whether a project file holds book markup.
-func IsBookFile(path string) bool { return strings.HasSuffix(path, BookFileExt) }
+// IsBookFile reports whether a project file holds markup: a .mmsbook
+// file, whose `---` lines break pages, or a .mmstext file, which is text
+// for anywhere and has no pages.
+func IsBookFile(path string) bool {
+	return strings.HasSuffix(path, BookFileExt) || strings.HasSuffix(path, TextFileExt)
+}
 
-// BookFileExt is the extension of book markup files.
-const BookFileExt = ".mmsbook"
+// BookFileExt is the extension of book text files, and TextFileExt that
+// of text files for anywhere.
+const (
+	BookFileExt = ".mmsbook"
+	TextFileExt = ".mmstext"
+)
 
 // bookSub is a checker for parts of book text, sharing c's lookups.
 func (c *Checker) bookSub() *Checker {
@@ -123,7 +131,7 @@ func bookType(p *spec.Pack) *spec.Type {
 		{Kind: "pair", Key: "generation", Optional: true, Type: gen,
 			Desc: "How many times the book has been copied: `original` (the default), `copy`, `copy_of_copy` or `tattered`. The last two cannot be copied."},
 		{Kind: "pair", Key: "text", Optional: true, Type: bookTextType,
-			Desc: "The book's text in book markup, one string per line, or `BookText(\"books/guide.mmsbook\")` to read it from a file. A line of `---` starts the next page.\n\n" + bookMarkupDoc},
+			Desc: "The book's text in book markup, one string per line, or `TextFile(\"books/guide.mmsbook\")` to read it from a file. A line of `---` starts the next page.\n\n" + bookMarkupDoc},
 		{Kind: "pair", Key: "pages", Optional: true, Type: &spec.Type{Kind: "list", Item: text},
 			Desc: "The pages as text components, for full control. Use `text` instead for book markup."},
 		{Kind: "pair", Key: "components", Optional: true, Type: &spec.Type{Kind: "reference", Path: "::java::world::component::DataComponentPatch"},
@@ -134,11 +142,11 @@ func bookType(p *spec.Pack) *spec.Type {
 }
 
 // bookTextType is the type of a Book's text field. Completion knows it by
-// identity to offer BookText("...") there.
+// identity to offer TextFile("...") there.
 var bookTextType = &spec.Type{Kind: "list", Item: &spec.Type{Kind: "string"}}
 
-// bookTextDoc documents BookText in completion.
-const bookTextDoc = "```mms\nBookText(path: string)\n```\n\nReads the book's text from a `.mmsbook` file in the project, such as `BookText(\"books/guide.mmsbook\")`. The editor checks and completes the markup in that file."
+// bookTextDoc documents TextFile in completion.
+const bookTextDoc = "```mms\nTextFile(path: string)\n```\n\nReads text markup from a file in the project: a `.mmstext` file, or a `.mmsbook` file whose `---` lines break pages, such as `TextFile(\"books/guide.mmsbook\")`. Pages work only in a book's text. The editor checks and completes the markup in that file."
 
 func ptr[T any](v T) *T { return &v }
 
@@ -163,11 +171,11 @@ func (c *Checker) Book(d *syntax.Decl, id string) *CustomItemOut {
 		return nil
 	}
 	fields := customItemFields(d)
-	// BookText(...) is read here; the rest of the body is checked as usual.
+	// TextFile(...) is read here; the rest of the body is checked as usual.
 	checked := body
 	var fileText *syntax.Call
 	if call, ok := fields["text"].(*syntax.Call); ok {
-		if fnID, ok := call.Fn.(*syntax.Ident); ok && fnID.Name == "BookText" {
+		if fnID, ok := call.Fn.(*syntax.Ident); ok && fnID.Name == "TextFile" {
 			fileText = call
 			cp := *body
 			cp.Items = nil
@@ -211,6 +219,7 @@ func (c *Checker) Book(d *syntax.Decl, id string) *CustomItemOut {
 			if !ok {
 				continue
 			}
+			c.info(s).Markup = true
 			p.text(c.stringSrc(s))
 		}
 	}
@@ -296,10 +305,11 @@ func (c *Checker) stringSrc(s *syntax.String) *bookSrc {
 	}}
 }
 
-// bookFile reads BookText("path"): a text file in the project.
+// bookFile reads TextFile("path"): a .mmstext or .mmsbook file in the
+// project.
 func (c *Checker) bookFile(call *syntax.Call) *bookSrc {
 	if len(call.Args) != 1 || call.Args[0].Name != nil {
-		c.errorf("mms/type-mismatch", call.Sp, "BookText takes one file path: BookText(\"books/guide.md\")")
+		c.errorf("mms/type-mismatch", call.Sp, "TextFile takes one file path: TextFile(\"text/rules.mmstext\")")
 		return nil
 	}
 	s, ok := call.Args[0].Value.(*syntax.String)
@@ -313,9 +323,10 @@ func (c *Checker) bookFile(call *syntax.Call) *bookSrc {
 		return nil
 	}
 	if !IsBookFile(src) {
-		c.errorf("mms/asset", s.Sp, "BookText reads a %s file, not '%s'", BookFileExt, path.Base(src))
+		c.errorf("mms/asset", s.Sp, "TextFile reads a %s or %s file, not '%s'", TextFileExt, BookFileExt, path.Base(src))
 		return nil
 	}
+	noPages := !strings.HasSuffix(src, BookFileExt)
 	if c.Texts != nil {
 		unit, t, ok := c.Texts(src)
 		if c.Deps != nil {
@@ -328,7 +339,7 @@ func (c *Checker) bookFile(call *syntax.Call) *bookSrc {
 		if ok {
 			// Problems are shown in the file itself.
 			text := []rune(strings.TrimRight(t, "\r\n"))
-			return &bookSrc{text: text, extern: unit, at: func(start, end int) syntax.Span {
+			return &bookSrc{text: text, extern: unit, noPages: noPages, at: func(start, end int) syntax.Span {
 				if end <= start {
 					end = start + 1
 				}
@@ -352,7 +363,7 @@ func (c *Checker) bookFile(call *syntax.Call) *bookSrc {
 			lines = append(lines, i+1)
 		}
 	}
-	return &bookSrc{text: text, file: src, lines: lines, at: func(int, int) syntax.Span { return s.Sp }}
+	return &bookSrc{text: text, file: src, lines: lines, noPages: noPages, at: func(int, int) syntax.Span { return s.Sp }}
 }
 
 // readFile reads a whole project file, recording it in Deps like an

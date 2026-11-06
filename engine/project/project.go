@@ -63,7 +63,7 @@ func (p *Project) SetFile(path, text string) {
 	}
 	if sema.IsBookFile(path) {
 		// Book text is not MMS: a Book declaration reads it with
-		// BookText, and its problems are reported in the file.
+		// TextFile, and its problems are reported in the file.
 		p.texts[path] = text
 		p.files[path] = &sema.Unit{Path: path, File: &syntax.File{Src: []rune(text)}}
 		return

@@ -12,7 +12,7 @@ class ProjectFile implements WorkspaceFile {
 		public doc: Text
 	) {}
 	get languageId() {
-		return this.uri.endsWith('.mmsbook') ? 'mmsbook' : 'mms';
+		return this.uri.endsWith('.mmsbook') || this.uri.endsWith('.mmstext') ? 'mmsbook' : 'mms';
 	}
 	getView() {
 		return this.view;

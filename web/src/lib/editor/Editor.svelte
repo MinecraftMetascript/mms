@@ -8,7 +8,7 @@
 	import { applyEdits, showDiagnostics } from './diagnostics';
 	import { onMount, untrack } from 'svelte';
 	import type { Engine } from '../engine/engine.svelte';
-	import { uriOf } from '../project/project.svelte';
+	import { isMarkupPath, uriOf } from '../project/project.svelte';
 	import { bookHighlight, bookLanguage, mmsHighlight, mmsLanguage } from './language';
 	import { semanticHighlighting } from './semantic';
 	import { inlayHints } from './inlay';
@@ -152,7 +152,7 @@
 	}
 
 	function stateFor(p: string, doc: string) {
-		const book = p.endsWith('.mmsbook');
+		const book = isMarkupPath(p);
 		return EditorState.create({
 			doc,
 			extensions: [

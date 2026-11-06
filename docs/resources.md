@@ -277,14 +277,14 @@ Book guide = {
 }
 ```
 
-`text` holds one string per line. A line of `---` starts a new page. Long text reads better from its own file: `text = BookText("books/diary.mmsbook")` reads a `.mmsbook` file in the project, where the editor checks and completes the markup and shows its problems in the file itself.
+`text` holds one string per line. A line of `---` starts a new page. Long text reads better from its own file: `text = TextFile("books/diary.mmsbook")` reads a `.mmsbook` file in the project, where the editor checks and completes the markup and shows its problems in the file itself. A book can also read a `.mmstext` file, which has no pages.
 
 | Field | |
 | --- | --- |
 | `title` | the title on the cover and the item's name, at most 32 characters |
 | `author` | shown as "by ..." under the title |
 | `generation` | `original` (the default), `copy`, `copy_of_copy` or `tattered`. The last two cannot be copied in a crafting table |
-| `text` | the pages in book markup, as strings or `BookText("....mmsbook")` |
+| `text` | the pages in book markup, as strings or `TextFile("....mmsbook")` (or a `.mmstext` file) |
 | `pages` | the pages as text components, for full control, instead of `text` |
 | `components` | more item components, such as `lore`, given to every use |
 
@@ -303,7 +303,21 @@ pages = [
 
 The book's name stands for the book wherever a [custom item](#custom-items) name works: `guide` in a loot entry, `guide * 2` as a recipe result, and `${guide}` in `/give @s ${guide}`.
 
-### Book markup
+### Text markup
+
+Book markup is the language's one text format. Wherever a text component goes, such as an advancement's title, a text display, a sign, an item's `lore` or a dialog, a string is markup. A string with no markup in it is the same string in the output, so plain names stay plain:
+
+```
+Advancement first_gem = {
+  display = {
+    title = "**First gem**"
+    description = "{gray}Mine a {aqua}diamond{/} or an {green}emerald"
+    ...
+  }
+}
+```
+
+`TextFile("text/rules.mmstext")` reads markup from a `.mmstext` file in the project, for text anywhere. Page breaks (`---`) and page links (`[..](page:2)`) work only in a book's text: in a `.mmsbook` file or a Book's `text`. Outside a book, a `{...}` style runs to the end of the text without `{/}`, and a style mark that is never closed, such as the `*` in `"5 * 3"`, is the character itself, which the [`accidental-markup`](lint.md) hint points out. Write `\*` to say so.
 
 | Markup | Shows |
 | --- | --- |
@@ -315,11 +329,11 @@ The book's name stands for the book wherever a [custom item](#custom-items) name
 | `{sprite:item/diamond}` | an inline icon; `atlas:gui` picks another atlas |
 | `{head:Notch}` | a player's head |
 | `{t:block.minecraft.stone}` | a translated text |
-| `[text](page:2)` | turns to page 2 |
+| `[text](page:2)` | turns to page 2, in a book |
 | `[text](run:/function demo:start)` | runs a command as the reader; MMS checks the command |
 | `[text](suggest:/tp @s ~ ~10 ~)`, `[text](copy:12345)`, `[text](https://...)` | puts text in chat, copies it, or opens a web page |
 | `[text](hover:A red gem)`, `[text](page:2 "Next")` | hover text, alone or after a target |
-| `${kills[@s]}`, `${wave}` | a score or a Global, filled in when the reader first opens the book |
+| `${kills[@s]}`, `${wave}` | a score or a Global, filled in when the text is shown (for a book, when the reader first opens it) |
 | `\*` | the character itself |
 
 A book page shows 14 lines of about 19 characters. Text past the last line is cut off in game, so the [`book-overflow`](lint.md) warning marks where a page runs over, measured with the vanilla font. Add a `---` line there.

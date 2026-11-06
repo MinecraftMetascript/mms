@@ -1,7 +1,7 @@
 // Written books. A Book's text is book markup: **bold**, {gold}colors{/},
 // {key:jump} for the reader's own key, [links](page:2) and ${scores}.
 // A line of --- starts a new page. The text can sit in the declaration,
-// one string per line, or in a .mmsbook file read with BookText.
+// one string per line, or in a .mmsbook file read with TextFile.
 
 /** How many times the reader has died, for the guide to show. */
 Objective deaths = "deathCount"
@@ -30,9 +30,9 @@ Book guide = {
 }
 
 /** One of the miner's diaries, worn by time. */
-Book diary_12 = { title = "Diary, Day 12", author = "A Miner", generation = tattered, text = BookText("books/day_12.mmsbook") }
-Book diary_13 = { title = "Diary, Day 13", author = "A Miner", generation = tattered, text = BookText("books/day_13.mmsbook") }
-Book diary_14 = { title = "Diary, Day 14", author = "A Miner", generation = tattered, text = BookText("books/day_14.mmsbook") }
+Book diary_12 = { title = "Diary, Day 12", author = "A Miner", generation = tattered, text = TextFile("books/day_12.mmsbook") }
+Book diary_13 = { title = "Diary, Day 13", author = "A Miner", generation = tattered, text = TextFile("books/day_13.mmsbook") }
+Book diary_14 = { title = "Diary, Day 14", author = "A Miner", generation = tattered, text = TextFile("books/day_14.mmsbook") }
 
 /** A chest of old things: one diary, and some clutter. */
 LootTable old_chest {

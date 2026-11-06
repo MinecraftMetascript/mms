@@ -33,8 +33,8 @@ type bookSrc struct {
 	text []rune
 	// at maps a rune range of text to the span a problem is reported at.
 	at func(start, end int) syntax.Span
-	// file is the BookText file the text came from, "" for a string in
-	// the declaration. Problems in a file are reported at the BookText
+	// file is the TextFile file the text came from, "" for a string in
+	// the declaration. Problems in a file are reported at the TextFile
 	// call with the file position in the message.
 	file string
 	// lines holds the offset each line of a file starts at.
@@ -42,6 +42,9 @@ type bookSrc struct {
 	// extern is the path of the .mmsbook file the text is, when its
 	// problems are reported in that file rather than at the call.
 	extern string
+	// noPages is set for text that has no pages: a .mmstext file, or
+	// text anywhere but a book's.
+	noPages bool
 }
 
 // where is the file position a message starts with, for file sources.
@@ -108,6 +111,13 @@ type bookParser struct {
 	// lineStart is set at the start of each line; a heading line is bold.
 	heading bool
 	started bool // a line has been written on the current page
+	// plainText is set for text outside a book: a style mark left open,
+	// such as the * in "5 * 3", is the character itself (see literal and
+	// Accidental), not an error.
+	plainText bool
+	// literal holds the offsets, by source, of marks read as the
+	// characters themselves.
+	literal map[*bookSrc]map[int]bool
 }
 
 func newBookParser(c *Checker) *bookParser {
@@ -230,6 +240,10 @@ func (p *bookParser) text(src *bookSrc) {
 func (p *bookParser) line(src *bookSrc, start, end int) {
 	t := src.text
 	if strings.TrimSpace(string(t[start:end])) == "---" {
+		if src.noPages {
+			p.errorf(src, start, end, "a page break works only in a book's text; this text has no pages")
+			return
+		}
 		p.pages = append(p.pages, &bookPage{src: src, off: start})
 		p.started = false
 		return
@@ -326,7 +340,7 @@ func (p *bookParser) inline(src *bookSrc, start, end int, click *jsonv.Object, h
 		}
 		marked := false
 		for _, m := range bookMarks {
-			if has(i, m) {
+			if has(i, m) && !p.literal[src][i] {
 				flush()
 				if _, open := p.toggles[m]; open {
 					delete(p.toggles, m)
@@ -437,6 +451,9 @@ func (p *bookParser) link(src *bookSrc, open, close, tStart, tEnd int, outerHove
 		click.Set(key, v)
 	}
 	switch {
+	case kind == "page" && src.noPages:
+		p.errorf(src, ts, te, "a page link works only in a book's text; this text has no pages")
+		return
 	case kind == "page":
 		n, err := strconv.Atoi(strings.TrimSpace(rest))
 		if err != nil || n < 1 {
@@ -718,6 +735,10 @@ func (p *bookParser) expr(src *bookSrc, start, end int, click *jsonv.Object, hov
 func (p *bookParser) finish() {
 	for m, at := range p.toggles {
 		p.errorf(at.src, at.off, at.off+len(m), "this %s is not closed; write \\%s for the character itself", m, m)
+	}
+	if p.plainText {
+		// Outside a book, a style runs to the end of the text.
+		p.groups = nil
 	}
 	for _, g := range p.groups {
 		e := indexRune(g.at.src.text, '}', g.at.off, len(g.at.src.text)) + 1

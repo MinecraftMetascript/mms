@@ -30,6 +30,11 @@
       "markdownDescription": "Lint rule severities by rule id. Each rule can be `error`, `warning`, `info`, `hint` or `off`.",
       "type": "object",
       "properties": {
+        "accidental-markup": {
+          "description": "A style mark in text that is never closed, such as the `*` of \"5 * 3\", so it is written as the character itself. The fix puts a backslash before it, which says so.\n\nDefault: `hint`.",
+          "markdownDescription": "A style mark in text that is never closed, such as the `*` of \"5 * 3\", so it is written as the character itself. The fix puts a backslash before it, which says so.\n\nDefault: `hint`.",
+          "$ref": "#/definitions/severity"
+        },
         "book-overflow": {
           "description": "A Book page with more text than the book screen shows: 14 lines of about 19 characters. The game cuts the rest off. Widths are measured with the vanilla font, so text outside ASCII is a close guess.\n\nDefault: `warning`.",
           "markdownDescription": "A Book page with more text than the book screen shows: 14 lines of about 19 characters. The game cuts the rest off. Widths are measured with the vanilla font, so text outside ASCII is a close guess.\n\nDefault: `warning`.",

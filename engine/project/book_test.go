@@ -169,8 +169,8 @@ func TestBookErrors(t *testing.T) {
 		{`Book b = { title = "This title is far too long for a book", author = "A" }`, "32"},
 		{`Book b = { title = "T", author = "A", text = ["a"], pages = ["b"] }`, "a book takes text or pages, not both"},
 		{`Book b = { title = "T", author = "A", components = { written_book_content = { title = "x", author = "y" } } }`, "writes written_book_content itself"},
-		{`Book b = { title = "T", author = "A", text = BookText("b.md") }`, "BookText reads a .mmsbook file"},
-		{`Book b = { title = "T", author = "A", text = BookText("missing.mmsbook") }`, "no file 'missing.mmsbook'"},
+		{`Book b = { title = "T", author = "A", text = TextFile("b.md") }`, "TextFile reads a .mmstext or .mmsbook file"},
+		{`Book b = { title = "T", author = "A", text = TextFile("missing.mmsbook") }`, "no file 'missing.mmsbook'"},
 	} {
 		_, r := bookProject(t, tc.src+"\n", nil)
 		if d := diagText(r); !strings.Contains(d, tc.want) {
@@ -210,7 +210,7 @@ func TestBookOverflow(t *testing.T) {
 }
 
 func TestBookFile(t *testing.T) {
-	const src = "Book diary = { title = \"Diary\", author = \"A\", text = BookText(\"books/diary.mmsbook\") }\nLootTable l { pools = [Pool(1, [diary])] }\n"
+	const src = "Book diary = { title = \"Diary\", author = \"A\", text = TextFile(\"books/diary.mmsbook\") }\nLootTable l { pools = [Pool(1, [diary])] }\n"
 	p, r := bookProject(t, src, map[string]string{"books/diary.mmsbook": "# Day 1\nThe {key:jumpp} lamps\n"})
 	if d := diagText(r); d != "" {
 		t.Errorf("main.mms has diagnostics:\n%s", d)
@@ -247,7 +247,7 @@ func TestBookFile(t *testing.T) {
 func TestBookFileByURI(t *testing.T) {
 	p := New(spec.MustDefault(), Config{Namespace: "demo"})
 	p.Root = "file:///pack/"
-	p.SetFile("file:///pack/main.mms", "Book b = { title = \"T\", author = \"A\", text = BookText(\"b.mmsbook\") }\n")
+	p.SetFile("file:///pack/main.mms", "Book b = { title = \"T\", author = \"A\", text = TextFile(\"b.mmsbook\") }\n")
 	p.SetFile("file:///pack/b.mmsbook", "{nope}x{/}\n")
 	r, _ := p.Analyze(context.Background())
 	if ds := r.Diagnostics("file:///pack/b.mmsbook"); len(ds) != 1 || !strings.Contains(ds[0].Message, "'nope' is not a style") {
