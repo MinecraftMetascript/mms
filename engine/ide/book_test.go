@@ -18,7 +18,7 @@ func bookSession(t *testing.T, book string) (*Session, int) {
 	off := strings.Index(book, "|")
 	book = book[:off] + book[off+1:]
 	p := project.New(spec.MustDefault(), project.Config{Namespace: "test"})
-	p.SetFile("main.mms", bookDecls+"Book b = { title = \"T\", author = \"A\", text = BookText(\"b.mmsbook\") }\n")
+	p.SetFile("main.mms", bookDecls+"Book b = { title = \"T\", author = \"A\", text = TextFile(\"b.mmsbook\") }\n")
 	p.SetFile("b.mmsbook", book)
 	r, err := p.Analyze(context.Background())
 	if err != nil {
@@ -111,7 +111,7 @@ func TestBookStringHover(t *testing.T) {
 	}
 }
 
-// A Book's text field offers BookText(...), whose path lists the
+// A Book's text field offers TextFile(...), whose path lists the
 // project's .mmsbook files.
 func TestBookTextCompletion(t *testing.T) {
 	p := project.New(spec.MustDefault(), project.Config{Namespace: "test"})
@@ -121,9 +121,9 @@ func TestBookTextCompletion(t *testing.T) {
 		name, src string
 		want      []string
 	}{
-		{"value", "Book b = {\n  text = |\n}\n", []string{"BookText"}},
-		{"path", "Book b = {\n  text = BookText(\"|\")\n}\n", []string{"books/guide.mmsbook", "books/lore.mmsbook"}},
-		{"unclosed path", "Book b = {\n  text = BookText(\"bo|\n}\n", []string{"books/guide.mmsbook"}},
+		{"value", "Book b = {\n  text = |\n}\n", []string{"TextFile"}},
+		{"path", "Book b = {\n  text = TextFile(\"|\")\n}\n", []string{"books/guide.mmsbook", "books/lore.mmsbook"}},
+		{"unclosed path", "Book b = {\n  text = TextFile(\"bo|\n}\n", []string{"books/guide.mmsbook"}},
 	} {
 		off := strings.Index(tc.src, "|")
 		src := tc.src[:off] + tc.src[off+1:]
@@ -147,5 +147,15 @@ func TestBookTextCompletion(t *testing.T) {
 				}
 			}
 		}
+	}
+}
+
+// Markup completes in any string where a text component goes.
+func TestTextStringCompletion(t *testing.T) {
+	src := "Advancement a = { display = { title = \"Hi {gol|\", description = \"d\", icon = { id = stone }, background = \"minecraft:block/stone\" }, criteria = { x = Tick() } }\n"
+	s, off := session(t, src)
+	items, _ := s.Completion("main.mms", off)
+	if !has(labels(items), "gold") {
+		t.Errorf("completions = %v", labels(items))
 	}
 }

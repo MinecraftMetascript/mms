@@ -158,6 +158,15 @@ func (c *Checker) sugar(e syntax.Expr, v tview) *sugarRule {
 		if isColorHexString(e) {
 			return &sugarRule{colorHex}
 		}
+	case tText:
+		switch x := e.(type) {
+		case *syntax.String:
+			return &sugarRule{textString}
+		case *syntax.Call:
+			if callName(x) == "TextFile" {
+				return &sugarRule{textFile}
+			}
+		}
 	case tCriterion:
 		if x, ok := e.(*syntax.Call); ok {
 			if id, ok := x.Fn.(*syntax.Ident); ok && id.Name != "AdvancementCriterion" {
