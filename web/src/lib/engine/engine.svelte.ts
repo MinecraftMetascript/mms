@@ -69,6 +69,18 @@ export interface OutputItem {
 	pages?: { uri: string; range: Diagnostic['range'] }[];
 }
 
+/** A message tell, title or actionbar shows, at the command or over the .mmstext file it reads. */
+export interface OutputText {
+	/** text:<uri>:<offset>, the key the editor selects it by. */
+	id: string;
+	kind: 'chat' | 'title' | 'actionbar';
+	/** The message as a text component, in JSON. */
+	text: string;
+	subtitle?: string;
+	uri: string;
+	range: Diagnostic['range'];
+}
+
 /**
  * The key the editor selects an output by. A data pack file keeps its
  * path; a resource pack file is under resources/, since both packs have a
@@ -126,6 +138,8 @@ export class Engine {
 	output = $state<OutputFile[]>([]);
 	outputAssets = $state<OutputAsset[]>([]);
 	outputItems = $state<OutputItem[]>([]);
+	/** The messages tell, title and actionbar show, for the chat preview. */
+	outputTexts = $state<OutputText[]>([]);
 	/** Project files nothing uses, so the packs leave them out. */
 	unusedAssets = $state<string[]>([]);
 	hasErrors = $state(false);
@@ -217,10 +231,11 @@ export class Engine {
 		try {
 			await this.client.initializing;
 			this.client.sync();
-			const out = await this.client.request<object, { files: OutputFile[]; assets?: OutputAsset[]; items?: OutputItem[]; unusedAssets?: string[]; hasErrors: boolean }>('mms/output', {});
+			const out = await this.client.request<object, { files: OutputFile[]; assets?: OutputAsset[]; items?: OutputItem[]; texts?: OutputText[]; unusedAssets?: string[]; hasErrors: boolean }>('mms/output', {});
 			this.output = out.files;
 			this.outputAssets = out.assets ?? [];
 			this.outputItems = out.items ?? [];
+			this.outputTexts = out.texts ?? [];
 			this.unusedAssets = out.unusedAssets ?? [];
 			this.hasErrors = out.hasErrors;
 			const syms: Record<string, DocSymbol[]> = {};

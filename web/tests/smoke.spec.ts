@@ -1100,3 +1100,27 @@ test('a function runs in the function preview', async ({ page }) => {
 	await expect(run.getByText('tick 20')).toBeVisible();
 	expect(errors).toEqual([]);
 });
+
+test('a tell or title previews its message as the game shows it', async ({ page }) => {
+	const errors: string[] = [];
+	page.on('pageerror', (e) => errors.push(e.message));
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	await replaceText(
+		page,
+		'Objective kills = "dummy"\nFunction f {\n  tell(@a, "{gold}**Wave** ${kills[@s]} begins")\n  title(@a, "Victory", subtitle = "{gray}*well held*")\n}\n'
+	);
+	await expect(status(page)).toHaveText(/No problems/);
+	await page.locator('.cm-line', { hasText: 'tell(@a' }).click();
+	const text = page.getByLabel('Text preview');
+	const chat = text.getByLabel('Chat');
+	await expect(chat).toContainText('Wave 0 begins');
+	await expect(chat.getByText('Wave', { exact: true })).toHaveCSS('font-weight', '700');
+	// The score is filled in when the message shows; try a value.
+	await text.getByRole('textbox', { name: 'kills[@s]' }).fill('7');
+	await expect(chat).toContainText('Wave 7 begins');
+	await page.locator('.cm-line', { hasText: 'title(@a' }).click();
+	await expect(text.getByLabel('Title', { exact: true })).toHaveText('Victory');
+	await expect(text.getByLabel('Subtitle')).toHaveText('well held');
+	expect(errors).toEqual([]);
+});
