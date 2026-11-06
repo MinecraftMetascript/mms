@@ -10,7 +10,7 @@ Every JSON resource kind can be written as an object literal that mirrors the JS
 
 **Sugar.** Shorthand for common shapes, listed below. Each one lowers to exactly the JSON shown, and the schema still checks every field.
 
-The `use-sugar` lint rule suggests the short forms, and imported packs use them automatically.
+The `use-shorthand` lint rule suggests the short forms, and imported packs use them automatically.
 
 ## Loot tables
 
@@ -252,7 +252,7 @@ Function give {
 - **Loot entries**: `ember_shard` or `Item(name = ember_shard, ...)` drop the base item with a `set_components` modifier ahead of the others.
 - **Commands**: `${ember_shard}` writes `amethyst_shard[item_model="embers:ember_shard",item_name={...}]`.
 
-Anywhere else that takes an item id, such as a recipe ingredient or an item tag, a custom item is written as its base item, so changing `base` updates every use. The game matches those fields by item id only, so `{ A = ember_shard }` in a recipe accepts any amethyst shard, not only ember shards. The [`custom-item-base`](lint.md) hint marks each such use, and editors show the base item after the name. A custom item's own `base` must be a vanilla item. A `Model`, `ItemModel` or `Lang` entry that the custom item also writes is reported as a duplicate.
+Anywhere else that takes an item id, such as a recipe ingredient or an item tag, a custom item is written as its base item, so changing `base` updates every use. The game matches those fields by item id only, so `{ A = ember_shard }` in a recipe accepts any amethyst shard, not only ember shards. The [`custom-item-as-base`](lint.md) hint marks each such use, and editors show the base item after the name. A custom item's own `base` must be a vanilla item. A `Model`, `ItemModel` or `Lang` entry that the custom item also writes is reported as a duplicate.
 
 To run code when a player right-clicks with the item, hits with it, eats it and so on, set its `on_*` fields to functions; see [item hooks](functions.md#item-hooks).
 

@@ -319,7 +319,7 @@ func TestCodeActions(t *testing.T) {
 	for _, a := range acts {
 		titles = append(titles, a.(map[string]any)["title"].(string))
 	}
-	if got := strings.Join(titles, "|"); got != "Write minecraft:diamond|Ignore use-sugar on this line|Write item|Ignore quoted-name on this line|Fix all MMS problems" {
+	if got := strings.Join(titles, "|"); got != "Write minecraft:diamond|Ignore use-shorthand on this line|Write item|Ignore quoted-name on this line|Fix all MMS problems" {
 		t.Errorf("actions = %s", got)
 	}
 	all := c.result("textDocument/codeAction", map[string]any{"textDocument": map[string]any{"uri": uri}, "range": rng(0, 0),

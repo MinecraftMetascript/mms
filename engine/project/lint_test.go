@@ -35,7 +35,7 @@ Function f {
 }
 `
 	got := strings.Join(lintCodes(t, cfg, src), " ")
-	want := "lint/unused@2 lint/unused@3 lint/constant-expression@3 lint/quoted-name@4 lint/quoted-name@4 lint/overrides-vanilla@5 lint/use-sugar@5 lint/redundant-namespace@6"
+	want := "lint/unused@2 lint/unused@3 lint/constant-expression@3 lint/quoted-name@4 lint/quoted-name@4 lint/overrides-vanilla@5 lint/use-shorthand@5 lint/redundant-namespace@6"
 	if got != want {
 		t.Errorf("lint = %s\nwant %s", got, want)
 	}
@@ -81,7 +81,7 @@ DensityFunction d = 1.5 + Noise(ridge, 1, 1)
 	}
 }
 
-func TestUseSugar(t *testing.T) {
+func TestUseShorthand(t *testing.T) {
 	p := New(spec.MustDefault(), Config{Namespace: "demo"})
 	src := `LootTable t = { pools = [{ rolls = { type = uniform, min = 1, max = 3 }, entries = [{ type = item, name = diamond }], condition = { type = inverted, term = { type = any_of, terms = [{ type = survives_explosion }, { type = random_chance, chance = 0.5 }] } } }] }
 DensityFunction d = { type = mul, left = { type = sub, left = { type = noise, noise = ridge, xz_scale = 1, y_scale = 1 }, right = 8.0 }, right = 0.5 }

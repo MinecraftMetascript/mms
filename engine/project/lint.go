@@ -52,7 +52,7 @@ var Rules = []*Rule{
 		Doc: "An id or enum name in quotes can be written bare: `minecraft:stone` or `stone` rather than \"minecraft:stone\"."},
 	{ID: "redundant-namespace", Severity: syntax.SeverityHint, run: lintNamespace,
 		Doc: "A `minecraft:` prefix that can be dropped: `stone` means `minecraft:stone` unless the project declares its own `stone`."},
-	{ID: "use-sugar", Severity: syntax.SeverityHint, run: lintSugar,
+	{ID: "use-shorthand", Severity: syntax.SeverityHint, run: lintShorthand,
 		Doc: "An object literal that has a shorter MMS form: an item entry as its id, `1..3` for a uniform provider or bounds, `diamond * 4` for a stack, a trigger call for a criterion, and `&&`, `||` and `!` for conditions."},
 	{ID: "unused", Severity: syntax.SeverityHint, all: lintUnused,
 		Doc: "A worldgen piece, predicate or item modifier that nothing in the project references, so the game never uses it. A TemplatePool counts as used when a jigsaw block in one of the project's structure files draws from it."},
@@ -381,7 +381,7 @@ func lintCustomBase(l *lintRun, d *Decl) {
 	})
 }
 
-func lintSugar(l *lintRun, d *Decl) {
+func lintShorthand(l *lintRun, d *Decl) {
 	src := d.Unit.File.Src
 	// Objects that are operands of an operator need parentheses when they
 	// become an operator expression themselves.
@@ -404,7 +404,7 @@ func lintSugar(l *lintRun, d *Decl) {
 		if !ok {
 			return true
 		}
-		short, op, ok := sema.Simplify(d.Info[o], o, src)
+		short, op, ok := sema.Simplify(l.r.pack, d.Info[o], o, src)
 		if !ok {
 			short, ok = sema.AsCall(d.Info[o], d.Info[o.Body], o, src)
 		}

@@ -27,6 +27,9 @@ type shifter struct {
 	d   int
 	m   map[Node]Node
 	fix *Span // when set, every span becomes this one
+	// sub, when set, replaces the expressions it returns ok for, which
+	// are used as they are.
+	sub func(Expr) (Expr, bool)
 }
 
 func (s shifter) sp(sp Span) Span {
@@ -204,6 +207,11 @@ func (s shifter) stmt(st Stmt) Stmt {
 }
 
 func (s shifter) expr(e Expr) Expr {
+	if s.sub != nil && e != nil {
+		if r, ok := s.sub(e); ok {
+			return r
+		}
+	}
 	var n Expr
 	switch x := e.(type) {
 	case nil:

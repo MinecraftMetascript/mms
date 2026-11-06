@@ -105,6 +105,9 @@ func (e *Env) define(name string) {
 	case d.Body != nil:
 		t = &spec.Type{Kind: "struct"}
 		for _, it := range d.Body.Items {
+			if _, ok := it.(*syntax.AsStmt); ok && d.Extern {
+				continue // a built-in form's meaning: see Forms
+			}
 			f, ok := it.(*syntax.FieldDecl)
 			if !ok {
 				e.Diags[td.Path] = append(e.Diags[td.Path], syntax.Diagnostic{Code: "mms/type-body", Severity: syntax.SeverityError,

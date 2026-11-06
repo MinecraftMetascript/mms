@@ -7,6 +7,18 @@ func CloneExpr(x Expr) Expr { return shifter{}.expr(x) }
 // written elsewhere, copied in where sp caused it.
 func CloneExprAt(x Expr, sp Span) Expr { return shifter{fix: &sp}.expr(x) }
 
+// CloneExprWith returns a copy of x with every span set to sp, except
+// that each expression sub returns ok for is replaced by what it returns,
+// which is used as it is.
+func CloneExprWith(x Expr, sp Span, sub func(Expr) (Expr, bool)) Expr {
+	return shifter{fix: &sp, sub: sub}.expr(x)
+}
+
+// CloneStmtWith is CloneExprWith for a statement.
+func CloneStmtWith(st Stmt, sp Span, sub func(Expr) (Expr, bool)) Stmt {
+	return shifter{fix: &sp, sub: sub}.stmt(st)
+}
+
 // CloneStmt returns a deep copy of st with fresh nodes and the same spans.
 func CloneStmt(st Stmt) Stmt { return shifter{}.stmt(st) }
 
