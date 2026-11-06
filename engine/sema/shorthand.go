@@ -8,10 +8,16 @@ import (
 	"github.com/minecraftmetascript/mms/engine/syntax"
 )
 
-// Sugar: hand-written rules for MMS syntax with no direct schema shape,
-// keyed by the type the position expects. Most rules rewrite the
-// expression into the call it stands for and check that, so the schema
-// still validates every field.
+// Shorthand the prelude cannot write yet, keyed by the type the position
+// expects, and the per-helper data the schema lacks. The forms of
+// expression (`1..3`, `!a`, `a + b`, bare ids in loot pools) are in the
+// prelude instead: see forms.go and prelude/forms.mms. What stays here
+// needs more than a conversion can say: If(cond) { rule } on surface
+// rules pushes && and || into nested rules, `block[state=value]` is
+// checked against the block's states, colors are parsed from hex text,
+// a trigger call names its trigger, and a Book's name is a stack. Each
+// rule rewrites the expression into what it stands for and checks that,
+// so the schema still validates every field.
 
 const (
 	tDensity      = "::java::data::worldgen::density_function::DensityFunction"
@@ -125,80 +131,28 @@ type sugarRule struct {
 
 func (c *Checker) sugar(e syntax.Expr, v tview) *sugarRule {
 	switch v.Name {
-	case tDensity:
-		switch x := e.(type) {
-		case *syntax.Binary:
-			if _, ok := densityOps[x.Op]; ok {
-				return &sugarRule{densityBinary}
-			}
-		case *syntax.Unary:
-			if x.Op == "-" && !isNumber(x) {
-				return &sugarRule{densityNeg}
-			}
-		}
 	case tMaterialRule:
 		switch e.(type) {
-		case *syntax.List:
-			return &sugarRule{ruleSequence}
 		case *syntax.Call, *syntax.Trailing:
 			if callName(e) == "If" {
 				return &sugarRule{ruleIf}
 			}
 		}
 	case tMaterialCond:
-		switch x := e.(type) {
-		case *syntax.Unary:
-			if x.Op == "!" {
-				return &sugarRule{condNot}
-			}
-		case *syntax.Binary:
-			if x.Op == "&&" || x.Op == "||" {
-				return &sugarRule{condLogic}
-			}
-		}
-	case tAnchor:
-		if isNumber(e) {
-			return &sugarRule{anchorAbsolute}
+		if x, ok := e.(*syntax.Binary); ok && (x.Op == "&&" || x.Op == "||") {
+			return &sugarRule{condLogic}
 		}
 	case tFullBlock:
 		if _, ok := e.(*syntax.Index); ok {
 			return &sugarRule{blockWithState}
 		}
-	case tLootCondition, tLootConditionRef:
-		switch x := e.(type) {
-		case *syntax.Unary:
-			if x.Op == "!" {
-				return &sugarRule{lootNot}
-			}
-		case *syntax.Binary:
-			if x.Op == "&&" || x.Op == "||" {
-				return &sugarRule{lootLogic}
-			}
-		}
 	case tLootEntry:
 		if c.isCustomItem(e) || c.usesCustomField(e, "name") {
 			return &sugarRule{customEntryRule}
 		}
-		switch e.(type) {
-		case *syntax.Ident, *syntax.ResLoc:
-			return &sugarRule{entryItem}
-		case *syntax.Tag:
-			return &sugarRule{entryTag}
-		}
-	case tIntProvider, tFloatProvider:
-		if r, ok := e.(*syntax.Range); ok && r.Lo != nil && r.Hi != nil {
-			return &sugarRule{providerRange}
-		}
-	case tIntRange, tFloatRange, tMinMax:
-		if _, ok := e.(*syntax.Range); ok {
-			return &sugarRule{boundsRange}
-		}
 	case tItemStack:
 		if c.isCustomItem(e) || c.usesCustomField(e, "id") {
 			return &sugarRule{customStackRule}
-		}
-		if b, ok := e.(*syntax.Binary); ok && b.Op == "*" && isID(b.L) && isNumber(b.R) {
-			return &sugarRule{stackCount}
 		}
 	case tRGB, tRGBA, tStringRGB, tStringARGB:
 		if isColorHexString(e) {
@@ -247,72 +201,6 @@ func isNilExpr(e syntax.Expr) bool {
 
 func word(text string, sp syntax.Span) *syntax.Ident { return &syntax.Ident{Name: text, Sp: sp} }
 
-// lootLogic lowers `a && b && c` to all_of and `a || b` to any_of, with
-// chains of the same operator flattened into one list of terms.
-// Parenthesised groups stay nested.
-func lootLogic(c *Checker, e syntax.Expr, v tview) jsonv.Value {
-	b := e.(*syntax.Binary)
-	var terms []syntax.Expr
-	var add func(x syntax.Expr)
-	add = func(x syntax.Expr) {
-		// Parentheses keep a nested group: (a && b) && c is all_of(all_of(a, b), c).
-		if inner, ok := x.(*syntax.Binary); ok && inner.Op == b.Op {
-			add(inner.L)
-			add(inner.R)
-			return
-		}
-		terms = append(terms, x)
-	}
-	add(b)
-	kind := "all_of"
-	if b.Op == "||" {
-		kind = "any_of"
-	}
-	return c.check(mkObject(b.Sp, "type", word(kind, b.Sp), "terms", &syntax.List{Elems: terms, Sp: b.Sp}), v)
-}
-
-func lootNot(c *Checker, e syntax.Expr, v tview) jsonv.Value {
-	u := e.(*syntax.Unary)
-	return c.check(mkObject(u.Sp, "type", word("inverted", u.Sp), "term", u.X), v)
-}
-
-// entryItem lowers a bare id in a pool's entries to an item entry.
-func entryItem(c *Checker, e syntax.Expr, v tview) jsonv.Value {
-	return c.check(mkObject(e.Span(), "type", word("item", e.Span()), "name", e), v)
-}
-
-// entryTag lowers `#tag` in a pool's entries to a tag entry that expands
-// to one entry per item, so each item is equally likely.
-func entryTag(c *Checker, e syntax.Expr, v tview) jsonv.Value {
-	t := e.(*syntax.Tag)
-	return c.check(mkObject(t.Sp, "type", word("tag", t.Sp), "items", t, "expand", &syntax.Bool{Value: true, Sp: t.Sp}), v)
-}
-
-// providerRange lowers `a..b` to a uniform number provider.
-func providerRange(c *Checker, e syntax.Expr, v tview) jsonv.Value {
-	r := e.(*syntax.Range)
-	return c.check(mkObject(r.Sp, "type", word("uniform", r.Sp), "min", r.Lo, "max", r.Hi), v)
-}
-
-// boundsRange lowers `a..b`, `a..` or `..b` to `{min, max}` bounds.
-func boundsRange(c *Checker, e syntax.Expr, v tview) jsonv.Value {
-	r := e.(*syntax.Range)
-	var lo, hi syntax.Expr
-	if r.Lo != nil {
-		lo = r.Lo
-	}
-	if r.Hi != nil {
-		hi = r.Hi
-	}
-	return c.check(mkObject(r.Sp, "min", lo, "max", hi), v)
-}
-
-// stackCount lowers `diamond * 4` to an item stack of four.
-func stackCount(c *Checker, e syntax.Expr, v tview) jsonv.Value {
-	b := e.(*syntax.Binary)
-	return c.check(mkObject(b.Sp, "id", b.L, "count", b.R), v)
-}
-
 // criterionCall lowers `InventoryChanged(items = [...])` to a criterion
 // whose trigger is inventory_changed and whose conditions are the named
 // arguments.
@@ -358,75 +246,6 @@ func mkCall(name string, sp syntax.Span, args ...syntax.Expr) *syntax.Call {
 		call.Args = append(call.Args, &syntax.Arg{Value: a, Sp: a.Span()})
 	}
 	return call
-}
-
-var densityOps = map[string]string{"+": "Add", "-": "Sub", "*": "Mul", "/": "Div"}
-
-// densityBinary lowers `a + b` to add, `a - b` to sub and so on, folding
-// constant operands.
-func densityBinary(c *Checker, e syntax.Expr, v tview) jsonv.Value {
-	b := e.(*syntax.Binary)
-	if f, ok := fold(b); ok {
-		return c.check(&syntax.Number{Text: strconv.FormatFloat(f, 'g', -1, 64), Sp: b.Sp}, v)
-	}
-	return c.check(mkCall(densityOps[b.Op], b.Sp, b.L, b.R), v)
-}
-
-func densityNeg(c *Checker, e syntax.Expr, v tview) jsonv.Value {
-	u := e.(*syntax.Unary)
-	return c.check(mkCall("Mul", u.Sp, &syntax.Number{Text: "-1", Sp: u.Sp}, u.X), v)
-}
-
-// fold evaluates an arithmetic expression made only of numbers.
-func fold(e syntax.Expr) (float64, bool) {
-	switch x := e.(type) {
-	case *syntax.Paren:
-		return fold(x.X)
-	case *syntax.Number, *syntax.Unary:
-		if t, ok := numberText(e); ok {
-			f, err := strconv.ParseFloat(t, 64)
-			return f, err == nil
-		}
-	case *syntax.Binary:
-		l, ok1 := fold(x.L)
-		r, ok2 := fold(x.R)
-		if !ok1 || !ok2 {
-			return 0, false
-		}
-		switch x.Op {
-		case "+":
-			return l + r, true
-		case "-":
-			return l - r, true
-		case "*":
-			return l * r, true
-		case "/":
-			if r != 0 {
-				return l / r, true
-			}
-		}
-	}
-	return 0, false
-}
-
-// ruleSequence lowers a list of rules to a sequence. Nested lists (written,
-// or produced by || in If) are flattened: a sequence inside a sequence
-// tries the same rules in the same order.
-func ruleSequence(c *Checker, e syntax.Expr, v tview) jsonv.Value {
-	l := e.(*syntax.List)
-	flat := &syntax.List{Sp: l.Sp}
-	var add func(l *syntax.List)
-	add = func(l *syntax.List) {
-		for _, x := range l.Elems {
-			if inner, ok := x.(*syntax.List); ok {
-				add(inner)
-				continue
-			}
-			flat.Elems = append(flat.Elems, x)
-		}
-	}
-	add(l)
-	return c.check(mkCall("Sequence", e.Span(), flat), v)
 }
 
 // ruleIf lowers `If(cond) { rule }` (or `If(cond, rule)`) to nested
@@ -531,19 +350,10 @@ func lowerIf(cond, rule syntax.Expr, sp syntax.Span) syntax.Expr {
 	return mkCall("Condition", sp, cond, rule)
 }
 
-func condNot(c *Checker, e syntax.Expr, v tview) jsonv.Value {
-	u := e.(*syntax.Unary)
-	return c.check(mkCall("Not", u.Sp, u.X), v)
-}
-
 func condLogic(c *Checker, e syntax.Expr, v tview) jsonv.Value {
 	b := e.(*syntax.Binary)
 	c.errorf("mms/unsupported-operator", b.Sp, "surface conditions cannot be combined with '%s' on their own; use it inside If(...), which nests or sequences the rule", b.Op)
 	return nil
-}
-
-func anchorAbsolute(c *Checker, e syntax.Expr, v tview) jsonv.Value {
-	return c.check(mkCall("Absolute", e.Span(), e), v)
 }
 
 // blockWithState lowers `oak_log[axis=y]` to { Name, Properties } and

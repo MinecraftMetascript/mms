@@ -278,6 +278,9 @@ func (c *Checker) check(e syntax.Expr, v tview) jsonv.Value {
 	if r, ok := c.mergeConvert(e, v); ok {
 		return r
 	}
+	if r, ok := c.formConvert(e, v); ok {
+		return r
+	}
 	if r := c.sugar(e, v); r != nil {
 		return r.apply(c, e, v)
 	}
@@ -508,7 +511,7 @@ func (c *Checker) fits(e syntax.Expr, v tview) bool {
 		return true
 	}
 	v = c.norm(v)
-	if r := c.sugar(e, v); r != nil {
+	if r := c.sugar(e, v); r != nil || c.formConversion(e, v) != nil {
 		return true
 	}
 	if v.T == nil {

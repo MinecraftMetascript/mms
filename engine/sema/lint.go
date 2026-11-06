@@ -4,6 +4,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/minecraftmetascript/mms/engine/spec"
 	"github.com/minecraftmetascript/mms/engine/syntax"
 )
 
@@ -75,70 +76,41 @@ func lexesBare(s string) bool {
 	return (bareIdent.MatchString(s) && !reserved[s]) || barePath.MatchString(s) || bareResLoc.MatchString(s)
 }
 
-// Simplify returns sugar that means the same as an object literal at its
-// position (see sugar.go), written from the source text src: an item entry
-// as its bare id, a uniform provider or bounds as a range, a stack as
-// `id * count`, a criterion as a trigger call and all_of, any_of and
-// inverted conditions as &&, || and !. ok is false when there is none.
-func Simplify(in *Info, o *syntax.Object, src []rune) (text string, op string, ok bool) {
-	text, op = simplify(in, o, src)
-	return text, op, text != ""
-}
-
-// simplify returns the sugar and its top-level operator ("" for none).
-func simplify(in *Info, o *syntax.Object, src []rune) (string, string) {
+// Simplify returns the shorthand that means the same as an object
+// literal at its position, written from the source text src: the form of
+// expression whose conversion in the prelude (prelude/forms.mms) builds
+// that object, such as `1..3` for a uniform provider or `a && b` for
+// all_of, or a criterion as a trigger call. ok is false when there is
+// none.
+func Simplify(p *spec.Pack, in *Info, o *syntax.Object, src []rune) (text string, op string, ok bool) {
 	if in == nil {
-		return "", ""
+		return "", "", false
 	}
-	fields := map[string]syntax.Expr{}
-	var order []string
-	for _, it := range o.Body.Items {
-		f, ok := it.(*syntax.FieldStmt)
-		if !ok || f.KeyQuoted {
-			return "", ""
-		}
-		fields[f.Key.Text] = f.Value
-		order = append(order, f.Key.Text)
+	names := typeNames(in.Type)
+	if s, op := shorthand(p, names, o, txt(src)); s != "" {
+		return s, op, true
 	}
-	text := func(e syntax.Expr) string { return string(src[e.Span().Start:e.Span().End]) }
-	is := func(e syntax.Expr, name string) bool {
-		switch x := e.(type) {
-		case *syntax.Ident:
-			return x.Name == name
-		case *syntax.ResLoc:
-			return x.Text == "minecraft:"+name
-		case *syntax.String:
-			return x.Value == name || x.Value == "minecraft:"+name
-		}
-		return false
-	}
-	only := func(keys ...string) bool {
-		if len(keys) != len(fields) {
-			return false
-		}
-		for _, k := range keys {
-			if fields[k] == nil {
-				return false
+	for _, n := range names {
+		if n == tCriterion {
+			if s := criterionShorthand(o, txt(src)); s != "" {
+				return s, "", true
 			}
 		}
-		return true
 	}
-	bound := func(e syntax.Expr) bool { return e == nil || isNumber(e) }
-	for _, name := range typeNames(in.Type) {
-		if text, op := simplifyAs(name, fields, only, is, bound, text); text != "" {
-			return text, op
-		}
-	}
-	return "", ""
+	return "", "", false
+}
+
+func txt(src []rune) func(syntax.Expr) string {
+	return func(e syntax.Expr) string { return string(src[e.Span().Start:e.Span().End]) }
 }
 
 // typeNames lists the named types a position accepts: its own name, or
 // the names of an anonymous union's members.
 func typeNames(v tview) []string {
-	if v.Name != "" {
-		return []string{v.Name}
-	}
 	var out []string
+	if v.Name != "" {
+		out = append(out, v.Name)
+	}
 	if v.T != nil && v.T.Kind == "union" {
 		for _, m := range v.T.Members {
 			if m.Kind == "reference" {
@@ -149,91 +121,36 @@ func typeNames(v tview) []string {
 	return out
 }
 
-func simplifyAs(name string, fields map[string]syntax.Expr, only func(...string) bool, is func(syntax.Expr, string) bool,
-	bound func(syntax.Expr) bool, text func(syntax.Expr) string) (string, string) {
-	switch name {
-	case tLootEntry:
-		if only("type", "name") && is(fields["type"], "item") && isID(fields["name"]) {
-			return text(fields["name"]), ""
+// criterionShorthand writes `{ trigger = t, conditions = {...} }` as the
+// trigger's call, `T(field = value, ...)`.
+func criterionShorthand(o *syntax.Object, text func(syntax.Expr) string) string {
+	fields := map[string]syntax.Expr{}
+	for _, it := range o.Body.Items {
+		f, ok := it.(*syntax.FieldStmt)
+		if !ok || f.KeyQuoted {
+			return ""
 		}
-	case tIntProvider, tFloatProvider:
-		if only("type", "min", "max") && is(fields["type"], "uniform") && isNumber(fields["min"]) && isNumber(fields["max"]) {
-			return text(fields["min"]) + ".." + text(fields["max"]), ".."
+		fields[f.Key.Text] = f.Value
+	}
+	trig, ok := fields["trigger"].(*syntax.Ident)
+	if !ok || len(fields) > 2 || (len(fields) == 2 && fields["conditions"] == nil) {
+		return ""
+	}
+	var args []string
+	if cond := fields["conditions"]; cond != nil {
+		co, ok := cond.(*syntax.Object)
+		if !ok {
+			return ""
 		}
-	case tIntRange, tFloatRange, tMinMax:
-		lo, hi := fields["min"], fields["max"]
-		if len(fields) > 0 && len(fields) == btoi(lo != nil)+btoi(hi != nil) && bound(lo) && bound(hi) {
-			s := ".."
-			if lo != nil {
-				s = text(lo) + s
+		for _, it := range co.Body.Items {
+			f, ok := it.(*syntax.FieldStmt)
+			if !ok || f.KeyQuoted {
+				return ""
 			}
-			if hi != nil {
-				s += text(hi)
-			}
-			return s, ".."
-		}
-	case tItemStack:
-		if only("id", "count") && isID(fields["id"]) && isNumber(fields["count"]) {
-			return text(fields["id"]) + " * " + text(fields["count"]), "*"
-		}
-	case tCriterion:
-		trig, ok := fields["trigger"].(*syntax.Ident)
-		if !ok || (len(fields) != 1 && !only("trigger", "conditions")) {
-			return "", ""
-		}
-		var args []string
-		if cond := fields["conditions"]; cond != nil {
-			co, ok := cond.(*syntax.Object)
-			if !ok {
-				return "", ""
-			}
-			for _, it := range co.Body.Items {
-				f, ok := it.(*syntax.FieldStmt)
-				if !ok || f.KeyQuoted {
-					return "", ""
-				}
-				args = append(args, f.Key.Text+" = "+text(f.Value))
-			}
-		}
-		return Pascal(trig.Name) + "(" + strings.Join(args, ", ") + ")", ""
-	case tDensity, tDensityRef:
-		if !only("type", "left", "right") {
-			return "", ""
-		}
-		l, r := fields["left"], fields["right"]
-		if isNumber(l) && isNumber(r) {
-			return "", "" // `2 * 3` would fold to a constant
-		}
-		for op, name := range densityOps {
-			if is(fields["type"], strings.ToLower(name)) {
-				return operand(op, false, l, text(l)) + " " + op + " " + operand(op, true, r, text(r)), op
-			}
-		}
-	case tLootCondition, tLootConditionRef, tPredicateRef, tPredicate:
-		switch {
-		case only("type", "terms") && (is(fields["type"], "all_of") || is(fields["type"], "any_of")):
-			l, ok := fields["terms"].(*syntax.List)
-			if !ok || len(l.Elems) < 2 {
-				return "", ""
-			}
-			op := "&&"
-			if is(fields["type"], "any_of") {
-				op = "||"
-			}
-			parts := make([]string, len(l.Elems))
-			for i, t := range l.Elems {
-				parts[i] = operand(op, i > 0, t, text(t))
-			}
-			return strings.Join(parts, " "+op+" "), op
-		case only("type", "term") && is(fields["type"], "inverted"):
-			t := fields["term"]
-			if _, ok := t.(*syntax.Binary); ok {
-				return "!(" + text(t) + ")", "!"
-			}
-			return "!" + text(t), "!"
+			args = append(args, f.Key.Text+" = "+text(f.Value))
 		}
 	}
-	return "", ""
+	return Pascal(trig.Name) + "(" + strings.Join(args, ", ") + ")"
 }
 
 // operand parenthesises an operator expression used as an operand of op.
