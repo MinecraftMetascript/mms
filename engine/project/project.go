@@ -202,7 +202,9 @@ type Decl struct {
 	// Hoisted are inline values written where an id is required, each
 	// written as its own resource.
 	Hoisted []sema.Hoisted
-	Info    map[syntax.Node]*sema.Info
+	// Shown are the messages its text commands show, for a chat preview.
+	Shown []sema.ShownText
+	Info  map[syntax.Node]*sema.Info
 	// Blueprint is set on a Blueprint instance's body, checked for the
 	// editor only.
 	Blueprint *eval.Blueprint
@@ -506,6 +508,7 @@ func (p *Project) checkDecl(u *sema.Unit, d *syntax.Decl, k sema.Kind, syms *sem
 	dr.Extern = c.Extern
 	dr.Deps = c.Deps
 	dr.Hoisted = c.Hoisted
+	dr.Shown = c.Shown
 	// Re-validate lowered output: a value that passed the checker but not
 	// the schema means a lowering bug, reported as an internal error
 	// rather than written as bad JSON.

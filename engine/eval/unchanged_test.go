@@ -29,13 +29,20 @@ func TestPlainFilesPassThrough(t *testing.T) {
 		units = append(units, Unit{Path: p, File: syntax.Parse(string(b))})
 	}
 	r := Run(units, Options{Namespace: "demo"})
+	plain := 0
 	for _, u := range units {
 		out := r.Files[u.Path]
-		if out.Changed {
-			t.Errorf("%s: changed", u.Path)
-		}
 		if len(out.Diags) > 0 {
 			t.Errorf("%s: %s", u.Path, out.Diags[0].Message)
+		}
+		// A top-level const, let or for is one of the new forms, so the
+		// file is expected to change.
+		if len(u.File.Items) != len(u.File.Decls) {
+			continue
+		}
+		plain++
+		if out.Changed {
+			t.Errorf("%s: changed", u.Path)
 		}
 		if len(out.Decls) != len(u.File.Decls) {
 			t.Errorf("%s: %d declarations, want %d", u.Path, len(out.Decls), len(u.File.Decls))
@@ -46,6 +53,9 @@ func TestPlainFilesPassThrough(t *testing.T) {
 				t.Errorf("%s: declaration %d was rebuilt", u.Path, i)
 			}
 		}
+	}
+	if plain < 20 {
+		t.Errorf("only %d files use none of the new forms", plain)
 	}
 }
 

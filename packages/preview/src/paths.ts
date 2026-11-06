@@ -77,10 +77,16 @@ export function bookPageAt(pages: readonly { uri: string; range: { start: { line
 	return at;
 }
 
+/** The message a text:<...> path names, if it is one of texts. */
+export function textAt(path: string | null, texts: readonly { id: string }[] = []): { kind: 'text'; id: string } | null {
+	if (!path?.startsWith('text:')) return null;
+	return texts.some((t) => t.id === path) ? { kind: 'text', id: path } : null;
+}
+
 /**
  * What the preview pane shows for an output path: a preview, an
- * inspector, a jigsaw graph, a book, a function run, or nothing. Books
- * need the items to tell.
+ * inspector, a jigsaw graph, a book, a function run, a chat message, or
+ * nothing. Books need the items to tell, and messages the texts.
  */
-export const shows = (path: string | null, items?: readonly { id: string; text: string }[]) =>
-	previewable(path) ?? inspectable(path) ?? jigsawable(path) ?? bookAt(path, items) ?? runnable(path);
+export const shows = (path: string | null, items?: readonly { id: string; text: string }[], texts?: readonly { id: string }[]) =>
+	previewable(path) ?? inspectable(path) ?? jigsawable(path) ?? bookAt(path, items) ?? runnable(path) ?? textAt(path, texts);

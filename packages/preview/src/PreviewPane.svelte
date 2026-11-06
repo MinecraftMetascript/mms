@@ -5,6 +5,7 @@
 	// preview for worldgen, with a note when a pinned declaration has left
 	// the pack.
 	import BookView from './book/BookView.svelte';
+	import ChatView from './chat/ChatView.svelte';
 	import Inspect from './inspect/Inspect.svelte';
 	import { itemContext } from './inspect/items';
 	import { inspectable } from './inspect/common';
@@ -13,7 +14,7 @@
 	import { bookAt, itemPath, jigsawable, runnable, shows } from './paths';
 	import FunctionRun from './run/FunctionRun.svelte';
 	import Preview from './preview/Preview.svelte';
-	import type { OutputAsset, OutputFile, OutputItem } from './types';
+	import type { OutputAsset, OutputFile, OutputItem, OutputText } from './types';
 
 	interface Props {
 		output: OutputFile[];
@@ -29,6 +30,8 @@
 		unpinLabel?: string;
 		/** The custom items and books; a book shows as its pages. */
 		items?: OutputItem[];
+		/** The messages text commands show; one shows as chat, a title or an action bar. */
+		texts?: OutputText[];
 		/** The book page to open, from 0, such as the one at the cursor. */
 		page?: number;
 		/** The files the pack copies; structure files carry their jigsaw blocks. */
@@ -39,26 +42,29 @@
 		 */
 		textures?: Record<string, string>;
 	}
-	let { output, path, pinned, onunpin, createWorker, hint, unpinLabel = 'unpin it', items = [], page = 0, assets = [], textures = {} }: Props = $props();
+	let { output, path, pinned, onunpin, createWorker, hint, unpinLabel = 'unpin it', items = [], texts = [], page = 0, assets = [], textures = {} }: Props = $props();
 	const itemInfo = $derived(itemContext(output, items, textures));
 
 	const file = $derived(output.find((f) => f.path === path) ?? null);
 	const book = $derived(bookAt(path, items) ? (items.find((it) => itemPath(it.id) === path) ?? null) : null);
 	// A pinned output that has left the pack (renamed, deleted or broken).
-	const missing = $derived(pinned !== null && !file && !book);
+	const text = $derived(path?.startsWith('text:') ? (texts.find((t) => t.id === path) ?? null) : null);
+	const missing = $derived(pinned !== null && !file && !book && !text);
 	const jigsaw = $derived(file && jigsawable(file.path) ? jigsawGraph(file.path, output, assets) : null);
 </script>
 
 <div class="flex h-full flex-col">
 	{#if missing}
 		<p class="border-b border-line px-3 py-1.5 text-xs text-muted">
-			{shows(pinned, items)?.id ?? pinned?.replace(/^item:/, '')} isn't in the pack right now. It shows again once it builds, or
+			{shows(pinned, items, texts)?.id ?? pinned?.replace(/^item:/, '')} isn't in the pack right now. It shows again once it builds, or
 			<button class="text-accent hover:underline" onclick={onunpin}>{unpinLabel}</button>.
 		</p>
 	{/if}
 	<div class="min-h-0 flex-1">
 		{#if book}
 			<BookView stack={book.text} {output} {page} />
+		{:else if text}
+			<ChatView {text} {output} />
 		{:else if jigsaw}
 			<JigsawView graph={jigsaw} />
 		{:else if file && jigsawable(file.path)}

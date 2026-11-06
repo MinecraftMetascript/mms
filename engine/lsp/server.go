@@ -1060,6 +1060,42 @@ func (s *Server) output(_ context.Context, p struct {
 		items = append(items, it)
 	}
 	sort.Slice(items, func(i, j int) bool { return items[i]["id"].(string) < items[j]["id"].(string) })
+	// The messages tell, title and actionbar show, for a chat preview of
+	// the one at the cursor, or of a .mmstext file it reads.
+	texts := []map[string]any{}
+	seen := map[string]bool{}
+	for _, d := range w.res.Order {
+		for _, t := range d.Shown {
+			unit := t.File
+			if unit == "" && d.Unit != nil {
+				unit = d.Unit.Path
+			}
+			l := idx[unit]
+			if l == nil {
+				l = s.lines(unit)
+				idx[unit] = l
+			}
+			if l == nil {
+				continue
+			}
+			id := fmt.Sprintf("text:%s:%d", unit, t.Sp.Start)
+			if seen[id] {
+				continue // a file that more than one command shows
+			}
+			seen[id] = true
+			m := map[string]any{
+				"id":    id,
+				"kind":  t.Kind,
+				"text":  jsonv.Compact(t.Message),
+				"uri":   unit,
+				"range": l.rng(t.Sp),
+			}
+			if t.Subtitle != nil {
+				m["subtitle"] = jsonv.Compact(t.Subtitle)
+			}
+			texts = append(texts, m)
+		}
+	}
 	// JigsawHole declarations write no file; an editor lists them where a
 	// jigsaw block's name or target is chosen.
 	holes := []map[string]any{}
@@ -1083,7 +1119,7 @@ func (s *Server) output(_ context.Context, p struct {
 	if unused == nil {
 		unused = []string{}
 	}
-	return map[string]any{"files": out, "assets": assets, "items": items, "jigsawHoles": holes, "unusedAssets": unused, "hasErrors": w.res.HasErrors()}, nil
+	return map[string]any{"files": out, "assets": assets, "items": items, "texts": texts, "jigsawHoles": holes, "unusedAssets": unused, "hasErrors": w.res.HasErrors()}, nil
 }
 
 // structureAsset matches a structure file's path in the data pack.

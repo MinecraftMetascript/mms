@@ -128,6 +128,10 @@
 		// A book's .mmsbook file shows the book that reads it.
 		const it = engine.outputItems.find((it) => (it.uri === c.uri && within(it.range, c.line)) || bookPageAt(it.pages, c.uri, c.line) !== null);
 		if (it) return itemKey(it);
+		// A tell, title or actionbar line, or a .mmstext file one reads,
+		// shows its message.
+		const t = engine.outputTexts.find((t) => t.uri === c.uri && within(t.range, c.line));
+		if (t) return t.id;
 		const f = engine.output.find((f) => f.uri === c.uri && f.range && !f.implicit && within(f.range, c.line));
 		return f ? outputKey(f) : null;
 	});
@@ -139,7 +143,9 @@
 		const f = engine.output.find((f) => outputKey(f) === selectedOutput);
 		if (f) return f;
 		const it = engine.outputItems.find((it) => itemKey(it) === selectedOutput);
-		return it ? { path: it.id, text: it.text, uri: it.uri, range: it.range, item: it } : null;
+		if (it) return { path: it.id, text: it.text, uri: it.uri, range: it.range, item: it };
+		const t = engine.outputTexts.find((t) => t.id === selectedOutput);
+		return t ? { path: t.kind, text: JSON.stringify(JSON.parse(t.text), null, 2), uri: t.uri, range: t.range } : null;
 	});
 
 	// A pinned output keeps the Preview tab on one declaration while the
@@ -147,9 +153,9 @@
 	// tab keeps following the cursor.
 	let pinned = $state<string | null>(null);
 	const previewPath = $derived(pinned ?? selectedOutput);
-	const pinnable = $derived(shows(previewPath, engine?.outputItems));
+	const pinnable = $derived(shows(previewPath, engine?.outputItems, engine?.outputTexts));
 	function togglePin() {
-		pinned = pinned ? null : previewPath && shows(previewPath, engine?.outputItems) ? previewPath : null;
+		pinned = pinned ? null : previewPath && shows(previewPath, engine?.outputItems, engine?.outputTexts) ? previewPath : null;
 	}
 	// A book opens on the page the cursor is in, and stays there while
 	// the cursor is outside its text.
@@ -181,7 +187,7 @@
 	function selectOutput(path: string) {
 		selectedOutput = path;
 		// A pinned preview stays on screen; otherwise show JSON for outputs with no preview.
-		if (!pinned && !shows(path, engine?.outputItems)) rightTab = 'json';
+		if (!pinned && !shows(path, engine?.outputItems, engine?.outputTexts)) rightTab = 'json';
 	}
 
 	// Opens data as a new saved project; the open one stays saved.
@@ -442,6 +448,7 @@
 						<PreviewPane
 							output={engine.output}
 							items={engine.outputItems}
+							texts={engine.outputTexts}
 							assets={engine.outputAssets}
 							{textures}
 							page={bookPage}
