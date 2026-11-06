@@ -1,0 +1,4 @@
+as.mms:14:18 gem-base: Matches any emerald ["ruby"]
+as.mms:18:12 mms/missing-field: missing field 'cookingtime' ["{"]
+as.mms:18:44 gem-base: Matches any emerald ["ruby"]
+as.mms:18:66 mms/unknown-id: unknown item 'minecraft:ruby2' ["ruby2"]

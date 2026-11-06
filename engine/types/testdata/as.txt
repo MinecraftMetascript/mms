@@ -1,0 +1,19 @@
+-- as.mms --
+Blueprint Gem {
+  base: Id<item>
+  as Id<item> = base hint("gem-base", "Matches any ${base}")
+  as LootPoolEntry = Item(name = base)
+  emit {
+    Function gems/${self.path} {
+      /say ${base}
+    }
+  }
+}
+
+Gem ruby { base = emerald }
+
+ItemTag shiny = [ruby, diamond]
+LootTable gems {
+  pools = [{ rolls = 1, entries = [ruby] }]
+}
+Recipe bad { type = smelting, ingredient = ruby, result = { id = ruby2 } }

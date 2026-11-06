@@ -16,6 +16,7 @@ import (
 	"github.com/minecraftmetascript/mms/engine/sema"
 	"github.com/minecraftmetascript/mms/engine/spec"
 	"github.com/minecraftmetascript/mms/engine/syntax"
+	"github.com/minecraftmetascript/mms/engine/types"
 )
 
 // Project is a set of source files plus configuration. It is safe for
@@ -162,6 +163,7 @@ type Result struct {
 	Order []*Decl
 
 	collect  map[string][]syntax.Diagnostic
+	typeErr  map[string][]syntax.Diagnostic // Template arguments, Blueprint fields, typed consts
 	assets   []assetUse
 	assetErr map[string][]syntax.Diagnostic
 	orderErr map[string][]syntax.Diagnostic // feature order cycles
@@ -246,12 +248,22 @@ func (r *Result) Diagnostics(path string) []syntax.Diagnostic {
 		}
 	}
 	out = append(out, r.collect[path]...)
+	out = append(out, r.typeErr[path]...)
 	out = append(out, r.assetErr[path]...)
 	out = append(out, r.orderErr[path]...)
 	out = append(out, r.langErr[path]...)
+	typeErr := r.typeErr[path]
 	for _, d := range r.Order {
 		if d.Unit == u {
-			out = append(out, d.Diags...)
+			for _, dg := range d.Diags {
+				// A Template argument or Blueprint field with a type
+				// error was reported where it is written; the
+				// expanded declaration's own complaint about it,
+				// which covers that spot, adds nothing.
+				if !coversAny(dg.Sp, typeErr) {
+					out = append(out, dg)
+				}
+			}
 		}
 		out = append(out, d.Extern[path]...)
 	}
@@ -304,7 +316,15 @@ func (p *Project) Analyze(ctx context.Context) (*Result, error) {
 
 	units, ev := expand(units, p.Config.Namespace, &p.evalCache)
 	syms, collect := sema.Collect(units, p.Kinds, p.Config.Namespace)
+	tenv := types.New(p.Pack, p.Kinds, ev)
+	syms.Types = tenv.Types
+	syms.Conversions = tenv.Conversions(ev, p.Config.Namespace)
 	r := &Result{Syms: syms, Units: units, Decls: map[*syntax.Decl]*Decl{}, collect: collect, pack: p.Pack, cfg: p.Config, files: p.Files, Eval: ev}
+	r.typeErr = tenv.Check(ev, p.Config.Namespace, func(ns string) *sema.Checker {
+		c := sema.NewChecker(p.Pack, p.Kinds, syms, ns)
+		c.Files = p.Files
+		return c
+	})
 	r.symKey = symbolKey(syms)
 	sameSyms := prev != nil && prev.symKey == r.symKey
 	for _, u := range units {
@@ -392,6 +412,9 @@ func symbolKey(t *sema.Table) uint64 {
 	var keys []string
 	for _, s := range t.All() {
 		keys = append(keys, s.Kind.Folder()+"|"+s.ID()+"|"+sema.SymSig(s))
+	}
+	for id, cs := range t.Conversions {
+		keys = append(keys, "as|"+id+"|"+sema.ConversionsSig(cs))
 	}
 	sort.Strings(keys)
 	h := fnv.New64a()
@@ -547,4 +570,14 @@ func objective(c *sema.Checker, d *syntax.Decl) []string {
 			Message: "expected an objective criterion such as dummy or deathCount"})
 	}
 	return []string{"scoreboard objectives add " + d.Name.Text + " " + criterion}
+}
+
+// coversAny reports whether sp holds the span of one of ds.
+func coversAny(sp syntax.Span, ds []syntax.Diagnostic) bool {
+	for _, d := range ds {
+		if sp.Start <= d.Sp.Start && d.Sp.End <= sp.End {
+			return true
+		}
+	}
+	return false
 }

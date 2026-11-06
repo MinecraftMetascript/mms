@@ -1,0 +1,42 @@
+-- types.mms --
+Type Wave {
+  mob: Id<entity_type>
+  count: int = 1
+}
+Type Mode = "rigid" | "terrain_matching"
+Type Broken = Strnig
+Type Things = Id<not_a_registry>
+
+Blueprint Spawner {
+  waves: [Wave]
+  mode: Mode = "rigid"
+  pool: LootPool?
+  emit {
+    Function ${self.path} {
+      /say ${mode}
+    }
+  }
+}
+
+Spawner fine {
+  waves = [{ mob = zombie, count = 2 }, { mob = skeleton }]
+  mode = "terrain_matching"
+}
+
+Spawner wrong {
+  waves = [{ mob = not_a_mob }, { mob = zombie, count = "two" }]
+  mode = "wobbly"
+  pool = Pool(1..3, diamond)
+}
+
+Template Repeat(n: int, item: Id<item>) = Pool(n, ${item})
+LootTable t {
+  pools = [Repeat("x", stone), Repeat(2, not_an_item), Repeat(1, diamond)]
+}
+
+const spacing: int = "far"
+const good: LootPool = Pool(1, diamond)
+const woods = [oak, birch]
+for w in woods {
+  LootTable crates/${w} { pools = [Repeat(1, ${w}_planks), Repeat(1, ${w}_plonks)] }
+}

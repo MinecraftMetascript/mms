@@ -6,7 +6,9 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/minecraftmetascript/mms/engine/jsonv"
 	"github.com/minecraftmetascript/mms/engine/spec"
+	"github.com/minecraftmetascript/mms/engine/syntax"
 )
 
 // tview is a type seen from a position: the type, the template bindings in
@@ -46,6 +48,23 @@ func (v tview) Short() string {
 	return spec.Format(v.T, 0)
 }
 
+// typeAt returns the type at an mcdoc path, or a type the project
+// declares with `Type`, which the type checker files under "::mms::".
+func (c *Checker) typeAt(path string) *spec.Type {
+	if c.Syms != nil && c.Syms.Types != nil {
+		if t, ok := c.Syms.Types[path]; ok {
+			return t
+		}
+	}
+	return c.Pack.Types[path]
+}
+
+// CheckType checks e against t, a type the type checker resolved from
+// MMS, and returns its JSON.
+func (c *Checker) CheckType(e syntax.Expr, t *spec.Type, name string) jsonv.Value {
+	return c.check(e, tview{T: t, Name: name})
+}
+
 // norm follows references, applies templates and resolves static
 // dispatches until it reaches a structural type. An unresolvable type
 // becomes nil, which the checker treats as `any`.
@@ -59,7 +78,7 @@ func (c *Checker) norm(v tview) tview {
 				continue
 			}
 			_, hasID := t.Attr("id")
-			v = tview{T: c.Pack.Types[t.Path], Env: v.Env, Name: t.Path, RefID: v.RefID || hasID}
+			v = tview{T: c.typeAt(t.Path), Env: v.Env, Name: t.Path, RefID: v.RefID || hasID}
 		case "concrete":
 			// Follow references only: norm would strip the template
 			// before its parameters are bound.
@@ -69,7 +88,7 @@ func (c *Checker) norm(v tview) tview {
 					child = b
 					continue
 				}
-				child = tview{T: c.Pack.Types[child.T.Path], Env: child.Env, Name: child.T.Path}
+				child = tview{T: c.typeAt(child.T.Path), Env: child.Env, Name: child.T.Path}
 			}
 			if child.T == nil || child.T.Kind != "template" {
 				v = child // type arguments on a non-template are ignored
