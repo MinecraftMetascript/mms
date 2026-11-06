@@ -67,7 +67,7 @@ func SigOf(d *syntax.Decl) FuncSig {
 // SymSig is the signature part of a symbol that other declarations
 // depend on; it is "" for most kinds.
 func SymSig(s *Symbol) string {
-	if s.Kind.MMS == "Function" || s.Kind.MMS == "Global" {
+	if s.Kind.MMS == "Function" || s.Kind.MMS == "Global" || s.Kind.MMS == "Storage" {
 		return symSig(s)
 	}
 	return ""
@@ -78,6 +78,12 @@ func SymSig(s *Symbol) string {
 func symSig(s *Symbol) string {
 	if s == nil || s.Decl == nil {
 		return ""
+	}
+	if s.Kind.MMS == "Storage" {
+		if s.table == nil {
+			return syntax.TypeText(s.Decl.Type)
+		}
+		return storageSig(s, s.table)
 	}
 	if s.Kind.MMS == "Global" {
 		if s.Decl.Type == nil {
@@ -213,6 +219,9 @@ func IsRaw(b *syntax.Block) bool {
 type local struct {
 	s    fn.Score
 	path string
+	// nbt is set for an int or bool kept in storage, such as a Storage
+	// field: "<storage> <path>".
+	nbt  string
 	typ  string
 	info *Local
 }
@@ -468,6 +477,12 @@ func (f *fc) stmt(out *fn.Block, s syntax.Stmt) {
 		if v == nil {
 			return
 		}
+		if target.nbt != "" {
+			t := f.load(&out.Ops, *target)
+			out.Add(fn.Arith{Dst: t, Op: s.Op, Src: *v})
+			f.save(&out.Ops, *target, fn.Of(t))
+			return
+		}
 		out.Add(fn.Arith{Dst: target.s, Op: s.Op, Src: *v})
 	case *syntax.IfStmt:
 		f.ifStmt(out, s)
@@ -646,6 +661,10 @@ func (f *fc) store(pre *[]fn.Op, l local, v *val, e syntax.Expr) {
 		*pre = append(*pre, f.setString(l.path, v))
 		return
 	}
+	if l.nbt != "" {
+		f.save(pre, l, f.operand(pre, v))
+		return
+	}
 	if v.cond != nil && !v.cond.Never && !v.cond.Always() {
 		*pre = append(*pre, fn.Set{Dst: l.s, Src: fn.Const(0)}, fn.If{Cond: *v.cond, Then: &fn.Block{Ops: []fn.Op{fn.Set{Dst: l.s, Src: fn.Const(1)}}}})
 		return
@@ -656,6 +675,12 @@ func (f *fc) store(pre *[]fn.Op, l local, v *val, e syntax.Expr) {
 // variable resolves a name to a local, parameter or Global.
 func (f *fc) variable(e syntax.Expr) *local {
 	switch e := e.(type) {
+	case *syntax.Member:
+		if l, ok := f.storageField(e); ok {
+			return l
+		}
+		f.c.errorf("mms/unsupported", e.Span(), "expected a variable, or a field of a Storage such as game.wave")
+		return nil
 	case *syntax.Ident:
 		if l, ok := f.lookup(e.Name); ok {
 			if l.info != nil {
@@ -825,13 +850,24 @@ func (f *fc) expr(pre *[]fn.Op, e syntax.Expr) *val {
 		return &val{typ: tBool, op: fn.Const(v)}
 	case *syntax.Paren:
 		return f.expr(pre, e.X)
-	case *syntax.Ident, *syntax.ResLoc:
-		l := f.variable(e)
+	case *syntax.Ident, *syntax.ResLoc, *syntax.Member:
+		var l *local
+		if m, ok := e.(*syntax.Member); ok {
+			var isStorage bool
+			if l, isStorage = f.storageField(m); !isStorage {
+				break
+			}
+		} else {
+			l = f.variable(e)
+		}
 		if l == nil {
 			return nil
 		}
 		if l.typ == tString {
 			return &val{typ: tString, path: l.path}
+		}
+		if l.nbt != "" {
+			return &val{typ: l.typ, op: fn.Of(f.load(pre, *l))}
 		}
 		return &val{typ: l.typ, op: fn.Of(l.s)}
 	case *syntax.String:
@@ -1123,6 +1159,9 @@ func (f *fc) call(pre *[]fn.Op, e *syntax.Call, wantValue bool) *val {
 		}
 		f.textCommand(pre, x.Name, e)
 		return nil
+	}
+	if x, ok := e.Fn.(*syntax.Ident); ok && sym == nil && (x.Name == "exists" || x.Name == "count") {
+		return f.selectorTest(pre, x.Name, e)
 	}
 	if sym == nil || sym.Kind.MMS != "Function" {
 		c.errorf("mms/unknown-name", e.Fn.Span(), "no Function named '%s' is declared", id)

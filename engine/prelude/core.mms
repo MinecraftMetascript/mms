@@ -9,6 +9,8 @@ extern Blueprint Function
 extern Blueprint Objective
 /** A value for the whole pack, set when the pack first loads. */
 extern Blueprint Global
+/** A record kept in command storage: `Storage game: GameState` keeps a `Type GameState { wave: int = 0 }` at `<namespace>:mms game`. Functions read and write its fields as `game.wave`; the pack sets each missing field to its default when it loads. */
+extern Blueprint Storage
 /** Code that runs when the pack loads, from #minecraft:load. */
 extern Blueprint OnLoad
 /** Code that runs every tick, from #minecraft:tick. */
@@ -53,4 +55,8 @@ extern Template tell(target: Selector, message: Text): Commands
 /** Shows `message` in large text in the middle of the screen of each player `target` selects, with `subtitle` under it. */
 extern Template title(target: Selector, message: Text, subtitle: Text?): Commands
 /** Shows `message` just above the hotbar of each player `target` selects. */
+/** Whether `target` selects at least one entity, in a function: `if (exists(@e[tag=boss])) { ... }`. */
+extern Template exists(target: Selector): bool
+/** How many entities `target` selects, in a function: `let n = count(@e[type=zombie, distance=..16])`. */
+extern Template count(target: Selector): int
 extern Template actionbar(target: Selector, message: Text): Commands

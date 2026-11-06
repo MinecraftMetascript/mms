@@ -173,7 +173,7 @@ func (r *Result) Emit() []OutFile {
 			}
 		case d.Kind.MMS == "Objective":
 			objectives[d.NS] = append(objectives[d.NS], d.Lines...)
-		case d.Kind.MMS == "Global":
+		case d.Kind.MMS == "Global" || d.Kind.MMS == "Storage":
 			gns := d.NS
 			if strings.Contains(d.D.NameText(), ":") {
 				gns, _ = splitID(d.D.NameText())

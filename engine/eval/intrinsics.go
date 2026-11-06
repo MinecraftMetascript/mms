@@ -32,7 +32,7 @@ var intrinsics = map[string]intrinsic{
 // kept are externs whose calls stay as written, with their arguments
 // evaluated, for the checker: tell(@a, "Hi") in a function, and
 // book_pages(text) where a book's pages go.
-var kept = map[string]bool{"tell": true, "title": true, "actionbar": true, "book_pages": true}
+var kept = map[string]bool{"tell": true, "title": true, "actionbar": true, "book_pages": true, "exists": true, "count": true}
 
 // Intrinsics lists the names of the intrinsics, for the test that each
 // has an extern declaration in the prelude.
