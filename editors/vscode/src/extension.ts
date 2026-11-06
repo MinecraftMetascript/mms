@@ -12,6 +12,7 @@
 // generated files, the Structures view (also world.ts), which imports
 // structures saved in the game, and the Jigsaw view (jigsaw.ts), which
 // copies give commands for set-up jigsaw blocks. The panels read the pack from output.ts.
+// Test declarations show in VS Code's Testing view (tests.ts).
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
@@ -21,6 +22,7 @@ import { JigsawView } from './jigsaw';
 import { PackOutput } from './output';
 import { PackView } from './packView';
 import { Previews } from './preview';
+import { Tests } from './tests';
 import { WorldView } from './world';
 
 const releasesUrl = 'https://github.com/MinecraftMetascript/mms/releases';
@@ -227,6 +229,7 @@ export function activate(context: vscode.ExtensionContext) {
 		world,
 		new PackView(pack, () => world.project()),
 		new JigsawView(context, pack, () => world.project()),
+		new Tests(() => client),
 		vscode.commands.registerCommand('mms.showPreview', () => previews.show()),
 		vscode.commands.registerCommand('mms.previewDeclaration', (path: string, page?: number) => previews.show(path, page)),
 		vscode.commands.registerCommand('mms.renameAt', renameAt),

@@ -212,6 +212,8 @@ type Decl struct {
 	// Extern are problems in other files, such as a Book's .mmsbook
 	// file, by path.
 	Extern map[string][]syntax.Diagnostic
+	// Expects are a Test's expect lines, in order.
+	Expects []sema.TestExpect
 	// Deps are the symbol lookups the check made (see sema.DepsHold).
 	Deps map[string]bool
 
@@ -511,6 +513,15 @@ func (p *Project) checkDecl(u *sema.Unit, d *syntax.Decl, k sema.Kind, syms *sem
 		dr.Lines = c.Global(d)
 	case k.MMS == "Storage":
 		dr.Lines = c.Storage(d)
+	case k.MMS == "Test":
+		if d.Name != nil {
+			f, ex := c.CompileTest(d, sema.TestID(ns, d.Name.Text), u.File.Src)
+			if f != nil {
+				dr.Fn, dr.Expects = fn.Generate(*f), ex
+			}
+		} else {
+			c.CompileTest(d, "", u.File.Src)
+		}
 	case k.MMS == sema.JigsawHoleKind:
 		c.JigsawHole(d)
 	}

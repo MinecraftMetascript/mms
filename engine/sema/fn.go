@@ -1020,6 +1020,11 @@ func (f *fc) compare(pre *[]fn.Op, e *syntax.Binary) *val {
 	if l == nil || r == nil {
 		return nil
 	}
+	return f.compareVals(p, e, l, r)
+}
+
+// compareVals compares two lowered values; p runs first.
+func (f *fc) compareVals(p []fn.Op, e *syntax.Binary, l, r *val) *val {
 	if l.typ != r.typ || (l.typ != tInt && e.Op != "==" && e.Op != "!=") {
 		f.c.errorf("mms/type-mismatch", e.Sp, "cannot compare %s with %s using %s", l.typ, r.typ, e.Op)
 		return nil

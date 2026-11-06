@@ -438,6 +438,18 @@ func (s *Session) complete(a *at, off int) []sema.Candidate {
 // the variables in scope, the execute helpers, the statement keywords,
 // then the Globals, objectives and functions.
 func (s *Session) statementCandidates(a *at, off int) []sema.Candidate {
+	if a.decl != nil && a.decl.Kind.MMS == "Test" && !inSection(a.path) {
+		// A Test's own lines: setup first, then run and expect.
+		var out []sema.Candidate
+		for i, kw := range []struct{ word, doc string }{
+			{"setup", "Commands and code that run first, in a fresh world after the pack loads: `setup { game.wave = 1 }`."},
+			{"run", "Calls the function under test: `run next_wave()`."},
+			{"expect", "A condition that must hold, checked in order: `expect game.wave == 2`."},
+		} {
+			out = append(out, sema.Candidate{Label: kw.word, Kind: sema.CandKeyword, Doc: kw.doc, Rank: i})
+		}
+		return out
+	}
 	out := locals(a.u.File, a.fn, off)
 	out = append(out, sema.ExecCandidates(true)...)
 	out = append(out, sema.TextCommandCandidates()...)
@@ -449,6 +461,17 @@ func (s *Session) statementCandidates(a *at, off int) []sema.Candidate {
 		out = append(out, c)
 	}
 	return out
+}
+
+// inSection reports whether a path is inside a section, such as a Test's
+// setup { } block.
+func inSection(path []syntax.Node) bool {
+	for _, n := range path {
+		if _, ok := n.(*syntax.SectionStmt); ok {
+			return true
+		}
+	}
+	return false
 }
 
 func lineOf(f *syntax.File, off int) int {

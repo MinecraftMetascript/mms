@@ -11,6 +11,8 @@ extern Blueprint Objective
 extern Blueprint Global
 /** A record kept in command storage: `Storage game: GameState` keeps a `Type GameState { wave: int = 0 }` at `<namespace>:mms game`. Functions read and write its fields as `game.wave`; the pack sets each missing field to its default when it loads. */
 extern Blueprint Storage
+/** A test of the pack's functions, run by `mms test` and the editor: a `setup { }` block, then `run f()` and `expect condition` lines. Tests run in a fresh world after the pack loads and are never written to the pack. */
+extern Blueprint Test
 /** Code that runs when the pack loads, from #minecraft:load. */
 extern Blueprint OnLoad
 /** Code that runs every tick, from #minecraft:tick. */

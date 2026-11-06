@@ -228,3 +228,18 @@ export type FromJigsaw =
 	| { type: 'declare'; id: string }
 	| { type: 'revealHole'; id: string }
 	| { type: 'revealFile'; src: string };
+
+/** One Test's outcome, as the language server's `mms/runTests` returns it. */
+export interface TestOutcome {
+	name: string;
+	uri: string;
+	/** The Test's name. */
+	range: Range;
+	pass: boolean;
+	message?: string;
+	/** The failing expect, from 1, and where it is. */
+	expect?: number;
+	expectRange?: Range;
+	/** What the test's commands said, through say and tellraw. */
+	said: string[];
+}

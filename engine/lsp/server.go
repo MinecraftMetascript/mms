@@ -219,6 +219,7 @@ func init() {
 		"textDocument/inlayHint":           typed((*Server).inlayHint),
 		"workspace/didChangeWatchedFiles":  typed((*Server).didChangeWatched),
 		"mms/output":                       typed((*Server).output),
+		"mms/runTests":                     typed((*Server).runTests),
 		"textDocument/codeAction":          typed((*Server).codeAction),
 		"mms/setConfig":                    typed((*Server).setConfig),
 		"mms/setFiles":                     typed((*Server).setFiles),
@@ -1162,3 +1163,47 @@ func canonURI(uri string) string {
 }
 
 func isLetter(c byte) bool { return 'a' <= c && c <= 'z' || 'A' <= c && c <= 'Z' }
+
+// runTests runs the Test declarations of the project holding uri, or
+// only the one named name, in the same interpreter as `mms test`.
+func (s *Server) runTests(_ context.Context, p struct {
+	URI  string `json:"uri"`
+	Name string `json:"name"`
+}) (any, *respError) {
+	w := s.at(canonURI(p.URI))
+	if w == nil {
+		w = s.last
+	}
+	if w == nil || w.res == nil {
+		w = s.projects[""]
+	}
+	tests := []map[string]any{}
+	if w.res == nil {
+		return map[string]any{"tests": tests}, nil
+	}
+	var keep func(string) bool
+	if p.Name != "" {
+		keep = func(n string) bool { return n == p.Name }
+	}
+	res, err := w.res.RunTests(keep)
+	if err != nil {
+		return map[string]any{"tests": tests, "error": err.Error()}, nil
+	}
+	idx := map[string]*lines{}
+	for _, t := range res {
+		l := idx[t.Unit]
+		if l == nil {
+			l = s.lines(t.Unit)
+			idx[t.Unit] = l
+		}
+		m := map[string]any{"name": t.Name, "uri": t.Unit, "range": l.rng(t.Span), "pass": t.Pass, "said": append([]string{}, t.Said...)}
+		if !t.Pass {
+			m["message"] = t.Message
+		}
+		if t.Expect > 0 {
+			m["expect"], m["expectRange"] = t.Expect, l.rng(t.ExpectSpan)
+		}
+		tests = append(tests, m)
+	}
+	return map[string]any{"tests": tests}, nil
+}

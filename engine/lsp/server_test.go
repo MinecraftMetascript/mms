@@ -843,3 +843,25 @@ func TestOutputTexts(t *testing.T) {
 		t.Errorf("third = %v", third)
 	}
 }
+
+func TestRunTests(t *testing.T) {
+	c := start(t)
+	c.result("initialize", map[string]any{})
+	a := "mem:///a.mms"
+	c.notify("mms/setFiles", map[string]any{"files": []any{
+		map[string]any{"uri": a, "text": "Global n: int = 0\nFunction bump {\n  n += 1\n}\nTest ok {\n  run bump()\n  expect n == 1\n}\nTest bad {\n  run bump()\n  expect n == 3\n}\n"},
+	}})
+	out := c.result("mms/runTests", map[string]any{"uri": a}).(map[string]any)
+	tests := out["tests"].([]any)
+	if len(tests) != 2 {
+		t.Fatalf("tests: %v", out)
+	}
+	bad := tests[1].(map[string]any)
+	if bad["pass"] != false || bad["message"] != "expected n == 3, but n is 1" || bad["expectRange"] == nil {
+		t.Errorf("bad: %v", bad)
+	}
+	one := c.result("mms/runTests", map[string]any{"uri": a, "name": "ok"}).(map[string]any)
+	if ts := one["tests"].([]any); len(ts) != 1 || ts[0].(map[string]any)["pass"] != true {
+		t.Errorf("one: %v", one)
+	}
+}

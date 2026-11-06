@@ -23,8 +23,8 @@ const typePrefix = "::mms::"
 
 // reservedStorage are the storage paths the function compiler uses for
 // globals (g), string locals (l), macro arguments (m) and the call
-// stack (stack).
-var reservedStorage = map[string]bool{"g": true, "l": true, "m": true, "stack": true}
+// stack (stack), and where a failing Test keeps its values (expect).
+var reservedStorage = map[string]bool{"g": true, "l": true, "m": true, "stack": true, ExpectStorage: true}
 
 // storageType returns the record type a Storage declaration names, and
 // its Type declaration, or nil.
