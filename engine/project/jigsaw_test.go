@@ -2,6 +2,7 @@ package project
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -439,6 +440,32 @@ Function f {
 		t.Errorf("function:\n%s", fn)
 	}
 	emitted(t, r, "data/demo/structure/hall.nbt")
+
+	// The fix for the missing pool adds it to pools.
+	var fixed string
+	for _, d := range r.Diagnostics("main.mms") {
+		if d.Code == "lint/jigsaw-pool" && len(d.Fixes) > 0 {
+			fixed = applyEdits(src, d.Fixes[0].Edits)
+		}
+	}
+	if !strings.Contains(fixed, "    halls = { fallback = minecraft:empty, elements = [Piece(\"hall\", 3)] }\n    rooms = []\n  }") {
+		t.Errorf("fixed:\n%s", fixed)
+	}
+	_, r = assetProject(t, files, fixed)
+	if got := jigsawDiags(r); strings.Contains(got, "jigsaw-pool") {
+		t.Errorf("after the fix:\n%s", got)
+	}
+
+	// On one line too.
+	one := strings.Replace(src, "pools = {\n    start = [Piece(\"start\")]\n    halls = { fallback = minecraft:empty, elements = [Piece(\"hall\", 3)] }\n  }", `pools = { start = [Piece("start")], halls = [Piece("hall")] }`, 1)
+	_, r = assetProject(t, files, one)
+	for _, d := range r.Diagnostics("main.mms") {
+		if d.Code == "lint/jigsaw-pool" {
+			if got := applyEdits(one, d.Fixes[0].Edits); !strings.Contains(got, `halls = [Piece("hall")], rooms = [] }`) {
+				t.Errorf("one line fixed:\n%s", got)
+			}
+		}
+	}
 }
 
 func TestJigsawStructureChecks(t *testing.T) {
@@ -460,4 +487,19 @@ func TestJigsawStructureChecks(t *testing.T) {
 			t.Errorf("%s: got %q, want %q", tc.fields, got, tc.want)
 		}
 	}
+}
+
+// applyEdits applies a fix's edits to src.
+func applyEdits(src string, edits []syntax.TextEdit) string {
+	rs := []rune(src)
+	sort.SliceStable(edits, func(i, j int) bool { return edits[i].Sp.Start < edits[j].Sp.Start })
+	var sb strings.Builder
+	at := 0
+	for _, e := range edits {
+		sb.WriteString(string(rs[at:e.Sp.Start]))
+		sb.WriteString(e.Text)
+		at = e.Sp.End
+	}
+	sb.WriteString(string(rs[at:]))
+	return sb.String()
 }
