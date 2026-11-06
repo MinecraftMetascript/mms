@@ -70,6 +70,9 @@ func (c *Checker) Tag(d *syntax.Decl, k Kind) (values jsonv.Array, replace bool)
 // { id = ..., required = false }.
 func (c *Checker) tagEntry(e syntax.Expr, k Kind, id idInfo) jsonv.Value {
 	c.info(e).Type = tview{}
+	if x := c.convertedID(e, k.TagOf); x != nil {
+		return c.tagEntry(x, k, id)
+	}
 	switch x := e.(type) {
 	case *syntax.Ident:
 		return jsonv.String(c.resolveID(x.Name, id, e))

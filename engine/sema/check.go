@@ -167,6 +167,10 @@ func DepsHold(t *Table, deps map[string]bool) bool {
 			// o|folder|id|other: the other-kind declaration is in that folder.
 			parts := strings.SplitN(rest, "|", 3)
 			now = len(parts) == 3 && otherFolder(t.OtherKind(parts[0], parts[1])) == parts[2]
+		} else if rest, ok := strings.CutPrefix(k, "c|"); ok {
+			// c|id|signature: the instance's conversions are unchanged.
+			i := strings.IndexByte(rest, '|')
+			now = ConversionsSig(t.Conversions[rest[:i]]) == rest[i+1:]
 		} else if rest, ok := strings.CutPrefix(k, "s|"); ok {
 			// s|folder|id|signature: the symbol still has that signature.
 			parts := strings.SplitN(rest, "|", 3)
@@ -259,6 +263,9 @@ func (c *Checker) check(e syntax.Expr, v tview) jsonv.Value {
 	}
 	if _, ok := e.(*syntax.Bad); ok {
 		return nil // already reported by the parser
+	}
+	if r, ok := c.convert(e, v); ok {
+		return r
 	}
 	if r := c.sugar(e, v); r != nil {
 		return r.apply(c, e, v)

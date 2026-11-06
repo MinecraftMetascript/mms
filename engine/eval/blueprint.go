@@ -52,7 +52,16 @@ func (c *ctx) instance(d *syntax.Decl, n *syntax.Name, bp *Blueprint, from *synt
 				continue
 			}
 			inst.fieldSp[key] = c.span(f.Sp)
-			given.set(key, c.reduce(f.Value))
+			v := c.reduce(f.Value)
+			given.set(key, v)
+			if c.site == nil {
+				if inst.Written == nil {
+					inst.Written = map[string]syntax.Expr{}
+				}
+				if x := c.lower(v); x != nil {
+					inst.Written[key] = x
+				}
+			}
 		}
 	}
 
@@ -92,6 +101,30 @@ func (c *ctx) instance(d *syntax.Decl, n *syntax.Name, bp *Blueprint, from *synt
 	for _, l := range bp.Lets {
 		var discard []syntax.Stmt
 		bc.stmt(l, &discard)
+	}
+
+	for _, as := range bp.As {
+		if as.Type == nil || as.Value == nil {
+			continue
+		}
+		conv := &Conversion{Type: as.Type, Path: bp.Path, X: bc.lower(bc.reduce(as.Value))}
+		if conv.X == nil {
+			continue
+		}
+		if as.Hint != nil {
+			args := bc.argValues(as.Hint.Args)
+			if len(args) == 2 {
+				r, ok1 := args[0].v.(*Str)
+				m, ok2 := args[1].v.(*Str)
+				if ok1 && ok2 {
+					conv.Rule, conv.Hint = r.S, m.S
+				}
+			}
+			if conv.Hint == "" {
+				bc.errorf("mms/hint-args", as.Hint.Sp, "hint takes a rule name and a message: hint(\"rule\", \"message\")")
+			}
+		}
+		inst.Conversions = append(inst.Conversions, conv)
 	}
 
 	for _, blk := range bp.Checks {

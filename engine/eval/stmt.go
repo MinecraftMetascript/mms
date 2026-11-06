@@ -424,6 +424,15 @@ func (c *ctx) apply(t *Template, x *syntax.Call) Value {
 	tc := &ctx{e: c.e, path: c.path, defPath: t.Path, site: &site, sc: &scope{}, ns: c.ns, compile: true,
 		depth: c.depth + 1, fr: append(append([]Frame(nil), c.fr...), Frame{Kind: FrameTemplate, Name: name,
 			Call: Origin{c.path, site}, Def: Origin{t.Path, t.D.Sp}})}
+	if c.site == nil {
+		call := &Call{Path: c.path, Template: t, X: x, Args: map[string]syntax.Expr{}}
+		for param, i := range argIndex(t.D, x) {
+			if a := c.lower(args[i].v); a != nil {
+				call.Args[param] = a
+			}
+		}
+		c.e.r.Calls = append(c.e.r.Calls, call)
+	}
 	if !c.bindParams(tc, t.D, "Template '"+name+"'", args, x) {
 		return &Code{p, &syntax.Bad{Sp: site}}
 	}
@@ -537,6 +546,36 @@ func quoteAll(ss []string) []string {
 	out := make([]string, len(ss))
 	for i, s := range ss {
 		out[i] = "'" + s + "'"
+	}
+	return out
+}
+
+// argIndex matches a call's arguments to the parameters they give.
+func argIndex(d *syntax.Decl, x *syntax.Call) map[string]int {
+	out := map[string]int{}
+	if d.Params == nil {
+		return out
+	}
+	ps := d.Params.Params
+	i := 0
+	for j, a := range x.Args {
+		if a.Name != nil {
+			out[a.Name.Text] = j
+			continue
+		}
+		for i < len(ps) && ps[i].Name != nil {
+			if _, taken := out[ps[i].Name.Text]; !taken {
+				break
+			}
+			i++
+		}
+		for i < len(ps) && ps[i].Name == nil {
+			i++
+		}
+		if i < len(ps) {
+			out[ps[i].Name.Text] = j
+			i++
+		}
 	}
 	return out
 }

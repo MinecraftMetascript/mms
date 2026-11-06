@@ -5,6 +5,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/minecraftmetascript/mms/engine/spec"
 	"github.com/minecraftmetascript/mms/engine/syntax"
 )
 
@@ -33,6 +34,12 @@ type Table struct {
 	DeclNS map[*syntax.Decl]string
 	// DeclKind maps each declaration to its resolved kind.
 	DeclKind map[*syntax.Decl]Kind
+	// Types are the types the project declares with `Type`, by the
+	// path the type checker gives them ("::mms::Name").
+	Types map[string]*spec.Type
+	// Conversions are the `as` conversions of Blueprint instances, by
+	// the instance's id.
+	Conversions map[string][]*Conversion
 }
 
 func key(folder, id string) string { return folder + "|" + id }

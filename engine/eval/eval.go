@@ -92,6 +92,9 @@ type Result struct {
 	// Instances are the Blueprint instances, in the order they were
 	// expanded.
 	Instances []*Instance
+	// Calls are the Template calls written in user code, whose
+	// arguments the type checker checks against the parameters.
+	Calls []*Call
 	// Nodes holds the provenance of output nodes whose text was written
 	// somewhere other than their span: inside a Template, a Blueprint or
 	// a const.
@@ -167,10 +170,37 @@ type Instance struct {
 	Fields *Record
 	// Primary is the emitted declaration the name forwards to, or nil.
 	Primary *syntax.Decl
+	// Written holds the field values the user wrote, evaluated and at
+	// the user's spans, when the declaration is user code (not emitted
+	// by another Blueprint).
+	Written map[string]syntax.Expr
+	// Conversions are the instance's `as` conversions, in order: what
+	// its name means where each type is expected.
+	Conversions []*Conversion
 	// Forward is set instead when the primary declaration is itself a
 	// Blueprint instance: the name means what that instance's name means.
 	Forward *Instance
 	fieldSp map[string]syntax.Span
+}
+
+// Conversion is one `as T = expr hint(...)` of a Blueprint instance.
+type Conversion struct {
+	Type syntax.TypeExpr
+	Path string // the Blueprint's file, where Type is written
+	// X is the converted value, built at the instance's name.
+	X syntax.Expr
+	// Rule and Hint are the hint's rule name and message, if any.
+	Rule, Hint string
+}
+
+// Call is a Template call in user code.
+type Call struct {
+	Path     string
+	Template *Template
+	X        *syntax.Call
+	// Args maps each parameter given to its argument, evaluated and at
+	// the user's spans.
+	Args map[string]syntax.Expr
 }
 
 type evaluator struct {
@@ -510,4 +540,15 @@ func pieces(s string) []piece {
 		out = append(out, piece{lit: s[lit:], off: lit})
 	}
 	return out
+}
+
+// Lowered returns the const's value written back as an expression at
+// the spans of its own text, or nil when it has none or was not
+// evaluated.
+func (s *Const) Lowered() syntax.Expr {
+	if s.state != 2 || s.val == nil {
+		return nil
+	}
+	c := &ctx{e: &evaluator{r: &Result{Nodes: map[syntax.Node]Prov{}}}, path: s.Path, defPath: s.Path, sc: &scope{}}
+	return c.lower(s.val)
 }

@@ -27,13 +27,26 @@ ItemModel both { model = Plain(item/x) }
 20:3 error mms/unknown-field: CustomItem has no field 'colour'
 23:12 error mms/missing-field: CustomItem nothing needs 'base'
 === provenance of copied nodes
+items.mms:16:12 from 07-custom-item.mms:17 < Blueprint CustomItem (at items.mms:16:12, def 07-custom-item.mms:2:1): 2 nodes, { item_model = demo:both }
+items.mms:16:12 from 07-custom-item.mms:2 < Blueprint CustomItem (at items.mms:16:12, def 07-custom-item.mms:2:1): 2 nodes, demo:both
+items.mms:16:12 from 07-custom-item.mms:34 < Blueprint CustomItem (at items.mms:16:12, def 07-custom-item.mms:2:1): 1 node, { id = stick, components = { item_model = dem...
+items.mms:16:12 from 07-custom-item.mms:35 < Blueprint CustomItem (at items.mms:16:12, def 07-custom-item.mms:2:1): 5 nodes, Item(name = stick, functions = [SetComponents...
 items.mms:16:12 from 07-custom-item.mms:43 < Blueprint CustomItem (at items.mms:16:12, def 07-custom-item.mms:2:1): 2 nodes, Plain(item/x)
 items.mms:1:12 from 07-custom-item.mms:15 < Blueprint CustomItem (at items.mms:1:12, def 07-custom-item.mms:2:1): 1 node, "item.demo.ruby"
-items.mms:1:12 from 07-custom-item.mms:19 < Blueprint CustomItem (at items.mms:1:12, def 07-custom-item.mms:2:1): 1 node, Translate
+items.mms:1:12 from 07-custom-item.mms:17 < Blueprint CustomItem (at items.mms:1:12, def 07-custom-item.mms:2:1): 2 nodes, { item_model = demo:ruby, item_name = Transla...
+items.mms:1:12 from 07-custom-item.mms:19 < Blueprint CustomItem (at items.mms:1:12, def 07-custom-item.mms:2:1): 3 nodes, Translate("item.demo.ruby", fallback = "Ruby")
+items.mms:1:12 from 07-custom-item.mms:2 < Blueprint CustomItem (at items.mms:1:12, def 07-custom-item.mms:2:1): 2 nodes, demo:ruby
+items.mms:1:12 from 07-custom-item.mms:34 < Blueprint CustomItem (at items.mms:1:12, def 07-custom-item.mms:2:1): 1 node, { id = emerald, components = { item_model = d...
+items.mms:1:12 from 07-custom-item.mms:35 < Blueprint CustomItem (at items.mms:1:12, def 07-custom-item.mms:2:1): 5 nodes, Item(name = emerald, functions = [SetComponen...
 items.mms:1:12 from 07-custom-item.mms:41 < Blueprint CustomItem (at items.mms:1:12, def 07-custom-item.mms:2:1): 1 node, { layer0 = Texture("art/ruby.png") }
 items.mms:1:12 from 07-custom-item.mms:43 < Blueprint CustomItem (at items.mms:1:12, def 07-custom-item.mms:2:1): 3 nodes, Plain(item/ruby)
 items.mms:1:12 from 07-custom-item.mms:9 < Blueprint CustomItem (at items.mms:1:12, def 07-custom-item.mms:2:1): 1 node, item/generated
 items.mms:7:12 from 07-custom-item.mms:15 < Blueprint CustomItem (at items.mms:7:12, def 07-custom-item.mms:2:1): 1 node, "item.demo.bell"
-items.mms:7:12 from 07-custom-item.mms:19 < Blueprint CustomItem (at items.mms:7:12, def 07-custom-item.mms:2:1): 1 node, Translate
-items.mms:7:12 from 07-custom-item.mms:2 < Blueprint CustomItem (at items.mms:7:12, def 07-custom-item.mms:2:1): 1 node, demo:bell
+items.mms:7:12 from 07-custom-item.mms:17 < Blueprint CustomItem (at items.mms:7:12, def 07-custom-item.mms:2:1): 2 nodes, { item_model = demo:bell, item_name = Transla...
+items.mms:7:12 from 07-custom-item.mms:19 < Blueprint CustomItem (at items.mms:7:12, def 07-custom-item.mms:2:1): 3 nodes, Translate("item.demo.bell", fallback = "Bell")
+items.mms:7:12 from 07-custom-item.mms:2 < Blueprint CustomItem (at items.mms:7:12, def 07-custom-item.mms:2:1): 3 nodes, demo:bell
+items.mms:7:12 from 07-custom-item.mms:20 < Blueprint CustomItem (at items.mms:7:12, def 07-custom-item.mms:2:1): 2 nodes, never_finished_consumable
+items.mms:7:12 from 07-custom-item.mms:21 < Blueprint CustomItem (at items.mms:7:12, def 07-custom-item.mms:2:1): 4 nodes, { mms_item = "demo:bell" }
+items.mms:7:12 from 07-custom-item.mms:34 < Blueprint CustomItem (at items.mms:7:12, def 07-custom-item.mms:2:1): 1 node, { id = gold_nugget, components = { item_model...
+items.mms:7:12 from 07-custom-item.mms:35 < Blueprint CustomItem (at items.mms:7:12, def 07-custom-item.mms:2:1): 5 nodes, Item(name = gold_nugget, functions = [SetComp...
 items.mms:7:12 from 07-custom-item.mms:43 < Blueprint CustomItem (at items.mms:7:12, def 07-custom-item.mms:2:1): 2 nodes, Plain(item/bell_model)

@@ -60,3 +60,36 @@ func keys(m map[string]string) []string {
 	}
 	return out
 }
+
+// TestConversionEdit checks that a use of a Blueprint instance in another
+// file follows an edit to the instance: the cached check of the user
+// must not survive the change of what its name converts to.
+func TestConversionEdit(t *testing.T) {
+	p := New(spec.MustDefault(), Config{Namespace: "demo"})
+	p.SetFile("gem.mms", `Blueprint Gem {
+  base: Id<item>
+  as Id<item> = base hint("gem-base", "Matches any ${base}")
+  emit { Function gems/${self.path} { /say ${base} } }
+}
+Gem ruby { base = emerald }
+`)
+	p.SetFile("tag.mms", "ItemTag shiny = [ruby]\n")
+	hint := func() string {
+		r, err := p.Analyze(context.Background())
+		if err != nil {
+			t.Fatal(err)
+		}
+		var msgs []string
+		for _, d := range r.Diagnostics("tag.mms") {
+			msgs = append(msgs, d.Code+" "+d.Message)
+		}
+		return strings.Join(msgs, "; ")
+	}
+	if got := hint(); got != "gem-base Matches any emerald" {
+		t.Fatalf("before the edit: %q", got)
+	}
+	p.SetFile("gem.mms", strings.Replace(p.texts["gem.mms"], "emerald", "diamond", 1))
+	if got := hint(); got != "gem-base Matches any diamond" {
+		t.Fatalf("after the edit: %q", got)
+	}
+}
