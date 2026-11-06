@@ -179,7 +179,7 @@ primary
     | ((TILDE | CARET) (MINUS? NUMBER)?)+                # coordinate
     | LPAREN value RPAREN                                # parenExpr
     | LBRACK FOR IDENT (COMMA IDENT)? IN expr (IF expr)? COLON value RBRACK # comprehension
-    | LBRACK (value ((COMMA | {p.onNewLine()}?) value)* COMMA?)? RBRACK # listLit
+    | LBRACK (value (COMMA? value)* COMMA?)? RBRACK            # listLit
     | block                                              # objectLit
     | MISSING                                            # missingLit
     ;

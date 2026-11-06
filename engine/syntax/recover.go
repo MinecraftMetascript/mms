@@ -39,7 +39,9 @@ var closerFor = map[int]struct {
 // closeUnbalanced inserts synthetic closing brackets where the author most
 // likely meant them: before a line that starts a new top-level declaration
 // (`Kind name` in column 0) while brackets are still open, and at the end
-// of the file. It reports each bracket it closes.
+// of the file. It reports each bracket it closes. The layout is only read
+// when some bracket is never closed: a file whose brackets all match keeps
+// its brackets, however it is laid out.
 func closeUnbalanced(toks []antlr.Token) ([]antlr.Token, map[antlr.Token]bool, []Diagnostic) {
 	var (
 		out       []antlr.Token
@@ -73,6 +75,7 @@ func closeUnbalanced(toks []antlr.Token) ([]antlr.Token, map[antlr.Token]bool, [
 		}
 		return nil
 	}
+	unclosed := hasUnclosed(toks)
 	for i, t := range toks {
 		if t.GetChannel() != antlr.TokenDefaultChannel {
 			out = append(out, t)
@@ -84,8 +87,8 @@ func closeUnbalanced(toks []antlr.Token) ([]antlr.Token, map[antlr.Token]bool, [
 			out = append(out, t)
 			continue
 		}
-		if len(stack) > 0 && t.GetColumn() == 0 && t.GetLine() > prevLine {
-			if n := nextDefault(i); n != nil && startsTopItem(tt, n.GetTokenType()) {
+		if unclosed && len(stack) > 0 && t.GetColumn() == 0 && t.GetLine() > prevLine {
+			if n := nextDefault(i); n != nil && startsTopItem(t, n.GetTokenType()) {
 				closeAll(t)
 			}
 		}
@@ -108,12 +111,38 @@ func closeUnbalanced(toks []antlr.Token) ([]antlr.Token, map[antlr.Token]bool, [
 	return out, synthetic, diags
 }
 
-// startsTopItem reports whether a token pair in column 0 starts a top-level
-// item: `Kind name`, or `const`, `for` or `extern` followed by a word.
-func startsTopItem(first, second int) bool {
-	switch first {
+// hasUnclosed reports whether some opening bracket in toks is never
+// closed, matching brackets the way closeUnbalanced does.
+func hasUnclosed(toks []antlr.Token) bool {
+	var stack []int
+	for _, t := range toks {
+		if t.GetChannel() != antlr.TokenDefaultChannel {
+			continue
+		}
+		tt := t.GetTokenType()
+		switch {
+		case closerFor[tt].text != "":
+			stack = append(stack, tt)
+		case isCloser(tt):
+			for j := len(stack) - 1; j >= 0; j-- {
+				if closerFor[stack[j]].kind == tt {
+					stack = stack[:j]
+					break
+				}
+			}
+		}
+	}
+	return len(stack) > 0
+}
+
+// startsTopItem reports whether a token pair starts a top-level item:
+// `Kind name` with a PascalCase kind, or `const`, `for` or `extern`
+// followed by a word.
+func startsTopItem(first antlr.Token, second int) bool {
+	switch first.GetTokenType() {
 	case parser.MMSLexerIDENT:
-		return parser.IsNameToken(second)
+		r := first.GetText()
+		return r != "" && r[0] >= 'A' && r[0] <= 'Z' && parser.IsNameToken(second)
 	case parser.MMSLexerCONST, parser.MMSLexerFOR, parser.MMSLexerEXTERN:
 		return second == parser.MMSLexerIDENT
 	}
@@ -159,8 +188,15 @@ func markMissingValues(toks []antlr.Token, synthetic map[antlr.Token]bool) ([]an
 		return antlr.TokenEOF
 	}
 	missing := map[int]bool{} // toks index of an '=' missing its value
+	depth := 0                // open brackets before the token
 	for k, i := range def {
 		eq := toks[i]
+		switch tt := eq.GetTokenType(); {
+		case closerFor[tt].text != "":
+			depth++
+		case isCloser(tt) && depth > 0:
+			depth--
+		}
 		if eq.GetTokenType() != parser.MMSLexerASSIGN || k+1 >= len(def) {
 			continue
 		}
@@ -172,14 +208,20 @@ func markMissingValues(toks []antlr.Token, synthetic map[antlr.Token]bool) ([]an
 			parser.MMSLexerRETURN, parser.MMSLexerBREAK, parser.MMSLexerCONTINUE:
 			missing[i] = true
 		case parser.MMSLexerIDENT, parser.MMSLexerRESLOC, parser.MMSLexerSTRING:
-			if next.GetLine() > eq.GetLine() && kind(k+2) == parser.MMSLexerASSIGN {
+			// `a = b = 1` is never a value followed by more: b starts the
+			// next field.
+			if kind(k+2) == parser.MMSLexerASSIGN {
 				missing[i] = true
 			}
 		case antlr.TokenEOF:
 			missing[i] = true
 		}
-		// A new top-level item on a later line is never the value.
-		if next.GetLine() > eq.GetLine() && next.GetColumn() == 0 && startsTopItem(next.GetTokenType(), kind(k+2)) {
+		// At the top level, `Kind name` is a new item, never the value:
+		// no top-level item starts with a value. When the pair after it
+		// starts an item too (`x = Floor` then `Noise n ...`), that later
+		// pair is the item.
+		if depth == 0 && k+2 < len(def) && startsTopItem(next, kind(k+2)) &&
+			!(k+3 < len(def) && startsTopItem(toks[def[k+2]], kind(k+3))) {
 			missing[i] = true
 		}
 	}
@@ -208,26 +250,28 @@ func markMissingValues(toks []antlr.Token, synthetic map[antlr.Token]bool) ([]an
 	return out, diags
 }
 
-// separateLines inserts a SEP token between two words on different lines
-// inside braces, where the first ends a statement and the second starts
-// the next: `x` then `y = 1`, or `JigsawHole a` then `JigsawHole b`. Without
-// it the parser could read the pair as one declaration, `x y = 1`. Inside
-// brackets and parentheses a newline never separates statements, so
-// nothing is inserted there.
-func separateLines(toks []antlr.Token, synthetic map[antlr.Token]bool) []antlr.Token {
+// separateWords inserts a SEP token between two words inside braces when
+// the first cannot be a declaration's kind: `x` then `y = 1`, or
+// `orange_edge` then `Bandlands()`. Kinds are PascalCase, so a lowercase
+// word, a resource location or a templated name always ends a statement
+// there, and without the SEP the parser would read the pair as one
+// declaration, `x y = 1`. The rule looks only at the tokens, never at line
+// breaks, so `a b` and `a` then `b` on the next line parse the same.
+// Inside brackets and parentheses nothing is inserted.
+func separateWords(toks []antlr.Token, synthetic map[antlr.Token]bool) []antlr.Token {
 	var (
 		out   []antlr.Token
 		stack []int
 		prev  antlr.Token
 	)
-	for _, t := range toks {
+	for i, t := range toks {
 		if t.GetChannel() != antlr.TokenDefaultChannel {
 			out = append(out, t)
 			continue
 		}
 		tt := t.GetTokenType()
 		if prev != nil && len(stack) > 0 && stack[len(stack)-1] == parser.MMSLexerLBRACE &&
-			t.GetLine() > prev.GetLine() && endsWord(prev.GetTokenType()) && parser.IsNameToken(tt) {
+			notKind(prev) && startsName(tt) && !isHint(toks, i) {
 			sep := antlr.CommonTokenFactoryDEFAULT.Create(&antlr.TokenSourceCharStreamPair{},
 				parser.MMSLexerSEP, "", antlr.TokenDefaultChannel, prev.GetStop()+1, prev.GetStop(), prev.GetLine(), prev.GetColumn())
 			synthetic[sep] = true
@@ -250,8 +294,42 @@ func separateLines(toks []antlr.Token, synthetic map[antlr.Token]bool) []antlr.T
 	return out
 }
 
-// endsWord reports whether a token is a word that can end a statement and
-// be mistaken for a declaration's kind.
-func endsWord(t int) bool {
-	return t == parser.MMSLexerIDENT || t == parser.MMSLexerRESLOC || t == parser.MMSLexerTNAME
+// notKind reports whether a token is a word that ends a statement and can
+// never be a declaration's kind: a lowercase identifier, a resource
+// location or a templated name.
+func notKind(t antlr.Token) bool {
+	switch t.GetTokenType() {
+	case parser.MMSLexerRESLOC, parser.MMSLexerTNAME:
+		return true
+	case parser.MMSLexerIDENT:
+		r := t.GetText()
+		return r != "" && (r[0] == '_' || r[0] >= 'a' && r[0] <= 'z')
+	}
+	return false
+}
+
+// startsName reports whether a token of kind t can be a declaration's
+// name (the declName rule).
+func startsName(t int) bool {
+	switch t {
+	case parser.MMSLexerIDENT, parser.MMSLexerRESLOC, parser.MMSLexerTNAME, parser.MMSLexerTYPE,
+		parser.MMSLexerPRIMARY, parser.MMSLexerAS, parser.MMSLexerCHECK, parser.MMSLexerEMIT,
+		parser.MMSLexerSETUP, parser.MMSLexerEXPECT, parser.MMSLexerRUN:
+		return true
+	}
+	return false
+}
+
+// isHint reports whether toks[i] starts the `hint(...)` that may follow
+// the value of an `as` conversion.
+func isHint(toks []antlr.Token, i int) bool {
+	if toks[i].GetTokenType() != parser.MMSLexerIDENT || toks[i].GetText() != "hint" {
+		return false
+	}
+	for _, t := range toks[i+1:] {
+		if t.GetChannel() == antlr.TokenDefaultChannel {
+			return t.GetTokenType() == parser.MMSLexerLPAREN
+		}
+	}
+	return false
 }

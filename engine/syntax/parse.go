@@ -25,7 +25,7 @@ func Parse(src string) *File {
 	}
 	toks, synthetic, closeDiags := closeUnbalanced(raw)
 	toks, missingDiags := markMissingValues(toks, synthetic)
-	toks = separateLines(toks, synthetic)
+	toks = separateWords(toks, synthetic)
 	closeDiags = append(closeDiags, missingDiags...)
 	stream := antlr.NewCommonTokenStream(&sliceSource{MMSLexer: lexer, toks: toks}, antlr.TokenDefaultChannel)
 	stream.Fill()
@@ -925,7 +925,7 @@ func (b *builder) primary(c parser.IPrimaryContext, sp Span) Expr {
 	case *parser.SelectorContext:
 		return &Selector{Name: strings.TrimPrefix(text, "@"), Sp: sp}
 	case *parser.CoordinateContext:
-		return &Coord{Text: b.sourceText(sp), Sp: sp}
+		return &Coord{Text: coordText(p), Sp: sp}
 	case *parser.ParenExprContext:
 		return &Paren{X: b.value(p.Value(), sp), Sp: sp}
 	case *parser.ListLitContext:
@@ -964,4 +964,25 @@ func unquote(s string) string {
 		return u
 	}
 	return strings.Trim(s, `"'`)
+}
+
+// coordText spells a coordinate group from its tokens, one space between
+// coordinates and none inside one, so `^ ^-1.7` reads the same however it
+// is spaced or broken across lines.
+func coordText(p *parser.CoordinateContext) string {
+	var b strings.Builder
+	for _, c := range p.GetChildren() {
+		t, ok := c.(antlr.TerminalNode)
+		if !ok {
+			continue
+		}
+		switch tt := t.GetSymbol().GetTokenType(); tt {
+		case parser.MMSLexerTILDE, parser.MMSLexerCARET:
+			if b.Len() > 0 {
+				b.WriteByte(' ')
+			}
+		}
+		b.WriteString(t.GetText())
+	}
+	return b.String()
 }
