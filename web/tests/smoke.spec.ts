@@ -1098,11 +1098,14 @@ test('a tell or title previews its message as the game shows it', async ({ page 
 		page,
 		'Objective kills = "dummy"\nFunction f {\n  tell(@a, "{gold}**Wave** ${kills[@s]} begins")\n  title(@a, "Victory", subtitle = "{gray}*well held*")\n}\n'
 	);
-	await expect(status(page)).toHaveText(/No problems/);
-	await page.locator('.cm-line', { hasText: 'tell(@a' }).click();
 	const text = page.getByLabel('Text preview');
 	const chat = text.getByLabel('Chat');
-	await expect(chat).toContainText('Wave 0 begins');
+	// The status still reads "No problems" from before the edit until the
+	// new analysis lands, so wait for the preview, not the status.
+	await expect(async () => {
+		await page.locator('.cm-line', { hasText: 'tell(@a' }).click();
+		await expect(chat).toContainText('Wave 0 begins', { timeout: 2_000 });
+	}).toPass({ timeout: 30_000 });
 	await expect(chat.getByText('Wave', { exact: true })).toHaveCSS('font-weight', '700');
 	// The score is filled in when the message shows; try a value.
 	await text.getByRole('textbox', { name: 'kills[@s]' }).fill('7');

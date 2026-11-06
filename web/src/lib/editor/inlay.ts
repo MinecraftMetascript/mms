@@ -72,10 +72,15 @@ export function inlayHints(fetch: (uri: string) => Promise<InlayHint[]>, delay =
 				if (seq !== this.seq || !LSPPlugin.get(this.view)) return;
 				const doc = plugin.syncedDoc;
 				const b = new RangeSetBuilder<Decoration>();
+				// The hints can be for an older text than the synced one, so
+				// each is kept within its line and in order.
+				let last = 0;
 				for (const h of hints) {
 					if (h.position.line >= doc.lines) continue;
-					const at = plugin.fromPosition(h.position, doc);
+					const at = Math.min(plugin.fromPosition(h.position, doc), doc.line(h.position.line + 1).to);
+					if (at < last) continue;
 					b.add(at, at, Decoration.widget({ widget: new HintWidget(h.label, h.tooltip ?? ''), side: 1 }));
+					last = at;
 				}
 				this.decorations = b.finish().map(plugin.unsyncedChanges);
 				this.view.dispatch({});
