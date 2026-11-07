@@ -14,7 +14,7 @@
 // The Structures view, next to it, lists what structure blocks saved in
 // the structure world (structures.ts), so pieces built in the game can be
 // pulled into the project for jigsaw template pools, and pulled again after
-// each re-save. Imported pieces that no Structure(...) call names (the
+// each re-save. Imported pieces that no StructureFile(...) call names (the
 // unused-asset lint) are marked there. It is its own view so the World view
 // stays short (the world, Build and its result) and each can be moved,
 // collapsed or hidden on its own. Both views are drawn by the same page and
@@ -394,7 +394,7 @@ export class WorldView implements vscode.Disposable {
 		if (chosen?.length) await this.importStructures(chosen.map((c) => c.structure));
 	}
 
-	/** Copies structures into the project and offers the Structure(...) call. */
+	/** Copies structures into the project and offers the StructureFile(...) call. */
 	private async importStructures(list: WorldStructure[]) {
 		const done: { rel: string; call: string }[] = [];
 		for (const s of list) {

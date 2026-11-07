@@ -169,6 +169,58 @@ func TestSemanticTokens(t *testing.T) {
 	}
 }
 
+// Templates, Blueprints, Types, consts and their parameters are
+// classified as written, not as they expand.
+func TestSemanticTokensSource(t *testing.T) {
+	src := "Type Size { w: int }\nconst amount: int = 3\nTemplate twice(x: int): int = x * 2\n" +
+		"Blueprint Wand(name: string) { CustomItem ${self.path} { base = stick, name = name } }\n" +
+		"Wand ruby { name = \"Ruby\" }\nDensityFunction d = twice(amount)\n"
+	s, _ := session(t, src)
+	toks := s.SemanticTokens("main.mms")
+	r := []rune(src)
+	at := func(sub string, nth int) (TokenType, int, bool) {
+		off := -1
+		for range nth + 1 {
+			off += 1 + strings.Index(src[off+1:], sub)
+		}
+		for _, tk := range toks {
+			if tk.Span.Start == len([]rune(src[:off])) && string(r[tk.Span.Start:tk.Span.End]) == sub {
+				return tk.Type, tk.Mods, true
+			}
+		}
+		return 0, 0, false
+	}
+	for _, c := range []struct {
+		sub  string
+		nth  int
+		want TokenType
+		mods int
+	}{
+		{"Size", 0, TokType, ModDeclaration},
+		{"int", 0, TokType, 0},
+		{"amount", 0, TokVariable, ModDeclaration},
+		{"amount", 1, TokVariable, 0},
+		{"twice", 0, TokFunction, ModDeclaration},
+		{"x", 0, TokParameter, ModDeclaration},
+		{"x", 1, TokParameter, 0},
+		{"Wand", 0, TokType, ModDeclaration},
+		{"self", 0, TokVariable, 0},
+		{"stick", 0, TokEnumMember, 0},
+		{"Wand", 1, TokType, 0},
+		{"twice", 1, TokFunction, 0}, // the user's own Template is not the library's
+	} {
+		typ, mods, ok := at(c.sub, c.nth)
+		if !ok || typ != c.want || mods != c.mods {
+			t.Errorf("%s #%d: got %s/%d (found %v), want %s/%d", c.sub, c.nth, TokenTypes[typ], mods, ok, TokenTypes[c.want], c.mods)
+		}
+	}
+	for i := 1; i < len(toks); i++ {
+		if toks[i].Span.Start < toks[i-1].Span.End {
+			t.Errorf("overlap at %v", toks[i].Span)
+		}
+	}
+}
+
 func TestResourcePackNavigation(t *testing.T) {
 	src := "Model block/glow = { parent = minecraft:block/cube_all }\nBlockState minecraft:glowstone = { variants = { \"\" = [{ model = block/gl|ow, weight = 3 }] } }\n"
 	s, off := session(t, src)
@@ -233,5 +285,33 @@ func TestRecipeIngredientCompletion(t *testing.T) {
 				t.Errorf("replaces %q, want %q", r, tc.replaced)
 			}
 		})
+	}
+}
+
+// A string read as text markup is split into its marks, tags and
+// ${...} reads; a mark left open is text.
+func TestSemanticTokensMarkup(t *testing.T) {
+	plain := "Advancement a = { display = { title = \"**Ruby** 5 * 3\", description = \"d\" } }\n"
+	ps, _ := session(t, plain)
+	var pg []string
+	for _, tk := range ps.SemanticTokens("main.mms") {
+		pg = append(pg, TokenTypes[tk.Type]+":"+string([]rune(plain)[tk.Span.Start:tk.Span.End]))
+	}
+	if g := strings.Join(pg, " "); !strings.Contains(g, `string:" operator:** string:Ruby operator:** string: 5 * 3" property:description`) {
+		t.Errorf("plain tokens: %s", g)
+	}
+
+	src := "const who = \"x\"\nAdvancement a = { display = { title = \"**Ruby** {gold}gem ${who} 5 * 3\", description = \"d\", icon = { id = stone } }, criteria = { x = Tick() } }\n"
+	s, _ := session(t, src)
+	r := []rune(src)
+	var got []string
+	for _, tk := range s.SemanticTokens("main.mms") {
+		if tk.Span.Start > len([]rune(src[:strings.Index(src, "title =")])) {
+			got = append(got, TokenTypes[tk.Type]+":"+string(r[tk.Span.Start:tk.Span.End]))
+		}
+	}
+	want := `string:" operator:** string:Ruby operator:** string:  keyword:{gold} string:gem  variable:${who} string: 5 * 3" property:description`
+	if g := strings.Join(got, " "); !strings.Contains(g, want) {
+		t.Errorf("tokens:\n%s\nwant:\n%s", g, want)
 	}
 }

@@ -43,7 +43,7 @@ type Info struct {
 	// Props are the block state properties a multipart `when` object
 	// body can test, for completion.
 	Props map[string][]string
-	// InlineFn is set on a `{ ... }` block written where a function id is
+	// InlineFn is set on a `run { ... }` block written where a function id is
 	// needed: its body is function code, compiled as a hoisted Function.
 	InlineFn bool
 	// Extract is the declaration kind (as written, e.g. "Noise") of an
@@ -99,7 +99,7 @@ type Checker struct {
 	// the unit path it has; nil when there are none.
 	Texts func(path string) (unit, text string, ok bool)
 	// Book is the layout of the last Book text checked, for the editor
-	// and the book-overflow lint.
+	// and the book-page-overflow lint.
 	Book *BookLayout
 	// Shown are the messages the function's text commands show.
 	Shown []ShownText

@@ -298,3 +298,52 @@ func kindName(v Value) string {
 	}
 	return "a value only known when the pack runs"
 }
+
+// TypeOf names the type of a compile-time value for an inlay hint, such
+// as int, float, string, Selector or [int], or "" when it has no short
+// name (an object, a name, or a value only known when the pack runs).
+func TypeOf(v Value) string {
+	switch v := v.(type) {
+	case *Bool:
+		return "bool"
+	case *Num:
+		if v.Int {
+			return "int"
+		}
+		return "float"
+	case *Str:
+		return "string"
+	case *Code:
+		x := v.X
+		if ix, ok := x.(*syntax.Index); ok {
+			x = ix.X // @e[tag=boss]
+		}
+		if _, ok := x.(*syntax.Selector); ok {
+			return "Selector"
+		}
+	case *List:
+		if len(v.Elems) == 0 {
+			return ""
+		}
+		t := TypeOf(v.Elems[0])
+		for _, it := range v.Elems[1:] {
+			if TypeOf(it) != t {
+				return ""
+			}
+		}
+		if t != "" {
+			return "[" + t + "]"
+		}
+	case *RangeV:
+		return "range"
+	}
+	return ""
+}
+
+// Value is the const's value once evaluated, or nil.
+func (k *Const) Value() Value {
+	if k.state != 2 {
+		return nil
+	}
+	return k.val
+}

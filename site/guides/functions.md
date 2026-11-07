@@ -45,6 +45,48 @@ Function on_death {
 - **Locals** (`let`) belong to their function. A name in an inner block can shadow an outer one.
 - **Objective scores** are written `objective[holder]`. The holder is a selector, or a fake player name in quotes, such as `kills["#total"]`.
 
+### Storage records
+
+A `Storage` keeps a record, a `Type` with fields, in command storage. Functions read and write its `int`, `bool` and `string` fields by name:
+
+```mms
+/** The state of a siege. */
+Type SiegeState {
+  wave: int = 0
+  boss_alive: bool
+  /** Mobs still to spawn this wave. */
+  queue: [Id<entity_type>] = []
+}
+
+/** Kept in storage siege:mms game. */
+Storage game: SiegeState
+
+Function next_wave {
+  game.wave += 1
+  game.boss_alive = game.wave % 5 == 0
+  tell(@a, "Wave ${game.wave} begins")
+}
+```
+
+The load function sets each missing field to its default, or to `0`, `false` or `""` when it has none. A `/reload` keeps the values, and a field added later starts at its default. The record is at `<namespace>:mms <name>`, so `/data get storage siege:mms game` shows it in the game. Fields of other types, such as `queue`, are stored and given their defaults, but functions do not read them yet. Completion after `game.` lists the fields, and hovering one shows its type and doc comment.
+
+A field costs a storage read and write each time a function uses it. A `Global` is a score, so it is cheaper in a tight loop.
+
+### Selectors
+
+`exists(target)` tells whether a selector finds any entity, and `count(target)` how many it finds:
+
+```mms
+const boss = @e[tag=siege.boss, limit=1]
+
+Function check {
+  if (!exists(boss)) {
+    /summon wither_skeleton ~ ~ ~ {Tags:["siege.boss"]}
+  }
+  let zombies = count(@e[type=zombie, distance=..16])
+}
+```
+
 ### Operators
 
 | Operators | Meaning |
@@ -142,6 +184,27 @@ A function with a return type must end with `return` on every path.
 A call looks like `add(1, 2)`, or `other_ns:add(1, 2)` for a function in another namespace. Arguments are passed by position. A call can stand on its own, or be used as a value when the function has a return type.
 
 Parameters are `int`, `bool` or `string`. Functions return `int` or `bool`. To hand a string back, assign it to a Global.
+
+## Command templates
+
+A `Template` that returns `Commands` writes its body where it is called, at compile time. Its loops unroll and its `${...}` pieces are filled in, so it costs no function call in the game:
+
+```mms
+/** A ring of particles around the executor. */
+Template particle_ring(p: Id<particle>, radius: int, points: int = 8): Commands {
+  for i in 0..points - 1 {
+    /particle ${p} ^${radius * cos(i * 360 / points)} ^1 ^${radius * sin(i * 360 / points)}
+  }
+}
+
+Function celebrate {
+  As(@a).At(@s) {
+    particle_ring(flame, 2)
+  }
+}
+```
+
+Its call looks like a function call, so the editor marks it with an `inlined` hint. Hovering the hint or the name shows the commands it writes. Arguments are compile-time values. A variable, a `Global` or a `Storage` field is passed as its value when the function runs, so the template can use it in commands and code but not in a compile-time loop.
 
 ## Execute blocks
 
@@ -310,4 +373,38 @@ CustomItem blast_potion {
 
 A thrown potion keeps no weapon, so no enchantment runs for it. Instead the tick function puts a marker on each new one, riding it, with the function's id in its `data`. The game drops a projectile's passengers where it removes it, so a marker that is no longer riding anything (`<namespace>:mms_gen/projectile/riding`) marks the spot. The function runs as that marker, at it, and the marker is removed afterwards. The spot is where the potion was at the end of its last tick of flight, so up to about half a block short, and the function can't tell what the potion hit or who threw it. The potion still splashes as usual.
 
-To see what these become in the data pack, read [How functions compile](../concepts/how-functions-compile.md).
+## Tests
+
+A `Test` checks functions without starting the game. It has a `setup { }` block, then `run` and `expect` lines:
+
+```mms
+Type SiegeState { wave: int = 0 }
+Storage game: SiegeState
+
+Function next_wave {
+  game.wave += 1
+  for i in 1..game.wave * 2 {
+    As(@e[tag=siege.spawn]).At(@s) {
+      /summon zombie ~ ~ ~ {Tags:["siege.enemy"]}
+    }
+  }
+}
+
+Test second_wave_spawns_four {
+  setup {
+    game.wave = 1
+    /summon marker 0 64 0 {Tags:["siege.spawn"]}
+  }
+  run next_wave()
+  expect game.wave == 2
+  expect count(@e[tag=siege.enemy]) == 4
+}
+```
+
+Each test runs in a fresh world after the pack's load functions. `setup` holds function code and commands, and its `let` variables stay in scope for the `expect` lines. `run` calls a function, and a test of a function that returns a value can skip it: `expect fib(10) == 55`. `expect` checks a condition, and the test stops at the first one that fails. A failing comparison of ints shows both sides: `expected game.wave == start, but game.wave is 6 and start is 5`. A test can have several `run` and `expect` lines, in any order after `setup`.
+
+`mms test` runs every test and exits with 1 when one fails. `-run <regexp>` runs the tests whose names match, and `-v` lists the passing tests too and prints what each test's commands said. The web editor shows a Tests tab once the project has a test, and runs the tests after every edit. VS Code lists them in its Testing view. All three run the same interpreter, so they give the same results.
+
+Tests compile to functions under `<namespace>:mms_test/` that the pack never includes. The interpreter runs the commands that functions compile to (scoreboard, storage, `execute`, `function`, `return`, `say` and `tellraw`) and keeps entities that `summon` creates, with their type, tags and position, for `kill`, `tag`, `execute as`, `execute at` and `if entity`. Selectors are `@e` and `@s`, with `type`, `tag`, `limit` and `sort=arbitrary`. There are no players, blocks or ticks, so `@a` selects no one. A command or selector argument the interpreter does not know fails the test and names it, so a test never passes by skipping a command.
+
+To see what functions become in the data pack, read [How functions compile](../concepts/how-functions-compile.md).

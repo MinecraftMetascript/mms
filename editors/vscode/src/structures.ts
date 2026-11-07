@@ -2,7 +2,7 @@
 // pull in for its template pools. The game writes a structure block's SAVE
 // to <world>/generated/<namespace>/structure/<path>.nbt (structures/ before
 // 1.21). Importing copies the file into the project, under the structures
-// folder (mms.structuresFolder), where Structure("structures/<path>.nbt")
+// folder (mms.structuresFolder), where StructureFile("structures/<path>.nbt")
 // puts it in the pack with the id <namespace>:<path>.
 import * as crypto from 'crypto';
 import * as fs from 'fs';
@@ -56,14 +56,17 @@ export function importPath(s: WorldStructure, projectNs: string | undefined, fol
 }
 
 /**
- * The helper call that puts an imported structure in the pack. The id name
+ * The call that puts an imported structure in the pack. The id name
  * keeps the folders of the path; without it the id would be the bare
  * file name.
  */
 export function structureCall(rel: string, s: WorldStructure): string {
+	// Piece("tower/base") reads structures/tower/base.nbt as a pool entry,
+	// with the id tower/base.
+	if (rel === `structures/${s.path}.nbt`) return `Piece("${s.path}")`;
 	const base = s.path.split('/').pop()!;
 	const defaultName = base.toLowerCase().replace(/[^a-z0-9_.-]/g, '_');
-	return s.path === defaultName ? `Structure("${rel}")` : `Structure("${rel}", "${s.path}")`;
+	return s.path === defaultName ? `StructureFile("${rel}")` : `StructureFile("${rel}", "${s.path}")`;
 }
 
 /** Whether the project has the structure, and the same bytes as the world. */

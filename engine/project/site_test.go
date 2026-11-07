@@ -62,7 +62,8 @@ func siteSamples(t *testing.T) []siteSample {
 // TestSiteSamples checks every ```mms block on the website as a file of
 // its own, so the docs break the build when the language moves on
 // without them. A block fenced ```mms error shows a mistake on purpose
-// and must report at least one error.
+// and must report at least one error. ```mms in=examples/jigsaw reads
+// asset files, such as structure templates, from that folder.
 func TestSiteSamples(t *testing.T) {
 	samples := siteSamples(t)
 	if len(samples) == 0 {
@@ -71,6 +72,22 @@ func TestSiteSamples(t *testing.T) {
 	pack := spec.MustDefault()
 	for _, s := range samples {
 		p := New(pack, DefaultConfig())
+		wantErr := false
+		bad := false
+		for _, w := range strings.Fields(s.info) {
+			switch {
+			case w == "error":
+				wantErr = true
+			case strings.HasPrefix(w, "in="):
+				p.Files = os.DirFS(filepath.Join("..", "..", filepath.FromSlash(strings.TrimPrefix(w, "in="))))
+			default:
+				t.Errorf("%s:%d: unknown fence word %q: use ```mms, ```mms error or ```mms in=<folder>", s.path, s.line, w)
+				bad = true
+			}
+		}
+		if bad {
+			continue
+		}
 		p.SetFile("main.mms", s.src)
 		r, err := p.Analyze(context.Background())
 		if err != nil {
@@ -85,17 +102,14 @@ func TestSiteSamples(t *testing.T) {
 				}
 			}
 		}
-		switch s.info {
-		case "":
-			for _, e := range errs {
-				t.Errorf("%s:%d: %s", s.path, s.line, e)
-			}
-		case "error":
+		if wantErr {
 			if len(errs) == 0 {
 				t.Errorf("%s:%d: a ```mms error sample reports no error", s.path, s.line)
 			}
-		default:
-			t.Errorf("%s:%d: unknown fence words %q: use ```mms or ```mms error", s.path, s.line, s.info)
+			continue
+		}
+		for _, e := range errs {
+			t.Errorf("%s:%d: %s", s.path, s.line, e)
 		}
 	}
 }

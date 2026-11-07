@@ -46,7 +46,7 @@ PaintingVariant again = { width = 2, height = 1, asset_id = demo:sunset }
 JukeboxSong tune = { sound_event = Sound("music/tune.ogg"), description = "Tune", length_in_seconds = 30, comparator_output = 3 }
 TemplatePool houses = {
   fallback = minecraft:empty
-  elements = [{ weight = 1, element = { element_type = "minecraft:single_pool_element", location = Structure("builds/house.nbt"), projection = "rigid", processors = "minecraft:empty" } }]
+  elements = [{ weight = 1, element = { element_type = "minecraft:single_pool_element", location = StructureFile("builds/house.nbt"), projection = "rigid", processors = "minecraft:empty" } }]
 }
 `
 
@@ -125,7 +125,7 @@ func TestAssetsNoResourcePack(t *testing.T) {
 	files := fstest.MapFS{"builds/house.nbt": {Data: nbtBytes}, "art/icon.png": {Data: pngBytes}}
 	_, r := assetProject(t, files, `TemplatePool houses = {
   fallback = minecraft:empty
-  elements = [{ weight = 1, element = { element_type = "minecraft:single_pool_element", location = Structure("builds/house.nbt"), projection = "rigid", processors = "minecraft:empty" } }]
+  elements = [{ weight = 1, element = { element_type = "minecraft:single_pool_element", location = StructureFile("builds/house.nbt"), projection = "rigid", processors = "minecraft:empty" } }]
 }
 `)
 	if _, res := SplitPacks(r.Emit()); len(res) != 0 {

@@ -21,7 +21,10 @@ type VM struct {
 	Said      []string                  // `say` output, and `tellraw` as plain text
 	Steps     int                       // commands run
 	MaxSteps  int
+	Entities  []*Entity // summoned entities, oldest first
 	depth     int
+	self      *Entity    // the executor, nil for the server
+	pos       [3]float64 // the execution position
 }
 
 func New(files map[string][]string) *VM {
@@ -168,6 +171,12 @@ func (vm *VM) exec(line string) (result, error) {
 		return result{value: v, ok: true, returned: true}, err
 	case "data":
 		return vm.data(w[1:])
+	case "summon":
+		return vm.summon(w[1:])
+	case "kill":
+		return vm.kill(w[1:])
+	case "tag":
+		return vm.tag(w[1:])
 	}
 	return result{}, fmt.Errorf("the test interpreter does not support %q", w[0])
 }
@@ -339,12 +348,44 @@ func floorDiv(a, b int32) int32 {
 // execute runs an execute chain. A failed condition ends the chain with
 // no result.
 func (vm *VM) execute(w []string) (result, error) {
-	type store struct {
-		holder, obj string
-		success     bool
-		storage     []string
+	self, pos := vm.self, vm.pos
+	defer func() { vm.self, vm.pos = self, pos }()
+	return vm.executeFrom(w, nil)
+}
+
+// store is one `store` subcommand of an execute.
+type store struct {
+	holder, obj string
+	success     bool
+	storage     []string
+}
+
+func (vm *VM) stored(stores []store, r result) error {
+	if !r.ok && !r.failed {
+		return nil
 	}
-	var stores []store
+	for _, s := range stores {
+		v := r.value
+		if s.success {
+			v = 1
+		}
+		if r.failed {
+			v = 0
+		}
+		var err error
+		if s.storage != nil {
+			err = vm.storeTo(s.storage, v)
+		} else {
+			err = vm.set(s.holder, s.obj, v)
+		}
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (vm *VM) executeFrom(w []string, stores []store) (result, error) {
 	for i := 0; i < len(w); {
 		switch w[i] {
 		case "run":
@@ -352,33 +393,63 @@ func (vm *VM) execute(w []string) (result, error) {
 			if err != nil {
 				return result{}, err
 			}
-			if r.ok || r.failed {
-				for _, s := range stores {
-					v := r.value
-					if s.success {
-						v = 1
-					}
-					if r.failed {
-						v = 0
-					}
-					var err error
-					if s.storage != nil {
-						err = vm.storeTo(s.storage, v)
-					} else {
-						err = vm.set(s.holder, s.obj, v)
-					}
-					if err != nil {
-						return result{}, err
-					}
-				}
+			return r, vm.stored(stores, r)
+		case "as", "at":
+			if i+1 >= len(w) {
+				return result{}, fmt.Errorf("%s needs a target", w[i])
 			}
-			return r, nil
-		case "if", "unless":
-			ok, n, err := vm.condition(w[i+1:])
+			es, err := vm.selectEntities(w[i+1])
 			if err != nil {
 				return result{}, err
 			}
-			if ok == (w[i] == "unless") {
+			// Each selected entity runs the rest; the last result stands.
+			var last result
+			for _, e := range es {
+				if w[i] == "as" {
+					vm.self = e
+				} else {
+					vm.pos = e.Pos
+				}
+				r, err := vm.executeFrom(w[i+2:], stores)
+				if err != nil {
+					return result{}, err
+				}
+				last = r
+				if r.returned {
+					break
+				}
+			}
+			return last, nil
+		case "positioned":
+			if i+3 >= len(w) {
+				return result{}, fmt.Errorf("positioned needs three coordinates")
+			}
+			p, err := vm.position(w[i+1 : i+4])
+			if err != nil {
+				return result{}, err
+			}
+			vm.pos = p
+			i += 4
+		case "if", "unless":
+			ok, n, count, err := vm.condition(w[i+1:])
+			if err != nil {
+				return result{}, err
+			}
+			pass := ok != (w[i] == "unless")
+			if i+1+n == len(w) {
+				// A condition at the end is the command's result: the
+				// number of entities for `if entity`, else 1, or a
+				// failure.
+				r := result{failed: true}
+				if pass {
+					r = result{value: 1, ok: true}
+					if w[i] == "if" && count >= 0 {
+						r.value = int32(count)
+					}
+				}
+				return r, vm.stored(stores, r)
+			}
+			if !pass {
 				return result{}, nil
 			}
 			i += 1 + n
@@ -406,21 +477,29 @@ func (vm *VM) execute(w []string) (result, error) {
 	return result{}, fmt.Errorf("execute without run")
 }
 
-// condition evaluates `score ...` or `data storage ...` and returns how
-// many words it used.
-func (vm *VM) condition(w []string) (bool, int, error) {
+// condition evaluates `score ...`, `data storage ...` or `entity ...`
+// and returns how many words it used, and for `entity` how many
+// entities matched (else -1).
+func (vm *VM) condition(w []string) (bool, int, int, error) {
+	if len(w) >= 2 && w[0] == "entity" {
+		es, err := vm.selectEntities(w[1])
+		if err != nil {
+			return false, 0, 0, err
+		}
+		return len(es) > 0, 2, len(es), nil
+	}
 	if len(w) >= 4 && w[0] == "score" {
 		a, aok := vm.Score(w[1], w[2])
 		if w[3] == "matches" {
 			lo, hi, err := parseRange(w[4])
 			if err != nil {
-				return false, 0, err
+				return false, 0, 0, err
 			}
-			return aok && a >= lo && a <= hi, 5, nil
+			return aok && a >= lo && a <= hi, 5, -1, nil
 		}
 		b, bok := vm.Score(w[4], w[5])
 		if !aok || !bok {
-			return false, 6, nil
+			return false, 6, -1, nil
 		}
 		var ok bool
 		switch w[3] {
@@ -435,15 +514,15 @@ func (vm *VM) condition(w []string) (bool, int, error) {
 		case ">":
 			ok = a > b
 		default:
-			return false, 0, fmt.Errorf("unknown comparison %q", w[3])
+			return false, 0, 0, fmt.Errorf("unknown comparison %q", w[3])
 		}
-		return ok, 6, nil
+		return ok, 6, -1, nil
 	}
 	if len(w) >= 4 && w[0] == "data" && w[1] == "storage" {
 		_, err := vm.get(w[2], w[3])
-		return err == nil, 4, nil
+		return err == nil, 4, -1, nil
 	}
-	return false, 0, fmt.Errorf("unsupported condition %v", w)
+	return false, 0, 0, fmt.Errorf("unsupported condition %v", w)
 }
 
 func parseRange(s string) (int32, int32, error) {

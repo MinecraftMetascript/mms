@@ -158,7 +158,12 @@ type Result struct {
 	Eval  *eval.Result
 	Syms  *sema.Table
 	Units []*sema.Unit
-	Decls map[*syntax.Decl]*Decl
+	// TypeEnv resolves type expressions: Template parameters, fields.
+	TypeEnv *types.Env
+	// Source holds each file as parsed, before expansion: with its
+	// const, Template, Blueprint and for items and the calls as written.
+	Source map[string]*syntax.File
+	Decls  map[*syntax.Decl]*Decl
 	// Order lists declarations in file and source order.
 	Order []*Decl
 	// Instances are the Blueprint instances the user wrote, in order,
@@ -212,6 +217,8 @@ type Decl struct {
 	// Extern are problems in other files, such as a Book's .mmsbook
 	// file, by path.
 	Extern map[string][]syntax.Diagnostic
+	// Expects are a Test's expect lines, in order.
+	Expects []sema.TestExpect
 	// Deps are the symbol lookups the check made (see sema.DepsHold).
 	Deps map[string]bool
 
@@ -329,13 +336,22 @@ func (p *Project) Analyze(ctx context.Context) (*Result, error) {
 	p.mu.Unlock()
 	sort.Slice(units, func(i, j int) bool { return units[i].Path < units[j].Path })
 
+	source := make(map[string]*syntax.File, len(units))
+	for _, u := range units {
+		source[u.Path] = u.File
+	}
 	units, ev := expand(units, p.Config.Namespace, &p.evalCache)
 	syms, collect := sema.Collect(units, p.Kinds, p.Config.Namespace)
 	tenv := types.New(p.Pack, p.Kinds, ev)
 	syms.Types = tenv.Types
+	syms.TypeDecls = map[string]*syntax.Decl{}
+	for name, td := range ev.Types {
+		syms.TypeDecls[name] = td.D
+	}
 	syms.Hidden = preludeEmitted(ev)
 	syms.Conversions = tenv.Conversions(ev, p.Config.Namespace)
-	r := &Result{Syms: syms, Units: units, Decls: map[*syntax.Decl]*Decl{}, collect: collect, pack: p.Pack, cfg: p.Config, files: p.Files, Eval: ev}
+	r := &Result{Syms: syms, Units: units, Source: source, Decls: map[*syntax.Decl]*Decl{}, collect: collect, pack: p.Pack, cfg: p.Config, files: p.Files, Eval: ev}
+	r.TypeEnv = tenv
 	r.typeErr = tenv.Check(ev, p.Config.Namespace, func(ns string) *sema.Checker {
 		c := sema.NewChecker(p.Pack, p.Kinds, syms, ns)
 		c.Files, c.Texts = p.Files, p.bookText
@@ -358,6 +374,11 @@ func (p *Project) Analyze(ctx context.Context) (*Result, error) {
 				// With different declared names, a result still holds if
 				// every name it looked up resolves the same way.
 				if dr != nil && !sameSyms && (dr.Deps == nil || !sema.DepsHold(syms, dr.Deps)) {
+					dr = nil
+				}
+				// A Storage reads its Type's defaults, which are cheap to
+				// read again and not among its dependencies.
+				if dr != nil && k.MMS == "Storage" {
 					dr = nil
 				}
 				// An asset file it read was added, removed or changed.
@@ -500,6 +521,17 @@ func (p *Project) checkDecl(u *sema.Unit, d *syntax.Decl, k sema.Kind, syms *sem
 		dr.Lines = objective(c, d)
 	case k.MMS == "Global":
 		dr.Lines = c.Global(d)
+	case k.MMS == "Storage":
+		dr.Lines = c.Storage(d)
+	case k.MMS == "Test":
+		if d.Name != nil {
+			f, ex := c.CompileTest(d, sema.TestID(ns, d.Name.Text), u.File.Src)
+			if f != nil {
+				dr.Fn, dr.Expects = fn.Generate(*f), ex
+			}
+		} else {
+			c.CompileTest(d, "", u.File.Src)
+		}
 	case k.MMS == sema.JigsawHoleKind:
 		c.JigsawHole(d)
 	}

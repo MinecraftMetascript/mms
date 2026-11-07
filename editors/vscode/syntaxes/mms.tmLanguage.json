@@ -50,7 +50,9 @@
       "patterns": [
         { "include": "#comments" },
         { "name": "keyword.control.mms", "match": "\\b(if|else|while|for|in|return|break|continue)\\b" },
-        { "name": "storage.modifier.mms", "match": "\\blet\\b" },
+        { "name": "storage.modifier.mms", "match": "\\b(let|const|extern|primary)\\b" },
+        { "name": "keyword.other.mms", "match": "\\b(emit|check|as|setup|run|expect)\\b" },
+        { "name": "variable.language.self.mms", "match": "\\bself\\b" },
         { "name": "constant.language.mms", "match": "\\b(true|false)\\b" },
         { "name": "string.quoted.double.mms", "begin": "\"", "end": "\"", "patterns": [{ "name": "constant.character.escape.mms", "match": "\\\\." }] },
         { "name": "string.quoted.single.mms", "begin": "'", "end": "'", "patterns": [{ "name": "constant.character.escape.mms", "match": "\\\\." }] },
@@ -58,8 +60,8 @@
         { "name": "entity.name.resource.mms", "match": "\\b[a-z0-9_.-]+:[a-z0-9_./-]+" },
         { "name": "variable.language.selector.mms", "match": "@[aenprs]\\b" },
         { "name": "constant.numeric.mms", "match": "\\b\\d+(\\.\\d+)?([eE][+-]?\\d+)?\\b" },
-        { "name": "entity.name.function.mms", "match": "\\b[A-Z][A-Za-z0-9]*(?=\\s*\\()" },
-        { "name": "support.type.mms", "match": "(?<=:\\s)(int|bool|string)\\b" },
+        { "name": "entity.name.function.mms", "match": "\\b[A-Za-z_][A-Za-z0-9_]*(?=\\s*\\()" },
+        { "name": "support.type.mms", "match": "(?<=:\\s)(int|float|bool|string|Text|Commands|Selector|Id|any)\\b" },
         { "name": "keyword.operator.mms", "match": "\\.\\.|->|[-+*/%]=?|==|!=|<=|>=|&&|\\|\\||[<>!=]" }
       ]
     }

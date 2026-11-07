@@ -507,3 +507,6 @@ func (p *snbt) word() (string, error) {
 	}
 	return p.s[start:p.i], nil
 }
+
+// Get reads a storage value at a path, such as "game.wave".
+func (vm *VM) Get(id, path string) (any, error) { return vm.get(id, path) }

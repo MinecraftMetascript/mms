@@ -179,6 +179,18 @@ func (e *Env) Resolve(path string, t syntax.TypeExpr) (rt *spec.Type, optional b
 	return &spec.Type{Kind: "any"}, false
 }
 
+// Lookup resolves a type expression for an editor, after checking: it
+// reports nothing and changes nothing, so it is safe to call while other
+// editor requests read the environment. Every Type declaration was
+// resolved by New, so the copy only reads e.Types.
+func (e *Env) Lookup(path string, t syntax.TypeExpr) *spec.Type {
+	q := *e
+	q.Diags = map[string][]syntax.Diagnostic{}
+	q.busy = map[string]bool{}
+	rt, _ := q.Resolve(path, t)
+	return rt
+}
+
 // primitives are the language's own value types.
 var primitives = map[string]string{
 	"int": "int", "float": "float", "double": "double", "bool": "boolean", "string": "string", "any": "any",
@@ -200,15 +212,18 @@ func (e *Env) named(path string, t *syntax.TypeName) *spec.Type {
 	if t.Name == "BookText" {
 		return sema.BookTextType()
 	}
-	if t.Name == "Id" {
+	if t.Name == "Id" || t.Name == "Ids" {
 		if len(t.Args) != 1 {
-			e.errorf(path, t.Sp, "Id takes one registry: Id<item>")
+			e.errorf(path, t.Sp, t.Name+" takes one registry: "+t.Name+"<item>")
 			return &spec.Type{Kind: "string"}
 		}
 		reg := syntax.TypeText(t.Args[0])
 		reg = strings.TrimPrefix(reg, "minecraft:")
 		if !e.Pack.HasRegistry(reg) && !e.isResourceFolder(reg) {
 			e.errorf(path, t.Args[0].Span(), "unknown registry '"+reg+"'")
+		}
+		if t.Name == "Ids" {
+			return idsType(reg)
 		}
 		return idType(reg)
 	}
@@ -275,6 +290,18 @@ func distance(a, b string) int {
 }
 
 // idType is a string that names an id in a registry.
+// idsType is Ids<reg>: a list of ids, or one id or tag, the way the
+// game writes a set of biomes or blocks.
+func idsType(reg string) *spec.Type {
+	raw, _ := json.Marshal(reg)
+	allowed, _ := json.Marshal("allowed")
+	tagged := &spec.Type{Kind: "string", Attributes: []spec.Attribute{{Name: "id", Value: &spec.Type{Kind: "tree", Tree: map[string]*spec.Type{
+		"registry": {Kind: "literal", Literal: &spec.Literal{Kind: "string", Value: raw}},
+		"tags":     {Kind: "literal", Literal: &spec.Literal{Kind: "string", Value: allowed}},
+	}}}}}
+	return &spec.Type{Kind: "union", Members: []*spec.Type{{Kind: "list", Item: idType(reg)}, tagged}}
+}
+
 func idType(reg string) *spec.Type {
 	raw, _ := json.Marshal(reg)
 	return &spec.Type{Kind: "string", Attributes: []spec.Attribute{{Name: "id",

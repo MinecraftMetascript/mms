@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/minecraftmetascript/mms/engine/prelude"
 	"github.com/minecraftmetascript/mms/engine/sema"
 	"github.com/minecraftmetascript/mms/engine/syntax"
 )
@@ -24,25 +25,25 @@ type Rule struct {
 
 // Rules lists every lint rule, sorted by id.
 var Rules = []*Rule{
-	{ID: "book-overflow", Severity: syntax.SeverityWarning, run: lintBookOverflow,
+	{ID: "book-page-overflow", Severity: syntax.SeverityWarning, run: lintBookOverflow,
 		Doc: "A Book page with more text than the book screen shows: 14 lines of about 19 characters. The game cuts the rest off. Widths are measured with the vanilla font, so text outside ASCII is a close guess."},
 	{ID: "constant-expression", Severity: syntax.SeverityHint, run: lintConstant,
 		Doc: "An arithmetic expression of number literals can be written as its value."},
 	{ID: "deprecated", Severity: syntax.SeverityWarning, all: lintDeprecated,
 		Doc: "A use of a declaration whose doc comment has a `@deprecated` tag."},
 	{ID: "external-asset", Severity: syntax.SeverityWarning, all: lintExternalAsset,
-		Doc: "An id of a texture, sound or structure in the project's namespace that no Texture, Sound or Structure call in the project provides. The pack still loads, but the file must come from another pack."},
+		Doc: "An id of a texture, sound or structure in the project's namespace that no Texture, Sound or StructureFile call in the project provides. The pack still loads, but the file must come from another pack."},
 	{ID: "jigsaw-facing", Severity: syntax.SeverityWarning, all: lintJigsawFacing,
 		Doc: "A jigsaw block that can never join its target: every jigsaw block with its target name in its pool faces a way it cannot meet. The game turns pieces only about the y axis, so a block facing up joins only one facing down, and a sideways block only a sideways one."},
 	{ID: "jigsaw-fit", Severity: syntax.SeverityWarning, all: lintJigsawFit,
 		Doc: "An internal jigsaw block (the block in front of it is inside its own piece, such as an arch mount on a road, or a jigsaw inset by a block by mistake) whose pool has pieces that stick out of the piece however they are turned. The game only places a piece joined at an internal jigsaw wholly inside its parent, so those pieces are never placed there. Height is not checked for terrain_matching pieces."},
-	{ID: "jigsaw-hole", Severity: syntax.SeverityWarning, all: lintJigsawHole,
-		Doc: "A jigsaw block in a structure file that Structure(\"...\") includes whose name or target is in a namespace with JigsawHole declarations, but is not one of them: most likely a typo made in the game's jigsaw screen. The quick fix declares it. Projects that declare no JigsawHole in a namespace are not checked there."},
+	{ID: "jigsaw-unknown-name", Severity: syntax.SeverityWarning, all: lintJigsawUnknownName,
+		Doc: "A jigsaw block in a structure file that StructureFile(\"...\") includes whose name or target is in a namespace with JigsawHole declarations, but is not one of them: most likely a typo made in the game's jigsaw screen. The quick fix declares it. Projects that declare no JigsawHole in a namespace are not checked there."},
 	{ID: "jigsaw-overlap", Severity: syntax.SeverityInfo, all: lintJigsawOverlap,
 		Doc: "A jigsaw block that can never grow when its piece joins a given parent: every piece its pool and the pool's fallback could place there overlaps the parent or the piece itself, however it is turned, and the game never places overlapping pieces. A junction narrower than the roads around it is the usual cause. Only certain cases are reported: every piece involved is a rigid project structure file with a known size and facing, and no pool involved has an empty or feature element."},
-	{ID: "jigsaw-pool", Severity: syntax.SeverityWarning, all: lintJigsawPool,
-		Doc: "A jigsaw block in a structure file that Structure(\"...\") includes draws from a pool in the project's namespace that no TemplatePool declares. The game skips the jigsaw, so the structure stops growing there. The quick fix declares the pool."},
-	{ID: "jigsaw-target", Severity: syntax.SeverityWarning, all: lintJigsawTarget,
+	{ID: "jigsaw-unknown-pool", Severity: syntax.SeverityWarning, all: lintJigsawPool,
+		Doc: "A jigsaw block in a structure file that StructureFile(\"...\") includes draws from a pool in the project's namespace that no TemplatePool declares. The game skips the jigsaw, so the structure stops growing there. The quick fix declares the pool."},
+	{ID: "jigsaw-unreachable-target", Severity: syntax.SeverityWarning, all: lintJigsawTarget,
 		Doc: "A jigsaw block whose target no piece of its pool can join: none of the pool's structure files has a jigsaw block with that name, or the pool has no pieces. Only pools whose pieces are all the project's own structure files are checked."},
 	{ID: "overrides-vanilla", Severity: syntax.SeverityInfo, run: lintOverrides,
 		Doc: "A declaration in the minecraft namespace replaces the vanilla resource with the same id."},
@@ -55,9 +56,9 @@ var Rules = []*Rule{
 	{ID: "use-shorthand", Severity: syntax.SeverityHint, run: lintShorthand,
 		Doc: "An object literal that has a shorter MMS form: an item entry as its id, `1..3` for a uniform provider or bounds, `diamond * 4` for a stack, a trigger call for a criterion, and `&&`, `||` and `!` for conditions."},
 	{ID: "unused", Severity: syntax.SeverityHint, all: lintUnused,
-		Doc: "A worldgen piece, predicate or item modifier that nothing in the project references, so the game never uses it. A TemplatePool counts as used when a jigsaw block in one of the project's structure files draws from it."},
+		Doc: "A worldgen piece, predicate or item modifier that nothing in the project references, so the game never uses it, or a const, Template, Type or Blueprint that nothing names. A TemplatePool counts as used when a jigsaw block in one of the project's structure files draws from it."},
 	{ID: "unused-asset", Severity: syntax.SeverityInfo,
-		Doc: "A .png, .ogg or .nbt file in the project that no Texture, Sound or Structure call and no `icon` uses, so the packs leave it out. It is reported on the file itself (in VS Code's Problems panel, by `mms check`, and in the web editor's asset list), and not while the project has errors."},
+		Doc: "A .png, .ogg or .nbt file in the project that no Texture, Sound or StructureFile call and no `icon` uses, so the packs leave it out. It is reported on the file itself (in VS Code's Problems panel, by `mms check`, and in the web editor's asset list), and not while the project has errors."},
 }
 
 // RuleByID returns a rule, or nil.
@@ -191,7 +192,7 @@ func (r *Result) lint() map[string][]syntax.Diagnostic {
 		var found []syntax.Diagnostic
 		ext := map[string][]syntax.Diagnostic{}
 		l.cur, l.ext = &found, ext
-		if l.rule = ruleByID("book-overflow"); l.rule != nil {
+		if l.rule = ruleByID("book-page-overflow"); l.rule != nil {
 			if l.sev = r.severity(l.rule); l.sev != 0 {
 				l.rule.run(l, d)
 			}
@@ -366,14 +367,28 @@ func lintAccidental(l *lintRun, d *Decl) {
 		if in == nil {
 			return true
 		}
+		seen := map[syntax.Span]bool{}
 		for _, sp := range in.Accidental {
+			if seen[sp] {
+				continue
+			}
+			seen[sp] = true
 			mark := string(d.Unit.File.Src[sp.Start:sp.End])
+			if !styleMarks[mark] {
+				// The text was rewritten (a const put in for ${name}), so
+				// the mark has no place in the source to fix.
+				l.report(d, sp, "a style mark in this text is never closed, so it is the character itself; write a backslash before it to say so")
+				continue
+			}
 			l.report(d, sp, "this "+mark+" is never closed, so it is the character itself; write \\"+mark+" to say so",
 				syntax.Fix{Title: "Write \\" + mark, Edits: []syntax.TextEdit{{Sp: syntax.Span{Start: sp.Start, End: sp.Start}, Text: "\\"}}, Safe: true})
 		}
 		return true
 	})
 }
+
+// styleMarks are the marks of text markup that open and close a style.
+var styleMarks = map[string]bool{"*": true, "**": true, "__": true, "~~": true, "||": true}
 
 func lintQuoted(l *lintRun, d *Decl) {
 	syntax.Walk(d.D, func(n syntax.Node) bool {
@@ -553,6 +568,7 @@ func lintUnused(l *lintRun) {
 		unused = append(unused, s)
 	}
 	sort.Slice(unused, func(i, j int) bool { return unused[i].Decl.Sp.Start < unused[j].Decl.Sp.Start })
+	unusedEvalNames(l)
 	for _, s := range unused {
 		if d := r.Decls[s.Decl]; d == nil || hasErrors(d.Diags) {
 			continue
@@ -563,6 +579,69 @@ func lintUnused(l *lintRun) {
 		})
 	}
 }
+
+// unusedEvalNames reports the project's consts, Templates, Types and
+// Blueprints that nothing names. They expand away, so their uses are
+// read from the source as written: a name used as a value or a call, a
+// type, a declaration's kind, or a word inside ${...}.
+func unusedEvalNames(l *lintRun) {
+	r := l.r
+	if r.Eval == nil {
+		return
+	}
+	named := map[string]bool{}
+	for _, f := range r.Source {
+		syntax.Walk(f, func(n syntax.Node) bool {
+			switch n := n.(type) {
+			case *syntax.Ident:
+				named[n.Name] = true
+			case *syntax.TypeName:
+				named[n.Name] = true
+			case *syntax.String, *syntax.CommandStmt:
+				sp := n.Span()
+				if sp.End <= len(f.Src) {
+					for _, piece := range evalPieceRe.FindAllString(string(f.Src[sp.Start:sp.End]), -1) {
+						for _, w := range evalWordRe.FindAllString(piece, -1) {
+							named[w] = true
+						}
+					}
+				}
+			}
+			return true
+		})
+	}
+	type decl struct {
+		kind, path string
+		name       *syntax.Name
+	}
+	var ds []decl
+	for _, c := range r.Eval.Consts {
+		ds = append(ds, decl{"const", c.Path, c.S.Name})
+	}
+	for _, t := range r.Eval.Templates {
+		ds = append(ds, decl{"Template", t.Path, t.D.Name})
+	}
+	for _, t := range r.Eval.Types {
+		ds = append(ds, decl{"Type", t.Path, t.D.Name})
+	}
+	for _, b := range r.Eval.Blueprints {
+		ds = append(ds, decl{"Blueprint", b.Path, b.D.Name})
+	}
+	for _, d := range ds {
+		if d.name == nil || prelude.Is(d.path) || r.Source[d.path] == nil || named[d.name.Text] {
+			continue
+		}
+		l.out[d.path] = append(l.out[d.path], syntax.Diagnostic{
+			Code: "lint/unused", Severity: l.sev, Sp: d.name.Sp, Unnecessary: true,
+			Message: fmt.Sprintf("%s '%s' is never used", d.kind, d.name.Text),
+		})
+	}
+}
+
+var (
+	evalPieceRe = regexp.MustCompile(`\$\{[^}]*\}`)
+	evalWordRe  = regexp.MustCompile(`[A-Za-z_][A-Za-z0-9_]*`)
+)
 
 // references lists what a declaration refers to, as "folder|id" for
 // resolved references and bare ids for ids named in its commands. It is

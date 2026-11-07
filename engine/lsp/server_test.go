@@ -402,7 +402,7 @@ func TestRegistersWatchers(t *testing.T) {
 			}
 		}
 	}
-	if strings.Join(globs, " ") != "**/*.mms **/*.mmsbook **/mms.json **/*.{png,ogg,nbt}" {
+	if strings.Join(globs, " ") != "**/*.mms **/*.mmsbook **/*.mmstext **/mms.json **/*.{png,ogg,nbt}" {
 		t.Fatalf("watchers = %q", globs)
 	}
 
@@ -730,7 +730,7 @@ func TestOutputStructureJigsaws(t *testing.T) {
 	}
 	c.notify("mms/setAssets", map[string]any{"files": []any{map[string]any{"path": "s/hall.nbt", "data": data}}})
 	c.notify("mms/setFiles", map[string]any{"files": []any{
-		map[string]any{"uri": "mem:///a.mms", "text": "TemplatePool rooms = { fallback = minecraft:empty, elements = [{ weight = 1, element = { element_type = minecraft:single_pool_element, location = Structure(\"s/hall.nbt\"), projection = rigid, processors = minecraft:empty } }] }\n"},
+		map[string]any{"uri": "mem:///a.mms", "text": "TemplatePool rooms = { fallback = minecraft:empty, elements = [{ weight = 1, element = { element_type = minecraft:single_pool_element, location = StructureFile(\"s/hall.nbt\"), projection = rigid, processors = minecraft:empty } }] }\n"},
 	}})
 	out := c.result("mms/output", map[string]any{}).(map[string]any)
 	assets := out["assets"].([]any)
@@ -841,5 +841,77 @@ func TestOutputTexts(t *testing.T) {
 	}
 	if third := texts[2].(map[string]any); third["uri"] != r || !strings.Contains(third["text"].(string), "bold") {
 		t.Errorf("third = %v", third)
+	}
+}
+
+func TestRunTests(t *testing.T) {
+	c := start(t)
+	c.result("initialize", map[string]any{})
+	a := "mem:///a.mms"
+	c.notify("mms/setFiles", map[string]any{"files": []any{
+		map[string]any{"uri": a, "text": "Global n: int = 0\nFunction bump {\n  n += 1\n}\nTest ok {\n  run bump()\n  expect n == 1\n}\nTest bad {\n  run bump()\n  expect n == 3\n}\n"},
+	}})
+	out := c.result("mms/runTests", map[string]any{"uri": a}).(map[string]any)
+	tests := out["tests"].([]any)
+	if len(tests) != 2 {
+		t.Fatalf("tests: %v", out)
+	}
+	bad := tests[1].(map[string]any)
+	if bad["pass"] != false || bad["message"] != "expected n == 3, but n is 1" || bad["expectRange"] == nil {
+		t.Errorf("bad: %v", bad)
+	}
+	one := c.result("mms/runTests", map[string]any{"uri": a, "name": "ok"}).(map[string]any)
+	if ts := one["tests"].([]any); len(ts) != 1 || ts[0].(map[string]any)["pass"] != true {
+		t.Errorf("one: %v", one)
+	}
+}
+
+// TestExpand checks mms/expand: at a position it gives what the call there
+// expands to, and without one it lists every expansion in the file.
+func TestExpand(t *testing.T) {
+	c := start(t)
+	c.result("initialize", map[string]any{})
+	c.notify("initialized", map[string]any{})
+	uri := "file:///a.mms"
+	src := "Template twice(n: int): int = n * 2\nDensityFunction d = twice(3)\n"
+	c.notify("textDocument/didOpen", map[string]any{"textDocument": map[string]any{"uri": uri, "languageId": "mms", "version": 1, "text": src}})
+	one, _ := c.result("mms/expand", pos(uri, 1, 21)).(map[string]any)
+	if one == nil || one["text"] != "6" || one["title"] != "Template twice" {
+		t.Errorf("expand at twice = %v", one)
+	}
+	if none := c.result("mms/expand", pos(uri, 0, 0)); none != nil {
+		t.Errorf("expand at the Template = %v", none)
+	}
+	// The list holds command Templates and Blueprint instances, not
+	// value Templates.
+	all, ok := c.result("mms/expand", map[string]any{"textDocument": map[string]any{"uri": uri}}).([]any)
+	if !ok || len(all) != 0 {
+		t.Errorf("expansions = %v", all)
+	}
+}
+
+// Go to definition on a prelude name opens the prelude file read-only:
+// an mms-prelude: URI whose text mms/preludeFile gives.
+func TestPreludeDefinition(t *testing.T) {
+	c := start(t)
+	c.result("initialize", map[string]any{})
+	c.notify("initialized", map[string]any{})
+	uri := "file:///a.mms"
+	src := "CustomItem ruby { base = diamond }\n"
+	c.notify("textDocument/didOpen", map[string]any{"textDocument": map[string]any{"uri": uri, "languageId": "mms", "version": 1, "text": src}})
+	defs, _ := c.result("textDocument/definition", pos(uri, 0, 3)).([]any)
+	if len(defs) != 1 {
+		t.Fatalf("definition = %v", defs)
+	}
+	loc := defs[0].(map[string]any)
+	target := loc["uri"].(string)
+	if !strings.HasPrefix(target, PreludeScheme+":/") {
+		t.Fatalf("uri = %s", target)
+	}
+	file, _ := c.result("mms/preludeFile", map[string]any{"uri": target}).(map[string]any)
+	text, _ := file["text"].(string)
+	line := int(loc["range"].(map[string]any)["start"].(map[string]any)["line"].(float64))
+	if lines := strings.Split(text, "\n"); line >= len(lines) || !strings.Contains(lines[line], "Blueprint CustomItem") {
+		t.Errorf("line %d of %s is not the Blueprint", line, target)
 	}
 }

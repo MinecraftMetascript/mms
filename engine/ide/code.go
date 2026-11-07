@@ -145,6 +145,12 @@ func (s *Session) projectNames(a *at) []sema.Candidate {
 		switch sym.Kind.MMS {
 		case "Global":
 			out = append(out, sema.Candidate{Label: short(sym), Kind: sema.CandID, Detail: "Global " + sema.SymSig(sym), Doc: doc, Rank: 50})
+		case "Storage":
+			detail := "Storage"
+			if sym.Decl.Type != nil {
+				detail += " " + syntax.TypeText(sym.Decl.Type)
+			}
+			out = append(out, sema.Candidate{Label: short(sym), Kind: sema.CandID, Detail: detail, Doc: doc, Rank: 55})
 		case "Objective":
 			name := short(sym)
 			out = append(out, sema.Candidate{Label: name, Kind: sema.CandID, Detail: "objective", Doc: doc, Insert: name + "[${1:@s}]", Rank: 60})

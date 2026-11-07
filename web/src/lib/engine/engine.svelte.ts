@@ -70,6 +70,28 @@ export interface OutputItem {
 }
 
 /** A message tell, title or actionbar shows, at the command or over the .mmstext file it reads. */
+/** What a Template call or Blueprint instance writes, as `mms/expand` returns it. */
+export interface Expansion {
+	title: string;
+	text: string;
+	range: Diagnostic['range'];
+}
+
+/** One Test's outcome, as `mms/runTests` returns it. */
+export interface TestOutcome {
+	name: string;
+	uri: string;
+	range: Diagnostic['range'];
+	pass: boolean;
+	message?: string;
+	/** The failing expect, from 1, and where it is. */
+	expect?: number;
+	expectRange?: Diagnostic['range'];
+	said: string[];
+}
+
+const testLine = /^[ \t]*Test[ \t]+[A-Za-z_]/m;
+
 export interface OutputText {
 	/** text:<uri>:<offset>, the key the editor selects it by. */
 	id: string;
@@ -143,6 +165,10 @@ export class Engine {
 	/** Project files nothing uses, so the packs leave them out. */
 	unusedAssets = $state<string[]>([]);
 	hasErrors = $state(false);
+	/** Whether the project declares a Test; the results of running them after each analysis; and why none ran. */
+	hasTests = $state(false);
+	tests = $state<TestOutcome[]>([]);
+	testsError = $state('');
 	symbols = $state<Record<string, DocSymbol[]>>({});
 
 	readonly client: LSPClient;
@@ -238,6 +264,17 @@ export class Engine {
 			this.outputTexts = out.texts ?? [];
 			this.unusedAssets = out.unusedAssets ?? [];
 			this.hasErrors = out.hasErrors;
+			// Tests run in the same interpreter as `mms test`, after every
+			// analysis, so their results stay current as the code changes.
+			this.hasTests = this.workspace.files.some((f) => f.languageId === 'mms' && testLine.test(f.doc.toString()));
+			if (this.hasTests) {
+				const res = await this.client.request<object, { tests: TestOutcome[]; error?: string }>('mms/runTests', {});
+				this.tests = res.tests;
+				this.testsError = res.error ?? '';
+			} else {
+				this.tests = [];
+				this.testsError = '';
+			}
 			const syms: Record<string, DocSymbol[]> = {};
 			await Promise.all(
 				this.workspace.files.map(async (f) => {
@@ -271,6 +308,27 @@ export class Engine {
 	async resourceKinds(): Promise<ResourceKind[]> {
 		await this.client.initializing;
 		return this.client.request<object, ResourceKind[]>('mms/resourceKinds', {});
+	}
+
+	/** The text of a file of the language's prelude, by its mms-prelude: URI. */
+	async preludeFile(uri: string): Promise<string | null> {
+		await this.client.initializing;
+		try {
+			return (await this.client.request<object, { text: string }>('mms/preludeFile', { uri })).text;
+		} catch {
+			return null;
+		}
+	}
+
+	/** What the Template call or Blueprint instance at a position writes, or null. */
+	async expand(uri: string, position: { line: number; character: number }): Promise<Expansion | null> {
+		if (!this.client.connected) return null;
+		this.client.sync();
+		try {
+			return await this.client.request<object, Expansion | null>('mms/expand', { textDocument: { uri }, position });
+		} catch {
+			return null;
+		}
 	}
 
 	/** Refactorings for a range of a file, such as extracting an inline value to a declaration. */
@@ -340,5 +398,6 @@ export const tokenTypes = [
 	'property',
 	'enumMember',
 	'namespace',
-	'macro'
+	'macro',
+	'parameter'
 ];

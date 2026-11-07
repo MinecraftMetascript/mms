@@ -111,11 +111,11 @@ NoiseSettings custom {
 func TestExtractInlineFunction(t *testing.T) {
 	out, _ := extracted(t, `Advancement found {
   criteria = { tick = { trigger = tick } }
-  rewards = { function = {
+  rewards = { function = run {
     /say |found it
   } }
 }
-`, "Extract { ... } to a Function")
+`, "Extract run { /say found it } to a Function declaration")
 	if !strings.HasPrefix(out, "Function found_function {\n  /say found it\n}\n\nAdvancement found {") {
 		t.Errorf("got\n%s", out)
 	}

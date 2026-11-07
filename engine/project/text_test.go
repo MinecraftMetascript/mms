@@ -75,6 +75,18 @@ func TestTextHasNoPages(t *testing.T) {
 			t.Errorf("%q: diagnostics %q lack %q", tc.src, msgs, tc.want)
 		}
 	}
+	// In a .mmstext file, the fix removes the --- line.
+	_, r := bookProject(t, "Book b { title = \"T\", author = \"A\", text = TextFile(\"b.mmstext\") }\n", map[string]string{"b.mmstext": "One\n---\nTwo\n"})
+	for _, d := range r.Diagnostics("b.mmstext") {
+		if d.Code != "mms/page-break-in-text" {
+			continue
+		}
+		if len(d.Fixes) != 1 || d.Fixes[0].Edits[0].Sp != (syntax.Span{Start: 4, End: 8}) {
+			t.Errorf("fix: %+v", d.Fixes)
+		}
+		return
+	}
+	t.Errorf("no page-break-in-text in b.mmstext: %v", r.Diagnostics("b.mmstext"))
 }
 
 // TextFile reads a .mmstext file where a text component goes, and a Book
@@ -96,4 +108,26 @@ func TestTextFile(t *testing.T) {
 	if pages := pagesOf(t, emitted(t, r, "data/demo/loot_table/l.json")); len(pages) != 1 {
 		t.Errorf("pages = %v", pages)
 	}
+}
+
+// A string the evaluator rewrote, with a const's value put in for
+// ${name}, has no place in the source for a mark: the hint covers the
+// string and offers no fix that edits it.
+func TestAccidentalMarkupRewritten(t *testing.T) {
+	src := "const who = \"abc\"\n" + adv(`"${who} 5 * 3"`)
+	_, r := bookProject(t, src, nil)
+	for _, d := range r.Diagnostics("main.mms") {
+		if d.Code != "lint/accidental-markup" {
+			continue
+		}
+		safe := false
+		for _, f := range d.Fixes {
+			safe = safe || f.Safe
+		}
+		if got := src[d.Sp.Start:d.Sp.End]; got != `"${who} 5 * 3"` || safe {
+			t.Errorf("hint at %q with fixes %+v", got, d.Fixes)
+		}
+		return
+	}
+	t.Error("no accidental-markup hint")
 }

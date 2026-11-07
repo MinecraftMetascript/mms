@@ -35,9 +35,10 @@ func TestPlainFilesPassThrough(t *testing.T) {
 		if len(out.Diags) > 0 {
 			t.Errorf("%s: %s", u.Path, out.Diags[0].Message)
 		}
-		// A top-level const, let or for is one of the new forms, so the
-		// file is expected to change.
-		if len(u.File.Items) != len(u.File.Decls) {
+		// A top-level const, let or for, or a Type, Template or Blueprint
+		// declaration, is one of the new forms, so the file is expected
+		// to change.
+		if len(u.File.Items) != len(u.File.Decls) || declaresForms(u.File) {
 			continue
 		}
 		plain++
@@ -57,6 +58,15 @@ func TestPlainFilesPassThrough(t *testing.T) {
 	if plain < 20 {
 		t.Errorf("only %d files use none of the new forms", plain)
 	}
+}
+
+func declaresForms(f *syntax.File) bool {
+	for _, d := range f.Decls {
+		if d.Kind != nil && (d.Kind.Name == "Type" || d.Kind.Name == "Template" || d.Kind.Name == "Blueprint") {
+			return true
+		}
+	}
+	return false
 }
 
 // FuzzRun checks that evaluation never panics on parsed input.

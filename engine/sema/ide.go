@@ -68,6 +68,15 @@ func (c *Checker) ValueCandidates(in *Info) []Candidate {
 	return dedupe(c.valueCandidates(in.Type, 0))
 }
 
+// TypeCandidates lists what can be written where a value of type t is
+// expected, such as a Template argument.
+func (c *Checker) TypeCandidates(t *spec.Type) []Candidate {
+	if t == nil {
+		return nil
+	}
+	return dedupe(c.valueCandidates(tview{T: t}, 0))
+}
+
 func (c *Checker) valueCandidates(v tview, depth int) []Candidate {
 	out := c.instanceCandidates(v)
 	v = c.norm(v)

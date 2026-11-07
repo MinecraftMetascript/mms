@@ -3,6 +3,17 @@ import { expect, test, type Page } from '@playwright/test';
 
 const status = (page: Page) => page.getByRole('status');
 
+// clickLine clicks the editor line containing text, scrolling down to it:
+// CodeMirror renders only the lines near the viewport.
+async function clickLine(page: Page, text: string) {
+	const line = page.locator('.cm-line', { hasText: text });
+	for (let i = 0; i < 50 && (await line.count()) === 0; i++) {
+		await page.locator('.cm-scroller').first().evaluate((el) => el.scrollBy(0, 200));
+		await page.waitForTimeout(100);
+	}
+	await line.first().click();
+}
+
 async function replaceText(page: Page, text: string) {
 	await page.locator('.cm-content').click();
 	await page.keyboard.press('ControlOrMeta+a');
@@ -421,7 +432,7 @@ test('a recipe making a custom item shows its name and texture', async ({ page }
 	await page.getByRole('button', { name: /embers/ }).click();
 	await expect(status(page)).toHaveText(/No problems/);
 	await page.getByRole('button', { name: 'items.mms' }).click();
-	await page.locator('.cm-line', { hasText: 'Recipe ember_shard' }).click();
+	await clickLine(page, 'Recipe ember_shard');
 	const inspector = page.getByLabel('Inspector');
 	await expect(inspector.getByLabel('Result')).toHaveText('2 × Ember Shard');
 	const result = inspector.getByRole('img', { name: 'Ember Shard' });
@@ -434,7 +445,7 @@ test('a recipe making a custom item shows its name and texture', async ({ page }
 	await page.screenshot({ path: 'test-results/recipe-custom-item.png' });
 
 	// A custom item that keeps its base's look shows its name as text.
-	await page.locator('.cm-line', { hasText: 'Recipe ember_disc' }).click();
+	await clickLine(page, 'Recipe ember_disc');
 	await expect(inspector.getByLabel('Result')).toHaveText('Music Disc');
 	await expect(inspector.getByRole('img', { name: 'Music Disc' }).locator('img')).toHaveCount(1);
 	expect(errors).toEqual([]);
@@ -970,7 +981,10 @@ test('Ctrl+. extracts an inline noise to a declaration and renames it', async ({
 	await page.keyboard.press('ControlOrMeta+.');
 	const menu = page.getByRole('menu', { name: 'Editor actions' });
 	const extract = menu.getByRole('menuitem', { name: 'Extract { ... } to a Noise declaration' });
-	await expect(extract).toBeVisible();
+	// The menu opens once the language server answers, which waits behind
+	// the analysis of the new text; on a loaded machine that takes longer
+	// than the default 5 seconds.
+	await expect(extract).toBeVisible({ timeout: 15_000 });
 	await extract.click();
 	await expect(page.locator('.cm-content')).toContainText(
 		'Noise hills_noise = { base_octave = -6, amplitude_modifiers = [1] }DensityFunction hills = Noise(hills_noise, 1, 1)'
@@ -1022,7 +1036,7 @@ test('a jigsaw structure previews which pieces join which, and marks dead ends',
 	await page.getByRole('button', { name: /Examples/ }).click();
 	await page.getByRole('button', { name: /jigsaw/ }).click();
 	await expect(status(page)).toHaveText(/No problems/);
-	await page.locator('.cm-line', { hasText: 'Structure dungeon = Jigsaw(' }).click();
+	await page.locator('.cm-line', { hasText: 'JigsawStructure dungeon {' }).click();
 	const graph = page.getByLabel('Jigsaw connections');
 	await expect(graph).toContainText('Jigsaw structure');
 	await expect(graph).toContainText('size 6');
@@ -1038,6 +1052,10 @@ test('a jigsaw structure previews which pieces join which, and marks dead ends',
 	const details = page.getByLabel('Piece details');
 	await expect(details.getByRole('row')).toHaveCount(5);
 	await expect(details.getByRole('row').nth(1)).toContainText('halls/hall (Long hall), halls/short_hall (Short hall)');
+	// Each jigsaw block copies a /give for another one set up the same way.
+	await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+	await details.getByRole('row').nth(1).getByRole('button', { name: 'Copy /give' }).click();
+	expect(await page.evaluate(() => navigator.clipboard.readText())).toMatch(/^\/give @s jigsaw\[block_entity_data=\{id:"jigsaw",name:"dungeon:room_exit",target:"dungeon:hall_entry",pool:"dungeon:halls"/);
 	// A doc comment above a pool element labels its piece.
 	await expect(graph.getByLabel('Pool dungeon:halls').first()).toContainText('Long hall');
 
@@ -1045,7 +1063,7 @@ test('a jigsaw structure previews which pieces join which, and marks dead ends',
 	// preview is pinned, since the edit moves the cursor away.
 	await page.getByRole('button', { name: /^Pin/ }).click();
 	const src = readFileSync(new URL('../../examples/jigsaw/dungeon.mms', import.meta.url), 'utf8');
-	await replaceText(page, src.replace('TemplatePool rooms = {', 'TemplatePool rooms2 = {'));
+	await replaceText(page, src.replace('rooms = { fallback', 'rooms2 = { fallback'));
 	await expect(graph.getByLabel('Problems')).toContainText('2 dead ends');
 	await expect(graph.getByLabel('Pool dungeon:rooms')).toContainText('No TemplatePool declares this');
 
@@ -1074,7 +1092,7 @@ test('a project file nothing uses is marked unused in the asset list', async ({ 
 	const vault = page.getByRole('listitem').filter({ hasText: 'structures/rooms/vault.nbt' });
 	await expect(vault).not.toContainText('unused');
 	const src = readFileSync(new URL('../../examples/jigsaw/dungeon.mms', import.meta.url), 'utf8');
-	await replaceText(page, src.replace('Structure("structures/rooms/vault.nbt", "rooms/vault")', 'Structure("structures/rooms/room.nbt", "rooms/room")'));
+	await replaceText(page, src.replace('Piece("rooms/vault")', 'Piece("rooms/room")'));
 	await expect(vault).toContainText('unused');
 	await expect(vault).toHaveAttribute('title', /Not used/);
 });
@@ -1110,11 +1128,14 @@ test('a tell or title previews its message as the game shows it', async ({ page 
 		page,
 		'Objective kills = "dummy"\nFunction f {\n  tell(@a, "{gold}**Wave** ${kills[@s]} begins")\n  title(@a, "Victory", subtitle = "{gray}*well held*")\n}\n'
 	);
-	await expect(status(page)).toHaveText(/No problems/);
-	await page.locator('.cm-line', { hasText: 'tell(@a' }).click();
 	const text = page.getByLabel('Text preview');
 	const chat = text.getByLabel('Chat');
-	await expect(chat).toContainText('Wave 0 begins');
+	// The status still reads "No problems" from before the edit until the
+	// new analysis lands, so wait for the preview, not the status.
+	await expect(async () => {
+		await page.locator('.cm-line', { hasText: 'tell(@a' }).click();
+		await expect(chat).toContainText('Wave 0 begins', { timeout: 2_000 });
+	}).toPass({ timeout: 30_000 });
 	await expect(chat.getByText('Wave', { exact: true })).toHaveCSS('font-weight', '700');
 	// The score is filled in when the message shows; try a value.
 	await text.getByRole('textbox', { name: 'kills[@s]' }).fill('7');
@@ -1123,4 +1144,51 @@ test('a tell or title previews its message as the game shows it', async ({ page 
 	await expect(text.getByLabel('Title', { exact: true })).toHaveText('Victory');
 	await expect(text.getByLabel('Subtitle')).toHaveText('well held');
 	expect(errors).toEqual([]);
+});
+
+test('Test declarations run in the Tests tab and follow edits', async ({ page }) => {
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	await replaceText(page, 'Global n: int = 0\nFunction bump {\n  n += 1\n  /say bumped\n}\nTest bumps {\n  run bump()\n  expect n == 2\n}\n');
+	const tab = page.getByRole('tab', { name: 'Tests (1 failed)' });
+	await expect(tab).toBeVisible({ timeout: 15_000 });
+	await tab.click();
+	await expect(page.getByTestId('tests-summary')).toHaveText('1 of 1 test failed');
+	await expect(page.getByText('expected n == 2, but n is 1')).toBeVisible();
+	await expect(page.getByText('bumped', { exact: true })).toBeVisible();
+	await page.getByRole('button', { name: 'bumps: failed' }).click();
+	await expect(page.locator('.cm-activeLine')).toContainText('expect n == 2');
+	await replaceText(page, 'Global n: int = 0\nFunction bump {\n  n += 2\n}\nTest bumps {\n  run bump()\n  expect n == 2\n}\n');
+	await expect(page.getByTestId('tests-summary')).toHaveText('1 test passed', { timeout: 15_000 });
+	await expect(page.getByRole('tab', { name: 'Tests', exact: true })).toBeVisible();
+});
+
+test('the Expanded tab shows what a template call or blueprint writes', async ({ page }) => {
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	await replaceText(page, 'Template ring(p: Id<particle>, points: int = 2): Commands {\n  for i in 0..points - 1 {\n    /particle ${p} ^${i} ^1 ^0\n  }\n}\nFunction f {\n  let n = 0\n  ring(flame)\n}\n');
+	// The call gets an `inlined` hint and the let its inferred type.
+	await expect(page.locator('.cm-inlay-hint', { hasText: 'inlined' })).toBeVisible({ timeout: 15_000 });
+	await expect(page.locator('.cm-inlay-type')).toHaveText(': int');
+	await page.getByRole('tab', { name: 'Expanded' }).click();
+	await page.locator('.cm-line', { hasText: 'ring(flame)' }).click();
+	await expect(page.getByTestId('expanded-text')).toHaveText('/particle flame ^0 ^1 ^0\n/particle flame ^1 ^1 ^0');
+	await expect(page.getByLabel('Expanded')).toContainText('Template ring');
+});
+
+test('go to definition on a built-in opens the prelude read-only', async ({ page }) => {
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	await replaceText(page, 'CustomItem ruby { base = diamond }\n');
+	await expect(status(page)).toHaveText(/No problems|problem/, { timeout: 15_000 });
+	await page.locator('.cm-line', { hasText: 'CustomItem ruby' }).click({ position: { x: 20, y: 5 } });
+	await expect(async () => {
+		await page.keyboard.press('F12');
+		await expect(page.getByTestId('prelude-view')).toBeVisible({ timeout: 2_000 });
+	}).toPass({ timeout: 15_000 });
+	await expect(page.locator('#prelude-title')).toContainText('items.mms');
+	// The definition is selected and scrolled into view.
+	await expect(page.getByTestId('prelude-view').locator('.cm-activeLine')).toContainText('Blueprint CustomItem');
+	await page.getByRole('button', { name: 'Close' }).click();
+	await expect(page.getByTestId('prelude-view')).toBeHidden();
 });

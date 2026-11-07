@@ -9,6 +9,10 @@ extern Blueprint Function
 extern Blueprint Objective
 /** A value for the whole pack, set when the pack first loads. */
 extern Blueprint Global
+/** A record kept in command storage: `Storage game: GameState` keeps a `Type GameState { wave: int = 0 }` at `<namespace>:mms game`. Functions read and write its fields as `game.wave`; the pack sets each missing field to its default when it loads. */
+extern Blueprint Storage
+/** A test of the pack's functions, run by `mms test` and the editor: a `setup { }` block, then `run f()` and `expect condition` lines. Tests run in a fresh world after the pack loads and are never written to the pack. */
+extern Blueprint Test
 /** Code that runs when the pack loads, from #minecraft:load. */
 extern Blueprint OnLoad
 /** Code that runs every tick, from #minecraft:tick. */
@@ -45,10 +49,16 @@ extern Template replace(text: string, old: string, new: string): string
 extern Template named(asset: any, name: string): any
 /** The kind of a value: "none", "bool", "number", "string", "name", "list", "object", "range", "commands", or "runtime" for a value only known when the pack runs. */
 extern Template kind_of(value: any): string
+/** A whole number from 0 to 2147483647 made from a string, the same in every build: `hash("dungeon:dungeon")`. */
+extern Template hash(text: string): int
 
 /** Sends `message` to the chat of each player `target` selects: `tell(@a, "Wave ${wave} begins")`. The message is text markup, and `${...}` in it shows a score, a Global, a selector's names or a constant. */
 extern Template tell(target: Selector, message: Text): Commands
 /** Shows `message` in large text in the middle of the screen of each player `target` selects, with `subtitle` under it. */
 extern Template title(target: Selector, message: Text, subtitle: Text?): Commands
+/** Whether `target` selects at least one entity, in a function: `if (exists(@e[tag=boss])) { ... }`. */
+extern Template exists(target: Selector): bool
+/** How many entities `target` selects, in a function: `let n = count(@e[type=zombie, distance=..16])`. */
+extern Template count(target: Selector): int
 /** Shows `message` just above the hotbar of each player `target` selects. */
 extern Template actionbar(target: Selector, message: Text): Commands

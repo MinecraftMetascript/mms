@@ -32,4 +32,4 @@ ItemTag fine = [diamond]
 === provenance of copied nodes
 errors.mms:16:7 from errors.mms:12 < Blueprint Thing (at errors.mms:16:7, def errors.mms:9:1): 1 node, item/generated
 errors.mms:16:7 from errors.mms:13 < Blueprint Thing (at errors.mms:16:7, def errors.mms:9:1): 1 node, item/generated
-errors.mms:2:27 from errors.mms:1 < Template forever (at errors.mms:2:27, def errors.mms:1:1) x100: 1 node, 
+errors.mms:2:27 from errors.mms:1 < Template forever (at errors.mms:2:27, def errors.mms:1:1) x100: 2 nodes, 

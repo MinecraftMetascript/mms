@@ -44,7 +44,11 @@ type OutFile struct {
 // then the asset files the project uses, and the resource pack when it
 // uses textures or sounds. Output is sorted by pack, then path, and is
 // byte-identical across runs. Copied assets need ReadAssets.
-func (r *Result) Emit() []OutFile {
+func (r *Result) Emit() []OutFile { return r.emit(false) }
+
+// emit lays out the pack, with the functions Tests compile to when
+// tests is set.
+func (r *Result) emit(tests bool) []OutFile {
 	var out []OutFile
 	type tagFile struct {
 		values  jsonv.Array
@@ -120,6 +124,9 @@ func (r *Result) Emit() []OutFile {
 		return l
 	}
 	for _, d := range r.Order {
+		if d.Kind.MMS == "Test" && !tests {
+			continue
+		}
 		for _, h := range d.Hoisted {
 			if h.Fn != nil {
 				addFnOut(h.Fn, d, h.Sp, true)
@@ -173,7 +180,7 @@ func (r *Result) Emit() []OutFile {
 			}
 		case d.Kind.MMS == "Objective":
 			objectives[d.NS] = append(objectives[d.NS], d.Lines...)
-		case d.Kind.MMS == "Global":
+		case d.Kind.MMS == "Global" || d.Kind.MMS == "Storage":
 			gns := d.NS
 			if strings.Contains(d.D.NameText(), ":") {
 				gns, _ = splitID(d.D.NameText())

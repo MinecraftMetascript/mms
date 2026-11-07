@@ -8,13 +8,15 @@
 	import Editor from '#lib/editor/Editor.svelte';
 	import Sidebar from '#lib/components/Sidebar.svelte';
 	import JsonView from '#lib/components/JsonView.svelte';
-	import { Engine, itemKey, outputKey, type Diagnostic, type DocSymbol, type OutputFile } from '#lib/engine/engine.svelte.ts';
+	import TestsView from '#lib/components/TestsView.svelte';
+	import { Engine, itemKey, outputKey, type Diagnostic, type DocSymbol, type Expansion, type OutputFile } from '#lib/engine/engine.svelte.ts';
 	import { Project, pathOf, uriOf, starter, type ProjectData } from '#lib/project/project.svelte.ts';
 	import { examples } from '#lib/project/examples.ts';
 	import { download, hasResourcePack, isDataPack, packZip, projectZip, readProjectZip, readZip, readZipAssets } from '#lib/project/zip.ts';
 	import PasteJson from '#lib/components/PasteJson.svelte';
 	import ProjectsDialog from '#lib/components/ProjectsDialog.svelte';
 	import AboutDialog from '#lib/components/AboutDialog.svelte';
+	import PreludeViewer from '#lib/components/PreludeViewer.svelte';
 	import { requestPersistence } from '#lib/project/store.ts';
 	import Dropdown from '#lib/components/Dropdown.svelte';
 	import { fixAllKeys, formatKeys, mod, quickFixKeys } from '#lib/editor/shortcuts.ts';
@@ -27,8 +29,8 @@
 	let viewWaiters: ((v: EditorView) => void)[] = [];
 	let loaded = $state(false);
 	let selectedOutput = $state<string | null>(null);
-	let rightTab = $state<'preview' | 'json'>('preview');
-	let cursor = $state<{ uri: string; line: number } | null>(null);
+	let rightTab = $state<'preview' | 'json' | 'expanded' | 'tests'>('preview');
+	let cursor = $state<{ uri: string; line: number; character: number } | null>(null);
 	let theme = $state<'system' | 'light' | 'dark'>('system');
 	const themes = { system: 'System', light: 'Light', dark: 'Dark' } as const;
 	function nextTheme() {
@@ -39,6 +41,7 @@
 	let editor = $state<ReturnType<typeof Editor> | null>(null);
 	let projects = $state<ReturnType<typeof ProjectsDialog> | null>(null);
 	let about = $state<ReturnType<typeof AboutDialog> | null>(null);
+	let preludeViewer = $state<ReturnType<typeof PreludeViewer> | null>(null);
 
 	onMount(() => {
 		try {
@@ -48,7 +51,11 @@
 		}
 		const e = new Engine(asset('mms-worker.js'), {
 			onText: (uri, text) => project.setText(pathOf(uri), text),
-			display: async (uri) => {
+			display: async (uri): Promise<EditorView | null> => {
+				if (uri.startsWith('mms-prelude:')) {
+					const text: string | null = await e.preludeFile(uri);
+					return text === null || !preludeViewer ? null : preludeViewer.show(uri, text);
+				}
 				const path = pathOf(uri);
 				if (!project.files.some((f) => f.path === path)) return null;
 				if (project.active === path && view) return view;
@@ -110,8 +117,9 @@
 
 	// Follow the cursor: the declaration under it picks the preview and JSON.
 	function trackCursor(v: EditorView) {
-		const line = v.state.doc.lineAt(v.state.selection.main.head).number - 1;
-		cursor = { uri: uriOf(project.active), line };
+		const head = v.state.selection.main.head;
+		const l = v.state.doc.lineAt(head);
+		cursor = { uri: uriOf(project.active), line: l.number - 1, character: head - l.from };
 	}
 	const cursorExt = EditorView.updateListener.of((u) => {
 		if (u.selectionSet || u.docChanged) trackCursor(u.view);
@@ -152,6 +160,29 @@
 	// cursor moves elsewhere; it still redraws as the pack changes. The JSON
 	// tab keeps following the cursor.
 	let pinned = $state<string | null>(null);
+	// The Tests tab shows how many tests fail, so a failure is seen from the other tabs.
+	const testsLabel = $derived.by(() => {
+		const failed = engine?.tests.filter((t) => !t.pass).length ?? 0;
+		return failed ? `Tests (${failed} failed)` : 'Tests';
+	});
+	$effect(() => {
+		if (rightTab === 'tests' && !engine?.hasTests) rightTab = 'preview';
+	});
+	// The Expanded tab shows what the Template call or Blueprint instance
+	// at the cursor writes, refreshed as the cursor moves and the code changes.
+	let expansion = $state<Expansion | null>(null);
+	$effect(() => {
+		const c = cursor;
+		void engine?.output; // a new analysis
+		if (rightTab !== 'expanded' || !engine || !c) return;
+		let live = true;
+		void engine.expand(c.uri, { line: c.line, character: c.character }).then((x) => {
+			if (live) expansion = x;
+		});
+		return () => {
+			live = false;
+		};
+	});
 	const previewPath = $derived(pinned ?? selectedOutput);
 	const pinnable = $derived(shows(previewPath, engine?.outputItems, engine?.outputTexts));
 	function togglePin() {
@@ -332,6 +363,7 @@
 		</div>
 		<ProjectsDialog bind:this={projects} {project} {onswitch} />
 		<AboutDialog bind:this={about} />
+		<PreludeViewer bind:this={preludeViewer} />
 		<input type="file" accept=".zip" class="hidden" bind:this={fileInput} onchange={importZip} />
 		{#if engine}
 			<PasteJson bind:this={pasteJson} {engine} uri={uriOf(project.active)} oninsert={insertDecl} />
@@ -430,7 +462,7 @@
 		</section>
 		<section class="flex min-h-0 flex-col bg-panel">
 			<div class="flex border-b border-line text-xs" role="tablist">
-				{#each [['preview', 'Preview'], ['json', 'JSON']] as [id, label] (id)}
+				{#each [['preview', 'Preview'], ['json', 'JSON'], ['expanded', 'Expanded'], ...(engine?.hasTests ? [['tests', testsLabel]] : [])] as [id, label] (id)}
 					<button
 						role="tab"
 						aria-selected={rightTab === id}
@@ -461,6 +493,21 @@
 					<div class="h-full" class:hidden={rightTab !== 'json'}>
 						<JsonView file={selectedFile} onsource={(f: OutputFile) => f.uri && f.range && reveal(f.uri, f.range)} />
 					</div>
+					{#if rightTab === 'expanded'}
+						<div class="flex h-full min-h-0 flex-col text-sm" aria-label="Expanded">
+							{#if expansion}
+								<p class="border-b border-line px-3 py-1.5 text-xs text-muted">What <span class="font-mono text-ink">{expansion.title}</span> writes</p>
+								<pre class="min-h-0 flex-1 overflow-auto px-3 py-2 font-mono text-[12.5px] leading-5" data-testid="expanded-text">{expansion.text || '(nothing)'}</pre>
+							{:else}
+								<p class="p-4 text-sm text-muted">Put the cursor in a Template call or a Blueprint declaration, such as a CustomItem, to see the code it writes.</p>
+							{/if}
+						</div>
+					{/if}
+					{#if rightTab === 'tests'}
+						<div class="h-full">
+							<TestsView tests={engine.tests} error={engine.testsError} onsource={reveal} />
+						</div>
+					{/if}
 				{/if}
 			</div>
 		</section>

@@ -99,6 +99,33 @@ A structure that generates in new chunks takes four resources, each naming the n
 | `TemplatePool` | the templates (`.nbt` files) to place, with their processors |
 | `ProcessorList` | rules that change blocks as a template is placed |
 
+### Jigsaw structures
+
+`JigsawStructure` writes the first three for a structure grown from jigsaw pieces:
+
+```mms in=examples/jigsaw
+JigsawStructure dungeon {
+  biomes = #minecraft:is_overworld
+  step = underground_structures
+  spacing = 32
+  separation = 12
+  height = AboveBottom(20)
+  depth = 6
+  start = start
+  pools = {
+    start = [Piece("start")]
+    halls = { fallback = caps, elements = [Piece("halls/hall", 3), Piece("halls/short_hall")] }
+    caps = [Piece("caps/hall_cap")]
+  }
+}
+```
+
+Each entry of `pools` is a `TemplatePool` of that name, so a jigsaw block draws from `<namespace>:halls`. An entry is a list of pieces, or a whole pool with its `fallback`. `Piece("halls/hall", 3)` is the structure file `structures/halls/hall.nbt` with weight 3. It also takes `processors` and `projection`. Any other pool element, such as a vanilla template, can go in the list too.
+
+The structure set's `salt` is made from the structure's id unless you set it, so two structures never share one by accident. `heightmap = WORLD_SURFACE_WG` measures `height` from the ground, as villages do. `terrain_adaptation` and `max_distance` (80 by default) are the `Structure`'s fields of those names. The name stands for the structure's id in a command, as in `/locate structure ${dungeon}`. The [`jigsaw`](../../examples/jigsaw/) and [`treasure`](../../examples/treasure/) examples use it.
+
+`biomes` has the type `Ids<worldgen/biome>`: a list of ids, or one id or tag. A Blueprint field can use `Ids<...>` the same way.
+
 ### Jigsaw holes
 
 A jigsaw block joins pieces by name: its target is the name of a jigsaw block in a piece of its pool. Those names are typed into the game's jigsaw screen, so a typo only shows as a structure that stops growing. `JigsawHole` declares a name, and writes no file:
@@ -108,7 +135,7 @@ A jigsaw block joins pieces by name: its target is the name of a jigsaw block in
 JigsawHole hall_exit
 ```
 
-This declares `<namespace>:hall_exit`. The editors list the declared holes where a jigsaw block's name or target is chosen (VS Code's **Jigsaw** view, which copies a `/give` command for a set-up jigsaw block). Once a namespace declares a hole, the `jigsaw-hole` lint reports a jigsaw block in a structure file whose name or target in that namespace is not declared, with the closest declared hole and a fix that declares it. The [`jigsaw`](../../examples/jigsaw/) example declares its holes.
+This declares `<namespace>:hall_exit`. The editors list the declared holes where a jigsaw block's name or target is chosen (VS Code's **Jigsaw** view, which copies a `/give` command for a set-up jigsaw block). Once a namespace declares a hole, the `jigsaw-unknown-name` lint reports a jigsaw block in a structure file whose name or target in that namespace is not declared, with the closest declared hole and a fix that declares it. The [`jigsaw`](../../examples/jigsaw/) example declares its holes. The jigsaw preview's piece details also copy a `/give` for each jigsaw block of a piece, for another block set up the same way.
 
 A template's chests can get a loot table from a `Rule` processor with `block_entity_modifier = AppendLoot(chests/buried)`. That works on vanilla templates too, so a structure can reuse one without its own `.nbt` file. The [`treasure`](../../examples/treasure/) example does this in `worldgen.mms`.
 
@@ -130,16 +157,18 @@ This writes `worldgen/noise/mms_gen/hills/noise.json` and gives `hills` the nois
 
 To turn an inline value into a declaration of its own, put the cursor in it and open the code actions (Ctrl/⌘+. in VS Code and the web editor). **Extract { ... } to a Noise declaration** moves the value above the declaration that holds it, as `Noise hills_noise = { ... }`, and writes `hills_noise` in its place. The action is offered for every value the build would write under `mms_gen/`, and for any inline value where an id of its kind would also do, such as an inline density function or predicate. The new name is the holding declaration's name and the field's name (or the kind's, for an argument), with a number added if it is taken. VS Code and the web editor open the rename box on it straight away.
 
-A function id takes a block of commands the same way, compiled as a `Function` with no parameters:
+A function id takes `run { }`, a block of commands compiled as a `Function` with no parameters:
 
 ```mms
 Advancement found = {
   criteria = { got = { trigger = inventory_changed } }
-  rewards = { function = {
+  rewards = { function = run {
     /say found it
   } }
 }
 ```
+
+A plain `{ }` there is an error, with a quick fix that adds `run`.
 
 ## Asset files
 
@@ -148,10 +177,7 @@ Textures, sounds and structure templates are files, not declarations. Keep them 
 ```
 PaintingVariant sunset = { width = 2, height = 1, asset_id = Texture("art/sunset.png") }
 JukeboxSong tune = { sound_event = Sound("music/tune.ogg"), description = "Tune", length_in_seconds = 30, comparator_output = 3 }
-TemplatePool houses = {
-  fallback = minecraft:empty
-  elements = [{ weight = 1, element = { element_type = "minecraft:single_pool_element", location = Structure("builds/house.nbt"), projection = "rigid", processors = "minecraft:empty" } }]
-}
+TemplatePool houses = { fallback = minecraft:empty, elements = [WeightedElement(1, SinglePoolElement(rigid, StructureFile("builds/house.nbt"), minecraft:empty))] }
 ```
 
 Each call stands for the id the file gets in your namespace: its base name, lowercased, or the second argument, as in `Texture("art/Sunset Final.png", "sunset")`. Only files that code uses are copied, to the path the game expects:
@@ -160,7 +186,7 @@ Each call stands for the id the file gets in your namespace: its base name, lowe
 | --- | --- | --- |
 | `Texture` | `.png` | `assets/<ns>/textures/<prefix><name>.png`, where the field sets the prefix, such as `painting/` |
 | `Sound` | `.ogg` | `assets/<ns>/sounds/<name>.ogg`, plus an entry in a generated `sounds.json` |
-| `Structure` | `.nbt` | `data/<ns>/structure/<name>.nbt` |
+| `StructureFile` | `.nbt` | `data/<ns>/structure/<name>.nbt` |
 
 Inside the quotes, completion lists the project's files of the helper's type, in VS Code and the web editor. A path to a file that is not there is an error.
 
@@ -339,7 +365,7 @@ Advancement first_gem = {
 | `${@s}` | the names of the entities a selector finds, filled in the same way |
 | `\*` | the character itself |
 
-A book page shows 14 lines of about 19 characters. Text past the last line is cut off in game, so the [`book-overflow`](lint.md) warning marks where a page runs over, measured with the vanilla font. Add a `---` line there.
+A book page shows 14 lines of about 19 characters. Text past the last line is cut off in game, so the [`book-page-overflow`](lint.md) warning marks where a page runs over, measured with the vanilla font. Add a `---` line there.
 
 ### Previewing a book
 

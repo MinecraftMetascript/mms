@@ -59,7 +59,7 @@ func (e *Env) Check(r *eval.Result, ns string, newChecker Checkers) map[string][
 				continue
 			}
 			x, ok := call.Args[p.Name.Text]
-			if !ok {
+			if !ok || call.Runtime[p.Name.Text] {
 				continue
 			}
 			t, _ := e.Resolve(call.Template.Path, p.Type)

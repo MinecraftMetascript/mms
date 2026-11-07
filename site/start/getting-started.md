@@ -92,9 +92,9 @@ These JSDoc-style tags are understood:
 
   ```
   elements = [
-    WeightedElement(50, SinglePoolElement(rigid, Structure("structures/road_cap.nbt"), [])),
+    WeightedElement(50, SinglePoolElement(rigid, StructureFile("structures/road_cap.nbt"), [])),
     /** @label Worn road cap */
-    WeightedElement(10, SinglePoolElement(rigid, Structure("structures/road_cap.nbt"), road_wear_medium)),
+    WeightedElement(10, SinglePoolElement(rigid, StructureFile("structures/road_cap.nbt"), road_wear_medium)),
   ]
   ```
 
@@ -124,7 +124,7 @@ Every value is checked against the 26.3 schema as you type. Completion offers th
 
 ## Formatting and lint
 
-`mms fmt` (and format-on-save in the editors) prints every file in one style, so there is nothing to configure. `mms check` reports errors and [lint](../guides/lint.md) findings, and `mms fix` applies the fixes that are always safe.
+`mms fmt` (and format-on-save in the editors) prints every file in one style, so there is nothing to configure. `mms check` reports errors and [lint](../guides/lint.md) findings, and `mms fix` applies the fixes that are always safe. `mms test` runs the project's [`Test` declarations](../guides/functions.md#tests).
 
 ## Next
 

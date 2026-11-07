@@ -49,7 +49,7 @@ func TestAssetPathCompletion(t *testing.T) {
 		{"partial", `PaintingVariant p = { width = 1, height = 1, asset_id = Texture("art/su|nset.png") }`, pngs, "art/sunset.png"},
 		{"unterminated", "PaintingVariant p = { width = 1, height = 1, asset_id = Texture(\"art/|\n", pngs, "art/"},
 		{"sound", `JukeboxSong s = { sound_event = Sound("|"), description = "x", length_in_seconds = 1, comparator_output = 1 }`, []string{"music/tune.ogg"}, ""},
-		{"structure", `Function f { /say hi }` + "\nTemplatePool p = { fallback = minecraft:empty, elements = [{ weight = 1, element = { element_type = minecraft:single_pool_element, location = Structure(\"|\"), projection = rigid, processors = minecraft:empty } }] }", []string{"builds/house.nbt"}, ""},
+		{"structure", `Function f { /say hi }` + "\nTemplatePool p = { fallback = minecraft:empty, elements = [{ weight = 1, element = { element_type = minecraft:single_pool_element, location = StructureFile(\"|\"), projection = rigid, processors = minecraft:empty } }] }", []string{"builds/house.nbt"}, ""},
 		{"second argument", `PaintingVariant p = { width = 1, height = 1, asset_id = Texture("art/sunset.png", "|") }`, nil, ""},
 		{"other call", `Advancement a = { criteria = { x = { trigger = minecraft:impossible } }, display = { title = Text("|") } }`, nil, ""},
 	}

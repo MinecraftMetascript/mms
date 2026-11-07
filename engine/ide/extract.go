@@ -26,6 +26,10 @@ type Extraction struct {
 // values of a declarable kind at a position that also takes its id (an
 // inline density function).
 func (s *Session) Extractions(path string, from, to int) []Extraction {
+	return append(s.declExtractions(path, from, to), s.evalExtractions(path, from, to)...)
+}
+
+func (s *Session) declExtractions(path string, from, to int) []Extraction {
 	a := s.at(path, from)
 	if a == nil || a.decl == nil || a.decl.Info == nil || len(a.path) < 2 {
 		return nil
@@ -54,6 +58,10 @@ func (s *Session) Extractions(path string, from, to int) []Extraction {
 		name := uniqueName(taken, extractName(top, a.path[i-1], in.Extract, s))
 		taken[name] = true
 		body := reindent(src, sp)
+		if r, ok := e.(*syntax.RunExpr); ok && r.Body != nil {
+			// A Function declaration takes the block, without `run`.
+			body = reindent(src, r.Body.Sp)
+		}
 		head := in.Extract + " " + name + " = "
 		if in.InlineFn {
 			head = in.Extract + " " + name + " "
