@@ -137,6 +137,9 @@ func TestCompletionParity(t *testing.T) {
 		probe(p, map[string]string{"main.mms": smp.src}, "main.mms", fmt.Sprintf("%s:%d+", smp.path, smp.line))
 	}
 
+	if len(got) == 0 {
+		t.Fatal("no position was measured: are ../../examples and ../../site there?")
+	}
 	baseline := "testdata/completion.tsv"
 	if os.Getenv("MMS_UPDATE") != "" {
 		keys := make([]string, 0, len(got))

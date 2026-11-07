@@ -97,7 +97,7 @@ func (c *Checker) TypeCandidates(t *spec.Type) []Candidate {
 	if t == nil {
 		return nil
 	}
-	return dedupe(append(c.valueCandidates(tview{T: t}, 0), c.typedCandidates(tview{T: t})...))
+	return dedupe(append(c.valueCandidates(tview{T: t}, 0), c.typedCandidates(c.norm(tview{T: t}))...))
 }
 
 func (c *Checker) valueCandidates(v tview, depth int) []Candidate {

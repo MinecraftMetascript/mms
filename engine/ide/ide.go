@@ -519,7 +519,13 @@ func (s *Session) statementCandidates(a *at, off int) []sema.Candidate {
 	}
 	// Templates that give commands, called as a statement.
 	if e := s.R.Eval; e != nil {
-		for name, t := range e.Templates {
+		names := make([]string, 0, len(e.Templates))
+		for name := range e.Templates {
+			names = append(names, name)
+		}
+		sort.Strings(names)
+		for _, name := range names {
+			t := e.Templates[name]
 			if t.D.Type == nil || syntax.TypeText(t.D.Type) != "Commands" || internal(t.D) {
 				continue
 			}
@@ -752,6 +758,10 @@ func (a *at) baseInfo(e syntax.Expr) *sema.Info {
 }
 
 func (a *at) namedArgs(call *syntax.Call) []sema.Candidate {
+	// A method's arguments are not its receiver's fields.
+	if _, method := call.Fn.(*syntax.Member); method {
+		return nil
+	}
 	base := sema.ChainBase(call)
 	in := a.info(base)
 	if in == nil {

@@ -460,7 +460,7 @@ func (s *Session) templateArgCandidates(path string, off int, c *sema.Checker) (
 			return out, true
 		}
 	}
-	return s.evalValueCandidates(), true
+	return append(out, s.evalValueCandidates()...), true
 }
 
 // templateNamedArgs offers the parameters after the i-th that the call
