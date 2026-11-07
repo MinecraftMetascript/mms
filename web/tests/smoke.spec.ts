@@ -43,7 +43,7 @@ test('the editor loads, checks, completes and previews', async ({ page }) => {
 	await expect(status(page)).toHaveText(/No problems/);
 
 	// A noise renders in the preview, and its JSON is shown.
-	await replaceText(page, 'Noise n = { base_octave = -5, amplitude_modifiers = [1, 1] }\n');
+	await replaceText(page, 'Noise n { base_octave = -5, amplitude_modifiers = [1, 1] }\n');
 	await page.locator('.cm-line').first().click();
 	await expect(page.getByText('my_pack:n')).toBeVisible();
 	await expect(page.locator('canvas')).toBeVisible();
@@ -120,7 +120,7 @@ test('an example with textures and a sound checks and exports both packs', async
 	await page.locator('.cm-content').click();
 	await page.keyboard.press('ControlOrMeta+End');
 	await page.keyboard.press('Enter');
-	await page.keyboard.insertText('PaintingVariant extra = { width = 1, height = 1, asset_id = Texture(');
+	await page.keyboard.insertText('PaintingVariant extra { width = 1, height = 1, asset_id = Texture(');
 	await page.keyboard.type('"art/h');
 	const popup = page.locator('.cm-tooltip-autocomplete');
 	await expect(popup).toContainText('art/hearth.png');
@@ -301,7 +301,7 @@ test('an inline noise where an id is needed previews', async ({ page }) => {
 	await replaceText(
 		page,
 		[
-			'Noise simple = { base_octave = -4, amplitude_modifiers = [1] }',
+			'Noise simple { base_octave = -4, amplitude_modifiers = [1] }',
 			'NoiseSettings custom {',
 			'  default_block = stone',
 			'  default_fluid = water',
@@ -379,7 +379,7 @@ test('data packs and pasted JSON import as MMS', async ({ page }) => {
 	await page.getByLabel('Name', { exact: true }).fill('blocks/ruby_ore');
 	await page.getByLabel('JSON', { exact: true }).fill('{"type":"minecraft:block","pools":[{"rolls":1,"entries":[{"type":"minecraft:item","name":"minecraft:diamond"}]}]}');
 	await page.getByRole('button', { name: 'Convert' }).click();
-	await expect(page.locator('.cm-content')).toContainText('LootTable blocks/ruby_ore = {');
+	await expect(page.locator('.cm-content')).toContainText('LootTable blocks/ruby_ore {');
 	await expect(page.locator('.cm-content')).toContainText('entries = [diamond]');
 	await expect(status(page)).toHaveText(/No problems/);
 	await page.getByRole('tab', { name: 'Pack' }).click();
@@ -459,9 +459,9 @@ test('loot tables, recipes and biomes show in the inspector', async ({ page }) =
 	await replaceText(
 		page,
 		[
-			'LootTable chest = { pools = [Pool(2, [Item(name = diamond).Weight(3), Item(name = emerald)])] }',
+			'LootTable chest { pools = [Pool(2, [Item(name = diamond).Weight(3), Item(name = emerald)])] }',
 			'Recipe ruby_block = Shaped(["RRR", "R R", "RRR"], { R = emerald }, emerald_block)',
-			'Biome warm = { temperature = 0.8, downfall = 0.4, has_precipitation = true, effects = { water_color = "#3f76e4" }, features = [], carvers = [] }',
+			'Biome warm { temperature = 0.8, downfall = 0.4, has_precipitation = true, effects = { water_color = "#3f76e4" }, features = [], carvers = [] }',
 			''
 		].join('\n')
 	);
@@ -840,7 +840,7 @@ test('several projects are saved and can be switched', async ({ page }) => {
 	page.on('dialog', (d) => d.accept());
 	await page.goto('./');
 	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
-	await replaceText(page, 'Noise first = { base_octave = -4, amplitude_modifiers = [1] }\n');
+	await replaceText(page, 'Noise first { base_octave = -4, amplitude_modifiers = [1] }\n');
 
 	// An example opens as a second project; the first stays saved.
 	await page.getByRole('button', { name: 'Examples ▾' }).click();
@@ -995,7 +995,7 @@ test('Ctrl+. extracts an inline noise to a declaration and renames it', async ({
 	await expect(extract).toBeVisible({ timeout: 15_000 });
 	await extract.click();
 	await expect(page.locator('.cm-content')).toContainText(
-		'Noise hills_noise = { base_octave = -6, amplitude_modifiers = [1] }DensityFunction hills = Noise(hills_noise, 1, 1)'
+		'Noise hills_noise { base_octave = -6, amplitude_modifiers = [1] }DensityFunction hills = Noise(hills_noise, 1, 1)'
 	);
 	// The rename box opens on the new name.
 	const box = page.getByRole('textbox', { name: 'New name' });
@@ -1003,7 +1003,7 @@ test('Ctrl+. extracts an inline noise to a declaration and renames it', async ({
 	await expect(box).toHaveValue('hills_noise');
 	await page.keyboard.type('hill_shape');
 	await page.keyboard.press('Enter');
-	await expect(page.locator('.cm-content')).toContainText('Noise hill_shape = {');
+	await expect(page.locator('.cm-content')).toContainText('Noise hill_shape {');
 	await expect(page.locator('.cm-content')).toContainText('Noise(hill_shape, 1, 1)');
 	await expect(status(page)).toHaveText(/No problems|warning/);
 });
@@ -1134,7 +1134,7 @@ test('a tell or title previews its message as the game shows it', async ({ page 
 	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
 	await replaceText(
 		page,
-		'Objective kills = "dummy"\nFunction f {\n  tell(@a, "{gold}**Wave** ${kills[@s]} begins")\n  title(@a, "Victory", subtitle = "{gray}*well held*")\n}\n'
+		'Objective kills: dummy\nFunction f {\n  tell(@a, "{gold}**Wave** ${kills[@s]} begins")\n  title(@a, "Victory", subtitle = "{gray}*well held*")\n}\n'
 	);
 	const text = page.getByLabel('Text preview');
 	const chat = text.getByLabel('Chat');

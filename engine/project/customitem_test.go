@@ -26,7 +26,7 @@ CustomItem ruby_sword {
   parent = item/handheld
 }
 CustomItem badge { base = paper, name = "Badge" }
-Lang en_us = { "item.demo.other" = "Other" }
+Lang en_us { "item.demo.other" = "Other" }
 Recipe ruby = Shapeless([emerald, redstone], ruby * 2)
 Recipe ruby_sword = Shapeless([iron_sword, emerald], { id = ruby_sword, components = { rarity = epic } })
 LootTable drops { pools = [Pool(1, [ruby, Item(name = badge, modifier = [SetCount(3)])])] }
@@ -108,10 +108,10 @@ func TestCustomItemErrors(t *testing.T) {
 		{`CustomItem a { base = stick, parent = item/handheld }`, "add a texture"},
 		{`CustomItem a { base = stick, name = { english = "A" } }`, "not a language code"},
 		{"CustomItem a { base = stick }\nRecipe r = Shapeless([a], stick)", ""},
-		{"CustomItem a { base = stick, texture = Texture(\"art/a.png\") }\nItemModel a = { model = Model(model = item/stick) }", "ItemModel 'demo:a' is already declared"},
-		{"ItemModel a = { model = Model(model = item/stick) }\nCustomItem a { base = stick, texture = Texture(\"art/a.png\") }", "ItemModel 'demo:a' is already declared"},
-		{"CustomItem a { base = stick, texture = Texture(\"art/a.png\") }\nModel item/a = { parent = item/generated }", "Model 'demo:item/a' is already declared"},
-		{"CustomItem a { base = stick, name = \"A\" }\nLang en_us = { \"item.demo.a\" = \"B\" }", "already sets 'item.demo.a'"},
+		{"CustomItem a { base = stick, texture = Texture(\"art/a.png\") }\nItemModel a { model = Model(model = item/stick) }", "ItemModel 'demo:a' is already declared"},
+		{"ItemModel a { model = Model(model = item/stick) }\nCustomItem a { base = stick, texture = Texture(\"art/a.png\") }", "ItemModel 'demo:a' is already declared"},
+		{"CustomItem a { base = stick, texture = Texture(\"art/a.png\") }\nModel item/a { parent = item/generated }", "Model 'demo:item/a' is already declared"},
+		{"CustomItem a { base = stick, name = \"A\" }\nLang en_us { \"item.demo.a\" = \"B\" }", "already sets 'item.demo.a'"},
 		{"CustomItem a { base = stick, components = { bundle_contents = [a] } }\nRecipe r = Shapeless([stick], a)", "contains itself"},
 	}
 	for _, tc := range cases {

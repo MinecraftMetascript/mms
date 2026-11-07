@@ -84,7 +84,7 @@ func TestBookStringCompletion(t *testing.T) {
 		t.Errorf("title completions = %v", labels(items))
 	}
 	// Nor in MMS code after a brace.
-	s, off = session(t, "LootTable l = {|}\n")
+	s, off = session(t, "LootTable l {|}\n")
 	if s.TriggerApplies("main.mms", off, "{") {
 		t.Error("{ triggers in code")
 	}
@@ -152,7 +152,7 @@ func TestBookTextCompletion(t *testing.T) {
 
 // Markup completes in any string where a text component goes.
 func TestTextStringCompletion(t *testing.T) {
-	src := "Advancement a = { display = { title = \"Hi {gol|\", description = \"d\", icon = { id = stone }, background = \"minecraft:block/stone\" }, criteria = { x = Tick() } }\n"
+	src := "Advancement a { display = { title = \"Hi {gol|\", description = \"d\", icon = { id = stone }, background = \"minecraft:block/stone\" }, criteria = { x = Tick() } }\n"
 	s, off := session(t, src)
 	items, _ := s.Completion("main.mms", off)
 	if !has(labels(items), "gold") {

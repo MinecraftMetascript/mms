@@ -26,7 +26,7 @@ Function add(a: int, b: int): int {
 Global total: int = 0
 
 /** Points per player. */
-Objective pts = dummy
+Objective pts: dummy
 
 /** @deprecated use add */
 Function old_reward {
@@ -34,7 +34,7 @@ Function old_reward {
 }
 
 /** Ridges for the terrain. */
-Noise ridges = { first_octave = -1, amplitudes = [1] }
+Noise ridges { first_octave = -1, amplitudes = [1] }
 `
 
 const docMain = `Function main {
@@ -115,7 +115,7 @@ func TestCommandReferences(t *testing.T) {
 	if len(defs) != 1 || defs[0].Path != "lib.mms" || defs[0].Span.Start != offOf(docLib, "old_reward {", 0) {
 		t.Errorf("definition = %+v", defs)
 	}
-	refs := s.References("lib.mms", offOf(docLib, "pts =", 0), false)
+	refs := s.References("lib.mms", offOf(docLib, "pts:", 0), false)
 	if len(refs) != 2 {
 		t.Errorf("objective references = %+v", refs)
 	}

@@ -177,6 +177,7 @@ type Result struct {
 	orderErr map[string][]syntax.Diagnostic // feature order cycles
 	emitted  map[*syntax.Decl]bool          // declarations Blueprint instances emitted
 	langErr  map[string][]syntax.Diagnostic // keys two Lang declarations set
+	formErr  map[string][]syntax.Diagnostic // declaration forms the language dropped
 	jigsaw   *jigsawModel                   // structure files' jigsaw blocks, for the jigsaw rules
 	files    fs.FS
 	lintMu   sync.Mutex
@@ -268,6 +269,7 @@ func (r *Result) Diagnostics(path string) []syntax.Diagnostic {
 	out = append(out, r.assetErr[path]...)
 	out = append(out, r.orderErr[path]...)
 	out = append(out, r.langErr[path]...)
+	out = append(out, r.formErr[path]...)
 	typeErr := r.typeErr[path]
 	for _, d := range r.Order {
 		if d.Unit == u {
@@ -402,6 +404,12 @@ func (p *Project) Analyze(ctx context.Context) (*Result, error) {
 		c.Files, c.Texts = p.Files, p.bookText
 		return c
 	})
+	r.formErr = map[string][]syntax.Diagnostic{}
+	for path, f := range source {
+		if ds := checkForms(path, f); ds != nil {
+			r.formErr[path] = ds
+		}
+	}
 	r.collectAssets()
 	r.checkFeatureOrder()
 	r.checkLangKeys()
@@ -601,12 +609,16 @@ func hasErrors(ds []syntax.Diagnostic) bool {
 // debugPanics re-raises checker panics, for tests.
 var debugPanics = false
 
-// objective turns `Objective kills = deathCount` into its setup command.
+// objective turns `Objective kills: deathCount` into its setup command.
+// The old `= deathCount` form still compiles, next to its error.
 func objective(c *sema.Checker, d *syntax.Decl) []string {
 	if d.Name == nil {
 		return nil
 	}
 	criterion := "dummy"
+	if d.Type != nil {
+		criterion = syntax.TypeText(d.Type)
+	}
 	switch v := d.Value.(type) {
 	case nil:
 	case *syntax.Ident:

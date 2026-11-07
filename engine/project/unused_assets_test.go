@@ -21,7 +21,7 @@ func TestUnusedAssets(t *testing.T) {
 		"build/x.png":   {Data: pngBytes}, // the output folder is not the project's
 		"notes/a.txt":   {Data: []byte("x")},
 	}
-	src := `PaintingVariant p = { width = 1, height = 1, asset_id = Texture("art/used.png", "used") }
+	src := `PaintingVariant p { width = 1, height = 1, asset_id = Texture("art/used.png", "used") }
 Structure s = Jigsaw(biomes = #minecraft:is_overworld, step = surface_structures, spawn_overrides = {}, start_pool = starts, size = 2, start_height = Constant({ absolute = 0 }), max_distance_from_center = 80, use_expansion_hack = false)
 ` + pool("starts", `StructureFile("s/base.nbt", "base")`) + pool("tops", `StructureFile("s/top.nbt", "top")`) + pool("lonely")
 	p := New(spec.MustDefault(), Config{Namespace: "demo", Description: "d", Icon: "art/icon.png", Output: "build"})

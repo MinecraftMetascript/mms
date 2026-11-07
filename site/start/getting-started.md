@@ -27,7 +27,7 @@ LootTable chests/gems {
 
 Recipe gem_block = Shaped(["GG", "GG"], { G = #gems }, emerald_block)
 
-Objective found = dummy
+Objective found: dummy
 
 Function find {
   found[@s] += 1

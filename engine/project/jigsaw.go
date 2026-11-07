@@ -385,7 +385,7 @@ func (r *Result) newPoolFix(s *structureUse, ns, name string) (syntax.Fix, bool)
 		return syntax.Fix{}, false
 	}
 	src := s.decl.Unit.File.Src
-	text := fmt.Sprintf("\nTemplatePool %s = {\n  fallback = minecraft:empty\n  elements = []\n}\n", name)
+	text := fmt.Sprintf("\nTemplatePool %s {\n  fallback = minecraft:empty\n  elements = []\n}\n", name)
 	if len(src) > 0 && src[len(src)-1] != '\n' {
 		text = "\n" + text
 	}

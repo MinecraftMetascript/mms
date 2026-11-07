@@ -22,9 +22,9 @@ func TestBuildAssets(t *testing.T) {
 		"art/unused.png":   png,
 		"music/tune.ogg":   "OggS sound",
 		"builds/house.nbt": "\x1f\x8b\x08\x00",
-		"main.mms": `PaintingVariant sunset = { width = 2, height = 1, asset_id = Texture("art/sunset.png") }
-JukeboxSong tune = { sound_event = Sound("music/tune.ogg"), description = "Tune", length_in_seconds = 30, comparator_output = 3 }
-TemplatePool houses = {
+		"main.mms": `PaintingVariant sunset { width = 2, height = 1, asset_id = Texture("art/sunset.png") }
+JukeboxSong tune { sound_event = Sound("music/tune.ogg"), description = "Tune", length_in_seconds = 30, comparator_output = 3 }
+TemplatePool houses {
   fallback = minecraft:empty
   elements = [{ weight = 1, element = { element_type = "minecraft:single_pool_element", location = StructureFile("builds/house.nbt"), projection = "rigid", processors = "minecraft:empty" } }]
 }

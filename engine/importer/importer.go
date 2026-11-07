@@ -23,6 +23,9 @@ var (
 // Decl returns the declaration for one resource file: kind, the id's path
 // (qualified when it is not in ns, or is not a valid bare name) and value.
 func Decl(k sema.Kind, ns, id string, v jsonv.Value) string {
+	if o, ok := v.(*jsonv.Object); ok {
+		return k.Name + " " + name(ns, id) + " " + Expr(o) + "\n"
+	}
 	return k.Name + " " + name(ns, id) + " = " + Expr(v) + "\n"
 }
 

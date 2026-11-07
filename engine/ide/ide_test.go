@@ -57,19 +57,19 @@ func TestCompletion(t *testing.T) {
 		{"value", "DensityFunction x = |", []string{"Noise", "Clamp", "Cache"}, false},
 		{"value prefix", "DensityFunction x = Cl|", []string{"Clamp"}, false},
 		{"method", "DensityFunction x = Noise(minecraft:ridge).|", []string{"XzScale", "YScale"}, false},
-		{"object field", "Noise n = {\n  |\n}", []string{"base_octave", "amplitude_modifiers"}, false},
-		{"local ref", "Noise n = { base_octave = -1, amplitude_modifiers = [1] }\nDensityFunction x = Noise(|)", []string{"n"}, false},
-		{"comment", "// Noise |\nNoise n = {}", nil, true},
-		{"string", "Noise n = { a = \"x|y\" }", nil, true},
+		{"object field", "Noise n {\n  |\n}", []string{"base_octave", "amplitude_modifiers"}, false},
+		{"local ref", "Noise n { base_octave = -1, amplitude_modifiers = [1] }\nDensityFunction x = Noise(|)", []string{"n"}, false},
+		{"comment", "// Noise |\nNoise n {}", nil, true},
+		{"string", "Noise n { a = \"x|y\" }", nil, true},
 		{"command name", "Function f {\n  /scoreb|\n}", []string{"scoreboard", "say"}, false},
 		{"command literal", "Function f {\n  /scoreboard players |\n}", []string{"set", "operation"}, false},
 		{"command selector", "Function f {\n  /kill |\n}", []string{"@e", "@s"}, false},
 		{"command function", "Function f {\n  /function |\n}\nFunction g {\n  /say hi\n}", []string{"test:g", "test:f"}, false},
-		{"command objective", "Objective kills = deathCount\nFunction f {\n  /scoreboard players set @s |\n}", []string{"kills"}, false},
+		{"command objective", "Objective kills: deathCount\nFunction f {\n  /scoreboard players set @s |\n}", []string{"kills"}, false},
 		{"command after execute run", "Function f {\n  /execute as @a run gam|\n}", []string{"gamemode"}, false},
 		{"command registry", "Function f {\n  /effect give @s |\n}", []string{"speed"}, false},
 		{"resource pack kind", "BlockSt|", []string{"BlockState"}, false},
-		{"block state property", "BlockState minecraft:oak_fence = {\n  multipart = [{ when = {\n    |\n  }, apply = { model = minecraft:block/oak_fence_post } }]\n}", []string{"north", "waterlogged"}, false},
+		{"block state property", "BlockState minecraft:oak_fence {\n  multipart = [{ when = {\n    |\n  }, apply = { model = minecraft:block/oak_fence_post } }]\n}", []string{"north", "waterlogged"}, false},
 		{"execute helper", "Function f {\n  A|\n}", []string{"As", "At", "Positioned"}, false},
 		{"empty statement", "Function f {\n  /say hi\n  |\n}", []string{"As", "Positioned", "let", "if"}, false},
 		{"empty statement nested", "Function f {\n  As(@a) {\n    |\n  }\n}", []string{"At", "while"}, false},
@@ -85,7 +85,7 @@ func TestCompletion(t *testing.T) {
 		{"advancement trigger", "OnAdvancement a = Pla|", []string{"PlacedBlock"}, false},
 		{"advancement condition", "OnAdvancement a = PlacedBlock(|) {\n  /say hi\n}", []string{"location"}, false},
 		{"hook kind", "OnFirst|", []string{"OnFirstJoin"}, false},
-		{"model parent", "Model block/x = { parent = minecraft:block/cube_a| }", []string{"block/cube_all"}, false},
+		{"model parent", "Model block/x { parent = minecraft:block/cube_a| }", []string{"block/cube_all"}, false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -109,7 +109,7 @@ func TestCompletion(t *testing.T) {
 }
 
 func TestHoverDefinitionRename(t *testing.T) {
-	src := "Noise ridges = { base_octave = -1, amplitude_modifiers = [1] }\nDensityFunction x = Noise(rid|ges)\nDensityFunction y = Noise(test:ridges)\n"
+	src := "Noise ridges { base_octave = -1, amplitude_modifiers = [1] }\nDensityFunction x = Noise(rid|ges)\nDensityFunction y = Noise(test:ridges)\n"
 	s, off := session(t, src)
 	h, _ := s.Hover("main.mms", off)
 	if !strings.Contains(h, "ridges") {
@@ -140,7 +140,7 @@ func TestHoverDefinitionRename(t *testing.T) {
 }
 
 func TestSymbols(t *testing.T) {
-	s, _ := session(t, "Noise a = { base_octave = -1, amplitude_modifiers = [1] }\nDensityFunction b = 1\n")
+	s, _ := session(t, "Noise a { base_octave = -1, amplitude_modifiers = [1] }\nDensityFunction b = 1\n")
 	syms := s.Symbols("main.mms")
 	if len(syms) != 2 {
 		t.Fatalf("symbols = %+v", syms)
@@ -222,7 +222,7 @@ func TestSemanticTokensSource(t *testing.T) {
 }
 
 func TestResourcePackNavigation(t *testing.T) {
-	src := "Model block/glow = { parent = minecraft:block/cube_all }\nBlockState minecraft:glowstone = { variants = { \"\" = [{ model = block/gl|ow, weight = 3 }] } }\n"
+	src := "Model block/glow { parent = minecraft:block/cube_all }\nBlockState minecraft:glowstone { variants = { \"\" = [{ model = block/gl|ow, weight = 3 }] } }\n"
 	s, off := session(t, src)
 	defs := s.Definition("main.mms", off)
 	if len(defs) != 1 || defs[0].Span.Start != strings.Index(src, "block/glow") {
@@ -261,7 +261,7 @@ func TestRecipeIngredientCompletion(t *testing.T) {
 		{"shaped key prefix", "Recipe r = Shaped([\"A\"], {\n  A = amethyst|\n}" + result, "amethyst"},
 		{"shaped key tag", "Recipe r = Shaped([\"A\"], {\n  A = #|\n}" + result, "#"},
 		{"shaped key tag prefix", "Recipe r = Shaped([\"A\"], {\n  A = #minecraft:creeper|\n}" + result, "#minecraft:creeper"},
-		{"object key empty", "Recipe r = { type = crafting_shaped, pattern = [\"A\"], key = { A = | }, result = { id = stick } }", ""},
+		{"object key empty", "Recipe r { type = crafting_shaped, pattern = [\"A\"], key = { A = | }, result = { id = stick } }", ""},
 		{"shapeless empty", "Recipe r = Shapeless([|]" + result, ""},
 		{"shapeless second", "Recipe r = Shapeless([stick, |]" + result, ""},
 		{"shapeless tag", "Recipe r = Shapeless([#|]" + result, "#"},
@@ -291,7 +291,7 @@ func TestRecipeIngredientCompletion(t *testing.T) {
 // A string read as text markup is split into its marks, tags and
 // ${...} reads; a mark left open is text.
 func TestSemanticTokensMarkup(t *testing.T) {
-	plain := "Advancement a = { display = { title = \"**Ruby** 5 * 3\", description = \"d\" } }\n"
+	plain := "Advancement a { display = { title = \"**Ruby** 5 * 3\", description = \"d\" } }\n"
 	ps, _ := session(t, plain)
 	var pg []string
 	for _, tk := range ps.SemanticTokens("main.mms") {
@@ -301,7 +301,7 @@ func TestSemanticTokensMarkup(t *testing.T) {
 		t.Errorf("plain tokens: %s", g)
 	}
 
-	src := "const who = \"x\"\nAdvancement a = { display = { title = \"**Ruby** {gold}gem ${who} 5 * 3\", description = \"d\", icon = { id = stone } }, criteria = { x = Tick() } }\n"
+	src := "const who = \"x\"\nAdvancement a { display = { title = \"**Ruby** {gold}gem ${who} 5 * 3\", description = \"d\", icon = { id = stone } }, criteria = { x = Tick() } }\n"
 	s, _ := session(t, src)
 	r := []rune(src)
 	var got []string

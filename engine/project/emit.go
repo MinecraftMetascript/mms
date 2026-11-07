@@ -350,12 +350,15 @@ func Zip(files []OutFile) ([]byte, error) {
 // pool can list one structure several times with different processors,
 // and a label tells them apart in the jigsaw preview.
 func elementLabels(d *Decl) map[string]string {
-	obj, ok := d.D.Value.(*syntax.Object)
-	if !ok || obj.Body == nil || d.Unit == nil || d.Unit.File == nil {
+	body := d.D.Body
+	if obj, ok := d.D.Value.(*syntax.Object); ok {
+		body = obj.Body
+	}
+	if body == nil || d.Unit == nil || d.Unit.File == nil {
 		return nil
 	}
 	var out map[string]string
-	for _, it := range obj.Body.Items {
+	for _, it := range body.Items {
 		f, ok := it.(*syntax.FieldStmt)
 		if !ok || f.Key == nil || f.Key.Text != "elements" {
 			continue

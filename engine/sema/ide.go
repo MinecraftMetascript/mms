@@ -549,7 +549,7 @@ func (k *Kinds) DeclKinds() []Candidate {
 		case name == "Function":
 			cand.Insert = "Function ${1:name} {\n\t$0\n}"
 		case name == "Objective":
-			cand.Insert = "Objective ${1:name} = ${2:dummy}"
+			cand.Insert = "Objective ${1:name}: ${2:dummy}"
 		case name == "Global":
 			cand.Insert = "Global ${1:name}: int = ${2:0}"
 		case kind.TagOf != "":
