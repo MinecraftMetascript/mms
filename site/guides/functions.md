@@ -113,6 +113,25 @@ Function welcome(name: string) {
 }
 ```
 
+### Lists of constants
+
+A `const` list of ints or strings can be read in function code. `len(list)` is its length, and `list[i]` is an item. When `i` is known only as the function runs, such as a Storage field, each item gets its own branch. An index outside the list gives `0` or `""`. Shift-right-clicking an item to cycle through modes looks like this:
+
+```mms
+const modes: [string] = ["Measure", "Replace"]
+
+Type ToolState {
+  mode: int
+}
+
+Storage tool: ToolState
+
+Function next_mode {
+  tool.mode = (tool.mode + 1) % len(modes)
+  actionbar(@s, "Mode: ${modes[tool.mode]}")
+}
+```
+
 ## Interpolation
 
 `${expr}` puts a value into a command:

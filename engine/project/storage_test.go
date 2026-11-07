@@ -88,6 +88,8 @@ func TestStorageErrors(t *testing.T) {
 		{"Type S {\n  blah: { x: int, y: int }\n}\nStorage s: S\nFunction f {\n  s.blah.z = 1\n}", "s.blah has no field 'z'"},
 		{"Type S {\n  a: int\n}\nStorage s: S\nFunction f {\n  s.a.b = 1\n}", "s.a is an integer, not a record"},
 		{"Type S {\n  blah: { x: int, y }\n}", "a record's field needs a type: y: Type"},
+		{"const modes: [string] = [\"a\", \"b\"]\nFunction f {\n  let m = modes[2]\n}", "index 2 is outside the list of 2"},
+		{"Global g: int = 0\nconst xs: [int] = [1, g]\nFunction f {\n  let m = xs[g]\n}", "holds int or string constants"},
 		{"Function f(): bool {\n  return exists(\"x\")\n}", "expected a selector"},
 		{"Function f(): int {\n  return count()\n}", "takes one selector"},
 	} {
@@ -186,6 +188,37 @@ Function f(): int {
 	}
 	if got := call(t, vm, "demo:f"); got != 72 {
 		t.Errorf("f again = %d, want 72", got)
+	}
+}
+
+// A const list read at an index known only when the function runs picks
+// its item then: cycling through modes kept in storage.
+func TestConstListIndex(t *testing.T) {
+	src := `Type S {
+  mode: int
+}
+Storage st: S
+const modes: [string] = ["Measure", "Replace", "Copy"]
+const costs: [int] = [1, 5, 9]
+Function next(): int {
+  st.mode = (st.mode + 1) % len(modes)
+  let name = modes[st.mode]
+  tell(@a, "Mode: ${modes[st.mode]}")
+  if (name == "Copy") {
+    return 100 + costs[st.mode]
+  }
+  return costs[st.mode] + ${len(costs)} * 10
+}
+`
+	_, r := bookProject(t, src, nil)
+	if d := diagText(r); d != "" {
+		t.Fatal(d)
+	}
+	vm := load(t, r, "demo")
+	for i, want := range []int32{35, 109, 31, 35} {
+		if got := call(t, vm, "demo:next"); got != want {
+			t.Errorf("call %d: next = %d, want %d", i+1, got, want)
+		}
 	}
 }
 
