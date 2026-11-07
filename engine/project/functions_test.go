@@ -635,3 +635,39 @@ Function run {
 		t.Errorf("said %q, want %q", got, "kept hi alex")
 	}
 }
+
+// TestStringControlCharacters checks that a newline or tab in a string
+// stays inside one command line and reaches the game as itself.
+func TestStringControlCharacters(t *testing.T) {
+	src := `
+Function greet(who: string) {
+  let m = "a\nb" + who
+  /say ${m}
+}
+
+Function run {
+  greet("c\td")
+}
+`
+	p := New(spec.MustDefault(), Config{Namespace: "demo", Description: "test"})
+	p.SetFile("main.mms", src)
+	r, err := p.Analyze(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range r.Emit() {
+		if !strings.HasSuffix(f.Path, ".mcfunction") {
+			continue
+		}
+		for _, line := range strings.Split(string(f.Data), "\n") {
+			if strings.Count(line, `"`)%2 != 0 {
+				t.Errorf("%s has a line with an unclosed string, so a string was split: %q", f.Path, line)
+			}
+		}
+	}
+	vm := world(t, src)
+	call(t, vm, "demo:run")
+	if got := strings.Join(vm.Said, "|"); got != "a\nbc\td" {
+		t.Errorf("said %q, want %q", got, "a\nbc\td")
+	}
+}

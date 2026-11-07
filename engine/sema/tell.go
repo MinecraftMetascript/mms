@@ -237,7 +237,7 @@ func componentSNBT(v jsonv.Value) string {
 			}
 			b.WriteByte(']')
 		case jsonv.String:
-			b.WriteString(quoteText(string(v)))
+			b.WriteString(fn.QuoteSNBT(string(v)))
 		case jsonv.Number:
 			b.WriteString(string(v))
 		case jsonv.Bool:
@@ -250,12 +250,6 @@ func componentSNBT(v jsonv.Value) string {
 	}
 	write(v)
 	return b.String()
-}
-
-// quoteText quotes a string for SNBT, with a line break as \n so the
-// command stays on one line.
-func quoteText(s string) string {
-	return `"` + strings.NewReplacer(`\`, `\\`, `"`, `\"`, "\n", `\n`).Replace(s) + `"`
 }
 
 func plainKey(k string) bool {

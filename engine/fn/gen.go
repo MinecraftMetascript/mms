@@ -445,9 +445,29 @@ func (g *gen) macro(o Macro) []string {
 	return append(lines, fmt.Sprintf("function %s with storage %s m", id, st))
 }
 
-// QuoteSNBT quotes a string for SNBT.
+// QuoteSNBT quotes a string for SNBT, escaping control characters so a
+// newline in the string cannot split the command line.
 func QuoteSNBT(s string) string {
-	return `"` + strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(s) + `"`
+	var b strings.Builder
+	b.WriteByte('"')
+	for _, r := range s {
+		switch {
+		case r == '\\':
+			b.WriteString(`\\`)
+		case r == '"':
+			b.WriteString(`\"`)
+		case r == '\n':
+			b.WriteString(`\n`)
+		case r == '\t':
+			b.WriteString(`\t`)
+		case r < 0x20 || (r >= 0x7f && r <= 0x9f):
+			fmt.Fprintf(&b, `\u%04x`, r)
+		default:
+			b.WriteRune(r)
+		}
+	}
+	b.WriteByte('"')
+	return b.String()
 }
 
 func (g *gen) call(fr *frame, o Call) []string {

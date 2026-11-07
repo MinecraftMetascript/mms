@@ -2,11 +2,11 @@ package sema
 
 import (
 	"encoding/json"
-	"fmt"
 	"regexp"
 	"sort"
 	"strings"
 
+	"github.com/minecraftmetascript/mms/engine/fn"
 	"github.com/minecraftmetascript/mms/engine/jsonv"
 	"github.com/minecraftmetascript/mms/engine/spec"
 )
@@ -86,7 +86,7 @@ func writeSNBT(sb *strings.Builder, v jsonv.Value) {
 			if bareSNBTKey.MatchString(m.Key) {
 				sb.WriteString(m.Key)
 			} else {
-				sb.WriteString(quoteSNBT(m.Key))
+				sb.WriteString(fn.QuoteSNBT(m.Key))
 			}
 			sb.WriteByte(':')
 			writeSNBT(sb, m.Value)
@@ -102,7 +102,7 @@ func writeSNBT(sb *strings.Builder, v jsonv.Value) {
 		}
 		sb.WriteByte(']')
 	case jsonv.String:
-		sb.WriteString(quoteSNBT(string(x)))
+		sb.WriteString(fn.QuoteSNBT(string(x)))
 	case jsonv.Number:
 		sb.WriteString(string(x))
 	case jsonv.Bool:
@@ -112,29 +112,4 @@ func writeSNBT(sb *strings.Builder, v jsonv.Value) {
 			sb.WriteString("false")
 		}
 	}
-}
-
-// quoteSNBT quotes a string for SNBT, escaping control characters so
-// that a newline in a name cannot split the command line.
-func quoteSNBT(s string) string {
-	var b strings.Builder
-	b.WriteByte('"')
-	for _, r := range s {
-		switch {
-		case r == '\\':
-			b.WriteString(`\\`)
-		case r == '"':
-			b.WriteString(`\"`)
-		case r == '\n':
-			b.WriteString(`\n`)
-		case r == '\t':
-			b.WriteString(`\t`)
-		case r < 0x20 || (r >= 0x7f && r <= 0x9f):
-			fmt.Fprintf(&b, `\u%04x`, r)
-		default:
-			b.WriteRune(r)
-		}
-	}
-	b.WriteByte('"')
-	return b.String()
 }

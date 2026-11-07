@@ -242,7 +242,7 @@ func snbtKey(k string) string {
 	if bareSNBTKey.MatchString(k) {
 		return k
 	}
-	return quoteSNBT(k)
+	return fn.QuoteSNBT(k)
 }
 
 // storageSig fingerprints a Storage declaration's fields, which functions
