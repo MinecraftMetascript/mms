@@ -307,3 +307,73 @@ func idType(reg string) *spec.Type {
 	return &spec.Type{Kind: "string", Attributes: []spec.Attribute{{Name: "id",
 		Value: &spec.Type{Kind: "literal", Literal: &spec.Literal{Kind: "string", Value: raw}}}}}
 }
+
+// TypeName is a name a type expression can use, for completion.
+type TypeName struct {
+	Name, Detail string
+	// Args is set on a name that takes a registry: Id<item>.
+	Args bool
+}
+
+// Names lists the names a type expression can use: the language's own
+// types, the project's Type declarations, resource kinds and then schema
+// types, in that order.
+func (e *Env) Names() []TypeName {
+	var out []TypeName
+	for _, n := range []string{"int", "float", "double", "long", "short", "byte", "bool", "string", "any"} {
+		out = append(out, TypeName{Name: n, Detail: "value type"})
+	}
+	out = append(out, TypeName{Name: "Id", Detail: "id in a registry", Args: true}, TypeName{Name: "Ids", Detail: "ids or a tag in a registry", Args: true})
+	for _, n := range []string{"Text", "BookText", "Commands", "Function", "Selector", "Texture", "Sound", "StructureFile"} {
+		out = append(out, TypeName{Name: n, Detail: "language type"})
+	}
+	seen := map[string]bool{}
+	for _, t := range out {
+		seen[t.Name] = true
+	}
+	add := func(names []string, detail string) {
+		sort.Strings(names)
+		for _, n := range names {
+			if !seen[n] {
+				seen[n] = true
+				out = append(out, TypeName{Name: n, Detail: detail})
+			}
+		}
+	}
+	var own []string
+	for n := range e.decls {
+		own = append(own, n)
+	}
+	add(own, "Type")
+	var kinds []string
+	for _, n := range e.Kinds.Names() {
+		if k, ok := e.Kinds.Lookup(n); ok && k.Resource != "" && !strings.HasPrefix(k.Resource, "tags/") {
+			kinds = append(kinds, n)
+		}
+	}
+	add(kinds, "resource: an id or an inline value")
+	var schema []string
+	for n := range schemaNames(e.Pack) {
+		schema = append(schema, n)
+	}
+	add(schema, "schema type")
+	return out
+}
+
+// Registries lists what Id<...> and Ids<...> take: the game's registries
+// and the data pack's resource folders.
+func (e *Env) Registries() []string {
+	seen := map[string]bool{}
+	var out []string
+	for r := range e.Pack.Registries {
+		seen[r] = true
+		out = append(out, r)
+	}
+	for r := range e.Pack.Resources {
+		if !seen[r] {
+			out = append(out, r)
+		}
+	}
+	sort.Strings(out)
+	return out
+}

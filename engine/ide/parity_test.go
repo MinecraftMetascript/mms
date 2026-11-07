@@ -3,6 +3,7 @@ package ide
 import (
 	"context"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -17,7 +18,7 @@ import (
 )
 
 // TestCompletionParity guards completion across real code. At every
-// third word of the examples it cuts the word to its first letter, as
+// third word of the examples and the website's samples it cuts the word to its first letter, as
 // if it were being typed, and checks that completion offers the word.
 // It does so twice: with the rest of the line kept, and with the rest of
 // the line gone, which is how a line being typed looks. The hit rates per
@@ -40,6 +41,61 @@ func TestCompletionParity(t *testing.T) {
 		}
 	}
 	var misses []string
+	// probe cuts every third word of rel to its first letter, in the
+	// project p whose files are texts, and tallies whether completion
+	// offers the word. where names the file in a miss.
+	probe := func(p *project.Project, texts map[string]string, rel, where string) {
+		r0, err := p.Analyze(context.Background())
+		if err != nil {
+			t.Fatal(err)
+		}
+		u := r0.Unit(rel)
+		if u == nil {
+			return
+		}
+		src := u.File.Src
+		n := 0
+		for _, tk := range u.File.Tokens {
+			if tk.Hidden || tk.Synthetic || tk.Sp.Len() < 2 {
+				continue
+			}
+			if tk.Kind != parser.MMSLexerIDENT && tk.Kind != parser.MMSLexerRESLOC && tk.Kind != parser.MMSLexerTNAME {
+				continue
+			}
+			if n++; n%3 != 0 {
+				continue
+			}
+			ctx := positionKind(u.File, tk.Sp.Start)
+			if ctx == "" {
+				continue // a name being declared: nothing to offer
+			}
+			word := string(src[tk.Sp.Start:tk.Sp.End])
+			for _, mode := range []string{"word", "line"} {
+				rest := string(src[tk.Sp.End:])
+				if mode == "line" {
+					if nl := strings.Index(rest, "\n"); nl >= 0 {
+						rest = rest[nl:]
+					} else {
+						rest = ""
+					}
+				}
+				p.SetFile(rel, string(src[:tk.Sp.Start+1])+rest)
+				r, err := p.Analyze(context.Background())
+				if err != nil {
+					t.Fatal(err)
+				}
+				items, _ := (&Session{P: p, R: r}).Completion(rel, tk.Sp.Start+1)
+				hit := offers(items, word)
+				add(mode+"\t"+ctx, hit)
+				add(mode+"\tall", hit)
+				if !hit {
+					line, _ := u.File.LineCol(tk.Sp.Start)
+					misses = append(misses, fmt.Sprintf("%s %s:%d %s (%s)", mode, where, line, word, ctx))
+				}
+			}
+			p.SetFile(rel, texts[rel])
+		}
+	}
 	dirs, _ := filepath.Glob("../../examples/*")
 	for _, dir := range dirs {
 		cfg, err := project.LoadConfig(dir)
@@ -61,58 +117,24 @@ func TestCompletionParity(t *testing.T) {
 			texts[rel] = string(b)
 			p.SetFile(rel, string(b))
 		}
-		r0, err := p.Analyze(context.Background())
-		if err != nil {
-			t.Fatal(err)
-		}
 		for _, rel := range paths {
-			u := r0.Unit(rel)
-			if !strings.HasSuffix(rel, ".mms") || u == nil {
-				continue
-			}
-			src := u.File.Src
-			n := 0
-			for _, tk := range u.File.Tokens {
-				if tk.Hidden || tk.Synthetic || tk.Sp.Len() < 2 {
-					continue
-				}
-				if tk.Kind != parser.MMSLexerIDENT && tk.Kind != parser.MMSLexerRESLOC && tk.Kind != parser.MMSLexerTNAME {
-					continue
-				}
-				if n++; n%3 != 0 {
-					continue
-				}
-				ctx := positionKind(u.File, tk.Sp.Start)
-				if ctx == "" {
-					continue // a name being declared: nothing to offer
-				}
-				word := string(src[tk.Sp.Start:tk.Sp.End])
-				for _, mode := range []string{"word", "line"} {
-					rest := string(src[tk.Sp.End:])
-					if mode == "line" {
-						if nl := strings.Index(rest, "\n"); nl >= 0 {
-							rest = rest[nl:]
-						} else {
-							rest = ""
-						}
-					}
-					p.SetFile(rel, string(src[:tk.Sp.Start+1])+rest)
-					r, err := p.Analyze(context.Background())
-					if err != nil {
-						t.Fatal(err)
-					}
-					items, _ := (&Session{P: p, R: r}).Completion(rel, tk.Sp.Start+1)
-					hit := offers(items, word)
-					add(mode+"\t"+ctx, hit)
-					add(mode+"\tall", hit)
-					if !hit {
-						line, _ := u.File.LineCol(tk.Sp.Start)
-						misses = append(misses, fmt.Sprintf("%s %s/%s:%d %s (%s)", mode, filepath.Base(dir), rel, line, word, ctx))
-					}
-				}
-				p.SetFile(rel, texts[rel])
+			if strings.HasSuffix(rel, ".mms") {
+				probe(p, texts, rel, filepath.Base(dir)+"/"+rel)
 			}
 		}
+	}
+	// The website's samples hold what the examples may not: Templates,
+	// Blueprints, Types. A sample that shows a mistake is left out.
+	for _, smp := range siteSamples(t) {
+		if strings.Contains(smp.info, "error") {
+			continue
+		}
+		p := project.New(spec.MustDefault(), project.DefaultConfig())
+		if dir, ok := strings.CutPrefix(smp.info, "in="); ok {
+			p.Files = os.DirFS(filepath.Join("..", "..", filepath.FromSlash(dir)))
+		}
+		p.SetFile("main.mms", smp.src)
+		probe(p, map[string]string{"main.mms": smp.src}, "main.mms", fmt.Sprintf("%s:%d+", smp.path, smp.line))
 	}
 
 	baseline := "testdata/completion.tsv"
@@ -195,4 +217,50 @@ func offers(items []Item, word string) bool {
 		}
 	}
 	return false
+}
+
+// siteSample is a ```mms block in one of the website's pages.
+type siteSample struct {
+	path string // relative to the repository root
+	line int    // of the opening fence
+	info string // the fence's words after "mms"
+	src  string
+}
+
+// siteSamples returns the ```mms blocks of every page under site/, as
+// TestSiteSamples in engine/project reads them.
+func siteSamples(t *testing.T) []siteSample {
+	t.Helper()
+	var out []siteSample
+	root := filepath.Join("..", "..")
+	err := filepath.WalkDir(filepath.Join(root, "site"), func(path string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() || !strings.HasSuffix(path, ".md") {
+			return err
+		}
+		b, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		rel, _ := filepath.Rel(root, path)
+		var cur *siteSample
+		var body []string
+		for i, line := range strings.Split(string(b), "\n") {
+			trimmed := strings.TrimSpace(line)
+			switch {
+			case cur != nil && trimmed == "```":
+				cur.src = strings.Join(body, "\n") + "\n"
+				out = append(out, *cur)
+				cur, body = nil, nil
+			case cur != nil:
+				body = append(body, line)
+			case trimmed == "```mms" || strings.HasPrefix(trimmed, "```mms "):
+				cur = &siteSample{path: filepath.ToSlash(rel), line: i + 1, info: strings.TrimSpace(strings.TrimPrefix(trimmed, "```mms"))}
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return out
 }

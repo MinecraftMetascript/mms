@@ -36,7 +36,9 @@ func TestCompletionMatrix(t *testing.T) {
 		{name: "feature value", src: "Feature f = |", want: []string{"Ore", "RandomNeighborSpread"}},
 		{name: "recipe value", src: "Recipe r = |", want: []string{"Shaped", "Smelting"}},
 		{name: "surface rule value", src: "SurfaceRule r = |", want: []string{"If", "Sequence"}},
-		{name: "objective criterion", src: "Objective kills = |", want: []string{"dummy", "deathCount", "trigger"}},
+		{name: "objective criterion", src: "Objective kills: |", want: []string{"dummy", "deathCount", "trigger"}},
+		{name: "objective criterion typed", src: "Objective kills: de|", want: []string{"deathCount"}, replace: "de"},
+		{name: "objective criterion old form", src: "Objective kills = |", want: []string{"dummy", "deathCount", "trigger"}},
 		{name: "global type", src: "Global g: |", want: []string{"int", "bool", "string"}},
 
 		// Helper arguments.

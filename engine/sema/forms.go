@@ -29,6 +29,9 @@ func formOf(e syntax.Expr) (string, map[string]syntax.Expr) {
 			return "Not", map[string]syntax.Expr{"operand": x.X}
 		case x.Op == "-" && !isNumber(x):
 			return "Negation", map[string]syntax.Expr{"operand": x.X}
+		case isNumber(x):
+			// `-128` is a number, such as a height below zero.
+			return "NumberLiteral", map[string]syntax.Expr{"value": e}
 		}
 	case *syntax.Binary:
 		switch x.Op {

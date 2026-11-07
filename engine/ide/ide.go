@@ -69,8 +69,20 @@ func (s *Session) at(path string, off int) *at {
 		}
 	}
 	if len(a.path) > 1 {
-		if d, ok := a.path[1].(*syntax.Decl); ok {
+		switch d := a.path[1].(type) {
+		case *syntax.Decl:
 			a.decl = s.R.Decls[d]
+		case *syntax.ConstStmt:
+			a.decl = s.R.Consts[d]
+		}
+	}
+	// A declaration in a Blueprint's emit block was checked on its own.
+	for i := len(a.path) - 1; i > 1; i-- {
+		if d, ok := a.path[i].(*syntax.Decl); ok {
+			if dr := s.R.Decls[d]; dr != nil && dr.Emitter != nil {
+				a.decl = dr
+				break
+			}
 		}
 	}
 	a.fn = a.codeRoot()
@@ -80,6 +92,12 @@ func (s *Session) at(path string, off int) *at {
 		a.c = sema.NewChecker(s.P.Pack, s.P.Kinds, s.R.Syms, s.P.Config.Namespace)
 	}
 	a.c.Typed = s.typedEval()
+	if a.decl != nil && a.decl.Template != nil {
+		a.c.Typed = append(s.templateParams(a.decl.Template), a.c.Typed...)
+	}
+	if a.decl != nil && a.decl.Emitter != nil {
+		a.c.Typed = append(s.blueprintFields(a.decl.Emitter), a.c.Typed...)
+	}
 	return a
 }
 
@@ -156,7 +174,10 @@ func (s *Session) Completion(path string, off int) ([]Item, syntax.Span) {
 			replace = sp
 		}
 	}
-	cands, ok := s.templateArgCandidates(path, off, a.c)
+	cands, ok := s.typeCompletion(a, off)
+	if !ok {
+		cands, ok = s.templateArgCandidates(path, off, a.c)
+	}
 	if !ok {
 		cands = s.complete(a, off)
 	}
@@ -345,6 +366,10 @@ func (s *Session) complete(a *at, off int) []sema.Candidate {
 			if a.code() && startsStatement(a.path, i) {
 				return s.statementCandidates(a, off)
 			}
+			// A line of a Blueprint's check block.
+			if inCheck(a.path) && startsStatement(a.path, i) {
+				return s.checkCandidates(a)
+			}
 			// A bare word in an object body is a field being typed.
 			if _, ok := parent.(*syntax.ExprStmt); ok && i >= 2 {
 				if b, ok := a.path[i-2].(*syntax.Block); ok {
@@ -483,6 +508,15 @@ func (s *Session) statementCandidates(a *at, off int) []sema.Candidate {
 		c.Rank += 100
 		out = append(out, c)
 	}
+	// In a Blueprint's emit block, its Function and Commands fields are
+	// called: `cast()`.
+	if a.decl != nil && a.decl.Emitter != nil {
+		for _, f := range a.decl.Emitter.Fields {
+			if f.Name != nil && f.Type != nil && (syntax.TypeText(f.Type) == "Function" || syntax.TypeText(f.Type) == "Commands") {
+				out = append(out, sema.Candidate{Label: f.Name.Text, Kind: sema.CandCallable, Detail: "field: " + syntax.TypeText(f.Type), Insert: f.Name.Text + "()", Rank: 50})
+			}
+		}
+	}
 	// Templates that give commands, called as a statement.
 	if e := s.R.Eval; e != nil {
 		for name, t := range e.Templates {
@@ -494,6 +528,34 @@ func (s *Session) statementCandidates(a *at, off int) []sema.Candidate {
 			out = append(out, sema.Candidate{Label: name, Kind: sema.CandCallable, Detail: "Template",
 				Doc: "```mms\nTemplate " + label + "\n```\n\n" + doc, Insert: name + "($1)", Rank: 180})
 		}
+	}
+	return out
+}
+
+// inCheck reports whether path is in a Blueprint's check { } block.
+func inCheck(path []syntax.Node) bool {
+	for _, n := range path {
+		if sec, ok := n.(*syntax.SectionStmt); ok && sec.Word != nil && sec.Word.Name == "check" {
+			return true
+		}
+	}
+	return false
+}
+
+// checkCandidates lists what can start a line of a Blueprint's check
+// block: error and warn, the statement keywords, and the fields.
+func (s *Session) checkCandidates(a *at) []sema.Candidate {
+	out := []sema.Candidate{
+		{Label: "error", Kind: sema.CandCallable, Detail: "check", Doc: "Reports an error at a field: `error(cooldown, \"a cooldown is at least one tick\")`.", Insert: "error($1)"},
+		{Label: "warn", Kind: sema.CandCallable, Detail: "check", Doc: "Reports a warning with a lint rule's name: `warn(cooldown, \"slow-wand\", \"...\")`.", Insert: "warn($1)", Rank: 1},
+	}
+	for i, kw := range []string{"if", "for", "let", "const"} {
+		out = append(out, sema.Candidate{Label: kw, Kind: sema.CandKeyword, Rank: 10 + i})
+	}
+	for _, tc := range a.c.Typed {
+		c := tc.Candidate
+		c.Rank += 20
+		out = append(out, c)
 	}
 	return out
 }

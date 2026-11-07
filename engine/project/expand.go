@@ -114,6 +114,40 @@ func (r *Result) instanceDecls(tenv *types.Env, newChecker types.Checkers) {
 	}
 }
 
+// templateDecls checks the body of each Template the user wrote against
+// its return type, for the editor, as instanceDecls does an instance's
+// body: completion and hover inside `= Pool(rolls, item)` read the Info.
+// A Commands Template's block is function code, so its result is given
+// the Function kind. Diagnostics are dropped, since its parameters are
+// not names the checker knows; calls are checked where they are made.
+func (r *Result) templateDecls(tenv *types.Env, kinds *sema.Kinds, newChecker types.Checkers) {
+	units := map[string]*sema.Unit{}
+	for _, u := range r.Units {
+		units[u.Path] = u
+	}
+	for _, t := range r.Eval.Templates {
+		u := units[t.Path]
+		if u == nil || prelude.Is(t.Path) {
+			continue
+		}
+		d := &Decl{Unit: u, D: t.D, NS: r.cfg.Namespace, Template: t}
+		switch {
+		case t.D.Body != nil:
+			d.Kind, _ = kinds.Lookup("Function")
+		case t.D.Value != nil:
+			c := newChecker(r.cfg.Namespace)
+			c.Src = u.File.Src
+			if want := tenv.Lookup(t.Path, t.D.Type); want != nil && want.Kind != "any" {
+				c.CheckType(t.D.Value, want, t.D.NameText())
+			}
+			d.Info = c.Info
+		default:
+			d.Info = map[syntax.Node]*sema.Info{}
+		}
+		r.Decls[t.D] = d
+	}
+}
+
 // missingFieldFixes gives a Blueprint instance's missing-field error the
 // quick fix that adds the fields, with placeholder values of their types.
 func (r *Result) missingFieldFixes(tenv *types.Env, kinds *sema.Kinds, source map[string]*syntax.File) {
