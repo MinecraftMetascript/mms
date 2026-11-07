@@ -149,7 +149,10 @@ func (s *Session) Completion(path string, off int) ([]Item, syntax.Span) {
 			replace = sp
 		}
 	}
-	cands := s.complete(a, off)
+	cands, ok := s.templateArgCandidates(path, off, a.c)
+	if !ok {
+		cands = s.complete(a, off)
+	}
 	items := make([]Item, 0, len(cands))
 	for i, c := range cands {
 		it := Item{Label: c.Label, Kind: c.Kind, Detail: c.Detail, Doc: c.Doc, Deprecated: c.Deprecated, Sort: sortKey(i)}
@@ -1188,8 +1191,10 @@ func (s *Session) Rename(path string, off int, newPath string) ([]Edit, string) 
 // Symbol is a document outline entry.
 type Symbol struct {
 	Name, Detail string
-	Kind         string // "resource", "function", "namespace", "tag", "objective"
-	Span, Sel    syntax.Span
+	// Kind is "resource", "function", "namespace", "tag", "objective",
+	// "constant", "template", "type" or "blueprint".
+	Kind      string
+	Span, Sel syntax.Span
 }
 
 // Symbols returns a file's outline.
@@ -1221,6 +1226,27 @@ func (s *Session) Symbols(path string) []Symbol {
 			sym.Kind = "namespace"
 		}
 		out = append(out, sym)
+	}
+	// The source's consts, Templates, Types and Blueprints, which
+	// expansion leaves out of the declarations.
+	if src := s.R.Source[path]; src != nil {
+		for _, it := range src.Items {
+			switch it := it.(type) {
+			case *syntax.ConstStmt:
+				if it.Name != nil {
+					out = append(out, Symbol{Name: it.Name.Text, Detail: "const", Kind: "constant", Span: it.Sp, Sel: it.Name.Sp})
+				}
+			case *syntax.Decl:
+				if it.Name == nil || it.Kind == nil {
+					continue
+				}
+				kind := map[string]string{"Template": "template", "Type": "type", "Blueprint": "blueprint"}[it.Kind.Name]
+				if kind != "" {
+					out = append(out, Symbol{Name: it.Name.Text, Detail: it.Kind.Name, Kind: kind, Span: it.Sp, Sel: it.Name.Sp})
+				}
+			}
+		}
+		sort.SliceStable(out, func(i, j int) bool { return out[i].Span.Start < out[j].Span.Start })
 	}
 	return out
 }

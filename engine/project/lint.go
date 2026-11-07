@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/minecraftmetascript/mms/engine/prelude"
 	"github.com/minecraftmetascript/mms/engine/sema"
 	"github.com/minecraftmetascript/mms/engine/syntax"
 )
@@ -55,7 +56,7 @@ var Rules = []*Rule{
 	{ID: "use-shorthand", Severity: syntax.SeverityHint, run: lintShorthand,
 		Doc: "An object literal that has a shorter MMS form: an item entry as its id, `1..3` for a uniform provider or bounds, `diamond * 4` for a stack, a trigger call for a criterion, and `&&`, `||` and `!` for conditions."},
 	{ID: "unused", Severity: syntax.SeverityHint, all: lintUnused,
-		Doc: "A worldgen piece, predicate or item modifier that nothing in the project references, so the game never uses it. A TemplatePool counts as used when a jigsaw block in one of the project's structure files draws from it."},
+		Doc: "A worldgen piece, predicate or item modifier that nothing in the project references, so the game never uses it, or a const, Template, Type or Blueprint that nothing names. A TemplatePool counts as used when a jigsaw block in one of the project's structure files draws from it."},
 	{ID: "unused-asset", Severity: syntax.SeverityInfo,
 		Doc: "A .png, .ogg or .nbt file in the project that no Texture, Sound or StructureFile call and no `icon` uses, so the packs leave it out. It is reported on the file itself (in VS Code's Problems panel, by `mms check`, and in the web editor's asset list), and not while the project has errors."},
 }
@@ -537,6 +538,7 @@ func lintUnused(l *lintRun) {
 		unused = append(unused, s)
 	}
 	sort.Slice(unused, func(i, j int) bool { return unused[i].Decl.Sp.Start < unused[j].Decl.Sp.Start })
+	unusedEvalNames(l)
 	for _, s := range unused {
 		if d := r.Decls[s.Decl]; d == nil || hasErrors(d.Diags) {
 			continue
@@ -547,6 +549,69 @@ func lintUnused(l *lintRun) {
 		})
 	}
 }
+
+// unusedEvalNames reports the project's consts, Templates, Types and
+// Blueprints that nothing names. They expand away, so their uses are
+// read from the source as written: a name used as a value or a call, a
+// type, a declaration's kind, or a word inside ${...}.
+func unusedEvalNames(l *lintRun) {
+	r := l.r
+	if r.Eval == nil {
+		return
+	}
+	named := map[string]bool{}
+	for _, f := range r.Source {
+		syntax.Walk(f, func(n syntax.Node) bool {
+			switch n := n.(type) {
+			case *syntax.Ident:
+				named[n.Name] = true
+			case *syntax.TypeName:
+				named[n.Name] = true
+			case *syntax.String, *syntax.CommandStmt:
+				sp := n.Span()
+				if sp.End <= len(f.Src) {
+					for _, piece := range evalPieceRe.FindAllString(string(f.Src[sp.Start:sp.End]), -1) {
+						for _, w := range evalWordRe.FindAllString(piece, -1) {
+							named[w] = true
+						}
+					}
+				}
+			}
+			return true
+		})
+	}
+	type decl struct {
+		kind, path string
+		name       *syntax.Name
+	}
+	var ds []decl
+	for _, c := range r.Eval.Consts {
+		ds = append(ds, decl{"const", c.Path, c.S.Name})
+	}
+	for _, t := range r.Eval.Templates {
+		ds = append(ds, decl{"Template", t.Path, t.D.Name})
+	}
+	for _, t := range r.Eval.Types {
+		ds = append(ds, decl{"Type", t.Path, t.D.Name})
+	}
+	for _, b := range r.Eval.Blueprints {
+		ds = append(ds, decl{"Blueprint", b.Path, b.D.Name})
+	}
+	for _, d := range ds {
+		if d.name == nil || prelude.Is(d.path) || r.Source[d.path] == nil || named[d.name.Text] {
+			continue
+		}
+		l.out[d.path] = append(l.out[d.path], syntax.Diagnostic{
+			Code: "lint/unused", Severity: l.sev, Sp: d.name.Sp, Unnecessary: true,
+			Message: fmt.Sprintf("%s '%s' is never used", d.kind, d.name.Text),
+		})
+	}
+}
+
+var (
+	evalPieceRe = regexp.MustCompile(`\$\{[^}]*\}`)
+	evalWordRe  = regexp.MustCompile(`[A-Za-z_][A-Za-z0-9_]*`)
+)
 
 // references lists what a declaration refers to, as "folder|id" for
 // resolved references and bare ids for ids named in its commands. It is

@@ -8,6 +8,7 @@ import (
 	"github.com/minecraftmetascript/mms/engine/eval"
 	"github.com/minecraftmetascript/mms/engine/format"
 	"github.com/minecraftmetascript/mms/engine/prelude"
+	"github.com/minecraftmetascript/mms/engine/sema"
 	"github.com/minecraftmetascript/mms/engine/syntax"
 )
 
@@ -358,12 +359,12 @@ func docText(raw string) (string, syntax.Doc) {
 	return text, doc
 }
 
-// templateSignature is signature help for a call of a Template, found in
-// the source as written, since expansion replaces the call.
-func (s *Session) templateSignature(path string, off int) (SignatureHelp, bool) {
+// sourceTemplateCall finds the innermost call of a Template whose
+// argument list holds off, in the source as written.
+func (s *Session) sourceTemplateCall(path string, off int) (*syntax.File, *syntax.Call, *eval.Template) {
 	src := s.R.Source[path]
 	if src == nil || s.R.Eval == nil {
-		return SignatureHelp{}, false
+		return nil, nil, nil
 	}
 	var best *syntax.Call
 	var bound map[string]bool
@@ -380,14 +381,24 @@ func (s *Session) templateSignature(path string, off int) (SignatureHelp, bool) 
 		bound = boundNames(it)
 	}
 	if best == nil {
-		return SignatureHelp{}, false
+		return nil, nil, nil
 	}
 	id, ok := best.Fn.(*syntax.Ident)
 	if !ok || bound[id.Name] {
-		return SignatureHelp{}, false
+		return nil, nil, nil
 	}
 	t := s.R.Eval.Templates[id.Name]
 	if t == nil {
+		return nil, nil, nil
+	}
+	return src, best, t
+}
+
+// templateSignature is signature help for a call of a Template, found in
+// the source as written, since expansion replaces the call.
+func (s *Session) templateSignature(path string, off int) (SignatureHelp, bool) {
+	src, call, t := s.sourceTemplateCall(path, off)
+	if call == nil {
 		return SignatureHelp{}, false
 	}
 	h := SignatureHelp{}
@@ -399,8 +410,86 @@ func (s *Session) templateSignature(path string, off int) (SignatureHelp, bool) 
 		name, _, _ = strings.Cut(name, " =")
 		h.ParamDocs = append(h.ParamDocs, doc.Param(strings.TrimSpace(name)))
 	}
-	h.Active = activeParam(src, best, off, h.Params)
+	h.Active = activeParam(src, call, off, h.Params)
 	return h, true
+}
+
+// templateArgCandidates lists what fits the Template parameter at off:
+// values of its type, then the consts and value Templates in scope.
+func (s *Session) templateArgCandidates(path string, off int, c *sema.Checker) ([]sema.Candidate, bool) {
+	src, call, t := s.sourceTemplateCall(path, off)
+	if call == nil || t.D.Params == nil {
+		return nil, false
+	}
+	// Typing a parameter's name, `twice(x| = 1)`, is not a value.
+	for _, a := range call.Args {
+		if a.Name != nil && within(a.Name.Sp, off) {
+			return nil, false
+		}
+	}
+	_, params := templateHead(t.D)
+	i := activeParam(src, call, off, params)
+	if i < 0 || i >= len(t.D.Params.Params) {
+		return nil, false
+	}
+	p := t.D.Params.Params[i]
+	var out []sema.Candidate
+	if p.Type != nil && s.R.TypeEnv != nil {
+		out = c.TypeCandidates(s.R.TypeEnv.Lookup(t.Path, p.Type))
+	}
+	return append(out, s.evalValueCandidates()...), true
+}
+
+// evalValueCandidates are the consts and value Templates a value can
+// name, after what its type offers.
+func (s *Session) evalValueCandidates() []sema.Candidate {
+	e := s.R.Eval
+	var out []sema.Candidate
+	names := make([]string, 0, len(e.Consts))
+	for n := range e.Consts {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+	for _, n := range names {
+		c := e.Consts[n]
+		detail := "const"
+		if c.S.Type != nil {
+			detail += ": " + syntax.TypeText(c.S.Type)
+		} else if t := eval.TypeOf(c.Value()); t != "" {
+			detail += ": " + t
+		}
+		doc, _ := docText(c.S.Doc)
+		out = append(out, sema.Candidate{Label: n, Kind: sema.CandID, Detail: detail, Doc: doc, Rank: 5})
+	}
+	names = names[:0]
+	for n, t := range e.Templates {
+		if t.D.Type != nil && syntax.TypeText(t.D.Type) == "Commands" || internal(t.D) {
+			continue
+		}
+		names = append(names, n)
+	}
+	sort.Strings(names)
+	for _, n := range names {
+		t := e.Templates[n]
+		label, _ := templateHead(t.D)
+		doc, _ := docText(t.D.Doc)
+		out = append(out, sema.Candidate{Label: n, Kind: sema.CandCallable, Detail: "Template", Doc: "```mms\nTemplate " + label + "\n```\n\n" + doc, Insert: n + "($1)", Rank: 6})
+	}
+	return out
+}
+
+// evalKeywords start the language's own top-level items.
+var evalKeywords = []sema.Candidate{
+	{Label: "const", Kind: sema.CandKeyword, Detail: "a named value", Insert: "const ${1:name} = $0",
+		Doc: "A value with a name, copied in wherever it is named: `const max_wave = 10`."},
+	{Label: "Template", Kind: sema.CandKeyword, Detail: "a reusable value or commands", Insert: "Template ${1:name}(${2:x: int}): ${3:int} = $0",
+		Doc: "A value or commands with parameters, expanded where it is called: `Template twice(x: int): int = x * 2`."},
+	{Label: "Type", Kind: sema.CandKeyword, Detail: "a named type", Insert: "Type ${1:Name} {\n\t$0\n}",
+		Doc: "A record type with fields, or an alias such as `Type Mode = \"rigid\" | \"terrain_matching\"`."},
+	{Label: "Blueprint", Kind: sema.CandKeyword, Detail: "a declaration kind", Insert: "Blueprint ${1:Name} {\n\t$0\n\temit {\n\t}\n}",
+		Doc: "A new declaration kind: its fields, `check` blocks, an `as` conversion and the declarations it `emit`s."},
+	{Label: "for", Kind: sema.CandKeyword, Detail: "declarations for each value", Insert: "for ${1:x} in ${2:[]} {\n\t$0\n}",
+		Doc: "Repeats the declarations in its body for each value, with `${x}` in their names."},
 }
 
 // evalHover describes a const, Template, Blueprint or Type at off.
