@@ -127,13 +127,13 @@
       "description": "The default namespace for files without a `Namespace` declaration.",
       "markdownDescription": "The default namespace for files without a `Namespace` declaration.",
       "type": "string",
-      "pattern": "^[a-z0-9_.\\-]+$",
-      "patternErrorMessage": "A namespace is lowercase letters, digits, '_', '-' or '.'.",
+      "pattern": "^(?!\\.+$)[a-z0-9_.\\-]+$",
+      "patternErrorMessage": "A namespace is lowercase letters, digits, '_', '-' or '.', and not only dots.",
       "default": "mms"
     },
     "output": {
-      "description": "The folder `mms build` writes the data pack to, relative to the project.",
-      "markdownDescription": "The folder `mms build` writes the data pack to, relative to the project.",
+      "description": "The folder `mms build` writes the data pack to: a folder inside the project, relative to it.",
+      "markdownDescription": "The folder `mms build` writes the data pack to: a folder inside the project, relative to it.",
       "type": "string",
       "default": "build"
     },

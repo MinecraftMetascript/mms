@@ -259,6 +259,13 @@ func runBuild(args []string, stdout, stderr io.Writer) int {
 	resOut := filepath.Join(dir, p.Config.ResourceOutput())
 	if *out == "" {
 		*out = filepath.Join(dir, p.Config.Output)
+		// mms.json comes with the project, so its folders must stay inside
+		// it even through a symlink; -out is the user's own choice.
+		for _, o := range []string{*out, resOut} {
+			if err := insideProject(dir, o); err != nil {
+				return fail(err)
+			}
+		}
 	} else {
 		resOut = filepath.Clean(*out) + "-resources"
 	}
@@ -382,6 +389,37 @@ func (f *resetFlag) Set(v string) error {
 	}
 	if len(f.ids) == 0 {
 		return fmt.Errorf("no dimension ids in %q", v)
+	}
+	return nil
+}
+
+// insideProject says why out, an output folder from mms.json, resolves to
+// somewhere outside the project folder dir, if it does. A folder that does
+// not exist yet is checked through its nearest existing parent.
+func insideProject(dir, out string) error {
+	root, err := filepath.EvalSymlinks(dir)
+	if err != nil {
+		return err
+	}
+	p, rest := filepath.Clean(out), ""
+	for {
+		real, err := filepath.EvalSymlinks(p)
+		if err == nil {
+			p = filepath.Join(real, rest)
+			break
+		}
+		if !os.IsNotExist(err) {
+			return err
+		}
+		parent := filepath.Dir(p)
+		if parent == p {
+			break
+		}
+		rest = filepath.Join(filepath.Base(p), rest)
+		p = parent
+	}
+	if rel, err := filepath.Rel(root, p); err != nil || rel == "." || !filepath.IsLocal(rel) {
+		return fmt.Errorf("%s resolves to %s, outside the project; mms.json's output folders must stay inside it", out, p)
 	}
 	return nil
 }

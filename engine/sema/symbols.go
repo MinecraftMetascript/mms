@@ -107,7 +107,24 @@ func (t *Table) InNamespace(folder, ns string) []*Symbol {
 }
 
 var validPath = regexp.MustCompile(`^[a-z0-9_.\-/]+$`)
-var validNS = regexp.MustCompile(`^[a-z0-9_.\-]+$`)
+var validNSChars = regexp.MustCompile(`^[a-z0-9_.\-]+$`)
+
+// ValidNamespace reports whether ns can name a namespace. "." and ".."
+// would name a folder above data/, so they can't.
+func ValidNamespace(ns string) bool {
+	return validNSChars.MatchString(ns) && strings.Trim(ns, ".") != ""
+}
+
+// pathEscapes reports whether a resource path has an empty, "." or ".."
+// segment, which would write outside the namespace's folder.
+func pathEscapes(path string) bool {
+	for _, part := range strings.Split(path, "/") {
+		if part == "" || part == "." || part == ".." {
+			return true
+		}
+	}
+	return false
+}
 
 // Collect builds the symbol table. defaultNS applies until a file's first
 // `Namespace x` declaration. It returns the table and its diagnostics,
@@ -131,7 +148,7 @@ func Collect(units []*Unit, kinds *Kinds, defaultNS string) (*Table, map[string]
 				if d.Name == nil {
 					continue
 				}
-				if !validNS.MatchString(d.Name.Text) {
+				if !ValidNamespace(d.Name.Text) {
 					report(u, "mms/invalid-name", d.Name.Sp, "namespace '"+d.Name.Text+"' must be lowercase letters, digits, '_', '-' or '.'")
 					continue
 				}
@@ -146,8 +163,12 @@ func Collect(units []*Unit, kinds *Kinds, defaultNS string) (*Table, map[string]
 			if sns == "" {
 				sns = ns
 			}
-			if !validPath.MatchString(path) || !validNS.MatchString(sns) {
+			if !validPath.MatchString(path) || !ValidNamespace(sns) {
 				report(u, "mms/invalid-name", d.Name.Sp, "resource names must be lowercase: use '"+Snake(d.Name.Text)+"'")
+				continue
+			}
+			if pathEscapes(path) {
+				report(u, "mms/invalid-name", d.Name.Sp, "a resource name's parts between '/' can't be empty, '.' or '..'")
 				continue
 			}
 			if ext := fileExt(path); ext != "" {

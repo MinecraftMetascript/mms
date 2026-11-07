@@ -60,15 +60,22 @@ func DefaultConfig() Config {
 	return Config{Namespace: "mms", Description: "Built with MMS", Output: "build"}
 }
 
-var nsPattern = regexp.MustCompile(`^[a-z0-9_.\-]+$`)
 
 // Validate reports a problem with the config, or nil.
 func (c Config) Validate() error {
-	if !nsPattern.MatchString(c.Namespace) {
+	if !sema.ValidNamespace(c.Namespace) {
 		return fmt.Errorf("mms.json: namespace %q must be lowercase letters, digits, '_', '-' or '.'", c.Namespace)
 	}
 	if c.Icon != "" && !strings.HasSuffix(strings.ToLower(c.Icon), ".png") {
 		return fmt.Errorf("mms.json: icon %q must be a .png file", c.Icon)
+	}
+	for _, o := range []struct{ key, dir string }{{"output", c.Output}, {"resourcePack.output", c.ResourcePack.Output}} {
+		if o.dir == "" {
+			continue
+		}
+		if d := filepath.FromSlash(o.dir); !filepath.IsLocal(d) || filepath.Clean(d) == "." {
+			return fmt.Errorf("mms.json: %s %q must be a folder inside the project, such as \"build\"", o.key, o.dir)
+		}
 	}
 	for id, sev := range c.Lint {
 		if RuleByID(id) == nil {
