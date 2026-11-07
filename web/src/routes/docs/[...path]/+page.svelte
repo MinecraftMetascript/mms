@@ -13,8 +13,10 @@
 
 <svelte:head>
 	{#if data.redirect}
-		<!-- Without JavaScript; the effect above keeps the section anchor. -->
-		<meta http-equiv="refresh" content="1; url={data.redirect}" />
+		<!-- Without JavaScript only: a refresh timer, once started, is not
+		     stopped by client-side navigation. The effect above keeps the
+		     section anchor. -->
+		<noscript><meta http-equiv="refresh" content="0; url={data.redirect}" /></noscript>
 		<link rel="canonical" href={data.redirect} />
 	{:else}
 		<title>{data.title} · MMS docs</title>
