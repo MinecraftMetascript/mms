@@ -3,9 +3,9 @@ name: vscode
 on:
   push:
     branches: [main]
-    paths: ["editors/vscode/**", "packages/**", ".github/workflows/vscode.yml"]
+    paths: ["editors/vscode/**", "packages/**", "engine/**", ".github/workflows/vscode.yml"]
   pull_request:
-    paths: ["editors/vscode/**", "packages/**", ".github/workflows/vscode.yml"]
+    paths: ["editors/vscode/**", "packages/**", "engine/**", ".github/workflows/vscode.yml"]
 
 defaults:
   run:
@@ -35,3 +35,28 @@ jobs:
         run: |
           mkdir vsix && unzip -q mms-linux-x64-*.vsix -d vsix
           vsix/extension/bin/mms version
+
+  # The editor features, checked in a real VS Code against the language
+  # server built from this commit (test/run.mjs, test/suite.ts).
+  extension-host:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: editors/vscode/package-lock.json
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: engine/go.mod
+          cache-dependency-path: engine/go.sum
+      - name: Build mms
+        working-directory: engine
+        run: go build -o "$RUNNER_TEMP/mms" ./cmd/mms
+      - run: npm ci
+      - run: npm run build
+      - name: Extension host tests
+        run: xvfb-run -a npm test
+        env:
+          MMS_PATH: ${{ runner.temp }}/mms

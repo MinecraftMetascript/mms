@@ -13,7 +13,11 @@
   "engines": {
     "vscode": "^1.85.0"
   },
-  "categories": ["Programming Languages", "Formatters", "Linters"],
+  "categories": [
+    "Programming Languages",
+    "Formatters",
+    "Linters"
+  ],
   "main": "./out/extension.js",
   "activationEvents": [
     "workspaceContains:**/mms.json",
@@ -26,8 +30,13 @@
     "languages": [
       {
         "id": "mms",
-        "aliases": ["Minecraft Metascript", "MMS"],
-        "extensions": [".mms"],
+        "aliases": [
+          "Minecraft Metascript",
+          "MMS"
+        ],
+        "extensions": [
+          ".mms"
+        ],
         "configuration": "./language-configuration.json",
         "icon": {
           "light": "./icons/mms-file.svg",
@@ -36,14 +45,22 @@
       },
       {
         "id": "mmsbook",
-        "aliases": ["MMS Book"],
-        "extensions": [".mmsbook"],
+        "aliases": [
+          "MMS Book"
+        ],
+        "extensions": [
+          ".mmsbook"
+        ],
         "configuration": "./language-configuration-book.json"
       },
       {
         "id": "mmstext",
-        "aliases": ["MMS Text"],
-        "extensions": [".mmstext"],
+        "aliases": [
+          "MMS Text"
+        ],
+        "extensions": [
+          ".mmstext"
+        ],
         "configuration": "./language-configuration-book.json"
       }
     ],
@@ -80,13 +97,19 @@
         },
         "mms.trace.server": {
           "type": "string",
-          "enum": ["off", "messages", "verbose"],
+          "enum": [
+            "off",
+            "messages",
+            "verbose"
+          ],
           "default": "off",
           "description": "Log the messages between VS Code and the MMS language server."
         },
         "mms.savesFolders": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "default": [],
           "markdownDescription": "More Minecraft `saves` folders to list worlds from in the World view, for launchers MMS does not know. The Minecraft launcher's, Prism Launcher's and MultiMC's are found by themselves. `~` is expanded."
         },
@@ -104,15 +127,42 @@
     },
     "viewsContainers": {
       "activitybar": [
-        { "id": "mms", "title": "Minecraft Metascript", "icon": "icons/sidebar.svg" }
+        {
+          "id": "mms",
+          "title": "Minecraft Metascript",
+          "icon": "icons/sidebar.svg"
+        }
       ]
     },
     "views": {
       "mms": [
-        { "id": "mms.world", "type": "webview", "name": "World", "icon": "icons/sidebar.svg", "initialSize": 2 },
-        { "id": "mms.pack", "name": "Pack", "icon": "icons/sidebar.svg", "initialSize": 2 },
-        { "id": "mms.structures", "type": "webview", "name": "Structures", "icon": "icons/sidebar.svg", "initialSize": 3 },
-        { "id": "mms.jigsaw", "type": "webview", "name": "Jigsaw", "icon": "icons/sidebar.svg", "initialSize": 3 }
+        {
+          "id": "mms.world",
+          "type": "webview",
+          "name": "World",
+          "icon": "icons/sidebar.svg",
+          "initialSize": 2
+        },
+        {
+          "id": "mms.pack",
+          "name": "Pack",
+          "icon": "icons/sidebar.svg",
+          "initialSize": 2
+        },
+        {
+          "id": "mms.structures",
+          "type": "webview",
+          "name": "Structures",
+          "icon": "icons/sidebar.svg",
+          "initialSize": 3
+        },
+        {
+          "id": "mms.jigsaw",
+          "type": "webview",
+          "name": "Jigsaw",
+          "icon": "icons/sidebar.svg",
+          "initialSize": 3
+        }
       ]
     },
     "viewsWelcome": [
@@ -139,57 +189,191 @@
         "command": "mms.previewDeclaration",
         "title": "MMS: Preview Declaration"
       },
-      { "command": "mms.buildToWorld", "title": "MMS: Build into World", "icon": "$(play)" },
-      { "command": "mms.chooseWorld", "title": "MMS: Choose World", "icon": "$(globe)" },
-      { "command": "mms.chooseStructureWorld", "title": "MMS: Choose World to Import Structures From" },
-      { "command": "mms.chooseProject", "title": "MMS: Choose Project" },
-      { "command": "mms.revealWorld", "title": "Reveal Data Packs Folder", "icon": "$(folder-opened)" },
-      { "command": "mms.forgetWorld", "title": "Forget This World" },
-      { "command": "mms.openOutput", "title": "Open" },
-      { "command": "mms.previewOutput", "title": "Open Preview", "icon": "$(open-preview)" },
-      { "command": "mms.revealOutputSource", "title": "Go to Source", "icon": "$(go-to-file)" },
-      { "command": "mms.renameAt", "title": "MMS: Rename Extracted Declaration" },
-      { "command": "mms.expandAtCursor", "title": "MMS: Expand at Cursor" },
-      { "command": "mms.showExpansion", "title": "MMS: Show Expansion" },
-      { "command": "mms.importStructures", "title": "MMS: Import Structures from World…", "icon": "$(cloud-download)" },
-      { "command": "mms.refreshStructures", "title": "Refresh", "icon": "$(refresh)" }
+      {
+        "command": "mms.buildToWorld",
+        "title": "MMS: Build into World",
+        "icon": "$(play)"
+      },
+      {
+        "command": "mms.chooseWorld",
+        "title": "MMS: Choose World",
+        "icon": "$(globe)"
+      },
+      {
+        "command": "mms.chooseStructureWorld",
+        "title": "MMS: Choose World to Import Structures From"
+      },
+      {
+        "command": "mms.chooseProject",
+        "title": "MMS: Choose Project"
+      },
+      {
+        "command": "mms.revealWorld",
+        "title": "Reveal Data Packs Folder",
+        "icon": "$(folder-opened)"
+      },
+      {
+        "command": "mms.forgetWorld",
+        "title": "Forget This World"
+      },
+      {
+        "command": "mms.openOutput",
+        "title": "Open"
+      },
+      {
+        "command": "mms.previewOutput",
+        "title": "Open Preview",
+        "icon": "$(open-preview)"
+      },
+      {
+        "command": "mms.revealOutputSource",
+        "title": "Go to Source",
+        "icon": "$(go-to-file)"
+      },
+      {
+        "command": "mms.renameAt",
+        "title": "MMS: Rename Extracted Declaration"
+      },
+      {
+        "command": "mms.expandAtCursor",
+        "title": "MMS: Expand at Cursor"
+      },
+      {
+        "command": "mms.showExpansion",
+        "title": "MMS: Show Expansion"
+      },
+      {
+        "command": "mms.importStructures",
+        "title": "MMS: Import Structures from World…",
+        "icon": "$(cloud-download)"
+      },
+      {
+        "command": "mms.refreshStructures",
+        "title": "Refresh",
+        "icon": "$(refresh)"
+      }
     ],
     "menus": {
       "editor/title": [
-        { "command": "mms.showPreview", "when": "editorLangId == mms || editorLangId == mmsbook || editorLangId == mmstext", "group": "navigation" }
+        {
+          "command": "mms.showPreview",
+          "when": "editorLangId == mms || editorLangId == mmsbook || editorLangId == mmstext",
+          "group": "navigation"
+        }
       ],
       "view/title": [
-        { "command": "mms.buildToWorld", "when": "view == mms.world && mms.hasWorld", "group": "navigation@1" },
-        { "command": "mms.chooseWorld", "when": "view == mms.world && mms.hasProject", "group": "navigation@2" },
-        { "command": "mms.refreshStructures", "when": "view == mms.structures && mms.hasStructureWorld", "group": "navigation@1" }
+        {
+          "command": "mms.buildToWorld",
+          "when": "view == mms.world && mms.hasWorld",
+          "group": "navigation@1"
+        },
+        {
+          "command": "mms.chooseWorld",
+          "when": "view == mms.world && mms.hasProject",
+          "group": "navigation@2"
+        },
+        {
+          "command": "mms.refreshStructures",
+          "when": "view == mms.structures && mms.hasStructureWorld",
+          "group": "navigation@1"
+        }
       ],
       "view/item/context": [
-        { "command": "mms.previewOutput", "when": "view == mms.pack && viewItem =~ /preview/", "group": "inline@1" },
-        { "command": "mms.revealOutputSource", "when": "view == mms.pack && viewItem =~ /source/", "group": "inline@2" },
-        { "command": "mms.previewOutput", "when": "view == mms.pack && viewItem =~ /preview/", "group": "1_output@1" },
-        { "command": "mms.revealOutputSource", "when": "view == mms.pack && viewItem =~ /source/", "group": "1_output@2" }
+        {
+          "command": "mms.previewOutput",
+          "when": "view == mms.pack && viewItem =~ /preview/",
+          "group": "inline@1"
+        },
+        {
+          "command": "mms.revealOutputSource",
+          "when": "view == mms.pack && viewItem =~ /source/",
+          "group": "inline@2"
+        },
+        {
+          "command": "mms.previewOutput",
+          "when": "view == mms.pack && viewItem =~ /preview/",
+          "group": "1_output@1"
+        },
+        {
+          "command": "mms.revealOutputSource",
+          "when": "view == mms.pack && viewItem =~ /source/",
+          "group": "1_output@2"
+        }
       ],
       "commandPalette": [
-        { "command": "mms.showPreview", "when": "editorLangId == mms || editorLangId == mmsbook || editorLangId == mmstext" },
-        { "command": "mms.previewDeclaration", "when": "false" },
-        { "command": "mms.renameAt", "when": "false" },
-        { "command": "mms.showExpansion", "when": "false" },
-        { "command": "mms.expandAtCursor", "when": "editorLangId == mms" },
-        { "command": "mms.importStructures", "when": "mms.hasStructureWorld" },
-        { "command": "mms.chooseStructureWorld", "when": "mms.hasProject" },
-        { "command": "mms.buildToWorld", "when": "mms.hasProject" },
-        { "command": "mms.chooseWorld", "when": "mms.hasProject" },
-        { "command": "mms.chooseProject", "when": "mms.hasProject" },
-        { "command": "mms.revealWorld", "when": "false" },
-        { "command": "mms.refreshStructures", "when": "false" },
-        { "command": "mms.forgetWorld", "when": "false" },
-        { "command": "mms.openOutput", "when": "false" },
-        { "command": "mms.previewOutput", "when": "false" },
-        { "command": "mms.revealOutputSource", "when": "false" }
+        {
+          "command": "mms.showPreview",
+          "when": "editorLangId == mms || editorLangId == mmsbook || editorLangId == mmstext"
+        },
+        {
+          "command": "mms.previewDeclaration",
+          "when": "false"
+        },
+        {
+          "command": "mms.renameAt",
+          "when": "false"
+        },
+        {
+          "command": "mms.showExpansion",
+          "when": "false"
+        },
+        {
+          "command": "mms.expandAtCursor",
+          "when": "editorLangId == mms"
+        },
+        {
+          "command": "mms.importStructures",
+          "when": "mms.hasStructureWorld"
+        },
+        {
+          "command": "mms.chooseStructureWorld",
+          "when": "mms.hasProject"
+        },
+        {
+          "command": "mms.buildToWorld",
+          "when": "mms.hasProject"
+        },
+        {
+          "command": "mms.chooseWorld",
+          "when": "mms.hasProject"
+        },
+        {
+          "command": "mms.chooseProject",
+          "when": "mms.hasProject"
+        },
+        {
+          "command": "mms.revealWorld",
+          "when": "false"
+        },
+        {
+          "command": "mms.refreshStructures",
+          "when": "false"
+        },
+        {
+          "command": "mms.forgetWorld",
+          "when": "false"
+        },
+        {
+          "command": "mms.openOutput",
+          "when": "false"
+        },
+        {
+          "command": "mms.previewOutput",
+          "when": "false"
+        },
+        {
+          "command": "mms.revealOutputSource",
+          "when": "false"
+        }
       ]
     },
     "keybindings": [
-      { "command": "mms.showPreview", "key": "ctrl+k v", "mac": "cmd+k v", "when": "editorLangId == mms || editorLangId == mmsbook || editorLangId == mmstext" }
+      {
+        "command": "mms.showPreview",
+        "key": "ctrl+k v",
+        "mac": "cmd+k v",
+        "when": "editorLangId == mms || editorLangId == mmsbook || editorLangId == mmstext"
+      }
     ],
     "configurationDefaults": {
       "[mms]": {
@@ -197,14 +381,26 @@
         "editor.tabSize": 2,
         "editor.insertSpaces": true,
         "editor.semanticHighlighting.enabled": true,
-        "editor.quickSuggestions": { "other": "on", "comments": "off", "strings": "on" }
+        "editor.quickSuggestions": {
+          "other": "on",
+          "comments": "off",
+          "strings": "on"
+        }
       },
       "[mmsbook]": {
-        "editor.quickSuggestions": { "other": "on", "comments": "off", "strings": "on" },
+        "editor.quickSuggestions": {
+          "other": "on",
+          "comments": "off",
+          "strings": "on"
+        },
         "editor.wordBasedSuggestions": "off"
       },
       "[mmstext]": {
-        "editor.quickSuggestions": { "other": "on", "comments": "off", "strings": "on" },
+        "editor.quickSuggestions": {
+          "other": "on",
+          "comments": "off",
+          "strings": "on"
+        },
         "editor.wordBasedSuggestions": "off"
       }
     }
@@ -215,6 +411,7 @@
     "build:extension": "esbuild src/extension.ts --bundle --platform=node --format=cjs --external:vscode --outfile=out/extension.js --minify",
     "build:webview": "vite build --config webview/vite.config.ts && vite build --config webview/world.vite.config.ts && vite build --config webview/jigsaw.vite.config.ts",
     "check": "tsc --noEmit && svelte-check --tsconfig ./webview/tsconfig.json",
+    "test": "esbuild test/suite.ts --bundle --platform=node --format=cjs --external:vscode --outfile=out-test/suite.js && node test/run.mjs",
     "package": "npm run check && npm run build && node -e \"require('node:fs').rmSync('bin', { recursive: true, force: true })\" && vsce package --skip-license",
     "package:targets": "npm run check && npm run build && node scripts/package-targets.mjs"
   },
@@ -227,6 +424,7 @@
     "@tailwindcss/vite": "4.3.3",
     "@types/node": "20.19.43",
     "@types/vscode": "1.85.0",
+    "@vscode/test-electron": "3.1.0",
     "@vscode/vsce": "3.2.1",
     "deepslate": "0.27.2",
     "esbuild": "0.27.7",
