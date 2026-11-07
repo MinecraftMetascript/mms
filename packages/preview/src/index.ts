@@ -13,4 +13,6 @@ export { inspectable } from './inspect/common';
 export { jigsawGraph, type JigsawGraph } from './jigsaw/graph';
 export { jigsawMarkdown, jigsawMermaid } from './jigsaw/export';
 export { default as JigsawView } from './jigsaw/JigsawView.svelte';
+export { default as JigsawSim } from './jigsaw/JigsawSim.svelte';
+export { simulate, type Simulation, type PlacedPiece } from './jigsaw/simulate';
 export type { OutputAsset, OutputFile, OutputItem, OutputJigsaw, OutputText, SourceRange } from './types';

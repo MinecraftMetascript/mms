@@ -1024,6 +1024,12 @@ func (s *Server) output(_ context.Context, p struct {
 						if j.Label != "" {
 							m["label"] = j.Label
 						}
+						if j.SelectionPriority != 0 {
+							m["selection_priority"] = j.SelectionPriority
+						}
+						if j.PlacementPriority != 0 {
+							m["placement_priority"] = j.PlacementPriority
+						}
 						list = append(list, m)
 					}
 					a["jigsaws"] = list

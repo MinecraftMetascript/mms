@@ -44,6 +44,10 @@ type Jigsaw struct {
 	// item_name or custom_name), which the block entity keeps among its
 	// components; empty when it has none.
 	Label string
+	// SelectionPriority orders a piece's jigsaw blocks when the game
+	// grows the structure: higher goes first. PlacementPriority orders
+	// the piece joined here among the pieces still to grow from.
+	SelectionPriority, PlacementPriority int
 }
 
 // structureCache holds parsed structure files by path, size and
@@ -151,6 +155,8 @@ func Jigsaws(root map[string]any) []Jigsaw {
 		j := Jigsaw{Pool: nbtID(data["pool"]), Name: nbtID(data["name"]), Target: nbtID(data["target"]), Orientation: orientation}
 		j.Joint, _ = data["joint"].(string)
 		j.FinalState, _ = data["final_state"].(string)
+		j.SelectionPriority = nbtInt(data["selection_priority"])
+		j.PlacementPriority = nbtInt(data["placement_priority"])
 		if comps, ok := data["components"].(map[string]any); ok {
 			for _, k := range []string{"minecraft:custom_name", "minecraft:item_name"} {
 				if j.Label = textOf(comps[k]); j.Label != "" {
@@ -985,4 +991,19 @@ func (r *Result) newHoleFix(s *structureUse, id string) (syntax.Fix, bool) {
 	}
 	at := len(src)
 	return syntax.Fix{Title: fmt.Sprintf("Declare JigsawHole %s", decl), Edits: []syntax.TextEdit{{Sp: syntax.Span{Start: at, End: at}, Text: text}}}, true
+}
+
+// nbtInt reads a whole number of any NBT integer type, or 0.
+func nbtInt(v any) int {
+	switch n := v.(type) {
+	case int8:
+		return int(n)
+	case int16:
+		return int(n)
+	case int32:
+		return int(n)
+	case int64:
+		return int(n)
+	}
+	return 0
 }

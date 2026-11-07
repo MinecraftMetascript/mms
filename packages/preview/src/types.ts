@@ -61,6 +61,10 @@ export interface OutputJigsaw {
 	final_state?: string;
 	/** The name of the item it was placed from, if it had one. */
 	label?: string;
+	/** Higher goes first among its piece's jigsaw blocks when the structure grows. */
+	selection_priority?: number;
+	/** Higher grows first among the pieces joined so far. */
+	placement_priority?: number;
 }
 
 /** A project file the pack copies, such as a texture or a structure. */

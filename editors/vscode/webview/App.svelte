@@ -14,6 +14,7 @@
 	let items = $state<OutputItem[]>([]);
 	let assets = $state<OutputAsset[]>([]);
 	let textures = $state<Record<string, string>>({});
+	let structures = $state<Record<string, string>>({});
 	let path = $state<string | null>(vscode.getState()?.path ?? null);
 	// The book page to open, from 0.
 	let page = $state(vscode.getState()?.page ?? 0);
@@ -28,6 +29,7 @@
 			items = m.items;
 			assets = m.assets;
 			textures = m.textures ?? {};
+			structures = m.structures ?? {};
 			ready = true;
 		} else if (m.type === 'target') {
 			path = m.path;
@@ -63,6 +65,7 @@
 				{items}
 				{assets}
 				{textures}
+				{structures}
 				{page}
 				{path}
 				pinned={path}
