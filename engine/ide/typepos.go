@@ -1,9 +1,12 @@
 package ide
 
 import (
+	"strings"
+
 	"github.com/minecraftmetascript/mms/engine/sema"
 	"github.com/minecraftmetascript/mms/engine/syntax"
 	"github.com/minecraftmetascript/mms/engine/syntax/parser"
+	"github.com/minecraftmetascript/mms/engine/types"
 )
 
 // typeCompletion completes a type expression outside function code: a
@@ -170,4 +173,87 @@ func inTypeExpr(path []syntax.Node) bool {
 		}
 	}
 	return false
+}
+
+// typeHover describes a built-in, resource or schema type named in a
+// type position. The project's own Types and Blueprints have evalHover.
+func (s *Session) typeHover(path string, off int) (string, syntax.Span, bool) {
+	u := s.R.Unit(path)
+	if u == nil || u.File == nil || s.R.TypeEnv == nil {
+		return "", syntax.Span{}, false
+	}
+	p := syntax.PathAt(u.File, off)
+	tn, ok := p[len(p)-1].(*syntax.TypeName)
+	if !ok || !within(typeNameSpan(tn), off) || !inTypes(p) {
+		return "", syntax.Span{}, false
+	}
+	for _, t := range s.R.TypeEnv.Names() {
+		if t.Name != tn.Name {
+			continue
+		}
+		head := t.Name
+		if t.Args {
+			head += "<registry>"
+		}
+		md := "```mms\n" + head + "\n```\n" + typeDetailDoc(t)
+		if doc := sema.KindDoc(t.Name); doc != "" {
+			md += "\n\n" + doc
+		}
+		if t.Detail == "schema type" {
+			md += schemaFields(s.R.TypeEnv, path, tn)
+		}
+		return md, typeNameSpan(tn), true
+	}
+	return "", syntax.Span{}, false
+}
+
+// typeDetailDoc says in a sentence what kind of type t is.
+func typeDetailDoc(t types.TypeName) string {
+	switch t.Detail {
+	case "value type":
+		return "A value type."
+	case "language type":
+		return "A type of the language's own."
+	case "id in a registry":
+		return "An id in the registry or resource folder it names, such as `Id<item>`."
+	case "ids or a tag in a registry":
+		return "Ids or a `#tag` in the registry or resource folder it names, such as `Ids<block>`."
+	case "resource: an id or an inline value":
+		return "A resource: the id of one, or one written inline."
+	case "schema type":
+		return "A type from the game's data schema."
+	}
+	return t.Detail
+}
+
+// schemaFields lists a schema struct's fixed fields, for its hover.
+func schemaFields(e *types.Env, path string, tn *syntax.TypeName) string {
+	rt := e.Lookup(path, tn)
+	for i := 0; rt != nil && rt.Kind == "reference" && i < 8; i++ {
+		rt = e.Pack.Types[rt.Path]
+	}
+	if rt == nil || rt.Kind != "struct" {
+		return ""
+	}
+	var sb strings.Builder
+	n := 0
+	for _, f := range rt.Fields {
+		if f.Kind != "pair" || f.Key == "" {
+			continue
+		}
+		if n == 20 {
+			sb.WriteString("- …\n")
+			break
+		}
+		if n == 0 {
+			sb.WriteString("\n\n**Fields**\n\n")
+		}
+		n++
+		opt := ""
+		if f.Optional {
+			opt = " *(optional)*"
+		}
+		sb.WriteString("- `" + f.Key + "`" + opt + "\n")
+	}
+	return strings.TrimRight(sb.String(), "\n")
 }

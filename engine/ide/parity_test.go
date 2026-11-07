@@ -24,7 +24,7 @@ import (
 // the line gone, which is how a line being typed looks. The hit rates per
 // kind of position, such as a field name or a call in a list, must not
 // fall below testdata/completion.tsv. MMS_UPDATE=1 rewrites that file
-// after a change that raises them.
+// after a change that raises them, and MMS_MISSES=1 lists every miss.
 func TestCompletionParity(t *testing.T) {
 	if testing.Short() {
 		t.Skip("reads every example")
@@ -184,7 +184,7 @@ func TestCompletionParity(t *testing.T) {
 			failed = true
 		}
 	}
-	if failed {
+	if failed || os.Getenv("MMS_MISSES") != "" {
 		t.Logf("missed:\n%s", strings.Join(misses, "\n"))
 	}
 }

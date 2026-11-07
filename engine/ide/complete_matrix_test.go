@@ -146,6 +146,16 @@ func TestCompletionMatrix(t *testing.T) {
 		{name: "item hook global", src: "Global g: int = 0\nCustomItem w {\n  base = stick\n  on_hit = run {\n    g|\n  }\n}", want: []string{"g"}, replace: "g"},
 		{name: "item hook field still a field", src: "CustomItem w {\n  base = stick\n  on_hit = run {\n    /say hi\n  }\n  |\n}", want: []string{"on_right_click"}, not: []string{"As"}},
 
+		// Selectors.
+		{name: "selector option", src: "Function f {\n  As(@e[ty|]) { /say hi }\n}", want: []string{"type", "tag", "limit"}, replace: "ty"},
+		{name: "selector next option", src: "Function f {\n  As(@e[type=zombie, |]) { /say hi }\n}", want: []string{"tag", "distance"}},
+		{name: "selector entity type", src: "Function f {\n  As(@e[type=|]) { /say hi }\n}", want: []string{"zombie", "creeper"}},
+		{name: "selector scores", src: "Objective kills\nFunction f {\n  As(@a[scores={ k| }]) { /say hi }\n}", want: []string{"kills"}, replace: "k"},
+		{name: "command selector option", src: "Function f {\n  /kill @e[ty|\n}", want: []string{"type=", "tag="}, replace: "ty"},
+		{name: "command selector type", src: "Function f {\n  /kill @e[tag=x,type=zom|\n}", want: []string{"zombie"}, replace: "zom"},
+		{name: "command selector scores", src: "Objective kills\nFunction f {\n  /kill @e[scores={a=1,ki|\n}", want: []string{"kills"}, replace: "ki"},
+		{name: "assignment target", src: "Global count: int = 0\nFunction f {\n  co| = 1\n}", want: []string{"count"}, replace: "co"},
+
 		// No completion.
 		{name: "comment", src: "// Feature |\nFeature f {}", none: true},
 		{name: "string", src: "Function f {\n  let s = \"a|b\"\n}", none: true},

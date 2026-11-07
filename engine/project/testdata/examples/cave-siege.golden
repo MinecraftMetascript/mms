@@ -413,8 +413,8 @@
       }
     },
     "minecraft:gameplay/bed_rule": {
-      "can_set_spawn": "always",
       "can_sleep": "never",
+      "can_set_spawn": "always",
       "error_message": {
         "translate": "siege.bed.no_sleep",
         "fallback": "There is no night underground. The siege clock keeps running."
@@ -1439,38 +1439,38 @@ execute positioned ~ ~-1 ~ if function siege:standable run return run function s
       "argument": [
         {
           "particle": {
-            "type": "ash"
+            "type": "minecraft:ash"
           },
           "probability": 0.03
         }
       ]
     },
     "minecraft:visual/default_dripstone_particle": {
-      "type": "dripping_dripstone_lava"
+      "type": "minecraft:dripping_dripstone_lava"
     },
     "minecraft:gameplay/natural_mob_spawns": {
       "modifier": "overlay",
       "argument": {
-        "spawn_costs": {},
         "spawns_by_category": {
           "monster": [
             {
-              "type": "magma_cube",
-              "count": 1,
-              "weight": 50
+              "weight": 50,
+              "type": "minecraft:magma_cube",
+              "count": 1
             },
             {
-              "type": "skeleton",
-              "count": 1,
-              "weight": 100
+              "weight": 100,
+              "type": "minecraft:skeleton",
+              "count": 1
             },
             {
-              "type": "zombie",
-              "count": 1,
-              "weight": 50
+              "weight": 50,
+              "type": "minecraft:zombie",
+              "count": 1
             }
           ]
-        }
+        },
+        "spawn_costs": {}
       }
     }
   },
@@ -1514,60 +1514,60 @@ execute positioned ~ ~-1 ~ if function siege:standable run return run function s
     "minecraft:gameplay/natural_mob_spawns": {
       "modifier": "overlay",
       "argument": {
-        "spawn_costs": {},
         "spawns_by_category": {
           "creature": [
             {
-              "type": "parrot",
-              "count": 1,
-              "weight": 4
+              "weight": 4,
+              "type": "minecraft:parrot",
+              "count": 1
             },
             {
-              "type": "ocelot",
-              "count": 1,
-              "weight": 2
+              "weight": 2,
+              "type": "minecraft:ocelot",
+              "count": 1
             },
             {
-              "type": "chicken",
-              "count": 2,
-              "weight": 6
+              "weight": 6,
+              "type": "minecraft:chicken",
+              "count": 2
             }
           ],
           "ambient": [
             {
-              "type": "bat",
-              "count": 4,
-              "weight": 10
+              "weight": 10,
+              "type": "minecraft:bat",
+              "count": 4
             }
           ],
           "monster": [
             {
-              "type": "zombie",
-              "count": 1,
-              "weight": 100
+              "weight": 100,
+              "type": "minecraft:zombie",
+              "count": 1
             },
             {
-              "type": "skeleton",
-              "count": 1,
-              "weight": 100
+              "weight": 100,
+              "type": "minecraft:skeleton",
+              "count": 1
             },
             {
-              "type": "spider",
-              "count": 2,
-              "weight": 100
+              "weight": 100,
+              "type": "minecraft:spider",
+              "count": 2
             },
             {
-              "type": "creeper",
-              "count": 1,
-              "weight": 80
+              "weight": 80,
+              "type": "minecraft:creeper",
+              "count": 1
             },
             {
-              "type": "witch",
-              "count": 1,
-              "weight": 5
+              "weight": 5,
+              "type": "minecraft:witch",
+              "count": 1
             }
           ]
-        }
+        },
+        "spawn_costs": {}
       }
     }
   },
@@ -1613,7 +1613,7 @@ execute positioned ~ ~-1 ~ if function siege:standable run return run function s
       "argument": [
         {
           "particle": {
-            "type": "white_ash"
+            "type": "minecraft:white_ash"
           },
           "probability": 0.002
         }
@@ -1630,55 +1630,55 @@ execute positioned ~ ~-1 ~ if function siege:standable run return run function s
     "minecraft:gameplay/natural_mob_spawns": {
       "modifier": "overlay",
       "argument": {
-        "spawn_costs": {},
         "spawns_by_category": {
           "creature": [
             {
-              "type": "cow",
-              "count": 4,
-              "weight": 8
+              "weight": 8,
+              "type": "minecraft:cow",
+              "count": 4
             },
             {
-              "type": "sheep",
-              "count": 4,
-              "weight": 12
+              "weight": 12,
+              "type": "minecraft:sheep",
+              "count": 4
             },
             {
-              "type": "pig",
-              "count": 4,
-              "weight": 10
+              "weight": 10,
+              "type": "minecraft:pig",
+              "count": 4
             },
             {
-              "type": "chicken",
-              "count": 4,
-              "weight": 10
+              "weight": 10,
+              "type": "minecraft:chicken",
+              "count": 4
             }
           ],
           "ambient": [
             {
-              "type": "bat",
-              "count": 4,
-              "weight": 10
+              "weight": 10,
+              "type": "minecraft:bat",
+              "count": 4
             }
           ],
           "monster": [
             {
-              "type": "zombie",
-              "count": 1,
-              "weight": 100
+              "weight": 100,
+              "type": "minecraft:zombie",
+              "count": 1
             },
             {
-              "type": "skeleton",
-              "count": 1,
-              "weight": 100
+              "weight": 100,
+              "type": "minecraft:skeleton",
+              "count": 1
             },
             {
-              "type": "creeper",
-              "count": 1,
-              "weight": 60
+              "weight": 60,
+              "type": "minecraft:creeper",
+              "count": 1
             }
           ]
-        }
+        },
+        "spawn_costs": {}
       }
     }
   },
@@ -1723,7 +1723,7 @@ execute positioned ~ ~-1 ~ if function siege:standable run return run function s
       "argument": [
         {
           "particle": {
-            "type": "mycelium"
+            "type": "minecraft:mycelium"
           },
           "probability": 0.02
         }
@@ -1732,23 +1732,23 @@ execute positioned ~ ~-1 ~ if function siege:standable run return run function s
     "minecraft:gameplay/natural_mob_spawns": {
       "modifier": "overlay",
       "argument": {
-        "spawn_costs": {},
         "spawns_by_category": {
           "creature": [
             {
-              "type": "mooshroom",
-              "count": 4,
-              "weight": 8
+              "weight": 8,
+              "type": "minecraft:mooshroom",
+              "count": 4
             }
           ],
           "ambient": [
             {
-              "type": "bat",
-              "count": 4,
-              "weight": 10
+              "weight": 10,
+              "type": "minecraft:bat",
+              "count": 4
             }
           ]
-        }
+        },
+        "spawn_costs": {}
       }
     }
   },
@@ -1788,7 +1788,7 @@ execute positioned ~ ~-1 ~ if function siege:standable run return run function s
       "argument": [
         {
           "particle": {
-            "type": "spore_blossom_air"
+            "type": "minecraft:spore_blossom_air"
           },
           "probability": 0.004
         }
@@ -1804,50 +1804,50 @@ execute positioned ~ ~-1 ~ if function siege:standable run return run function s
     "minecraft:gameplay/natural_mob_spawns": {
       "modifier": "overlay",
       "argument": {
-        "spawn_costs": {},
         "spawns_by_category": {
           "creature": [
             {
-              "type": "rabbit",
-              "count": 2,
-              "weight": 4
+              "weight": 4,
+              "type": "minecraft:rabbit",
+              "count": 2
             },
             {
-              "type": "fox",
-              "count": 2,
-              "weight": 4
+              "weight": 4,
+              "type": "minecraft:fox",
+              "count": 2
             }
           ],
           "ambient": [
             {
-              "type": "bat",
-              "count": 4,
-              "weight": 10
+              "weight": 10,
+              "type": "minecraft:bat",
+              "count": 4
             }
           ],
           "monster": [
             {
-              "type": "zombie",
-              "count": 1,
-              "weight": 100
+              "weight": 100,
+              "type": "minecraft:zombie",
+              "count": 1
             },
             {
-              "type": "skeleton",
-              "count": 1,
-              "weight": 100
+              "weight": 100,
+              "type": "minecraft:skeleton",
+              "count": 1
             },
             {
-              "type": "spider",
-              "count": 1,
-              "weight": 100
+              "weight": 100,
+              "type": "minecraft:spider",
+              "count": 1
             },
             {
-              "type": "creeper",
-              "count": 1,
-              "weight": 80
+              "weight": 80,
+              "type": "minecraft:creeper",
+              "count": 1
             }
           ]
-        }
+        },
+        "spawn_costs": {}
       }
     }
   },
@@ -1891,59 +1891,59 @@ execute positioned ~ ~-1 ~ if function siege:standable run return run function s
     "minecraft:gameplay/natural_mob_spawns": {
       "modifier": "overlay",
       "argument": {
-        "spawn_costs": {},
         "spawns_by_category": {
           "water_creature": [
             {
-              "type": "squid",
-              "count": 4,
-              "weight": 4
+              "weight": 4,
+              "type": "minecraft:squid",
+              "count": 4
             }
           ],
           "water_ambient": [
             {
-              "type": "cod",
-              "count": 4,
-              "weight": 10
+              "weight": 10,
+              "type": "minecraft:cod",
+              "count": 4
             },
             {
-              "type": "salmon",
-              "count": 4,
-              "weight": 5
+              "weight": 5,
+              "type": "minecraft:salmon",
+              "count": 4
             }
           ],
           "underground_water_creature": [
             {
-              "type": "glow_squid",
-              "count": 4,
-              "weight": 10
+              "weight": 10,
+              "type": "minecraft:glow_squid",
+              "count": 4
             }
           ],
           "ambient": [
             {
-              "type": "bat",
-              "count": 4,
-              "weight": 10
+              "weight": 10,
+              "type": "minecraft:bat",
+              "count": 4
             }
           ],
           "monster": [
             {
-              "type": "drowned",
-              "count": 1,
-              "weight": 100
+              "weight": 100,
+              "type": "minecraft:drowned",
+              "count": 1
             },
             {
-              "type": "zombie",
-              "count": 1,
-              "weight": 50
+              "weight": 50,
+              "type": "minecraft:zombie",
+              "count": 1
             },
             {
-              "type": "skeleton",
-              "count": 1,
-              "weight": 50
+              "weight": 50,
+              "type": "minecraft:skeleton",
+              "count": 1
             }
           ]
-        }
+        },
+        "spawn_costs": {}
       }
     }
   },

@@ -60,9 +60,13 @@ func TestRenameEvalNames(t *testing.T) {
 			t.Errorf("%s: definition = %v", c.at, defs)
 		}
 	}
-	// The parameter amount is not the const.
-	if refs := s.References("main.mms", strings.Index(evalNamesSrc, "= amount\n")+3, true); len(refs) != 0 {
-		t.Errorf("shadowed use = %v", refs)
+	// The parameter amount is not the const: its references are the
+	// parameter's.
+	constAt := strings.Index(evalNamesSrc, "const amount") + len("const ")
+	for _, r := range s.References("main.mms", strings.Index(evalNamesSrc, "= amount\n")+3, true) {
+		if r.Span.Start == constAt {
+			t.Errorf("shadowed use finds the const: %v", r)
+		}
 	}
 	off := strings.Index(evalNamesSrc, "twice(amount)") + 1
 	if _, msg := s.Rename("main.mms", off, "amount"); msg == "" {
