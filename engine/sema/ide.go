@@ -44,22 +44,6 @@ type Candidate struct {
 // HasType reports whether the checker recorded an expected type.
 func (in *Info) HasType() bool { return in != nil && in.typed }
 
-// TypeName is the expected type in a few words.
-func (in *Info) TypeName() string {
-	if in == nil || !in.typed {
-		return ""
-	}
-	return describe(in.Type)
-}
-
-// FieldName returns the field a key, named argument or method names.
-func (in *Info) FieldName() (key, doc, typ string, ok bool) {
-	if in == nil || in.Field == nil {
-		return "", "", "", false
-	}
-	return in.Field.Key, in.Field.Desc, describe(in.Field.Type), true
-}
-
 // ValueCandidates lists what can be written where in expects a value.
 func (c *Checker) ValueCandidates(in *Info) []Candidate {
 	if in == nil || !in.typed {
@@ -83,12 +67,6 @@ func (c *Checker) typedCandidates(v tview) []Candidate {
 		}
 	}
 	return out
-}
-
-// Fits reports whether a value of type t can be written where a value of
-// type want is expected.
-func (c *Checker) Fits(t, want *spec.Type) bool {
-	return t != nil && want != nil && c.convFits(t, tview{T: want}, 0)
 }
 
 // TypeCandidates lists what can be written where a value of type t is
@@ -394,15 +372,6 @@ func (c *Checker) listMember(v tview, depth int) (tview, bool) {
 	return tview{}, false
 }
 
-// TypeInfo returns an Info expecting a value of type t, such as a
-// Template parameter's.
-func (c *Checker) TypeInfo(t *spec.Type) *Info {
-	if t == nil {
-		return nil
-	}
-	return &Info{Type: c.norm(tview{T: t}), typed: true}
-}
-
 func (c *Checker) requiredSlots(cl *Callable) []field {
 	var out []field
 	for _, f := range c.positional(cl) {
@@ -541,14 +510,6 @@ func DocMarkdown(doc string) string {
 // Deprecated reports whether a declaration's doc comment has @deprecated.
 func Deprecated(d *syntax.Decl) bool {
 	return d != nil && d.Doc != "" && syntax.ParseDoc(d.Doc).Deprecated != nil
-}
-
-// TypeDoc renders the expected type in mcdoc-like syntax, for hover.
-func (in *Info) TypeDoc() string {
-	if in == nil || !in.typed || in.Type.T == nil {
-		return ""
-	}
-	return spec.Format(in.Type.T, 1)
 }
 
 // ChainBase returns the innermost call of a builder chain such as

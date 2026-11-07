@@ -20,9 +20,8 @@ func TestParseSketch(t *testing.T) {
 		kinds = append(kinds, d.Kind.Name+" "+d.NameText())
 	}
 	want := []string{
-		"Namespace example", "Noise ridges", "DensityFunction terrain", "SurfaceRule badlands_top",
-		"LootTable blocks/ruby_ore", "Recipe ruby_block", "Objective kills", "Global deaths_total",
-		"Function on_kill", "OnLoad ",
+		"Type Ore", "DensityFunction ridges", "DensityFunction terrain", "Template gem_block",
+		"Recipe ruby_block", "Objective kills", "Global deaths_total", "Function on_kill", "OnLoad ",
 	}
 	if len(kinds) != len(want) {
 		t.Fatalf("decls = %q", kinds)
@@ -34,6 +33,15 @@ func TestParseSketch(t *testing.T) {
 	}
 	if f.Decls[1].Doc != "Ridges used by the custom continent shape." {
 		t.Errorf("doc = %q", f.Decls[1].Doc)
+	}
+	var loops int
+	for _, it := range f.Items {
+		if _, ok := it.(*ForStmt); ok {
+			loops++
+		}
+	}
+	if loops != 1 {
+		t.Errorf("top-level for loops = %d, want 1", loops)
 	}
 }
 

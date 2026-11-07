@@ -47,9 +47,6 @@ func (k Kind) Folder() string {
 	switch k.MMS {
 	case "Function":
 		return "function"
-	case "CustomItem":
-		// Its name stands for an item where item stacks are expected.
-		return "item"
 	case "OnAdvancement":
 		// It declares an advancement, so commands such as `advancement
 		// grant` find it, and an Advancement of the same name clashes.

@@ -993,13 +993,6 @@ func (b *builder) exprAt(xs []parser.IExprContext, i int, around Span) Expr {
 	return &Bad{Sp: Span{around.End, around.End}}
 }
 
-func (b *builder) sourceText(sp Span) string {
-	if sp.Start < 0 || sp.End > len(b.file.Src) || sp.Start > sp.End {
-		return ""
-	}
-	return string(b.file.Src[sp.Start:sp.End])
-}
-
 // unquote reads a string literal's value. It resolves the language's own
 // escapes (\" \' \\ \n \t \r \uHHHH) and keeps every other backslash as
 // written, since \{, \$, \* and the like belong to the markup and

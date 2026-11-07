@@ -135,23 +135,32 @@ func coalesce(b *Block, uses map[Score]int) {
 		}
 		switch o := ops[i].(type) {
 		case If:
-			coalesce(&Block{Ops: o.Cond.Pre}, uses)
+			o.Cond.Pre = coalesceOps(o.Cond.Pre, uses)
 			coalesce(o.Then, uses)
 			coalesce(o.Else, uses)
+			ops[i] = o
 		case Loop:
+			o.Cond.Pre = coalesceOps(o.Cond.Pre, uses)
 			coalesce(o.Body, uses)
 			coalesce(o.Post, uses)
+			ops[i] = o
 		case Exec:
 			coalesce(o.Body, uses)
 		case Call:
-			args := &Block{Ops: o.Args}
-			coalesce(args, uses)
-			o.Args = args.Ops
+			o.Args = coalesceOps(o.Args, uses)
 			ops[i] = o
 		}
 		out = append(out, ops[i])
 	}
 	b.Ops = out
+}
+
+// coalesceOps is coalesce for a list of ops outside a block, such as a
+// condition's pre-ops.
+func coalesceOps(ops []Op, uses map[Score]int) []Op {
+	b := &Block{Ops: ops}
+	coalesce(b, uses)
+	return b.Ops
 }
 
 // set is a set of scores.

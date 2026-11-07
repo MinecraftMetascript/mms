@@ -1,14 +1,11 @@
 package sema
 
 import (
-	"encoding/json"
 	"regexp"
-	"sort"
 	"strings"
 
 	"github.com/minecraftmetascript/mms/engine/fn"
 	"github.com/minecraftmetascript/mms/engine/jsonv"
-	"github.com/minecraftmetascript/mms/engine/spec"
 )
 
 // Item stacks a declaration's name stands for. CustomItem and Book are
@@ -18,38 +15,11 @@ import (
 
 // CustomItemOut is a checked custom item.
 type CustomItemOut struct {
-	// Model is the generated item model under models/, nil when the item
-	// names its own model or item_model.
-	Model jsonv.Value
-	// ModelPath is Model's path under models/: "item/<name>".
-	ModelPath string
-	// ItemModel is the generated item model definition under items/, nil
-	// when item_model names an existing one.
-	ItemModel jsonv.Value
-	// LangKey is the translation key the item_name component uses, and
-	// Names its text by language; both are empty without a name.
-	LangKey string
-	Names   map[string]string
 	// Stack is the item stack the name stands for: {id, components}.
 	Stack *jsonv.Object
 	// Book is a Book's layout: its pages that run past the bottom of the
 	// page, and where each starts.
 	Book *BookLayout
-}
-
-// Languages lists the item's languages, sorted.
-func (o *CustomItemOut) Languages() []string {
-	var out []string
-	for l := range o.Names {
-		out = append(out, l)
-	}
-	sort.Strings(out)
-	return out
-}
-
-func idType(registry string) *spec.Type {
-	lit, _ := json.Marshal(registry)
-	return &spec.Type{Kind: "string", Attributes: []spec.Attribute{{Name: "id", Value: &spec.Type{Kind: "literal", Literal: &spec.Literal{Kind: "string", Value: lit}}}}}
 }
 
 // StackSNBT writes an item stack as a command's item argument:

@@ -195,13 +195,6 @@ func NeedsParens(parent string, right bool, child string) bool {
 
 var precedence = map[string]int{"||": 1, "&&": 2, "+": 3, "-": 3, "*": 4, "/": 4}
 
-func btoi(b bool) int {
-	if b {
-		return 1
-	}
-	return 0
-}
-
 // AsCall returns a dispatched object literal written as its helper call,
 // `{ type = noise, noise = ridge }` as `Noise(noise = ridge)`, when the call
 // checks to the same value. in is the object's Info and body its body's.

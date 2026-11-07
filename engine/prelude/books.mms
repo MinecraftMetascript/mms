@@ -20,7 +20,11 @@ Blueprint Book {
   author: string
   /** How many times the book has been copied: `original` (the default), `copy`, `copy_of_copy` or `tattered`. The last two cannot be copied. */
   generation: BookGeneration?
-  /** The book's text in book markup, one string per line, or `TextFile("books/guide.mmsbook")` to read it from a file. A line of `---` starts the next page. */
+  /**
+   * The book's text in book markup, one string per line, or `TextFile("books/guide.mmsbook")` to read it from a file. A line of `---` starts the next page.
+   *
+   * Markup: `# heading`, `**bold**`, `*italic*`, `__underlined__`, `~~struck~~`, `||obfuscated||`, `{gold}...{/}` (colors, `#ff8800`, `bold`, `shadow:#000000`, `font:uniform`, combined as `{bold red}`), `{key:jump}`, `{sprite:item/diamond}`, `{head:Notch}`, `{t:translation.key}`, `[text](page:2)` (also `run:/command`, `suggest:/command`, `copy:text`, `hover:text`, `https://...`; add `"hover text"` after the target), `${kills[@s]}` for a score or Global, `\` before a character to write it as is.
+   */
   text: BookText?
   /** The pages as text components, for full control. Use `text` instead for book markup. */
   pages: [Text]?

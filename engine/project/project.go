@@ -663,22 +663,6 @@ func (p *Project) checkDecl(u *sema.Unit, d *syntax.Decl, k sema.Kind, syms *sem
 			})
 		}
 	}
-	if it := dr.Item; it != nil && !hasErrors(dr.Diags) {
-		for _, f := range []struct {
-			res string
-			v   jsonv.Value
-		}{{"model", it.Model}, {"item_definition", it.ItemModel}} {
-			if f.v == nil {
-				continue
-			}
-			if errs := sema.Validate(p.Pack, p.Kinds, f.res, f.v); len(errs) > 0 {
-				dr.Diags = append(dr.Diags, syntax.Diagnostic{
-					Code: "mms/internal", Severity: syntax.SeverityError, Sp: d.Kind.Sp,
-					Message: "internal error: the generated " + f.res + " JSON does not match the schema (" + errs[0] + "). Please report this with the declaration's source.",
-				})
-			}
-		}
-	}
 	return dr
 }
 

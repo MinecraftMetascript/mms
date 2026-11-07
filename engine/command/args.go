@@ -81,21 +81,14 @@ func (s *state) arg(name string, n *spec.CommandNode, pos int) (int, bool) {
 	case "brigadier:integer", "brigadier:float", "brigadier:double":
 		return s.number(pos, p == "brigadier:integer", n.Properties)
 	case "brigadier:string":
-		switch n.Properties["type"] {
-		case "greedy":
-			return len(s.src), true
-		case "phrase":
-			if s.src[pos] == '"' || s.src[pos] == '\'' {
-				return s.quoted(pos)
-			}
+		if n.Properties["type"] == "phrase" && (s.src[pos] == '"' || s.src[pos] == '\'') {
+			return s.quoted(pos)
 		}
 		end := s.unquoted(pos)
 		if end == pos {
 			return 0, s.fail(pos, s.word(pos), "expected a word")
 		}
 		return end, true
-	case "message":
-		return len(s.src), true
 	case "entity", "game_profile":
 		return s.entity(pos, n.Properties)
 	case "score_holder":

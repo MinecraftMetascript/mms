@@ -25,12 +25,6 @@ func CloneStmt(st Stmt) Stmt { return shifter{}.stmt(st) }
 // CloneStmtAt returns a deep copy of st with every span set to sp.
 func CloneStmtAt(st Stmt, sp Span) Stmt { return shifter{fix: &sp}.stmt(st) }
 
-// CloneBlock returns a deep copy of b with fresh nodes and the same spans.
-func CloneBlock(b *Block) *Block { return shifter{}.block(b) }
-
-// CloneDecl returns a deep copy of d with fresh nodes and the same spans.
-func CloneDecl(d *Decl) *Decl { return shifter{}.decl(d) }
-
 // CloneTypeAt returns a deep copy of t with every span set to sp.
 func CloneTypeAt(t TypeExpr, sp Span) TypeExpr { return shifter{fix: &sp}.typ(t) }
 

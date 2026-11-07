@@ -113,9 +113,6 @@ type Checker struct {
 	// file a Book reads, by path.
 	Extern map[string][]syntax.Diagnostic
 
-	// textureName is the id name Texture("...") gets when the call
-	// gives none; a CustomItem sets it to item/<name>.
-	textureName string
 	// Owner is the id of the declaration being checked; inline values
 	// hoisted out of it are named after it.
 	Owner string

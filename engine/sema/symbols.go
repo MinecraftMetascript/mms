@@ -2,7 +2,6 @@ package sema
 
 import (
 	"regexp"
-	"sort"
 	"strings"
 
 	"github.com/minecraftmetascript/mms/engine/spec"
@@ -93,18 +92,6 @@ func (t *Table) OtherKind(folder, id string) *Symbol {
 
 // All returns every symbol in declaration order.
 func (t *Table) All() []*Symbol { return t.all }
-
-// InNamespace returns the symbols of one folder in a namespace, sorted.
-func (t *Table) InNamespace(folder, ns string) []*Symbol {
-	var out []*Symbol
-	for _, s := range t.all {
-		if s.NS == ns && s.Kind.Folder() == folder {
-			out = append(out, s)
-		}
-	}
-	sort.Slice(out, func(i, j int) bool { return out[i].Path < out[j].Path })
-	return out
-}
 
 var validPath = regexp.MustCompile(`^[a-z0-9_.\-/]+$`)
 var validNSChars = regexp.MustCompile(`^[a-z0-9_.\-]+$`)

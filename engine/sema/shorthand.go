@@ -31,8 +31,7 @@ const (
 	tAnchor          = "::java::data::worldgen::VerticalAnchor"
 	tFullBlock       = "::java::util::block_state::FullBlockState"
 
-	tLootCondition = "::java::data::loot::condition::LootCondition"
-	// tLootConditionRef is an alias of tLootCondition used by loot tables.
+	// tLootConditionRef is the loot condition type loot tables use.
 	tLootConditionRef = "::java::data::loot::LootCondition"
 	tPredicateRef     = "::java::data::predicate::PredicateRef"
 	tPredicate        = "::java::data::predicate::Predicate"
@@ -205,8 +204,6 @@ func isNilExpr(e syntax.Expr) bool {
 	}
 	return false
 }
-
-func word(text string, sp syntax.Span) *syntax.Ident { return &syntax.Ident{Name: text, Sp: sp} }
 
 // criterionCall lowers `InventoryChanged(items = [...])` to a criterion
 // whose trigger is inventory_changed and whose conditions are the named

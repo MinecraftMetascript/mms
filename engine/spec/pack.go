@@ -91,10 +91,6 @@ func MustDefault() *Pack {
 	return p
 }
 
-// Embedded returns the raw gzipped bytes of the default pack, for hosts
-// that ship it separately (the web editor serves it as a static file).
-func Embedded() []byte { return embedded263 }
-
 // Decode reads a gzipped pack.
 func Decode(r io.Reader) (*Pack, error) {
 	zr, err := gzip.NewReader(r)
