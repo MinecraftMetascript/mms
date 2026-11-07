@@ -1,27 +1,30 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import { goto } from '$app/navigation';
-	import { search, type Entry } from './find.ts';
+	import type { Entry, Finder } from './find.ts';
 
 	// The site search: Ctrl+K or / opens it. The index is fetched the first
 	// time it opens.
 	let open = $state(false);
 	let q = $state('');
 	let active = $state(0);
-	let entries: Entry[] | undefined = $state();
+	let finder: Finder | undefined = $state();
+	let failed = $state(false);
 	let input: HTMLInputElement | undefined = $state();
 	const base = resolve('/').replace(/\/$/, '');
-	const results = $derived(entries ? search(entries, q) : []);
+	const results = $derived(finder ? finder.search(q) : []);
 
 	async function show() {
 		open = true;
 		active = 0;
 		queueMicrotask(() => input?.select());
-		if (!entries) {
+		if (!finder && !failed) {
 			try {
-				entries = await (await fetch(base + '/docs/search.json')).json();
+				// FlexSearch loads with the index, the first time search opens.
+				const [{ Finder }, entries] = await Promise.all([import('./find.ts'), fetch(base + '/docs/search.json').then((r) => r.json() as Promise<Entry[]>)]);
+				finder = new Finder(entries);
 			} catch {
-				entries = [];
+				failed = true;
 			}
 		}
 	}
@@ -79,7 +82,7 @@
 					</a>
 				</li>
 			{:else}
-				<li class="px-3 py-2 text-sm text-muted">{q.trim() ? (entries ? `Nothing matches “${q}”.` : 'Loading…') : 'Type to search.'}</li>
+				<li class="px-3 py-2 text-sm text-muted">{q.trim() ? (finder ? `Nothing matches “${q}”.` : failed ? 'Search could not load.' : 'Loading…') : 'Type to search.'}</li>
 			{/each}
 		</ul>
 	</div>

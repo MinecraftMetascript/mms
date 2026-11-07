@@ -145,14 +145,14 @@ export function render(p: Page, base: string): string {
 	return marked.parse(p.source, { async: false }) as string;
 }
 
-/** The h2 sections of a page: heading, anchor and plain text. */
+/** The h2 and h3 sections of a page: heading, anchor and plain text. */
 export function sections(p: Page): { title: string; id: string; text: string }[] {
 	const out: { title: string; id: string; text: string }[] = [];
 	let fence = false;
 	let cur: { title: string; id: string; lines: string[] } | undefined;
 	for (const line of p.source.split('\n')) {
 		if (line.startsWith('```')) fence = !fence;
-		const h = !fence && /^##\s+(.+)$/.exec(line);
+		const h = !fence && /^###?\s+(.+)$/.exec(line);
 		if (h) {
 			if (cur) out.push({ title: cur.title, id: cur.id, text: plain(cur.lines.join(' ')) });
 			cur = { title: plain(h[1]), id: slugify(h[1]), lines: [] };

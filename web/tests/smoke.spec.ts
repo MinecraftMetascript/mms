@@ -539,7 +539,15 @@ test('the docs render guides and the reference', async ({ page }) => {
 	// Search finds pages, helpers and rules from anywhere.
 	await page.keyboard.press('Control+k');
 	const search = page.getByRole('dialog', { name: 'Search the docs' });
-	await search.getByRole('searchbox').fill('setcount');
+	const box = search.getByRole('searchbox');
+	// Words of a name in any order, a typo, and a guide's sub-section.
+	await box.fill('count set');
+	await expect(search.getByRole('option').first()).toContainText('SetCount');
+	await box.fill('jigsaw hole');
+	await expect(search.getByRole('option', { name: /Jigsaw holes.*Writing resources/ })).toBeVisible();
+	await box.fill('setcuont');
+	await expect(search.getByRole('option', { name: /SetCount/ })).toBeVisible();
+	await box.fill('setcount');
 	await expect(search.getByRole('option').first()).toContainText('SetCount');
 	await page.keyboard.press('Enter');
 	await expect(page).toHaveURL(/\/docs\/reference\/helpers\/loot_function#loot_function-SetCount$/);
