@@ -232,6 +232,9 @@ type Decl struct {
 	Expects []sema.TestExpect
 	// Deps are the symbol lookups the check made (see sema.DepsHold).
 	Deps map[string]bool
+	// id is a Blueprint instance's id, which a top-level for gives each
+	// copy of one declaration.
+	id string
 
 	lints    []syntax.Diagnostic            // cached lint findings, valid for lintKey
 	extLints map[string][]syntax.Diagnostic // the same, in other files
@@ -242,6 +245,9 @@ type Decl struct {
 
 // ID returns "ns:path" for a named declaration.
 func (d *Decl) ID() string {
+	if d.id != "" {
+		return d.id
+	}
 	if d.D.Name == nil {
 		return ""
 	}

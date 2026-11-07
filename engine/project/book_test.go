@@ -324,3 +324,32 @@ func TestColorErrors(t *testing.T) {
 		t.Errorf("biome alpha: %s", d)
 	}
 }
+
+// A Book in a top-level for reads the file its own copy names, and the
+// editor lays out that file for each copy.
+func TestBookFileInLoop(t *testing.T) {
+	const src = "for d in [1, 2] {\n  Book diary_${d} {\n    title = \"Day ${d}\"\n    author = \"A\"\n    text = TextFile(\"books/day_${d}.mmsbook\")\n  }\n}\n"
+	p, r := bookProject(t, src, map[string]string{
+		"books/day_1.mmsbook": "one page",
+		"books/day_2.mmsbook": "page one\n---\npage two",
+	})
+	if d := diagText(r); d != "" {
+		t.Fatalf("diagnostics:\n%s", d)
+	}
+	pages := map[string]int{}
+	for _, d := range r.Instances {
+		if d.Item == nil || d.Item.Book == nil {
+			t.Fatalf("%s has no book layout", d.ID())
+		}
+		pages[d.ID()] = len(d.Item.Book.PageStarts)
+	}
+	if pages["demo:diary_1"] != 1 || pages["demo:diary_2"] != 2 {
+		t.Errorf("pages per copy = %v", pages)
+	}
+	// The second copy's file is a dependency of its check.
+	p.SetFile("books/day_2.mmsbook", "{key:jumpp}")
+	r, _ = p.Analyze(context.Background())
+	if ds := r.Diagnostics("books/day_2.mmsbook"); len(ds) != 1 {
+		t.Errorf("day_2 diagnostics after the edit = %+v", ds)
+	}
+}

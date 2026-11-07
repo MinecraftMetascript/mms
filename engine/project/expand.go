@@ -99,16 +99,47 @@ func (r *Result) instanceDecls(tenv *types.Env, newChecker types.Checkers) {
 		c := newChecker(ns)
 		obj := &syntax.Object{Body: inst.D.Body, Sp: inst.D.Body.Sp}
 		c.CheckType(obj, tenv.InstanceType(inst.Blueprint), inst.Blueprint.D.NameText())
+		// A Book's text is checked only here, for its layout and markup
+		// problems. They come from the values the evaluator worked out,
+		// since the body as written can hold a loop's ${...}.
+		w := c
+		if len(inst.Written) > 0 {
+			w = newChecker(ns)
+			w.Src = u.File.Src
+			body := &syntax.Block{Closed: true, Sp: inst.D.Body.Sp}
+			for _, it := range inst.D.Body.Items {
+				f, ok := it.(*syntax.FieldStmt)
+				if !ok || f.Key == nil {
+					continue
+				}
+				// A value from elsewhere, such as a const in another file,
+				// keeps the field as written: its spans are not here.
+				x := inst.Written[f.Key.Text]
+				if x == nil || !within(x.Span(), f.Sp) {
+					x = f.Value
+				}
+				body.Items = append(body.Items, &syntax.FieldStmt{Key: f.Key, KeyQuoted: f.KeyQuoted, Value: x, Sp: f.Sp})
+			}
+			w.CheckType(&syntax.Object{Body: body, Sp: body.Sp}, tenv.InstanceType(inst.Blueprint), inst.Blueprint.D.NameText())
+			for k, ok := range w.Deps {
+				if c.Deps == nil {
+					c.Deps = map[string]bool{}
+				}
+				c.Deps[k] = ok
+			}
+		}
 		d := &Decl{Unit: u, D: inst.D, NS: ns, Info: c.Info, Deps: c.Deps, Blueprint: inst.Blueprint}
+		if id, ok := inst.Self.Vals[0].(*eval.Word); ok {
+			d.id = id.Text
+		}
 		// The item stack the name stands for, if it stands for one, for
 		// an editor to list and preview.
 		if inst.Name != nil {
 			if st := c.ConvertedStack(&syntax.ResLoc{Text: d.ID(), Sp: inst.Name.Sp}); st != nil {
-				d.Item = &sema.CustomItemOut{Stack: st, Book: c.Book}
+				d.Item = &sema.CustomItemOut{Stack: st, Book: w.Book}
 			}
 		}
-		// A Book's text is checked only here: its markup problems.
-		d.Diags, d.Extern = c.BookDiags, c.Extern
+		d.Diags, d.Extern = w.BookDiags, w.Extern
 		r.Decls[inst.D] = d
 		r.Instances = append(r.Instances, d)
 	}
@@ -187,3 +218,6 @@ func (r *Result) missingFieldFixes(tenv *types.Env, kinds *sema.Kinds, source ma
 		}
 	}
 }
+
+// within reports whether span a lies inside span b.
+func within(a, b syntax.Span) bool { return a.Start >= b.Start && a.End <= b.End }

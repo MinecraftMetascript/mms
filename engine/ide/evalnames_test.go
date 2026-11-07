@@ -2,6 +2,7 @@ package ide
 
 import (
 	"context"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
@@ -169,5 +170,20 @@ func TestEvalSymbols(t *testing.T) {
 	want := "type:Size constant:amount template:twice template:shadow blueprint:Wand resource:ruby"
 	if !strings.HasPrefix(strings.Join(got, " "), want) {
 		t.Errorf("symbols = %v", got)
+	}
+}
+
+// A helper's named arguments include the fields a secondary key brings in:
+// a multi-noise source without a preset lists its biomes, also while the
+// first argument is still being typed.
+func TestCompletionSecondaryDispatchFields(t *testing.T) {
+	for _, src := range []string{
+		"Dimension d {\n  type = overworld\n  generator = Noise(settings = overworld, biome_source = MultiNoise(^))\n}\n",
+		"Dimension d {\n  type = overworld\n  generator = Noise(settings = overworld, biome_source = MultiNoise(b^))\n}\n",
+	} {
+		got := labelsAt(t, src)
+		if !slices.Contains(got, "biomes") || !slices.Contains(got, "preset") {
+			t.Errorf("%q offers %v", src, got)
+		}
 	}
 }

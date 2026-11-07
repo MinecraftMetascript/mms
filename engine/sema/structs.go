@@ -539,7 +539,29 @@ func (c *Checker) callStruct(e syntax.Expr, v tview) jsonv.Value {
 			return secondaryKey(keys, k)
 		})
 		fs = withDocs(cl.Disp.Dispatcher+"/"+cl.Case, cl.Disp.Dispatcher, fs)
-		fs = withDocs(cl.Disp.Dispatcher+"/"+cl.Case, cl.Disp.Dispatcher, fs)
+		// Completion offers the fields these keys bring in, such as a
+		// multi-noise source's biomes when it has no preset. The last
+		// positional word may be a name still being typed, MultiNoise(b|),
+		// so the fields without the key it gives are offered too.
+		ci.Fields = fs
+		if n := len(pos); n > 0 && n <= len(free) && keys[free[n-1].Key] != "" {
+			if _, word := pos[n-1].(*syntax.Ident); word {
+				typing, _ := c.fieldsWith(cl.Struct, func(k string) string {
+					if k == cl.Disp.KeyField {
+						return cl.Case
+					}
+					if k == free[n-1].Key {
+						return noneKey
+					}
+					return secondaryKey(keys, k)
+				})
+				for _, f := range typing {
+					if !hasField(ci.Fields, f.Key) {
+						ci.Fields = append(ci.Fields, f)
+					}
+				}
+			}
+		}
 	}
 	return c.buildStruct(fs, disp, cl.Case, as, name.Sp, cl.Ov, v, fixSite{call: base})
 }
