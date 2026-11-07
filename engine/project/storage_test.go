@@ -2,6 +2,7 @@ package project
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -238,5 +239,73 @@ func TestStorageDeps(t *testing.T) {
 	}
 	if !found {
 		t.Errorf("b.mms was not rechecked: %v", r.Diagnostics("b.mms"))
+	}
+}
+
+// TestStorageOptionalRecordDefaults keeps the inner defaults of a record
+// field whose type is wrapped in parentheses or marked optional.
+func TestStorageOptionalRecordDefaults(t *testing.T) {
+	src := `Type S {
+  a: ({ x: int = 5 })
+  b: { y: int = 7 }?
+}
+Storage s: S
+`
+	_, r := bookProject(t, src, nil)
+	if d := diagText(r); d != "" {
+		t.Fatal(d)
+	}
+	ld := emitted(t, r, "data/demo/function/mms_gen/load.mcfunction")
+	for _, want := range []string{
+		"s.a.x set value 5",
+		"s.b.y set value 7",
+	} {
+		if !strings.Contains(ld, want) {
+			t.Errorf("load lacks %s:\n%s", want, ld)
+		}
+	}
+}
+
+// TestStorageIncremental checks that a change to a nested field or to a
+// field's choices reaches functions that use the Storage.
+func TestStorageIncremental(t *testing.T) {
+	src := `Namespace demo
+Type S {
+  blah: { x: int }
+  mode: "a" | "b"
+}
+Storage s: S
+Function f {
+  s.blah.x = 1
+  s.mode = "b"
+}
+`
+	edits := []func(string) string{
+		func(s string) string { return strings.Replace(s, "blah: { x: int }", "blah: { x: string }", 1) },
+		func(s string) string { return strings.Replace(s, `"a" | "b"`, `"a" | "c"`, 1) },
+		func(s string) string { return strings.Replace(s, "blah: { x: string }", "blah: { x: int }", 1) },
+		func(s string) string { return strings.Replace(s, `"a" | "c"`, `"a" | "b"`, 1) },
+	}
+	describe := func(r *Result) string {
+		var sb strings.Builder
+		for _, d := range r.Diagnostics("main.mms") {
+			fmt.Fprintf(&sb, "%v %s %s\n", d.Sp, d.Code, d.Message)
+		}
+		sb.WriteString(dumpFiles(r.Emit()))
+		return sb.String()
+	}
+	p := New(spec.MustDefault(), DefaultConfig())
+	p.SetFile("main.mms", src)
+	p.Analyze(context.Background())
+	for i, edit := range edits {
+		src = edit(src)
+		p.SetFile("main.mms", src)
+		got, _ := p.Analyze(context.Background())
+		fresh := New(spec.MustDefault(), DefaultConfig())
+		fresh.SetFile("main.mms", src)
+		want, _ := fresh.Analyze(context.Background())
+		if g, w := describe(got), describe(want); g != w {
+			t.Errorf("edit %d: incremental result differs\n--- incremental\n%s\n--- fresh\n%s", i, g, w)
+		}
 	}
 }

@@ -121,7 +121,17 @@ func (c *Checker) storageDefaults(ns, loc string, t *spec.Type, decls []*syntax.
 		case c.record(f.Type) != nil && depth < 16:
 			var inner []*syntax.FieldDecl
 			if d != nil {
-				switch dt := d.Type.(type) {
+				dt := d.Type
+				for {
+					if o, ok := dt.(*syntax.TypeOptional); ok {
+						dt = o.X
+					} else if p, ok := dt.(*syntax.TypeParen); ok {
+						dt = p.X
+					} else {
+						break
+					}
+				}
+				switch dt := dt.(type) {
 				case *syntax.TypeRecord:
 					inner = dt.Fields
 				case *syntax.TypeName:
@@ -249,12 +259,29 @@ func storageSig(s *Symbol, t *Table) string {
 	if rt == nil {
 		return tn.Name
 	}
+	return tn.Name + fieldSig(rt, t, 0)
+}
+
+// fieldSig fingerprints a record's fields, following nested records and
+// listing the strings a choice field allows.
+func fieldSig(rt *spec.Type, t *Table, depth int) string {
 	var fs []string
 	for _, f := range rt.Fields {
-		fs = append(fs, f.Key+":"+storageKind(f.Type))
+		ft := f.Type
+		for i := 0; ft != nil && ft.Kind == "reference" && i < 8; i++ {
+			ft = t.Types[ft.Path]
+		}
+		sig := f.Key + ":" + storageKind(f.Type)
+		if cs := storageChoices(ft); cs != nil {
+			sig += "(" + strings.Join(cs, "|") + ")"
+		}
+		if ft != nil && ft.Kind == "struct" && depth < 16 {
+			sig += fieldSig(ft, t, depth+1)
+		}
+		fs = append(fs, sig)
 	}
 	sort.Strings(fs)
-	return tn.Name + "{" + strings.Join(fs, ",") + "}"
+	return "{" + strings.Join(fs, ",") + "}"
 }
 
 // storageField resolves `game.wave` in a function to the field's storage

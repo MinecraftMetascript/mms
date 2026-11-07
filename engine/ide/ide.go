@@ -18,6 +18,7 @@ import (
 	"github.com/minecraftmetascript/mms/engine/prelude"
 	"github.com/minecraftmetascript/mms/engine/project"
 	"github.com/minecraftmetascript/mms/engine/sema"
+	"github.com/minecraftmetascript/mms/engine/spec"
 	"github.com/minecraftmetascript/mms/engine/syntax"
 	"github.com/minecraftmetascript/mms/engine/syntax/parser"
 )
@@ -1673,12 +1674,24 @@ func (s *Session) storagePaths(id string) []string {
 		if !ok {
 			continue
 		}
-		if t := s.R.Syms.Types["::mms::"+tn.Name]; t != nil && t.Kind == "struct" {
-			for _, f := range t.Fields {
-				if f.Kind == "pair" && f.Key != "" {
-					out = append(out, name+"."+f.Key)
-				}
-			}
+		out = s.recordPaths(out, name, s.R.Syms.Types["::mms::"+tn.Name], 0)
+	}
+	return out
+}
+
+// recordPaths adds the dotted path of each field of t under name, and of
+// the fields of nested records.
+func (s *Session) recordPaths(out []string, name string, t *spec.Type, depth int) []string {
+	for i := 0; t != nil && t.Kind == "reference" && i < 8; i++ {
+		t = s.R.Syms.Types[t.Path]
+	}
+	if t == nil || t.Kind != "struct" || depth > 16 {
+		return out
+	}
+	for _, f := range t.Fields {
+		if f.Kind == "pair" && f.Key != "" {
+			out = append(out, name+"."+f.Key)
+			out = s.recordPaths(out, name+"."+f.Key, f.Type, depth+1)
 		}
 	}
 	return out
