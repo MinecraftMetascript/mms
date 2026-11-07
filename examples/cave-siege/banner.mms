@@ -6,7 +6,7 @@ Function give_banner {
 }
 
 /** Granted when a player places the Siege Banner; it runs on_place and is revoked straight away. */
-Advancement placed_banner = {
+Advancement placed_banner {
   criteria = {
     placed = PlacedBlock(
       location = MatchTool(

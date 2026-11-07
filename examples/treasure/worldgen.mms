@@ -34,7 +34,7 @@ JigsawStructure wreck {
  * state and writes the same state back, to keep the way the chest faces.
  * Properties left out, such as waterlogged, take their default values.
  */
-ProcessorList wreck_loot = {
+ProcessorList wreck_loot {
   processors = [
     Rule(
       [

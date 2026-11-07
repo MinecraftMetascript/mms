@@ -7,7 +7,7 @@ import (
 
 // tell, title and actionbar write their message as a text component.
 func TestTextCommands(t *testing.T) {
-	src := `Objective kills = "dummy"
+	src := `Objective kills: dummy
 Global wave = 1
 const welcome: Text = "Welcome, ${@s}!"
 Template wave_start(n: any): Text = "{red}Wave ${n}{/} begins"

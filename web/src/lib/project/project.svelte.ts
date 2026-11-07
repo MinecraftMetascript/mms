@@ -45,7 +45,7 @@ export const starter: ProjectData = {
 			text: `// Welcome to MMS. Declarations here become data pack files; the
 // preview on the right renders noises and density functions.
 
-Noise hills = {
+Noise hills {
   base_octave = -6
   amplitude_modifiers = [1, 1, 0.5]
 }

@@ -16,31 +16,31 @@
 // is never sky and the bedrock layers are never breached.
 
 /** Cheese caves. About 130 blocks across, flattened in y. */
-Noise cave_cheese = {
+Noise cave_cheese {
   base_octave = -7
   amplitude_modifiers = [1, 0.6, 0.3, 0.15]
 }
 
 /** Where the big chambers are: a flat 2D field, about 500 blocks across. */
-Noise chamber_field = {
+Noise chamber_field {
   base_octave = -9
   amplitude_modifiers = [1, 0.5]
 }
 
 /** Where tunnels run: along the lines where this noise is 0. */
-Noise tunnel_path = {
+Noise tunnel_path {
   base_octave = -7
   amplitude_modifiers = [1, 0.5]
 }
 
 /** How far a tunnel's floor rises and falls along its length. */
-Noise tunnel_height = {
+Noise tunnel_height {
   base_octave = -7
   amplitude_modifiers = [1]
 }
 
 /** Small bumps on every wall, so caves don't look smooth. */
-Noise wall_roughness = {
+Noise wall_roughness {
   base_octave = -4
   amplitude_modifiers = [1, 0.5]
 }

@@ -45,13 +45,13 @@ func TestAssetPathCompletion(t *testing.T) {
 		want      []string
 		text      string // the text the item replaces
 	}{
-		{"empty string", `PaintingVariant p = { width = 1, height = 1, asset_id = Texture("|") }`, pngs, ""},
-		{"partial", `PaintingVariant p = { width = 1, height = 1, asset_id = Texture("art/su|nset.png") }`, pngs, "art/sunset.png"},
-		{"unterminated", "PaintingVariant p = { width = 1, height = 1, asset_id = Texture(\"art/|\n", pngs, "art/"},
-		{"sound", `JukeboxSong s = { sound_event = Sound("|"), description = "x", length_in_seconds = 1, comparator_output = 1 }`, []string{"music/tune.ogg"}, ""},
-		{"structure", `Function f { /say hi }` + "\nTemplatePool p = { fallback = minecraft:empty, elements = [{ weight = 1, element = { element_type = minecraft:single_pool_element, location = StructureFile(\"|\"), projection = rigid, processors = minecraft:empty } }] }", []string{"builds/house.nbt"}, ""},
-		{"second argument", `PaintingVariant p = { width = 1, height = 1, asset_id = Texture("art/sunset.png", "|") }`, nil, ""},
-		{"other call", `Advancement a = { criteria = { x = { trigger = minecraft:impossible } }, display = { title = Text("|") } }`, nil, ""},
+		{"empty string", `PaintingVariant p { width = 1, height = 1, asset_id = Texture("|") }`, pngs, ""},
+		{"partial", `PaintingVariant p { width = 1, height = 1, asset_id = Texture("art/su|nset.png") }`, pngs, "art/sunset.png"},
+		{"unterminated", "PaintingVariant p { width = 1, height = 1, asset_id = Texture(\"art/|\n", pngs, "art/"},
+		{"sound", `JukeboxSong s { sound_event = Sound("|"), description = "x", length_in_seconds = 1, comparator_output = 1 }`, []string{"music/tune.ogg"}, ""},
+		{"structure", `Function f { /say hi }` + "\nTemplatePool p { fallback = minecraft:empty, elements = [{ weight = 1, element = { element_type = minecraft:single_pool_element, location = StructureFile(\"|\"), projection = rigid, processors = minecraft:empty } }] }", []string{"builds/house.nbt"}, ""},
+		{"second argument", `PaintingVariant p { width = 1, height = 1, asset_id = Texture("art/sunset.png", "|") }`, nil, ""},
+		{"other call", `Advancement a { criteria = { x = { trigger = minecraft:impossible } }, display = { title = Text("|") } }`, nil, ""},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -85,9 +85,9 @@ func TestTriggerApplies(t *testing.T) {
 		src, ch string
 		want    bool
 	}{
-		{`PaintingVariant p = { width = 1, height = 1, asset_id = Texture("|") }`, `"`, true},
-		{"PaintingVariant p = { width = 1, height = 1, asset_id = Texture(\"art/|\n", "/", true},
-		{`Advancement a = { display = { title = "|" } }`, `"`, false},
+		{`PaintingVariant p { width = 1, height = 1, asset_id = Texture("|") }`, `"`, true},
+		{"PaintingVariant p { width = 1, height = 1, asset_id = Texture(\"art/|\n", "/", true},
+		{`Advancement a { display = { title = "|" } }`, `"`, false},
 		{"Function f {\n  /|\n}", "/", true},
 		{"Global g = 4 /| 2", "/", false},
 		{"Global g = 4 .| 2", ".", true},

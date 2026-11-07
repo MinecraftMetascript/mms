@@ -85,7 +85,7 @@ func TestSession(t *testing.T) {
 		t.Fatal("no semantic tokens capability")
 	}
 	c.notify("initialized", map[string]any{})
-	src := "Noise ridges = { base_octave = -1, amplitude_modifiers = [1] }\nDensityFunction x = Clamp(Noise(ridges, 1, 1), 0, 1)\nDensityFunction y = Clmp(1, 0, 1)\n"
+	src := "Noise ridges { base_octave = -1, amplitude_modifiers = [1] }\nDensityFunction x = Clamp(Noise(ridges, 1, 1), 0, 1)\nDensityFunction y = Clmp(1, 0, 1)\n"
 	c.notify("textDocument/didOpen", map[string]any{"textDocument": map[string]any{"uri": uri, "languageId": "mms", "version": 1, "text": src}})
 
 	// Diagnostics arrive before the next response.
@@ -232,7 +232,7 @@ func TestSetAssets(t *testing.T) {
 	c.result("initialize", map[string]any{})
 	a := "mem:///a.mms"
 	c.notify("mms/setFiles", map[string]any{"files": []any{
-		map[string]any{"uri": a, "text": "PaintingVariant p = { width = 1, height = 1, asset_id = Texture(\"art/p.png\") }\n"},
+		map[string]any{"uri": a, "text": "PaintingVariant p { width = 1, height = 1, asset_id = Texture(\"art/p.png\") }\n"},
 	}})
 	assets := func() []any {
 		out := c.result("mms/output", map[string]any{}).(map[string]any)
@@ -285,7 +285,7 @@ func TestImportPack(t *testing.T) {
 		t.Errorf("empty import = %v", empty)
 	}
 	c.notify("textDocument/didOpen", map[string]any{"textDocument": map[string]any{"uri": "file:///a.mms", "languageId": "mms", "version": 1,
-		"text": "Namespace gems\nNoise ridge = { base_octave = -1, amplitude_modifiers = [1] }\n"}})
+		"text": "Namespace gems\nNoise ridge { base_octave = -1, amplitude_modifiers = [1] }\n"}})
 	conv := c.result("mms/convertJSON", map[string]any{"uri": "file:///a.mms", "kind": "DensityFunction", "name": "hill",
 		"text": `{"type":"minecraft:noise","noise":"minecraft:ridge","xz_scale":1,"y_scale":1}`}).(map[string]any)
 	// minecraft:ridge keeps its prefix: the file declares a ridge noise.
@@ -309,7 +309,7 @@ func TestCodeActions(t *testing.T) {
 	c.result("initialize", map[string]any{})
 	c.notify("initialized", map[string]any{})
 	uri := "file:///a.mms"
-	src := "LootTable t = { pools = [{ rolls = 1, entries = [{ type = \"minecraft:item\", name = minecraft:diamond }] }] }\n"
+	src := "LootTable t { pools = [{ rolls = 1, entries = [{ type = \"minecraft:item\", name = minecraft:diamond }] }] }\n"
 	c.notify("textDocument/didOpen", map[string]any{"textDocument": map[string]any{"uri": uri, "languageId": "mms", "version": 1, "text": src}})
 	rng := func(a, b int) map[string]any {
 		return map[string]any{"start": map[string]any{"line": 0, "character": a}, "end": map[string]any{"line": 0, "character": b}}
@@ -328,7 +328,7 @@ func TestCodeActions(t *testing.T) {
 		t.Fatalf("fix all = %v", all)
 	}
 	edit := all[0].(map[string]any)["edit"].(map[string]any)["changes"].(map[string]any)[uri].([]any)[0].(map[string]any)
-	if want := "LootTable t = { pools = [{ rolls = 1, entries = [diamond] }] }\n"; edit["newText"] != want {
+	if want := "LootTable t { pools = [{ rolls = 1, entries = [diamond] }] }\n"; edit["newText"] != want {
 		t.Errorf("fix all text = %q", edit["newText"])
 	}
 }
@@ -520,7 +520,7 @@ func TestAssetPathCompletion(t *testing.T) {
 		}
 		return out
 	}
-	const text = "PaintingVariant p = { width = 1, height = 1, asset_id = Texture(\"\") }\n"
+	const text = "PaintingVariant p { width = 1, height = 1, asset_id = Texture(\"\") }\n"
 	at := strings.Index(text, `""`) + 1
 	withTrigger := func(uri, ch string) map[string]any {
 		p := pos(uri, 0, at)
@@ -579,7 +579,7 @@ func TestKindCompletionRange(t *testing.T) {
 	c := start(t)
 	c.result("initialize", map[string]any{})
 	a := "mem:///a.mms"
-	c.notify("mms/setFiles", map[string]any{"files": []any{map[string]any{"uri": a, "text": "Feature f = {}\nFe"}}})
+	c.notify("mms/setFiles", map[string]any{"files": []any{map[string]any{"uri": a, "text": "Feature f {}\nFe"}}})
 	res := c.result("textDocument/completion", pos(a, 1, 2)).(map[string]any)
 	for _, it := range res["items"].([]any) {
 		m := it.(map[string]any)
@@ -701,7 +701,7 @@ func TestExtractAction(t *testing.T) {
 		t.Errorf("action = %v", a)
 	}
 	edits := a["edit"].(map[string]any)["changes"].(map[string]any)[uri].([]any)
-	if got := edits[0].(map[string]any)["newText"]; got != "Noise hills_noise = { base_octave = -6, amplitude_modifiers = [1] }\n\n" {
+	if got := edits[0].(map[string]any)["newText"]; got != "Noise hills_noise { base_octave = -6, amplitude_modifiers = [1] }\n\n" {
 		t.Errorf("declaration = %q", got)
 	}
 	if got := edits[1].(map[string]any)["newText"]; got != "hills_noise" {
@@ -730,7 +730,7 @@ func TestOutputStructureJigsaws(t *testing.T) {
 	}
 	c.notify("mms/setAssets", map[string]any{"files": []any{map[string]any{"path": "s/hall.nbt", "data": data}}})
 	c.notify("mms/setFiles", map[string]any{"files": []any{
-		map[string]any{"uri": "mem:///a.mms", "text": "TemplatePool rooms = { fallback = minecraft:empty, elements = [{ weight = 1, element = { element_type = minecraft:single_pool_element, location = StructureFile(\"s/hall.nbt\"), projection = rigid, processors = minecraft:empty } }] }\n"},
+		map[string]any{"uri": "mem:///a.mms", "text": "TemplatePool rooms { fallback = minecraft:empty, elements = [{ weight = 1, element = { element_type = minecraft:single_pool_element, location = StructureFile(\"s/hall.nbt\"), projection = rigid, processors = minecraft:empty } }] }\n"},
 	}})
 	out := c.result("mms/output", map[string]any{}).(map[string]any)
 	assets := out["assets"].([]any)
@@ -780,7 +780,7 @@ func TestUnusedAssetDiagnostics(t *testing.T) {
 	if out := c.result("mms/output", map[string]any{"uri": m}).(map[string]any); fmt.Sprint(out["unusedAssets"]) != "[art/p.png]" {
 		t.Errorf("unusedAssets = %v", out["unusedAssets"])
 	}
-	src := "PaintingVariant p = { width = 1, height = 1, asset_id = Texture(\"art/p.png\") }\n"
+	src := "PaintingVariant p { width = 1, height = 1, asset_id = Texture(\"art/p.png\") }\n"
 	c.notify("textDocument/didChange", map[string]any{"textDocument": map[string]any{"uri": m, "version": 2}, "contentChanges": []any{map[string]any{"text": src}}})
 	if got := last(); len(got) != 0 {
 		t.Errorf("still reported once used: %v", got)

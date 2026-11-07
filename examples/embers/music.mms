@@ -3,7 +3,7 @@
 // stands for is what sound_event needs.
 
 /** The song the Embers disc plays in a jukebox. */
-JukeboxSong embers = {
+JukeboxSong embers {
   sound_event = Sound("sounds/embers.ogg")
   description = { translate = "jukebox_song.embers.embers" }
   length_in_seconds = 8

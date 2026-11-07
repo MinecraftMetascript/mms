@@ -6,7 +6,7 @@
 // the same markup without pages; a .mmstext file holds it.
 
 /** How many times the reader has died, for the guide to show. */
-Objective deaths = "deathCount"
+Objective deaths: deathCount
 
 /** Given to every player the first time they join. */
 Book guide {

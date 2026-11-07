@@ -15,7 +15,7 @@ import (
 func benchSource() string {
 	var sb strings.Builder
 	for i := 0; sb.Len() == 0 || strings.Count(sb.String(), "\n") < 2000; i++ {
-		fmt.Fprintf(&sb, `Noise n%[1]d = {
+		fmt.Fprintf(&sb, `Noise n%[1]d {
   base_octave = -7
   amplitude_modifiers = [1, 1, 0.5]
 }

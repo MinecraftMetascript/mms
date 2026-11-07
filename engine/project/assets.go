@@ -181,7 +181,7 @@ func lintExternalAsset(l *lintRun) {
 				if ns == l.r.cfg.Namespace {
 					_, name, _ = strings.Cut(in.ID, ":")
 				}
-				msg += fmt.Sprintf(", or be declared here: %s %s = { ... }", k, name)
+				msg += fmt.Sprintf(", or be declared here: %s %s { ... }", k, name)
 			}
 			hits = append(hits, hit{n.Span(), msg})
 		}

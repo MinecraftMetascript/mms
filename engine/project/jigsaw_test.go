@@ -39,7 +39,7 @@ func pool(name string, locations ...string) string {
 	for _, l := range locations {
 		els = append(els, `{ weight = 1, element = { element_type = "minecraft:single_pool_element", location = `+l+`, projection = "rigid", processors = "minecraft:empty" } }`)
 	}
-	return "TemplatePool " + name + " = {\n  fallback = minecraft:empty\n  elements = [" + strings.Join(els, ", ") + "]\n}\n"
+	return "TemplatePool " + name + " {\n  fallback = minecraft:empty\n  elements = [" + strings.Join(els, ", ") + "]\n}\n"
 }
 
 func jigsawDiags(r *Result) string {
@@ -195,8 +195,8 @@ func TestJigsawFitArch(t *testing.T) {
 // structure with different processors can be told apart.
 func TestPoolElementLabels(t *testing.T) {
 	files := fstest.MapFS{"art/icon.png": {Data: pngBytes}, "s/cap.nbt": {Data: piece(t)}}
-	src := `ProcessorList worn = { processors = [] }
-TemplatePool caps = {
+	src := `ProcessorList worn { processors = [] }
+TemplatePool caps {
   fallback = minecraft:empty
   elements = [
     { weight = 5, element = { element_type = minecraft:single_pool_element, location = StructureFile("s/cap.nbt", "cap"), projection = rigid, processors = minecraft:empty } },
@@ -252,9 +252,9 @@ func TestJigsawOverlapNarrowJunction(t *testing.T) {
 		return `{ weight = 1, element = { element_type = minecraft:single_pool_element, location = ` + loc + `, projection = rigid, processors = minecraft:empty } }`
 	}
 	src := func(tee string) string {
-		return "TemplatePool roads = {\n  fallback = caps\n  elements = [" + el(`StructureFile("s/straight.nbt", "straight")`) + ", " + el(`StructureFile("s/`+tee+`.nbt", "`+tee+`")`) + "]\n}\n" +
-			"TemplatePool straights = {\n  fallback = caps\n  elements = [" + el(`StructureFile("s/straight.nbt", "straight")`) + "]\n}\n" +
-			"TemplatePool caps = {\n  fallback = minecraft:empty\n  elements = [" + el(`StructureFile("s/cap.nbt", "cap")`) + "]\n}\n"
+		return "TemplatePool roads {\n  fallback = caps\n  elements = [" + el(`StructureFile("s/straight.nbt", "straight")`) + ", " + el(`StructureFile("s/`+tee+`.nbt", "`+tee+`")`) + "]\n}\n" +
+			"TemplatePool straights {\n  fallback = caps\n  elements = [" + el(`StructureFile("s/straight.nbt", "straight")`) + "]\n}\n" +
+			"TemplatePool caps {\n  fallback = minecraft:empty\n  elements = [" + el(`StructureFile("s/cap.nbt", "cap")`) + "]\n}\n"
 	}
 	files := fstest.MapFS{
 		"s/straight.nbt": {Data: orientedPiece(t, [3]int32{7, 6, 7}, road(0, 0, 3, "west"), road(6, 0, 3, "east"))},

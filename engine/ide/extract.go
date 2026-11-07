@@ -63,7 +63,7 @@ func (s *Session) declExtractions(path string, from, to int) []Extraction {
 			body = reindent(src, r.Body.Sp)
 		}
 		head := in.Extract + " " + name + " = "
-		if in.InlineFn {
+		if _, obj := e.(*syntax.Object); obj || in.InlineFn {
 			head = in.Extract + " " + name + " "
 		}
 		out = append(out, Extraction{

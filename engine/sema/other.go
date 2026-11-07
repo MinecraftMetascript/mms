@@ -13,7 +13,11 @@ import (
 // tag's registry. Declarations of the same tag are merged by the emitter.
 func (c *Checker) Tag(d *syntax.Decl, k Kind) (values jsonv.Array, replace bool) {
 	var elems []syntax.Expr
-	switch x := d.Value.(type) {
+	value := d.Value
+	if d.Body != nil {
+		value = &syntax.Object{Body: d.Body, Sp: d.Body.Sp}
+	}
+	switch x := value.(type) {
 	case *syntax.List:
 		elems = x.Elems
 	case *syntax.Object:

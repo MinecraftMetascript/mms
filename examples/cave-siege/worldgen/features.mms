@@ -100,7 +100,7 @@ Feature verdant_crystals = RandomNeighborSpread(
  * Glowstone under the roof of a chamber: picks heights between the floor
  * and the roof, then scans up to the ceiling above.
  */
-PlacedFeature roof_glowstone = {
+PlacedFeature roof_glowstone {
   feature = glowstone_cluster
   placement = [
     Count(Uniform(4, 8)),
@@ -118,7 +118,7 @@ PlacedFeature roof_glowstone = {
 }
 
 /** Fewer clusters, for biomes that only need some light. */
-PlacedFeature roof_glowstone_sparse = {
+PlacedFeature roof_glowstone_sparse {
   feature = glowstone_cluster
   placement = [
     Count(Uniform(1, 3)),
@@ -136,7 +136,7 @@ PlacedFeature roof_glowstone_sparse = {
 }
 
 /** Glow caps on every floor, a few per chunk. */
-PlacedFeature glow_caps = {
+PlacedFeature glow_caps {
   feature = glow_cap
   placement = [
     CountOnEveryLayer(2),
@@ -150,7 +150,7 @@ PlacedFeature glow_caps = {
   ]
 }
 
-PlacedFeature ochre_crystals = {
+PlacedFeature ochre_crystals {
   feature = ochre_crystals
   placement = [
     RarityFilter(2),
@@ -167,7 +167,7 @@ PlacedFeature ochre_crystals = {
   ]
 }
 
-PlacedFeature verdant_crystals = {
+PlacedFeature verdant_crystals {
   feature = verdant_crystals
   placement = [
     Count(2),
@@ -189,7 +189,7 @@ PlacedFeature verdant_crystals = {
  * clusters under its roof. FixedPlacement only places in the chunk being
  * decorated, so every biome can list this and it runs once.
  */
-PlacedFeature starter_lights = {
+PlacedFeature starter_lights {
   feature = glowstone_cluster
   placement = [
     FixedPlacement([[0, 40, 0], [18, 40, 8], [-16, 40, -10], [10, 40, -18], [-12, 40, 16]]),
@@ -206,7 +206,7 @@ PlacedFeature starter_lights = {
 // ---- Plants ----------------------------------------------------------------
 
 /** Grass on every lit floor. */
-PlacedFeature floor_grass = {
+PlacedFeature floor_grass {
   feature = minecraft:grass
   placement = [
     CountOnEveryLayer(12),
@@ -217,7 +217,7 @@ PlacedFeature floor_grass = {
   ]
 }
 
-PlacedFeature floor_tall_grass = {
+PlacedFeature floor_tall_grass {
   feature = minecraft:tall_grass
   placement = [
     CountOnEveryLayer(2),
@@ -228,7 +228,7 @@ PlacedFeature floor_tall_grass = {
   ]
 }
 
-PlacedFeature floor_flowers = {
+PlacedFeature floor_flowers {
   feature = minecraft:flower_default
   placement = [
     CountOnEveryLayer(2),
@@ -239,7 +239,7 @@ PlacedFeature floor_flowers = {
   ]
 }
 
-PlacedFeature floor_pumpkins = {
+PlacedFeature floor_pumpkins {
   feature = minecraft:pumpkin
   placement = [
     RarityFilter(4),
@@ -256,7 +256,7 @@ PlacedFeature floor_pumpkins = {
   ]
 }
 
-PlacedFeature floor_melons = {
+PlacedFeature floor_melons {
   feature = minecraft:melon
   placement = [
     RarityFilter(3),
@@ -274,7 +274,7 @@ PlacedFeature floor_melons = {
 }
 
 /** Sugar cane on lake shores. WouldSurvive checks for water next to the block below. */
-PlacedFeature shore_sugar_cane = {
+PlacedFeature shore_sugar_cane {
   feature = minecraft:sugar_cane
   placement = [
     CountOnEveryLayer(8),
@@ -285,7 +285,7 @@ PlacedFeature shore_sugar_cane = {
   ]
 }
 
-PlacedFeature lake_kelp = {
+PlacedFeature lake_kelp {
   feature = minecraft:kelp
   placement = [
     CountOnEveryLayer(4),
@@ -296,7 +296,7 @@ PlacedFeature lake_kelp = {
   ]
 }
 
-PlacedFeature floor_mushrooms = {
+PlacedFeature floor_mushrooms {
   feature = minecraft:brown_mushroom
   placement = [
     CountOnEveryLayer(2),
@@ -309,7 +309,7 @@ PlacedFeature floor_mushrooms = {
   ]
 }
 
-PlacedFeature floor_red_mushrooms = {
+PlacedFeature floor_red_mushrooms {
   feature = minecraft:red_mushroom
   placement = [
     CountOnEveryLayer(1),
@@ -320,7 +320,7 @@ PlacedFeature floor_red_mushrooms = {
   ]
 }
 
-PlacedFeature huge_mushrooms = {
+PlacedFeature huge_mushrooms {
   feature = minecraft:mushroom_island_vegetation
   placement = [
     CountOnEveryLayer(1),
@@ -329,7 +329,7 @@ PlacedFeature huge_mushrooms = {
   ]
 }
 
-PlacedFeature floor_bamboo = {
+PlacedFeature floor_bamboo {
   feature = minecraft:bamboo_no_podzol
   placement = [
     RarityFilter(2),
@@ -398,7 +398,7 @@ Feature darkroot_trees = RandomSelector(
   },
 )
 
-PlacedFeature rootwood_trees = {
+PlacedFeature rootwood_trees {
   feature = rootwood_trees
   placement = [
     CountOnEveryLayer(3),
@@ -407,7 +407,7 @@ PlacedFeature rootwood_trees = {
   ]
 }
 
-PlacedFeature darkroot_trees = {
+PlacedFeature darkroot_trees {
   feature = darkroot_trees
   placement = [
     CountOnEveryLayer(4),
@@ -427,7 +427,7 @@ Feature water_lake = Lake(
 )
 
 /** Finds a floor below a random height, then digs a lake into it. */
-PlacedFeature water_lakes = {
+PlacedFeature water_lakes {
   feature = water_lake
   placement = [
     Count(3),
@@ -444,7 +444,7 @@ PlacedFeature water_lakes = {
 }
 
 /** Shallow lava pools, for early obsidian. */
-PlacedFeature lava_lakes = {
+PlacedFeature lava_lakes {
   feature = minecraft:lake_lava
   placement = [
     Count(2),
