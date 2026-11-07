@@ -701,7 +701,9 @@ func objective(c *sema.Checker, d *syntax.Decl) []string {
 		return nil
 	}
 	criterion := "dummy"
-	if d.Type != nil {
+	if ts, ok := d.Type.(*syntax.TypeString); ok {
+		criterion = ts.Value
+	} else if d.Type != nil {
 		criterion = syntax.TypeText(d.Type)
 	}
 	switch v := d.Value.(type) {

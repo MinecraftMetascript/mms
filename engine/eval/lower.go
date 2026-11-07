@@ -77,8 +77,12 @@ func (c *ctx) recordBlock(r *Record) *syntax.Block {
 			continue
 		}
 		x := c.lower(r.Vals[i])
-		b.Items = append(b.Items, &syntax.FieldStmt{Key: &syntax.Name{Text: k, Sp: r.Sp}, KeyQuoted: !keyRe.MatchString(k),
-			Value: x, Sp: r.Sp})
+		keySp, sp := r.Sp, r.Sp
+		if at, ok := r.keySp[k]; ok {
+			keySp, sp = at[0], at[1]
+		}
+		b.Items = append(b.Items, &syntax.FieldStmt{Key: &syntax.Name{Text: k, Sp: keySp}, KeyQuoted: !keyRe.MatchString(k),
+			Value: x, Sp: sp})
 	}
 	return b
 }

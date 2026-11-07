@@ -417,6 +417,10 @@ func (c *ctx) object(x *syntax.Object) Value {
 				key, _ = c.interp(key, it.Key.Sp)
 			}
 			r.set(key, c.reduce(it.Value))
+			if r.keySp == nil {
+				r.keySp = map[string][2]syntax.Span{}
+			}
+			r.keySp[key] = [2]syntax.Span{c.span(it.Key.Sp), c.span(it.Sp)}
 		case *syntax.ExprStmt:
 			v := c.reduce(it.X.(*syntax.Spread).X)
 			switch v := v.(type) {

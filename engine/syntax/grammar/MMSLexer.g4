@@ -66,7 +66,9 @@ RESLOC
 // A templated name: a name or resource location with `${...}` pieces, as
 // in `${w}_crate` or `item/${self.path}`. Only declaration names and name
 // expressions use it; strings and commands have their own interpolation.
-TNAME : TNAME_CHAR* INTERP (TNAME_CHAR | INTERP)*;
+// It never ends in ':', so `Objective kills_${w}: ...` is a name and a
+// colon.
+TNAME : TNAME_CHAR* INTERP ((TNAME_CHAR | INTERP)* (TNAME_END | INTERP))?;
 
 IDENT  : IDENT_START IDENT_CHAR*;
 NUMBER : DIGIT+ ('.' DIGIT+)? ([eE] [+-]? DIGIT+)?;
@@ -122,5 +124,6 @@ fragment NS_CHAR     : [a-z0-9_.-];
 fragment PATH_CHAR   : [a-z0-9_./-];
 fragment DIGIT       : [0-9];
 fragment TNAME_CHAR  : [a-zA-Z0-9_./:-];
+fragment TNAME_END   : [a-zA-Z0-9_./-];
 fragment INTERP      : '${' ~[}\r\n]* '}';
 fragment ESC         : '\\' .;

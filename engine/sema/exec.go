@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/minecraftmetascript/mms/engine/fn"
+	"github.com/minecraftmetascript/mms/engine/format"
 	"github.com/minecraftmetascript/mms/engine/syntax"
 )
 
@@ -260,8 +261,7 @@ func (f *fc) execParts(e syntax.Expr) (parts []string, ok bool) {
 				ok = false
 				continue
 			default:
-				sp := a.Value.Span()
-				ea.text = string(f.src[sp.Start:sp.End])
+				ea.text, verbatim = f.argText(a.Value)
 				switch x := a.Value.(type) {
 				case *syntax.Selector:
 					ea.selector = true
@@ -427,3 +427,23 @@ func (c *Checker) ExecArgCandidates(name string, index int) []Candidate {
 
 // ExecHelper looks up an execute helper by name.
 func ExecHelperNamed(name string) *ExecHelper { return execByName[name] }
+
+// argText is an execute helper argument as the command takes it. It is
+// the source as written when that is what the evaluator kept; a loop's
+// or a Template's ${...} filled in, or code a Template wrote at its call,
+// is written out from the value instead.
+func (f *fc) argText(e syntax.Expr) (text string, verbatim bool) {
+	out := selectorText(e)
+	if out == "" {
+		out = format.Expr(e)
+	}
+	sp := e.Span()
+	if sp.Start < 0 || sp.End > len(f.src) || sp.Start > sp.End {
+		return out, false
+	}
+	src := string(f.src[sp.Start:sp.End])
+	if x, diags := syntax.ParseExpr(src, 0); len(diags) == 0 && format.Expr(x) == format.Expr(e) {
+		return src, true
+	}
+	return out, false
+}

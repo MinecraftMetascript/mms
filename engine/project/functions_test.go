@@ -671,3 +671,55 @@ Function run {
 		t.Errorf("said %q, want %q", got, "a\nbc\td")
 	}
 }
+
+// Execute helpers and objectives take what a loop or a Template filled
+// in, not the source as written.
+func TestExecuteHelpersInLoopsAndTemplates(t *testing.T) {
+	p := New(spec.MustDefault(), Config{Namespace: "demo"})
+	p.SetFile("main.mms", `
+const woods = ["oak", "birch"]
+
+Objective plain: "dummy"
+
+for w in woods {
+  Objective chop_${w}: "minecraft.mined:minecraft.${w}_log"
+}
+
+Template greet(who: string): Commands {
+  As(@e[tag=${who}]) {
+    /say hi
+  }
+}
+
+Function f {
+  for w in woods {
+    As(@a[scores={ "chop_${w}" = 1.. }]).At(@e[tag=${w}, limit=1]) {
+      /say ${w}
+    }
+  }
+  greet("guest")
+}
+`)
+	r, _ := p.Analyze(context.Background())
+	for _, d := range r.Diagnostics("main.mms") {
+		if d.Severity == syntax.SeverityError {
+			t.Fatalf("%s: %s", d.Code, d.Message)
+		}
+	}
+	got := dumpFiles(r.Emit())
+	for _, want := range []string{
+		"scoreboard objectives add plain dummy\n",
+		"scoreboard objectives add chop_oak minecraft.mined:minecraft.oak_log\n",
+		"scoreboard objectives add chop_birch minecraft.mined:minecraft.birch_log\n",
+		"execute as @a[scores={chop_oak=1..}] at @e[tag=oak,limit=1] run say oak\n",
+		"execute as @a[scores={chop_birch=1..}] at @e[tag=birch,limit=1] run say birch\n",
+		"execute as @e[tag=guest] run say hi\n",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("missing %q in:\n%s", want, got)
+		}
+	}
+	if strings.Contains(got, "${") {
+		t.Errorf("a ${...} was written as is:\n%s", got)
+	}
+}
