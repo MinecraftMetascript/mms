@@ -60,7 +60,6 @@ func DefaultConfig() Config {
 	return Config{Namespace: "mms", Description: "Built with MMS", Output: "build"}
 }
 
-
 // Validate reports a problem with the config, or nil.
 func (c Config) Validate() error {
 	if !sema.ValidNamespace(c.Namespace) {
