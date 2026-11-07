@@ -22,7 +22,6 @@ export interface ProjectMeta {
 
 const indexKey = 'mms-projects';
 const lastKey = 'mms-current';
-const legacyKey = 'mms-project';
 const dataKey = (id: string) => `mms-project:${id}`;
 // This tab's project, so a reload reopens it even if another tab switched.
 const tabKey = 'mms-tab-project';
@@ -42,20 +41,9 @@ export const newId = () =>
 		? crypto.randomUUID()
 		: Date.now().toString(36) + Math.random().toString(36).slice(2);
 
-/** All saved projects, most recently saved first. Moves a pre-index save over. */
+/** All saved projects, most recently saved first. */
 export async function listProjects(): Promise<ProjectMeta[]> {
-	let list = await get<ProjectMeta[]>(indexKey);
-	if (!list) {
-		list = [];
-		const legacy = await get<ProjectData>(legacyKey);
-		if (legacy?.files?.length) {
-			const id = newId();
-			await saveProject(id, legacy);
-			await set(lastKey, id);
-			await del(legacyKey);
-			list = (await get<ProjectMeta[]>(indexKey)) ?? [];
-		}
-	}
+	const list = (await get<ProjectMeta[]>(indexKey)) ?? [];
 	return [...list].sort((a, b) => b.updated - a.updated);
 }
 

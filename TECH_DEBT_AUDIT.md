@@ -42,6 +42,42 @@ Two places where this differs from the docs:
 | `madge --circular` | web: 2 cycles, both type-only (`import type`). preview: cycles only inside vendored cmdlib |
 | `knip`, `depcheck` | not run; unused dependencies were checked by hand (none found apart from F86) |
 
+## Status after the fix pass
+
+The same pull request then fixed most of these. What is left needs a decision from the maintainer or is a larger piece of work.
+
+**Resolved:** F01 to F19, F23, F31 to F34, F36 to F38, F43, F47, F49, F52 to F59, F67 to F70, F73, F76, F80, F82, F84 to F88 and F90.
+
+**Partly resolved:**
+
+- F24: the World and Structures views no longer redraw while they are hidden, and structure hashes are cached. `level.dat` is still read on each visible redraw.
+- F66: the pre-index project migration and the scaffold `index.ts` are gone. The old docs redirects stay until Q6 is answered.
+- F72: the fuzz test no longer excuses Reparse/Parse differences, and the whitespace test checks Reparse on every layout. Whitespace-removal variants (`total/2`, `a:int`) are still missing.
+- F81: VS Code is on TypeScript 6.0.3 like the other packages. The pinning policy and a root workspace wait on Q8.
+- F83: lint.md now links to the generated rule reference. Whether Blueprint hints can be configured waits on Q3.
+
+**Waiting on a decision:** F35 (Q3), F40 and F41 (Q9), F42 (Q7), F44 (Q1), F51 (Q2), F60 and F22 (Q4).
+
+**Deferred as larger work (M or L effort):** the editor hot-path items F20, F21, F22 and F25 to F29; the typed `mms/*` protocol F30; F39, F45, F46, F48, F50, F71, F74, F75 and F89; and the god files F61 to F65.
+
+**Bugs found and fixed while rewriting the examples:**
+
+- A Book inside a top-level `for` read `TextFile("books/day_${d}.mmsbook")` literally, and every copy shared one id.
+- A templated name swallowed a following colon, so `Objective chop_${w}: ...` did not parse.
+- An Objective's string criterion kept its quotes, and a loop's `${...}` in it was never filled in.
+- Execute helper arguments were copied from the source text, so `@a[tag=${w}]` kept its `${w}`.
+- A Template or Blueprint copied score holders from the call site, so `coins[@s]` in an emitted function wrote the item's name.
+- Selector words were evaluated as expressions, so the `waves` in `@e[tag=waves.spawn]` became the const of that name.
+- A record checked against a project `Type` did not get the defaults of the fields it left out.
+- Text could not show a Storage field outside a function.
+- The test interpreter shared one `@s` among all entities. It had no `title` or `give`, and it treated a failing `return run` as an error.
+- A failed `expect` said `x is 0` for a score that had never been set.
+- In the editor:
+  - Completion missed fields from a secondary dispatch key (`MultiNoise(|)`).
+  - Completion offered the wrong keys inside an evaluated object.
+  - Completion worked only at statement starts inside an OnAdvancement trigger block.
+- `TestWhitespaceAgnostic` failed on a command value (`let n = /...`), which must stay on the line of its `=`.
+
 ## Findings
 
 Severity: **Critical** is a bug that loses data, miscompiles or is exploitable now. **High** is a real bug or a large cost on the editor hot path. **Medium** raises the cost of change or causes visible DX problems. **Low** is cleanup.
@@ -254,24 +290,24 @@ In `Reparse`, when a new chunk has errors, parse the whole file once; if that pa
 
 ## Quick wins (Low effort, Medium or higher severity)
 
-- [ ] F01 Separate generated score holders from user locals
-- [ ] F02 / F03 / F04 Validate output folders, namespaces and declaration path segments
-- [ ] F05 `sanitizeHTML` on the web `LSPClient`
-- [ ] F06 One SNBT quoter that escapes control characters
-- [ ] F07 Derive the reserved-word list from the lexer
-- [ ] F08 / F90 Fix the shadowed `err` in `mms import` and the ignored write in `mms fmt`
-- [ ] F09 Chunk only where a top-level item can start
-- [ ] F11 Keep `.mmsbook`/`.mmstext` in zip import
-- [ ] F12 Show save failures in the web editor
-- [ ] F23 Offer Fix All only when asked for it, on a fork
+- [x] F01 Separate generated score holders from user locals
+- [x] F02 / F03 / F04 Validate output folders, namespaces and declaration path segments
+- [x] F05 `sanitizeHTML` on the web `LSPClient`
+- [x] F06 One SNBT quoter that escapes control characters
+- [x] F07 Derive the reserved-word list from the lexer
+- [x] F08 / F90 Fix the shadowed `err` in `mms import` and the ignored write in `mms fmt`
+- [x] F09 Chunk only where a top-level item can start
+- [x] F11 Keep `.mmsbook`/`.mmstext` in zip import
+- [x] F12 Show save failures in the web editor
+- [x] F23 Offer Fix All only when asked for it, on a fork
 - [ ] F24 Stop re-reading the world on every keystroke in VS Code
 - [ ] F40 One name for surface rules and conditions
-- [ ] F15 Upgrade fflate and unzip once
-- [ ] F33 Carry missing field names in the diagnostic, not the message
-- [ ] F53 Restore the book markup reference in hover
-- [ ] F80 Add staticcheck to engine CI
-- [ ] F81 Align TypeScript to 6.0 in the VS Code extension
-- [ ] F83 / F84 / F85 Fix the lint table, the `StructureFile` name and the VS Code README
+- [x] F15 Upgrade fflate and unzip once
+- [x] F33 Carry missing field names in the diagnostic, not the message
+- [x] F53 Restore the book markup reference in hover
+- [x] F80 Add staticcheck to engine CI
+- [x] F81 Align TypeScript to 6.0 in the VS Code extension
+- [x] F83 / F84 / F85 Fix the lint table, the `StructureFile` name and the VS Code README
 
 ## Things that look bad but are actually fine
 

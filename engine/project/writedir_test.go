@@ -29,3 +29,26 @@ func TestWriteDirRefusesEscapes(t *testing.T) {
 		}
 	}
 }
+
+// TestWriteDirReplacesSymlinks checks that a file kept from the last
+// build that is now a symlink is replaced, not written through.
+func TestWriteDirReplacesSymlinks(t *testing.T) {
+	dir, outside := t.TempDir(), t.TempDir()
+	target := filepath.Join(outside, "victim.txt")
+	if err := os.WriteFile(target, []byte("keep"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(dir, "pack.mcmeta")
+	if err := os.Symlink(target, link); err != nil {
+		t.Skip("symlinks not supported:", err)
+	}
+	if err := WriteDir(dir, []OutFile{{Path: "pack.mcmeta", Data: []byte("{}")}}); err != nil {
+		t.Fatal(err)
+	}
+	if b, _ := os.ReadFile(target); string(b) != "keep" {
+		t.Errorf("wrote through the symlink: target now %q", b)
+	}
+	if fi, err := os.Lstat(link); err != nil || fi.Mode()&os.ModeSymlink != 0 {
+		t.Errorf("pack.mcmeta is still a symlink (err %v)", err)
+	}
+}

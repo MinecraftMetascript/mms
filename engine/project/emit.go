@@ -339,6 +339,13 @@ func WriteDir(dir string, files []OutFile) error {
 		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
 			return err
 		}
+		// A file kept from the last build, such as pack.mcmeta, may be a
+		// symlink. Replace it rather than write through it out of dir.
+		if fi, err := os.Lstat(p); err == nil && fi.Mode()&os.ModeSymlink != 0 {
+			if err := os.Remove(p); err != nil {
+				return err
+			}
+		}
 		if err := os.WriteFile(p, f.Data, 0o644); err != nil {
 			return err
 		}
