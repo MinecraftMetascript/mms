@@ -58,6 +58,10 @@ func Children(n Node) []Node {
 		add(n.Elem)
 	case *TypeMap:
 		add(n.Key, n.Value)
+	case *TypeRecord:
+		for _, f := range n.Fields {
+			add(f)
+		}
 	case *TypeUnion:
 		for _, a := range n.Arms {
 			add(a)

@@ -138,6 +138,8 @@ func TestCompletionMatrix(t *testing.T) {
 		{name: "command storage", src: "Type S { wave: int = 0 }\nStorage game: S\nFunction f {\n  /data get storage other:x\n  /data modify storage |\n}", want: []string{"test:mms", "other:x"}},
 		{name: "command storage in execute", src: "Type S { wave: int = 0 }\nStorage game: S\nFunction f {\n  /execute store result storage |\n}", want: []string{"test:mms"}},
 		{name: "command storage path", src: "Type S { wave: int = 0 }\nStorage game: S\nFunction f {\n  /data modify storage test:mms |\n}", want: []string{"game", "game.wave"}},
+		{name: "nested storage field", src: "Type S {\n  blah: {\n    x: int\n    y: int\n  }\n}\nStorage s: S\nFunction f {\n  s.blah.|\n}", want: []string{"x", "y"}, not: []string{"blah"}},
+		{name: "record field type", src: "Type S {\n  blah: {\n    x: in|\n  }\n}", want: []string{"int"}, replace: "in"},
 		{name: "command in execute block", src: "Function f {\n  As(@a).At(@s) {\n    /|\n  }\n}", want: []string{"say"}},
 
 		{name: "interpolation", src: "Function f(n: int) {\n  let x = 1\n  /say ${|}\n}", want: []string{"n", "x"}, not: []string{"say", "As"}},

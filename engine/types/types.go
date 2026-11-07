@@ -143,6 +143,18 @@ func (e *Env) Resolve(path string, t syntax.TypeExpr) (rt *spec.Type, optional b
 	case *syntax.TypeList:
 		item, _ := e.Resolve(path, t.Elem)
 		return &spec.Type{Kind: "list", Item: item}, false
+	case *syntax.TypeRecord:
+		r := &spec.Type{Kind: "struct"}
+		for _, f := range t.Fields {
+			if f.Type == nil {
+				e.Diags[path] = append(e.Diags[path], syntax.Diagnostic{Code: "mms/type-body", Severity: syntax.SeverityError,
+					Message: "a record's field needs a type: " + f.Name.Text + ": Type", Sp: f.Sp})
+			}
+			ft, opt := e.Resolve(path, f.Type)
+			r.Fields = append(r.Fields, &spec.Field{Kind: "pair", Key: f.Name.Text, Type: ft, Desc: f.Doc,
+				Optional: opt || f.Default != nil})
+		}
+		return r, false
 	case *syntax.TypeMap:
 		k, _ := e.Resolve(path, t.Key)
 		v, _ := e.Resolve(path, t.Value)

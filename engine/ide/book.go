@@ -345,20 +345,43 @@ func (s *Session) markupNameHover(body string) string {
 				return s.declHover(d)
 			}
 		case isField && sym.Kind.MMS == "Storage":
-			tn, ok := sym.Decl.Type.(*syntax.TypeName)
-			if !ok {
-				return ""
-			}
-			td := s.R.Syms.TypeDecls[tn.Name]
-			if td == nil || td.Body == nil {
-				return ""
-			}
-			for _, it := range td.Body.Items {
-				if f, ok := it.(*syntax.FieldDecl); ok && f.Name != nil && f.Name.Text == field && f.Type != nil {
-					return "```mms\n" + body + ": " + syntax.TypeText(f.Type) + "\n```\n" + sema.DocMarkdown(f.Doc)
+			// Follow `game.a.b` through the record types written for it.
+			t := sym.Decl.Type
+			var found *syntax.FieldDecl
+			for _, n := range strings.Split(field, ".") {
+				found = nil
+				for _, f := range s.recordFields(t) {
+					if f.Name.Text == n {
+						found = f
+					}
 				}
+				if found == nil {
+					return ""
+				}
+				t = found.Type
 			}
+			return "```mms\n" + body + ": " + syntax.TypeText(found.Type) + "\n```\n" + sema.DocMarkdown(found.Doc)
 		}
 	}
 	return ""
+}
+
+// recordFields are the fields of a record type as written: in place,
+// `{ x: int }`, or a Type declaration's body.
+func (s *Session) recordFields(t syntax.TypeExpr) []*syntax.FieldDecl {
+	switch t := t.(type) {
+	case *syntax.TypeRecord:
+		return t.Fields
+	case *syntax.TypeName:
+		if td := s.R.Syms.TypeDecls[t.Name]; td != nil && td.Body != nil {
+			var out []*syntax.FieldDecl
+			for _, it := range td.Body.Items {
+				if f, ok := it.(*syntax.FieldDecl); ok && f.Name != nil {
+					out = append(out, f)
+				}
+			}
+			return out
+		}
+	}
+	return nil
 }

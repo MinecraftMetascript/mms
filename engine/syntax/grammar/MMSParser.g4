@@ -67,16 +67,27 @@ letDecl   : LET IDENT typeAnnotation? (ASSIGN value)?;
 
 typeAnnotation : COLON typeExpr;
 
-// int, Id<item>, [T], {string: T}, T?, A | B, "rigid" | "terrain_matching"
+// int, Id<item>, [T], {string: T}, T?, A | B, "rigid" | "terrain_matching",
+// and a record written in place, { x: int, y: int = 0 }, whose fields are
+// separated by commas or line breaks as in a Type body.
 typeExpr : typeArm (PIPE typeArm)*;
 typeArm  : typeAtom QUESTION?;
 typeAtom
     : typeName (LT typeExpr (COMMA typeExpr)* GT)?               # namedType
     | STRING                                                      # literalType
     | LBRACK typeExpr RBRACK                                      # listType
-    | LBRACE typeExpr COLON typeExpr RBRACE                       # mapType
+    | LBRACE typeField ((COMMA | SEP)? typeField)* (COMMA | SEP)? RBRACE # recordType
+    | LBRACE mapKey COLON typeExpr RBRACE                         # mapType
     | LPAREN typeExpr RPAREN                                      # parenType
     ;
+// A record's field. `{string: T}` reads as a record with one field too;
+// the builder turns a lone field named `string`, or one with a PascalCase
+// name, into the map type it is.
+typeField : IDENT typeAnnotation? (ASSIGN value)?;
+// A map's key type other than a plain name, which reads as a record's
+// field: `{Id<item>: int}`. The two alternatives part at the second token,
+// so a half-typed field still recovers inside the record.
+mapKey : typeName LT typeExpr (COMMA typeExpr)* GT | RESLOC | LPAREN typeExpr RPAREN;
 typeName : IDENT (DOT IDENT)* | RESLOC;
 
 params : LPAREN (param (COMMA param)* COMMA?)? RPAREN;

@@ -501,6 +501,12 @@ type (
 		Arms []TypeExpr
 		Sp   Span
 	}
+	// TypeRecord is a record type written in place:
+	// `{ x: int, y: int = 0 }`, with fields as in a Type body.
+	TypeRecord struct {
+		Fields []*FieldDecl
+		Sp     Span
+	}
 	// TypeString is a literal word in a type, as in `"rigid" | "beard"`.
 	TypeString struct {
 		Value string
@@ -518,6 +524,7 @@ func (t *TypeOptional) Span() Span { return t.Sp }
 func (t *TypeList) Span() Span     { return t.Sp }
 func (t *TypeMap) Span() Span      { return t.Sp }
 func (t *TypeUnion) Span() Span    { return t.Sp }
+func (t *TypeRecord) Span() Span   { return t.Sp }
 func (t *TypeString) Span() Span   { return t.Sp }
 func (t *TypeParen) Span() Span    { return t.Sp }
 func (*TypeName) typeExpr()        {}
@@ -525,6 +532,7 @@ func (*TypeOptional) typeExpr()    {}
 func (*TypeList) typeExpr()        {}
 func (*TypeMap) typeExpr()         {}
 func (*TypeUnion) typeExpr()       {}
+func (*TypeRecord) typeExpr()      {}
 func (*TypeString) typeExpr()      {}
 func (*TypeParen) typeExpr()       {}
 
@@ -546,6 +554,18 @@ func TypeText(t TypeExpr) string {
 		return "[" + TypeText(t.Elem) + "]"
 	case *TypeMap:
 		return "{" + TypeText(t.Key) + ": " + TypeText(t.Value) + "}"
+	case *TypeRecord:
+		fs := make([]string, len(t.Fields))
+		for i, f := range t.Fields {
+			fs[i] = f.Name.Text
+			if f.Type != nil {
+				fs[i] += ": " + TypeText(f.Type)
+			}
+			if f.Default != nil {
+				fs[i] += " = …"
+			}
+		}
+		return "{ " + strings.Join(fs, ", ") + " }"
 	case *TypeUnion:
 		arms := make([]string, len(t.Arms))
 		for i, a := range t.Arms {

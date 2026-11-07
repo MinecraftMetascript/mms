@@ -76,13 +76,32 @@ func (c *Checker) Storage(d *syntax.Decl) []string {
 		return nil
 	}
 	loc := fn.Storage(ns) + " " + path
-	defaults := map[string]syntax.Expr{}
+	var decls []*syntax.FieldDecl
 	if td != nil && td.Body != nil {
-		for _, it := range td.Body.Items {
-			if f, ok := it.(*syntax.FieldDecl); ok && f.Name != nil && f.Default != nil {
-				defaults[f.Name.Text] = f.Default
-			}
+		decls = fieldDecls(td.Body.Items)
+	}
+	return c.storageDefaults(ns, loc, t, decls, 0)
+}
+
+// fieldDecls are the field declarations among a Type body's items.
+func fieldDecls(items []syntax.Stmt) []*syntax.FieldDecl {
+	var out []*syntax.FieldDecl
+	for _, it := range items {
+		if f, ok := it.(*syntax.FieldDecl); ok && f.Name != nil {
+			out = append(out, f)
 		}
+	}
+	return out
+}
+
+// storageDefaults are the load-function lines that set each missing field
+// of record t, kept at loc, to its default. A field holding a record
+// without a default of its own gets its fields' defaults, so a field
+// added to it later starts at its default too.
+func (c *Checker) storageDefaults(ns, loc string, t *spec.Type, decls []*syntax.FieldDecl, depth int) []string {
+	byName := map[string]*syntax.FieldDecl{}
+	for _, d := range decls {
+		byName[d.Name.Text] = d
 	}
 	var lines []string
 	for _, f := range t.Fields {
@@ -90,21 +109,36 @@ func (c *Checker) Storage(d *syntax.Decl) []string {
 			continue
 		}
 		at := loc + "." + snbtKey(f.Key)
+		d := byName[f.Key]
 		var v jsonv.Value
-		if x := defaults[f.Key]; x != nil {
+		switch {
+		case d != nil && d.Default != nil:
 			// The default was checked against the field's type with the
 			// Type; this only turns it into a value.
 			sub := NewChecker(c.Pack, c.Kinds, c.Syms, ns)
 			sub.Files, sub.Texts = c.Files, c.Texts
-			v = sub.check(x, tview{T: f.Type})
-			if v == nil {
-				continue
+			v = sub.check(d.Default, tview{T: f.Type})
+		case c.record(f.Type) != nil && depth < 16:
+			var inner []*syntax.FieldDecl
+			if d != nil {
+				switch dt := d.Type.(type) {
+				case *syntax.TypeRecord:
+					inner = dt.Fields
+				case *syntax.TypeName:
+					if c.Syms != nil {
+						if nd := c.Syms.TypeDecls[dt.Name]; nd != nil && nd.Body != nil {
+							inner = fieldDecls(nd.Body.Items)
+						}
+					}
+				}
 			}
-		} else {
+			lines = append(lines, c.storageDefaults(ns, at, c.record(f.Type), inner, depth+1)...)
+			continue
+		default:
 			v = zeroOf(f.Type)
-			if v == nil {
-				continue
-			}
+		}
+		if v == nil {
+			continue
 		}
 		var sb strings.Builder
 		writeSNBT(&sb, v)
@@ -226,8 +260,9 @@ func storageSig(s *Symbol, t *Table) string {
 // storageField resolves `game.wave` in a function to the field's storage
 // location and function type.
 func (f *fc) storageField(e *syntax.Member) (*local, bool) {
+	base, names := storageChain(e)
 	var id, name string
-	switch x := e.X.(type) {
+	switch x := base.(type) {
 	case *syntax.Ident:
 		if _, ok := f.lookup(x.Name); ok {
 			return nil, false
@@ -243,39 +278,89 @@ func (f *fc) storageField(e *syntax.Member) (*local, bool) {
 	if sym == nil {
 		return nil, false
 	}
-	in := f.c.info(e.X)
+	in := f.c.info(base)
 	in.Symbol = sym
 	in.ID = id
-	if e.Name == nil {
-		return nil, true
+	for _, n := range names {
+		if n == nil {
+			return nil, true
+		}
 	}
 	t, _ := f.c.storageType(sym.Decl)
 	if t == nil {
-		f.c.errorf("mms/type-mismatch", e.X.Span(), "'%s' has no record type", name)
+		f.c.errorf("mms/type-mismatch", base.Span(), "'%s' has no record type", name)
 		return nil, true
 	}
-	for _, fl := range t.Fields {
-		if fl.Key != e.Name.Text {
+	path, loc := name, fn.Storage(sym.NS)+" "+sym.Path
+	for i, n := range names {
+		var fl *spec.Field
+		for _, x := range t.Fields {
+			if x.Key == n.Text {
+				fl = x
+			}
+		}
+		if fl == nil {
+			var keys []string
+			for _, x := range t.Fields {
+				keys = append(keys, x.Key)
+			}
+			f.c.errorf("mms/unknown-name", n.Sp, "%s has no field '%s'%s", path, n.Text, suggestOf(n.Text, keys))
+			return nil, true
+		}
+		path += "." + fl.Key
+		loc += "." + snbtKey(fl.Key)
+		f.c.info(n).Help = "```mms\n" + path + ": " + describe(tview{T: fl.Type}) + "\n```\n" + DocMarkdown(fl.Desc)
+		if i < len(names)-1 {
+			if t = f.c.record(fl.Type); t == nil {
+				f.c.errorf("mms/type-mismatch", names[i+1].Sp, "%s is %s, not a record with fields", path, describe(tview{T: fl.Type}))
+				return nil, true
+			}
 			continue
 		}
 		k := storageKind(fl.Type)
 		if k == "" {
-			f.c.errorf("mms/unsupported", e.Name.Sp, "a function reads int, bool and string fields; %s.%s is another type", name, e.Name.Text)
+			f.c.errorf("mms/unsupported", n.Sp, "a function reads int, bool and string fields; %s is another type", path)
 			return nil, true
 		}
-		f.c.info(e.Name).Help = "```mms\n" + name + "." + fl.Key + ": " + describe(tview{T: fl.Type}) + "\n```\n" + DocMarkdown(fl.Desc)
-		loc := fn.Storage(sym.NS) + " " + sym.Path + "." + snbtKey(fl.Key)
 		if k == tString {
 			return &local{typ: tString, path: loc, choices: storageChoices(fl.Type)}, true
 		}
 		return &local{typ: k, nbt: loc}, true
 	}
-	var names []string
-	for _, fl := range t.Fields {
-		names = append(names, fl.Key)
-	}
-	f.c.errorf("mms/unknown-name", e.Name.Sp, "%s has no field '%s'%s", name, e.Name.Text, suggestOf(e.Name.Text, names))
 	return nil, true
+}
+
+// storageChain splits `game.a.b` into the expression before the first
+// dot and the names after it.
+func storageChain(e syntax.Expr) (base syntax.Expr, names []*syntax.Name) {
+	for {
+		m, ok := e.(*syntax.Member)
+		if !ok {
+			return e, names
+		}
+		names = append([]*syntax.Name{m.Name}, names...)
+		e = m.X
+	}
+}
+
+// record is t as a record with fields, following a project Type's name,
+// or nil when t is not one.
+func (c *Checker) record(t *spec.Type) *spec.Type {
+	for i := 0; t != nil && t.Kind == "reference" && i < 8; i++ {
+		if c.Syms == nil {
+			return nil
+		}
+		t = c.Syms.Types[t.Path]
+	}
+	if t == nil || t.Kind != "struct" {
+		return nil
+	}
+	for _, f := range t.Fields {
+		if f.Key == "" {
+			return nil // a map
+		}
+	}
+	return t
 }
 
 // suggestOf offers the closest of names, as "; did you mean 'x'?".
@@ -343,18 +428,32 @@ func (f *fc) selectorTest(pre *[]fn.Op, name string, e *syntax.Call) *val {
 // StorageFieldCandidates lists the fields of the Storage that x names in
 // function code, for completion after `game.`; nil when x names none.
 func (c *Checker) StorageFieldCandidates(x syntax.Expr) []Candidate {
-	sym := c.storageOf(x)
+	base, names := storageChain(x)
+	sym := c.storageOf(base)
 	if sym == nil {
 		return nil
 	}
 	t, _ := c.storageType(sym.Decl)
+	// After `game.a.`, the fields of the record a holds.
+	for _, n := range names {
+		if t == nil || n == nil {
+			return nil
+		}
+		var next *spec.Type
+		for _, f := range t.Fields {
+			if f.Key == n.Text {
+				next = c.record(f.Type)
+			}
+		}
+		t = next
+	}
 	if t == nil {
 		return nil
 	}
 	var out []Candidate
 	for i, f := range t.Fields {
 		detail := describe(tview{T: f.Type})
-		if storageKind(f.Type) == "" {
+		if storageKind(f.Type) == "" && c.record(f.Type) == nil {
 			detail += " (not readable in functions)"
 		}
 		out = append(out, Candidate{Label: f.Key, Kind: CandField, Detail: detail, Doc: DocMarkdown(f.Desc), Rank: i})

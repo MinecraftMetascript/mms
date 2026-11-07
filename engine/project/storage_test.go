@@ -85,6 +85,9 @@ func TestStorageErrors(t *testing.T) {
 		{"Type S { a: int = 0 }\nStorage s: S\nFunction f {\n  s.a = true\n}", "expected int"},
 		{"Type S { mode: \"x\" | \"y\" }\nStorage s: S\nFunction f {\n  s.mode = \"z\"\n}", `expected one of "x" or "y", but this is "z"`},
 		{"Type S { mode: \"x\" | \"y\" }\nStorage s: S\nFunction f {\n  s.mode += \"x\"\n}", "set it with ="},
+		{"Type S {\n  blah: { x: int, y: int }\n}\nStorage s: S\nFunction f {\n  s.blah.z = 1\n}", "s.blah has no field 'z'"},
+		{"Type S {\n  a: int\n}\nStorage s: S\nFunction f {\n  s.a.b = 1\n}", "s.a is an integer, not a record"},
+		{"Type S {\n  blah: { x: int, y }\n}", "a record's field needs a type: y: Type"},
 		{"Function f(): bool {\n  return exists(\"x\")\n}", "expected a selector"},
 		{"Function f(): int {\n  return count()\n}", "takes one selector"},
 	} {
@@ -133,6 +136,56 @@ Function f(): int {
 	}
 	if got := call(t, vm, "demo:f"); got != 0 {
 		t.Errorf("f again = %d, want 0", got)
+	}
+}
+
+// A field can hold a record written in place, or a Type; functions reach
+// its fields by path, and the load function sets each one's default.
+func TestStorageNested(t *testing.T) {
+	src := `Type Pos {
+  x: int
+  y: int = 64
+}
+Type S {
+  blah: {
+    x: int
+    y: int = 2
+    /** The way it faces. */
+    facing: "north" | "south"
+  }
+  home: Pos
+}
+Storage s: S
+Function f(): int {
+  s.blah.x += 3
+  s.home.x = s.blah.x + s.blah.y
+  if (s.blah.facing == "north") {
+    s.blah.facing = "south"
+  }
+  return s.home.x + s.home.y
+}
+`
+	_, r := bookProject(t, src, nil)
+	if d := diagText(r); d != "" {
+		t.Fatal(d)
+	}
+	ld := emitted(t, r, "data/demo/function/mms_gen/load.mcfunction")
+	for _, want := range []string{
+		"execute unless data storage demo:mms s.blah.x run data modify storage demo:mms s.blah.x set value 0",
+		"execute unless data storage demo:mms s.blah.y run data modify storage demo:mms s.blah.y set value 2",
+		`execute unless data storage demo:mms s.blah.facing run data modify storage demo:mms s.blah.facing set value "north"`,
+		"execute unless data storage demo:mms s.home.y run data modify storage demo:mms s.home.y set value 64",
+	} {
+		if !strings.Contains(ld, want) {
+			t.Errorf("load lacks %s:\n%s", want, ld)
+		}
+	}
+	vm := load(t, r, "demo")
+	if got := call(t, vm, "demo:f"); got != 69 {
+		t.Errorf("f = %d, want 69", got)
+	}
+	if got := call(t, vm, "demo:f"); got != 72 {
+		t.Errorf("f again = %d, want 72", got)
 	}
 }
 
