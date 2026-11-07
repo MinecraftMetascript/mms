@@ -83,6 +83,8 @@ func TestStorageErrors(t *testing.T) {
 		{"Type S { a: int = 0 }\nStorage g: S", "keeps its own values"},
 		{"Type S { a: int = 0 }\nStorage s: S = {}", "starts from its type's defaults"},
 		{"Type S { a: int = 0 }\nStorage s: S\nFunction f {\n  s.a = true\n}", "expected int"},
+		{"Type S { mode: \"x\" | \"y\" }\nStorage s: S\nFunction f {\n  s.mode = \"z\"\n}", `expected one of "x" or "y", but this is "z"`},
+		{"Type S { mode: \"x\" | \"y\" }\nStorage s: S\nFunction f {\n  s.mode += \"x\"\n}", "set it with ="},
 		{"Function f(): bool {\n  return exists(\"x\")\n}", "expected a selector"},
 		{"Function f(): int {\n  return count()\n}", "takes one selector"},
 	} {
@@ -98,6 +100,39 @@ func TestStorageErrors(t *testing.T) {
 		if len(msgs) == 0 || !strings.Contains(strings.Join(msgs, "\n"), tc.want) {
 			t.Errorf("%q: errors %q, want %q", tc.src, msgs, tc.want)
 		}
+	}
+}
+
+// A field of a union of string literals is a string functions read and
+// write, and it starts at the first of them.
+func TestStorageChoices(t *testing.T) {
+	src := `Type S {
+  mode: "x" | "y"
+}
+Storage s: S
+Function f(): int {
+  tell(@a, "Mode ${s.mode}")
+  if (s.mode == "x") {
+    s.mode = "y"
+    return 1
+  }
+  return 0
+}
+`
+	_, r := bookProject(t, src, nil)
+	if d := diagText(r); d != "" {
+		t.Fatal(d)
+	}
+	ld := emitted(t, r, "data/demo/function/mms_gen/load.mcfunction")
+	if want := `execute unless data storage demo:mms s.mode run data modify storage demo:mms s.mode set value "x"`; !strings.Contains(ld, want) {
+		t.Errorf("load lacks %s:\n%s", want, ld)
+	}
+	vm := load(t, r, "demo")
+	if got := call(t, vm, "demo:f"); got != 1 {
+		t.Errorf("f = %d, want 1", got)
+	}
+	if got := call(t, vm, "demo:f"); got != 0 {
+		t.Errorf("f again = %d, want 0", got)
 	}
 }
 

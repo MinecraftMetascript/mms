@@ -1,6 +1,7 @@
 package sema
 
 import (
+	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
@@ -121,6 +122,9 @@ func zeroOf(t *spec.Type) jsonv.Value {
 	case tBool:
 		return jsonv.Bool(false)
 	case tString:
+		if cs := storageChoices(t); len(cs) > 0 {
+			return jsonv.String(cs[0])
+		}
 		return jsonv.String("")
 	}
 	return nil
@@ -128,6 +132,8 @@ func zeroOf(t *spec.Type) jsonv.Value {
 
 // storageKind is the function type of a field: int, bool or string, or
 // "" for a field functions cannot read.
+// A union of string literals, `mode: "x" | "y"`, is a string that holds
+// one of them.
 func storageKind(t *spec.Type) string {
 	if t == nil {
 		return ""
@@ -139,8 +145,53 @@ func storageKind(t *spec.Type) string {
 		return tBool
 	case "string":
 		return tString
+	case "literal":
+		if t.Literal != nil && t.Literal.Kind == "string" {
+			return tString
+		}
+	case "enum":
+		if t.EnumKind == "string" {
+			return tString
+		}
+	case "union":
+		if storageChoices(t) != nil {
+			return tString
+		}
 	}
 	return ""
+}
+
+// storageChoices are the strings a field of a union of string literals,
+// or a string enum, can hold, in order, or nil for any other field.
+func storageChoices(t *spec.Type) []string {
+	if t == nil {
+		return nil
+	}
+	var out []string
+	switch t.Kind {
+	case "literal":
+		if t.Literal != nil && t.Literal.Kind == "string" {
+			out = append(out, t.Literal.String())
+		}
+	case "enum":
+		if t.EnumKind == "string" {
+			for _, v := range t.Values {
+				var s string
+				if json.Unmarshal(v.Value, &s) == nil {
+					out = append(out, s)
+				}
+			}
+		}
+	case "union":
+		for _, m := range t.Members {
+			cs := storageChoices(m)
+			if cs == nil {
+				return nil
+			}
+			out = append(out, cs...)
+		}
+	}
+	return out
 }
 
 func snbtKey(k string) string {
@@ -215,7 +266,7 @@ func (f *fc) storageField(e *syntax.Member) (*local, bool) {
 		f.c.info(e.Name).Help = "```mms\n" + name + "." + fl.Key + ": " + describe(tview{T: fl.Type}) + "\n```\n" + DocMarkdown(fl.Desc)
 		loc := fn.Storage(sym.NS) + " " + sym.Path + "." + snbtKey(fl.Key)
 		if k == tString {
-			return &local{typ: tString, path: loc}, true
+			return &local{typ: tString, path: loc, choices: storageChoices(fl.Type)}, true
 		}
 		return &local{typ: k, nbt: loc}, true
 	}

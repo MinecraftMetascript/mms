@@ -68,7 +68,7 @@ Function next_wave {
 }
 ```
 
-The load function sets each missing field to its default, or to `0`, `false` or `""` when it has none. A `/reload` keeps the values, and a field added later starts at its default. The record is at `<namespace>:mms <name>`, so `/data get storage siege:mms game` shows it in the game. Fields of other types, such as `queue`, are stored and given their defaults, but functions do not read them yet. Completion after `game.` lists the fields, and hovering one shows its type and doc comment.
+A field can also hold one of a few strings, such as `mode: "siege" | "raid"`. Functions read it as a string, and setting it to any other string literal is an error. The load function sets each missing field to its default. A field without one starts at `0`, `false`, `""`, or the first of its strings. A `/reload` keeps the values, and a field added later starts at its default. The record is at `<namespace>:mms <name>`, so `/data get storage siege:mms game` shows it in the game. Fields of other types, such as `queue`, are stored and given their defaults, but functions do not read them yet. Completion after `game.` lists the fields, and hovering one shows its type and doc comment.
 
 A field costs a storage read and write each time a function uses it. A `Global` is a score, so it is cheaper in a tight loop.
 

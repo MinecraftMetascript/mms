@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -224,6 +225,9 @@ type local struct {
 	nbt  string
 	typ  string
 	info *Local
+	// choices are the strings a Storage field of a union of string
+	// literals can hold; nil for any string.
+	choices []string
 }
 
 // Local describes a function parameter, local variable or loop variable,
@@ -460,6 +464,10 @@ func (f *fc) stmt(out *fn.Block, s syntax.Stmt) {
 			f.store(&out.Ops, *target, f.expr(&out.Ops, s.Value), s.Value)
 			return
 		}
+		if target.typ == tString && s.Op == "+=" && target.choices != nil {
+			c.errorf("mms/type-mismatch", s.Sp, "+= would leave a string that is none of %s; set it with =", quoteChoices(target.choices))
+			return
+		}
 		if target.typ == tString && s.Op == "+=" {
 			v := f.expr(&out.Ops, s.Value)
 			if v == nil {
@@ -658,6 +666,10 @@ func (f *fc) store(pre *[]fn.Op, l local, v *val, e syntax.Expr) {
 		return
 	}
 	if l.typ == tString {
+		if v.str != nil && l.choices != nil && !slices.Contains(l.choices, *v.str) {
+			f.c.errorf("mms/type-mismatch", e.Span(), "expected one of %s, but this is %q", quoteChoices(l.choices), *v.str)
+			return
+		}
 		*pre = append(*pre, f.setString(l.path, v))
 		return
 	}
@@ -670,6 +682,18 @@ func (f *fc) store(pre *[]fn.Op, l local, v *val, e syntax.Expr) {
 		return
 	}
 	*pre = append(*pre, fn.Set{Dst: l.s, Src: f.operand(pre, v)})
+}
+
+// quoteChoices lists strings as "x", "y" or "z".
+func quoteChoices(cs []string) string {
+	q := make([]string, len(cs))
+	for i, c := range cs {
+		q[i] = strconv.Quote(c)
+	}
+	if len(q) == 1 {
+		return q[0]
+	}
+	return strings.Join(q[:len(q)-1], ", ") + " or " + q[len(q)-1]
 }
 
 // variable resolves a name to a local, parameter or Global.

@@ -273,7 +273,7 @@ func (s *Session) bookHover(path string, off int) (string, syntax.Span, bool) {
 		return "", syntax.Span{}, true
 	}
 	if lo > 0 && text[lo-1] == '$' {
-		return "A score, a Global or a constant, filled in when the reader first opens the book.", sp, true
+		return s.markupExprHover(path, off, body), sp, true
 	}
 	if k, v, ok := strings.Cut(body, ":"); ok && bookTagHelp[k+":"] != "" && !strings.Contains(k, " ") {
 		doc := bookTagHelp[k+":"]
@@ -310,4 +310,55 @@ func (s *Session) bookTrigger(path string, off int) bool {
 	}
 	_, ok = bookContextAt(text, off-base)
 	return ok
+}
+
+// markupExprHover describes `${body}` in text markup: the Global or
+// Storage field it names, and when it is filled in, which depends on
+// where the text is. A book fills it in when the reader first opens it,
+// function code when the line runs, and other text when it is shown.
+func (s *Session) markupExprHover(path string, off int, body string) string {
+	when := "A score, a Global or a constant, filled in when the text is shown."
+	a := s.at(path, off)
+	switch {
+	case sema.IsBookFile(path) || a != nil && a.decl != nil && a.decl.D != nil && a.decl.D.Kind != nil && a.decl.D.Kind.Name == "Book":
+		when = "A score, a Global or a constant, filled in when the reader first opens the book."
+	case a != nil && a.code():
+		when = "A value the function computes, filled in when this line runs: a local, a parameter, a Global, a Storage field, a score or a constant."
+	}
+	if md := s.markupNameHover(body); md != "" {
+		return strings.TrimSpace(md) + "\n\n" + when
+	}
+	return when
+}
+
+// markupNameHover describes a Global, `g`, or a Storage field,
+// `game.wave`, by the name written in ${...}; "" for anything else.
+func (s *Session) markupNameHover(body string) string {
+	name, field, isField := strings.Cut(body, ".")
+	for _, sym := range s.R.Syms.All() {
+		if sym.Path != name && sym.ID() != name {
+			continue
+		}
+		switch {
+		case !isField && sym.Kind.MMS == "Global":
+			if d := s.R.Decls[sym.Decl]; d != nil {
+				return s.declHover(d)
+			}
+		case isField && sym.Kind.MMS == "Storage":
+			tn, ok := sym.Decl.Type.(*syntax.TypeName)
+			if !ok {
+				return ""
+			}
+			td := s.R.Syms.TypeDecls[tn.Name]
+			if td == nil || td.Body == nil {
+				return ""
+			}
+			for _, it := range td.Body.Items {
+				if f, ok := it.(*syntax.FieldDecl); ok && f.Name != nil && f.Name.Text == field && f.Type != nil {
+					return "```mms\n" + body + ": " + syntax.TypeText(f.Type) + "\n```\n" + sema.DocMarkdown(f.Doc)
+				}
+			}
+		}
+	}
+	return ""
 }
