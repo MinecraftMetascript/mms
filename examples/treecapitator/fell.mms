@@ -41,6 +41,24 @@ Objective leaf_dist
  */
 BlockTag caps = [nether_wart_block, warped_wart_block, shroomlight]
 
+/** The six blocks that share a face with this one. */
+const faces = ["~1 ~ ~", "~-1 ~ ~", "~ ~1 ~", "~ ~-1 ~", "~ ~ ~1", "~ ~ ~-1"]
+
+/** The 8 blocks around this one, at its height. */
+const around = [
+  "~1 ~ ~",
+  "~-1 ~ ~",
+  "~ ~ ~1",
+  "~ ~ ~-1",
+  "~1 ~ ~1",
+  "~1 ~ ~-1",
+  "~-1 ~ ~1",
+  "~-1 ~ ~-1",
+]
+
+/** The 8 blocks around this one and the 9 above it: never below. */
+const upward = [...around, "~ ~1 ~", ...[for at in around: replace(at, " ~ ", " ~1 ")]]
+
 /**
  * Runs as the player who chopped a log, positioned at the centre of the
  * block where the log was.
@@ -93,23 +111,9 @@ Function is_tree(): bool {
  * part way up.
  */
 Function spread {
-  /execute positioned ~1 ~ ~ if block ~ ~ ~ #${kind} unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
-  /execute positioned ~-1 ~ ~ if block ~ ~ ~ #${kind} unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
-  /execute positioned ~ ~ ~1 if block ~ ~ ~ #${kind} unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
-  /execute positioned ~ ~ ~-1 if block ~ ~ ~ #${kind} unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
-  /execute positioned ~1 ~ ~1 if block ~ ~ ~ #${kind} unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
-  /execute positioned ~1 ~ ~-1 if block ~ ~ ~ #${kind} unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
-  /execute positioned ~-1 ~ ~1 if block ~ ~ ~ #${kind} unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
-  /execute positioned ~-1 ~ ~-1 if block ~ ~ ~ #${kind} unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
-  /execute positioned ~ ~1 ~ if block ~ ~ ~ #${kind} unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
-  /execute positioned ~1 ~1 ~ if block ~ ~ ~ #${kind} unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
-  /execute positioned ~-1 ~1 ~ if block ~ ~ ~ #${kind} unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
-  /execute positioned ~ ~1 ~1 if block ~ ~ ~ #${kind} unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
-  /execute positioned ~ ~1 ~-1 if block ~ ~ ~ #${kind} unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
-  /execute positioned ~1 ~1 ~1 if block ~ ~ ~ #${kind} unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
-  /execute positioned ~1 ~1 ~-1 if block ~ ~ ~ #${kind} unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
-  /execute positioned ~-1 ~1 ~1 if block ~ ~ ~ #${kind} unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
-  /execute positioned ~-1 ~1 ~-1 if block ~ ~ ~ #${kind} unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
+  for at in upward {
+    /execute positioned ${at} if block ~ ~ ~ #${kind} unless entity @e[type=marker,tag=treecap.node,distance=..0.5] run function treecap:visit
+  }
 }
 
 /**
@@ -154,12 +158,9 @@ Function visit {
 
 /** Runs as and at a log's marker: starts a leaf fill from each of its six faces. */
 Function leaves_by_log {
-  /execute positioned ~1 ~ ~ if block ~ ~ ~ #minecraft:leaves[persistent=false,distance=1] unless entity @e[type=marker,tag=treecap.leaf,distance=..0.5] summon marker run function treecap:leaf
-  /execute positioned ~-1 ~ ~ if block ~ ~ ~ #minecraft:leaves[persistent=false,distance=1] unless entity @e[type=marker,tag=treecap.leaf,distance=..0.5] summon marker run function treecap:leaf
-  /execute positioned ~ ~1 ~ if block ~ ~ ~ #minecraft:leaves[persistent=false,distance=1] unless entity @e[type=marker,tag=treecap.leaf,distance=..0.5] summon marker run function treecap:leaf
-  /execute positioned ~ ~-1 ~ if block ~ ~ ~ #minecraft:leaves[persistent=false,distance=1] unless entity @e[type=marker,tag=treecap.leaf,distance=..0.5] summon marker run function treecap:leaf
-  /execute positioned ~ ~ ~1 if block ~ ~ ~ #minecraft:leaves[persistent=false,distance=1] unless entity @e[type=marker,tag=treecap.leaf,distance=..0.5] summon marker run function treecap:leaf
-  /execute positioned ~ ~ ~-1 if block ~ ~ ~ #minecraft:leaves[persistent=false,distance=1] unless entity @e[type=marker,tag=treecap.leaf,distance=..0.5] summon marker run function treecap:leaf
+  for at in faces {
+    /execute positioned ${at} if block ~ ~ ~ #minecraft:leaves[persistent=false,distance=1] unless entity @e[type=marker,tag=treecap.leaf,distance=..0.5] summon marker run function treecap:leaf
+  }
 }
 
 /**
@@ -172,19 +173,13 @@ Function leaf {
   if (leaf_count > max_leaves) {
     return
   }
-  /execute if block ~ ~ ~ #minecraft:leaves[distance=1] run scoreboard players set @s leaf_dist 1
-  /execute if block ~ ~ ~ #minecraft:leaves[distance=2] run scoreboard players set @s leaf_dist 2
-  /execute if block ~ ~ ~ #minecraft:leaves[distance=3] run scoreboard players set @s leaf_dist 3
-  /execute if block ~ ~ ~ #minecraft:leaves[distance=4] run scoreboard players set @s leaf_dist 4
-  /execute if block ~ ~ ~ #minecraft:leaves[distance=5] run scoreboard players set @s leaf_dist 5
-  /execute if block ~ ~ ~ #minecraft:leaves[distance=6] run scoreboard players set @s leaf_dist 6
+  for d in [1, 2, 3, 4, 5, 6] {
+    /execute if block ~ ~ ~ #minecraft:leaves[distance=${d}] run scoreboard players set @s leaf_dist ${d}
+  }
   /execute if block ~ ~ ~ #minecraft:leaves[distance=7] run return 0
-  /execute positioned ~1 ~ ~ if block ~ ~ ~ #minecraft:leaves[persistent=false] unless entity @e[type=marker,tag=treecap.leaf,distance=..0.5] if function treecap:farther summon marker run function treecap:leaf
-  /execute positioned ~-1 ~ ~ if block ~ ~ ~ #minecraft:leaves[persistent=false] unless entity @e[type=marker,tag=treecap.leaf,distance=..0.5] if function treecap:farther summon marker run function treecap:leaf
-  /execute positioned ~ ~1 ~ if block ~ ~ ~ #minecraft:leaves[persistent=false] unless entity @e[type=marker,tag=treecap.leaf,distance=..0.5] if function treecap:farther summon marker run function treecap:leaf
-  /execute positioned ~ ~-1 ~ if block ~ ~ ~ #minecraft:leaves[persistent=false] unless entity @e[type=marker,tag=treecap.leaf,distance=..0.5] if function treecap:farther summon marker run function treecap:leaf
-  /execute positioned ~ ~ ~1 if block ~ ~ ~ #minecraft:leaves[persistent=false] unless entity @e[type=marker,tag=treecap.leaf,distance=..0.5] if function treecap:farther summon marker run function treecap:leaf
-  /execute positioned ~ ~ ~-1 if block ~ ~ ~ #minecraft:leaves[persistent=false] unless entity @e[type=marker,tag=treecap.leaf,distance=..0.5] if function treecap:farther summon marker run function treecap:leaf
+  for at in faces {
+    /execute positioned ${at} if block ~ ~ ~ #minecraft:leaves[persistent=false] unless entity @e[type=marker,tag=treecap.leaf,distance=..0.5] if function treecap:farther summon marker run function treecap:leaf
+  }
 }
 
 /**
@@ -192,12 +187,9 @@ Function leaf {
  * that block is exactly one step further from the logs.
  */
 Function farther {
-  /execute if score @s leaf_dist matches 1 if block ~ ~ ~ #minecraft:leaves[distance=2] run return 1
-  /execute if score @s leaf_dist matches 2 if block ~ ~ ~ #minecraft:leaves[distance=3] run return 1
-  /execute if score @s leaf_dist matches 3 if block ~ ~ ~ #minecraft:leaves[distance=4] run return 1
-  /execute if score @s leaf_dist matches 4 if block ~ ~ ~ #minecraft:leaves[distance=5] run return 1
-  /execute if score @s leaf_dist matches 5 if block ~ ~ ~ #minecraft:leaves[distance=6] run return 1
-  /execute if score @s leaf_dist matches 6 if block ~ ~ ~ #minecraft:leaves[distance=7] run return 1
+  for d in [1, 2, 3, 4, 5, 6] {
+    /execute if score @s leaf_dist matches ${d} if block ~ ~ ~ #minecraft:leaves[distance=${d + 1}] run return 1
+  }
   /return fail
 }
 
@@ -210,9 +202,9 @@ Function farther {
 Function wear_axe {
   /execute if items entity @s weapon.mainhand *[minecraft:unbreakable] run return 0
   unbreaking = 0
-  /execute if items entity @s weapon.mainhand *[minecraft:enchantments~[{enchantments:"minecraft:unbreaking",levels:1}]] run scoreboard players set $unbreaking mms.treecap 1
-  /execute if items entity @s weapon.mainhand *[minecraft:enchantments~[{enchantments:"minecraft:unbreaking",levels:2}]] run scoreboard players set $unbreaking mms.treecap 2
-  /execute if items entity @s weapon.mainhand *[minecraft:enchantments~[{enchantments:"minecraft:unbreaking",levels:3}]] run scoreboard players set $unbreaking mms.treecap 3
+  for level in [1, 2, 3] {
+    /execute if items entity @s weapon.mainhand *[minecraft:enchantments~[{enchantments:"minecraft:unbreaking",levels:${level}}]] run scoreboard players set $unbreaking mms.treecap ${level}
+  }
   // Whole shares of the points, then one roll for what is left over.
   let cost = logs / (unbreaking + 1)
   let rest = logs % (unbreaking + 1)

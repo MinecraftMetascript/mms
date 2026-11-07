@@ -1,50 +1,31 @@
 // Breakers dig through whatever stands between them and the banner.
 
 /** Blocks a mob walks through: nothing to break. */
-BlockTag walkable = [
-  #minecraft:air,
-  #minecraft:replaceable,
-  #minecraft:wall_post_override,
-  #minecraft:climbable,
-  #minecraft:banners,
-  minecraft:light,
-]
+BlockTag walkable = [#air, #replaceable, #wall_post_override, #climbable, #banners, light]
 
 /** Never broken. */
 BlockTag unbreakable = [
-  minecraft:bedrock,
-  minecraft:reinforced_deepslate,
-  minecraft:end_portal_frame,
-  minecraft:barrier,
-  minecraft:command_block,
-  minecraft:structure_block,
+  bedrock,
+  reinforced_deepslate,
+  end_portal_frame,
+  barrier,
+  command_block,
+  structure_block,
 ]
 
 /** 1 second: soft blocks. */
-BlockTag break_fast = [
-  #minecraft:mineable/axe,
-  #minecraft:mineable/shovel,
-  #minecraft:mineable/hoe,
-  #minecraft:wool,
-  #minecraft:impermeable,
-]
+BlockTag break_fast = [#mineable/axe, #mineable/shovel, #mineable/hoe, #wool, #impermeable]
 
 /** 6 seconds: iron. */
-BlockTag break_metal = [
-  minecraft:iron_block,
-  minecraft:iron_door,
-  minecraft:iron_bars,
-  minecraft:iron_trapdoor,
-  #minecraft:anvil,
-]
+BlockTag break_metal = [iron_block, iron_door, iron_bars, iron_trapdoor, #anvil]
 
 /** 15 seconds: obsidian and similar. */
 BlockTag break_obsidian = [
-  minecraft:obsidian,
-  minecraft:crying_obsidian,
-  minecraft:respawn_anchor,
-  minecraft:netherite_block,
-  minecraft:ancient_debris,
+  obsidian,
+  crying_obsidian,
+  respawn_anchor,
+  netherite_block,
+  ancient_debris,
 ]
 
 /** Runs as and at a breaker: looks at the block in front of it, level with the banner's direction. */

@@ -7,17 +7,28 @@
 // where the log was: a broken block's item appears inside the block's
 // space, and the tick function runs before items move for the first time.
 
-Objective chop_oak: minecraft.mined:minecraft.oak_log
-Objective chop_spruce: minecraft.mined:minecraft.spruce_log
-Objective chop_birch: minecraft.mined:minecraft.birch_log
-Objective chop_jungle: minecraft.mined:minecraft.jungle_log
-Objective chop_acacia: minecraft.mined:minecraft.acacia_log
-Objective chop_dark_oak: minecraft.mined:minecraft.dark_oak_log
-Objective chop_mangrove: minecraft.mined:minecraft.mangrove_log
-Objective chop_cherry: minecraft.mined:minecraft.cherry_log
-Objective chop_pale_oak: minecraft.mined:minecraft.pale_oak_log
-Objective chop_crimson: minecraft.mined:minecraft.crimson_stem
-Objective chop_warped: minecraft.mined:minecraft.warped_stem
+/**
+ * Every wood that grows on a tree: its name, its log block, the block tag
+ * of its logs, and whether it is the stem of a huge fungus.
+ */
+const woods = [
+  { name = "oak", log = "oak_log", tag = "minecraft:oak_logs", nether = false },
+  { name = "spruce", log = "spruce_log", tag = "minecraft:spruce_logs", nether = false },
+  { name = "birch", log = "birch_log", tag = "minecraft:birch_logs", nether = false },
+  { name = "jungle", log = "jungle_log", tag = "minecraft:jungle_logs", nether = false },
+  { name = "acacia", log = "acacia_log", tag = "minecraft:acacia_logs", nether = false },
+  { name = "dark_oak", log = "dark_oak_log", tag = "minecraft:dark_oak_logs", nether = false },
+  { name = "mangrove", log = "mangrove_log", tag = "minecraft:mangrove_logs", nether = false },
+  { name = "cherry", log = "cherry_log", tag = "minecraft:cherry_logs", nether = false },
+  { name = "pale_oak", log = "pale_oak_log", tag = "minecraft:pale_oak_logs", nether = false },
+  { name = "crimson", log = "crimson_stem", tag = "minecraft:crimson_stems", nether = true },
+  { name = "warped", log = "warped_stem", tag = "minecraft:warped_stems", nether = true },
+]
+
+for w in woods {
+  /** How many ${w.log} blocks the player has mined since the last tick. */
+  Objective chop_${w.name}: "minecraft.mined:minecraft.${w.log}"
+}
 
 /** Whether the player is sneaking. Sneaking chops one log, as in vanilla. */
 Predicate sneaking = EntityProperties(entity = this, predicate = { flags = { is_sneaking = true } })
@@ -25,17 +36,9 @@ Predicate sneaking = EntityProperties(entity = this, predicate = { flags = { is_
 OnTick {
   // Each kind of log passes on its block tag, so that only logs of the
   // same wood fall: an oak growing into a birch leaves the birch alone.
-  As(@a[scores={ chop_oak = 1.. }]).At(@s) { chopped("minecraft:oak_logs", false) }
-  As(@a[scores={ chop_spruce = 1.. }]).At(@s) { chopped("minecraft:spruce_logs", false) }
-  As(@a[scores={ chop_birch = 1.. }]).At(@s) { chopped("minecraft:birch_logs", false) }
-  As(@a[scores={ chop_jungle = 1.. }]).At(@s) { chopped("minecraft:jungle_logs", false) }
-  As(@a[scores={ chop_acacia = 1.. }]).At(@s) { chopped("minecraft:acacia_logs", false) }
-  As(@a[scores={ chop_dark_oak = 1.. }]).At(@s) { chopped("minecraft:dark_oak_logs", false) }
-  As(@a[scores={ chop_mangrove = 1.. }]).At(@s) { chopped("minecraft:mangrove_logs", false) }
-  As(@a[scores={ chop_cherry = 1.. }]).At(@s) { chopped("minecraft:cherry_logs", false) }
-  As(@a[scores={ chop_pale_oak = 1.. }]).At(@s) { chopped("minecraft:pale_oak_logs", false) }
-  As(@a[scores={ chop_crimson = 1.. }]).At(@s) { chopped("minecraft:crimson_stems", true) }
-  As(@a[scores={ chop_warped = 1.. }]).At(@s) { chopped("minecraft:warped_stems", true) }
+  for w in woods {
+    As(@a[scores={ "chop_${w.name}" = 1.. }]).At(@s) { chopped(w.tag, w.nether) }
+  }
 }
 
 /**
@@ -46,17 +49,9 @@ OnTick {
 Function chopped(wood: string, nether_tree: bool) {
   // Reset every count, so a player who mined two kinds of log in one
   // tick is handled once.
-  /scoreboard players reset @s chop_oak
-  /scoreboard players reset @s chop_spruce
-  /scoreboard players reset @s chop_birch
-  /scoreboard players reset @s chop_jungle
-  /scoreboard players reset @s chop_acacia
-  /scoreboard players reset @s chop_dark_oak
-  /scoreboard players reset @s chop_mangrove
-  /scoreboard players reset @s chop_cherry
-  /scoreboard players reset @s chop_pale_oak
-  /scoreboard players reset @s chop_crimson
-  /scoreboard players reset @s chop_warped
+  for w in woods {
+    /scoreboard players reset @s chop_${w.name}
+  }
   /execute if predicate treecap:sneaking run return 0
   // The axe is still in hand, unless that log used up its last point of
   // durability.

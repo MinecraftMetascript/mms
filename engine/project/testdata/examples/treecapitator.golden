@@ -150,60 +150,60 @@ execute unless score $damage mms.treecap = $damage mms.treecap run scoreboard pl
 scoreboard players set #cf mms.treecap 0
 return run scoreboard players get #rv mms.treecap
 === data/treecap/function/mms_gen/tick.mcfunction
-function treecap:mms_gen/tick/bb87e52b
-=== data/treecap/function/mms_gen/tick/bb87e52b.mcfunction
-execute as @a[scores={ chop_oak = 1.. }] at @s run function treecap:mms_gen/tick/bb87e52b/_exec0
-execute as @a[scores={ chop_spruce = 1.. }] at @s run function treecap:mms_gen/tick/bb87e52b/_exec1
-execute as @a[scores={ chop_birch = 1.. }] at @s run function treecap:mms_gen/tick/bb87e52b/_exec2
-execute as @a[scores={ chop_jungle = 1.. }] at @s run function treecap:mms_gen/tick/bb87e52b/_exec3
-execute as @a[scores={ chop_acacia = 1.. }] at @s run function treecap:mms_gen/tick/bb87e52b/_exec4
-execute as @a[scores={ chop_dark_oak = 1.. }] at @s run function treecap:mms_gen/tick/bb87e52b/_exec5
-execute as @a[scores={ chop_mangrove = 1.. }] at @s run function treecap:mms_gen/tick/bb87e52b/_exec6
-execute as @a[scores={ chop_cherry = 1.. }] at @s run function treecap:mms_gen/tick/bb87e52b/_exec7
-execute as @a[scores={ chop_pale_oak = 1.. }] at @s run function treecap:mms_gen/tick/bb87e52b/_exec8
-execute as @a[scores={ chop_crimson = 1.. }] at @s run function treecap:mms_gen/tick/bb87e52b/_exec9
-execute as @a[scores={ chop_warped = 1.. }] at @s run function treecap:mms_gen/tick/bb87e52b/_exec10
-=== data/treecap/function/mms_gen/tick/bb87e52b/_exec0.mcfunction
+function treecap:mms_gen/tick/7fd44582
+=== data/treecap/function/mms_gen/tick/7fd44582.mcfunction
+execute as @a[scores={chop_oak=1..}] at @s run function treecap:mms_gen/tick/7fd44582/_exec0
+execute as @a[scores={chop_spruce=1..}] at @s run function treecap:mms_gen/tick/7fd44582/_exec1
+execute as @a[scores={chop_birch=1..}] at @s run function treecap:mms_gen/tick/7fd44582/_exec2
+execute as @a[scores={chop_jungle=1..}] at @s run function treecap:mms_gen/tick/7fd44582/_exec3
+execute as @a[scores={chop_acacia=1..}] at @s run function treecap:mms_gen/tick/7fd44582/_exec4
+execute as @a[scores={chop_dark_oak=1..}] at @s run function treecap:mms_gen/tick/7fd44582/_exec5
+execute as @a[scores={chop_mangrove=1..}] at @s run function treecap:mms_gen/tick/7fd44582/_exec6
+execute as @a[scores={chop_cherry=1..}] at @s run function treecap:mms_gen/tick/7fd44582/_exec7
+execute as @a[scores={chop_pale_oak=1..}] at @s run function treecap:mms_gen/tick/7fd44582/_exec8
+execute as @a[scores={chop_crimson=1..}] at @s run function treecap:mms_gen/tick/7fd44582/_exec9
+execute as @a[scores={chop_warped=1..}] at @s run function treecap:mms_gen/tick/7fd44582/_exec10
+=== data/treecap/function/mms_gen/tick/7fd44582/_exec0.mcfunction
 data modify storage treecap:mms l."chopped".wood set value "minecraft:oak_logs"
 scoreboard players set #chopped.nether_tree mms.treecap 0
 function treecap:chopped
-=== data/treecap/function/mms_gen/tick/bb87e52b/_exec1.mcfunction
+=== data/treecap/function/mms_gen/tick/7fd44582/_exec1.mcfunction
 data modify storage treecap:mms l."chopped".wood set value "minecraft:spruce_logs"
 scoreboard players set #chopped.nether_tree mms.treecap 0
 function treecap:chopped
-=== data/treecap/function/mms_gen/tick/bb87e52b/_exec10.mcfunction
+=== data/treecap/function/mms_gen/tick/7fd44582/_exec10.mcfunction
 data modify storage treecap:mms l."chopped".wood set value "minecraft:warped_stems"
 scoreboard players set #chopped.nether_tree mms.treecap 1
 function treecap:chopped
-=== data/treecap/function/mms_gen/tick/bb87e52b/_exec2.mcfunction
+=== data/treecap/function/mms_gen/tick/7fd44582/_exec2.mcfunction
 data modify storage treecap:mms l."chopped".wood set value "minecraft:birch_logs"
 scoreboard players set #chopped.nether_tree mms.treecap 0
 function treecap:chopped
-=== data/treecap/function/mms_gen/tick/bb87e52b/_exec3.mcfunction
+=== data/treecap/function/mms_gen/tick/7fd44582/_exec3.mcfunction
 data modify storage treecap:mms l."chopped".wood set value "minecraft:jungle_logs"
 scoreboard players set #chopped.nether_tree mms.treecap 0
 function treecap:chopped
-=== data/treecap/function/mms_gen/tick/bb87e52b/_exec4.mcfunction
+=== data/treecap/function/mms_gen/tick/7fd44582/_exec4.mcfunction
 data modify storage treecap:mms l."chopped".wood set value "minecraft:acacia_logs"
 scoreboard players set #chopped.nether_tree mms.treecap 0
 function treecap:chopped
-=== data/treecap/function/mms_gen/tick/bb87e52b/_exec5.mcfunction
+=== data/treecap/function/mms_gen/tick/7fd44582/_exec5.mcfunction
 data modify storage treecap:mms l."chopped".wood set value "minecraft:dark_oak_logs"
 scoreboard players set #chopped.nether_tree mms.treecap 0
 function treecap:chopped
-=== data/treecap/function/mms_gen/tick/bb87e52b/_exec6.mcfunction
+=== data/treecap/function/mms_gen/tick/7fd44582/_exec6.mcfunction
 data modify storage treecap:mms l."chopped".wood set value "minecraft:mangrove_logs"
 scoreboard players set #chopped.nether_tree mms.treecap 0
 function treecap:chopped
-=== data/treecap/function/mms_gen/tick/bb87e52b/_exec7.mcfunction
+=== data/treecap/function/mms_gen/tick/7fd44582/_exec7.mcfunction
 data modify storage treecap:mms l."chopped".wood set value "minecraft:cherry_logs"
 scoreboard players set #chopped.nether_tree mms.treecap 0
 function treecap:chopped
-=== data/treecap/function/mms_gen/tick/bb87e52b/_exec8.mcfunction
+=== data/treecap/function/mms_gen/tick/7fd44582/_exec8.mcfunction
 data modify storage treecap:mms l."chopped".wood set value "minecraft:pale_oak_logs"
 scoreboard players set #chopped.nether_tree mms.treecap 0
 function treecap:chopped
-=== data/treecap/function/mms_gen/tick/bb87e52b/_exec9.mcfunction
+=== data/treecap/function/mms_gen/tick/7fd44582/_exec9.mcfunction
 data modify storage treecap:mms l."chopped".wood set value "minecraft:crimson_stems"
 scoreboard players set #chopped.nether_tree mms.treecap 1
 function treecap:chopped

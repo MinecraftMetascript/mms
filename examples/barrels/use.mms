@@ -38,7 +38,10 @@ OnAdvancement use_barrel = PlayerInteractedWithEntity(
     } else if (holding == 1) {
       insert_held()
     } else {
-      actionbar(@s, "{gray}Right-click with an item to put it in, or sneak to put in everything that matches")
+      actionbar(
+        @s,
+        "{gray}Right-click with an item to put it in, or sneak to put in everything that matches",
+      )
     }
     /kill @e[type=item_display,tag=barrels.tmp]
     close()

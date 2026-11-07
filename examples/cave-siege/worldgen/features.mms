@@ -13,41 +13,41 @@
 
 /** Ores, clay and gravel, as in the vanilla overworld. Every custom biome uses this. */
 PlacedFeatureTag ores = [
-  minecraft:ore_dirt,
-  minecraft:ore_gravel,
-  minecraft:ore_granite_upper,
-  minecraft:ore_granite_lower,
-  minecraft:ore_diorite_upper,
-  minecraft:ore_diorite_lower,
-  minecraft:ore_andesite_upper,
-  minecraft:ore_andesite_lower,
-  minecraft:ore_tuff,
-  minecraft:ore_coal_upper,
-  minecraft:ore_coal_lower,
-  minecraft:ore_iron_upper,
-  minecraft:ore_iron_middle,
-  minecraft:ore_iron_small,
-  minecraft:ore_gold,
-  minecraft:ore_gold_lower,
-  minecraft:ore_redstone,
-  minecraft:ore_redstone_lower,
-  minecraft:ore_diamond,
-  minecraft:ore_diamond_medium,
-  minecraft:ore_diamond_large,
-  minecraft:ore_diamond_buried,
-  minecraft:ore_lapis,
-  minecraft:ore_lapis_buried,
-  minecraft:ore_copper,
-  minecraft:ore_clay,
+  ore_dirt,
+  ore_gravel,
+  ore_granite_upper,
+  ore_granite_lower,
+  ore_diorite_upper,
+  ore_diorite_lower,
+  ore_andesite_upper,
+  ore_andesite_lower,
+  ore_tuff,
+  ore_coal_upper,
+  ore_coal_lower,
+  ore_iron_upper,
+  ore_iron_middle,
+  ore_iron_small,
+  ore_gold,
+  ore_gold_lower,
+  ore_redstone,
+  ore_redstone_lower,
+  ore_diamond,
+  ore_diamond_medium,
+  ore_diamond_large,
+  ore_diamond_buried,
+  ore_lapis,
+  ore_lapis_buried,
+  ore_copper,
+  ore_clay,
 ]
 
 /** Geodes and dungeons. */
-PlacedFeatureTag underground_extras = [minecraft:amethyst_geode]
+PlacedFeatureTag underground_extras = [amethyst_geode]
 
-PlacedFeatureTag dungeons = [minecraft:monster_room, minecraft:monster_room_deep]
+PlacedFeatureTag dungeons = [monster_room, monster_room_deep]
 
 /** Water springs only: lava springs would pour lava across the tunnels waves walk. */
-PlacedFeatureTag water_springs = [minecraft:spring_water]
+PlacedFeatureTag water_springs = [spring_water]
 
 // ---- Light -----------------------------------------------------------------
 
@@ -55,7 +55,7 @@ PlacedFeatureTag water_springs = [minecraft:spring_water]
 Feature glowstone_cluster = RandomNeighborSpread(
   block = { id = glowstone },
   accepted_neighbors = [glowstone, stone, deepslate, tuff, granite, diorite, andesite, dirt],
-  can_replace = MatchingBlockTag(tag = #minecraft:air),
+  can_replace = MatchingBlockTag(tag = #air),
   attempts = 400,
   xz_offset = Trapezoid(min = -4, max = 4, plateau = 0),
   y_offset = Uniform(min_inclusive = -6, max_inclusive = 0),
@@ -64,7 +64,7 @@ Feature glowstone_cluster = RandomNeighborSpread(
 /** A short mushroom stem with a shroomlight on top. */
 Feature glow_cap = BlockColumn(
   direction = up,
-  allowed_placement = MatchingBlockTag(tag = #minecraft:air),
+  allowed_placement = MatchingBlockTag(tag = #air),
   prioritize_tip = true,
   layers = [
     {
@@ -81,7 +81,7 @@ Feature glow_cap = BlockColumn(
 Feature ochre_crystals = RandomNeighborSpread(
   block = { id = ochre_froglight },
   accepted_neighbors = [ochre_froglight, stone, deepslate, tuff],
-  can_replace = MatchingBlockTag(tag = #minecraft:air),
+  can_replace = MatchingBlockTag(tag = #air),
   attempts = 60,
   xz_offset = Trapezoid(min = -2, max = 2, plateau = 0),
   y_offset = Uniform(min_inclusive = -3, max_inclusive = 0),
@@ -90,7 +90,7 @@ Feature ochre_crystals = RandomNeighborSpread(
 Feature verdant_crystals = RandomNeighborSpread(
   block = { id = verdant_froglight },
   accepted_neighbors = [verdant_froglight, stone, deepslate, tuff],
-  can_replace = MatchingBlockTag(tag = #minecraft:air),
+  can_replace = MatchingBlockTag(tag = #air),
   attempts = 60,
   xz_offset = Trapezoid(min = -2, max = 2, plateau = 0),
   y_offset = Uniform(min_inclusive = -3, max_inclusive = 0),
@@ -110,7 +110,7 @@ PlacedFeature roof_glowstone {
       direction_of_search = up,
       max_steps = 32,
       target_condition = Solid(),
-      allowed_search_condition = MatchingBlockTag(tag = #minecraft:air),
+      allowed_search_condition = MatchingBlockTag(tag = #air),
     ),
     Offset(0, -1, 0),
     Biome(),
@@ -128,7 +128,7 @@ PlacedFeature roof_glowstone_sparse {
       direction_of_search = up,
       max_steps = 32,
       target_condition = Solid(),
-      allowed_search_condition = MatchingBlockTag(tag = #minecraft:air),
+      allowed_search_condition = MatchingBlockTag(tag = #air),
     ),
     Offset(0, -1, 0),
     Biome(),
@@ -160,7 +160,7 @@ PlacedFeature ochre_crystals {
       direction_of_search = up,
       max_steps = 32,
       target_condition = Solid(),
-      allowed_search_condition = MatchingBlockTag(tag = #minecraft:air),
+      allowed_search_condition = MatchingBlockTag(tag = #air),
     ),
     Offset(0, -1, 0),
     Biome(),
@@ -177,7 +177,7 @@ PlacedFeature verdant_crystals {
       direction_of_search = up,
       max_steps = 32,
       target_condition = Solid(),
-      allowed_search_condition = MatchingBlockTag(tag = #minecraft:air),
+      allowed_search_condition = MatchingBlockTag(tag = #air),
     ),
     Offset(0, -1, 0),
     Biome(),
@@ -197,7 +197,7 @@ PlacedFeature starter_lights {
       direction_of_search = up,
       max_steps = 20,
       target_condition = Solid(),
-      allowed_search_condition = MatchingBlockTag(tag = #minecraft:air),
+      allowed_search_condition = MatchingBlockTag(tag = #air),
     ),
     Offset(0, -1, 0),
   ]
@@ -207,49 +207,46 @@ PlacedFeature starter_lights {
 
 /** Grass on every lit floor. */
 PlacedFeature floor_grass {
-  feature = minecraft:grass
+  feature = grass
   placement = [
     CountOnEveryLayer(12),
     BlockPredicateFilter(
-      AllOf([MatchingBlockTag(tag = #minecraft:air), WouldSurvive(state = { id = short_grass })]),
+      AllOf([MatchingBlockTag(tag = #air), WouldSurvive(state = { id = short_grass })]),
     ),
     Biome(),
   ]
 }
 
 PlacedFeature floor_tall_grass {
-  feature = minecraft:tall_grass
+  feature = tall_grass
   placement = [
     CountOnEveryLayer(2),
     BlockPredicateFilter(
-      AllOf([MatchingBlockTag(tag = #minecraft:air), WouldSurvive(state = { id = tall_grass })]),
+      AllOf([MatchingBlockTag(tag = #air), WouldSurvive(state = { id = tall_grass })]),
     ),
     Biome(),
   ]
 }
 
 PlacedFeature floor_flowers {
-  feature = minecraft:flower_default
+  feature = flower_default
   placement = [
     CountOnEveryLayer(2),
     BlockPredicateFilter(
-      AllOf([MatchingBlockTag(tag = #minecraft:air), WouldSurvive(state = { id = poppy })]),
+      AllOf([MatchingBlockTag(tag = #air), WouldSurvive(state = { id = poppy })]),
     ),
     Biome(),
   ]
 }
 
 PlacedFeature floor_pumpkins {
-  feature = minecraft:pumpkin
+  feature = pumpkin
   placement = [
     RarityFilter(4),
     CountOnEveryLayer(1),
     BlockPredicateFilter(
       AllOf(
-        [
-          MatchingBlockTag(tag = #minecraft:air),
-          MatchingBlocks(offset = [0, -1, 0], blocks = grass_block),
-        ],
+        [MatchingBlockTag(tag = #air), MatchingBlocks(offset = [0, -1, 0], blocks = grass_block)],
       ),
     ),
     Biome(),
@@ -257,14 +254,14 @@ PlacedFeature floor_pumpkins {
 }
 
 PlacedFeature floor_melons {
-  feature = minecraft:melon
+  feature = melon
   placement = [
     RarityFilter(3),
     CountOnEveryLayer(1),
     BlockPredicateFilter(
       AllOf(
         [
-          MatchingBlockTag(tag = #minecraft:air),
+          MatchingBlockTag(tag = #air),
           MatchingBlocks(offset = [0, -1, 0], blocks = [grass_block, podzol]),
         ],
       ),
@@ -275,18 +272,18 @@ PlacedFeature floor_melons {
 
 /** Sugar cane on lake shores. WouldSurvive checks for water next to the block below. */
 PlacedFeature shore_sugar_cane {
-  feature = minecraft:sugar_cane
+  feature = sugar_cane
   placement = [
     CountOnEveryLayer(8),
     BlockPredicateFilter(
-      AllOf([MatchingBlockTag(tag = #minecraft:air), WouldSurvive(state = { id = sugar_cane })]),
+      AllOf([MatchingBlockTag(tag = #air), WouldSurvive(state = { id = sugar_cane })]),
     ),
     Biome(),
   ]
 }
 
 PlacedFeature lake_kelp {
-  feature = minecraft:kelp
+  feature = kelp
   placement = [
     CountOnEveryLayer(4),
     BlockPredicateFilter(
@@ -297,31 +294,29 @@ PlacedFeature lake_kelp {
 }
 
 PlacedFeature floor_mushrooms {
-  feature = minecraft:brown_mushroom
+  feature = brown_mushroom
   placement = [
     CountOnEveryLayer(2),
     BlockPredicateFilter(
-      AllOf(
-        [MatchingBlockTag(tag = #minecraft:air), WouldSurvive(state = { id = brown_mushroom })],
-      ),
+      AllOf([MatchingBlockTag(tag = #air), WouldSurvive(state = { id = brown_mushroom })]),
     ),
     Biome(),
   ]
 }
 
 PlacedFeature floor_red_mushrooms {
-  feature = minecraft:red_mushroom
+  feature = red_mushroom
   placement = [
     CountOnEveryLayer(1),
     BlockPredicateFilter(
-      AllOf([MatchingBlockTag(tag = #minecraft:air), WouldSurvive(state = { id = red_mushroom })]),
+      AllOf([MatchingBlockTag(tag = #air), WouldSurvive(state = { id = red_mushroom })]),
     ),
     Biome(),
   ]
 }
 
 PlacedFeature huge_mushrooms {
-  feature = minecraft:mushroom_island_vegetation
+  feature = mushroom_island_vegetation
   placement = [
     CountOnEveryLayer(1),
     BlockPredicateFilter(MatchingBlocks(offset = [0, -1, 0], blocks = mycelium)),
@@ -330,12 +325,12 @@ PlacedFeature huge_mushrooms {
 }
 
 PlacedFeature floor_bamboo {
-  feature = minecraft:bamboo_no_podzol
+  feature = bamboo_no_podzol
   placement = [
     RarityFilter(2),
     CountOnEveryLayer(3),
     BlockPredicateFilter(
-      AllOf([MatchingBlockTag(tag = #minecraft:air), WouldSurvive(state = { id = bamboo })]),
+      AllOf([MatchingBlockTag(tag = #air), WouldSurvive(state = { id = bamboo })]),
     ),
     Biome(),
   ]
@@ -349,27 +344,27 @@ Feature rootwood_trees = RandomSelector(
     {
       chance = 0.3
       feature = {
-        feature = minecraft:birch
+        feature = birch
         placement = []
       }
     },
     {
       chance = 0.25
       feature = {
-        feature = minecraft:spruce
+        feature = spruce
         placement = []
       }
     },
     {
       chance = 0.15
       feature = {
-        feature = minecraft:fancy_oak
+        feature = fancy_oak
         placement = []
       }
     },
   ],
   default = {
-    feature = minecraft:oak
+    feature = oak
     placement = []
   },
 )
@@ -380,20 +375,20 @@ Feature darkroot_trees = RandomSelector(
     {
       chance = 0.4
       feature = {
-        feature = minecraft:jungle_tree
+        feature = jungle_tree
         placement = []
       }
     },
     {
       chance = 0.2
       feature = {
-        feature = minecraft:cherry
+        feature = cherry
         placement = []
       }
     },
   ],
   default = {
-    feature = minecraft:dark_oak
+    feature = dark_oak
     placement = []
   },
 )
@@ -422,8 +417,8 @@ Feature water_lake = Lake(
   fluid = { id = water },
   barrier = { id = sandstone },
   can_place_feature = True(),
-  can_replace_with_air_or_fluid = Not(MatchingBlockTag(tag = #minecraft:features_cannot_replace)),
-  can_replace_with_barrier = Not(MatchingBlockTag(tag = #minecraft:lava_pool_stone_cannot_replace)),
+  can_replace_with_air_or_fluid = Not(MatchingBlockTag(tag = #features_cannot_replace)),
+  can_replace_with_barrier = Not(MatchingBlockTag(tag = #lava_pool_stone_cannot_replace)),
 )
 
 /** Finds a floor below a random height, then digs a lake into it. */
@@ -437,7 +432,7 @@ PlacedFeature water_lakes {
       direction_of_search = down,
       max_steps = 32,
       target_condition = Solid(),
-      allowed_search_condition = MatchingBlockTag(tag = #minecraft:air),
+      allowed_search_condition = MatchingBlockTag(tag = #air),
     ),
     Biome(),
   ]
@@ -445,7 +440,7 @@ PlacedFeature water_lakes {
 
 /** Shallow lava pools, for early obsidian. */
 PlacedFeature lava_lakes {
-  feature = minecraft:lake_lava
+  feature = lake_lava
   placement = [
     Count(2),
     InSquare(),
@@ -454,7 +449,7 @@ PlacedFeature lava_lakes {
       direction_of_search = down,
       max_steps = 32,
       target_condition = Solid(),
-      allowed_search_condition = MatchingBlockTag(tag = #minecraft:air),
+      allowed_search_condition = MatchingBlockTag(tag = #air),
     ),
     Biome(),
   ]

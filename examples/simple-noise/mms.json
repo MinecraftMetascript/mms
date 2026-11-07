@@ -1,5 +1,5 @@
 {
   "$schema": "https://minecraftmetascript.github.io/mms/mms.schema.json",
-  "namespace": "test_files",
-  "description": "Port of the old simple_noise example"
+  "namespace": "simple_noise",
+  "description": "Noise: a noise and a density function that uses it, with previews"
 }

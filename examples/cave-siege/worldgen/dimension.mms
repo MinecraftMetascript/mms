@@ -25,9 +25,9 @@ DimensionType caves {
   has_ender_dragon_fight = false
   has_fixed_time = false
   skybox = none
-  infiniburn = "#minecraft:infiniburn_overworld"
+  infiniburn = #infiniburn_overworld
   default_clock = overworld
-  timelines = "#minecraft:in_overworld"
+  timelines = #in_overworld
   monster_spawn_block_light_limit = 0
   monster_spawn_light_level = 0
   attributes = {
@@ -38,7 +38,7 @@ DimensionType caves {
     "minecraft:visual/sky_light_factor" = 0
     "minecraft:audio/ambient_sounds" = {
       mood = {
-        sound = "minecraft:ambient.cave"
+        sound = minecraft:ambient.cave
         tick_delay = 6000
         block_search_extent = 8
         offset = 2
@@ -46,7 +46,7 @@ DimensionType caves {
     }
     "minecraft:audio/background_music" = {
       default = {
-        sound = "minecraft:music.game"
+        sound = minecraft:music.game
         min_delay = 12000
         max_delay = 24000
       }
@@ -98,141 +98,145 @@ NoiseSettings caves {
   }
 }
 
+/**
+ * The cave world's generator, shared by the dimension and the world
+ * preset: the caves noise settings, and biomes by climate and depth.
+ */
+const cave_generator: ChunkGenerator = Noise(
+  settings = caves,
+  biome_source = MultiNoise(
+    biomes = [
+      // Rare regions where continents is low
+      {
+        biome = mycelium_deeps
+        parameters = {
+          temperature = [-1, 1]
+          humidity = [-1, 1]
+          continentalness = [-1, -0.75]
+          erosion = [-1, 1]
+          weirdness = 0
+          depth = [0, 1.1]
+          offset = 0
+        }
+      },
+      // The deep layer, below y -35
+      {
+        biome = deep_dark
+        parameters = {
+          temperature = [-1, 0.25]
+          humidity = [-1, 1]
+          continentalness = [-0.75, 1]
+          erosion = [-1, 1]
+          weirdness = 0
+          depth = [1.1, 1.5]
+          offset = 0
+        }
+      },
+      {
+        biome = ash_vents
+        parameters = {
+          temperature = [0.5, 1]
+          humidity = [-1, -0.35]
+          continentalness = [-0.75, 1]
+          erosion = [-1, 1]
+          weirdness = 0
+          depth = [-1, 1.5]
+          offset = 0
+        }
+      },
+      // Below y 10
+      {
+        biome = darkroot_grove
+        parameters = {
+          temperature = [0.25, 1]
+          humidity = [0.25, 1]
+          continentalness = [-0.75, 1]
+          erosion = [-1, 1]
+          weirdness = 0
+          depth = [0.75, 1.5]
+          offset = 0
+        }
+      },
+      {
+        biome = rootwood_hollow
+        parameters = {
+          temperature = [0.25, 1]
+          humidity = [-0.25, 1]
+          continentalness = [-0.75, 1]
+          erosion = [-1, 1]
+          weirdness = 0
+          depth = [-1, 0.6]
+          offset = 0
+        }
+      },
+      {
+        biome = rootwood_hollow
+        parameters = {
+          temperature = [-1, -0.25]
+          humidity = [-0.25, 0.25]
+          continentalness = [-0.75, 1]
+          erosion = [-1, 1]
+          weirdness = 0
+          depth = [-1, 1.1]
+          offset = 0
+        }
+      },
+      {
+        biome = dripstone_caves
+        parameters = {
+          temperature = [-1, -0.25]
+          humidity = [-1, -0.25]
+          continentalness = [-0.75, 1]
+          erosion = [-1, 1]
+          weirdness = 0
+          depth = [-1, 1.1]
+          offset = 0
+        }
+      },
+      {
+        biome = sunken_lake
+        parameters = {
+          temperature = [-1, -0.25]
+          humidity = [0.25, 1]
+          continentalness = [-0.75, 1]
+          erosion = [-1, 1]
+          weirdness = 0
+          depth = [-1, 1.1]
+          offset = 0
+        }
+      },
+      {
+        biome = glowmeadow
+        parameters = {
+          temperature = [-0.25, 0.25]
+          humidity = [-1, 0.25]
+          continentalness = [-0.75, 1]
+          erosion = [-1, 1]
+          weirdness = 0
+          depth = [-1, 1.1]
+          offset = 0
+        }
+      },
+      {
+        biome = lush_caves
+        parameters = {
+          temperature = [-0.25, 0.25]
+          humidity = [0.25, 1]
+          continentalness = [-0.75, 1]
+          erosion = [-1, 1]
+          weirdness = 0
+          depth = [-1, 1.1]
+          offset = 0
+        }
+      },
+    ],
+  ),
+)
+
 /** The cave world as its own dimension, for existing worlds. */
 Dimension caves {
   type = caves
-  generator = {
-    type = noise
-    settings = caves
-    biome_source = {
-      type = multi_noise
-      biomes = [
-        // Rare regions where continents is low
-        {
-          biome = mycelium_deeps
-          parameters = {
-            temperature = [-1, 1]
-            humidity = [-1, 1]
-            continentalness = [-1, -0.75]
-            erosion = [-1, 1]
-            weirdness = 0
-            depth = [0, 1.1]
-            offset = 0
-          }
-        },
-        // The deep layer, below y -35
-        {
-          biome = minecraft:deep_dark
-          parameters = {
-            temperature = [-1, 0.25]
-            humidity = [-1, 1]
-            continentalness = [-0.75, 1]
-            erosion = [-1, 1]
-            weirdness = 0
-            depth = [1.1, 1.5]
-            offset = 0
-          }
-        },
-        {
-          biome = ash_vents
-          parameters = {
-            temperature = [0.5, 1]
-            humidity = [-1, -0.35]
-            continentalness = [-0.75, 1]
-            erosion = [-1, 1]
-            weirdness = 0
-            depth = [-1, 1.5]
-            offset = 0
-          }
-        },
-        // Below y 10
-        {
-          biome = darkroot_grove
-          parameters = {
-            temperature = [0.25, 1]
-            humidity = [0.25, 1]
-            continentalness = [-0.75, 1]
-            erosion = [-1, 1]
-            weirdness = 0
-            depth = [0.75, 1.5]
-            offset = 0
-          }
-        },
-        {
-          biome = rootwood_hollow
-          parameters = {
-            temperature = [0.25, 1]
-            humidity = [-0.25, 1]
-            continentalness = [-0.75, 1]
-            erosion = [-1, 1]
-            weirdness = 0
-            depth = [-1, 0.6]
-            offset = 0
-          }
-        },
-        {
-          biome = rootwood_hollow
-          parameters = {
-            temperature = [-1, -0.25]
-            humidity = [-0.25, 0.25]
-            continentalness = [-0.75, 1]
-            erosion = [-1, 1]
-            weirdness = 0
-            depth = [-1, 1.1]
-            offset = 0
-          }
-        },
-        {
-          biome = minecraft:dripstone_caves
-          parameters = {
-            temperature = [-1, -0.25]
-            humidity = [-1, -0.25]
-            continentalness = [-0.75, 1]
-            erosion = [-1, 1]
-            weirdness = 0
-            depth = [-1, 1.1]
-            offset = 0
-          }
-        },
-        {
-          biome = sunken_lake
-          parameters = {
-            temperature = [-1, -0.25]
-            humidity = [0.25, 1]
-            continentalness = [-0.75, 1]
-            erosion = [-1, 1]
-            weirdness = 0
-            depth = [-1, 1.1]
-            offset = 0
-          }
-        },
-        {
-          biome = glowmeadow
-          parameters = {
-            temperature = [-0.25, 0.25]
-            humidity = [-1, 0.25]
-            continentalness = [-0.75, 1]
-            erosion = [-1, 1]
-            weirdness = 0
-            depth = [-1, 1.1]
-            offset = 0
-          }
-        },
-        {
-          biome = minecraft:lush_caves
-          parameters = {
-            temperature = [-0.25, 0.25]
-            humidity = [0.25, 1]
-            continentalness = [-0.75, 1]
-            erosion = [-1, 1]
-            weirdness = 0
-            depth = [-1, 1.1]
-            offset = 0
-          }
-        },
-      ]
-    }
-  }
+  generator = cave_generator
 }
 
 /**
@@ -243,157 +247,15 @@ WorldPreset cave_siege {
   dimensions = {
     "minecraft:overworld" = {
       type = caves
-      generator = {
-        type = noise
-        settings = caves
-        biome_source = {
-          type = multi_noise
-          biomes = [
-            // Rare regions where continents is low
-            {
-              biome = mycelium_deeps
-              parameters = {
-                temperature = [-1, 1]
-                humidity = [-1, 1]
-                continentalness = [-1, -0.75]
-                erosion = [-1, 1]
-                weirdness = 0
-                depth = [0, 1.1]
-                offset = 0
-              }
-            },
-            // The deep layer, below y -35
-            {
-              biome = minecraft:deep_dark
-              parameters = {
-                temperature = [-1, 0.25]
-                humidity = [-1, 1]
-                continentalness = [-0.75, 1]
-                erosion = [-1, 1]
-                weirdness = 0
-                depth = [1.1, 1.5]
-                offset = 0
-              }
-            },
-            {
-              biome = ash_vents
-              parameters = {
-                temperature = [0.5, 1]
-                humidity = [-1, -0.35]
-                continentalness = [-0.75, 1]
-                erosion = [-1, 1]
-                weirdness = 0
-                depth = [-1, 1.5]
-                offset = 0
-              }
-            },
-            // Below y 10
-            {
-              biome = darkroot_grove
-              parameters = {
-                temperature = [0.25, 1]
-                humidity = [0.25, 1]
-                continentalness = [-0.75, 1]
-                erosion = [-1, 1]
-                weirdness = 0
-                depth = [0.75, 1.5]
-                offset = 0
-              }
-            },
-            {
-              biome = rootwood_hollow
-              parameters = {
-                temperature = [0.25, 1]
-                humidity = [-0.25, 1]
-                continentalness = [-0.75, 1]
-                erosion = [-1, 1]
-                weirdness = 0
-                depth = [-1, 0.6]
-                offset = 0
-              }
-            },
-            {
-              biome = rootwood_hollow
-              parameters = {
-                temperature = [-1, -0.25]
-                humidity = [-0.25, 0.25]
-                continentalness = [-0.75, 1]
-                erosion = [-1, 1]
-                weirdness = 0
-                depth = [-1, 1.1]
-                offset = 0
-              }
-            },
-            {
-              biome = minecraft:dripstone_caves
-              parameters = {
-                temperature = [-1, -0.25]
-                humidity = [-1, -0.25]
-                continentalness = [-0.75, 1]
-                erosion = [-1, 1]
-                weirdness = 0
-                depth = [-1, 1.1]
-                offset = 0
-              }
-            },
-            {
-              biome = sunken_lake
-              parameters = {
-                temperature = [-1, -0.25]
-                humidity = [0.25, 1]
-                continentalness = [-0.75, 1]
-                erosion = [-1, 1]
-                weirdness = 0
-                depth = [-1, 1.1]
-                offset = 0
-              }
-            },
-            {
-              biome = glowmeadow
-              parameters = {
-                temperature = [-0.25, 0.25]
-                humidity = [-1, 0.25]
-                continentalness = [-0.75, 1]
-                erosion = [-1, 1]
-                weirdness = 0
-                depth = [-1, 1.1]
-                offset = 0
-              }
-            },
-            {
-              biome = minecraft:lush_caves
-              parameters = {
-                temperature = [-0.25, 0.25]
-                humidity = [0.25, 1]
-                continentalness = [-0.75, 1]
-                erosion = [-1, 1]
-                weirdness = 0
-                depth = [-1, 1.1]
-                offset = 0
-              }
-            },
-          ]
-        }
-      }
+      generator = cave_generator
     }
     "minecraft:the_nether" = {
-      type = minecraft:the_nether
-      generator = {
-        type = noise
-        settings = minecraft:nether
-        biome_source = {
-          type = multi_noise
-          preset = minecraft:nether
-        }
-      }
+      type = the_nether
+      generator = Noise(settings = nether, biome_source = MultiNoise(preset = nether))
     }
     "minecraft:the_end" = {
-      type = minecraft:the_end
-      generator = {
-        type = noise
-        settings = minecraft:end
-        biome_source = { type = the_end }
-      }
+      type = the_end
+      generator = Noise(settings = end, biome_source = TheEnd())
     }
   }
 }

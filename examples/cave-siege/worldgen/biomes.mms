@@ -30,14 +30,14 @@ Biome rootwood_hollow {
       modifier = append
       argument = [
         {
-          particle = { type = spore_blossom_air }
+          particle = SporeBlossomAir()
           probability = 0.004
         },
       ]
     }
     "minecraft:audio/background_music" = {
       default = {
-        sound = "minecraft:music.overworld.forest"
+        sound = minecraft:music.overworld.forest
         min_delay = 12000
         max_delay = 24000
       }
@@ -101,9 +101,9 @@ Biome rootwood_hollow {
     [],
     [],
     #ores,
-    [roof_glowstone, minecraft:glow_lichen],
+    [roof_glowstone, glow_lichen],
     #water_springs,
-    [rootwood_trees, floor_grass, floor_flowers, minecraft:cave_vines, glow_caps],
+    [rootwood_trees, floor_grass, floor_flowers, cave_vines, glow_caps],
     [],
   ]
 }
@@ -127,14 +127,14 @@ Biome glowmeadow {
       modifier = append
       argument = [
         {
-          particle = { type = white_ash }
+          particle = WhiteAsh()
           probability = 0.002
         },
       ]
     }
     "minecraft:audio/background_music" = {
       default = {
-        sound = "minecraft:music.overworld.meadow"
+        sound = minecraft:music.overworld.meadow
         min_delay = 12000
         max_delay = 24000
       }
@@ -224,7 +224,7 @@ Biome mycelium_deeps {
       modifier = append
       argument = [
         {
-          particle = { type = mycelium }
+          particle = Mycelium()
           probability = 0.02
         },
       ]
@@ -285,7 +285,7 @@ Biome darkroot_grove {
     "minecraft:visual/fog_color" = "#15241a"
     "minecraft:audio/background_music" = {
       default = {
-        sound = "minecraft:music.overworld.jungle"
+        sound = minecraft:music.overworld.jungle
         min_delay = 12000
         max_delay = 24000
       }
@@ -359,7 +359,7 @@ Biome darkroot_grove {
     [],
     [],
     #ores,
-    [verdant_crystals, roof_glowstone_sparse, minecraft:ore_emerald],
+    [verdant_crystals, roof_glowstone_sparse, ore_emerald],
     #water_springs,
     [darkroot_trees, floor_bamboo, floor_melons, floor_grass, glow_caps],
     [],
@@ -471,12 +471,12 @@ Biome ash_vents {
       modifier = append
       argument = [
         {
-          particle = { type = ash }
+          particle = Ash()
           probability = 0.03
         },
       ]
     }
-    "minecraft:visual/default_dripstone_particle" = { type = dripping_dripstone_lava }
+    "minecraft:visual/default_dripstone_particle" = DrippingDripstoneLava()
     "minecraft:gameplay/natural_mob_spawns" = {
       modifier = overlay
       argument = {
@@ -512,7 +512,7 @@ Biome ash_vents {
     [],
     [],
     #ores,
-    [minecraft:ore_magma, minecraft:ore_emerald],
+    [ore_magma, ore_emerald],
     #water_springs,
     [],
     [],

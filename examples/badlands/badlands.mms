@@ -1,3 +1,6 @@
+// The vanilla badlands surface rules, written with MMS's surface rule
+// helpers. Put the cursor on a rule to preview its terrain.
+
 /** The three badlands biomes. */
 SurfaceCondition in_badlands = Biome(badlands, eroded_badlands, wooded_badlands)
 
@@ -17,8 +20,6 @@ SurfaceRule terracotta_bands = If(StoneDepth(Floor)) {
 
 SurfaceRule white_terracotta = If(AboveWater().Offset(-6).Mul(-1).Add()) { Block(white_terracotta) }
 
-SurfaceRule orange_terracotta = If(YAbove(63)) { Block(orange_terracotta) }
-
 SurfaceRule stone_and_gravel = [
   If(StoneDepth(Ceiling)) { Block(stone) },
   Block(gravel),
@@ -33,7 +34,11 @@ SurfaceRule orange_terracotta_edge = If(YAbove(63) && !YAbove(74).Mul(1).Add()) 
   Block(orange_terracotta)
 }
 
-/** Only the top few blocks of the terrain in the badlands biomes are painted. */
+/**
+ * Only the top few blocks of the terrain in the badlands biomes are
+ * painted. A dimension's noise settings use it as their surface rule.
+ */
+// mms-ignore unused
 SurfaceRule badlands = If(in_badlands && StoneDepth(Floor).AddSurfaceDepth()) {
   If(YAbove(63)) {
     sky_terracotta
