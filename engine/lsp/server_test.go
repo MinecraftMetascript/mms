@@ -319,7 +319,10 @@ func TestCodeActions(t *testing.T) {
 	for _, a := range acts {
 		titles = append(titles, a.(map[string]any)["title"].(string))
 	}
-	if got := strings.Join(titles, "|"); got != "Write minecraft:diamond|Ignore use-shorthand on this line|Write item|Ignore quoted-name on this line|Fix all MMS problems" {
+	// No "Fix all" here: the lightbulb asks on every cursor move, and fix
+	// all analyses the project in rounds.
+	want := "Write minecraft:diamond|Ignore use-shorthand on this line|Write item|Ignore quoted-name on this line"
+	if got := strings.Join(titles, "|"); got != want {
 		t.Errorf("actions = %s", got)
 	}
 	all := c.result("textDocument/codeAction", map[string]any{"textDocument": map[string]any{"uri": uri}, "range": rng(0, 0),
@@ -330,6 +333,15 @@ func TestCodeActions(t *testing.T) {
 	edit := all[0].(map[string]any)["edit"].(map[string]any)["changes"].(map[string]any)[uri].([]any)[0].(map[string]any)
 	if want := "LootTable t { pools = [{ rolls = 1, entries = [diamond] }] }\n"; edit["newText"] != want {
 		t.Errorf("fix all text = %q", edit["newText"])
+	}
+	// Fixing all is only offered: the open file's problems are unchanged.
+	again := c.result("textDocument/codeAction", map[string]any{"textDocument": map[string]any{"uri": uri}, "range": rng(60, 60), "context": map[string]any{"diagnostics": []any{}}}).([]any)
+	titles = titles[:0]
+	for _, a := range again {
+		titles = append(titles, a.(map[string]any)["title"].(string))
+	}
+	if got := strings.Join(titles, "|"); got != want {
+		t.Errorf("actions after fix all = %s", got)
 	}
 }
 
@@ -913,5 +925,29 @@ func TestPreludeDefinition(t *testing.T) {
 	line := int(loc["range"].(map[string]any)["start"].(map[string]any)["line"].(float64))
 	if lines := strings.Split(text, "\n"); line >= len(lines) || !strings.Contains(lines[line], "Blueprint CustomItem") {
 		t.Errorf("line %d of %s is not the Blueprint", line, target)
+	}
+}
+
+// TestWatchedFileOutsideSources checks that a .mms file that mms.json's
+// sources leave out stays out of the project when it changes on disk, as
+// it does for mms build.
+func TestWatchedFileOutsideSources(t *testing.T) {
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, "src"), 0o755)
+	os.MkdirAll(filepath.Join(dir, "scratch"), 0o755)
+	os.WriteFile(filepath.Join(dir, "mms.json"), []byte(`{"namespace": "demo", "sources": ["src/**/*.mms"]}`), 0o644)
+	os.WriteFile(filepath.Join(dir, "src", "main.mms"), []byte("DensityFunction kept = 1\n"), 0o644)
+	main := pathURI(filepath.Join(dir, "src", "main.mms"))
+	c := start(t)
+	c.result("initialize", map[string]any{"workspaceFolders": []any{map[string]any{"uri": pathURI(dir)}}})
+	c.notify("initialized", map[string]any{})
+	scratch := filepath.Join(dir, "scratch", "draft.mms")
+	os.WriteFile(scratch, []byte("DensityFunction draft = 2\n"), 0o644)
+	c.notify("workspace/didChangeWatchedFiles", map[string]any{"changes": []any{map[string]any{"uri": pathURI(scratch), "type": 1}}})
+	out := c.result("mms/output", map[string]any{"uri": main}).(map[string]any)
+	for _, f := range out["files"].([]any) {
+		if strings.Contains(f.(map[string]any)["path"].(string), "draft") {
+			t.Errorf("output has %v, from a file sources leave out", f.(map[string]any)["path"])
+		}
 	}
 }

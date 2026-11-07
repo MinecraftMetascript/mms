@@ -123,14 +123,6 @@ func LoadConfig(dir string) (Config, error) {
 // SourceFiles lists the project's .mms files, sorted, relative to dir.
 // Folders holding their own mms.json are other projects and left out.
 func (c Config) SourceFiles(dir string) ([]string, error) {
-	patterns := c.Sources
-	if len(patterns) == 0 {
-		patterns = []string{"**/*.mms"}
-	}
-	var res []*regexp.Regexp
-	for _, p := range patterns {
-		res = append(res, globRegexp(p))
-	}
 	var out []string
 	err := filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
@@ -150,20 +142,31 @@ func (c Config) SourceFiles(dir string) ([]string, error) {
 			}
 			return nil
 		}
-		if sema.IsBookFile(rel) {
-			// Book text belongs to the project wherever it is.
+		if c.IsSource(rel) {
 			out = append(out, rel)
-			return nil
-		}
-		for _, re := range res {
-			if re.MatchString(rel) {
-				out = append(out, rel)
-				break
-			}
 		}
 		return nil
 	})
 	return out, err
+}
+
+// IsSource reports whether the file at rel, a slash path relative to the
+// project, is one of its sources by `sources`. Book and text files belong
+// to the project wherever they are. Folders are not checked here.
+func (c Config) IsSource(rel string) bool {
+	if sema.IsBookFile(rel) {
+		return true
+	}
+	patterns := c.Sources
+	if len(patterns) == 0 {
+		patterns = []string{"**/*.mms"}
+	}
+	for _, p := range patterns {
+		if globRegexp(p).MatchString(rel) {
+			return true
+		}
+	}
+	return false
 }
 
 // globRegexp compiles a glob with *, ** and ? into an anchored regexp.

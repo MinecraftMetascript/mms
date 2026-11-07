@@ -27,7 +27,9 @@ type workspace struct {
 	res   *project.Result
 }
 
-// contains reports whether the .mms file at path belongs to w on disk.
+// contains reports whether the .mms file at path belongs to w on disk:
+// for a project with mms.json, whether its `sources` take it, the same
+// files mms build reads.
 func (w *workspace) contains(path string) bool {
 	if !strings.HasSuffix(path, ".mms") && !sema.IsBookFile(path) {
 		return false
@@ -37,9 +39,10 @@ func (w *workspace) contains(path string) bool {
 			continue
 		}
 		rel, err := filepath.Rel(root, path)
-		if err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
-			return true
+		if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+			continue
 		}
+		return w.dir == "" || w.proj.Config.IsSource(filepath.ToSlash(rel))
 	}
 	return false
 }
@@ -198,6 +201,14 @@ func (s *Server) reload(ctx context.Context) {
 	for uri := range s.managed {
 		keep(uri)
 	}
+	// The projects are rebuilt, so clear what was published for the old
+	// ones; the next analysis publishes what still holds.
+	for _, uris := range s.assetDiags {
+		for uri := range uris {
+			s.notify("textDocument/publishDiagnostics", map[string]any{"uri": uri, "diagnostics": []any{}})
+		}
+	}
+	s.assetDiags = map[*workspace]map[string]bool{}
 	s.discover(s.projects[""].proj.Config)
 	for uri, t := range texts {
 		s.setFile(uri, t)
