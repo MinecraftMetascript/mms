@@ -150,6 +150,28 @@ func TestBookTextCompletion(t *testing.T) {
 	}
 }
 
+// A host that names files by URI lists the .mmsbook files by their path
+// in the project, which is what TextFile takes.
+func TestBookTextCompletionURI(t *testing.T) {
+	p := project.New(spec.MustDefault(), project.Config{Namespace: "test"})
+	p.Root = "file:///home/me/my%20pack/"
+	p.SetFile(p.Root+"tools/test/content.mmsbook", "# Hi\n")
+	p.SetFile("file:///elsewhere/other.mmsbook", "Old\n")
+	src := "Book b {\n  text = TextFile(\"|\")\n}\n"
+	off := strings.Index(src, "|")
+	src = src[:off] + src[off+1:]
+	p.SetFile(p.Root+"main.mms", src)
+	r, err := p.Analyze(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := &Session{P: p, R: r}
+	items, _ := s.Completion(p.Root+"main.mms", len([]rune(src[:off])))
+	if got := labels(items); len(got) != 1 || got[0] != "tools/test/content.mmsbook" {
+		t.Errorf("completions %v, want only tools/test/content.mmsbook", got)
+	}
+}
+
 // Markup completes in any string where a text component goes.
 func TestTextStringCompletion(t *testing.T) {
 	src := "Advancement a { display = { title = \"Hi {gol|\", description = \"d\", icon = { id = stone }, background = \"minecraft:block/stone\" }, criteria = { x = Tick() } }\n"
