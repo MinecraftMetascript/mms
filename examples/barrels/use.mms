@@ -38,7 +38,7 @@ OnAdvancement use_barrel = PlayerInteractedWithEntity(
     } else if (holding == 1) {
       insert_held()
     } else {
-      /title @s actionbar {text:"Right-click with an item to put it in, or sneak to put in everything that matches",color:"gray"}
+      actionbar(@s, "{gray}Right-click with an item to put it in, or sneak to put in everything that matches")
     }
     /kill @e[type=item_display,tag=barrels.tmp]
     close()
@@ -89,7 +89,7 @@ Function insert_held {
   if (stack > 0) {
     absorb("weapon.mainhand")
     if (diff == 1) {
-      /title @s actionbar {text:"This barrel holds something else",color:"red"}
+      actionbar(@s, "{red}This barrel holds something else")
     }
   }
 }
@@ -99,7 +99,7 @@ Function claim {
   /execute if items entity @s weapon.mainhand *[max_stack_size=64] run scoreboard players set $stack mms.barrels 64
   /execute if items entity @s weapon.mainhand *[max_stack_size=16] run scoreboard players set $stack mms.barrels 16
   if (stack == 0) {
-    /title @s actionbar {text:"Only items that stack to 16 or 64 fit in a barrel",color:"red"}
+    actionbar(@s, "{red}Only items that stack to 16 or 64 fit in a barrel")
     return
   }
   /item replace entity @e[type=item_display,tag=barrels.this,limit=1] contents from entity @s weapon.mainhand
@@ -109,7 +109,7 @@ Function claim {
 /** Puts in every item in the player's hotbar and inventory that matches the barrel. */
 Function insert_all {
   if (stack == 0) {
-    /title @s actionbar {text:"Right-click with an item to choose what this barrel holds",color:"gray"}
+    actionbar(@s, "{gray}Right-click with an item to choose what this barrel holds")
     return
   }
   let before = count
@@ -120,7 +120,7 @@ Function insert_all {
     absorb("inventory." + i)
   }
   if (count == before) {
-    /title @s actionbar {text:"Nothing in your inventory matches",color:"gray"}
+    actionbar(@s, "{gray}Nothing in your inventory matches")
   }
 }
 
@@ -147,7 +147,7 @@ Function absorb(slot: string) {
   }
   let take = capacity() - count
   if (take <= 0) {
-    /title @s actionbar {text:"This barrel is full",color:"gold"}
+    actionbar(@s, "{gold}This barrel is full")
     return
   }
   if (take > held) {

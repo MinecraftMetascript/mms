@@ -11,9 +11,13 @@ import (
 var update = flag.Bool("update", false, "rewrite golden files")
 
 // Each testdata/*.in.mms is formatted and compared with *.out.mms. The
-// output must also be stable: formatting it again changes nothing.
+// output must also be stable: formatting it again changes nothing. The
+// language design doc's snippets (syntax/testdata/design) are checked the
+// same way, with goldens in testdata/design.
 func TestGolden(t *testing.T) {
 	ins, _ := filepath.Glob("testdata/*.in.mms")
+	design, _ := filepath.Glob("../syntax/testdata/design/*.mms")
+	ins = append(ins, design...)
 	for _, in := range ins {
 		t.Run(filepath.Base(in), func(t *testing.T) {
 			src, err := os.ReadFile(in)
@@ -32,6 +36,9 @@ func TestGolden(t *testing.T) {
 				t.Errorf("not idempotent\n--- first\n%s--- second\n%s", got, again)
 			}
 			outPath := strings.TrimSuffix(in, ".in.mms") + ".out.mms"
+			if !strings.HasSuffix(in, ".in.mms") {
+				outPath = filepath.Join("testdata/design", strings.TrimSuffix(filepath.Base(in), ".mms")+".out.mms")
+			}
 			if *update {
 				os.WriteFile(outPath, []byte(got), 0o644)
 				return

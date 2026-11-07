@@ -23,17 +23,17 @@ Global ticks: int = 0
 // Objective names are global to the world, so they carry a cs_ prefix.
 
 /** Scratch values: #cx #cy #cz (core position), #ex #ey #ez, #lost, #hp, #tgt, #need, #near. */
-Objective cs_tmp = dummy
+Objective cs_tmp: dummy
 /** Which of the 4 update groups an enemy is in, 0 to 3. */
-Objective cs_group = dummy
+Objective cs_group: dummy
 /** Updates an enemy has had, to run some checks less often. */
-Objective cs_age = dummy
+Objective cs_age: dummy
 /** An enemy's distance to the banner at the last stuck check (blocks, x + y + z). */
-Objective cs_prev = dummy
+Objective cs_prev: dummy
 /** Updates left in breaker mode. Sappers start with a very large value. */
-Objective cs_stuck = dummy
+Objective cs_stuck: dummy
 /** Progress on the block a breaker is digging, in updates. */
-Objective cs_break = dummy
+Objective cs_break: dummy
 
 OnLoad {
   /team add cs_defenders "Defenders"
@@ -77,9 +77,9 @@ Function status {
   /execute store result score #enemies cs_tmp if entity @e[tag=cs_enemy]
   let enemies = cs_tmp["#enemies"]
   if (banner_placed) {
-    /tellraw @s "Banner: ${banner_hp} / ${banner_max} health, ${enemies} enemies alive"
+    tell(@s, "Banner: ${banner_hp} / ${banner_max} health, ${enemies} enemies alive")
   } else {
-    /tellraw @s "No banner is planted, ${enemies} enemies alive"
+    tell(@s, "No banner is planted, ${enemies} enemies alive")
   }
 }
 
@@ -96,5 +96,5 @@ Function reset {
   /bossbar set siege:banner players
   banner_placed = false
   banner_hp = banner_max
-  /tellraw @a "Cave Siege reset"
+  tell(@a, "Cave Siege reset")
 }

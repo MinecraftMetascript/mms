@@ -8,8 +8,9 @@ import (
 	"github.com/minecraftmetascript/mms/engine/syntax"
 )
 
-// Book markup completion and hover, in .mmsbook files and in the strings
-// of a Book's text field.
+// Text markup completion and hover, in .mmsbook and .mmstext files, in
+// the strings of a Book's text field and in strings where a text
+// component goes.
 
 // bookText finds the book markup at off: in a .mmsbook file, the file;
 // in a .mms file, the text field string the cursor is in. It returns the
@@ -29,26 +30,20 @@ func (s *Session) bookText(path string, off int) (text []rune, base int, ok bool
 	return u.File.Src[start:end], start, true
 }
 
-// inBookText reports whether the string starting at off is in the text
-// field of a Book.
+// inBookText reports whether the string starting at off is text markup:
+// a Book's text, or a string where a text component goes.
 func (s *Session) inBookText(u *sema.Unit, off int) bool {
-	path := syntax.PathAt(u.File, off)
-	book, field := false, false
-	for _, n := range path {
-		switch n := n.(type) {
-		case *syntax.Decl:
-			if k, ok := s.R.Syms.DeclKind[n]; ok && k.MMS == "Book" {
-				book = true
-			}
-		case *syntax.FieldStmt:
-			field = n.Key != nil && n.Key.Text == "text"
-		}
-	}
-	if !book || !field {
+	a := s.at(u.Path, off)
+	if a == nil || a.decl == nil {
 		return false
 	}
-	// Not the path of BookText("...").
-	return assetHelperBefore(u.File, off-1) != "BookText"
+	for i := len(a.path) - 1; i >= 0; i-- {
+		if str, ok := a.path[i].(*syntax.String); ok {
+			in := a.info(str)
+			return in != nil && in.Markup
+		}
+	}
+	return false
 }
 
 // bookContext is what the cursor is in: a {...} tag, a link target or a

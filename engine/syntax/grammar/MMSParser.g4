@@ -1,68 +1,143 @@
 // Parser for Minecraft Metascript. The grammar knows shapes, not Minecraft:
-// a declaration is `Kind name ...` and Kind is resolved against the spec
-// pack later. Optional tails (args?, chains with a missing name) let
-// half-typed code such as `Noise(-7).` parse, which completion relies on.
+// a declaration is `Kind name ...` and Kind is resolved later. Optional
+// tails (args?, chains with a missing name) let half-typed code such as
+// `Noise(-7).` parse, which completion relies on.
 parser grammar MMSParser;
 
 options { tokenVocab = MMSLexer; }
 
-file : declaration* EOF;
+file : topItem* EOF;
+
+// Entry point for the expression inside a `${...}` piece of a name.
+exprOnly : expr EOF;
 
 // Namespace example
 // Noise ridges = Noise(-7)
 // LootTable blocks/ruby_ore { pools = [ ... ] }
+// const spacing: int = 32
+// for w in woods { Recipe ${w}_crate = ... }
+// extern Template font_width(text: string): int
+topItem
+    : EXTERN? declaration                                         # declItem
+    | constDecl                                                   # constItem
+    | letDecl                                                     # letItem
+    | FOR IDENT (COMMA IDENT)? IN expr block                      # forItem
+    ;
+
 // Global deaths: int = 0
-// Function on_kill(target: selector) { ... }
 // Function add(a: int, b: int): int { return a + b }
 // OnLoad { ... }
+// Type LangText = string | {string: string}
+// JigsawHole room_exit, hall_entry
 declaration
-    : kind=IDENT name=declName (typeAnnotation | params typeAnnotation?)? declBody?
+    : kind=TYPE name=declName ASSIGN typeExpr
+    | kind=TYPE name=declName block
+    | kind=IDENT name=declName (COMMA declName)+
+    | kind=IDENT name=declName (typeAnnotation | params typeAnnotation?)? declBody?
     | kind=IDENT params? block
     ;
 
-declName : IDENT | RESLOC;
+// The same shapes nested in a block (an emit block or a top-level for). A
+// rule of its own keeps what may follow a top-level declaration narrow,
+// which keeps error recovery at the top level sharp. `Kind { }` without a
+// name parses as an expression statement; the builder turns it into a
+// declaration where declarations belong.
+innerDecl
+    : kind=IDENT name=declName (COMMA declName)+
+    | kind=IDENT name=declName (typeAnnotation | params typeAnnotation?)? innerBody?
+    ;
 
-// The value after '=' is optional to the parser so that `Noise a =`
-// followed by a new declaration on the next line recovers cleanly; the
-// predicate stops the value from swallowing that declaration.
+innerBody : ASSIGN value | block;
+
+declName : word | RESLOC | TNAME;
+
+// An identifier, or a body keyword used as a plain name.
+word : IDENT | TYPE | PRIMARY | AS | CHECK | EMIT | SETUP | EXPECT | RUN;
+
+// When the value after '=' is left out and the next line starts a new
+// declaration, recovery inserts a MISSING token as the value (see
+// markMissingValues), so the value never swallows that declaration.
 declBody
-    : ASSIGN ({p.valueFollows()}? expr)?
+    : ASSIGN value
     | block
     ;
 
-typeAnnotation : COLON typeRef;
-typeRef        : IDENT | RESLOC;
+constDecl : CONST IDENT typeAnnotation? (ASSIGN value)?;
+letDecl   : LET IDENT typeAnnotation? (ASSIGN value)?;
+
+typeAnnotation : COLON typeExpr;
+
+// int, Id<item>, [T], {string: T}, T?, A | B, "rigid" | "terrain_matching"
+typeExpr : typeArm (PIPE typeArm)*;
+typeArm  : typeAtom QUESTION?;
+typeAtom
+    : typeName (LT typeExpr (COMMA typeExpr)* GT)?               # namedType
+    | STRING                                                      # literalType
+    | LBRACK typeExpr RBRACK                                      # listType
+    | LBRACE typeExpr COLON typeExpr RBRACE                       # mapType
+    | LPAREN typeExpr RPAREN                                      # parenType
+    ;
+typeName : IDENT (DOT IDENT)* | RESLOC;
 
 params : LPAREN (param (COMMA param)* COMMA?)? RPAREN;
-param  : IDENT typeAnnotation?;
+param  : IDENT typeAnnotation? (ASSIGN value)?;
 
 // A block holds items. In a resource body they are fields; in a function
-// body they are statements; the checker decides which by context.
+// body they are statements; in a Type or Blueprint body they are field
+// declarations and sections. The checker decides what fits by context.
 block : LBRACE blockItem* RBRACE;
 
 blockItem
-    : statement COMMA?
+    : statement (COMMA | SEP)?
     ;
 
 statement
-    : LET IDENT typeAnnotation? (ASSIGN expr)?                    # letStmt
-    | IF LPAREN expr RPAREN block (ELSE (ifTail | block))?        # ifStmt
+    : letDecl                                                     # letStmt
+    | constDecl                                                   # constStmt
+    | IF LPAREN expr RPAREN thenPart (ELSE elsePart)?             # ifStmt
     | WHILE LPAREN expr RPAREN block                              # whileStmt
-    | FOR IDENT IN expr block                                     # forStmt
-    | RETURN expr?                                                # returnStmt
+    | FOR IDENT (COMMA IDENT)? IN expr block                      # forStmt
+    | RETURN value?                                               # returnStmt
     | BREAK                                                       # breakStmt
     | CONTINUE                                                    # continueStmt
     | COMMAND                                                     # commandStmt
-    | fieldKey ASSIGN expr                                        # fieldStmt
-    | IDENT (DOT IDENT)+ ASSIGN expr                              # pathAssignStmt
-    | IDENT LBRACK arg RBRACK ASSIGN expr                         # indexAssignStmt
+    | PRIMARY innerDecl                                           # primaryStmt
+    | innerDecl                                                   # declStmt
+    | AS typeExpr ASSIGN value hint?                              # asStmt
+    | section=(CHECK | EMIT | SETUP) block                        # sectionStmt
+    | EXPECT expr                                                 # expectStmt
+    | RUN bareCall                                                # runStmt
+    | IDENT typeAnnotation (ASSIGN value)?                        # fieldDeclStmt
+    | fieldKey ASSIGN value                                       # fieldStmt
+    | IDENT (DOT IDENT)+ ASSIGN value                             # pathAssignStmt
+    | IDENT LBRACK arg RBRACK ASSIGN value                        # indexAssignStmt
     | expr op=(PLUS_EQ | MINUS_EQ | STAR_EQ | SLASH_EQ | PCT_EQ) expr # compoundAssignStmt
     | expr                                                        # exprStmt
     ;
 
-ifTail : IF LPAREN expr RPAREN block (ELSE (ifTail | block))?;
+// A statement-level if takes a block, or a single call as in
+// `if (cooldown < 1) error(cooldown, "...")`. The call must start with a
+// name, so the choice is made on the first token and a broken block still
+// recovers as a block.
+thenPart : block | bareCall;
+elsePart : ifTail | block | bareCall;
+bareCall : IDENT postfix*;
 
-fieldKey : IDENT | RESLOC | STRING;
+// `hint("rule", "message")` after an `as` conversion.
+hint : {p.word("hint")}? IDENT args;
+
+ifTail : IF LPAREN expr RPAREN thenPart (ELSE elsePart)?;
+
+fieldKey : word | RESLOC | STRING;
+
+// A value is an expression, or an if expression such as
+// `item_name = if (name != none) Translate(...)`. If expressions sit only
+// where a value is expected, so a statement that starts with `if` is always
+// an if statement.
+value
+    : IF LPAREN expr RPAREN value (ELSE value)?
+    | expr
+    ;
 
 expr
     : expr postfix                                       # postfixExpr
@@ -75,31 +150,36 @@ expr
     | expr op=(EQEQ | NEQ) expr                          # equalExpr
     | expr ANDAND expr                                   # andExpr
     | expr OROR expr                                     # orExpr
+    | expr QQ expr                                       # coalesceExpr
     | <assoc=right> expr ARROW expr                      # arrowExpr
+    | ELLIPSIS expr                                      # spreadExpr
     | primary                                            # primaryExpr
     ;
 
 postfix
-    : DOT name=IDENT?                                    # memberPostfix
+    : DOT name=word?                                     # memberPostfix
     | args                                               # callPostfix
     | LBRACK (arg (COMMA arg)* COMMA?)? RBRACK           # indexPostfix
     | block                                              # blockPostfix
     ;
 
 args : LPAREN (arg (COMMA arg)* COMMA?)? RPAREN;
-arg  : (IDENT ASSIGN)? expr;
+arg  : (word ASSIGN)? value;
 
 primary
     : NUMBER                                             # numberLit
     | STRING                                             # stringLit
     | (TRUE | FALSE)                                     # boolLit
+    | RUN block                                          # runExpr
     | IDENT                                              # identRef
     | RESLOC                                             # reslocRef
-    | HASH (IDENT | RESLOC)                              # tagRef
+    | TNAME                                              # templatedRef
+    | HASH (IDENT | RESLOC | TNAME)                      # tagRef
     | AT IDENT                                           # selector
     | ((TILDE | CARET) (MINUS? NUMBER)?)+                # coordinate
-    | LPAREN expr RPAREN                                 # parenExpr
-    | LBRACK (expr ((COMMA | {p.onNewLine()}?) expr)* COMMA?)? RBRACK # listLit
+    | LPAREN value RPAREN                                # parenExpr
+    | LBRACK FOR IDENT (COMMA IDENT)? IN expr (IF expr)? COLON value RBRACK # comprehension
+    | LBRACK (value (COMMA? value)* COMMA?)? RBRACK            # listLit
     | block                                              # objectLit
     | MISSING                                            # missingLit
     ;

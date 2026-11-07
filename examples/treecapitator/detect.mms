@@ -7,17 +7,17 @@
 // where the log was: a broken block's item appears inside the block's
 // space, and the tick function runs before items move for the first time.
 
-Objective chop_oak = minecraft.mined:minecraft.oak_log
-Objective chop_spruce = minecraft.mined:minecraft.spruce_log
-Objective chop_birch = minecraft.mined:minecraft.birch_log
-Objective chop_jungle = minecraft.mined:minecraft.jungle_log
-Objective chop_acacia = minecraft.mined:minecraft.acacia_log
-Objective chop_dark_oak = minecraft.mined:minecraft.dark_oak_log
-Objective chop_mangrove = minecraft.mined:minecraft.mangrove_log
-Objective chop_cherry = minecraft.mined:minecraft.cherry_log
-Objective chop_pale_oak = minecraft.mined:minecraft.pale_oak_log
-Objective chop_crimson = minecraft.mined:minecraft.crimson_stem
-Objective chop_warped = minecraft.mined:minecraft.warped_stem
+Objective chop_oak: minecraft.mined:minecraft.oak_log
+Objective chop_spruce: minecraft.mined:minecraft.spruce_log
+Objective chop_birch: minecraft.mined:minecraft.birch_log
+Objective chop_jungle: minecraft.mined:minecraft.jungle_log
+Objective chop_acacia: minecraft.mined:minecraft.acacia_log
+Objective chop_dark_oak: minecraft.mined:minecraft.dark_oak_log
+Objective chop_mangrove: minecraft.mined:minecraft.mangrove_log
+Objective chop_cherry: minecraft.mined:minecraft.cherry_log
+Objective chop_pale_oak: minecraft.mined:minecraft.pale_oak_log
+Objective chop_crimson: minecraft.mined:minecraft.crimson_stem
+Objective chop_warped: minecraft.mined:minecraft.warped_stem
 
 /** Whether the player is sneaking. Sneaking chops one log, as in vanilla. */
 Predicate sneaking = EntityProperties(entity = this, predicate = { flags = { is_sneaking = true } })

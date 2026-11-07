@@ -61,10 +61,10 @@ func pagesOf(t *testing.T, lootJSON string) []any {
 }
 
 func TestBook(t *testing.T) {
-	const src = `Objective kills = "dummy"
+	const src = `Objective kills: dummy
 Global wave = 3
 Global motto: string = "Hold"
-Book guide = {
+Book guide {
   title = "Guide"
   author = "The Garrison"
   generation = tattered
@@ -148,7 +148,7 @@ func TestBookErrors(t *testing.T) {
 		{`"{x"`, "this { is not closed"},
 	}
 	for _, tc := range cases {
-		src := "Book b = { title = \"T\", author = \"A\", text = [" + tc.text + "] }\nFunction f {\n  /say hi\n}\n"
+		src := "Book b { title = \"T\", author = \"A\", text = [" + tc.text + "] }\nFunction f {\n  /say hi\n}\n"
 		_, r := bookProject(t, src, nil)
 		d := diagText(r)
 		if !strings.Contains(d, tc.want) {
@@ -159,18 +159,18 @@ func TestBookErrors(t *testing.T) {
 		}
 	}
 	// Problems point into the string.
-	src := "Book b = { title = \"T\", author = \"A\", text = [\"ok {key:jumpp}\"] }\n"
+	src := "Book b { title = \"T\", author = \"A\", text = [\"ok {key:jumpp}\"] }\n"
 	_, r := bookProject(t, src, nil)
 	ds := r.Diagnostics("main.mms")
 	if len(ds) != 1 || string([]rune(src)[ds[0].Sp.Start:ds[0].Sp.End]) != "jumpp" {
 		t.Errorf("diagnostics = %+v", ds)
 	}
 	for _, tc := range []struct{ src, want string }{
-		{`Book b = { title = "This title is far too long for a book", author = "A" }`, "32"},
-		{`Book b = { title = "T", author = "A", text = ["a"], pages = ["b"] }`, "a book takes text or pages, not both"},
-		{`Book b = { title = "T", author = "A", components = { written_book_content = { title = "x", author = "y" } } }`, "writes written_book_content itself"},
-		{`Book b = { title = "T", author = "A", text = BookText("b.md") }`, "BookText reads a .mmsbook file"},
-		{`Book b = { title = "T", author = "A", text = BookText("missing.mmsbook") }`, "no file 'missing.mmsbook'"},
+		{`Book b { title = "This title is far too long for a book", author = "A" }`, "32"},
+		{`Book b { title = "T", author = "A", text = ["a"], pages = ["b"] }`, "a book takes text or pages, not both"},
+		{`Book b { title = "T", author = "A", components = { written_book_content = { title = "x", author = "y" } } }`, "writes written_book_content itself"},
+		{`Book b { title = "T", author = "A", text = TextFile("b.md") }`, "TextFile reads a .mmstext or .mmsbook file"},
+		{`Book b { title = "T", author = "A", text = TextFile("missing.mmsbook") }`, "no file 'missing.mmsbook'"},
 	} {
 		_, r := bookProject(t, tc.src+"\n", nil)
 		if d := diagText(r); !strings.Contains(d, tc.want) {
@@ -186,11 +186,11 @@ func TestBookOverflow(t *testing.T) {
 		lines = append(lines, `"line"`)
 	}
 	lines = append(lines, `"cut"`, `"---"`, `"fine"`)
-	src := "Book b = { title = \"T\", author = \"A\", text = [" + strings.Join(lines, ", ") + "] }\n"
+	src := "Book b { title = \"T\", author = \"A\", text = [" + strings.Join(lines, ", ") + "] }\n"
 	_, r := bookProject(t, src, nil)
 	var got []syntax.Diagnostic
 	for _, d := range r.Diagnostics("main.mms") {
-		if d.Code == "lint/book-overflow" {
+		if d.Code == "lint/book-page-overflow" {
 			got = append(got, d)
 		}
 	}
@@ -202,7 +202,7 @@ func TestBookOverflow(t *testing.T) {
 		t.Errorf("points at %q", at[:10])
 	}
 	// Exactly 14 lines fit.
-	src = "Book b = { title = \"T\", author = \"A\", text = [" + strings.Repeat(`"x", `, 13) + `"x"] }` + "\n"
+	src = "Book b { title = \"T\", author = \"A\", text = [" + strings.Repeat(`"x", `, 13) + `"x"] }` + "\n"
 	_, r = bookProject(t, src, nil)
 	for _, d := range r.Diagnostics("main.mms") {
 		t.Errorf("unexpected %s", d.Message)
@@ -210,7 +210,7 @@ func TestBookOverflow(t *testing.T) {
 }
 
 func TestBookFile(t *testing.T) {
-	const src = "Book diary = { title = \"Diary\", author = \"A\", text = BookText(\"books/diary.mmsbook\") }\nLootTable l { pools = [Pool(1, [diary])] }\n"
+	const src = "Book diary { title = \"Diary\", author = \"A\", text = TextFile(\"books/diary.mmsbook\") }\nLootTable l { pools = [Pool(1, [diary])] }\n"
 	p, r := bookProject(t, src, map[string]string{"books/diary.mmsbook": "# Day 1\nThe {key:jumpp} lamps\n"})
 	if d := diagText(r); d != "" {
 		t.Errorf("main.mms has diagnostics:\n%s", d)
@@ -237,7 +237,7 @@ func TestBookFile(t *testing.T) {
 	p.SetFile("books/diary.mmsbook", strings.Repeat("line\n", 15))
 	r, _ = p.Analyze(context.Background())
 	ds = r.Diagnostics("books/diary.mmsbook")
-	if len(ds) != 1 || ds[0].Code != "lint/book-overflow" || ds[0].Sp.Start != 70 {
+	if len(ds) != 1 || ds[0].Code != "lint/book-page-overflow" || ds[0].Sp.Start != 70 {
 		t.Fatalf("overflow in the file = %+v", ds)
 	}
 }
@@ -247,7 +247,7 @@ func TestBookFile(t *testing.T) {
 func TestBookFileByURI(t *testing.T) {
 	p := New(spec.MustDefault(), Config{Namespace: "demo"})
 	p.Root = "file:///pack/"
-	p.SetFile("file:///pack/main.mms", "Book b = { title = \"T\", author = \"A\", text = BookText(\"b.mmsbook\") }\n")
+	p.SetFile("file:///pack/main.mms", "Book b { title = \"T\", author = \"A\", text = TextFile(\"b.mmsbook\") }\n")
 	p.SetFile("file:///pack/b.mmsbook", "{nope}x{/}\n")
 	r, _ := p.Analyze(context.Background())
 	if ds := r.Diagnostics("file:///pack/b.mmsbook"); len(ds) != 1 || !strings.Contains(ds[0].Message, "'nope' is not a style") {
@@ -259,7 +259,7 @@ func TestBookFileByURI(t *testing.T) {
 // such as click and hover actions stay unnamespaced (the game rejects
 // "minecraft:show_text"), and colors take "#hex" strings.
 func TestBookRawPageValues(t *testing.T) {
-	const src = `Book manual = {
+	const src = `Book manual {
   title = "Builders Manual"
   author = "Shuckle I"
   pages = [
@@ -305,7 +305,7 @@ func TestColorErrors(t *testing.T) {
 		{`red`, `expected an RGBA color, got 'red'. Write a color as "#RRGGBB" or "#AARRGGBB"`},
 		{`[1, 0, 0]`, `list must have 4 items, got 3`},
 	} {
-		_, r := bookProject(t, `Book b = { title = "T", author = "A", pages = [{ text = "x", shadow_color = `+tc.value+` }] }`, nil)
+		_, r := bookProject(t, `Book b { title = "T", author = "A", pages = [{ text = "x", shadow_color = `+tc.value+` }] }`, nil)
 		if d := diagText(r); !strings.Contains(d, tc.want) {
 			t.Errorf("%s: diagnostics %q lack %q", tc.value, d, tc.want)
 		}

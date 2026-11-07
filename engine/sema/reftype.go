@@ -111,7 +111,7 @@ func (rt *refTypes) format(v tview, depth int) []TypePart {
 		if b, ok := v.Env.lookup(t.Path); ok {
 			return rt.format(b, depth+1)
 		}
-		if rt.c.Pack.Types[t.Path] == nil {
+		if rt.c.typeAt(t.Path) == nil {
 			return []TypePart{text(spec.ShortPath(t.Path))} // an unbound type parameter
 		}
 		return []TypePart{rt.named(t.Path, v.Env)}
@@ -299,7 +299,7 @@ func (rt *refTypes) define() {
 		path := rt.queue[0]
 		rt.queue = rt.queue[1:]
 		entry := rt.types[typeID(path)]
-		t := rt.c.Pack.Types[path]
+		t := rt.c.typeAt(path)
 		if t == nil {
 			entry.Def = []TypePart{text("any")}
 			continue

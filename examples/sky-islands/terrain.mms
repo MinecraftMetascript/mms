@@ -1,6 +1,6 @@
 // 3. The terrain: islands where 3D noise is high, fading out above and
 // below y = 128.
-Noise island_noise = {
+Noise island_noise {
   base_octave = -6
   amplitude_modifiers = [1, 1, 0.5]
 }
@@ -22,7 +22,7 @@ SurfaceRule surface = [
   If(StoneDepth(Floor).Offset(3)) { Block(dirt) },
 ]
 
-NoiseSettings islands = {
+NoiseSettings islands {
   sea_level = 0
   default_block = stone
   default_fluid = air

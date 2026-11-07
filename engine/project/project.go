@@ -10,11 +10,13 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/minecraftmetascript/mms/engine/eval"
 	"github.com/minecraftmetascript/mms/engine/fn"
 	"github.com/minecraftmetascript/mms/engine/jsonv"
 	"github.com/minecraftmetascript/mms/engine/sema"
 	"github.com/minecraftmetascript/mms/engine/spec"
 	"github.com/minecraftmetascript/mms/engine/syntax"
+	"github.com/minecraftmetascript/mms/engine/types"
 )
 
 // Project is a set of source files plus configuration. It is safe for
@@ -40,6 +42,8 @@ type Project struct {
 	// analysis, so their checked results can be carried over.
 	moved map[*syntax.Decl]syntax.Moved
 	last  *Result
+	// evalCache remembers which declarations need no expansion.
+	evalCache eval.Cache
 }
 
 // New returns an empty project.
@@ -59,7 +63,7 @@ func (p *Project) SetFile(path, text string) {
 	}
 	if sema.IsBookFile(path) {
 		// Book text is not MMS: a Book declaration reads it with
-		// BookText, and its problems are reported in the file.
+		// TextFile, and its problems are reported in the file.
 		p.texts[path] = text
 		p.files[path] = &sema.Unit{Path: path, File: &syntax.File{Src: []rune(text)}}
 		return
@@ -149,17 +153,31 @@ func (p *Project) Paths() []string {
 
 // Result is one analysis of the whole project.
 type Result struct {
+	// Eval is the expansion of const, for, Template and Blueprint
+	// declarations, with the provenance of what they wrote.
+	Eval  *eval.Result
 	Syms  *sema.Table
 	Units []*sema.Unit
-	Decls map[*syntax.Decl]*Decl
+	// TypeEnv resolves type expressions: Template parameters, fields.
+	TypeEnv *types.Env
+	// Source holds each file as parsed, before expansion: with its
+	// const, Template, Blueprint and for items and the calls as written.
+	Source map[string]*syntax.File
+	Decls  map[*syntax.Decl]*Decl
 	// Order lists declarations in file and source order.
 	Order []*Decl
+	// Instances are the Blueprint instances the user wrote, in order,
+	// checked for the editor (see instanceDecls). They write nothing.
+	Instances []*Decl
 
 	collect  map[string][]syntax.Diagnostic
+	typeErr  map[string][]syntax.Diagnostic // Template arguments, Blueprint fields, typed consts
 	assets   []assetUse
 	assetErr map[string][]syntax.Diagnostic
 	orderErr map[string][]syntax.Diagnostic // feature order cycles
-	langErr  map[string][]syntax.Diagnostic // CustomItem names a Lang also has
+	emitted  map[*syntax.Decl]bool          // declarations Blueprint instances emitted
+	langErr  map[string][]syntax.Diagnostic // keys two Lang declarations set
+	formErr  map[string][]syntax.Diagnostic // declaration forms the language dropped
 	jigsaw   *jigsawModel                   // structure files' jigsaw blocks, for the jigsaw rules
 	files    fs.FS
 	lintMu   sync.Mutex
@@ -190,11 +208,18 @@ type Decl struct {
 	// Hoisted are inline values written where an id is required, each
 	// written as its own resource.
 	Hoisted []sema.Hoisted
-	Info    map[syntax.Node]*sema.Info
-	Diags   []syntax.Diagnostic
+	// Shown are the messages its text commands show, for a chat preview.
+	Shown []sema.ShownText
+	Info  map[syntax.Node]*sema.Info
+	// Blueprint is set on a Blueprint instance's body, checked for the
+	// editor only.
+	Blueprint *eval.Blueprint
+	Diags     []syntax.Diagnostic
 	// Extern are problems in other files, such as a Book's .mmsbook
 	// file, by path.
 	Extern map[string][]syntax.Diagnostic
+	// Expects are a Test's expect lines, in order.
+	Expects []sema.TestExpect
 	// Deps are the symbol lookups the check made (see sema.DepsHold).
 	Deps map[string]bool
 
@@ -234,11 +259,33 @@ func (r *Result) Diagnostics(path string) []syntax.Diagnostic {
 	}
 	var out []syntax.Diagnostic
 	out = append(out, u.File.Diags...)
+	if r.Eval != nil {
+		if f := r.Eval.Files[path]; f != nil {
+			out = append(out, f.Diags...)
+		}
+	}
 	out = append(out, r.collect[path]...)
+	out = append(out, r.typeErr[path]...)
 	out = append(out, r.assetErr[path]...)
 	out = append(out, r.orderErr[path]...)
 	out = append(out, r.langErr[path]...)
+	out = append(out, r.formErr[path]...)
+	typeErr := r.typeErr[path]
 	for _, d := range r.Order {
+		if d.Unit == u {
+			for _, dg := range d.Diags {
+				// A Template argument or Blueprint field with a type
+				// error was reported where it is written; the
+				// expanded declaration's own complaint about it,
+				// which covers that spot, adds nothing.
+				if !coversAny(dg.Sp, typeErr) {
+					out = append(out, dg)
+				}
+			}
+		}
+		out = append(out, d.Extern[path]...)
+	}
+	for _, d := range r.Instances {
 		if d.Unit == u {
 			out = append(out, d.Diags...)
 		}
@@ -291,8 +338,27 @@ func (p *Project) Analyze(ctx context.Context) (*Result, error) {
 	p.mu.Unlock()
 	sort.Slice(units, func(i, j int) bool { return units[i].Path < units[j].Path })
 
+	source := make(map[string]*syntax.File, len(units))
+	for _, u := range units {
+		source[u.Path] = u.File
+	}
+	units, ev := expand(units, p.Config.Namespace, &p.evalCache)
 	syms, collect := sema.Collect(units, p.Kinds, p.Config.Namespace)
-	r := &Result{Syms: syms, Units: units, Decls: map[*syntax.Decl]*Decl{}, collect: collect, pack: p.Pack, cfg: p.Config, files: p.Files}
+	tenv := types.New(p.Pack, p.Kinds, ev)
+	syms.Types = tenv.Types
+	syms.TypeDecls = map[string]*syntax.Decl{}
+	for name, td := range ev.Types {
+		syms.TypeDecls[name] = td.D
+	}
+	syms.Hidden = preludeEmitted(ev)
+	syms.Conversions = tenv.Conversions(ev, p.Config.Namespace)
+	r := &Result{Syms: syms, Units: units, Source: source, Decls: map[*syntax.Decl]*Decl{}, collect: collect, pack: p.Pack, cfg: p.Config, files: p.Files, Eval: ev}
+	r.TypeEnv = tenv
+	r.typeErr = tenv.Check(ev, p.Config.Namespace, func(ns string) *sema.Checker {
+		c := sema.NewChecker(p.Pack, p.Kinds, syms, ns)
+		c.Files, c.Texts = p.Files, p.bookText
+		return c
+	})
 	r.symKey = symbolKey(syms)
 	sameSyms := prev != nil && prev.symKey == r.symKey
 	for _, u := range units {
@@ -312,6 +378,11 @@ func (p *Project) Analyze(ctx context.Context) (*Result, error) {
 				if dr != nil && !sameSyms && (dr.Deps == nil || !sema.DepsHold(syms, dr.Deps)) {
 					dr = nil
 				}
+				// A Storage reads its Type's defaults, which are cheap to
+				// read again and not among its dependencies.
+				if dr != nil && k.MMS == "Storage" {
+					dr = nil
+				}
 				// An asset file it read was added, removed or changed.
 				if dr != nil && !sema.AssetDepsHold(p.Files, dr.Deps) {
 					dr = nil
@@ -328,9 +399,20 @@ func (p *Project) Analyze(ctx context.Context) (*Result, error) {
 			r.Order = append(r.Order, dr)
 		}
 	}
+	r.instanceDecls(tenv, func(ns string) *sema.Checker {
+		c := sema.NewChecker(p.Pack, p.Kinds, syms, ns)
+		c.Files, c.Texts = p.Files, p.bookText
+		return c
+	})
+	r.formErr = map[string][]syntax.Diagnostic{}
+	for path, f := range source {
+		if ds := checkForms(path, f); ds != nil {
+			r.formErr[path] = ds
+		}
+	}
 	r.collectAssets()
 	r.checkFeatureOrder()
-	r.checkCustomItemLang()
+	r.checkLangKeys()
 	p.mu.Lock()
 	p.last = r
 	p.mu.Unlock()
@@ -380,6 +462,9 @@ func symbolKey(t *sema.Table) uint64 {
 	var keys []string
 	for _, s := range t.All() {
 		keys = append(keys, s.Kind.Folder()+"|"+s.ID()+"|"+sema.SymSig(s))
+	}
+	for id, cs := range t.Conversions {
+		keys = append(keys, "as|"+id+"|"+sema.ConversionsSig(cs))
 	}
 	sort.Strings(keys)
 	h := fnv.New64a()
@@ -440,14 +525,21 @@ func (p *Project) checkDecl(u *sema.Unit, d *syntax.Decl, k sema.Kind, syms *sem
 			dr.Fn = fn.Generate(*f)
 			dr.Lines = []string{"function " + id}
 		}
-	case k.MMS == "CustomItem":
-		dr.Item = c.CustomItem(d, dr.ID())
-	case k.MMS == "Book":
-		dr.Item = c.Book(d, dr.ID())
 	case k.MMS == "Objective":
 		dr.Lines = objective(c, d)
 	case k.MMS == "Global":
 		dr.Lines = c.Global(d)
+	case k.MMS == "Storage":
+		dr.Lines = c.Storage(d)
+	case k.MMS == "Test":
+		if d.Name != nil {
+			f, ex := c.CompileTest(d, sema.TestID(ns, d.Name.Text), u.File.Src)
+			if f != nil {
+				dr.Fn, dr.Expects = fn.Generate(*f), ex
+			}
+		} else {
+			c.CompileTest(d, "", u.File.Src)
+		}
 	case k.MMS == sema.JigsawHoleKind:
 		c.JigsawHole(d)
 	}
@@ -456,6 +548,7 @@ func (p *Project) checkDecl(u *sema.Unit, d *syntax.Decl, k sema.Kind, syms *sem
 	dr.Extern = c.Extern
 	dr.Deps = c.Deps
 	dr.Hoisted = c.Hoisted
+	dr.Shown = c.Shown
 	// Re-validate lowered output: a value that passed the checker but not
 	// the schema means a lowering bug, reported as an internal error
 	// rather than written as bad JSON.
@@ -516,12 +609,16 @@ func hasErrors(ds []syntax.Diagnostic) bool {
 // debugPanics re-raises checker panics, for tests.
 var debugPanics = false
 
-// objective turns `Objective kills = deathCount` into its setup command.
+// objective turns `Objective kills: deathCount` into its setup command.
+// The old `= deathCount` form still compiles, next to its error.
 func objective(c *sema.Checker, d *syntax.Decl) []string {
 	if d.Name == nil {
 		return nil
 	}
 	criterion := "dummy"
+	if d.Type != nil {
+		criterion = syntax.TypeText(d.Type)
+	}
 	switch v := d.Value.(type) {
 	case nil:
 	case *syntax.Ident:
@@ -535,4 +632,14 @@ func objective(c *sema.Checker, d *syntax.Decl) []string {
 			Message: "expected an objective criterion such as dummy or deathCount"})
 	}
 	return []string{"scoreboard objectives add " + d.Name.Text + " " + criterion}
+}
+
+// coversAny reports whether sp holds the span of one of ds.
+func coversAny(sp syntax.Span, ds []syntax.Diagnostic) bool {
+	for _, d := range ds {
+		if sp.Start <= d.Sp.Start && d.Sp.End <= sp.End {
+			return true
+		}
+	}
+	return false
 }

@@ -30,23 +30,23 @@ DensityFunction spawn_fade = Clamp(
   1,
 )
 
-Noise climate_temperature = {
+Noise climate_temperature {
   base_octave = -10
   amplitude_modifiers = [1, 1, 0.5]
 }
 
-Noise climate_humidity = {
+Noise climate_humidity {
   base_octave = -9
   amplitude_modifiers = [1, 1, 0.5]
 }
 
 /** Picks the rare regions: Mycelium Deeps where it is low. */
-Noise climate_continents = {
+Noise climate_continents {
   base_octave = -9
   amplitude_modifiers = [1, 0.5]
 }
 
-Noise climate_erosion = {
+Noise climate_erosion {
   base_octave = -8
   amplitude_modifiers = [1, 0.5]
 }

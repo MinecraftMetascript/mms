@@ -7,6 +7,8 @@ scoreboard players set #cf mms.basics 0
 scoreboard players set #c10 mms.basics 10
 execute unless score $total_kills mms.basics = $total_kills mms.basics run scoreboard players set $total_kills mms.basics 0
 execute unless score $reward_every mms.basics = $reward_every mms.basics run scoreboard players set $reward_every mms.basics 5
+function basics:mms_gen/load/00003e6e
+=== data/basics/function/mms_gen/load/00003e6e.mcfunction
 tellraw @a "Points game loaded"
 === data/basics/function/mms_gen/tick.mcfunction
 execute as @a[scores={basics_kills=1..}] run function basics:on_kill
@@ -33,10 +35,7 @@ scoreboard players remove #on_kill.rewards mms.basics 1
 return run function basics:on_kill/_while0
 === data/basics/function/reward.mcfunction
 give @s diamond
-execute store result storage basics:mms m.a0 int 1 run scoreboard players get @s basics_points
-function basics:reward/_macro0 with storage basics:mms m
-=== data/basics/function/reward/_macro0.mcfunction
-$tellraw @s "Reward! You have $(a0) points"
+tellraw @s ["","Reward! You have ",{score:{name:"@s",objective:"basics_points"}}," points"]
 === data/basics/function/status.mcfunction
 scoreboard players set #status.i mms.basics 1
 function basics:status/_while0
@@ -44,16 +43,12 @@ execute store result score #players basics_online if entity @a
 scoreboard players operation #status.players mms.basics = #players basics_online
 scoreboard players set #status.average mms.basics 0
 execute if score #status.players mms.basics matches 1.. run function basics:status/_if2
-execute store result storage basics:mms m.a0 int 1 run scoreboard players get $total_kills mms.basics
-execute store result storage basics:mms m.a1 int 1 run scoreboard players get #status.average mms.basics
-function basics:status/_macro3 with storage basics:mms m
+tellraw @s ["",{score:{name:"$total_kills",objective:"mms.basics"}}," kills in total, ",{score:{name:"#status.average",objective:"mms.basics"}}," per player"]
 === data/basics/function/status/_if2.mcfunction
 scoreboard players operation #status.average mms.basics = $total_kills mms.basics
 scoreboard players operation #status.average mms.basics /= #status.players mms.basics
 === data/basics/function/status/_macro1.mcfunction
 $say $(a0)...
-=== data/basics/function/status/_macro3.mcfunction
-$tellraw @s "$(a0) kills in total, $(a1) per player"
 === data/basics/function/status/_while0.mcfunction
 execute unless score #status.i mms.basics matches ..3 run return 0
 scoreboard players set #status._t0 mms.basics 4

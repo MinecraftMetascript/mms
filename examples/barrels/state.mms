@@ -21,9 +21,9 @@ Global next_id: int = 0
 // The barrel being used, loaded by open() and saved by close(). Some raw
 // commands below write these with `scoreboard players set $<name>
 // mms.barrels` or `execute store`, because a Global named x is the score
-// $x on the objective mms.<namespace> (see docs/functions.md, "How it
-// compiles"). The item modifiers at the end of this file read them the
-// same way.
+// $x on the objective mms.<namespace> (see
+// site/concepts/how-functions-compile.md, "Values"). The item modifiers
+// at the end of this file read them the same way.
 Global id: int = 0
 Global count: int = 0
 /** The stored item's stack size: 16 or 64, or 0 while the barrel is empty. */

@@ -18,7 +18,7 @@ func bookSession(t *testing.T, book string) (*Session, int) {
 	off := strings.Index(book, "|")
 	book = book[:off] + book[off+1:]
 	p := project.New(spec.MustDefault(), project.Config{Namespace: "test"})
-	p.SetFile("main.mms", bookDecls+"Book b = { title = \"T\", author = \"A\", text = BookText(\"b.mmsbook\") }\n")
+	p.SetFile("main.mms", bookDecls+"Book b { title = \"T\", author = \"A\", text = TextFile(\"b.mmsbook\") }\n")
 	p.SetFile("b.mmsbook", book)
 	r, err := p.Analyze(context.Background())
 	if err != nil {
@@ -69,7 +69,7 @@ func TestBookCompletion(t *testing.T) {
 }
 
 func TestBookStringCompletion(t *testing.T) {
-	src := "Book b = { title = \"T {\", author = \"A\", text = [\"Hello {gol|\"] }\nX = { a = 1 }\n"
+	src := "Book b { title = \"T {\", author = \"A\", text = [\"Hello {gol|\"] }\nX = { a = 1 }\n"
 	s, off := session(t, src)
 	items, rep := s.Completion("main.mms", off)
 	if !has(labels(items), "gold") {
@@ -79,12 +79,12 @@ func TestBookStringCompletion(t *testing.T) {
 		t.Errorf("replaces %q", got)
 	}
 	// Not in the title.
-	s, off = session(t, "Book b = { title = \"T {|\", author = \"A\" }\n")
+	s, off = session(t, "Book b { title = \"T {|\", author = \"A\" }\n")
 	if items, _ := s.Completion("main.mms", off); len(items) > 0 {
 		t.Errorf("title completions = %v", labels(items))
 	}
 	// Nor in MMS code after a brace.
-	s, off = session(t, "LootTable l = {|}\n")
+	s, off = session(t, "LootTable l {|}\n")
 	if s.TriggerApplies("main.mms", off, "{") {
 		t.Error("{ triggers in code")
 	}
@@ -105,13 +105,13 @@ func TestBookHover(t *testing.T) {
 }
 
 func TestBookStringHover(t *testing.T) {
-	s, off := session(t, "Book b = { title = \"T\", author = \"A\", text = [\"Press {key:inv|entory}\"] }\n")
+	s, off := session(t, "Book b { title = \"T\", author = \"A\", text = [\"Press {key:inv|entory}\"] }\n")
 	if h, _ := s.Hover("main.mms", off); !strings.Contains(h, "key.inventory") {
 		t.Errorf("hover = %q", h)
 	}
 }
 
-// A Book's text field offers BookText(...), whose path lists the
+// A Book's text field offers TextFile(...), whose path lists the
 // project's .mmsbook files.
 func TestBookTextCompletion(t *testing.T) {
 	p := project.New(spec.MustDefault(), project.Config{Namespace: "test"})
@@ -121,9 +121,9 @@ func TestBookTextCompletion(t *testing.T) {
 		name, src string
 		want      []string
 	}{
-		{"value", "Book b = {\n  text = |\n}\n", []string{"BookText"}},
-		{"path", "Book b = {\n  text = BookText(\"|\")\n}\n", []string{"books/guide.mmsbook", "books/lore.mmsbook"}},
-		{"unclosed path", "Book b = {\n  text = BookText(\"bo|\n}\n", []string{"books/guide.mmsbook"}},
+		{"value", "Book b {\n  text = |\n}\n", []string{"TextFile"}},
+		{"path", "Book b {\n  text = TextFile(\"|\")\n}\n", []string{"books/guide.mmsbook", "books/lore.mmsbook"}},
+		{"unclosed path", "Book b {\n  text = TextFile(\"bo|\n}\n", []string{"books/guide.mmsbook"}},
 	} {
 		off := strings.Index(tc.src, "|")
 		src := tc.src[:off] + tc.src[off+1:]
@@ -147,5 +147,48 @@ func TestBookTextCompletion(t *testing.T) {
 				}
 			}
 		}
+	}
+}
+
+// Markup completes in any string where a text component goes.
+func TestTextStringCompletion(t *testing.T) {
+	src := "Advancement a { display = { title = \"Hi {gol|\", description = \"d\", icon = { id = stone }, background = \"minecraft:block/stone\" }, criteria = { x = Tick() } }\n"
+	s, off := session(t, src)
+	items, _ := s.Completion("main.mms", off)
+	if !has(labels(items), "gold") {
+		t.Errorf("completions = %v", labels(items))
+	}
+}
+
+// Markup completes and hovers in a tell message.
+func TestTellCompletion(t *testing.T) {
+	src := "Function f {\n  tell(@a, \"Hi {gol|\")\n}\n"
+	s, off := session(t, src)
+	items, _ := s.Completion("main.mms", off)
+	if !has(labels(items), "gold") {
+		t.Errorf("completions = %v", labels(items))
+	}
+	s, off = session(t, "Function f {\n  actionbar(@s, \"Press {key:inv|entory}\")\n}\n")
+	if h, _ := s.Hover("main.mms", off); !strings.Contains(h, "key.inventory") {
+		t.Errorf("hover = %q", h)
+	}
+	s, off = session(t, "Function f {\n  te|\n}\n")
+	if items, _ := s.Completion("main.mms", off); !has(labels(items), "tell") {
+		t.Errorf("statement completions lack tell: %v", labels(items))
+	}
+}
+
+func TestTellHover(t *testing.T) {
+	s, off := session(t, "Function f {\n  te|ll(@a, \"hi\")\n}\n")
+	if h, _ := s.Hover("main.mms", off); !strings.Contains(h, "tell(target: Selector, message: Text)") {
+		t.Errorf("hover = %q", h)
+	}
+}
+
+func TestTellSignature(t *testing.T) {
+	s, off := session(t, "Function f {\n  title(@a, \"hi\", |)\n}\n")
+	h, ok := s.Signature("main.mms", off)
+	if !ok || h.Active != 2 || !strings.HasPrefix(h.Label, "title(") {
+		t.Errorf("signature = %+v", h)
 	}
 }

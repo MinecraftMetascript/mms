@@ -10,7 +10,7 @@ Repeats each position `count` times. Follow it with `InSquare()` to spread the c
 - count: How many: a number, or a range such as `2..5`.
 
 ```mms
-PlacedFeature trees = { feature = minecraft:oak, placement = [Count(3), InSquare(), Heightmap(WORLD_SURFACE_WG), Biome()] }
+PlacedFeature trees { feature = minecraft:oak, placement = [Count(3), InSquare(), Heightmap(WORLD_SURFACE_WG), Biome()] }
 ```
 
 ## minecraft:placement_modifier/in_square
@@ -35,7 +35,7 @@ Keeps each position with a chance of 1 in `chance`.
 - chance: Keep one position in this many, on average.
 
 ```mms
-PlacedFeature rare_rocks = { feature = minecraft:forest_rock, placement = [RarityFilter(16), InSquare(), Heightmap(MOTION_BLOCKING), Biome()] }
+PlacedFeature rare_rocks { feature = minecraft:forest_rock, placement = [RarityFilter(16), InSquare(), Heightmap(MOTION_BLOCKING), Biome()] }
 ```
 
 ## minecraft:placement_modifier/random_chance

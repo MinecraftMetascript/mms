@@ -68,12 +68,21 @@ func (c *Checker) ValueCandidates(in *Info) []Candidate {
 	return dedupe(c.valueCandidates(in.Type, 0))
 }
 
-func (c *Checker) valueCandidates(v tview, depth int) []Candidate {
-	v = c.norm(v)
-	if v.T == nil || depth > 6 {
+// TypeCandidates lists what can be written where a value of type t is
+// expected, such as a Template argument.
+func (c *Checker) TypeCandidates(t *spec.Type) []Candidate {
+	if t == nil {
 		return nil
 	}
-	var out []Candidate
+	return dedupe(c.valueCandidates(tview{T: t}, 0))
+}
+
+func (c *Checker) valueCandidates(v tview, depth int) []Candidate {
+	out := c.instanceCandidates(v)
+	v = c.norm(v)
+	if v.T == nil || depth > 6 {
+		return out
+	}
 	switch v.T.Kind {
 	case "union":
 		for _, m := range v.T.Members {
@@ -103,7 +112,7 @@ func (c *Checker) valueCandidates(v tview, depth int) []Candidate {
 		}
 	case "list":
 		if v.T == bookTextType {
-			out = append(out, Candidate{Label: "BookText", Kind: CandCallable, Insert: `BookText("$1")`, Detail: ".mmsbook file", Doc: bookTextDoc, Rank: 0})
+			out = append(out, Candidate{Label: "TextFile", Kind: CandCallable, Insert: `TextFile("$1")`, Detail: ".mmstext or .mmsbook file", Doc: bookTextDoc, Rank: 0})
 		}
 	case "string":
 		if id := idOf(v.T); id.Present {
@@ -130,7 +139,7 @@ func (c *Checker) idCandidates(id idInfo) []Candidate {
 	reg := c.registryName(id.Registry)
 	if id.Tags != "required" {
 		for _, s := range c.Syms.All() {
-			if s.Kind.Folder() == reg {
+			if s.Kind.Folder() == reg && !c.Syms.Hidden[s.Decl] {
 				out = append(out, Candidate{Label: c.shortID(s.ID()), Kind: CandID, Detail: s.Kind.Name, Doc: DocMarkdown(s.Decl.Doc), Deprecated: Deprecated(s.Decl), Rank: 0})
 			}
 		}
@@ -140,7 +149,7 @@ func (c *Checker) idCandidates(id idInfo) []Candidate {
 	}
 	if id.Tags != "" {
 		for _, s := range c.Syms.All() {
-			if s.Kind.TagOf == reg {
+			if s.Kind.TagOf == reg && !c.Syms.Hidden[s.Decl] {
 				out = append(out, Candidate{Label: "#" + c.shortID(s.ID()), Kind: CandID, Detail: reg + " tag", Doc: DocMarkdown(s.Decl.Doc), Deprecated: Deprecated(s.Decl), Rank: 1})
 			}
 		}
@@ -460,11 +469,11 @@ func SymbolHead(kind, id string, d *syntax.Decl) string {
 			head += "(" + strings.Join(ps, ", ") + ")"
 		}
 		if d.Type != nil {
-			head += ": " + d.Type.Text
+			head += ": " + syntax.TypeText(d.Type)
 		}
 	case "Global":
 		if d.Type != nil {
-			head += ": " + d.Type.Text
+			head += ": " + syntax.TypeText(d.Type)
 		}
 	}
 	return head
@@ -540,7 +549,7 @@ func (k *Kinds) DeclKinds() []Candidate {
 		case name == "Function":
 			cand.Insert = "Function ${1:name} {\n\t$0\n}"
 		case name == "Objective":
-			cand.Insert = "Objective ${1:name} = ${2:dummy}"
+			cand.Insert = "Objective ${1:name}: ${2:dummy}"
 		case name == "Global":
 			cand.Insert = "Global ${1:name}: int = ${2:0}"
 		case kind.TagOf != "":

@@ -258,25 +258,25 @@ effect give @s fire_resistance 5
 === assets/embers/items/ember_disc.json
 {
   "model": {
-    "type": "minecraft:model",
+    "type": "model",
     "model": "embers:item/ember_disc"
   }
 }
 === assets/embers/items/ember_shard.json
 {
   "model": {
-    "type": "minecraft:model",
+    "type": "model",
     "model": "embers:item/ember_shard"
   }
 }
 === assets/embers/lang/en_us.json
 {
-  "jukebox_song.embers.embers": "MMS - Embers",
-  "painting.embers.hearth.title": "Hearth",
-  "painting.embers.hearth.author": "MMS Examples",
   "item.embers.ember_shard": "Ember Shard",
   "item.embers.ember_wand": "Ember Wand",
-  "item.embers.ember_disc": "Music Disc"
+  "item.embers.ember_disc": "Music Disc",
+  "jukebox_song.embers.embers": "MMS - Embers",
+  "painting.embers.hearth.title": "Hearth",
+  "painting.embers.hearth.author": "MMS Examples"
 }
 === assets/embers/models/item/ember_disc.json
 {

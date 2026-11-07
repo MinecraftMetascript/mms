@@ -23,7 +23,7 @@ func TestStructureHoverListsJigsaws(t *testing.T) {
 	}
 	p := project.New(spec.MustDefault(), project.Config{Namespace: "test", Output: "build"})
 	p.Files = fstest.MapFS{"s/base.nbt": {Data: data}}
-	src := `TemplatePool p = { fallback = minecraft:empty, elements = [{ weight = 1, element = { element_type = minecraft:single_pool_element, location = Structure("s/base.nbt"), projection = rigid, processors = minecraft:empty } }] }`
+	src := `TemplatePool p { fallback = minecraft:empty, elements = [{ weight = 1, element = { element_type = minecraft:single_pool_element, location = StructureFile("s/base.nbt"), projection = rigid, processors = minecraft:empty } }] }`
 	p.SetFile("main.mms", src)
 	r, err := p.Analyze(context.Background())
 	if err != nil {

@@ -3,6 +3,17 @@ import { expect, test, type Page } from '@playwright/test';
 
 const status = (page: Page) => page.getByRole('status');
 
+// clickLine clicks the editor line containing text, scrolling down to it:
+// CodeMirror renders only the lines near the viewport.
+async function clickLine(page: Page, text: string) {
+	const line = page.locator('.cm-line', { hasText: text });
+	for (let i = 0; i < 50 && (await line.count()) === 0; i++) {
+		await page.locator('.cm-scroller').first().evaluate((el) => el.scrollBy(0, 200));
+		await page.waitForTimeout(100);
+	}
+	await line.first().click();
+}
+
 async function replaceText(page: Page, text: string) {
 	await page.locator('.cm-content').click();
 	await page.keyboard.press('ControlOrMeta+a');
@@ -32,7 +43,7 @@ test('the editor loads, checks, completes and previews', async ({ page }) => {
 	await expect(status(page)).toHaveText(/No problems/);
 
 	// A noise renders in the preview, and its JSON is shown.
-	await replaceText(page, 'Noise n = { base_octave = -5, amplitude_modifiers = [1, 1] }\n');
+	await replaceText(page, 'Noise n { base_octave = -5, amplitude_modifiers = [1, 1] }\n');
 	await page.locator('.cm-line').first().click();
 	await expect(page.getByText('my_pack:n')).toBeVisible();
 	await expect(page.locator('canvas')).toBeVisible();
@@ -109,7 +120,7 @@ test('an example with textures and a sound checks and exports both packs', async
 	await page.locator('.cm-content').click();
 	await page.keyboard.press('ControlOrMeta+End');
 	await page.keyboard.press('Enter');
-	await page.keyboard.insertText('PaintingVariant extra = { width = 1, height = 1, asset_id = Texture(');
+	await page.keyboard.insertText('PaintingVariant extra { width = 1, height = 1, asset_id = Texture(');
 	await page.keyboard.type('"art/h');
 	const popup = page.locator('.cm-tooltip-autocomplete');
 	await expect(popup).toContainText('art/hearth.png');
@@ -290,7 +301,7 @@ test('an inline noise where an id is needed previews', async ({ page }) => {
 	await replaceText(
 		page,
 		[
-			'Noise simple = { base_octave = -4, amplitude_modifiers = [1] }',
+			'Noise simple { base_octave = -4, amplitude_modifiers = [1] }',
 			'NoiseSettings custom {',
 			'  default_block = stone',
 			'  default_fluid = water',
@@ -368,7 +379,7 @@ test('data packs and pasted JSON import as MMS', async ({ page }) => {
 	await page.getByLabel('Name', { exact: true }).fill('blocks/ruby_ore');
 	await page.getByLabel('JSON', { exact: true }).fill('{"type":"minecraft:block","pools":[{"rolls":1,"entries":[{"type":"minecraft:item","name":"minecraft:diamond"}]}]}');
 	await page.getByRole('button', { name: 'Convert' }).click();
-	await expect(page.locator('.cm-content')).toContainText('LootTable blocks/ruby_ore = {');
+	await expect(page.locator('.cm-content')).toContainText('LootTable blocks/ruby_ore {');
 	await expect(page.locator('.cm-content')).toContainText('entries = [diamond]');
 	await expect(status(page)).toHaveText(/No problems/);
 	await page.getByRole('tab', { name: 'Pack' }).click();
@@ -405,7 +416,7 @@ test('lint fixes apply from the editor', async ({ page }) => {
 test('a custom item in a recipe ingredient shows its base item', async ({ page }) => {
 	await page.goto('./');
 	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
-	await replaceText(page, 'CustomItem ember = { base = amethyst_shard, name = "Ember" }\nRecipe r = Shapeless([ember, stick], torch)\n');
+	await replaceText(page, 'CustomItem ember { base = amethyst_shard, name = "Ember" }\nRecipe r = Shapeless([ember, stick], torch)\n');
 	await expect(page.locator('.cm-inlay-hint')).toHaveText('→ amethyst_shard');
 	await expect(page.locator('.cm-lintRange-hint')).toHaveCount(1);
 	await page.screenshot({ path: 'test-results/custom-item-base.png' });
@@ -421,7 +432,7 @@ test('a recipe making a custom item shows its name and texture', async ({ page }
 	await page.getByRole('button', { name: /embers/ }).click();
 	await expect(status(page)).toHaveText(/No problems/);
 	await page.getByRole('button', { name: 'items.mms' }).click();
-	await page.locator('.cm-line', { hasText: 'Recipe ember_shard' }).click();
+	await clickLine(page, 'Recipe ember_shard');
 	const inspector = page.getByLabel('Inspector');
 	await expect(inspector.getByLabel('Result')).toHaveText('2 × Ember Shard');
 	const result = inspector.getByRole('img', { name: 'Ember Shard' });
@@ -434,7 +445,7 @@ test('a recipe making a custom item shows its name and texture', async ({ page }
 	await page.screenshot({ path: 'test-results/recipe-custom-item.png' });
 
 	// A custom item that keeps its base's look shows its name as text.
-	await page.locator('.cm-line', { hasText: 'Recipe ember_disc' }).click();
+	await clickLine(page, 'Recipe ember_disc');
 	await expect(inspector.getByLabel('Result')).toHaveText('Music Disc');
 	await expect(inspector.getByRole('img', { name: 'Music Disc' }).locator('img')).toHaveCount(1);
 	expect(errors).toEqual([]);
@@ -448,9 +459,9 @@ test('loot tables, recipes and biomes show in the inspector', async ({ page }) =
 	await replaceText(
 		page,
 		[
-			'LootTable chest = { pools = [Pool(2, [Item(name = diamond).Weight(3), Item(name = emerald)])] }',
+			'LootTable chest { pools = [Pool(2, [Item(name = diamond).Weight(3), Item(name = emerald)])] }',
 			'Recipe ruby_block = Shaped(["RRR", "R R", "RRR"], { R = emerald }, emerald_block)',
-			'Biome warm = { temperature = 0.8, downfall = 0.4, has_precipitation = true, effects = { water_color = "#3f76e4" }, features = [], carvers = [] }',
+			'Biome warm { temperature = 0.8, downfall = 0.4, has_precipitation = true, effects = { water_color = "#3f76e4" }, features = [], carvers = [] }',
 			''
 		].join('\n')
 	);
@@ -480,36 +491,88 @@ test('loot tables, recipes and biomes show in the inspector', async ({ page }) =
 test('the docs render guides and the reference', async ({ page }) => {
 	await page.goto('./');
 	await page.getByRole('link', { name: 'Docs' }).click();
-	await expect(page.getByRole('heading', { level: 1 })).toHaveText('Getting started');
+	await expect(page.getByRole('heading', { level: 1 })).toHaveText('MMS docs');
 
-	// A guide, and a link from one guide to a section of another.
+	// A guide from the grouped sidebar, and a link from one guide to a
+	// section of another.
 	const nav = page.getByRole('navigation', { name: 'Docs' });
+	await expect(nav.getByRole('heading', { name: 'Concepts' })).toBeVisible();
 	await nav.getByRole('link', { name: 'Tutorial: a custom dimension' }).click();
 	await expect(page.getByRole('heading', { level: 1 })).toHaveText('Tutorial: a custom dimension');
 	await expect(page.getByRole('navigation', { name: 'On this page' }).getByRole('link').first()).toBeVisible();
-	await page.getByRole('main').getByRole('link', { name: 'Writing resources' }).click();
-	await expect(page).toHaveURL(/\/docs\/resources#density-functions$/);
+	await page.getByRole('article').getByRole('link', { name: 'Writing resources' }).click();
+	await expect(page).toHaveURL(/\/docs\/guides\/resources#density-functions$/);
 	await expect(page.locator('#density-functions')).toBeVisible();
+	await expect(page.getByRole('navigation', { name: 'Previous and next' }).getByRole('link', { name: /Functions/ })).toBeVisible();
 
-	// The generated reference, filtered.
-	await nav.getByRole('link', { name: 'Reference' }).click();
+	// An old guide URL redirects, keeping its anchor.
+	await page.goto('./docs/functions#calls');
+	await expect(page).toHaveURL(/\/docs\/guides\/functions#calls$/);
+
+	// The Reference tab: helpers by group, one page each.
+	await page.getByRole('navigation', { name: 'Sections' }).getByRole('link', { name: 'Reference' }).click();
+	await expect(page.getByRole('heading', { level: 1 })).toHaveText('Reference');
+	const refNav = page.getByRole('navigation', { name: 'Reference' });
+	await refNav.getByRole('link', { name: 'Declaration kinds' }).click();
 	await expect(page.getByRole('cell', { name: 'DensityFunction', exact: true })).toBeVisible();
-	const filter = page.getByRole('searchbox', { name: 'Filter helpers' });
-	const toc = page.getByRole('navigation', { name: 'On this page' });
-	await expect(toc.getByRole('link', { name: 'Loot function', exact: true })).toBeVisible();
-	await filter.fill('gradient');
-	// The page sections follow the filter.
-	await expect(toc.getByRole('link', { name: 'Loot function', exact: true })).toHaveCount(0);
-	await expect(toc.getByRole('link', { name: 'Density function', exact: true })).toBeVisible();
+	await refNav.getByRole('link', { name: 'Helpers' }).click();
+	await page.getByRole('main').getByRole('link', { name: /^Density function/ }).click();
+	await expect(page).toHaveURL(/\/docs\/reference\/helpers\/density_function$/);
 	await expect(page.getByText(/^Gradient\(axis, /)).toBeVisible();
-	await expect(page.getByRole('region', { name: 'Loot function' })).toHaveCount(0);
+	await expect(page.locator('#loot_function-SetCount')).toHaveCount(0);
 
-	// A type in a signature links to its entry, even from a filtered list.
-	const gradient = page.locator('#density_function-Gradient');
-	await gradient.getByRole('link', { name: 'Axis', exact: true }).click();
-	await expect(page).toHaveURL(/#type-util-direction-Axis$/);
-	await expect(filter).toHaveValue('');
+	// A type in a signature links to its entry on the Types page.
+	await page.locator('#density_function-Gradient').getByRole('link', { name: 'Axis', exact: true }).click();
+	await expect(page).toHaveURL(/\/docs\/reference\/types#type-util-direction-Axis$/);
 	await expect(page.locator('#type-util-direction-Axis')).toBeInViewport();
+
+	// A link into the old one-page reference lands on the entry's new page.
+	await page.goto('./docs/reference#loot_function-SetCount', { waitUntil: 'commit' });
+	await expect(page).toHaveURL(/\/docs\/reference\/helpers\/loot_function#loot_function-SetCount$/);
+
+	// A lint rule has a page of its own.
+	await page.goto('./docs/reference/lint');
+	await page.getByRole('table').getByRole('link', { name: 'unused', exact: true }).click();
+	await expect(page.getByRole('heading', { level: 1 })).toHaveText('unused');
+	await expect(page.getByText('hint by default')).toBeVisible();
+
+	// Kinds written in MMS have a page each, from the prelude.
+	await page.goto('./docs/reference/kinds');
+	await page.getByRole('table').getByRole('link', { name: 'CustomItem', exact: true }).click();
+	await expect(page.getByRole('heading', { level: 1 })).toHaveText('CustomItem');
+	await expect(page.locator('article dt').filter({ hasText: /^base$/ })).toBeVisible();
+	await expect(page.getByRole('heading', { name: 'What its name stands for' })).toBeVisible();
+
+	// The language reference, and the forms of expression by type.
+	await page.goto('./docs/reference/language/blueprints');
+	await expect(page.getByRole('heading', { level: 1 })).toHaveText('Blueprints');
+	await page.goto('./docs/reference/prelude');
+	await expect(page.locator('#prelude-Range')).toContainText('IntNumberProviderRef');
+
+	// Search finds pages, helpers and rules from anywhere.
+	await page.keyboard.press('Control+k');
+	const search = page.getByRole('dialog', { name: 'Search the docs' });
+	const box = search.getByRole('searchbox');
+	// Words of a name in any order, a typo, and a guide's sub-section.
+	await box.fill('count set');
+	await expect(search.getByRole('option').first()).toContainText('SetCount');
+	await box.fill('jigsaw hole');
+	await expect(search.getByRole('option', { name: /Jigsaw holes.*Writing resources/ })).toBeVisible();
+	await box.fill('setcuont');
+	await expect(search.getByRole('option', { name: /SetCount/ })).toBeVisible();
+	await box.fill('setcount');
+	await expect(search.getByRole('option').first()).toContainText('SetCount');
+	await page.keyboard.press('Enter');
+	await expect(page).toHaveURL(/\/docs\/reference\/helpers\/loot_function#loot_function-SetCount$/);
+
+	// The reference for AI tools.
+	const llms = await (await page.request.get('./docs/llms.txt')).text();
+	expect(llms).toMatch(/^# MMS\n\n> /);
+	expect(llms).toContain('/docs/guides/functions');
+	const yaml = await (await page.request.get('./docs/reference.yaml')).text();
+	expect(yaml).toContain('lint_rules:');
+	expect(yaml).toContain('- name: "SetCount"');
+	expect(yaml).toContain('- name: "CustomItem"');
 });
 
 test('the Project menu closes on outside click and Escape, and the editor header formats and fixes', async ({ page }) => {
@@ -710,7 +773,7 @@ test('built-in helpers explain themselves on hover and while typing', async ({ p
 		await expect(hover).toContainText('True for blocks close to a surface', { timeout: 1500 });
 	}).toPass({ timeout: 15_000 });
 	await expect(hover).toContainText('secondary_depth_range');
-	await expect(hover.locator('a[href*="reference#material_condition-StoneDepth"]')).toHaveCount(1);
+	await expect(hover.locator('a[href*="reference/helpers/material_condition#material_condition-StoneDepth"]')).toHaveCount(1);
 	await page.mouse.move(0, 0);
 
 	// Signature help shows the active parameter's meaning first.
@@ -791,7 +854,7 @@ test('several projects are saved and can be switched', async ({ page }) => {
 	page.on('dialog', (d) => d.accept());
 	await page.goto('./');
 	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
-	await replaceText(page, 'Noise first = { base_octave = -4, amplitude_modifiers = [1] }\n');
+	await replaceText(page, 'Noise first { base_octave = -4, amplitude_modifiers = [1] }\n');
 
 	// An example opens as a second project; the first stays saved.
 	await page.getByRole('button', { name: 'Examples ▾' }).click();
@@ -888,7 +951,7 @@ test('a book file in an example is checked and completed in place', async ({ pag
 test('the Pack tab lists custom items and splits the two packs', async ({ page }) => {
 	await page.goto('./');
 	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
-	await replaceText(page, 'CustomItem ruby = {\n  base = stick\n  components = { max_stack_size = 1 }\n}\nCustomItem charm = {\n  base = torch\n  name = "Charm"\n}\n');
+	await replaceText(page, 'CustomItem ruby {\n  base = stick\n  components = { max_stack_size = 1 }\n}\nCustomItem charm {\n  base = torch\n  name = "Charm"\n}\n');
 	await expect(status(page)).toHaveText(/No problems/);
 	await page.getByRole('tab', { name: 'Pack' }).click();
 	// ruby writes no file, but is listed with the stack its name stands for.
@@ -940,10 +1003,13 @@ test('Ctrl+. extracts an inline noise to a declaration and renames it', async ({
 	await page.keyboard.press('ControlOrMeta+.');
 	const menu = page.getByRole('menu', { name: 'Editor actions' });
 	const extract = menu.getByRole('menuitem', { name: 'Extract { ... } to a Noise declaration' });
-	await expect(extract).toBeVisible();
+	// The menu opens once the language server answers, which waits behind
+	// the analysis of the new text; on a loaded machine that takes longer
+	// than the default 5 seconds.
+	await expect(extract).toBeVisible({ timeout: 15_000 });
 	await extract.click();
 	await expect(page.locator('.cm-content')).toContainText(
-		'Noise hills_noise = { base_octave = -6, amplitude_modifiers = [1] }DensityFunction hills = Noise(hills_noise, 1, 1)'
+		'Noise hills_noise { base_octave = -6, amplitude_modifiers = [1] }DensityFunction hills = Noise(hills_noise, 1, 1)'
 	);
 	// The rename box opens on the new name.
 	const box = page.getByRole('textbox', { name: 'New name' });
@@ -951,7 +1017,7 @@ test('Ctrl+. extracts an inline noise to a declaration and renames it', async ({
 	await expect(box).toHaveValue('hills_noise');
 	await page.keyboard.type('hill_shape');
 	await page.keyboard.press('Enter');
-	await expect(page.locator('.cm-content')).toContainText('Noise hill_shape = {');
+	await expect(page.locator('.cm-content')).toContainText('Noise hill_shape {');
 	await expect(page.locator('.cm-content')).toContainText('Noise(hill_shape, 1, 1)');
 	await expect(status(page)).toHaveText(/No problems|warning/);
 });
@@ -992,7 +1058,7 @@ test('a jigsaw structure previews which pieces join which, and marks dead ends',
 	await page.getByRole('button', { name: /Examples/ }).click();
 	await page.getByRole('button', { name: /jigsaw/ }).click();
 	await expect(status(page)).toHaveText(/No problems/);
-	await page.locator('.cm-line', { hasText: 'Structure dungeon = Jigsaw(' }).click();
+	await page.locator('.cm-line', { hasText: 'JigsawStructure dungeon {' }).click();
 	const graph = page.getByLabel('Jigsaw connections');
 	await expect(graph).toContainText('Jigsaw structure');
 	await expect(graph).toContainText('size 6');
@@ -1008,6 +1074,10 @@ test('a jigsaw structure previews which pieces join which, and marks dead ends',
 	const details = page.getByLabel('Piece details');
 	await expect(details.getByRole('row')).toHaveCount(5);
 	await expect(details.getByRole('row').nth(1)).toContainText('halls/hall (Long hall), halls/short_hall (Short hall)');
+	// Each jigsaw block copies a /give for another one set up the same way.
+	await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+	await details.getByRole('row').nth(1).getByRole('button', { name: 'Copy /give' }).click();
+	expect(await page.evaluate(() => navigator.clipboard.readText())).toMatch(/^\/give @s jigsaw\[block_entity_data=\{id:"jigsaw",name:"dungeon:room_exit",target:"dungeon:hall_entry",pool:"dungeon:halls"/);
 	// A doc comment above a pool element labels its piece.
 	await expect(graph.getByLabel('Pool dungeon:halls').first()).toContainText('Long hall');
 
@@ -1015,7 +1085,7 @@ test('a jigsaw structure previews which pieces join which, and marks dead ends',
 	// preview is pinned, since the edit moves the cursor away.
 	await page.getByRole('button', { name: /^Pin/ }).click();
 	const src = readFileSync(new URL('../../examples/jigsaw/dungeon.mms', import.meta.url), 'utf8');
-	await replaceText(page, src.replace('TemplatePool rooms = {', 'TemplatePool rooms2 = {'));
+	await replaceText(page, src.replace('rooms = { fallback', 'rooms2 = { fallback'));
 	await expect(graph.getByLabel('Problems')).toContainText('2 dead ends');
 	await expect(graph.getByLabel('Pool dungeon:rooms')).toContainText('No TemplatePool declares this');
 
@@ -1044,7 +1114,7 @@ test('a project file nothing uses is marked unused in the asset list', async ({ 
 	const vault = page.getByRole('listitem').filter({ hasText: 'structures/rooms/vault.nbt' });
 	await expect(vault).not.toContainText('unused');
 	const src = readFileSync(new URL('../../examples/jigsaw/dungeon.mms', import.meta.url), 'utf8');
-	await replaceText(page, src.replace('Structure("structures/rooms/vault.nbt", "rooms/vault")', 'Structure("structures/rooms/room.nbt", "rooms/room")'));
+	await replaceText(page, src.replace('Piece("rooms/vault")', 'Piece("rooms/room")'));
 	await expect(vault).toContainText('unused');
 	await expect(vault).toHaveAttribute('title', /Not used/);
 });
@@ -1069,4 +1139,78 @@ test('a function runs in the function preview', async ({ page }) => {
 	await run.getByRole('button', { name: '+20' }).click();
 	await expect(run.getByText('tick 20')).toBeVisible();
 	expect(errors).toEqual([]);
+});
+
+test('a tell or title previews its message as the game shows it', async ({ page }) => {
+	const errors: string[] = [];
+	page.on('pageerror', (e) => errors.push(e.message));
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	await replaceText(
+		page,
+		'Objective kills: dummy\nFunction f {\n  tell(@a, "{gold}**Wave** ${kills[@s]} begins")\n  title(@a, "Victory", subtitle = "{gray}*well held*")\n}\n'
+	);
+	const text = page.getByLabel('Text preview');
+	const chat = text.getByLabel('Chat');
+	// The status still reads "No problems" from before the edit until the
+	// new analysis lands, so wait for the preview, not the status.
+	await expect(async () => {
+		await page.locator('.cm-line', { hasText: 'tell(@a' }).click();
+		await expect(chat).toContainText('Wave 0 begins', { timeout: 2_000 });
+	}).toPass({ timeout: 30_000 });
+	await expect(chat.getByText('Wave', { exact: true })).toHaveCSS('font-weight', '700');
+	// The score is filled in when the message shows; try a value.
+	await text.getByRole('textbox', { name: 'kills[@s]' }).fill('7');
+	await expect(chat).toContainText('Wave 7 begins');
+	await page.locator('.cm-line', { hasText: 'title(@a' }).click();
+	await expect(text.getByLabel('Title', { exact: true })).toHaveText('Victory');
+	await expect(text.getByLabel('Subtitle')).toHaveText('well held');
+	expect(errors).toEqual([]);
+});
+
+test('Test declarations run in the Tests tab and follow edits', async ({ page }) => {
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	await replaceText(page, 'Global n: int = 0\nFunction bump {\n  n += 1\n  /say bumped\n}\nTest bumps {\n  run bump()\n  expect n == 2\n}\n');
+	const tab = page.getByRole('tab', { name: 'Tests (1 failed)' });
+	await expect(tab).toBeVisible({ timeout: 15_000 });
+	await tab.click();
+	await expect(page.getByTestId('tests-summary')).toHaveText('1 of 1 test failed');
+	await expect(page.getByText('expected n == 2, but n is 1')).toBeVisible();
+	await expect(page.getByText('bumped', { exact: true })).toBeVisible();
+	await page.getByRole('button', { name: 'bumps: failed' }).click();
+	await expect(page.locator('.cm-activeLine')).toContainText('expect n == 2');
+	await replaceText(page, 'Global n: int = 0\nFunction bump {\n  n += 2\n}\nTest bumps {\n  run bump()\n  expect n == 2\n}\n');
+	await expect(page.getByTestId('tests-summary')).toHaveText('1 test passed', { timeout: 15_000 });
+	await expect(page.getByRole('tab', { name: 'Tests', exact: true })).toBeVisible();
+});
+
+test('the Expanded tab shows what a template call or blueprint writes', async ({ page }) => {
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	await replaceText(page, 'Template ring(p: Id<particle>, points: int = 2): Commands {\n  for i in 0..points - 1 {\n    /particle ${p} ^${i} ^1 ^0\n  }\n}\nFunction f {\n  let n = 0\n  ring(flame)\n}\n');
+	// The call gets an `inlined` hint and the let its inferred type.
+	await expect(page.locator('.cm-inlay-hint', { hasText: 'inlined' })).toBeVisible({ timeout: 15_000 });
+	await expect(page.locator('.cm-inlay-type')).toHaveText(': int');
+	await page.getByRole('tab', { name: 'Expanded' }).click();
+	await page.locator('.cm-line', { hasText: 'ring(flame)' }).click();
+	await expect(page.getByTestId('expanded-text')).toHaveText('/particle flame ^0 ^1 ^0\n/particle flame ^1 ^1 ^0');
+	await expect(page.getByLabel('Expanded')).toContainText('Template ring');
+});
+
+test('go to definition on a built-in opens the prelude read-only', async ({ page }) => {
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	await replaceText(page, 'CustomItem ruby { base = diamond }\n');
+	await expect(status(page)).toHaveText(/No problems|problem/, { timeout: 15_000 });
+	await page.locator('.cm-line', { hasText: 'CustomItem ruby' }).click({ position: { x: 20, y: 5 } });
+	await expect(async () => {
+		await page.keyboard.press('F12');
+		await expect(page.getByTestId('prelude-view')).toBeVisible({ timeout: 2_000 });
+	}).toPass({ timeout: 15_000 });
+	await expect(page.locator('#prelude-title')).toContainText('items.mms');
+	// The definition is selected and scrolled into view.
+	await expect(page.getByTestId('prelude-view').locator('.cm-activeLine')).toContainText('Blueprint CustomItem');
+	await page.getByRole('button', { name: 'Close' }).click();
+	await expect(page.getByTestId('prelude-view')).toBeHidden();
 });

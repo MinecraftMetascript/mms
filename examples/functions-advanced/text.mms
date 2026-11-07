@@ -1,7 +1,15 @@
 // String values and the functions in math.mms, used from commands.
 
-/** The last message built by report, for other functions to read. */
-Global last_report: string = ""
+/** What the reports so far have found, kept in storage adv:mms reports. */
+Type Reports {
+  /** How many reports have run. */
+  count: int = 0
+  /** The last line a report built, for other functions to read. */
+  last: string = ""
+}
+
+/** Read it in the game with /data get storage adv:mms reports. */
+Storage reports: Reports
 
 /** Lists the primes up to max, joined into one line. */
 Function primes_up_to(max: int) {
@@ -14,8 +22,9 @@ Function primes_up_to(max: int) {
     line += " " + n
     count += 1
   }
-  last_report = line + " (" + count + " in total)"
-  /tellraw @a "${last_report}"
+  reports.count += 1
+  reports.last = line + " (" + count + " in total)"
+  tell(@a, "${reports.last}")
 }
 
 /** Says hello in a way that depends on the name. */
@@ -26,7 +35,7 @@ Function greet(name: string) {
   } else {
     greeting += "!"
   }
-  /tellraw @a "${greeting}"
+  tell(@a, "${greeting}")
 }
 
 /** /function adv:demo shows everything above. */

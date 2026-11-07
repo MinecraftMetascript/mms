@@ -14,7 +14,7 @@ import (
 func TestWrongKindDeps(t *testing.T) {
 	p := New(spec.MustDefault(), Config{Namespace: "demo"})
 	p.SetFile("a.mms", "DensityFunction terrain = Abs(ridges)\n")
-	p.SetFile("b.mms", "Noise ridges = { base_octave = -7, octave_count = 1 }\n")
+	p.SetFile("b.mms", "Noise ridges { base_octave = -7, octave_count = 1 }\n")
 	msg := func() string {
 		r, _ := p.Analyze(context.Background())
 		var out []string

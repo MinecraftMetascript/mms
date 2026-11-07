@@ -1,0 +1,25 @@
+=== 02-const.mms (changed: false)
+=== 03-const-values.mms (changed: true)
+# at 03-const-values.mms:5:11
+LootTable chests/gems { pools = [Pool(1..3, #gems)] }
+# at 03-const-values.mms:6:11
+LootTable chests/storm_gems {
+  pools = [
+    {
+      ...Pool(1..3, #gems)
+      conditions = [
+        WeatherCheck(thundering = true) && TimeCheck(clock = overworld, value = 13000..),
+      ]
+    },
+  ]
+}
+=== use.mms (changed: true)
+# at use.mms:1:11
+LootTable chests/far { pools = [Pool(4, #gems)] }
+# at use.mms:2:13
+SurfaceRule top = If(StoneDepth(Floor)) { Block(grass_block) }
+=== provenance of copied nodes
+03-const-values.mms:5:34 from 03-const-values.mms:1 < const gem_pool (at 03-const-values.mms:5:34, def 03-const-values.mms:1:1): 1 node, Pool(1..3, #gems)
+03-const-values.mms:6:45 from 03-const-values.mms:1 < const gem_pool (at 03-const-values.mms:6:45, def 03-const-values.mms:1:1): 1 node, Pool(1..3, #gems)
+03-const-values.mms:6:69 from 03-const-values.mms:2 < const stormy (at 03-const-values.mms:6:69, def 03-const-values.mms:2:1): 1 node, WeatherCheck(thundering = true) && TimeCheck(...
+use.mms:2:19 from 03-const-values.mms:3 < const grass_top (at use.mms:2:19, def 03-const-values.mms:3:1): 1 node, If(StoneDepth(Floor)) { Block(grass_block) }

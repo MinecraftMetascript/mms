@@ -11,6 +11,8 @@ import (
 func FuzzParse(f *testing.F) {
 	seeds, _ := filepath.Glob("testdata/*.mms")
 	more, _ := filepath.Glob("testdata/recovery/*.mms")
+	design, _ := filepath.Glob("testdata/design/*.mms")
+	seeds = append(seeds, design...)
 	for _, path := range append(seeds, more...) {
 		src, _ := os.ReadFile(path)
 		f.Add(string(src))
@@ -31,9 +33,12 @@ func FuzzParse(f *testing.F) {
 				check("token", tok.Sp)
 			}
 		}
-		for _, d := range file.Decls {
-			check("decl", d.Sp)
-		}
+		Walk(file, func(n Node) bool {
+			if _, ok := n.(*File); !ok {
+				check("node", n.Span())
+			}
+			return true
+		})
 		_ = Dump(file)
 		// Chunked parsing must agree with a whole-file parse on valid input,
 		// unless the parser joined lines across a chunk boundary (such as a

@@ -17,8 +17,6 @@ This branch is a full rewrite. The plan is in [docs/plan.md](docs/plan.md), prog
 | `web/` | Browser editor (SvelteKit, CodeMirror 6, Deepslate previews), deployed to GitHub Pages |
 | `docs/` | Guides, plan, task list, frozen decision log |
 | `editors/vscode/` | VS Code extension (a client for `mms lsp`) |
-| `editors/zed/` | Zed extension (a client for `mms lsp`, highlighting from `editors/tree-sitter-mms`) |
-| `editors/tree-sitter-mms/` | Tree-sitter grammar, for Zed and other tree-sitter editors |
 | `branding/` | Logo, mark and favicon (SVG sources and the script that builds them) |
 | `examples/` | Example projects, built by the tests and listed in the web editor |
 
@@ -41,13 +39,14 @@ Release builds of `mms` for Linux, macOS and Windows, and the VS Code extension 
 
 ## Documentation
 
-The guides are in `docs/` and on the [docs site](https://minecraftmetascript.github.io/mms/docs), which also has the generated reference:
+The guides are in `site/` and on the [docs site](https://minecraftmetascript.github.io/mms/docs), which also has the generated reference:
 
-- [Getting started](docs/getting-started.md)
-- [Writing resources](docs/resources.md)
-- [Functions](docs/functions.md)
-- [Lint rules](docs/lint.md)
-- [Tutorial: a custom dimension](docs/tutorial-dimension.md)
+- [Getting started](site/start/getting-started.md)
+- [Writing resources](site/guides/resources.md)
+- [Functions](site/guides/functions.md)
+- [Lint rules](site/guides/lint.md)
+- [Tutorial: a custom dimension](site/start/tutorial-dimension.md)
+- [How functions compile](site/concepts/how-functions-compile.md)
 
 ## Credits
 

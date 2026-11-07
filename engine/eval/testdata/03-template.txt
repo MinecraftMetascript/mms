@@ -1,0 +1,10 @@
+-- 04-template.mms -- design
+-- use.mms --
+TemplatePool rooms {
+  fallback = caps
+  elements = [Piece("rooms/room", processors = rooms_decay), Piece(weight = 2, path = "rooms/vault")]
+}
+TemplatePool broken {
+  fallback = caps
+  elements = [Piece(), Piece("a", 1, minecraft:empty, 9), Piece("b", size = 3)]
+}

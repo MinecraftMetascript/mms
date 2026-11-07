@@ -4,6 +4,8 @@
 // diagnostics, and the rest of the tree is still usable.
 package syntax
 
+import "strings"
+
 // Span is a half-open range of rune offsets into the source.
 type Span struct {
 	Start, End int
@@ -27,26 +29,51 @@ type Node interface{ Span() Span }
 
 // File is one parsed source file.
 type File struct {
+	// Items holds every top-level item in source order: *Decl, *ConstStmt,
+	// *LetStmt and *ForStmt.
+	Items []Stmt
+	// Decls holds the declarations among Items, in order. Declarations
+	// nested in a top-level for are not included.
 	Decls  []*Decl
 	Tokens []Token // every token, hidden channel included, in order
 	Diags  []Diagnostic
 	Src    []rune
 }
 
-// Decl is a top-level declaration: `Kind name: Type (params) = value` or
-// `Kind name { ... }`. Every part but Kind is optional.
+// Decl is a declaration: `Kind name: Type (params) = value` or
+// `Kind name { ... }`. Every part but Kind is optional. Declarations sit at
+// the top level, in a top-level for, and in a Blueprint's emit block.
 type Decl struct {
-	Kind   *Ident
-	Name   *Name
-	Type   *Name      // type annotation, e.g. `int` in `Global x: int = 0`
+	Kind *Ident
+	Name *Name
+	// More holds the further names of a comma list, as in
+	// `JigsawHole room_exit, hall_entry`.
+	More   []*Name
+	Type   TypeExpr   // type annotation, e.g. `int` in `Global x: int = 0`
 	Params *ParamList // nil when the declaration has no parameter list
 	Value  Expr       // after '='
-	Body   *Block     // a `{ ... }` body
-	Doc    string     // text of the /** */ comment right above, if any
-	Sp     Span
+	// TypeValue is the right-hand side of a type alias, as in
+	// `Type LangText = string | {string: string}`.
+	TypeValue TypeExpr
+	Body      *Block // a `{ ... }` body
+	// Extern marks `extern Kind name ...`: a declaration whose meaning is
+	// supplied by the engine.
+	Extern bool
+	// Primary marks `primary Kind name ...` in an emit block.
+	Primary bool
+	Doc     string // text of the /** */ comment right above, if any
+	Sp      Span
 }
 
 func (d *Decl) Span() Span { return d.Sp }
+
+// Names returns the declaration's names: Name, then More.
+func (d *Decl) Names() []*Name {
+	if d.Name == nil {
+		return nil
+	}
+	return append([]*Name{d.Name}, d.More...)
+}
 
 // NameText returns the declared name or "" when it is missing.
 func (d *Decl) NameText() string {
@@ -56,13 +83,26 @@ func (d *Decl) NameText() string {
 	return d.Name.Text
 }
 
-// Name is an identifier or a resource location used as a name or type.
+// Name is an identifier or a resource location used as a name or key.
 type Name struct {
 	Text string
-	Sp   Span
+	// Parts is set when the name is a template such as `${w}_crate`.
+	Parts []NamePart
+	Sp    Span
 }
 
 func (n *Name) Span() Span { return n.Sp }
+
+// Templated reports whether the name has `${...}` pieces.
+func (n *Name) Templated() bool { return n != nil && len(n.Parts) > 0 }
+
+// NamePart is one piece of a templated name: literal text, or the
+// expression inside a `${...}`.
+type NamePart struct {
+	Lit string // set when X is nil
+	X   Expr
+	Sp  Span // the literal text, or the whole `${...}`
+}
 
 type ParamList struct {
 	Params []*Param
@@ -71,10 +111,12 @@ type ParamList struct {
 
 func (p *ParamList) Span() Span { return p.Sp }
 
+// Param is `name: Type = default`; Type and Default are optional.
 type Param struct {
-	Name *Name
-	Type *Name
-	Sp   Span
+	Name    *Name
+	Type    TypeExpr
+	Default Expr
+	Sp      Span
 }
 
 func (p *Param) Span() Span { return p.Sp }
@@ -83,7 +125,10 @@ func (p *Param) Span() Span { return p.Sp }
 type Block struct {
 	Items  []Stmt
 	Closed bool
-	Sp     Span
+	// Bare marks the branch of an if statement written without braces, as
+	// in `if (x) error(...)`. It holds one ExprStmt.
+	Bare bool
+	Sp   Span
 }
 
 func (b *Block) Span() Span { return b.Sp }
@@ -97,9 +142,18 @@ type Stmt interface {
 type (
 	LetStmt struct {
 		Name  *Name
-		Type  *Name
+		Type  TypeExpr
 		Value Expr
 		Doc   string // text of the /** */ comment right above, if any
+		Sp    Span
+	}
+	// ConstStmt is `const name: Type = value`, at the top level or in a
+	// body.
+	ConstStmt struct {
+		Name  *Name
+		Type  TypeExpr
+		Value Expr
+		Doc   string
 		Sp    Span
 	}
 	IfStmt struct {
@@ -113,8 +167,11 @@ type (
 		Body *Block
 		Sp   Span
 	}
+	// ForStmt is `for x in iter { }` or `for k, v in iter { }`, in a body
+	// or at the top level, where its body holds declarations.
 	ForStmt struct {
 		Var  *Name
+		Var2 *Name // the second variable of `for k, v in ...`, or nil
 		Iter Expr
 		Body *Block
 		Sp   Span
@@ -149,6 +206,39 @@ type (
 		X  Expr
 		Sp Span
 	}
+	// FieldDecl is `name: Type = default` in a Type or Blueprint body.
+	FieldDecl struct {
+		Name    *Name
+		Type    TypeExpr
+		Default Expr
+		Doc     string
+		Sp      Span
+	}
+	// SectionStmt is a named block in a Blueprint or Test body:
+	// `check { }`, `emit { }` or `setup { }`.
+	SectionStmt struct {
+		Word *Ident
+		Body *Block
+		Sp   Span
+	}
+	// AsStmt is `as Type = value hint("rule", "message")` in a Blueprint.
+	AsStmt struct {
+		Type  TypeExpr
+		Value Expr
+		Hint  *Call // nil without a hint
+		Doc   string
+		Sp    Span
+	}
+	// ExpectStmt is `expect cond` in a Test.
+	ExpectStmt struct {
+		X  Expr
+		Sp Span
+	}
+	// RunStmt is `run call()` in a Test.
+	RunStmt struct {
+		X  Expr
+		Sp Span
+	}
 )
 
 func (s *LetStmt) Span() Span      { return s.Sp }
@@ -162,6 +252,19 @@ func (s *CommandStmt) Span() Span  { return s.Sp }
 func (s *FieldStmt) Span() Span    { return s.Sp }
 func (s *AssignStmt) Span() Span   { return s.Sp }
 func (s *ExprStmt) Span() Span     { return s.Sp }
+func (s *ConstStmt) Span() Span    { return s.Sp }
+func (s *FieldDecl) Span() Span    { return s.Sp }
+func (s *SectionStmt) Span() Span  { return s.Sp }
+func (s *AsStmt) Span() Span       { return s.Sp }
+func (s *ExpectStmt) Span() Span   { return s.Sp }
+func (s *RunStmt) Span() Span      { return s.Sp }
+func (*Decl) stmt()                {}
+func (*ConstStmt) stmt()           {}
+func (*FieldDecl) stmt()           {}
+func (*SectionStmt) stmt()         {}
+func (*AsStmt) stmt()              {}
+func (*ExpectStmt) stmt()          {}
+func (*RunStmt) stmt()             {}
 func (b *Block) stmt()             {}
 func (*LetStmt) stmt()             {}
 func (*IfStmt) stmt()              {}
@@ -272,6 +375,38 @@ type (
 		Block *Block
 		Sp    Span
 	}
+	// TemplatedName is a name with `${...}` pieces used as a value, as in
+	// `item/${self.path}`.
+	TemplatedName struct {
+		Text  string // as written
+		Parts []NamePart
+		Sp    Span
+	}
+	// Spread is `...x` in a list, an object or arguments.
+	Spread struct {
+		X  Expr
+		Sp Span
+	}
+	// IfExpr is `if (cond) then else other`; Else may be nil, which
+	// means none.
+	IfExpr struct {
+		Cond, Then, Else Expr
+		Sp               Span
+	}
+	// RunExpr is an inline function body, `run { ... }`.
+	RunExpr struct {
+		Body *Block
+		Sp   Span
+	}
+	// Comprehension is `[for x in iter if cond: body]`.
+	Comprehension struct {
+		Var  *Name
+		Var2 *Name // `for k, v in ...`, or nil
+		Iter Expr
+		Cond Expr // nil without a filter
+		Body Expr
+		Sp   Span
+	}
 	// Bad stands in for an expression that failed to parse.
 	Bad struct{ Sp Span }
 )
@@ -285,41 +420,142 @@ type Arg struct {
 
 func (a *Arg) Span() Span { return a.Sp }
 
-func (e *Number) Span() Span   { return e.Sp }
-func (e *String) Span() Span   { return e.Sp }
-func (e *Bool) Span() Span     { return e.Sp }
-func (e *Ident) Span() Span    { return e.Sp }
-func (e *ResLoc) Span() Span   { return e.Sp }
-func (e *Tag) Span() Span      { return e.Sp }
-func (e *Selector) Span() Span { return e.Sp }
-func (e *Coord) Span() Span    { return e.Sp }
-func (e *Paren) Span() Span    { return e.Sp }
-func (e *List) Span() Span     { return e.Sp }
-func (e *Object) Span() Span   { return e.Sp }
-func (e *Unary) Span() Span    { return e.Sp }
-func (e *Binary) Span() Span   { return e.Sp }
-func (e *Range) Span() Span    { return e.Sp }
-func (e *Member) Span() Span   { return e.Sp }
-func (e *Call) Span() Span     { return e.Sp }
-func (e *Index) Span() Span    { return e.Sp }
-func (e *Trailing) Span() Span { return e.Sp }
-func (e *Bad) Span() Span      { return e.Sp }
-func (*Number) expr()          {}
-func (*String) expr()          {}
-func (*Bool) expr()            {}
-func (*Ident) expr()           {}
-func (*ResLoc) expr()          {}
-func (*Tag) expr()             {}
-func (*Selector) expr()        {}
-func (*Coord) expr()           {}
-func (*Paren) expr()           {}
-func (*List) expr()            {}
-func (*Object) expr()          {}
-func (*Unary) expr()           {}
-func (*Binary) expr()          {}
-func (*Range) expr()           {}
-func (*Member) expr()          {}
-func (*Call) expr()            {}
-func (*Index) expr()           {}
-func (*Trailing) expr()        {}
-func (*Bad) expr()             {}
+func (e *Number) Span() Span        { return e.Sp }
+func (e *String) Span() Span        { return e.Sp }
+func (e *Bool) Span() Span          { return e.Sp }
+func (e *Ident) Span() Span         { return e.Sp }
+func (e *ResLoc) Span() Span        { return e.Sp }
+func (e *Tag) Span() Span           { return e.Sp }
+func (e *Selector) Span() Span      { return e.Sp }
+func (e *Coord) Span() Span         { return e.Sp }
+func (e *Paren) Span() Span         { return e.Sp }
+func (e *List) Span() Span          { return e.Sp }
+func (e *Object) Span() Span        { return e.Sp }
+func (e *Unary) Span() Span         { return e.Sp }
+func (e *Binary) Span() Span        { return e.Sp }
+func (e *Range) Span() Span         { return e.Sp }
+func (e *Member) Span() Span        { return e.Sp }
+func (e *Call) Span() Span          { return e.Sp }
+func (e *Index) Span() Span         { return e.Sp }
+func (e *Trailing) Span() Span      { return e.Sp }
+func (e *Bad) Span() Span           { return e.Sp }
+func (e *TemplatedName) Span() Span { return e.Sp }
+func (e *Spread) Span() Span        { return e.Sp }
+func (e *IfExpr) Span() Span        { return e.Sp }
+func (e *RunExpr) Span() Span       { return e.Sp }
+func (e *Comprehension) Span() Span { return e.Sp }
+func (*TemplatedName) expr()        {}
+func (*Spread) expr()               {}
+func (*IfExpr) expr()               {}
+func (*RunExpr) expr()              {}
+func (*Comprehension) expr()        {}
+func (*Number) expr()               {}
+func (*String) expr()               {}
+func (*Bool) expr()                 {}
+func (*Ident) expr()                {}
+func (*ResLoc) expr()               {}
+func (*Tag) expr()                  {}
+func (*Selector) expr()             {}
+func (*Coord) expr()                {}
+func (*Paren) expr()                {}
+func (*List) expr()                 {}
+func (*Object) expr()               {}
+func (*Unary) expr()                {}
+func (*Binary) expr()               {}
+func (*Range) expr()                {}
+func (*Member) expr()               {}
+func (*Call) expr()                 {}
+func (*Index) expr()                {}
+func (*Trailing) expr()             {}
+func (*Bad) expr()                  {}
+
+// TypeExpr is a type written in source: `int`, `Id<item>`, `[T]`,
+// `{string: T}`, `T?`, `A | B` or a literal word such as `"rigid"`.
+type TypeExpr interface {
+	Node
+	typeExpr()
+}
+
+type (
+	// TypeName is a named type with optional arguments: `int`,
+	// `Id<item>`, or a dotted or namespaced word such as an objective
+	// criterion.
+	TypeName struct {
+		Name string
+		Args []TypeExpr
+		Sp   Span
+	}
+	TypeOptional struct {
+		X  TypeExpr
+		Sp Span
+	}
+	TypeList struct {
+		Elem TypeExpr
+		Sp   Span
+	}
+	TypeMap struct {
+		Key, Value TypeExpr
+		Sp         Span
+	}
+	TypeUnion struct {
+		Arms []TypeExpr
+		Sp   Span
+	}
+	// TypeString is a literal word in a type, as in `"rigid" | "beard"`.
+	TypeString struct {
+		Value string
+		Raw   string
+		Sp    Span
+	}
+	TypeParen struct {
+		X  TypeExpr
+		Sp Span
+	}
+)
+
+func (t *TypeName) Span() Span     { return t.Sp }
+func (t *TypeOptional) Span() Span { return t.Sp }
+func (t *TypeList) Span() Span     { return t.Sp }
+func (t *TypeMap) Span() Span      { return t.Sp }
+func (t *TypeUnion) Span() Span    { return t.Sp }
+func (t *TypeString) Span() Span   { return t.Sp }
+func (t *TypeParen) Span() Span    { return t.Sp }
+func (*TypeName) typeExpr()        {}
+func (*TypeOptional) typeExpr()    {}
+func (*TypeList) typeExpr()        {}
+func (*TypeMap) typeExpr()         {}
+func (*TypeUnion) typeExpr()       {}
+func (*TypeString) typeExpr()      {}
+func (*TypeParen) typeExpr()       {}
+
+// TypeText renders a type in canonical form, or "" for nil.
+func TypeText(t TypeExpr) string {
+	switch t := t.(type) {
+	case *TypeName:
+		if len(t.Args) == 0 {
+			return t.Name
+		}
+		args := make([]string, len(t.Args))
+		for i, a := range t.Args {
+			args[i] = TypeText(a)
+		}
+		return t.Name + "<" + strings.Join(args, ", ") + ">"
+	case *TypeOptional:
+		return TypeText(t.X) + "?"
+	case *TypeList:
+		return "[" + TypeText(t.Elem) + "]"
+	case *TypeMap:
+		return "{" + TypeText(t.Key) + ": " + TypeText(t.Value) + "}"
+	case *TypeUnion:
+		arms := make([]string, len(t.Arms))
+		for i, a := range t.Arms {
+			arms[i] = TypeText(a)
+		}
+		return strings.Join(arms, " | ")
+	case *TypeString:
+		return t.Raw
+	case *TypeParen:
+		return "(" + TypeText(t.X) + ")"
+	}
+	return ""
+}

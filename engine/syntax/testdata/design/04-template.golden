@@ -1,0 +1,29 @@
+Decl Template Piece: WeightedPoolElement(path: string, weight: int = ..., processors: ProcessorList = ...)
+  Default weight
+    Number 1
+  Default processors
+    ResLoc minecraft:empty
+  Call
+    Ident WeightedElement
+    Ident weight
+    Call
+      Ident SinglePoolElement
+      Ident rigid
+      Call
+        Ident StructureFile
+        String "structures/${path}.nbt"
+        Ident path
+      Ident processors
+Decl TemplatePool halls
+  Block
+    Field fallback
+      Ident caps
+    Field elements
+      List
+        Call
+          Ident Piece
+          String "halls/hall"
+          Number 3
+        Call
+          Ident Piece
+          String "halls/short_hall"

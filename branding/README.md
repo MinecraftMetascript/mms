@@ -16,8 +16,6 @@ Copies live where each tool needs them:
 - `web/src/lib/components/Logo.svelte`, the header logo, with braces and text in `currentColor`
 - `editors/vscode/icons/mms.png` and `editors/vscode/icons/mms-file.svg`
 
-Zed extensions have no icon field, so the Zed extension carries no logo.
-
 ## Colours
 
 | | Light | Dark |

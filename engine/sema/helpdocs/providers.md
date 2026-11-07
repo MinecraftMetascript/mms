@@ -13,7 +13,7 @@ A random whole number from `min_inclusive` to `max_inclusive`, each equally like
 - max_inclusive: The largest value.
 
 ```mms
-PlacedFeature some_iron = { feature = minecraft:ore_iron, placement = [Count(Uniform(2, 5)), InSquare()] }
+PlacedFeature some_iron { feature = minecraft:ore_iron, placement = [Count(Uniform(2, 5)), InSquare()] }
 ```
 
 ## minecraft:int_provider/biased_to_bottom
@@ -63,7 +63,7 @@ Always the same height.
 A random height from `min_inclusive` to `max_inclusive`, each equally likely.
 
 ```mms
-PlacedFeature low_iron = {
+PlacedFeature low_iron {
   feature = minecraft:ore_iron
   placement = [Count(10), InSquare(), HeightRange(Uniform(AboveBottom(0), Absolute(64)))]
 }

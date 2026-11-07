@@ -23,7 +23,8 @@ import (
 //	[Next](page:2)                a link: page:N, run:/command,
 //	                              suggest:/command, copy:text, hover:text
 //	                              or https://...; [text](target "hover")
-//	${kills[@s]}                  a score, a Global or a constant
+//	${kills[@s]}                  a score, a Global, a constant, or ${@s} a
+//	                              selector's names
 //	---                           a line of its own: the next page
 //
 // A backslash makes the next character plain text.
@@ -33,8 +34,8 @@ type bookSrc struct {
 	text []rune
 	// at maps a rune range of text to the span a problem is reported at.
 	at func(start, end int) syntax.Span
-	// file is the BookText file the text came from, "" for a string in
-	// the declaration. Problems in a file are reported at the BookText
+	// file is the TextFile file the text came from, "" for a string in
+	// the declaration. Problems in a file are reported at the TextFile
 	// call with the file position in the message.
 	file string
 	// lines holds the offset each line of a file starts at.
@@ -42,6 +43,9 @@ type bookSrc struct {
 	// extern is the path of the .mmsbook file the text is, when its
 	// problems are reported in that file rather than at the call.
 	extern string
+	// noPages is set for text that has no pages: a .mmstext file, or
+	// text anywhere but a book's.
+	noPages bool
 }
 
 // where is the file position a message starts with, for file sources.
@@ -108,6 +112,17 @@ type bookParser struct {
 	// lineStart is set at the start of each line; a heading line is bold.
 	heading bool
 	started bool // a line has been written on the current page
+	// plainText is set for text outside a book: a style mark left open,
+	// such as the * in "5 * 3", is the character itself (see literal and
+	// Accidental), not an error.
+	plainText bool
+	// literal holds the offsets, by source, of marks read as the
+	// characters themselves.
+	literal map[*bookSrc]map[int]bool
+	// fn is the function the text is shown from, for a tell message:
+	// ${...} can then read its variables, and computes a value into pre.
+	fn  *fc
+	pre *[]fn.Op
 }
 
 func newBookParser(c *Checker) *bookParser {
@@ -133,6 +148,21 @@ func (p *bookParser) report(src *bookSrc, code string, sp syntax.Span, msg strin
 		c.Extern = map[string][]syntax.Diagnostic{}
 	}
 	c.Extern[src.extern] = append(c.Extern[src.extern], syntax.Diagnostic{Code: code, Severity: syntax.SeverityError, Message: msg, Sp: sp})
+}
+
+// fix attaches a quick fix to the error report just added.
+func (p *bookParser) fix(src *bookSrc, f syntax.Fix) {
+	c := p.c
+	if c.trial {
+		return
+	}
+	ds := c.Diags
+	if src.extern != "" {
+		ds = c.Extern[src.extern]
+	}
+	if len(ds) > 0 {
+		ds[len(ds)-1].Fixes = append(ds[len(ds)-1].Fixes, f)
+	}
 }
 
 func (p *bookParser) page() *bookPage {
@@ -230,6 +260,15 @@ func (p *bookParser) text(src *bookSrc) {
 func (p *bookParser) line(src *bookSrc, start, end int) {
 	t := src.text
 	if strings.TrimSpace(string(t[start:end])) == "---" {
+		if src.noPages {
+			p.report(src, "mms/page-break-in-text", src.at(start, end), src.where(start)+"a page break works only in a book's text; this text has no pages")
+			cut := end
+			if cut < len(t) && t[cut] == '\n' {
+				cut++
+			}
+			p.fix(src, syntax.Fix{Title: "Remove the --- line", Safe: true, Edits: []syntax.TextEdit{{Sp: src.at(start, cut)}}})
+			return
+		}
 		p.pages = append(p.pages, &bookPage{src: src, off: start})
 		p.started = false
 		return
@@ -326,7 +365,7 @@ func (p *bookParser) inline(src *bookSrc, start, end int, click *jsonv.Object, h
 		}
 		marked := false
 		for _, m := range bookMarks {
-			if has(i, m) {
+			if has(i, m) && !p.literal[src][i] {
 				flush()
 				if _, open := p.toggles[m]; open {
 					delete(p.toggles, m)
@@ -437,6 +476,9 @@ func (p *bookParser) link(src *bookSrc, open, close, tStart, tEnd int, outerHove
 		click.Set(key, v)
 	}
 	switch {
+	case kind == "page" && src.noPages:
+		p.errorf(src, ts, te, "a page link works only in a book's text; this text has no pages")
+		return
 	case kind == "page":
 		n, err := strconv.Atoi(strings.TrimSpace(rest))
 		if err != nil || n < 1 {
@@ -654,8 +696,9 @@ func isHexColor(s string, digits int) bool {
 	return true
 }
 
-// expr handles ${...} over the runes [start, end): a score, a Global or a
-// constant, which the game fills in when the book is first opened.
+// expr handles ${...} over the runes [start, end): a score, a Global, a
+// selector or a constant, which the game fills in when the text is shown
+// (a book's when it is first opened).
 func (p *bookParser) expr(src *bookSrc, start, end int, click *jsonv.Object, hover string) {
 	text := string(src.text[start:end])
 	c := p.c
@@ -669,22 +712,41 @@ func (p *bookParser) expr(src *bookSrc, start, end int, click *jsonv.Object, hov
 		p.report(src, code, src.at(s, e), src.where(s)+msg)
 	}
 	if strings.TrimSpace(text) == "" || len(file.Diags) > 0 || len(file.Decls) != 1 || file.Decls[0].Value == nil {
-		report(syntax.Span{}, "mms/syntax", "expected a score, a Global or a constant inside ${...}")
+		report(syntax.Span{}, "mms/syntax", "expected a score, a Global, a selector or a constant inside ${...}")
+		return
+	}
+	if sel := selectorText(file.Decls[0].Value); sel != "" {
+		// ${@s} is the names of the entities a selector finds.
+		o := &jsonv.Object{}
+		o.Set("selector", jsonv.String(sel))
+		p.addObj(src, start-2, o, 48, click, hover)
 		return
 	}
 	sub := c.bookSub()
 	sub.Src = []rune(head + text)
 	f := &fc{c: sub, src: sub.Src, ns: c.NS, obj: fn.Objective(c.NS), names: map[string]int{}}
 	f.push()
+	if o := p.fn; o != nil {
+		// The function's own variables, in a copy so a temporary used here
+		// does not clash with the function's.
+		f.ns, f.path, f.obj, f.names, f.temps = o.ns, o.path, o.obj, o.names, o.temps
+		f.selfID, f.frame, f.strings = o.selfID, o.frame, o.strings
+		f.scopes = append(append([]map[string]local(nil), o.scopes...), map[string]local{})
+	}
 	var pre []fn.Op
 	v := f.expr(&pre, file.Decls[0].Value)
+	if o := p.fn; o != nil {
+		o.temps, o.frame, o.strings = f.temps, f.frame, f.strings
+	}
 	for _, d := range sub.Diags {
 		report(d.Sp, d.Code, d.Message)
 	}
 	if v == nil || len(sub.Diags) > 0 {
 		return
 	}
-	if len(pre) > 0 {
+	if len(pre) > 0 && p.pre != nil {
+		*p.pre = append(*p.pre, pre...)
+	} else if len(pre) > 0 {
 		report(syntax.Span{}, "mms/book", "a book can show a score, a Global or a constant, not a computed value; work it out in a function and keep it in a Global")
 		return
 	}
@@ -718,6 +780,10 @@ func (p *bookParser) expr(src *bookSrc, start, end int, click *jsonv.Object, hov
 func (p *bookParser) finish() {
 	for m, at := range p.toggles {
 		p.errorf(at.src, at.off, at.off+len(m), "this %s is not closed; write \\%s for the character itself", m, m)
+	}
+	if p.plainText {
+		// Outside a book, a style runs to the end of the text.
+		p.groups = nil
 	}
 	for _, g := range p.groups {
 		e := indexRune(g.at.src.text, '}', g.at.off, len(g.at.src.text)) + 1

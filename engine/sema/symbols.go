@@ -5,6 +5,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/minecraftmetascript/mms/engine/spec"
 	"github.com/minecraftmetascript/mms/engine/syntax"
 )
 
@@ -20,6 +21,7 @@ type Symbol struct {
 	Kind     Kind
 	Decl     *syntax.Decl
 	Unit     *Unit
+	table    *Table
 }
 
 // ID returns "ns:path".
@@ -33,6 +35,18 @@ type Table struct {
 	DeclNS map[*syntax.Decl]string
 	// DeclKind maps each declaration to its resolved kind.
 	DeclKind map[*syntax.Decl]Kind
+	// Hidden are declarations the prelude's Blueprints emitted, which
+	// the editor does not offer by name.
+	Hidden map[*syntax.Decl]bool
+	// Types are the types the project declares with `Type`, by the
+	// path the type checker gives them ("::mms::Name").
+	Types map[string]*spec.Type
+	// TypeDecls are the project's Type declarations by name, for the
+	// defaults of a record's fields.
+	TypeDecls map[string]*syntax.Decl
+	// Conversions are the `as` conversions of Blueprint instances, by
+	// the instance's id.
+	Conversions map[string][]*Conversion
 }
 
 func key(folder, id string) string { return folder + "|" + id }
@@ -41,7 +55,7 @@ func key(folder, id string) string { return folder + "|" + id }
 // folder: an objective, a global and a jigsaw hole may share a name with
 // a function or anything else.
 func ownKey(k Kind) bool {
-	return k.MMS == "Objective" || k.MMS == "Global" || k.MMS == JigsawHoleKind
+	return k.MMS == "Objective" || k.MMS == "Global" || k.MMS == "Storage" || k.MMS == "Test" || k.MMS == JigsawHoleKind
 }
 
 // Find returns the symbol of a resource folder ("worldgen/noise") and id.
@@ -146,19 +160,17 @@ func Collect(units []*Unit, kinds *Kinds, defaultNS string) (*Table, map[string]
 				})
 				continue
 			}
-			sym := &Symbol{NS: sns, Path: path, Kind: k, Decl: d, Unit: u}
+			sym := &Symbol{NS: sns, Path: path, Kind: k, Decl: d, Unit: u, table: t}
 			kk := key(k.Folder(), sym.ID())
 			if ownKey(k) {
 				kk = key(k.MMS, sym.ID())
 			}
 			if prev, dup := t.byKey[kk]; dup {
-				if k.TagOf != "" {
-					// Tags merge across declarations, like vanilla tag files.
+				if k.TagOf != "" || k.Merges() {
+					// Tags merge across declarations, like vanilla tag
+					// files, and so do the entries of a language's lang
+					// file.
 					t.all = append(t.all, sym)
-					continue
-				}
-				if pk := t.DeclKind[prev.Decl]; pk.MMS == customItemKind && prev.Kind.MMS != customItemKind {
-					report(u, "mms/duplicate", d.Name.Sp, d.Kind.Name+" '"+sym.ID()+"' is already made by CustomItem '"+prev.Decl.Name.Text+"' in "+prev.Unit.Path+"; leave this out, or give the CustomItem its own "+customItemField(prev.Kind))
 					continue
 				}
 				report(u, "mms/duplicate", d.Name.Sp, d.Kind.Name+" '"+sym.ID()+"' is already declared in "+prev.Unit.Path)
@@ -166,45 +178,7 @@ func Collect(units []*Unit, kinds *Kinds, defaultNS string) (*Table, map[string]
 			}
 			t.byKey[kk] = sym
 			t.all = append(t.all, sym)
-			if k.MMS == customItemKind {
-				t.reserveCustomItem(kinds, sym, func(msg string) { report(u, "mms/duplicate", d.Name.Sp, msg) })
-			}
 		}
 	}
 	return t, diags
-}
-
-// reserveCustomItem claims the names of the files a custom item writes,
-// so that a declaration of the same name is reported and references such
-// as `item_model = ember_shard` resolve.
-func (t *Table) reserveCustomItem(kinds *Kinds, sym *Symbol, report func(string)) {
-	itemModel, model := CustomItemGenerates(sym.Decl)
-	claim := func(kindName, path string) {
-		k, ok := kinds.Lookup(kindName)
-		if !ok {
-			return
-		}
-		gen := &Symbol{NS: sym.NS, Path: path, Kind: k, Decl: sym.Decl, Unit: sym.Unit}
-		kk := key(k.Folder(), gen.ID())
-		if prev, dup := t.byKey[kk]; dup {
-			report("CustomItem '" + sym.ID() + "' makes " + kindName + " '" + gen.ID() + "', which is already declared in " + prev.Unit.Path + "; remove that declaration, or set " + customItemField(k) + " to use it")
-			return
-		}
-		t.byKey[kk] = gen
-	}
-	if itemModel {
-		claim("ItemModel", sym.Path)
-	}
-	if model {
-		claim("Model", "item/"+sym.Path)
-	}
-}
-
-// customItemField is the CustomItem field that names an existing file of
-// kind k instead of generating one.
-func customItemField(k Kind) string {
-	if k.Resource == "model" {
-		return "model"
-	}
-	return "item_model"
 }

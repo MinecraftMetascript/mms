@@ -1211,20 +1211,8 @@ execute store result score #enemies cs_tmp if entity @e[tag=cs_enemy]
 scoreboard players operation #status.enemies mms.siege = #enemies cs_tmp
 scoreboard players set #status._f0 mms.siege 0
 execute if score $banner_placed mms.siege matches 1 run scoreboard players set #status._f0 mms.siege 1
-execute if score #status._f0 mms.siege matches 1 run function siege:status/_if1
-execute unless score #status._f0 mms.siege matches 1 run function siege:status/_else3
-=== data/siege/function/status/_else3.mcfunction
-execute store result storage siege:mms m.a0 int 1 run scoreboard players get #status.enemies mms.siege
-function siege:status/_macro4 with storage siege:mms m
-=== data/siege/function/status/_if1.mcfunction
-execute store result storage siege:mms m.a0 int 1 run scoreboard players get $banner_hp mms.siege
-execute store result storage siege:mms m.a1 int 1 run scoreboard players get $banner_max mms.siege
-execute store result storage siege:mms m.a2 int 1 run scoreboard players get #status.enemies mms.siege
-function siege:status/_macro2 with storage siege:mms m
-=== data/siege/function/status/_macro2.mcfunction
-$tellraw @s "Banner: $(a0) / $(a1) health, $(a2) enemies alive"
-=== data/siege/function/status/_macro4.mcfunction
-$tellraw @s "No banner is planted, $(a0) enemies alive"
+execute if score #status._f0 mms.siege matches 1 run tellraw @s ["","Banner: ",{score:{name:"$banner_hp",objective:"mms.siege"}}," / ",{score:{name:"$banner_max",objective:"mms.siege"}}," health, ",{score:{name:"#status.enemies",objective:"mms.siege"}}," enemies alive"]
+execute unless score #status._f0 mms.siege matches 1 run tellraw @s ["","No banner is planted, ",{score:{name:"#status.enemies",objective:"mms.siege"}}," enemies alive"]
 === data/siege/function/steer.mcfunction
 scoreboard players set #tgt cs_tmp 0
 execute on target run scoreboard players set #tgt cs_tmp 1

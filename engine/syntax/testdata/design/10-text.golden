@@ -1,0 +1,43 @@
+Const welcome
+  Type: Text
+  String "Welcome to **the Library**, ${@s}! Press {key:inventory} to open your bag."
+Decl Template wave_start: Text(wave: int)
+  String "{red}Wave ${wave}{/} begins. [Rules](run:/function siege:rules \"Show the rules\")"
+Const rules
+  Type: Text
+  Call
+    Ident TextFile
+    String "text/rules.mmstext"
+Decl OnFirstJoin
+  Block
+    Call
+      Ident tell
+      Selector s
+      Ident welcome
+    Call
+      Ident title
+      Selector s
+      String "{gold}The Library"
+      Arg subtitle =
+        String "{gray}*mind the shelves*"
+Decl Function start_wave
+  Block
+    Call
+      Ident tell
+      Selector a
+      Call
+        Ident wave_start
+        Member .wave
+          Ident game
+Decl CustomItem ember_shard
+  Block
+    Field base
+      Ident amethyst_shard
+    Field name
+      String "{#ff8800}Ember Shard"
+    Field components
+      Object
+        Block
+          Field lore
+            List
+              String "{gray}*Still warm.*"

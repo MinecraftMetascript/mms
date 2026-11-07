@@ -41,12 +41,12 @@ func diagText(r *Result) string {
 	return sb.String()
 }
 
-const assetSrc = `PaintingVariant sunset = { width = 2, height = 1, asset_id = Texture("art/Sunset Final.png", "sunset") }
-PaintingVariant again = { width = 2, height = 1, asset_id = demo:sunset }
-JukeboxSong tune = { sound_event = Sound("music/tune.ogg"), description = "Tune", length_in_seconds = 30, comparator_output = 3 }
-TemplatePool houses = {
+const assetSrc = `PaintingVariant sunset { width = 2, height = 1, asset_id = Texture("art/Sunset Final.png", "sunset") }
+PaintingVariant again { width = 2, height = 1, asset_id = demo:sunset }
+JukeboxSong tune { sound_event = Sound("music/tune.ogg"), description = "Tune", length_in_seconds = 30, comparator_output = 3 }
+TemplatePool houses {
   fallback = minecraft:empty
-  elements = [{ weight = 1, element = { element_type = "minecraft:single_pool_element", location = Structure("builds/house.nbt"), projection = "rigid", processors = "minecraft:empty" } }]
+  elements = [{ weight = 1, element = { element_type = "minecraft:single_pool_element", location = StructureFile("builds/house.nbt"), projection = "rigid", processors = "minecraft:empty" } }]
 }
 `
 
@@ -123,9 +123,9 @@ res pack.png <- art/icon.png`
 
 func TestAssetsNoResourcePack(t *testing.T) {
 	files := fstest.MapFS{"builds/house.nbt": {Data: nbtBytes}, "art/icon.png": {Data: pngBytes}}
-	_, r := assetProject(t, files, `TemplatePool houses = {
+	_, r := assetProject(t, files, `TemplatePool houses {
   fallback = minecraft:empty
-  elements = [{ weight = 1, element = { element_type = "minecraft:single_pool_element", location = Structure("builds/house.nbt"), projection = "rigid", processors = "minecraft:empty" } }]
+  elements = [{ weight = 1, element = { element_type = "minecraft:single_pool_element", location = StructureFile("builds/house.nbt"), projection = "rigid", processors = "minecraft:empty" } }]
 }
 `)
 	if _, res := SplitPacks(r.Emit()); len(res) != 0 {
@@ -140,15 +140,15 @@ func TestAssetsDiagnostics(t *testing.T) {
 		"art/b.png":    {Data: pngBytes},
 		"music/t.ogg":  {Data: oggBytes},
 	}
-	_, r := assetProject(t, files, `PaintingVariant a = { width = 1, height = 1, asset_id = Texture("art/fake.png") }
-PaintingVariant b = { width = 1, height = 1, asset_id = Texture("art/nope.png") }
-PaintingVariant c = { width = 1, height = 1, asset_id = Sound("music/t.ogg") }
-PaintingVariant d = { width = 1, height = 1, asset_id = Texture("music/t.ogg") }
-PaintingVariant e = { width = 1, height = 1, asset_id = Texture("../x.png") }
-PaintingVariant f = { width = 1, height = 1, asset_id = Texture("art/a.png", "same") }
-PaintingVariant g = { width = 1, height = 1, asset_id = Texture("art/b.png", "same") }
-PaintingVariant h = { width = 1, height = 1, asset_id = "demo:elsewhere" }
-PaintingVariant i = { width = 1, height = 1, asset_id = "other:elsewhere" }
+	_, r := assetProject(t, files, `PaintingVariant a { width = 1, height = 1, asset_id = Texture("art/fake.png") }
+PaintingVariant b { width = 1, height = 1, asset_id = Texture("art/nope.png") }
+PaintingVariant c { width = 1, height = 1, asset_id = Sound("music/t.ogg") }
+PaintingVariant d { width = 1, height = 1, asset_id = Texture("music/t.ogg") }
+PaintingVariant e { width = 1, height = 1, asset_id = Texture("../x.png") }
+PaintingVariant f { width = 1, height = 1, asset_id = Texture("art/a.png", "same") }
+PaintingVariant g { width = 1, height = 1, asset_id = Texture("art/b.png", "same") }
+PaintingVariant h { width = 1, height = 1, asset_id = "demo:elsewhere" }
+PaintingVariant i { width = 1, height = 1, asset_id = "other:elsewhere" }
 `)
 	want := `mms/asset: 'art/fake.png' is not a PNG image
 mms/asset: no file 'art/nope.png' in the project
@@ -167,7 +167,7 @@ lint/external-asset: this project does not provide the texture 'demo:elsewhere';
 // file it reads appears, disappears or changes.
 func TestAssetsIncremental(t *testing.T) {
 	files := fstest.MapFS{"art/icon.png": {Data: pngBytes}}
-	p, r := assetProject(t, files, `PaintingVariant a = { width = 1, height = 1, asset_id = Texture("art/a.png") }`+"\n")
+	p, r := assetProject(t, files, `PaintingVariant a { width = 1, height = 1, asset_id = Texture("art/a.png") }`+"\n")
 	if !strings.Contains(diagText(r), "no file 'art/a.png'") {
 		t.Fatalf("want a missing-file error, got:\n%s", diagText(r))
 	}
@@ -188,9 +188,9 @@ func TestAssetsIncremental(t *testing.T) {
 // about, with a fix that removes it from the source.
 func TestAssetsExtension(t *testing.T) {
 	files := fstest.MapFS{"art/a.png": {Data: pngBytes}, "art/icon.png": {Data: pngBytes}}
-	src := `PaintingVariant a = { width = 1, height = 1, asset_id = Texture("art/a.png", "sun.png") }
-PaintingVariant b = { width = 1, height = 1, asset_id = "demo:sun.png" }
-Model item/ruby = { parent = "item/generated.json", textures = { layer0 = demo:sun.png, layer1 = "item/diamond.png" } }
+	src := `PaintingVariant a { width = 1, height = 1, asset_id = Texture("art/a.png", "sun.png") }
+PaintingVariant b { width = 1, height = 1, asset_id = "demo:sun.png" }
+Model item/ruby { parent = "item/generated.json", textures = { layer0 = demo:sun.png, layer1 = "item/diamond.png" } }
 `
 	_, r := assetProject(t, files, src)
 	want := `mms/asset-extension: texture ids leave out the file extension, which the game adds itself; MMS writes 'sun'
@@ -231,7 +231,7 @@ mms/asset-extension: texture ids leave out the file extension, which the game ad
 // TestAssetsExtensionDeclName: a declaration named with its file's
 // extension would be written as ruby.json.json, so it is an error.
 func TestAssetsExtensionDeclName(t *testing.T) {
-	_, r := assetProject(t, fstest.MapFS{"art/icon.png": {Data: pngBytes}}, "Model item/ruby.json = { parent = \"item/generated\" }\n")
+	_, r := assetProject(t, fstest.MapFS{"art/icon.png": {Data: pngBytes}}, "Model item/ruby.json { parent = \"item/generated\" }\n")
 	ds := r.Diagnostics("main.mms")
 	if len(ds) == 0 || ds[0].Code != "mms/invalid-name" || !strings.Contains(ds[0].Message, "use 'item/ruby'") || len(ds[0].Fixes) != 1 {
 		t.Fatalf("diagnostics: %+v", ds)

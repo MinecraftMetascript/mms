@@ -31,6 +31,22 @@ export interface OutputItem {
 	pages?: { uri: string; range: SourceRange }[];
 }
 
+/**
+ * A message a `tell`, `title` or `actionbar` command shows, from
+ * `mms/output`'s texts: at the command, or over the .mmstext file it reads.
+ */
+export interface OutputText {
+	/** text:<uri>:<offset>, the key an editor selects it by. */
+	id: string;
+	kind: 'chat' | 'title' | 'actionbar';
+	/** The message as a text component, in JSON. */
+	text: string;
+	/** A title's subtitle, in JSON. */
+	subtitle?: string;
+	uri: string;
+	range: SourceRange;
+}
+
 /** A jigsaw block of a structure file: where it is, and what it joins. */
 export interface OutputJigsaw {
 	pos: [number, number, number];
@@ -41,6 +57,10 @@ export interface OutputJigsaw {
 	orientation?: string;
 	/** rollable or aligned: whether a piece joined to an up or down facing block may turn. */
 	joint?: string;
+	/** The block it turns into once the structure is placed, such as minecraft:air. */
+	final_state?: string;
+	/** The name of the item it was placed from, if it had one. */
+	label?: string;
 }
 
 /** A project file the pack copies, such as a texture or a structure. */

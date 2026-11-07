@@ -10,7 +10,10 @@ import (
 	"strings"
 
 	"github.com/minecraftmetascript/mms/engine/command"
+	"github.com/minecraftmetascript/mms/engine/eval"
+	"github.com/minecraftmetascript/mms/engine/format"
 	"github.com/minecraftmetascript/mms/engine/jsonv"
+	"github.com/minecraftmetascript/mms/engine/prelude"
 	"github.com/minecraftmetascript/mms/engine/project"
 	"github.com/minecraftmetascript/mms/engine/sema"
 	"github.com/minecraftmetascript/mms/engine/syntax"
@@ -108,7 +111,7 @@ func (s *Session) Completion(path string, off int) ([]Item, syntax.Span) {
 		return nil, syntax.Span{Start: off, End: off}
 	}
 	f := a.u.File
-	// The path of Texture("..."), Sound("...") or Structure("...") lists
+	// The path of Texture("..."), Sound("...") or StructureFile("...") lists
 	// the project's files of that type.
 	if items, replace, ok := s.assetPathCompletion(f, off); ok {
 		return items, replace
@@ -146,7 +149,10 @@ func (s *Session) Completion(path string, off int) ([]Item, syntax.Span) {
 			replace = sp
 		}
 	}
-	cands := s.complete(a, off)
+	cands, ok := s.templateArgCandidates(path, off, a.c)
+	if !ok {
+		cands = s.complete(a, off)
+	}
 	items := make([]Item, 0, len(cands))
 	for i, c := range cands {
 		it := Item{Label: c.Label, Kind: c.Kind, Detail: c.Detail, Doc: c.Doc, Deprecated: c.Deprecated, Sort: sortKey(i)}
@@ -191,7 +197,7 @@ func wordAt(f *syntax.File, off int) (syntax.Span, bool) {
 	case t.Kind == parser.MMSLexerAT:
 		// A selector being typed: `@` alone, or `@a` below.
 		return t.Sp, true
-	case t.Kind == parser.MMSLexerIDENT || (t.Kind >= parser.MMSLexerLET && t.Kind <= parser.MMSLexerFALSE):
+	case t.Kind == parser.MMSLexerIDENT || (t.Kind >= parser.MMSLexerCONST && t.Kind <= parser.MMSLexerFALSE):
 		sp := t.Sp
 		if i > 0 && f.Tokens[i-1].Kind == parser.MMSLexerAT && f.Tokens[i-1].Sp.End == sp.Start {
 			sp.Start = f.Tokens[i-1].Sp.Start
@@ -234,7 +240,7 @@ func (s *Session) TriggerApplies(path string, off int, ch string) bool {
 	f := a.u.File
 	if start, _, ok := assetPathString(f, off); ok {
 		h := assetHelperBefore(f, start-1)
-		if _, _, ok := sema.AssetFileType(h); ok || h == "BookText" {
+		if _, _, ok := sema.AssetFileType(h); ok || h == "TextFile" {
 			return true
 		}
 	}
@@ -267,18 +273,18 @@ func (s *Session) complete(a *at, off int) []sema.Candidate {
 		if prev := prevToken(f, start); prev != nil && prev.Kind == parser.MMSLexerIDENT && lineOf(f, prev.Sp.End) == lineOf(f, off) {
 			return nil
 		}
-		return s.P.Kinds.DeclKinds()
+		return s.declKinds()
 	}
 	d, _ := a.path[1].(*syntax.Decl)
 	if d != nil && d.Kind.Sp.Contains(off) {
-		return s.P.Kinds.DeclKinds()
+		return s.declKinds()
 	}
 	if d != nil && d.Name != nil && d.Name.Sp.Contains(off) {
 		// A name on a later line than its kind is a new declaration's
 		// kind: in `X x = foo` + newline + `Fe|`, the value `foo` reads
 		// as the kind of a declaration named `Fe`.
 		if l1, _ := f.LineCol(d.Kind.Sp.End); l1 != lineOf(f, off) {
-			return s.P.Kinds.DeclKinds()
+			return s.declKinds()
 		}
 		return nil
 	}
@@ -359,6 +365,9 @@ func (s *Session) complete(a *at, off int) []sema.Candidate {
 				if a.code() && sema.IsExecChain(p.X) {
 					return sema.ExecCandidates(false)
 				}
+				if fs := a.c.StorageFieldCandidates(p.X); a.code() && fs != nil {
+					return fs
+				}
 				return a.methods(p)
 			case *syntax.FieldStmt:
 				if i >= 2 {
@@ -378,6 +387,9 @@ func (s *Session) complete(a *at, off int) []sema.Candidate {
 			if n.Name == nil || !n.Name.Sp.Contains(off) {
 				if a.code() && sema.IsExecChain(n.X) {
 					return sema.ExecCandidates(false)
+				}
+				if fs := a.c.StorageFieldCandidates(n.X); a.code() && fs != nil {
+					return fs
 				}
 				return a.methods(n)
 			}
@@ -431,8 +443,21 @@ func (s *Session) complete(a *at, off int) []sema.Candidate {
 // the variables in scope, the execute helpers, the statement keywords,
 // then the Globals, objectives and functions.
 func (s *Session) statementCandidates(a *at, off int) []sema.Candidate {
+	if a.decl != nil && a.decl.Kind.MMS == "Test" && !inSection(a.path) {
+		// A Test's own lines: setup first, then run and expect.
+		var out []sema.Candidate
+		for i, kw := range []struct{ word, doc string }{
+			{"setup", "Commands and code that run first, in a fresh world after the pack loads: `setup { game.wave = 1 }`."},
+			{"run", "Calls the function under test: `run next_wave()`."},
+			{"expect", "A condition that must hold, checked in order: `expect game.wave == 2`."},
+		} {
+			out = append(out, sema.Candidate{Label: kw.word, Kind: sema.CandKeyword, Doc: kw.doc, Rank: i})
+		}
+		return out
+	}
 	out := locals(a.u.File, a.fn, off)
 	out = append(out, sema.ExecCandidates(true)...)
+	out = append(out, sema.TextCommandCandidates()...)
 	for i, kw := range []string{"let", "if", "while", "for", "return"} {
 		out = append(out, sema.Candidate{Label: kw, Kind: sema.CandKeyword, Rank: 100 + i})
 	}
@@ -441,6 +466,17 @@ func (s *Session) statementCandidates(a *at, off int) []sema.Candidate {
 		out = append(out, c)
 	}
 	return out
+}
+
+// inSection reports whether a path is inside a section, such as a Test's
+// setup { } block.
+func inSection(path []syntax.Node) bool {
+	for _, n := range path {
+		if _, ok := n.(*syntax.SectionStmt); ok {
+			return true
+		}
+	}
+	return false
 }
 
 func lineOf(f *syntax.File, off int) int {
@@ -463,15 +499,15 @@ func (a *at) code() bool { return a.fn != nil }
 
 // codeRoot finds the function code holding the cursor: the innermost
 // inline function block on the path, such as CustomItem's
-// `on_right_click = { ... }` or an advancement's `function = { ... }`,
+// `on_right_click = run { ... }` or an advancement's `function = run { ... }`,
 // else the declaration when its kind holds code.
 func (a *at) codeRoot() *syntax.Decl {
 	if a.decl == nil {
 		return nil
 	}
 	for i := len(a.path) - 1; i >= 2; i-- {
-		if o, ok := a.path[i].(*syntax.Object); ok && o.Body != nil && a.info(o) != nil && a.info(o).InlineFn {
-			return &syntax.Decl{Body: o.Body, Sp: o.Sp}
+		if r, ok := a.path[i].(*syntax.RunExpr); ok && r.Body != nil {
+			return &syntax.Decl{Body: r.Body, Sp: r.Sp}
 		}
 	}
 	if sema.IsCodeKind(a.decl.Kind) {
@@ -751,6 +787,24 @@ func commaBetween(f *syntax.File, from, to int) bool {
 
 // Hover returns Markdown for the node at off and the span it describes.
 func (s *Session) Hover(path string, off int) (string, syntax.Span) {
+	md, sp := s.hover(path, off)
+	if md == "" || strings.HasPrefix(md, "Expected:") {
+		if emd, esp, ok := s.evalHover(path, off); ok {
+			md, sp = emd, esp
+		}
+	}
+	for _, c := range s.commandCalls(path) {
+		if fsp := c.X.Fn.Span(); fsp.Contains(off) {
+			if md != "" {
+				md += "\n\n---\n\n"
+			}
+			return md + inlinedText(c, true), fsp
+		}
+	}
+	return md, sp
+}
+
+func (s *Session) hover(path string, off int) (string, syntax.Span) {
 	if md, sp, ok := s.bookHover(path, off); ok {
 		return md, sp
 	}
@@ -758,12 +812,21 @@ func (s *Session) Hover(path string, off int) (string, syntax.Span) {
 	if a == nil || len(a.path) < 2 {
 		return "", syntax.Span{}
 	}
-	d := a.path[1].(*syntax.Decl)
+	d, ok := a.path[1].(*syntax.Decl)
+	if !ok || d.Kind == nil {
+		return "", syntax.Span{} // a const or a top-level for
+	}
 	inner := a.path[len(a.path)-1]
+	if a.decl != nil && a.decl.Blueprint != nil && d.Name != nil && d.Name.Sp.Contains(off) {
+		return instanceHover(d), d.Name.Sp
+	}
 	if a.decl != nil && d.Name != nil && d.Name.Sp.Contains(off) {
 		return s.declHover(a.decl), d.Name.Sp
 	}
 	if d.Kind.Sp.Contains(off) {
+		if bp := s.blueprint(d); bp != nil {
+			return "```mms\nBlueprint " + d.Kind.Name + "\n```\n" + sema.DocMarkdown(bp.D.Doc), d.Kind.Sp
+		}
 		k := a.decl
 		if k != nil && k.Kind.Resource != "" {
 			where := "."
@@ -789,7 +852,7 @@ func (s *Session) Hover(path string, off int) (string, syntax.Span) {
 		n := a.path[i]
 		if in := a.info(n); in != nil {
 			if md := a.c.Hover(in); md != "" {
-				if in.Asset != nil && in.Asset.Helper == "Structure" {
+				if in.Asset != nil && in.Asset.Helper == "StructureFile" {
 					md += s.jigsawHover(in.Asset.Src)
 				}
 				return md, n.Span()
@@ -804,7 +867,7 @@ func (s *Session) Hover(path string, off int) (string, syntax.Span) {
 }
 
 // jigsawHover lists a structure file's jigsaw blocks, for the hover of
-// its Structure("...") call.
+// its StructureFile("...") call.
 func (s *Session) jigsawHover(src string) string {
 	js, ok := project.StructureJigsaws(s.P.Files, src)
 	if !ok || len(js) == 0 {
@@ -854,6 +917,9 @@ type SignatureHelp struct {
 
 // Signature returns signature help for the call around off.
 func (s *Session) Signature(path string, off int) (SignatureHelp, bool) {
+	if h, ok := s.templateSignature(path, off); ok {
+		return h, true
+	}
 	a := s.at(path, off)
 	if a == nil {
 		return SignatureHelp{}, false
@@ -871,6 +937,10 @@ func (s *Session) Signature(path string, off int) (SignatureHelp, bool) {
 		h.Doc = a.c.SignatureDoc(a.info(call))
 		if h.Label == "" {
 			h = s.functionSignature(a.info(call.Fn))
+		}
+		if id, ok := call.Fn.(*syntax.Ident); ok && h.Label == "" && a.code() {
+			h.Label, h.Params, h.Doc = sema.TextCommandSignature(id.Name)
+			h.ParamDocs = make([]string, len(h.Params))
 		}
 		if h.Label == "" {
 			return SignatureHelp{}, false
@@ -909,7 +979,10 @@ func (s *Session) target(path string, off int) *sema.Symbol {
 	if a == nil || len(a.path) < 2 {
 		return nil
 	}
-	d := a.path[1].(*syntax.Decl)
+	d, ok := a.path[1].(*syntax.Decl)
+	if !ok {
+		return nil
+	}
 	if d.Name != nil && d.Name.Sp.Contains(off) {
 		for _, sym := range s.R.Syms.All() {
 			if sym.Decl == d {
@@ -940,7 +1013,7 @@ func (a *at) inCommand(off int) (syntax.Node, *sema.Info) {
 	var best syntax.Node
 	var bestIn *sema.Info
 	for n, in := range a.decl.Info {
-		if in.Symbol == nil && in.Local == nil {
+		if in.Symbol == nil && in.Local == nil && in.Converted == nil {
 			continue
 		}
 		switch n.(type) {
@@ -974,6 +1047,14 @@ func (s *Session) current(sym *sema.Symbol) *sema.Symbol {
 
 // Definition returns where the symbol at off is declared.
 func (s *Session) Definition(path string, off int) []Location {
+	if n, ok := s.evalNameAt(path, off); ok {
+		// A prelude name's Path is its prelude file, which editors open
+		// read-only.
+		return []Location{{Path: n.Path, Span: n.Def}}
+	}
+	if cv := s.convertedAt(path, off); cv != nil && cv.Decl != nil && cv.Decl.Name != nil {
+		return []Location{{Path: cv.Path, Span: cv.Decl.Name.Sp}}
+	}
 	sym := s.target(path, off)
 	if sym == nil || sym.Decl.Name == nil {
 		return nil
@@ -984,6 +1065,15 @@ func (s *Session) Definition(path string, off int) []Location {
 // References returns every use of the symbol at off, with its declaration
 // first when includeDecl is set.
 func (s *Session) References(path string, off int, includeDecl bool) []Location {
+	if n, ok := s.evalNameAt(path, off); ok {
+		var out []Location
+		for _, l := range s.evalUses(n) {
+			if includeDecl || l != (Location{Path: n.Path, Span: n.Def}) {
+				out = append(out, l)
+			}
+		}
+		return out
+	}
 	sym := s.target(path, off)
 	if sym == nil {
 		return nil
@@ -1034,6 +1124,17 @@ type Edit struct {
 
 // PrepareRename returns the span of the renamable name at off.
 func (s *Session) PrepareRename(path string, off int) (syntax.Span, bool) {
+	if n, ok := s.evalNameAt(path, off); ok {
+		if strings.HasPrefix(n.Path, prelude.Prefix) {
+			return syntax.Span{}, false
+		}
+		for _, l := range s.evalUses(n) {
+			if l.Path == path && within(l.Span, off) {
+				return l.Span, true
+			}
+		}
+		return syntax.Span{}, false
+	}
 	sym := s.target(path, off)
 	if sym == nil {
 		return syntax.Span{}, false
@@ -1046,6 +1147,9 @@ func (s *Session) PrepareRename(path string, off int) (syntax.Span, bool) {
 // Rename renames the symbol at off to newPath (a resource path such as
 // `hills` or `terrain/hills`), editing the declaration and every use.
 func (s *Session) Rename(path string, off int, newPath string) ([]Edit, string) {
+	if n, ok := s.evalNameAt(path, off); ok {
+		return s.renameEval(n, newPath)
+	}
 	sym := s.target(path, off)
 	if sym == nil {
 		return nil, "nothing to rename here"
@@ -1086,8 +1190,10 @@ func (s *Session) Rename(path string, off int, newPath string) ([]Edit, string) 
 // Symbol is a document outline entry.
 type Symbol struct {
 	Name, Detail string
-	Kind         string // "resource", "function", "namespace", "tag", "objective"
-	Span, Sel    syntax.Span
+	// Kind is "resource", "function", "namespace", "tag", "objective",
+	// "constant", "template", "type" or "blueprint".
+	Kind      string
+	Span, Sel syntax.Span
 }
 
 // Symbols returns a file's outline.
@@ -1097,7 +1203,22 @@ func (s *Session) Symbols(path string) []Symbol {
 		return nil
 	}
 	var out []Symbol
+	// What a Blueprint instance emits is listed as the instance, as
+	// written, below.
+	emitted := map[*syntax.Decl]bool{}
+	if s.R.Eval != nil {
+		if fo := s.R.Eval.Files[path]; fo != nil {
+			for _, od := range fo.Decls {
+				if od.Instance != nil {
+					emitted[od.D] = true
+				}
+			}
+		}
+	}
 	for _, d := range u.File.Decls {
+		if emitted[d] {
+			continue
+		}
 		sym := Symbol{Detail: d.Kind.Name, Span: d.Sp, Sel: d.Kind.Sp, Kind: "resource"}
 		if d.Name != nil {
 			sym.Name, sym.Sel = d.Name.Text, d.Name.Sp
@@ -1119,6 +1240,32 @@ func (s *Session) Symbols(path string) []Symbol {
 			sym.Kind = "namespace"
 		}
 		out = append(out, sym)
+	}
+	// The source's consts, Templates, Types and Blueprints, which
+	// expansion leaves out of the declarations.
+	if src := s.R.Source[path]; src != nil {
+		for _, it := range src.Items {
+			switch it := it.(type) {
+			case *syntax.ConstStmt:
+				if it.Name != nil {
+					out = append(out, Symbol{Name: it.Name.Text, Detail: "const", Kind: "constant", Span: it.Sp, Sel: it.Name.Sp})
+				}
+			case *syntax.Decl:
+				if it.Name == nil || it.Kind == nil {
+					continue
+				}
+				kind := map[string]string{"Template": "template", "Type": "type", "Blueprint": "blueprint"}[it.Kind.Name]
+				if kind == "" && s.R.Eval.Blueprints[it.Kind.Name] != nil && !it.Name.Templated() {
+					if bp := s.R.Eval.Blueprints[it.Kind.Name]; !bp.D.Extern {
+						kind = "resource" // a Blueprint instance, such as a CustomItem
+					}
+				}
+				if kind != "" {
+					out = append(out, Symbol{Name: it.Name.Text, Detail: it.Kind.Name, Kind: kind, Span: it.Sp, Sel: it.Name.Sp})
+				}
+			}
+		}
+		sort.SliceStable(out, func(i, j int) bool { return out[i].Span.Start < out[j].Span.Start })
 	}
 	return out
 }
@@ -1179,6 +1326,9 @@ type InlayHint struct {
 	Off     int // where the label goes
 	Label   string
 	Tooltip string
+	// Type marks an inferred type, `: int`, which sits right after the
+	// name.
+	Type bool
 }
 
 // InlayHints lists the inlay hints in a file, in order: the base item
@@ -1195,19 +1345,92 @@ func (s *Session) InlayHints(path string) []InlayHint {
 			continue
 		}
 		for n, in := range dr.Info {
-			if in.Base == "" || in.Symbol == nil {
-				continue
+			if cv := in.Converted; cv != nil && cv.Hint != "" {
+				// A Blueprint instance read as one of its `as`
+				// conversions, which says why with a hint.
+				to := format.Expr(cv.X)
+				if r := []rune(to); len(r) > 30 {
+					to = string(r[:29]) + "…"
+				}
+				out = append(out, InlayHint{Off: n.Span().End, Label: "→ " + to, Tooltip: cv.Hint})
 			}
-			base := strings.TrimPrefix(in.Base, "minecraft:")
-			out = append(out, InlayHint{
-				Off:     n.Span().End,
-				Label:   "→ " + base,
-				Tooltip: "A plain item id has no components, so " + in.Symbol.Path + " is written as " + in.Base + " here and any " + base + " matches.",
-			})
 		}
+	}
+	out = append(out, s.typeHints(u)...)
+	// A Commands Template writes its code where it is called.
+	for _, c := range s.commandCalls(path) {
+		out = append(out, InlayHint{Off: c.X.Sp.End, Label: "inlined", Tooltip: inlinedText(c, false)})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Off < out[j].Off })
 	return out
+}
+
+// typeHints shows the inferred type after a `const` or `let` name that
+// has none written: `let n = 0` reads `let n: int = 0`.
+func (s *Session) typeHints(u *sema.Unit) []InlayHint {
+	var out []InlayHint
+	hint := func(n *syntax.Name, t string) {
+		if n != nil && t != "" {
+			out = append(out, InlayHint{Off: n.Sp.End, Label: ": " + t, Tooltip: "Inferred type", Type: true})
+		}
+	}
+	for _, it := range u.File.Items {
+		if k, ok := it.(*syntax.ConstStmt); ok && k.Name != nil && k.Type == nil && s.R.Eval != nil {
+			if c := s.R.Eval.Consts[k.Name.Text]; c != nil && c.S == k {
+				hint(k.Name, eval.TypeOf(c.Value()))
+			}
+		}
+	}
+	for _, d := range u.File.Decls {
+		dr := s.R.Decls[d]
+		if dr == nil || d.Body == nil {
+			continue
+		}
+		syntax.Walk(d.Body, func(n syntax.Node) bool {
+			if l, ok := n.(*syntax.LetStmt); ok && l.Name != nil && l.Type == nil {
+				if in := dr.Info[l.Name]; in != nil && in.Local != nil {
+					hint(l.Name, in.Local.Type)
+				}
+			}
+			return true
+		})
+	}
+	return out
+}
+
+// commandCalls lists the calls in a file of Templates that return
+// Commands, which write their statements in place.
+func (s *Session) commandCalls(path string) []*eval.Call {
+	if s.R.Eval == nil {
+		return nil
+	}
+	var out []*eval.Call
+	for _, c := range s.R.Eval.Calls {
+		if c.Path == path && c.X != nil && c.Template != nil && c.Template.D.Body != nil {
+			out = append(out, c)
+		}
+	}
+	return out
+}
+
+// maxInlined is how many lines of a Template's expansion hover shows.
+const maxInlined = 20
+
+// inlinedText says what a Commands Template call writes, as markdown for
+// hover or as plain text for an inlay's tooltip.
+func inlinedText(c *eval.Call, md bool) string {
+	code := format.Stmts(c.Expanded)
+	if lines := strings.Split(code, "\n"); len(lines) > maxInlined {
+		code = strings.Join(lines[:maxInlined], "\n") + fmt.Sprintf("\n// … %d more lines", len(lines)-maxInlined)
+	}
+	name := c.Template.D.NameText()
+	if code == "" {
+		return "Template " + name + " is inlined here at compile time, and writes nothing for these arguments."
+	}
+	if md {
+		return "Inlined at compile time: Template `" + name + "` writes\n\n```mms\n" + code + "\n```"
+	}
+	return "Template " + name + " is inlined here at compile time:\n" + code
 }
 
 func isIdent(e syntax.Expr, name string) bool {

@@ -1,0 +1,22 @@
+=== 10-text.mms (changed: true)
+# at 10-text.mms:9:1
+OnFirstJoin {
+  tell(@s, "Welcome to **the Library**, ${@s}! Press {key:inventory} to open your bag.")
+  title(@s, "{gold}The Library", subtitle = "{gray}*mind the shelves*")
+}
+# at 10-text.mms:14:10
+Function start_wave {
+  tell(
+    @a,
+    "{red}Wave ${game.wave}{/} begins. [Rules](run:/function siege:rules \"Show the rules\")",
+  )
+}
+# at 10-text.mms:18:1
+CustomItem ember_shard {
+  base = amethyst_shard
+  name = "{#ff8800}Ember Shard"
+  components = { lore = ["{gray}*Still warm.*"] }
+}
+=== provenance of copied nodes
+10-text.mms:10:12 from 10-text.mms:1 < const welcome (at 10-text.mms:10:12, def 10-text.mms:1:1): 1 node, "Welcome to **the Library**, ${@s}! Press {ke...
+10-text.mms:15:12 from 10-text.mms:5 < Template wave_start (at 10-text.mms:15:12, def 10-text.mms:4:1): 2 nodes, "{red}Wave ${game.wave}{/} begins. [Rules](ru...

@@ -95,9 +95,9 @@ export class PackOutput implements vscode.Disposable {
 	}
 }
 
-/** Whether a document is MMS source: a .mms file or a .mmsbook book text. */
+/** Whether a document is MMS source: a .mms file, a .mmsbook book text or a .mmstext text. */
 export function isSource(doc: vscode.TextDocument | undefined): boolean {
-	return doc?.languageId === 'mms' || doc?.languageId === 'mmsbook';
+	return doc?.languageId === 'mms' || doc?.languageId === 'mmsbook' || doc?.languageId === 'mmstext';
 }
 
 /** A file's identity: its path, ignoring case on Windows. */

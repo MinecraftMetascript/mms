@@ -1,0 +1,30 @@
+For w
+  Ident woods
+  Block
+    Decl Recipe ${w}_crate (templated)
+      Interp
+        Ident w
+      Lit "_crate"
+      Call
+        Ident Shaped
+        List
+          String "PPP"
+          String "P P"
+          String "PPP"
+        Object
+          Block
+            Field P
+              String "${w}_planks"
+        Ident barrel
+    Decl LootTable blocks/${w}_crate (templated)
+      Lit "blocks/"
+      Interp
+        Ident w
+      Lit "_crate"
+      Block
+        Field pools
+          List
+            Call
+              Ident Pool
+              Number 1
+              String "${w}_crate"

@@ -4,7 +4,7 @@ package syntax
 // old-to-new nodes in nodes when it is not nil.
 func shiftFile(f *File, delta int, nodes map[Node]Node) *File {
 	s := shifter{d: delta, m: nodes}
-	out := &File{Src: f.Src, Decls: make([]*Decl, len(f.Decls)), Tokens: make([]Token, len(f.Tokens)), Diags: make([]Diagnostic, len(f.Diags))}
+	out := &File{Src: f.Src, Tokens: make([]Token, len(f.Tokens)), Diags: make([]Diagnostic, len(f.Diags))}
 	for i, t := range f.Tokens {
 		t.Sp = s.sp(t.Sp)
 		out.Tokens[i] = t
@@ -13,18 +13,31 @@ func shiftFile(f *File, delta int, nodes map[Node]Node) *File {
 		d.Sp = s.sp(d.Sp)
 		out.Diags[i] = d
 	}
-	for i, d := range f.Decls {
-		out.Decls[i] = s.decl(d)
+	for _, it := range f.Items {
+		n := s.stmt(it)
+		out.Items = append(out.Items, n)
+		if d, ok := n.(*Decl); ok {
+			out.Decls = append(out.Decls, d)
+		}
 	}
 	return out
 }
 
 type shifter struct {
-	d int
-	m map[Node]Node
+	d   int
+	m   map[Node]Node
+	fix *Span // when set, every span becomes this one
+	// sub, when set, replaces the expressions it returns ok for, which
+	// are used as they are.
+	sub func(Expr) (Expr, bool)
 }
 
-func (s shifter) sp(sp Span) Span { return Span{sp.Start + s.d, sp.End + s.d} }
+func (s shifter) sp(sp Span) Span {
+	if s.fix != nil {
+		return *s.fix
+	}
+	return Span{sp.Start + s.d, sp.End + s.d}
+}
 
 func (s shifter) rec(old, new Node) {
 	if s.m != nil {
@@ -33,11 +46,15 @@ func (s shifter) rec(old, new Node) {
 }
 
 func (s shifter) decl(d *Decl) *Decl {
-	n := &Decl{Kind: s.ident(d.Kind), Name: s.name(d.Name), Type: s.name(d.Type), Value: s.expr(d.Value), Body: s.block(d.Body), Doc: d.Doc, Sp: s.sp(d.Sp)}
+	n := &Decl{Kind: s.ident(d.Kind), Name: s.name(d.Name), Type: s.typ(d.Type), Value: s.expr(d.Value),
+		TypeValue: s.typ(d.TypeValue), Body: s.block(d.Body), Extern: d.Extern, Primary: d.Primary, Doc: d.Doc, Sp: s.sp(d.Sp)}
+	for _, m := range d.More {
+		n.More = append(n.More, s.name(m))
+	}
 	if d.Params != nil {
 		n.Params = &ParamList{Sp: s.sp(d.Params.Sp)}
 		for _, p := range d.Params.Params {
-			np := &Param{Name: s.name(p.Name), Type: s.name(p.Type), Sp: s.sp(p.Sp)}
+			np := &Param{Name: s.name(p.Name), Type: s.typ(p.Type), Default: s.expr(p.Default), Sp: s.sp(p.Sp)}
 			s.rec(p, np)
 			n.Params.Params = append(n.Params.Params, np)
 		}
@@ -60,8 +77,53 @@ func (s shifter) name(x *Name) *Name {
 	if x == nil {
 		return nil
 	}
-	n := &Name{Text: x.Text, Sp: s.sp(x.Sp)}
+	n := &Name{Text: x.Text, Parts: s.parts(x.Parts), Sp: s.sp(x.Sp)}
 	s.rec(x, n)
+	return n
+}
+
+func (s shifter) parts(ps []NamePart) []NamePart {
+	if ps == nil {
+		return nil
+	}
+	out := make([]NamePart, len(ps))
+	for i, p := range ps {
+		out[i] = NamePart{Lit: p.Lit, X: s.expr(p.X), Sp: s.sp(p.Sp)}
+	}
+	return out
+}
+
+func (s shifter) typ(t TypeExpr) TypeExpr {
+	var n TypeExpr
+	switch x := t.(type) {
+	case nil:
+		return nil
+	case *TypeName:
+		tn := &TypeName{Name: x.Name, Sp: s.sp(x.Sp)}
+		for _, a := range x.Args {
+			tn.Args = append(tn.Args, s.typ(a))
+		}
+		n = tn
+	case *TypeOptional:
+		n = &TypeOptional{X: s.typ(x.X), Sp: s.sp(x.Sp)}
+	case *TypeList:
+		n = &TypeList{Elem: s.typ(x.Elem), Sp: s.sp(x.Sp)}
+	case *TypeMap:
+		n = &TypeMap{Key: s.typ(x.Key), Value: s.typ(x.Value), Sp: s.sp(x.Sp)}
+	case *TypeUnion:
+		u := &TypeUnion{Sp: s.sp(x.Sp)}
+		for _, a := range x.Arms {
+			u.Arms = append(u.Arms, s.typ(a))
+		}
+		n = u
+	case *TypeString:
+		n = &TypeString{Value: x.Value, Raw: x.Raw, Sp: s.sp(x.Sp)}
+	case *TypeParen:
+		n = &TypeParen{X: s.typ(x.X), Sp: s.sp(x.Sp)}
+	default:
+		panic("syntax: shift: unknown type")
+	}
+	s.rec(t, n)
 	return n
 }
 
@@ -69,7 +131,7 @@ func (s shifter) block(b *Block) *Block {
 	if b == nil {
 		return nil
 	}
-	n := &Block{Closed: b.Closed, Sp: s.sp(b.Sp), Items: make([]Stmt, len(b.Items))}
+	n := &Block{Closed: b.Closed, Bare: b.Bare, Sp: s.sp(b.Sp), Items: make([]Stmt, len(b.Items))}
 	for i, it := range b.Items {
 		n.Items[i] = s.stmt(it)
 	}
@@ -97,14 +159,32 @@ func (s shifter) stmt(st Stmt) Stmt {
 		return nil
 	case *Block:
 		return s.block(x)
+	case *Decl:
+		return s.decl(x)
 	case *LetStmt:
-		n = &LetStmt{Name: s.name(x.Name), Type: s.name(x.Type), Value: s.expr(x.Value), Doc: x.Doc, Sp: s.sp(x.Sp)}
+		n = &LetStmt{Name: s.name(x.Name), Type: s.typ(x.Type), Value: s.expr(x.Value), Doc: x.Doc, Sp: s.sp(x.Sp)}
+	case *ConstStmt:
+		n = &ConstStmt{Name: s.name(x.Name), Type: s.typ(x.Type), Value: s.expr(x.Value), Doc: x.Doc, Sp: s.sp(x.Sp)}
+	case *FieldDecl:
+		n = &FieldDecl{Name: s.name(x.Name), Type: s.typ(x.Type), Default: s.expr(x.Default), Doc: x.Doc, Sp: s.sp(x.Sp)}
+	case *SectionStmt:
+		n = &SectionStmt{Word: s.ident(x.Word), Body: s.block(x.Body), Sp: s.sp(x.Sp)}
+	case *AsStmt:
+		a := &AsStmt{Type: s.typ(x.Type), Value: s.expr(x.Value), Doc: x.Doc, Sp: s.sp(x.Sp)}
+		if x.Hint != nil {
+			a.Hint = s.expr(x.Hint).(*Call)
+		}
+		n = a
+	case *ExpectStmt:
+		n = &ExpectStmt{X: s.expr(x.X), Sp: s.sp(x.Sp)}
+	case *RunStmt:
+		n = &RunStmt{X: s.expr(x.X), Sp: s.sp(x.Sp)}
 	case *IfStmt:
 		n = &IfStmt{Cond: s.expr(x.Cond), Then: s.block(x.Then), Else: s.stmt(x.Else), Sp: s.sp(x.Sp)}
 	case *WhileStmt:
 		n = &WhileStmt{Cond: s.expr(x.Cond), Body: s.block(x.Body), Sp: s.sp(x.Sp)}
 	case *ForStmt:
-		n = &ForStmt{Var: s.name(x.Var), Iter: s.expr(x.Iter), Body: s.block(x.Body), Sp: s.sp(x.Sp)}
+		n = &ForStmt{Var: s.name(x.Var), Var2: s.name(x.Var2), Iter: s.expr(x.Iter), Body: s.block(x.Body), Sp: s.sp(x.Sp)}
 	case *ReturnStmt:
 		n = &ReturnStmt{Value: s.expr(x.Value), Sp: s.sp(x.Sp)}
 	case *BreakStmt:
@@ -127,6 +207,11 @@ func (s shifter) stmt(st Stmt) Stmt {
 }
 
 func (s shifter) expr(e Expr) Expr {
+	if s.sub != nil && e != nil {
+		if r, ok := s.sub(e); ok {
+			return r
+		}
+	}
 	var n Expr
 	switch x := e.(type) {
 	case nil:
@@ -174,6 +259,16 @@ func (s shifter) expr(e Expr) Expr {
 		n = &Index{X: s.expr(x.X), Args: s.args(x.Args), Sp: s.sp(x.Sp)}
 	case *Trailing:
 		n = &Trailing{X: s.expr(x.X), Block: s.block(x.Block), Sp: s.sp(x.Sp)}
+	case *TemplatedName:
+		n = &TemplatedName{Text: x.Text, Parts: s.parts(x.Parts), Sp: s.sp(x.Sp)}
+	case *Spread:
+		n = &Spread{X: s.expr(x.X), Sp: s.sp(x.Sp)}
+	case *IfExpr:
+		n = &IfExpr{Cond: s.expr(x.Cond), Then: s.expr(x.Then), Else: s.expr(x.Else), Sp: s.sp(x.Sp)}
+	case *RunExpr:
+		n = &RunExpr{Body: s.block(x.Body), Sp: s.sp(x.Sp)}
+	case *Comprehension:
+		n = &Comprehension{Var: s.name(x.Var), Var2: s.name(x.Var2), Iter: s.expr(x.Iter), Cond: s.expr(x.Cond), Body: s.expr(x.Body), Sp: s.sp(x.Sp)}
 	case *Bad:
 		n = &Bad{Sp: s.sp(x.Sp)}
 	default:

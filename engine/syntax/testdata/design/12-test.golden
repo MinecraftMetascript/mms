@@ -1,0 +1,27 @@
+Decl Test second_wave_spawns_four
+  Block
+    Section setup
+      Block
+        Assign =
+          Member .wave
+            Ident game
+          Number 1
+        Command "summon marker 0 64 0 {Tags:[\"siege.spawn\"]}"
+    Run
+      Call
+        Ident next_wave
+    Expect
+      Binary ==
+        Member .wave
+          Ident game
+        Number 2
+    Expect
+      Binary ==
+        Call
+          Ident count
+          Index
+            Selector e
+            Arg tag =
+              Member .enemy
+                Ident siege
+        Number 4

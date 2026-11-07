@@ -3,13 +3,11 @@ package project
 import (
 	"encoding/json"
 	"fmt"
-
-	"github.com/minecraftmetascript/mms/engine/syntax"
 )
 
 // SchemaURL is where the docs site serves the mms.json JSON Schema.
 // `mms init` writes it as "$schema" so editors without the VS Code
-// extension (Zed, JetBrains, ...) still validate and complete mms.json.
+// extension (JetBrains, ...) still validate and complete mms.json.
 const SchemaURL = "https://minecraftmetascript.github.io/mms/mms.schema.json"
 
 // schemaNode is the subset of JSON Schema that ConfigSchema uses. VS Code
@@ -50,14 +48,10 @@ func ConfigSchema() []byte {
 	def := DefaultConfig()
 	no := false
 
-	severityNames := map[syntax.Severity]string{
-		syntax.SeverityError: "error", syntax.SeverityWarning: "warning",
-		syntax.SeverityInfo: "info", syntax.SeverityHint: "hint",
-	}
 	lint := map[string]*schemaNode{}
 	for _, r := range Rules {
 		lint[r.ID] = md(&schemaNode{Ref: "#/definitions/severity"},
-			fmt.Sprintf("%s\n\nDefault: `%s`.", r.Doc, severityNames[r.Severity]))
+			fmt.Sprintf("%s\n\nDefault: `%s`.", r.Doc, SeverityName(r.Severity)))
 	}
 
 	s := &schemaNode{

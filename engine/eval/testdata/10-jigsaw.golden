@@ -1,0 +1,130 @@
+=== 04-template.mms (changed: true)
+# at 04-template.mms:9:14
+TemplatePool halls {
+  fallback = caps
+  elements = [
+    WeightedElement(
+      3,
+      SinglePoolElement(
+        rigid,
+        StructureFile("structures/halls/hall.nbt", "halls/hall"),
+        minecraft:empty,
+      ),
+    ),
+    WeightedElement(
+      1,
+      SinglePoolElement(
+        rigid,
+        StructureFile("structures/halls/short_hall.nbt", "halls/short_hall"),
+        minecraft:empty,
+      ),
+    ),
+  ]
+}
+=== 11-jigsaw.mms (changed: true)
+# at 11-jigsaw.mms:1:1
+JigsawHole room_exit, hall_entry, hall_exit, room_entry
+# at 11-jigsaw.mms:4:17
+JigsawStructure dungeon {
+  biomes = #minecraft:is_overworld
+  step = underground_structures
+  spacing = 32
+  separation = 12
+  height = AboveBottom(20)
+  depth = 6
+  start = start
+
+  pools = {
+    start = [
+      WeightedElement(
+        1,
+        SinglePoolElement(
+          rigid,
+          StructureFile("structures/start.nbt", "start"),
+          minecraft:empty,
+        ),
+      ),
+    ]
+    halls = Pool(
+      fallback = caps,
+      WeightedElement(
+        3,
+        SinglePoolElement(
+          rigid,
+          StructureFile("structures/halls/hall.nbt", "halls/hall"),
+          minecraft:empty,
+        ),
+      ),
+      WeightedElement(
+        1,
+        SinglePoolElement(
+          rigid,
+          StructureFile("structures/halls/short_hall.nbt", "halls/short_hall"),
+          minecraft:empty,
+        ),
+      ),
+    )
+    rooms = Pool(
+      fallback = caps,
+      WeightedElement(
+        2,
+        SinglePoolElement(
+          rigid,
+          StructureFile("structures/rooms/room.nbt", "rooms/room"),
+          minecraft:empty,
+        ),
+      ),
+      WeightedElement(
+        1,
+        SinglePoolElement(
+          rigid,
+          StructureFile("structures/rooms/vault.nbt", "rooms/vault"),
+          minecraft:empty,
+        ),
+      ),
+    )
+    caps = [
+      WeightedElement(
+        1,
+        SinglePoolElement(
+          rigid,
+          StructureFile("structures/caps/hall_cap.nbt", "caps/hall_cap"),
+          minecraft:empty,
+        ),
+      ),
+      WeightedElement(
+        1,
+        SinglePoolElement(
+          rigid,
+          StructureFile("structures/caps/room_cap.nbt", "caps/room_cap"),
+          minecraft:empty,
+        ),
+      ),
+    ]
+  }
+}
+=== provenance of copied nodes
+04-template.mms:11:15 from 04-template.mms:5 < Template Piece (at 04-template.mms:11:15, def 04-template.mms:2:1): 1 node, minecraft:empty
+04-template.mms:11:15 from 04-template.mms:7 < Template Piece (at 04-template.mms:11:15, def 04-template.mms:2:1): 9 nodes, SinglePoolElement(rigid, StructureFile("struc...
+04-template.mms:11:39 from 04-template.mms:4 < Template Piece (at 04-template.mms:11:39, def 04-template.mms:2:1): 1 node, 1
+04-template.mms:11:39 from 04-template.mms:5 < Template Piece (at 04-template.mms:11:39, def 04-template.mms:2:1): 1 node, minecraft:empty
+04-template.mms:11:39 from 04-template.mms:7 < Template Piece (at 04-template.mms:11:39, def 04-template.mms:2:1): 9 nodes, SinglePoolElement(rigid, StructureFile("struc...
+11-jigsaw.mms:13:14 from 04-template.mms:4 < Template Piece (at 11-jigsaw.mms:13:14, def 04-template.mms:2:1): 1 node, 1
+11-jigsaw.mms:13:14 from 04-template.mms:5 < Template Piece (at 11-jigsaw.mms:13:14, def 04-template.mms:2:1): 1 node, minecraft:empty
+11-jigsaw.mms:13:14 from 04-template.mms:7 < Template Piece (at 11-jigsaw.mms:13:14, def 04-template.mms:2:1): 9 nodes, SinglePoolElement(rigid, StructureFile("struc...
+11-jigsaw.mms:16:31 from 04-template.mms:5 < Template Piece (at 11-jigsaw.mms:16:31, def 04-template.mms:2:1): 1 node, minecraft:empty
+11-jigsaw.mms:16:31 from 04-template.mms:7 < Template Piece (at 11-jigsaw.mms:16:31, def 04-template.mms:2:1): 9 nodes, SinglePoolElement(rigid, StructureFile("struc...
+11-jigsaw.mms:17:32 from 04-template.mms:4 < Template Piece (at 11-jigsaw.mms:17:32, def 04-template.mms:2:1): 1 node, 1
+11-jigsaw.mms:17:32 from 04-template.mms:5 < Template Piece (at 11-jigsaw.mms:17:32, def 04-template.mms:2:1): 1 node, minecraft:empty
+11-jigsaw.mms:17:32 from 04-template.mms:7 < Template Piece (at 11-jigsaw.mms:17:32, def 04-template.mms:2:1): 9 nodes, SinglePoolElement(rigid, StructureFile("struc...
+11-jigsaw.mms:19:35 from 04-template.mms:5 < Template Piece (at 11-jigsaw.mms:19:35, def 04-template.mms:2:1): 1 node, minecraft:empty
+11-jigsaw.mms:19:35 from 04-template.mms:7 < Template Piece (at 11-jigsaw.mms:19:35, def 04-template.mms:2:1): 9 nodes, SinglePoolElement(rigid, StructureFile("struc...
+11-jigsaw.mms:19:59 from 04-template.mms:4 < Template Piece (at 11-jigsaw.mms:19:59, def 04-template.mms:2:1): 1 node, 1
+11-jigsaw.mms:19:59 from 04-template.mms:5 < Template Piece (at 11-jigsaw.mms:19:59, def 04-template.mms:2:1): 1 node, minecraft:empty
+11-jigsaw.mms:19:59 from 04-template.mms:7 < Template Piece (at 11-jigsaw.mms:19:59, def 04-template.mms:2:1): 9 nodes, SinglePoolElement(rigid, StructureFile("struc...
+11-jigsaw.mms:20:13 from 04-template.mms:4 < Template Piece (at 11-jigsaw.mms:20:13, def 04-template.mms:2:1): 1 node, 1
+11-jigsaw.mms:20:13 from 04-template.mms:5 < Template Piece (at 11-jigsaw.mms:20:13, def 04-template.mms:2:1): 1 node, minecraft:empty
+11-jigsaw.mms:20:13 from 04-template.mms:7 < Template Piece (at 11-jigsaw.mms:20:13, def 04-template.mms:2:1): 9 nodes, SinglePoolElement(rigid, StructureFile("struc...
+11-jigsaw.mms:20:37 from 04-template.mms:4 < Template Piece (at 11-jigsaw.mms:20:37, def 04-template.mms:2:1): 1 node, 1
+11-jigsaw.mms:20:37 from 04-template.mms:5 < Template Piece (at 11-jigsaw.mms:20:37, def 04-template.mms:2:1): 1 node, minecraft:empty
+11-jigsaw.mms:20:37 from 04-template.mms:7 < Template Piece (at 11-jigsaw.mms:20:37, def 04-template.mms:2:1): 9 nodes, SinglePoolElement(rigid, StructureFile("struc...

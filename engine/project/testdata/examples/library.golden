@@ -11,10 +11,17 @@
 }
 === data/library/function/chest.mcfunction
 setblock ~ ~ ~ chest{LootTable:"library:old_chest"}
-=== data/library/function/mms_gen/first_join.mcfunction
-function library:mms_gen/first_join/f9e05114
-=== data/library/function/mms_gen/first_join/f9e05114.mcfunction
+=== data/library/function/guide.mcfunction
 give @s written_book[written_book_content={pages:[["",{text:"Welcome",bold:true},"\nThis world hides ",{text:"three diaries",color:"gold"}," in old chests.\n\nPress ",{keybind:"key.inventory"}," to see what you carry, and ",{keybind:"key.jump"}," to climb.\n\n",{text:"Contents",click_event:{action:"change_page",page:2},hover_event:{action:"show_text",value:"Turn to the contents"}}],["",{text:"Contents",bold:true},"\n",{text:"Find a chest",click_event:{action:"run_command",command:"function library:chest"},hover_event:{action:"show_text",value:"Places a chest here"}},"\n",{text:"About the diaries",click_event:{action:"change_page",page:3}},"\n\nYou have died ",{score:{name:"@s",objective:"deaths"}}," times. ",{text:"Careful.",color:"dark_gray"}],["",{text:"The diaries",bold:true},"\nA miner kept them while digging too deep. Each chest holds one; collect the set to learn what ",{text:"happened",obfuscated:true},"."]],title:"Library Guide",author:"The Librarian"}]
+title @s actionbar {text:"You take a fresh copy of the guide",color:"green"}
+=== data/library/function/mms_gen/first_join.mcfunction
+function library:mms_gen/first_join/2340445e
+=== data/library/function/mms_gen/first_join/2340445e.mcfunction
+give @s written_book[written_book_content={pages:[["",{text:"Welcome",bold:true},"\nThis world hides ",{text:"three diaries",color:"gold"}," in old chests.\n\nPress ",{keybind:"key.inventory"}," to see what you carry, and ",{keybind:"key.jump"}," to climb.\n\n",{text:"Contents",click_event:{action:"change_page",page:2},hover_event:{action:"show_text",value:"Turn to the contents"}}],["",{text:"Contents",bold:true},"\n",{text:"Find a chest",click_event:{action:"run_command",command:"function library:chest"},hover_event:{action:"show_text",value:"Places a chest here"}},"\n",{text:"About the diaries",click_event:{action:"change_page",page:3}},"\n\nYou have died ",{score:{name:"@s",objective:"deaths"}}," times. ",{text:"Careful.",color:"dark_gray"}],["",{text:"The diaries",bold:true},"\nA miner kept them while digging too deep. Each chest holds one; collect the set to learn what ",{text:"happened",obfuscated:true},"."]],title:"Library Guide",author:"The Librarian"}]
+title @s subtitle {text:"mind the shelves",color:"gray",italic:true}
+title @s title {text:"The Library",color:"gold"}
+tellraw @s ["","Welcome to the ",{text:"Library",color:"gold"},", ",{selector:"@s"},"! Press ",{keybind:"key.inventory"}," to find your guide."]
+tellraw @s ["",{text:"Library rules",color:"gold",bold:true},"\n1. Read the ",{text:"guide",color:"aqua",click_event:{action:"run_command",command:"function library:guide"},hover_event:{action:"show_text",value:"Get another copy"}}," first.\n2. Leave the diaries where you found them, ",{text:"or else",obfuscated:true},"."]
 === data/library/function/mms_gen/load.mcfunction
 scoreboard objectives add deaths deathCount
 === data/library/loot_table/old_chest.json

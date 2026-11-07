@@ -8,7 +8,7 @@
 	import { applyEdits, showDiagnostics } from './diagnostics';
 	import { onMount, untrack } from 'svelte';
 	import type { Engine } from '../engine/engine.svelte';
-	import { uriOf } from '../project/project.svelte';
+	import { isMarkupPath, uriOf } from '../project/project.svelte';
 	import { bookHighlight, bookLanguage, mmsHighlight, mmsLanguage } from './language';
 	import { semanticHighlighting } from './semantic';
 	import { inlayHints } from './inlay';
@@ -120,7 +120,7 @@
 		}));
 	}
 
-	/** Cmd/Ctrl+. : a menu of quick fixes and refactorings at the cursor, as in VS Code and Zed. */
+	/** Cmd/Ctrl+. : a menu of quick fixes and refactorings at the cursor, as in VS Code. */
 	function quickFixCommand(v: EditorView) {
 		const at = v.coordsAtPos(v.state.selection.main.head);
 		if (!at) return false;
@@ -152,7 +152,7 @@
 	}
 
 	function stateFor(p: string, doc: string) {
-		const book = p.endsWith('.mmsbook');
+		const book = isMarkupPath(p);
 		return EditorState.create({
 			doc,
 			extensions: [
@@ -174,7 +174,7 @@
 					{ key: 'Mod-.', run: quickFixCommand, preventDefault: true },
 					// Ctrl+Space (from basicSetup) is taken by the OS on macOS (input
 					// source switching) and by some IMEs elsewhere, so offer the
-					// VS Code and Zed alternatives too: Cmd/Ctrl+I and Alt/Option+Space.
+					// VS Code's alternatives too: Cmd/Ctrl+I and Alt/Option+Space.
 					{ key: 'Mod-i', run: startCompletion, preventDefault: true },
 					{ key: 'Alt-Space', run: startCompletion, preventDefault: true },
 					// Tab accepts an open completion, otherwise indents; Shift+Tab unindents.

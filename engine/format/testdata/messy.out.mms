@@ -12,15 +12,7 @@ DensityFunction long_one = Add(
 
 LootTable blocks/ruby_ore {
   pools = [
-    {
-      rolls = 1
-      entries = [
-        {
-          type = "minecraft:item"
-          name = "minecraft:ruby"
-        },
-      ]
-    },
+    { rolls = 1, entries = [{ type = "minecraft:item", name = "minecraft:ruby" }] },
     { rolls = 2 },
   ]
   // functions apply to every pool

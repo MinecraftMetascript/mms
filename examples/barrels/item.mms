@@ -5,7 +5,7 @@
 // that make up its front.
 
 /** A barrel that holds up to 32 stacks of one kind of item. */
-CustomItem storage_barrel = {
+CustomItem storage_barrel {
   base = item_frame
   name = "Storage Barrel"
   components = {

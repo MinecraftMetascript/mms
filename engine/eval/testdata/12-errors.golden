@@ -1,0 +1,35 @@
+=== errors.mms (changed: true)
+# at errors.mms:2:11
+LootTable loop { pools = [] }
+# at errors.mms:16:7, def errors.mms:12:5 < Blueprint Thing (at errors.mms:16:7, def errors.mms:9:1) [primary]
+Model other_name { parent = item/generated }
+# at errors.mms:16:7, def errors.mms:13:5 < Blueprint Thing (at errors.mms:16:7, def errors.mms:9:1)
+Model thing { parent = item/generated }
+# at errors.mms:22:1
+Function f {
+  let n = 3
+  Model ${n}_x {}
+}
+# at errors.mms:29:13 < for i = 0 (at errors.mms:28:1, def errors.mms:28:1)
+Objective count_0
+# at errors.mms:29:13 < for i = 1 (at errors.mms:28:1, def errors.mms:28:1)
+Objective count_1
+# at errors.mms:29:13 < for i = 2 (at errors.mms:28:1, def errors.mms:28:1)
+Objective count_2
+# at errors.mms:29:13 < for i = 3 (at errors.mms:28:1, def errors.mms:28:1)
+Objective count_3
+# at errors.mms:33:9
+ItemTag too_big =
+# at errors.mms:35:1
+ItemTag fine = [diamond]
+--- diagnostics
+2:27 error mms/eval-depth: Template 'forever' calls itself too deeply
+5:12 error mms/const-cycle: const 'a' depends on itself
+7:1 error mms/top-level-let: a value at the top of a file is a const: write 'const' instead of 'let'
+16:7 error mms/primary-id: the primary declaration of a Thing has its id: demo:thing, not demo:other_name
+18:10 error mms/loop-value: a loop here must go over a list or range known at compile time, but this is a name
+33:19 error mms/eval-budget: evaluation took too many steps; is a Template calling itself without end?
+=== provenance of copied nodes
+errors.mms:16:7 from errors.mms:12 < Blueprint Thing (at errors.mms:16:7, def errors.mms:9:1): 1 node, item/generated
+errors.mms:16:7 from errors.mms:13 < Blueprint Thing (at errors.mms:16:7, def errors.mms:9:1): 1 node, item/generated
+errors.mms:2:27 from errors.mms:1 < Template forever (at errors.mms:2:27, def errors.mms:1:1) x100: 2 nodes, 

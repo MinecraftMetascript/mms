@@ -4,6 +4,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/minecraftmetascript/mms/engine/prelude"
 	"github.com/minecraftmetascript/mms/engine/spec"
 )
 
@@ -15,8 +16,9 @@ type Kind struct {
 	Resource string
 	// TagOf is the registry a tag kind lists ("block", "worldgen/biome").
 	TagOf string
-	// MMS is set for language-level kinds: Namespace, Function, Objective,
-	// Global, CustomItem, Book, JigsawHole and the event hooks (OnLoad, OnTick, OnFirstJoin,
+	// MMS is set for the language's own kinds, which the prelude declares
+	// with `extern Blueprint`: Namespace, Function, Objective, Global,
+	// Book, JigsawHole and the event hooks (OnLoad, OnTick, OnFirstJoin,
 	// OnRespawn, OnAdvancement).
 	MMS string
 	// Assets is the folder under assets/<ns>/ for resource-pack kinds
@@ -33,6 +35,10 @@ func (k Kind) Dir(ns string) string {
 	return "data/" + ns + "/" + k.Folder()
 }
 
+// Merges reports whether declarations of the kind with the same id are
+// one file: a language's lang entries.
+func (k Kind) Merges() bool { return k.Resource == "lang" && k.Assets != "" }
+
 // IsResource reports whether the declaration emits a JSON file.
 func (k Kind) IsResource() bool { return k.Resource != "" }
 
@@ -41,7 +47,7 @@ func (k Kind) Folder() string {
 	switch k.MMS {
 	case "Function":
 		return "function"
-	case "CustomItem", "Book":
+	case "CustomItem":
 		// Its name stands for an item where item stacks are expected.
 		return "item"
 	case "OnAdvancement":
@@ -50,13 +56,6 @@ func (k Kind) Folder() string {
 		return "advancement"
 	}
 	return k.Resource
-}
-
-var mmsKinds = map[string]bool{
-	"Namespace": true, "Function": true, "Objective": true, "Global": true,
-	"OnLoad": true, "OnTick": true,
-	"OnFirstJoin": true, "OnRespawn": true, "OnAdvancement": true,
-	"CustomItem": true, "Book": true, "JigsawHole": true,
 }
 
 // kindAliases name resource kinds whose MMS names differ from the folder,
@@ -85,7 +84,9 @@ type Kinds struct {
 // NewKinds indexes the pack's resource kinds and registries.
 func NewKinds(p *spec.Pack) *Kinds {
 	ks := &Kinds{pack: p, byName: map[string]Kind{}, tagRegs: map[string]string{}}
-	for name := range mmsKinds {
+	// The language's own kinds are those the prelude declares with
+	// `extern Blueprint`.
+	for name := range prelude.Kinds() {
 		ks.byName[name] = Kind{Name: name, MMS: name}
 	}
 	// A resource kind is named after its last path segment, unless two
@@ -192,6 +193,6 @@ func (ks *Kinds) ForFolder(folder string) (Kind, bool) {
 
 // JigsawHoleKind names a jigsaw block name: `JigsawHole road_end`. It
 // writes nothing; editors list the declared holes where a jigsaw block's
-// name or target is chosen, and the jigsaw-hole lint checks the names
+// name or target is chosen, and the jigsaw-unknown-name lint checks the names
 // structure files use against them.
 const JigsawHoleKind = "JigsawHole"

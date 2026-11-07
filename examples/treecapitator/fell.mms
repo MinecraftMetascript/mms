@@ -56,7 +56,7 @@ Function fell {
   /summon marker ~ ~ ~ {Tags:["treecap.node","treecap.origin"]}
   spread()
   if (logs > max_logs) {
-    /title @s actionbar {text:"That is too big to fell at once",color:"gray"}
+    actionbar(@s, "{gray}That is too big to fell at once")
   } else if (logs > 0 && is_tree()) {
     if (break_leaves && !nether) {
       /execute as @e[type=marker,tag=treecap.node] at @s run function treecap:leaves_by_log

@@ -85,7 +85,7 @@ func TestSession(t *testing.T) {
 		t.Fatal("no semantic tokens capability")
 	}
 	c.notify("initialized", map[string]any{})
-	src := "Noise ridges = { base_octave = -1, amplitude_modifiers = [1] }\nDensityFunction x = Clamp(Noise(ridges, 1, 1), 0, 1)\nDensityFunction y = Clmp(1, 0, 1)\n"
+	src := "Noise ridges { base_octave = -1, amplitude_modifiers = [1] }\nDensityFunction x = Clamp(Noise(ridges, 1, 1), 0, 1)\nDensityFunction y = Clmp(1, 0, 1)\n"
 	c.notify("textDocument/didOpen", map[string]any{"textDocument": map[string]any{"uri": uri, "languageId": "mms", "version": 1, "text": src}})
 
 	// Diagnostics arrive before the next response.
@@ -232,7 +232,7 @@ func TestSetAssets(t *testing.T) {
 	c.result("initialize", map[string]any{})
 	a := "mem:///a.mms"
 	c.notify("mms/setFiles", map[string]any{"files": []any{
-		map[string]any{"uri": a, "text": "PaintingVariant p = { width = 1, height = 1, asset_id = Texture(\"art/p.png\") }\n"},
+		map[string]any{"uri": a, "text": "PaintingVariant p { width = 1, height = 1, asset_id = Texture(\"art/p.png\") }\n"},
 	}})
 	assets := func() []any {
 		out := c.result("mms/output", map[string]any{}).(map[string]any)
@@ -285,7 +285,7 @@ func TestImportPack(t *testing.T) {
 		t.Errorf("empty import = %v", empty)
 	}
 	c.notify("textDocument/didOpen", map[string]any{"textDocument": map[string]any{"uri": "file:///a.mms", "languageId": "mms", "version": 1,
-		"text": "Namespace gems\nNoise ridge = { base_octave = -1, amplitude_modifiers = [1] }\n"}})
+		"text": "Namespace gems\nNoise ridge { base_octave = -1, amplitude_modifiers = [1] }\n"}})
 	conv := c.result("mms/convertJSON", map[string]any{"uri": "file:///a.mms", "kind": "DensityFunction", "name": "hill",
 		"text": `{"type":"minecraft:noise","noise":"minecraft:ridge","xz_scale":1,"y_scale":1}`}).(map[string]any)
 	// minecraft:ridge keeps its prefix: the file declares a ridge noise.
@@ -309,7 +309,7 @@ func TestCodeActions(t *testing.T) {
 	c.result("initialize", map[string]any{})
 	c.notify("initialized", map[string]any{})
 	uri := "file:///a.mms"
-	src := "LootTable t = { pools = [{ rolls = 1, entries = [{ type = \"minecraft:item\", name = minecraft:diamond }] }] }\n"
+	src := "LootTable t { pools = [{ rolls = 1, entries = [{ type = \"minecraft:item\", name = minecraft:diamond }] }] }\n"
 	c.notify("textDocument/didOpen", map[string]any{"textDocument": map[string]any{"uri": uri, "languageId": "mms", "version": 1, "text": src}})
 	rng := func(a, b int) map[string]any {
 		return map[string]any{"start": map[string]any{"line": 0, "character": a}, "end": map[string]any{"line": 0, "character": b}}
@@ -319,7 +319,7 @@ func TestCodeActions(t *testing.T) {
 	for _, a := range acts {
 		titles = append(titles, a.(map[string]any)["title"].(string))
 	}
-	if got := strings.Join(titles, "|"); got != "Write minecraft:diamond|Ignore use-sugar on this line|Write item|Ignore quoted-name on this line|Fix all MMS problems" {
+	if got := strings.Join(titles, "|"); got != "Write minecraft:diamond|Ignore use-shorthand on this line|Write item|Ignore quoted-name on this line|Fix all MMS problems" {
 		t.Errorf("actions = %s", got)
 	}
 	all := c.result("textDocument/codeAction", map[string]any{"textDocument": map[string]any{"uri": uri}, "range": rng(0, 0),
@@ -328,7 +328,7 @@ func TestCodeActions(t *testing.T) {
 		t.Fatalf("fix all = %v", all)
 	}
 	edit := all[0].(map[string]any)["edit"].(map[string]any)["changes"].(map[string]any)[uri].([]any)[0].(map[string]any)
-	if want := "LootTable t = { pools = [{ rolls = 1, entries = [diamond] }] }\n"; edit["newText"] != want {
+	if want := "LootTable t { pools = [{ rolls = 1, entries = [diamond] }] }\n"; edit["newText"] != want {
 		t.Errorf("fix all text = %q", edit["newText"])
 	}
 }
@@ -402,7 +402,7 @@ func TestRegistersWatchers(t *testing.T) {
 			}
 		}
 	}
-	if strings.Join(globs, " ") != "**/*.mms **/*.mmsbook **/mms.json **/*.{png,ogg,nbt}" {
+	if strings.Join(globs, " ") != "**/*.mms **/*.mmsbook **/*.mmstext **/mms.json **/*.{png,ogg,nbt}" {
 		t.Fatalf("watchers = %q", globs)
 	}
 
@@ -520,7 +520,7 @@ func TestAssetPathCompletion(t *testing.T) {
 		}
 		return out
 	}
-	const text = "PaintingVariant p = { width = 1, height = 1, asset_id = Texture(\"\") }\n"
+	const text = "PaintingVariant p { width = 1, height = 1, asset_id = Texture(\"\") }\n"
 	at := strings.Index(text, `""`) + 1
 	withTrigger := func(uri, ch string) map[string]any {
 		p := pos(uri, 0, at)
@@ -579,7 +579,7 @@ func TestKindCompletionRange(t *testing.T) {
 	c := start(t)
 	c.result("initialize", map[string]any{})
 	a := "mem:///a.mms"
-	c.notify("mms/setFiles", map[string]any{"files": []any{map[string]any{"uri": a, "text": "Feature f = {}\nFe"}}})
+	c.notify("mms/setFiles", map[string]any{"files": []any{map[string]any{"uri": a, "text": "Feature f {}\nFe"}}})
 	res := c.result("textDocument/completion", pos(a, 1, 2)).(map[string]any)
 	for _, it := range res["items"].([]any) {
 		m := it.(map[string]any)
@@ -602,7 +602,7 @@ func TestBookFiles(t *testing.T) {
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, "books"), 0o755)
 	os.WriteFile(filepath.Join(dir, "mms.json"), []byte(`{"namespace": "demo"}`), 0o644)
-	const main = "Book guide = { title = \"G\", author = \"A\", text = BookText(\"books/guide.mmsbook\") }\n"
+	const main = "Book guide { title = \"G\", author = \"A\", text = TextFile(\"books/guide.mmsbook\") }\n"
 	os.WriteFile(filepath.Join(dir, "main.mms"), []byte(main), 0o644)
 	os.WriteFile(filepath.Join(dir, "books", "guide.mmsbook"), []byte("# Hello\n"), 0o644)
 	m, b := pathURI(filepath.Join(dir, "main.mms")), pathURI(filepath.Join(dir, "books", "guide.mmsbook"))
@@ -658,7 +658,7 @@ func TestOutputCustomItems(t *testing.T) {
 	c.result("initialize", map[string]any{})
 	a := "mem:///a.mms"
 	c.notify("mms/setFiles", map[string]any{"files": []any{
-		map[string]any{"uri": a, "text": "\nCustomItem ruby = {\n  base = stick\n  components = { max_stack_size = 1 }\n}\n"},
+		map[string]any{"uri": a, "text": "\nCustomItem ruby {\n  base = stick\n  components = { max_stack_size = 1 }\n}\n"},
 	}})
 	out := c.result("mms/output", map[string]any{}).(map[string]any)
 	items := out["items"].([]any)
@@ -701,7 +701,7 @@ func TestExtractAction(t *testing.T) {
 		t.Errorf("action = %v", a)
 	}
 	edits := a["edit"].(map[string]any)["changes"].(map[string]any)[uri].([]any)
-	if got := edits[0].(map[string]any)["newText"]; got != "Noise hills_noise = { base_octave = -6, amplitude_modifiers = [1] }\n\n" {
+	if got := edits[0].(map[string]any)["newText"]; got != "Noise hills_noise { base_octave = -6, amplitude_modifiers = [1] }\n\n" {
 		t.Errorf("declaration = %q", got)
 	}
 	if got := edits[1].(map[string]any)["newText"]; got != "hills_noise" {
@@ -730,7 +730,7 @@ func TestOutputStructureJigsaws(t *testing.T) {
 	}
 	c.notify("mms/setAssets", map[string]any{"files": []any{map[string]any{"path": "s/hall.nbt", "data": data}}})
 	c.notify("mms/setFiles", map[string]any{"files": []any{
-		map[string]any{"uri": "mem:///a.mms", "text": "TemplatePool rooms = { fallback = minecraft:empty, elements = [{ weight = 1, element = { element_type = minecraft:single_pool_element, location = Structure(\"s/hall.nbt\"), projection = rigid, processors = minecraft:empty } }] }\n"},
+		map[string]any{"uri": "mem:///a.mms", "text": "TemplatePool rooms { fallback = minecraft:empty, elements = [{ weight = 1, element = { element_type = minecraft:single_pool_element, location = StructureFile(\"s/hall.nbt\"), projection = rigid, processors = minecraft:empty } }] }\n"},
 	}})
 	out := c.result("mms/output", map[string]any{}).(map[string]any)
 	assets := out["assets"].([]any)
@@ -780,7 +780,7 @@ func TestUnusedAssetDiagnostics(t *testing.T) {
 	if out := c.result("mms/output", map[string]any{"uri": m}).(map[string]any); fmt.Sprint(out["unusedAssets"]) != "[art/p.png]" {
 		t.Errorf("unusedAssets = %v", out["unusedAssets"])
 	}
-	src := "PaintingVariant p = { width = 1, height = 1, asset_id = Texture(\"art/p.png\") }\n"
+	src := "PaintingVariant p { width = 1, height = 1, asset_id = Texture(\"art/p.png\") }\n"
 	c.notify("textDocument/didChange", map[string]any{"textDocument": map[string]any{"uri": m, "version": 2}, "contentChanges": []any{map[string]any{"text": src}}})
 	if got := last(); len(got) != 0 {
 		t.Errorf("still reported once used: %v", got)
@@ -808,5 +808,110 @@ func TestOutputJigsawHoles(t *testing.T) {
 		if p := f.(map[string]any)["path"]; p != "pack.mcmeta" {
 			t.Errorf("a JigsawHole wrote %v", p)
 		}
+	}
+}
+
+// mms/output lists the messages text commands show, for a chat preview:
+// at the command, or over the whole .mmstext file it reads.
+func TestOutputTexts(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "mms.json"), []byte(`{"namespace": "demo"}`), 0o644)
+	const main = "Function f {\n  tell(@a, \"{gold}Hi\")\n  title(@a, \"Big\", subtitle = \"small\")\n  tell(@s, TextFile(\"rules.mmstext\"))\n}\n"
+	os.WriteFile(filepath.Join(dir, "main.mms"), []byte(main), 0o644)
+	os.WriteFile(filepath.Join(dir, "rules.mmstext"), []byte("**Rules**\nBe nice.\n"), 0o644)
+	m, r := pathURI(filepath.Join(dir, "main.mms")), pathURI(filepath.Join(dir, "rules.mmstext"))
+	c := start(t)
+	c.result("initialize", map[string]any{"rootUri": pathURI(dir)})
+	c.notify("textDocument/didOpen", map[string]any{"textDocument": map[string]any{"uri": m, "languageId": "mms", "version": 1, "text": main}})
+	c.notify("textDocument/didOpen", map[string]any{"textDocument": map[string]any{"uri": r, "languageId": "mmsbook", "version": 1, "text": "**Rules**\nBe nice.\n"}})
+	out := c.result("mms/output", map[string]any{}).(map[string]any)
+	texts := out["texts"].([]any)
+	if len(texts) != 3 {
+		t.Fatalf("texts = %v", texts)
+	}
+	first := texts[0].(map[string]any)
+	if first["kind"] != "chat" || !strings.Contains(first["text"].(string), "gold") || first["uri"] != m {
+		t.Errorf("first = %v", first)
+	}
+	if line := first["range"].(map[string]any)["start"].(map[string]any)["line"]; line != float64(1) {
+		t.Errorf("first starts on line %v", line)
+	}
+	if second := texts[1].(map[string]any); second["kind"] != "title" || second["subtitle"] != `"small"` {
+		t.Errorf("second = %v", second)
+	}
+	if third := texts[2].(map[string]any); third["uri"] != r || !strings.Contains(third["text"].(string), "bold") {
+		t.Errorf("third = %v", third)
+	}
+}
+
+func TestRunTests(t *testing.T) {
+	c := start(t)
+	c.result("initialize", map[string]any{})
+	a := "mem:///a.mms"
+	c.notify("mms/setFiles", map[string]any{"files": []any{
+		map[string]any{"uri": a, "text": "Global n: int = 0\nFunction bump {\n  n += 1\n}\nTest ok {\n  run bump()\n  expect n == 1\n}\nTest bad {\n  run bump()\n  expect n == 3\n}\n"},
+	}})
+	out := c.result("mms/runTests", map[string]any{"uri": a}).(map[string]any)
+	tests := out["tests"].([]any)
+	if len(tests) != 2 {
+		t.Fatalf("tests: %v", out)
+	}
+	bad := tests[1].(map[string]any)
+	if bad["pass"] != false || bad["message"] != "expected n == 3, but n is 1" || bad["expectRange"] == nil {
+		t.Errorf("bad: %v", bad)
+	}
+	one := c.result("mms/runTests", map[string]any{"uri": a, "name": "ok"}).(map[string]any)
+	if ts := one["tests"].([]any); len(ts) != 1 || ts[0].(map[string]any)["pass"] != true {
+		t.Errorf("one: %v", one)
+	}
+}
+
+// TestExpand checks mms/expand: at a position it gives what the call there
+// expands to, and without one it lists every expansion in the file.
+func TestExpand(t *testing.T) {
+	c := start(t)
+	c.result("initialize", map[string]any{})
+	c.notify("initialized", map[string]any{})
+	uri := "file:///a.mms"
+	src := "Template twice(n: int): int = n * 2\nDensityFunction d = twice(3)\n"
+	c.notify("textDocument/didOpen", map[string]any{"textDocument": map[string]any{"uri": uri, "languageId": "mms", "version": 1, "text": src}})
+	one, _ := c.result("mms/expand", pos(uri, 1, 21)).(map[string]any)
+	if one == nil || one["text"] != "6" || one["title"] != "Template twice" {
+		t.Errorf("expand at twice = %v", one)
+	}
+	if none := c.result("mms/expand", pos(uri, 0, 0)); none != nil {
+		t.Errorf("expand at the Template = %v", none)
+	}
+	// The list holds command Templates and Blueprint instances, not
+	// value Templates.
+	all, ok := c.result("mms/expand", map[string]any{"textDocument": map[string]any{"uri": uri}}).([]any)
+	if !ok || len(all) != 0 {
+		t.Errorf("expansions = %v", all)
+	}
+}
+
+// Go to definition on a prelude name opens the prelude file read-only:
+// an mms-prelude: URI whose text mms/preludeFile gives.
+func TestPreludeDefinition(t *testing.T) {
+	c := start(t)
+	c.result("initialize", map[string]any{})
+	c.notify("initialized", map[string]any{})
+	uri := "file:///a.mms"
+	src := "CustomItem ruby { base = diamond }\n"
+	c.notify("textDocument/didOpen", map[string]any{"textDocument": map[string]any{"uri": uri, "languageId": "mms", "version": 1, "text": src}})
+	defs, _ := c.result("textDocument/definition", pos(uri, 0, 3)).([]any)
+	if len(defs) != 1 {
+		t.Fatalf("definition = %v", defs)
+	}
+	loc := defs[0].(map[string]any)
+	target := loc["uri"].(string)
+	if !strings.HasPrefix(target, PreludeScheme+":/") {
+		t.Fatalf("uri = %s", target)
+	}
+	file, _ := c.result("mms/preludeFile", map[string]any{"uri": target}).(map[string]any)
+	text, _ := file["text"].(string)
+	line := int(loc["range"].(map[string]any)["start"].(map[string]any)["line"].(float64))
+	if lines := strings.Split(text, "\n"); line >= len(lines) || !strings.Contains(lines[line], "Blueprint CustomItem") {
+		t.Errorf("line %d of %s is not the Blueprint", line, target)
 	}
 }

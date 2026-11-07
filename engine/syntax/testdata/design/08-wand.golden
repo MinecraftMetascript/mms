@@ -1,0 +1,72 @@
+Decl Blueprint Wand
+  Block
+    FieldDecl name: string
+    FieldDecl texture: Texture
+    FieldDecl cast: Function
+    FieldDecl cooldown: int
+      Number 20
+    Section check
+      Block
+        If
+          Binary <
+            Ident cooldown
+            Number 1
+          Block (bare)
+            Call
+              Ident error
+              Ident cooldown
+              String "A cooldown is at least one tick"
+    Section emit
+      Block
+        Decl primary CustomItem ${self.path} (templated)
+          Interp
+            Member .path
+              Ident self
+          Block
+            Field base
+              Ident stick
+            Field name
+              Ident name
+            Field texture
+              Ident texture
+            Field parent
+              ResLoc item/handheld
+            Field on_right_click
+              Run
+                Block
+                  If
+                    Binary >
+                      Index
+                        Ident wand_cooldown
+                        Selector s
+                      Number 0
+                    Block
+                      Return
+                  Assign =
+                    Index
+                      Ident wand_cooldown
+                      Selector s
+                    Ident cooldown
+                  Call
+                    Ident cast
+Decl Objective wand_cooldown
+Decl OnTick
+  Block
+    Command "scoreboard players remove @a[scores={wand_cooldown=1..}] wand_cooldown 1"
+Decl Wand fire_wand
+  Block
+    Field name
+      String "Fire Wand"
+    Field texture
+      Call
+        Ident Texture
+        String "art/fire_wand.png"
+    Field cast
+      Ident shoot_fireball
+Decl Recipe fire_wand
+  Call
+    Ident Shapeless
+    List
+      Ident stick
+      Ident blaze_powder
+    Ident fire_wand

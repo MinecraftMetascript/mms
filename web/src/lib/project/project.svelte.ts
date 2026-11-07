@@ -45,7 +45,7 @@ export const starter: ProjectData = {
 			text: `// Welcome to MMS. Declarations here become data pack files; the
 // preview on the right renders noises and density functions.
 
-Noise hills = {
+Noise hills {
   base_octave = -6
   amplitude_modifiers = [1, 1, 0.5]
 }
@@ -204,7 +204,7 @@ export class Project {
 	add(path: string, text = ''): string {
 		path = normalizePath(path);
 		let unique = path;
-		const ext = path.endsWith('.mmsbook') ? '.mmsbook' : '.mms';
+		const ext = path.endsWith('.mmsbook') ? '.mmsbook' : path.endsWith('.mmstext') ? '.mmstext' : '.mms';
 		for (let i = 2; this.files.some((f) => f.path === unique); i++) unique = path.slice(0, -ext.length) + `_${i}${ext}`;
 		this.files.push({ path: unique, text });
 		this.files.sort((a, b) => a.path.localeCompare(b.path));
@@ -282,7 +282,12 @@ export function normalizePath(p: string): string {
 	return p;
 }
 
-/** Whether a path is a project source: MMS code, or book text (.mmsbook). */
+/** Whether a path is a project source: MMS code, or text markup (.mmsbook, .mmstext). */
 export function isSourcePath(p: string): boolean {
-	return p.endsWith('.mms') || p.endsWith('.mmsbook');
+	return p.endsWith('.mms') || isMarkupPath(p);
+}
+
+/** Whether a path holds text markup: book text (.mmsbook) or text for anywhere (.mmstext). */
+export function isMarkupPath(p: string): boolean {
+	return p.endsWith('.mmsbook') || p.endsWith('.mmstext');
 }

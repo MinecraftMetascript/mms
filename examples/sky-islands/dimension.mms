@@ -1,10 +1,10 @@
-// The custom-dimension tutorial (docs/tutorial-dimension.md) builds this
+// The custom-dimension tutorial (site/start/tutorial-dimension.md) builds this
 // project. The dimension, its type and its biome are here; the terrain is
 // in terrain.mms and the way in is in visit.mms. Names resolve across
 // files, so `settings = islands` below finds the NoiseSettings there.
 
 // 1. How the world behaves: height, light, sky.
-DimensionType islands = {
+DimensionType islands {
   height = 256
   logical_height = 256
   min_y = 0
@@ -25,7 +25,7 @@ DimensionType islands = {
 }
 
 // 2. The one biome.
-Biome meadow = {
+Biome meadow {
   temperature = 0.7
   downfall = 0.6
   has_precipitation = true
@@ -35,7 +35,7 @@ Biome meadow = {
 }
 
 // 5. The dimension: ties the type, the biomes and the terrain together.
-Dimension islands = {
+Dimension islands {
   type = islands
   generator = {
     type = noise

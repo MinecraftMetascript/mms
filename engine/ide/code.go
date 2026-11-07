@@ -145,6 +145,12 @@ func (s *Session) projectNames(a *at) []sema.Candidate {
 		switch sym.Kind.MMS {
 		case "Global":
 			out = append(out, sema.Candidate{Label: short(sym), Kind: sema.CandID, Detail: "Global " + sema.SymSig(sym), Doc: doc, Rank: 50})
+		case "Storage":
+			detail := "Storage"
+			if sym.Decl.Type != nil {
+				detail += " " + syntax.TypeText(sym.Decl.Type)
+			}
+			out = append(out, sema.Candidate{Label: short(sym), Kind: sema.CandID, Detail: detail, Doc: doc, Rank: 55})
 		case "Objective":
 			name := short(sym)
 			out = append(out, sema.Candidate{Label: name, Kind: sema.CandID, Detail: "objective", Doc: doc, Insert: name + "[${1:@s}]", Rank: 60})
@@ -206,11 +212,11 @@ func locals(f *syntax.File, d *syntax.Decl, off int) []sema.Candidate {
 	return out
 }
 
-func typeSuffix(t *syntax.Name) string {
+func typeSuffix(t syntax.TypeExpr) string {
 	if t == nil {
 		return ""
 	}
-	return ": " + t.Text
+	return ": " + syntax.TypeText(t)
 }
 
 // typeCandidates are the value types of Globals, parameters and locals.
@@ -264,15 +270,9 @@ func (s *Session) interpolationCompletion(a *at, base, off int) ([]Item, syntax.
 		end++
 	}
 	cands := s.codeValues(a, start)
-	for _, sym := range s.R.Syms.All() {
-		if sym.Kind.MMS != "CustomItem" && sym.Kind.MMS != "Book" {
-			continue
-		}
-		name := sym.Path
-		if sym.NS != a.decl.NS {
-			name = sym.ID()
-		}
-		cands = append(cands, sema.Candidate{Label: name, Kind: sema.CandID, Detail: sym.Kind.MMS, Doc: sema.DocMarkdown(sym.Decl.Doc), Rank: 80})
+	for _, c := range a.c.StackCandidates() {
+		c.Rank = 80
+		cands = append(cands, c)
 	}
 	items := make([]Item, 0, len(cands))
 	for i, c := range cands {

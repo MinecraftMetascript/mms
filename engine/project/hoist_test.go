@@ -39,7 +39,7 @@ func compact(s string) string { return strings.Join(strings.Fields(s), "") }
 // schema lists their fields.
 func TestHoistInlineNoise(t *testing.T) {
 	out := emitText(t, `
-Noise simple = { base_octave = -4, amplitude_modifiers = [1] }
+Noise simple { base_octave = -4, amplitude_modifiers = [1] }
 
 NoiseSettings custom {
   default_block = stone
@@ -135,9 +135,9 @@ func TestHoistErrors(t *testing.T) {
 // id is required compiles as its own function.
 func TestHoistInlineFunction(t *testing.T) {
 	out := emitText(t, `
-Advancement got = {
+Advancement got {
   criteria = { t = { trigger = tick } }
-  rewards = { function = {
+  rewards = { function = run {
     /say hi
     let n = 3
   } }
@@ -150,4 +150,23 @@ Advancement got = {
 	if !strings.Contains(got, "say hi\n") || !strings.Contains(got, "scoreboard players set") {
 		t.Errorf("function = %q", got)
 	}
+}
+
+// A plain block where a function id is needed is an error with a fix
+// that writes run { }.
+func TestInlineFunctionNeedsRun(t *testing.T) {
+	p := New(spec.MustDefault(), Config{Namespace: "demo"})
+	src := "Advancement got {\n  criteria = { t = { trigger = tick } }\n  rewards = { function = {\n    /say hi\n  } }\n}\n"
+	p.SetFile("main.mms", src)
+	r, _ := p.Analyze(context.Background())
+	for _, d := range r.Diagnostics("main.mms") {
+		if d.Message != "an inline function is written run { ... }" {
+			continue
+		}
+		if len(d.Fixes) == 0 || d.Fixes[0].Edits[0].Text != "run " || d.Fixes[0].Edits[0].Sp.Start != strings.Index(src, "{\n    /say") {
+			t.Errorf("fix: %+v", d.Fixes)
+		}
+		return
+	}
+	t.Errorf("no error: %v", r.Diagnostics("main.mms"))
 }

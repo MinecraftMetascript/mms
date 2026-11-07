@@ -19,6 +19,7 @@ import (
 	"github.com/minecraftmetascript/mms/engine/format"
 	"github.com/minecraftmetascript/mms/engine/ide"
 	"github.com/minecraftmetascript/mms/engine/jsonv"
+	"github.com/minecraftmetascript/mms/engine/prelude"
 	"github.com/minecraftmetascript/mms/engine/project"
 	"github.com/minecraftmetascript/mms/engine/sema"
 	"github.com/minecraftmetascript/mms/engine/spec"
@@ -55,7 +56,7 @@ type Server struct {
 	assets   fstest.MapFS
 	shutdown bool
 	// watchFiles is set when the client lets the server register file
-	// watchers itself (Zed, Neovim and Helix rely on this; VS Code does
+	// watchers itself (Neovim and Helix rely on this; VS Code does
 	// too).
 	watchFiles bool
 	// renameAfterExtract is set when the client handles the mms.renameAt
@@ -219,12 +220,15 @@ func init() {
 		"textDocument/inlayHint":           typed((*Server).inlayHint),
 		"workspace/didChangeWatchedFiles":  typed((*Server).didChangeWatched),
 		"mms/output":                       typed((*Server).output),
+		"mms/runTests":                     typed((*Server).runTests),
+		"mms/expand":                       typed((*Server).expand),
 		"textDocument/codeAction":          typed((*Server).codeAction),
 		"mms/setConfig":                    typed((*Server).setConfig),
 		"mms/setFiles":                     typed((*Server).setFiles),
 		"mms/setAssets":                    typed((*Server).setAssets),
 		"mms/importPack":                   typed((*Server).importPack),
 		"mms/resourceKinds":                typed((*Server).resourceKinds),
+		"mms/preludeFile":                  typed((*Server).preludeFile),
 		"mms/convertJSON":                  typed((*Server).convertJSON),
 		"mms/ping":                         func(*Server, context.Context, json.RawMessage) (any, *respError) { return "pong", nil },
 	}
@@ -266,7 +270,7 @@ type initializeParams struct {
 // watchedGlobs are the files whose changes on disk the server needs to
 // hear about: sources edited outside the editor (a git checkout, say),
 // and the assets that Texture, Sound and Structure read.
-var watchedGlobs = []string{"**/*.mms", "**/*" + sema.BookFileExt, "**/" + project.ConfigFile, "**/*.{png,ogg,nbt}"}
+var watchedGlobs = []string{"**/*.mms", "**/*" + sema.BookFileExt, "**/*" + sema.TextFileExt, "**/" + project.ConfigFile, "**/*.{png,ogg,nbt}"}
 
 // registerWatchers asks the client to send workspace/didChangeWatchedFiles
 // for watchedGlobs. Clients only watch files a server registers for, so
@@ -646,6 +650,10 @@ func (s *Server) unit(uri string) (*workspace, *sema.Unit) {
 }
 
 func (s *Server) lines(uri string) *lines {
+	if prelude.Is(uri) {
+		text, _ := preludeText(uri)
+		return newLines(text)
+	}
 	if _, u := s.unit(uri); u != nil {
 		return newLines(string(u.File.Src))
 	}
@@ -752,9 +760,40 @@ func (s *Server) locations(locs []ide.Location) []location {
 			l = s.lines(loc.Path)
 			idx[loc.Path] = l
 		}
-		out = append(out, location{URI: loc.Path, Range: l.rng(loc.Span)})
+		uri := loc.Path
+		if rest, ok := strings.CutPrefix(loc.Path, prelude.Prefix); ok {
+			uri = PreludeScheme + ":/" + rest
+		}
+		out = append(out, location{URI: uri, Range: l.rng(loc.Span)})
 	}
 	return out
+}
+
+// PreludeScheme is the URI scheme of the prelude's files, which the
+// editors open read-only: mms-prelude:/core.mms. mms/preludeFile gives
+// their text.
+const PreludeScheme = "mms-prelude"
+
+// preludeText returns the text of a prelude file by its path or URI.
+func preludeText(path string) (string, bool) {
+	name := strings.TrimPrefix(strings.TrimPrefix(path, PreludeScheme+":"), "/")
+	name = strings.TrimPrefix(strings.TrimPrefix(name, "//"), prelude.Prefix)
+	for _, f := range prelude.Files() {
+		if f.Path == prelude.Prefix+name {
+			return f.Text, true
+		}
+	}
+	return "", false
+}
+
+func (s *Server) preludeFile(_ context.Context, p struct {
+	URI string `json:"uri"`
+}) (any, *respError) {
+	text, ok := preludeText(p.URI)
+	if !ok {
+		return nil, &respError{Code: codeInvalidParams, Message: "no prelude file " + p.URI}
+	}
+	return map[string]string{"text": text}, nil
 }
 
 func (s *Server) definition(_ context.Context, p posParams) (any, *respError) {
@@ -838,7 +877,8 @@ func (s *Server) formatting(_ context.Context, p struct {
 	return []any{map[string]any{"range": Range{Start: Position{}, End: l.pos(len(l.src))}, "newText": out}}, nil
 }
 
-var symbolKinds = map[string]int{"resource": 23, "function": 12, "namespace": 3, "tag": 18, "objective": 13}
+var symbolKinds = map[string]int{"resource": 23, "function": 12, "namespace": 3, "tag": 18, "objective": 13,
+	"constant": 14, "template": 12, "type": 23, "blueprint": 5}
 
 func (s *Server) documentSymbol(_ context.Context, p struct {
 	TextDocument docID `json:"textDocument"`
@@ -870,10 +910,11 @@ func (s *Server) inlayHint(_ context.Context, p struct {
 	hints := w.session().InlayHints(p.TextDocument.URI)
 	out := make([]map[string]any, 0, len(hints))
 	for _, h := range hints {
-		out = append(out, map[string]any{
-			"position": l.pos(h.Off),
-			"label":    h.Label, "tooltip": h.Tooltip, "paddingLeft": true,
-		})
+		m := map[string]any{"position": l.pos(h.Off), "label": h.Label, "tooltip": h.Tooltip, "paddingLeft": !h.Type}
+		if h.Type {
+			m["kind"] = 1 // InlayHintKind.Type
+		}
+		out = append(out, m)
 	}
 	return out, nil
 }
@@ -1020,7 +1061,7 @@ func (s *Server) output(_ context.Context, p struct {
 	// and name. Listing the stack lets an editor show every custom item,
 	// including one with just components.
 	items := []map[string]any{}
-	for _, d := range w.res.Order {
+	for _, d := range append(append([]*project.Decl(nil), w.res.Order...), w.res.Instances...) {
 		if d.Item == nil || d.Item.Stack == nil || d.Unit == nil {
 			continue
 		}
@@ -1038,9 +1079,9 @@ func (s *Server) output(_ context.Context, p struct {
 		}
 		// Where a Book's pages start, in its text or its .mmsbook file,
 		// so a preview can open on the page at the cursor.
-		if len(d.Item.PageStarts) > 0 {
-			pages := make([]map[string]any, 0, len(d.Item.PageStarts))
-			for _, ps := range d.Item.PageStarts {
+		if d.Item.Book != nil && len(d.Item.Book.PageStarts) > 0 {
+			pages := make([]map[string]any, 0, len(d.Item.Book.PageStarts))
+			for _, ps := range d.Item.Book.PageStarts {
 				unit := ps.File
 				if unit == "" {
 					unit = d.Unit.Path
@@ -1060,6 +1101,42 @@ func (s *Server) output(_ context.Context, p struct {
 		items = append(items, it)
 	}
 	sort.Slice(items, func(i, j int) bool { return items[i]["id"].(string) < items[j]["id"].(string) })
+	// The messages tell, title and actionbar show, for a chat preview of
+	// the one at the cursor, or of a .mmstext file it reads.
+	texts := []map[string]any{}
+	seen := map[string]bool{}
+	for _, d := range w.res.Order {
+		for _, t := range d.Shown {
+			unit := t.File
+			if unit == "" && d.Unit != nil {
+				unit = d.Unit.Path
+			}
+			l := idx[unit]
+			if l == nil {
+				l = s.lines(unit)
+				idx[unit] = l
+			}
+			if l == nil {
+				continue
+			}
+			id := fmt.Sprintf("text:%s:%d", unit, t.Sp.Start)
+			if seen[id] {
+				continue // a file that more than one command shows
+			}
+			seen[id] = true
+			m := map[string]any{
+				"id":    id,
+				"kind":  t.Kind,
+				"text":  jsonv.Compact(t.Message),
+				"uri":   unit,
+				"range": l.rng(t.Sp),
+			}
+			if t.Subtitle != nil {
+				m["subtitle"] = jsonv.Compact(t.Subtitle)
+			}
+			texts = append(texts, m)
+		}
+	}
 	// JigsawHole declarations write no file; an editor lists them where a
 	// jigsaw block's name or target is chosen.
 	holes := []map[string]any{}
@@ -1083,7 +1160,7 @@ func (s *Server) output(_ context.Context, p struct {
 	if unused == nil {
 		unused = []string{}
 	}
-	return map[string]any{"files": out, "assets": assets, "items": items, "jigsawHoles": holes, "unusedAssets": unused, "hasErrors": w.res.HasErrors()}, nil
+	return map[string]any{"files": out, "assets": assets, "items": items, "texts": texts, "jigsawHoles": holes, "unusedAssets": unused, "hasErrors": w.res.HasErrors()}, nil
 }
 
 // structureAsset matches a structure file's path in the data pack.
@@ -1126,3 +1203,79 @@ func canonURI(uri string) string {
 }
 
 func isLetter(c byte) bool { return 'a' <= c && c <= 'z' || 'A' <= c && c <= 'Z' }
+
+// runTests runs the Test declarations of the project holding uri, or
+// only the one named name, in the same interpreter as `mms test`.
+func (s *Server) runTests(_ context.Context, p struct {
+	URI  string `json:"uri"`
+	Name string `json:"name"`
+}) (any, *respError) {
+	w := s.at(canonURI(p.URI))
+	if w == nil {
+		w = s.last
+	}
+	if w == nil || w.res == nil {
+		w = s.projects[""]
+	}
+	tests := []map[string]any{}
+	if w.res == nil {
+		return map[string]any{"tests": tests}, nil
+	}
+	var keep func(string) bool
+	if p.Name != "" {
+		keep = func(n string) bool { return n == p.Name }
+	}
+	res, err := w.res.RunTests(keep)
+	if err != nil {
+		return map[string]any{"tests": tests, "error": err.Error()}, nil
+	}
+	idx := map[string]*lines{}
+	for _, t := range res {
+		l := idx[t.Unit]
+		if l == nil {
+			l = s.lines(t.Unit)
+			idx[t.Unit] = l
+		}
+		m := map[string]any{"name": t.Name, "uri": t.Unit, "range": l.rng(t.Span), "pass": t.Pass, "said": append([]string{}, t.Said...)}
+		if !t.Pass {
+			m["message"] = t.Message
+		}
+		if t.Expect > 0 {
+			m["expect"], m["expectRange"] = t.Expect, l.rng(t.ExpectSpan)
+		}
+		tests = append(tests, m)
+	}
+	return map[string]any{"tests": tests}, nil
+}
+
+// expand returns what a Template call or Blueprint instance writes: at
+// a position, the innermost one there (or null); without one, every
+// Blueprint instance and Commands Template call in the file, for the
+// Expand lens.
+func (s *Server) expand(_ context.Context, p struct {
+	TextDocument docID     `json:"textDocument"`
+	Position     *Position `json:"position"`
+}) (any, *respError) {
+	uri := p.TextDocument.URI
+	if p.Position != nil {
+		sess, l, off, ok := s.locate(posParams{TextDocument: p.TextDocument, Position: *p.Position})
+		if !ok {
+			return nil, nil
+		}
+		x, ok := sess.Expand(p.TextDocument.URI, off)
+		if !ok {
+			return nil, nil
+		}
+		return map[string]any{"title": x.Title, "text": x.Text, "range": l.rng(x.Sp)}, nil
+	}
+	w := s.at(uri)
+	if w == nil || w.res == nil {
+		return []any{}, nil
+	}
+	l := s.lines(uri)
+	out := []map[string]any{}
+	for _, x := range w.session().Expansions(uri) {
+		out = append(out, map[string]any{"title": x.Title, "text": x.Text, "range": l.rng(x.Sp)})
+	}
+	return out, nil
+}

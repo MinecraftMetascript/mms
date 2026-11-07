@@ -7,7 +7,7 @@
 // Waypoints that reach the banner park there: damage they take is the banner's damage.
 
 /** A damage type that only exists to point creepers at a waypoint. It does no knockback. */
-DamageType creeper_ping = {
+DamageType creeper_ping {
   message_id = "generic"
   exhaustion = 0
   scaling = "never"

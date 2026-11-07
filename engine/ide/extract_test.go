@@ -61,7 +61,7 @@ DensityFunction hills = Noise({
   amplitude_modifiers = [1]
 |}, 1, 1)
 `, "Extract { ... } to a Noise")
-	if !strings.HasPrefix(out, "Noise hills_noise = {\n  base_octave = -6\n  amplitude_modifiers = [1]\n}\n\n/** Hills. */\nDensityFunction hills = Noise(hills_noise, 1, 1)") {
+	if !strings.HasPrefix(out, "Noise hills_noise {\n  base_octave = -6\n  amplitude_modifiers = [1]\n}\n\n/** Hills. */\nDensityFunction hills = Noise(hills_noise, 1, 1)") {
 		t.Errorf("got\n%s", out)
 	}
 	if x.Name != "hills_noise" {
@@ -73,7 +73,7 @@ DensityFunction hills = Noise({
 // to the top level, it is named after its field, and a name in use gets
 // a number.
 func TestExtractNested(t *testing.T) {
-	out, _ := extracted(t, `Noise custom_final_density = { base_octave = -4, amplitude_modifiers = [1] }
+	out, _ := extracted(t, `Noise custom_final_density { base_octave = -4, amplitude_modifiers = [1] }
 
 NoiseSettings custom {
   default_block = stone
@@ -111,11 +111,11 @@ NoiseSettings custom {
 func TestExtractInlineFunction(t *testing.T) {
 	out, _ := extracted(t, `Advancement found {
   criteria = { tick = { trigger = tick } }
-  rewards = { function = {
+  rewards = { function = run {
     /say |found it
   } }
 }
-`, "Extract { ... } to a Function")
+`, "Extract run { /say found it } to a Function declaration")
 	if !strings.HasPrefix(out, "Function found_function {\n  /say found it\n}\n\nAdvancement found {") {
 		t.Errorf("got\n%s", out)
 	}
@@ -124,7 +124,7 @@ func TestExtractInlineFunction(t *testing.T) {
 // TestExtractNone checks that ids and plain numbers are not offered.
 func TestExtractNone(t *testing.T) {
 	for _, src := range []string{
-		"Noise n = { base_octave = -4, amplitude_modifiers = [1] }\nDensityFunction d = Noise(|n, 1, 1)\n",
+		"Noise n { base_octave = -4, amplitude_modifiers = [1] }\nDensityFunction d = Noise(|n, 1, 1)\n",
 		"DensityFunction d = Add(|1, 2)\n",
 	} {
 		s, off := session(t, src)

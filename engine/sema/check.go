@@ -32,13 +32,18 @@ type Info struct {
 	Folder string
 	// Asset is set on an asset helper call such as Texture("a.png").
 	Asset *Asset
-	// Base is set where a custom item is used as a plain item id: the
-	// base item id written in its place.
-	Base string
+	// Converted is set where a Blueprint instance's name is checked as
+	// one of its `as` conversions.
+	Converted *Conversion
+	// Markup is set on a string read as text markup, and Accidental holds
+	// the style marks in it read as the characters themselves, such as
+	// the * of "5 * 3", for the accidental-markup lint.
+	Markup     bool
+	Accidental []syntax.Span
 	// Props are the block state properties a multipart `when` object
 	// body can test, for completion.
 	Props map[string][]string
-	// InlineFn is set on a `{ ... }` block written where a function id is
+	// InlineFn is set on a `run { ... }` block written where a function id is
 	// needed: its body is function code, compiled as a hoisted Function.
 	InlineFn bool
 	// Extract is the declaration kind (as written, e.g. "Noise") of an
@@ -93,6 +98,13 @@ type Checker struct {
 	// source, such as a .mmsbook file, by its path in the project, and
 	// the unit path it has; nil when there are none.
 	Texts func(path string) (unit, text string, ok bool)
+	// Book is the layout of the last Book text checked, for the editor
+	// and the book-page-overflow lint.
+	Book *BookLayout
+	// Shown are the messages the function's text commands show.
+	Shown []ShownText
+	// BookDiags are the problems in the Book text checked.
+	BookDiags []syntax.Diagnostic
 	// Extern holds problems found in other files, such as a .mmsbook
 	// file a Book reads, by path.
 	Extern map[string][]syntax.Diagnostic
@@ -107,15 +119,17 @@ type Checker struct {
 	// to be written as its own resource (see hoist.go).
 	Hoisted []Hoisted
 	hoistN  map[string]int
-	// customOf is the custom item this checker expands, to catch an item
-	// that contains itself.
-	customOf string
 
-	trial  bool
-	errs   int
-	depth  int
-	memo   map[memoKey]int
-	parent *Checker
+	trial bool
+	errs  int
+	depth int
+	memo  map[memoKey]int
+	// merging holds the objects mergeConvert is checking on their own.
+	merging map[syntax.Node]bool
+	// converting holds the instances whose conversions are being
+	// checked, to catch one that contains itself.
+	converting map[string]bool
+	parent     *Checker
 }
 
 type memoKey struct {
@@ -167,6 +181,10 @@ func DepsHold(t *Table, deps map[string]bool) bool {
 			// o|folder|id|other: the other-kind declaration is in that folder.
 			parts := strings.SplitN(rest, "|", 3)
 			now = len(parts) == 3 && otherFolder(t.OtherKind(parts[0], parts[1])) == parts[2]
+		} else if rest, ok := strings.CutPrefix(k, "c|"); ok {
+			// c|id|signature: the instance's conversions are unchanged.
+			i := strings.IndexByte(rest, '|')
+			now = ConversionsSig(t.Conversions[rest[:i]]) == rest[i+1:]
 		} else if rest, ok := strings.CutPrefix(k, "s|"); ok {
 			// s|folder|id|signature: the symbol still has that signature.
 			parts := strings.SplitN(rest, "|", 3)
@@ -220,7 +238,13 @@ func (c *Checker) Resource(d *syntax.Decl, k Kind) jsonv.Value {
 	var v jsonv.Value
 	switch {
 	case d.Body != nil:
-		v = c.check(&syntax.Object{Body: d.Body, Sp: d.Body.Sp}, root)
+		obj := &syntax.Object{Body: d.Body, Sp: d.Body.Sp}
+		v = c.check(obj, root)
+		// The body's object is not in the tree; its Info is kept on the
+		// declaration, for lints that read the body as a value.
+		if in := c.Info[obj]; in != nil {
+			c.Info[d] = in
+		}
 		if k.Resource == "block_definition" {
 			c.blockState(d, d.Body)
 		}
@@ -259,6 +283,15 @@ func (c *Checker) check(e syntax.Expr, v tview) jsonv.Value {
 	}
 	if _, ok := e.(*syntax.Bad); ok {
 		return nil // already reported by the parser
+	}
+	if r, ok := c.convert(e, v); ok {
+		return r
+	}
+	if r, ok := c.mergeConvert(e, v); ok {
+		return r
+	}
+	if r, ok := c.formConvert(e, v); ok {
+		return r
 	}
 	if r := c.sugar(e, v); r != nil {
 		return r.apply(c, e, v)
@@ -475,7 +508,7 @@ func (c *Checker) trialErrors(e syntax.Expr, v tview) int {
 	if n, ok := root.memo[k]; ok {
 		return n
 	}
-	t := &Checker{Pack: c.Pack, Kinds: c.Kinds, Syms: c.Syms, NS: c.NS, trial: true, depth: c.depth, parent: root, Deps: c.Deps, Files: c.Files}
+	t := &Checker{Pack: c.Pack, Kinds: c.Kinds, Syms: c.Syms, NS: c.NS, trial: true, depth: c.depth, parent: root, Deps: c.Deps, Files: c.Files, converting: c.converting}
 	t.check(e, v)
 	root.memo[k] = t.errs
 	return t.errs
@@ -490,7 +523,7 @@ func (c *Checker) fits(e syntax.Expr, v tview) bool {
 		return true
 	}
 	v = c.norm(v)
-	if r := c.sugar(e, v); r != nil {
+	if r := c.sugar(e, v); r != nil || c.formConversion(e, v) != nil {
 		return true
 	}
 	if v.T == nil {
@@ -896,17 +929,6 @@ func (c *Checker) resolveID(text string, id idInfo, e syntax.Expr) string {
 	in.ID = full
 	in.Symbol = sym
 	in.Bare, in.Folder = BareID, reg
-	if sym != nil && isItemKind(sym.Kind.MMS) {
-		// A plain item id has no components, so the custom item stands
-		// for its base item. The custom-item-base lint rule says so.
-		c.findSig(reg, sym.ID())
-		base := customItemBase(sym)
-		in.Base = base
-		if id.excluded(base) {
-			c.excludedID(base, id, e.Span())
-		}
-		return base
-	}
 	if id.excluded(full) {
 		c.excludedID(full, id, e.Span())
 		return full

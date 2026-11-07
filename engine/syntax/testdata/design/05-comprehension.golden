@@ -1,0 +1,14 @@
+Decl ItemTag planks_and_logs
+  List
+    Spread
+      Comprehension w
+        Ident woods
+        String "${w}_planks"
+    Spread
+      Comprehension w
+        Ident woods
+        If
+          Binary !=
+            Ident w
+            Ident mangrove
+        String "${w}_log"

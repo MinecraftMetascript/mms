@@ -38,6 +38,7 @@ commands:
   init    create mms.json and a starter file
   lsp     run the language server over stdio
   reference print every kind and helper as JSON
+  test    run the project's Test declarations
   version print the version
 `
 
@@ -60,6 +61,8 @@ func main() {
 		code = runFmt(os.Args[2:], os.Stdin, os.Stdout, os.Stderr)
 	case "import":
 		code = runImport(os.Args[2:], os.Stdout, os.Stderr)
+	case "test":
+		code = runTest(os.Args[2:], os.Stdout, os.Stderr)
 	case "lsp":
 		code = runLSP(os.Args[2:], os.Stdin, os.Stdout, os.Stderr)
 	case "reference":

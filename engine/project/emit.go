@@ -44,7 +44,11 @@ type OutFile struct {
 // then the asset files the project uses, and the resource pack when it
 // uses textures or sounds. Output is sorted by pack, then path, and is
 // byte-identical across runs. Copied assets need ReadAssets.
-func (r *Result) Emit() []OutFile {
+func (r *Result) Emit() []OutFile { return r.emit(false) }
+
+// emit lays out the pack, with the functions Tests compile to when
+// tests is set.
+func (r *Result) emit(tests bool) []OutFile {
 	var out []OutFile
 	type tagFile struct {
 		values  jsonv.Array
@@ -78,9 +82,6 @@ func (r *Result) Emit() []OutFile {
 		}
 		hooks[name][ns] = append(hooks[name][ns], ls...)
 	}
-	clicks := map[string]bool{}      // namespaces with a right-click hook
-	spotted := map[string][]string{} // namespaces with projectile hooks: their spotted lines
-	thrown := map[string]bool{}      // namespaces with on_projectile_land
 	consts := map[string]map[int32]bool{}
 	ret := map[string]bool{}
 	used := map[string]bool{} // namespaces whose objective the code uses
@@ -123,6 +124,9 @@ func (r *Result) Emit() []OutFile {
 		return l
 	}
 	for _, d := range r.Order {
+		if d.Kind.MMS == "Test" && !tests {
+			continue
+		}
 		for _, h := range d.Hoisted {
 			if h.Fn != nil {
 				addFnOut(h.Fn, d, h.Sp, true)
@@ -136,55 +140,13 @@ func (r *Result) Emit() []OutFile {
 		switch {
 		case d.Kind.Resource == "lang" && d.Kind.Assets != "":
 			if o, ok := d.Value.(*jsonv.Object); ok {
+				// Every Lang of a language adds to its file; a key two of
+				// them set is reported by checkLangKeys.
 				l := lang(d.Kind.Dir(ns)+"/"+path+".json", d)
-				l.decl = d
-				// The Lang's own entries come first; a CustomItem key it
-				// also has is reported by checkCustomItemLang.
-				ms := append([]jsonv.Member(nil), o.Members...)
-				for _, m := range l.o.Members {
-					if o.Get(m.Key) == nil {
-						ms = append(ms, m)
+				for _, m := range o.Members {
+					if l.o.Get(m.Key) == nil {
+						l.o.Set(m.Key, m.Value)
 					}
-				}
-				l.o.Members = ms
-			}
-		case d.Kind.MMS == "CustomItem":
-			it := d.Item
-			if it == nil {
-				continue
-			}
-			if it.Model != nil {
-				out = append(out, OutFile{Path: "assets/" + ns + "/models/" + it.ModelPath + ".json", Data: jsonv.Marshal(it.Model), Unit: d.Unit.Path, Span: d.D.Sp, Pack: sema.ResourcePack})
-			}
-			if it.ItemModel != nil {
-				out = append(out, OutFile{Path: "assets/" + ns + "/items/" + path + ".json", Data: jsonv.Marshal(it.ItemModel), Unit: d.Unit.Path, Span: d.D.Sp, Pack: sema.ResourcePack})
-			}
-			hf := sema.ItemHookOutput(d.ID(), it)
-			for hid, adv := range hf.Advancements {
-				hns, hpath := splitID(hid)
-				out = append(out, OutFile{Path: "data/" + hns + "/advancement/" + hpath + ".json", Data: jsonv.Marshal(adv), Unit: d.Unit.Path, Span: d.D.Sp})
-			}
-			for fid, ls := range hf.Functions {
-				fns, fpath := splitID(fid)
-				out = append(out, OutFile{Path: "data/" + fns + "/function/" + fpath + ".mcfunction", Data: lines(ls), Unit: d.Unit.Path, Span: d.D.Sp})
-			}
-			if hf.Click {
-				clicks[ns] = true
-			}
-			for eid, e := range hf.Enchantments {
-				ens, epath := splitID(eid)
-				out = append(out, OutFile{Path: "data/" + ens + "/enchantment/" + epath + ".json", Data: jsonv.Marshal(e), Unit: d.Unit.Path, Span: d.D.Sp})
-			}
-			if len(hf.Spotted) > 0 {
-				spotted[ns] = append(spotted[ns], hf.Spotted...)
-			}
-			if hf.Thrown {
-				thrown[ns] = true
-			}
-			for _, lc := range it.Languages() {
-				l := lang("assets/"+ns+"/lang/"+lc+".json", d)
-				if l.o.Get(it.LangKey) == nil {
-					l.o.Set(it.LangKey, jsonv.String(it.Names[lc]))
 				}
 			}
 		case d.Kind.TagOf != "":
@@ -218,7 +180,7 @@ func (r *Result) Emit() []OutFile {
 			}
 		case d.Kind.MMS == "Objective":
 			objectives[d.NS] = append(objectives[d.NS], d.Lines...)
-		case d.Kind.MMS == "Global":
+		case d.Kind.MMS == "Global" || d.Kind.MMS == "Storage":
 			gns := d.NS
 			if strings.Contains(d.D.NameText(), ":") {
 				gns, _ = splitID(d.D.NameText())
@@ -235,23 +197,6 @@ func (r *Result) Emit() []OutFile {
 	// are alive again (@e skips dead players). Both run at the player.
 	for ns := range hooks["first_join"] {
 		out = append(out, OutFile{Path: "data/" + ns + "/advancement/mms_gen/first_join.json", Data: jsonv.Marshal(sema.FirstJoinAdvancement(ns))})
-	}
-	for ns, ls := range spotted {
-		tick, fns, preds := sema.ProjectileSetup(ns, ls, thrown[ns])
-		hook("tick", ns, tick)
-		for fid, fl := range fns {
-			fns, fpath := splitID(fid)
-			out = append(out, OutFile{Path: "data/" + fns + "/function/" + fpath + ".mcfunction", Data: lines(fl)})
-		}
-		for pid, pv := range preds {
-			pns, ppath := splitID(pid)
-			out = append(out, OutFile{Path: "data/" + pns + "/predicate/" + ppath + ".json", Data: jsonv.Marshal(pv)})
-		}
-	}
-	for ns := range clicks {
-		load, tick := sema.ClickSetup(ns)
-		objectives[ns] = append(objectives[ns], load...)
-		hook("tick", ns, tick)
 	}
 	for ns, ls := range hooks["respawn"] {
 		obj := sema.RespawnObjective(ns)
@@ -405,12 +350,15 @@ func Zip(files []OutFile) ([]byte, error) {
 // pool can list one structure several times with different processors,
 // and a label tells them apart in the jigsaw preview.
 func elementLabels(d *Decl) map[string]string {
-	obj, ok := d.D.Value.(*syntax.Object)
-	if !ok || obj.Body == nil || d.Unit == nil || d.Unit.File == nil {
+	body := d.D.Body
+	if obj, ok := d.D.Value.(*syntax.Object); ok {
+		body = obj.Body
+	}
+	if body == nil || d.Unit == nil || d.Unit.File == nil {
 		return nil
 	}
 	var out map[string]string
-	for _, it := range obj.Body.Items {
+	for _, it := range body.Items {
 		f, ok := it.(*syntax.FieldStmt)
 		if !ok || f.Key == nil || f.Key.Text != "elements" {
 			continue

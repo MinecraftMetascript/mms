@@ -70,7 +70,7 @@
 	function rowMenu(r: WorldStructureRow): MenuItem[] {
 		return [
 			...(r.status !== 'imported' ? [{ label: r.status === 'changed' ? 'Import again' : 'Import', run: () => send({ type: 'import', file: r.file }) }] : []),
-			{ label: 'Copy Structure(...) call', run: () => send({ type: 'copyCall', file: r.file }) },
+			{ label: 'Copy StructureFile(...) call', run: () => send({ type: 'copyCall', file: r.file }) },
 			...(r.status !== 'new' ? [{ label: 'Show file in Explorer', run: () => send({ type: 'revealFile', rel: r.rel }) }] : []),
 			'sep',
 			{ label: 'Delete from world…', danger: true, run: () => send({ type: 'deleteFromWorld', file: r.file }) }
@@ -127,7 +127,7 @@
 	{@const tip = [
 		r.id,
 		r.status === 'new' ? `New: not in the project yet. Import copies it to ${r.rel}.` : r.status === 'changed' ? `Changed: differs from the project copy ${r.rel}. Import again overwrites it.` : r.rel,
-		r.unused ? `Not used: no Structure(...) call uses it, so the pack leaves it out. Add it to a template pool:\n${r.call}` : '',
+		r.unused ? `Not used: no StructureFile(...) call uses it, so the pack leaves it out. Add it to a template pool:\n${r.call}` : '',
 		r.packId ? `In the pack as ${r.packId}, the project's namespace.` : '',
 		`Saved ${r.saved}`
 	].filter(Boolean).join('\n')}
@@ -353,7 +353,7 @@
 				{#each s.unusedFiles as rel (rel)}
 					{@const items: MenuItem[] = [{ label: 'Show file in Explorer', run: () => send({ type: 'revealFile', rel }) }]}
 					<li>
-						<div class="item" style:--depth={0} tabindex="0" role="treeitem" aria-selected="false" title={`${rel}\nNot saved in ${from.name}, and no Structure(...) call uses it, so the pack leaves it out.`} oncontextmenu={(e) => openMenu(e, items)}>
+						<div class="item" style:--depth={0} tabindex="0" role="treeitem" aria-selected="false" title={`${rel}\nNot saved in ${from.name}, and no StructureFile(...) call uses it, so the pack leaves it out.`} oncontextmenu={(e) => openMenu(e, items)}>
 							<span class="twistie"></span>
 							<span class="label warn-text missing">{rel}</span>
 							<span class="desc"><span class="warn-text">not used</span> · not in world</span>

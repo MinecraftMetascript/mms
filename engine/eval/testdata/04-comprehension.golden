@@ -1,0 +1,20 @@
+=== 02-const.mms (changed: false)
+=== 05-comprehension.mms (changed: true)
+# at 05-comprehension.mms:1:9
+ItemTag planks_and_logs = [
+  "oak_planks",
+  "spruce_planks",
+  "birch_planks",
+  "jungle_planks",
+  "acacia_planks",
+  "dark_oak_planks",
+  "mangrove_planks",
+  "cherry_planks",
+  "oak_log",
+  "spruce_log",
+  "birch_log",
+  "jungle_log",
+  "acacia_log",
+  "dark_oak_log",
+  "cherry_log",
+]
