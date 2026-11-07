@@ -275,9 +275,10 @@ Function give {
 		`"items": "minecraft:stick"`,
 		`"mms_item": "demo:wand"`,
 		`"function": "demo:mms_gen/item_hook/wand/press"`,
-		"=== data/demo/function/mms_gen/item_hook/wand/press.mcfunction\nadvancement revoke @s only demo:mms_gen/item_hook/wand/press\nexecute if score @s mms_click.demo matches 1.. run return run scoreboard players set @s mms_click.demo 2\nscoreboard players set @s mms_click.demo 2\nfunction demo:zap\n",
+		"=== data/demo/function/mms_gen/item_hook/wand/press.mcfunction\nadvancement revoke @s only demo:mms_gen/item_hook/wand/press\nexecute if score @s mms_click.demo matches 1.. if score @s mms_click_item.demo matches 216571602 run return run scoreboard players set @s mms_click.demo 2\nscoreboard players set @s mms_click.demo 2\nscoreboard players set @s mms_click_item.demo 216571602\nfunction demo:zap\n",
 		"=== data/demo/function/zap.mcfunction\nsay zap\n",
 		"scoreboard objectives add mms_click.demo dummy\n",
+		"scoreboard objectives add mms_click_item.demo dummy\n",
 		"scoreboard players remove @a[scores={mms_click.demo=1..}] mms_click.demo 1\n",
 	} {
 		if !strings.Contains(got, want) {
@@ -419,6 +420,89 @@ Function f {
 	}
 }
 
+// TestRightClickOneHookPerPress checks that the right-click hooks of
+// one item and of different items do not get in each other's way: a
+// press runs the block or entity hook when the ray reaches what it
+// hooks and on_right_click only otherwise, the use cost is paid once by
+// whichever runs, and each item's "still held" check names the item, so
+// one item's countdown does not swallow a press of another.
+func TestRightClickOneHookPerPress(t *testing.T) {
+	p := New(spec.MustDefault(), Config{Namespace: "demo"})
+	p.SetFile("main.mms", `
+CustomItem wand {
+  base = stick
+  on_right_click = cast
+  on_use_on_block = light
+  on_right_click_entity = poke
+  consume_on_use = 1
+}
+CustomItem rod {
+  base = stick
+  on_right_click = cast
+}
+Function cast {
+  /say cast
+}
+Function light {
+  /say light
+}
+Function poke {
+  /say poke
+}
+`)
+	r, _ := p.Analyze(context.Background())
+	if d := diagText(r); d != "" {
+		t.Fatalf("unexpected diagnostics:\n%s", d)
+	}
+	files := map[string]string{}
+	for _, f := range r.Emit() {
+		files[f.Path] = string(f.Data)
+	}
+	fn := func(name string) string {
+		return files["data/demo/function/mms_gen/item_hook/"+name+".mcfunction"]
+	}
+	press := fn("wand/press")
+	for _, want := range []string{
+		"scoreboard players set #hit mms_click.demo 0\nexecute anchored eyes positioned ^ ^ ^ anchored feet run function demo:mms_gen/item_hook/wand/press/ray\ntag @s remove mms_clicker\nexecute if score #hit mms_click.demo matches 0 run function demo:mms_gen/item_hook/wand/press/click\n",
+	} {
+		if !strings.Contains(press, want) {
+			t.Errorf("wand/press lacks %q:\n%s", want, press)
+		}
+	}
+	if strings.Contains(press, "function demo:cast") {
+		t.Errorf("wand/press runs on_right_click before knowing whether the ray hit:\n%s", press)
+	}
+	for name, want := range map[string]string{
+		"wand/press/click":      "function demo:cast\nfunction demo:mms_gen/item_hook/wand/press/cost\n",
+		"wand/press/ray/block":  "scoreboard players set #hit mms_click.demo 1\nfunction demo:light\nfunction demo:mms_gen/item_hook/wand/press/cost\n",
+		"wand/press/ray/entity": "scoreboard players set #hit mms_click.demo 1\n",
+	} {
+		if !strings.Contains(fn(name), want) {
+			t.Errorf("%s lacks %q:\n%s", name, want, fn(name))
+		}
+	}
+	if !strings.Contains(fn("wand/press/ray/entity"), "execute as @p[tag=mms_clicker] run function demo:mms_gen/item_hook/wand/press/cost\n") {
+		t.Errorf("the entity hook does not pay the cost:\n%s", fn("wand/press/ray/entity"))
+	}
+	// The rod has no ray, so its click runs straight from the press.
+	if !strings.Contains(fn("rod/press"), "function demo:cast\n") || files["data/demo/function/mms_gen/item_hook/rod/press/click.mcfunction"] != "" {
+		t.Errorf("rod/press should run cast itself:\n%s", fn("rod/press"))
+	}
+	// Each item checks and sets its own id in mms_click_item.
+	check := func(item string) string {
+		for _, line := range strings.Split(fn(item+"/press"), "\n") {
+			if strings.HasPrefix(line, "execute if score @s mms_click.demo matches 1.. if score @s mms_click_item.demo matches ") {
+				return line
+			}
+		}
+		t.Errorf("%s/press has no held check:\n%s", item, fn(item+"/press"))
+		return ""
+	}
+	if a, b := check("wand"), check("rod"); a == b {
+		t.Errorf("wand and rod share a held check: %s", a)
+	}
+}
+
 // TestRightClickIncremental checks that a function declared, removed
 // and declared again in another file is picked up by the item.
 func TestRightClickIncremental(t *testing.T) {
@@ -472,7 +556,8 @@ Function give {
 	}
 	got := dumpFiles(r.Emit())
 	for _, want := range []string{
-		"scoreboard players set @s mms_click.demo 2\nsay hi\n",
+		"scoreboard players set @s mms_click.demo 2\nscoreboard players set @s mms_click_item.demo ",
+		"\nsay hi\n",
 		"advancement revoke @s only demo:mms_gen/item_hook/staff/hit\nsay hit\n",
 	} {
 		if !strings.Contains(got, want) {

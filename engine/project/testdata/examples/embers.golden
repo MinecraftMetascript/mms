@@ -49,8 +49,9 @@ give @s painting[painting/variant="embers:hearth"]
 setblock ~ ~1 ~ fire keep
 === data/embers/function/mms_gen/item_hook/ember_shard/press.mcfunction
 advancement revoke @s only embers:mms_gen/item_hook/ember_shard/press
-execute if score @s mms_click.embers matches 1.. run return run scoreboard players set @s mms_click.embers 2
+execute if score @s mms_click.embers matches 1.. if score @s mms_click_item.embers matches 491614863 run return run scoreboard players set @s mms_click.embers 2
 scoreboard players set @s mms_click.embers 2
+scoreboard players set @s mms_click_item.embers 491614863
 function embers:warm
 function embers:mms_gen/item_hook/ember_shard/press/cost
 === data/embers/function/mms_gen/item_hook/ember_shard/press/cost.mcfunction
@@ -62,8 +63,9 @@ item modify entity @s weapon.mainhand {type:"minecraft:set_count",count:-1,add:t
 item modify entity @s weapon.offhand {type:"minecraft:set_count",count:-1,add:true}
 === data/embers/function/mms_gen/item_hook/ember_wand/press.mcfunction
 advancement revoke @s only embers:mms_gen/item_hook/ember_wand/press
-execute if score @s mms_click.embers matches 1.. run return run scoreboard players set @s mms_click.embers 2
+execute if score @s mms_click.embers matches 1.. if score @s mms_click_item.embers matches 1012731115 run return run scoreboard players set @s mms_click.embers 2
 scoreboard players set @s mms_click.embers 2
+scoreboard players set @s mms_click_item.embers 1012731115
 tag @s add mms_clicker
 execute store result score #block mms_click.embers run attribute @s block_interaction_range get 10
 execute store result score #entity mms_click.embers run attribute @s entity_interaction_range get 10
@@ -95,6 +97,7 @@ function embers:kindle
 function embers:mms_gen/item_hook/ember_wand/press/cost
 === data/embers/function/mms_gen/load.mcfunction
 scoreboard objectives add mms_click.embers dummy
+scoreboard objectives add mms_click_item.embers dummy
 === data/embers/function/mms_gen/tick.mcfunction
 scoreboard players remove @a[scores={mms_click.embers=1..}] mms_click.embers 1
 === data/embers/function/warm.mcfunction

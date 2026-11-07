@@ -205,8 +205,9 @@ function arrows:explode
 execute if data entity @s Item.components."minecraft:custom_data"{mms_item:"arrows:blast_potion"} run function arrows:mms_gen/item_hook/blast_potion/land
 === data/arrows/function/mms_gen/item_hook/cow_wand/press.mcfunction
 advancement revoke @s only arrows:mms_gen/item_hook/cow_wand/press
-execute if score @s mms_click.arrows matches 1.. run return run scoreboard players set @s mms_click.arrows 2
+execute if score @s mms_click.arrows matches 1.. if score @s mms_click_item.arrows matches 660435737 run return run scoreboard players set @s mms_click.arrows 2
 scoreboard players set @s mms_click.arrows 2
+scoreboard players set @s mms_click_item.arrows 660435737
 function arrows:shoot_cow
 === data/arrows/function/mms_gen/item_hook/ender_arrow/projectile.mcfunction
 execute unless data entity @s weapon run data modify entity @s weapon set value {id:"minecraft:bow",count:1}
@@ -237,6 +238,7 @@ function arrows:strike
 execute if data entity @s weapon.components."minecraft:custom_data"{mms_item:"arrows:thunder_bow"} run function arrows:mms_gen/item_hook/thunder_bow/projectile
 === data/arrows/function/mms_gen/load.mcfunction
 scoreboard objectives add mms_click.arrows dummy
+scoreboard objectives add mms_click_item.arrows dummy
 scoreboard objectives add mms.arrows dummy
 scoreboard players set #cf mms.arrows 0
 execute unless data storage arrows:mms g.launch_motion run data modify storage arrows:mms g.launch_motion set value ""
