@@ -23,9 +23,19 @@ type RefDecl struct {
 	// As is the type a Blueprint instance's name stands for, as in
 	// `as Id<item>`.
 	As string `json:"as,omitempty"`
+	// Uses are every `as` of a Blueprint or Type, in order: what its
+	// name, or for a built-in form the expression, means where each type
+	// is expected.
+	Uses []RefAs `json:"uses,omitempty"`
 	// Builtin is set for an `extern` declaration, whose meaning the
 	// compiler supplies.
 	Builtin bool `json:"builtin,omitempty"`
+}
+
+// RefAs is one `as T = value`: the type, and its doc comment.
+type RefAs struct {
+	Type string `json:"type"`
+	Doc  string `json:"doc,omitempty"`
 }
 
 // RefField is a field or parameter.
@@ -87,13 +97,16 @@ func Reference() []RefDecl {
 					continue // a kind the compiler builds
 				}
 				r.Signature = d.Name.Text
-				r.Fields, r.As = fields(d.Body)
+				r.Fields, r.Uses = fields(d.Body)
+				if len(r.Uses) > 0 {
+					r.As = r.Uses[0].Type
+				}
 			case "Type":
 				r.Signature = d.Name.Text
 				if d.TypeValue != nil {
 					r.Signature += " = " + syntax.TypeText(d.TypeValue)
 				}
-				r.Fields, _ = fields(d.Body)
+				r.Fields, r.Uses = fields(d.Body)
 			default:
 				continue
 			}
@@ -103,13 +116,13 @@ func Reference() []RefDecl {
 	return out
 }
 
-// fields lists the fields of a Blueprint or Type body, and its `as` type.
-func fields(b *syntax.Block) ([]RefField, string) {
+// fields lists the fields of a Blueprint or Type body, and its `as` types.
+func fields(b *syntax.Block) ([]RefField, []RefAs) {
 	if b == nil {
-		return nil, ""
+		return nil, nil
 	}
 	var out []RefField
-	as := ""
+	var as []RefAs
 	for _, it := range b.Items {
 		switch it := it.(type) {
 		case *syntax.FieldDecl:
@@ -127,8 +140,8 @@ func fields(b *syntax.Block) ([]RefField, string) {
 			}
 			out = append(out, f)
 		case *syntax.AsStmt:
-			if it.Type != nil && as == "" {
-				as = syntax.TypeText(it.Type)
+			if it.Type != nil {
+				as = append(as, RefAs{Type: syntax.TypeText(it.Type), Doc: syntax.ParseDoc(it.Doc).Text})
 			}
 		}
 	}

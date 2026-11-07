@@ -6,6 +6,32 @@ export interface Reference {
 	groups: Group[];
 	types: TypeEntry[];
 	rules: Rule[];
+	prelude: PreludeDecl[];
+}
+
+/** A Template, Blueprint or Type that every project has, from the prelude. */
+export interface PreludeDecl {
+	kind: 'Blueprint' | 'Template' | 'Type';
+	name: string;
+	/** How it is written, such as `tell(target: Selector, message: Text): Commands`. */
+	signature: string;
+	doc?: string;
+	/** A Blueprint's or Type's fields, or a Template's parameters. */
+	fields?: PreludeField[];
+	/** The first type of `uses`. */
+	as?: string;
+	/** Each `as T = value`: what the name, or a built-in form, means where a T goes. */
+	uses?: { type: string; doc?: string }[];
+	/** The compiler supplies its meaning: a built-in Template, or a form of expression such as `a..b`. */
+	builtin?: boolean;
+}
+
+export interface PreludeField {
+	name: string;
+	type?: string;
+	default?: string;
+	optional?: boolean;
+	doc?: string;
 }
 
 /** A lint rule and its default severity. */
@@ -77,7 +103,9 @@ export const refURL = {
 	group: (base: string, dispatcher: string) => `${base}/docs/reference/helpers/${groupId(dispatcher)}`,
 	helper: (base: string, dispatcher: string, name: string) => `${refURL.group(base, dispatcher)}#${helperId(dispatcher, name)}`,
 	type: (base: string, id: string) => `${base}/docs/reference/types#${typeId(id)}`,
-	rule: (base: string, id: string) => `${base}/docs/reference/lint/${id}`
+	rule: (base: string, id: string) => `${base}/docs/reference/lint/${id}`,
+	kind: (base: string, name: string) => `${base}/docs/reference/kinds/${name}`,
+	prelude: (base: string, name: string) => `${base}/docs/reference/prelude#prelude-${name}`
 };
 
 /** The URL a type part links to, or "" for plain text. */

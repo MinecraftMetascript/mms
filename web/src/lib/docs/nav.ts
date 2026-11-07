@@ -1,5 +1,5 @@
 import { docGroups, groupPages, referenceGroups } from './site.ts';
-import { ref } from './refdata.ts';
+import { blueprints, ref } from './refdata.ts';
 import { groupId, groupTitle } from './reference.ts';
 
 /** A sidebar link; `children` show while the link's section is open. */
@@ -27,12 +27,17 @@ export const referenceNav: NavGroup[] = [
 	{
 		title: 'Generated',
 		links: [
-			{ path: '/docs/reference/kinds', title: 'Declaration kinds' },
+			{
+				path: '/docs/reference/kinds',
+				title: 'Declaration kinds',
+				children: blueprints.map((b) => ({ path: `/docs/reference/kinds/${b.name}`, title: b.name }))
+			},
 			{
 				path: '/docs/reference/helpers',
 				title: 'Helpers',
 				children: ref.groups.map((g) => ({ path: `/docs/reference/helpers/${groupId(g.dispatcher)}`, title: groupTitle(g.dispatcher) }))
 			},
+			{ path: '/docs/reference/prelude', title: 'Templates and forms' },
 			{ path: '/docs/reference/types', title: 'Types' },
 			{ path: '/docs/reference/lint', title: 'Lint rules', children: ref.rules.map((r) => ({ path: `/docs/reference/lint/${r.id}`, title: r.id })) }
 		]

@@ -536,6 +536,19 @@ test('the docs render guides and the reference', async ({ page }) => {
 	await expect(page.getByRole('heading', { level: 1 })).toHaveText('unused');
 	await expect(page.getByText('hint by default')).toBeVisible();
 
+	// Kinds written in MMS have a page each, from the prelude.
+	await page.goto('./docs/reference/kinds');
+	await page.getByRole('table').getByRole('link', { name: 'CustomItem', exact: true }).click();
+	await expect(page.getByRole('heading', { level: 1 })).toHaveText('CustomItem');
+	await expect(page.locator('article dt').filter({ hasText: /^base$/ })).toBeVisible();
+	await expect(page.getByRole('heading', { name: 'What its name stands for' })).toBeVisible();
+
+	// The language reference, and the forms of expression by type.
+	await page.goto('./docs/reference/language/blueprints');
+	await expect(page.getByRole('heading', { level: 1 })).toHaveText('Blueprints');
+	await page.goto('./docs/reference/prelude');
+	await expect(page.locator('#prelude-Range')).toContainText('IntNumberProviderRef');
+
 	// Search finds pages, helpers and rules from anywhere.
 	await page.keyboard.press('Control+k');
 	const search = page.getByRole('dialog', { name: 'Search the docs' });
@@ -559,6 +572,7 @@ test('the docs render guides and the reference', async ({ page }) => {
 	const yaml = await (await page.request.get('./docs/reference.yaml')).text();
 	expect(yaml).toContain('lint_rules:');
 	expect(yaml).toContain('- name: "SetCount"');
+	expect(yaml).toContain('- name: "CustomItem"');
 });
 
 test('the Project menu closes on outside click and Escape, and the editor header formats and fixes', async ({ page }) => {

@@ -1,8 +1,10 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
 	import Doc from '#lib/docs/Doc.svelte';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
+	const base = resolve('/').replace(/\/$/, '');
 </script>
 
 <svelte:head><title>Declaration kinds · MMS docs</title></svelte:head>
@@ -18,6 +20,17 @@
 		<tbody>
 			{#each data.ownKinds as k (k.name)}
 				<tr id="kind-{k.name}"><td><code>{k.name}</code></td><td>{#if k.doc}<Doc text={k.doc} />{/if}</td></tr>
+			{/each}
+		</tbody>
+	</table>
+
+	<h2 id="blueprints">Blueprint kinds</h2>
+	<p>These are written in MMS, in the prelude. Each one writes several resources from one declaration, and has a page of its own.</p>
+	<table>
+		<thead><tr><th>Kind</th><th>Does</th></tr></thead>
+		<tbody>
+			{#each data.blueprints as k (k.name)}
+				<tr id="kind-{k.name}"><td><a href="{base}/docs/reference/kinds/{k.name}"><code>{k.name}</code></a></td><td>{#if k.doc}<Doc text={k.doc.split(/\n\n/)[0]} />{/if}</td></tr>
 			{/each}
 		</tbody>
 	</table>

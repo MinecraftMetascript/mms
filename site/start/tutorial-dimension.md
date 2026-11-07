@@ -26,7 +26,7 @@ This writes `mms.json` and a starter `main.mms`. You can put everything below in
 
 ## 2. The dimension type
 
-```
+```mms
 DimensionType islands {
   height = 256
   logical_height = 256
@@ -52,7 +52,7 @@ The world runs from y = 0 to y = 255. Low clouds at y = 40 drift below the islan
 
 ## 3. A biome
 
-```
+```mms
 Biome meadow {
   temperature = 0.7
   downfall = 0.6
@@ -69,7 +69,7 @@ With no carvers and no features, the islands are bare stone, grass and dirt. To 
 
 Terrain comes from a density function. Where it is above 0 the generator places `default_block`, and where it is below 0 it leaves air (or `default_fluid` below the sea level).
 
-```
+```mms
 Noise island_noise {
   base_octave = -6
   amplitude_modifiers = [1, 1, 0.5]
@@ -99,7 +99,7 @@ The infix arithmetic compiles to `sub` and `mul` density functions. See [Writing
 
 ## 5. The surface
 
-```
+```mms
 SurfaceRule surface = [
   If(StoneDepth(Floor)) { Block(grass_block) },
   If(StoneDepth(Floor).Offset(3)) { Block(dirt) },
@@ -158,7 +158,7 @@ The names on the right are resolved by the field they are in: `type` names a `Di
 
 ## 8. A way in
 
-```
+```mms
 Function visit {
   /execute in sky:islands run tp @s 0 160 0
   tell(@s, "Welcome to the sky islands")

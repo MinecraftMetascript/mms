@@ -14,7 +14,7 @@ The `use-shorthand` lint rule suggests the short forms, and imported packs use t
 
 ## Loot tables
 
-```
+```mms
 LootTable chests/gems {
   pools = [
     Pool(1..3, diamond, emerald, #minecraft:logs),
@@ -32,7 +32,7 @@ LootTable chests/gems {
 
 ## Conditions and predicates
 
-```
+```mms
 Predicate stormy_night = WeatherCheck(thundering = true) && !(TimeCheck(clock = overworld, value = 0..12000) || RandomChance(0.5))
 ```
 
@@ -56,7 +56,7 @@ These work for int and float ranges and for min/max bounds (scores, counts, dist
 
 ## Recipes and item stacks
 
-```
+```mms
 Recipe ruby_block = Shaped(["RRR", "RRR", "RRR"], { R = emerald }, emerald_block)
 Recipe rubies = Shapeless([emerald_block], emerald * 9)
 ```
@@ -69,7 +69,7 @@ Recipe rubies = Shapeless([emerald_block], emerald * 9)
 
 ## Advancements
 
-```
+```mms
 Advancement first_gem {
   criteria = { has_gem = InventoryChanged(items = [{ items = [diamond, emerald] }]) }
 }
@@ -79,7 +79,7 @@ A trigger helper's named arguments are the criterion's conditions. `InventoryCha
 
 ## Tags
 
-```
+```mms
 ItemTag gems = [diamond, #minecraft:logs, Optional(emerald)]
 ```
 
@@ -240,7 +240,7 @@ In a model's `textures`, a value is a texture id, `"#name"` for another slot, or
 
 Data packs cannot add items, but they can give a vanilla item a new look and name with its `item_model` and `item_name` components. That takes a model, an item model, a translation and the same components at every use. `CustomItem` writes all of it from one declaration:
 
-```
+```mms in=examples/embers
 CustomItem ember_shard {
   base = amethyst_shard
   name = "Ember Shard"

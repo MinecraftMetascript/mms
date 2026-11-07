@@ -6,7 +6,7 @@
 
 A line that starts with `/` is a command. It is written to the output as it is, without the slash:
 
-```
+```mms
 Function greet {
   /say hello
   /execute as @a at @s run particle minecraft:heart ~ ~2 ~
@@ -29,7 +29,7 @@ The checker checks syntax, not meaning. Whether an entity exists, or whether an 
 
 Function code computes with whole numbers (`int`, 32-bit, wrapping like the game's scoreboards) and `bool`s.
 
-```
+```mms
 Global deaths: int = 0          // one value for the whole pack
 Objective kills: deathCount    // a score per player
 
@@ -101,7 +101,7 @@ Constant parts are folded at compile time.
 
 `string` values live in command storage (`<namespace>:mms`). They can be joined with `+`, appended with `+=`, and compared with `==` and `!=`. Ints and bools join as their text.
 
-```
+```mms
 Global motd: string = "Welcome"
 
 Function welcome(name: string) {
@@ -117,7 +117,7 @@ Function welcome(name: string) {
 
 `${expr}` puts a value into a command:
 
-```
+```mms
 Function report(points: int) {
   /say ${points} points, ${points * 2} doubled
   /scoreboard players set @s kills ${points}
@@ -132,8 +132,9 @@ Function report(points: int) {
 
 `tell`, `title` and `actionbar` show [text markup](resources.md#text-markup) to players:
 
-```
+```mms
 Global wave = 1
+Objective kills
 
 Function start_wave {
   tell(@a, "{red}Wave ${wave}{/} begins. [Rules](run:/function siege:rules)")
@@ -150,7 +151,7 @@ In the web editor, the Preview tab shows the message at the cursor as the game s
 
 ## Control flow
 
-```
+```mms
 Function classify(x: int): int {
   if (x > 100) {
     return 2
@@ -210,7 +211,7 @@ Its call looks like a function call, so the editor marks it with an `inlined` hi
 
 A chain of execute helpers followed by a block runs the block under `execute`:
 
-```
+```mms
 Objective hits
 
 Function zap {
@@ -253,7 +254,7 @@ The body can use the function's variables. They are not per entity: a body that 
 
 These declarations run their body when something happens, as the player it happens to, at their position:
 
-```
+```mms
 Objective banners
 
 /** Counts every banner a player places. */
@@ -276,9 +277,9 @@ OnRespawn {
 
 ### Item hooks
 
-A [custom item](resources.md)'s `on_*` fields each name a function to run when something happens with the item. The functions take no parameters and can be in any file. A field can also hold the commands themselves in a `{ ... }` block, written like a function body (each command on its own line). That block is compiled as a function of its own, under `mms_gen/<item>/`. They run as the player, at the player unless the table says otherwise:
+A [custom item](resources.md)'s `on_*` fields each name a function to run when something happens with the item. The functions take no parameters and can be in any file. A field can also hold the commands themselves in a `run { ... }` block, written like a function body (each command on its own line). That block is compiled as a function of its own, under `mms_gen/<item>/`. They run as the player, at the player unless the table says otherwise:
 
-```
+```mms
 CustomItem ember_wand {
   base = stick
   name = "Ember Wand"
@@ -344,7 +345,7 @@ A base item that already does something on right click keeps doing it, and then 
 - **A bow or crossbow**: every arrow shot from the item, whatever the arrow is.
 - **An `arrow`, `tipped_arrow` or `spectral_arrow`**: the item itself, once it is shot from any bow, crossbow or dispenser. Prefer `tipped_arrow`: Infinity makes plain `arrow` items free, and a tipped arrow can be coloured with `potion_contents.custom_color`.
 
-```
+```mms
 CustomItem explosive_arrow {
   base = tipped_arrow
   name = "Explosive Arrow"

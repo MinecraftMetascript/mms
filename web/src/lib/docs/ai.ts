@@ -3,8 +3,8 @@
 // convention), /docs/llms-full.txt (every page and the whole reference
 // as Markdown) and /docs/reference.yaml (the generated reference as data).
 import { docGroups, groupPages, referenceGroups, siteURL } from './site.ts';
-import { ref, resourceKinds, ownKinds, helperCount } from './refdata.ts';
-import { groupId, groupTitle, type Param } from './reference.ts';
+import { ref, resourceKinds, ownKinds, helperCount, blueprints, forms, preludeTemplates, preludeTypes } from './refdata.ts';
+import { groupId, groupTitle, type Param, type PreludeDecl, type PreludeField } from './reference.ts';
 
 const intro =
 	'MMS (Minecraft Metascript) is a language for Minecraft Java Edition data packs and resource packs. ' +
@@ -25,7 +25,9 @@ export function llmsIndex(): string {
 	out.push(
 		'## Reference',
 		'',
-		`- [Declaration kinds](${url('/docs/reference/kinds')}): the ${ref.kinds.length} kinds a declaration can have, and the folder each writes to`,
+		`- [Declaration kinds](${url('/docs/reference/kinds')}): the ${ref.kinds.length + blueprints.length} kinds a declaration can have, and the folder each writes to`,
+		...blueprints.map((b) => `- [${b.name}](${url(`/docs/reference/kinds/${b.name}`)}): its fields, and what its name stands for`),
+		`- [Templates and forms](${url('/docs/reference/prelude')}): the prelude's templates and types, and what each operator means by type`,
 		`- [Helpers](${url('/docs/reference/helpers')}): ${helperCount} helpers in ${ref.groups.length} groups, each building one typed object`,
 		`- [Types](${url('/docs/reference/types')}): named types that parameters refer to`,
 		`- [Lint rules](${url('/docs/reference/lint')}): the ${ref.rules.length} lint rules and their default severities`,
@@ -38,6 +40,9 @@ export function llmsIndex(): string {
 	);
 	return out.join('\n');
 }
+
+const fieldLine = (f: PreludeField) => paramLine({ ...f, type: f.type ?? 'any' });
+const usesLines = (d: PreludeDecl) => (d.uses ?? []).map((u) => `  - where \`${u.type}\` goes${u.doc ? `: ${u.doc.replace(/\s*\n\s*/g, ' ')}` : ''}`);
 
 const paramLine = (p: Param) =>
 	`  - \`${p.name}\`: ${p.type}${p.default ? ` (default \`${p.default}\`)` : p.optional ? ' (optional)' : ''}${p.doc ? `. ${p.doc.replace(/\s*\n\s*/g, ' ')}` : ''}`;
@@ -53,6 +58,18 @@ export function llmsFull(): string {
 	out.push('# Reference: declaration kinds', '');
 	for (const k of ownKinds) out.push(`- \`${k.name}\`: ${k.doc ?? ''}`);
 	for (const k of resourceKinds) out.push(`- \`${k.name}\`: writes \`${k.resources ? 'assets' : 'data'}/<namespace>/${k.folder}/\`${k.doc ? `. ${k.doc}` : ''}`);
+	for (const b of blueprints) {
+		out.push('', `## ${b.name}`, '', `A Blueprint in the prelude. ${b.doc ?? ''}`, '', 'Fields:', ...(b.fields ?? []).map(fieldLine));
+		if (b.uses?.length) out.push('', 'Its name stands for:', ...usesLines(b));
+	}
+	out.push('', '# Reference: templates and forms', '');
+	for (const d of [...preludeTemplates, ...preludeTypes]) {
+		out.push(`### ${d.name}`, '', '```', d.kind === 'Type' ? `Type ${d.signature}` : d.signature, '```', '');
+		if (d.doc) out.push(d.doc, '');
+		if (d.kind === 'Template' && d.fields?.length) out.push(...d.fields.map(fieldLine), '');
+	}
+	out.push('## Forms of expression', '', 'What an operator or literal means depends on the type expected where it is written.', '');
+	for (const d of forms) out.push(`- ${d.name}: ${d.doc ?? ''}`, ...usesLines(d));
 	out.push('', '# Reference: helpers', '', 'A helper builds one typed object. `Name(a, b)` fills the parameters in order; `Name(a = 1)` names them.', '');
 	for (const g of ref.groups) {
 		out.push(`## ${groupTitle(g.dispatcher)}${g.dispatcher ? ` (\`${g.dispatcher}\`)` : ''}`, '');
@@ -88,6 +105,22 @@ export function referenceYaml(): string {
 			folder: k.folder ? `${k.resources ? 'assets' : 'data'}/<namespace>/${k.folder}/` : undefined,
 			doc: k.doc
 		})),
+		blueprints: blueprints.map((b) => ({
+			name: b.name,
+			url: url(`/docs/reference/kinds/${b.name}`),
+			doc: b.doc,
+			fields: b.fields?.map((f) => ({ name: f.name, type: f.type, optional: f.optional || undefined, default: f.default, doc: f.doc })),
+			stands_for: b.uses?.map((u) => ({ type: u.type, doc: u.doc }))
+		})),
+		templates: preludeTemplates.map((d) => ({
+			name: d.name,
+			signature: d.signature,
+			builtin: d.builtin || undefined,
+			doc: d.doc,
+			params: d.fields?.map((f) => ({ name: f.name, type: f.type, optional: f.optional || undefined, default: f.default, doc: f.doc }))
+		})),
+		prelude_types: preludeTypes.map((d) => ({ name: d.name, is: d.signature, doc: d.doc })),
+		forms: forms.map((d) => ({ name: d.name, doc: d.doc, means: d.uses?.map((u) => ({ where: u.type, doc: u.doc })) })),
 		helpers: ref.groups.map((g) => ({
 			group: groupTitle(g.dispatcher),
 			dispatcher: g.dispatcher || undefined,
