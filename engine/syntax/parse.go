@@ -1000,14 +1000,47 @@ func (b *builder) sourceText(sp Span) string {
 	return string(b.file.Src[sp.Start:sp.End])
 }
 
+// unquote reads a string literal's value. It resolves the language's own
+// escapes (\" \' \\ \n \t \r \uHHHH) and keeps every other backslash as
+// written, since \{, \$, \* and the like belong to the markup and
+// interpolation layers, which read the value after this.
 func unquote(s string) string {
-	if len(s) >= 2 && s[0] == '\'' {
-		s = `"` + strings.ReplaceAll(strings.ReplaceAll(s[1:len(s)-1], `\'`, `'`), `"`, `\"`) + `"`
+	if len(s) < 2 {
+		return s
 	}
-	if u, err := strconv.Unquote(s); err == nil {
-		return u
+	body := []rune(s[1 : len(s)-1])
+	var b strings.Builder
+	for i := 0; i < len(body); i++ {
+		r := body[i]
+		if r != '\\' || i+1 == len(body) {
+			b.WriteRune(r)
+			continue
+		}
+		i++
+		switch c := body[i]; c {
+		case 'n':
+			b.WriteRune('\n')
+		case 't':
+			b.WriteRune('\t')
+		case 'r':
+			b.WriteRune('\r')
+		case '"', '\'', '\\':
+			b.WriteRune(c)
+		case 'u':
+			if i+4 < len(body) {
+				if v, err := strconv.ParseUint(string(body[i+1:i+5]), 16, 32); err == nil {
+					b.WriteRune(rune(v))
+					i += 4
+					continue
+				}
+			}
+			b.WriteString(`\u`)
+		default:
+			b.WriteRune('\\')
+			b.WriteRune(c)
+		}
 	}
-	return strings.Trim(s, `"'`)
+	return b.String()
 }
 
 // coordText spells a coordinate group from its tokens, one space between
