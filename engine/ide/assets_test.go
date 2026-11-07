@@ -89,6 +89,9 @@ func TestTriggerApplies(t *testing.T) {
 		{"PaintingVariant p { width = 1, height = 1, asset_id = Texture(\"art/|\n", "/", true},
 		{`Advancement a { display = { title = "|" } }`, `"`, false},
 		{"Function f {\n  /|\n}", "/", true},
+		{"Function f {\n  let n = /|\n}", "/", true},
+		{"Function f {\n  let a = 4\n  let n = a /|\n}", "/", false},
+		{"Function f {\n  let b = a == /|\n}", "/", false},
 		{"Global g = 4 /| 2", "/", false},
 		{"Global g = 4 .| 2", ".", true},
 	}
