@@ -74,6 +74,10 @@ func Pack(fsys fs.FS, kinds *sema.Kinds, sp *spec.Pack) (*Result, error) {
 			return nil
 		}
 		ns, rel := parts[0], parts[1]
+		if !sema.ValidNamespace(ns) {
+			res.Skipped = append(res.Skipped, p+": '"+ns+"' is not a namespace (lowercase letters, digits, '_', '-' or '.')")
+			return nil
+		}
 		b, err := fs.ReadFile(fsys, p)
 		if err != nil {
 			res.Skipped = append(res.Skipped, p+": "+err.Error())

@@ -58,3 +58,63 @@ func TestImportZip(t *testing.T) {
 		t.Errorf("second import exit %d, want 1 (mms.json exists)", code)
 	}
 }
+
+// TestImportErrors checks that import reports a write it could not make,
+// skips a namespace folder MMS can't name, and writes a $schema line.
+func TestImportErrors(t *testing.T) {
+	src := t.TempDir()
+	for name, text := range map[string]string{
+		"pack.mcmeta":                         `{"pack":{"pack_format":121,"description":"x"}}`,
+		"data/ruby/function/load.mcfunction":  "say hi\n",
+		"data/My Pack/function/f.mcfunction": "say no\n",
+	} {
+		p := filepath.Join(src, filepath.FromSlash(name))
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		write(t, p, text)
+	}
+	proj := filepath.Join(t.TempDir(), "proj")
+	var out, errOut bytes.Buffer
+	if code := runImport([]string{src, proj}, &out, &errOut); code != 0 {
+		t.Fatalf("import exit %d: %s", code, errOut.String())
+	}
+	if !strings.Contains(errOut.String(), "My Pack") {
+		t.Errorf("stderr %q does not report the skipped namespace", errOut.String())
+	}
+	cfg, _ := os.ReadFile(filepath.Join(proj, "mms.json"))
+	if !strings.Contains(string(cfg), `"$schema"`) || !strings.Contains(string(cfg), `"namespace": "ruby"`) {
+		t.Errorf("mms.json = %s", cfg)
+	}
+
+	// The file import wants to write is a folder: that must fail loudly.
+	blocked := filepath.Join(t.TempDir(), "proj")
+	if err := os.MkdirAll(filepath.Join(blocked, "function.mms"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	out.Reset()
+	errOut.Reset()
+	if code := runImport([]string{src, blocked}, &out, &errOut); code == 0 {
+		t.Errorf("import into a blocked folder succeeded: %s", out.String())
+	}
+}
+
+// TestInitKeepsMain checks that init says so when it keeps a main.mms
+// that is already there, and writes a config that loads.
+func TestInitKeepsMain(t *testing.T) {
+	dir := t.TempDir()
+	write(t, filepath.Join(dir, "main.mms"), "Function mine {\n  /say mine\n}\n")
+	var out, errOut bytes.Buffer
+	if code := runInit([]string{dir}, &out, &errOut); code != 0 {
+		t.Fatalf("init exit %d: %s", code, errOut.String())
+	}
+	if !strings.Contains(out.String(), "kept the existing main.mms") {
+		t.Errorf("init output %q", out.String())
+	}
+	if got, _ := os.ReadFile(filepath.Join(dir, "main.mms")); !strings.Contains(string(got), "mine") {
+		t.Errorf("main.mms was replaced: %s", got)
+	}
+	if code := runCheck([]string{dir}, &out, &errOut); code != 0 {
+		t.Errorf("check exit %d: %s", code, errOut.String())
+	}
+}

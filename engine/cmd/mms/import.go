@@ -3,7 +3,6 @@ package main
 import (
 	"archive/zip"
 	"context"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -67,7 +66,8 @@ func runImport(args []string, stdout, stderr io.Writer) int {
 	for _, f := range res.Files {
 		text := f.Text
 		dst := filepath.Join(out, filepath.FromSlash(f.Path))
-		if err := os.MkdirAll(filepath.Dir(dst), 0o755); err == nil {
+		err := os.MkdirAll(filepath.Dir(dst), 0o755)
+		if err == nil {
 			err = os.WriteFile(dst, []byte(text), 0o644)
 		}
 		if err != nil {
@@ -79,8 +79,11 @@ func runImport(args []string, stdout, stderr io.Writer) int {
 	if cfg.Description == "" {
 		cfg.Description = "Imported with MMS"
 	}
-	b, _ := json.MarshalIndent(cfg, "", "  ")
-	if err := os.WriteFile(filepath.Join(out, project.ConfigFile), append(b, '\n'), 0o644); err != nil {
+	if err := cfg.Validate(); err != nil {
+		fmt.Fprintln(stderr, "mms:", err)
+		return 1
+	}
+	if err := os.WriteFile(filepath.Join(out, project.ConfigFile), cfg.File(), 0o644); err != nil {
 		fmt.Fprintln(stderr, "mms:", err)
 		return 1
 	}

@@ -305,17 +305,25 @@ func runInit(args []string, stdout, stderr io.Writer) int {
 		abs, _ := filepath.Abs(dir)
 		*ns = sanitizeNS(filepath.Base(abs))
 	}
-	cfg := fmt.Sprintf("{\n  \"$schema\": %q,\n  \"namespace\": %q,\n  \"description\": \"A data pack built with MMS\",\n  \"output\": \"build\"\n}\n", project.SchemaURL, *ns)
-	src := fmt.Sprintf("Namespace %s\n\n/** A gentle hill shape. */\nDensityFunction hills = Noise(minecraft:ridge, 0.25, 0) * 0.5\n\nOnLoad {\n  /say %s loaded\n}\n", *ns, *ns)
-	if err := os.WriteFile(filepath.Join(dir, project.ConfigFile), []byte(cfg), 0o644); err != nil {
+	cfg := project.Config{Namespace: *ns, Description: "A data pack built with MMS", Output: "build"}
+	if err := cfg.Validate(); err != nil {
 		fmt.Fprintln(stderr, "mms:", err)
 		return 1
 	}
-	main := filepath.Join(dir, "main.mms")
-	if _, err := os.Stat(main); os.IsNotExist(err) {
-		os.WriteFile(main, []byte(src), 0o644)
+	src := fmt.Sprintf("Namespace %s\n\n/** A gentle hill shape. */\nDensityFunction hills = Noise(minecraft:ridge, 0.25, 0) * 0.5\n\nOnLoad {\n  /say %s loaded\n}\n", *ns, *ns)
+	if err := os.WriteFile(filepath.Join(dir, project.ConfigFile), cfg.File(), 0o644); err != nil {
+		fmt.Fprintln(stderr, "mms:", err)
+		return 1
 	}
-	fmt.Fprintf(stdout, "created %s and main.mms; run `mms build %s`\n", project.ConfigFile, dir)
+	made := project.ConfigFile + " and main.mms"
+	main := filepath.Join(dir, "main.mms")
+	if _, err := os.Stat(main); err == nil {
+		made = project.ConfigFile + " (kept the existing main.mms)"
+	} else if err := os.WriteFile(main, []byte(src), 0o644); err != nil {
+		fmt.Fprintln(stderr, "mms:", err)
+		return 1
+	}
+	fmt.Fprintf(stdout, "created %s; run `mms build %s`\n", made, dir)
 	return 0
 }
 

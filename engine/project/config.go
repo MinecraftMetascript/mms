@@ -60,6 +60,19 @@ func DefaultConfig() Config {
 	return Config{Namespace: "mms", Description: "Built with MMS", Output: "build"}
 }
 
+// File returns c as the text of a new mms.json, with the $schema line
+// that gives editors completion and checks for it.
+func (c Config) File() []byte {
+	b, err := json.MarshalIndent(struct {
+		Schema string `json:"$schema"`
+		Config
+	}{SchemaURL, c}, "", "  ")
+	if err != nil {
+		panic(err) // Config is plain data
+	}
+	return append(b, '\n')
+}
+
 // Validate reports a problem with the config, or nil.
 func (c Config) Validate() error {
 	if !sema.ValidNamespace(c.Namespace) {

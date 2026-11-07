@@ -41,7 +41,10 @@ func runFmt(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			}
 			return 0
 		}
-		io.WriteString(stdout, out)
+		if _, err := io.WriteString(stdout, out); err != nil {
+			fmt.Fprintln(stderr, "mms:", err)
+			return 1
+		}
 		return 0
 	}
 
