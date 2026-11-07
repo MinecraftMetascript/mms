@@ -98,6 +98,11 @@ func (c *ctx) instance(d *syntax.Decl, n *syntax.Name, bp *Blueprint, from *synt
 	if len(missing) > 0 {
 		c.e.report(c.path, syntax.Diagnostic{Code: "mms/missing-field", Severity: syntax.SeverityError, Sp: site,
 			Message: bpName + " " + name.Text + " needs " + strings.Join(quoteAll(missing), ", ")})
+		if f := c.e.r.Files[c.path]; f.Missing == nil {
+			f.Missing = map[syntax.Span][]string{site: missing}
+		} else {
+			f.Missing[site] = missing
+		}
 		return nil
 	}
 	for _, l := range bp.Lets {

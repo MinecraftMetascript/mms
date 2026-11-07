@@ -278,3 +278,12 @@ func TextCommandSignature(name string) (label string, params []string, doc strin
 	}
 	return "", nil, ""
 }
+
+// argCountCode is the code for a call with got arguments where want are
+// expected: mms/missing-arg for too few, mms/too-many-args for too many.
+func argCountCode(got, want int) string {
+	if got > want {
+		return "mms/too-many-args"
+	}
+	return "mms/missing-arg"
+}

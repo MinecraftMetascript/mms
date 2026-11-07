@@ -214,7 +214,7 @@ func criterionCall(c *Checker, e syntax.Expr, v tview) jsonv.Value {
 	cond := &syntax.Block{Closed: true, Sp: call.ArgsSp}
 	for _, a := range call.Args {
 		if a.Name == nil {
-			c.errorf("mms/missing-field", a.Sp, "criterion conditions are named: %s(player = ...)", name.Name)
+			c.errorf("mms/positional-arg", a.Sp, "criterion conditions are named: %s(player = ...)", name.Name)
 			continue
 		}
 		cond.Items = append(cond.Items, &syntax.FieldStmt{Key: a.Name, Value: a.Value, Sp: a.Sp})

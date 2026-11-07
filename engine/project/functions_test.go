@@ -201,7 +201,7 @@ func TestFunctionErrors(t *testing.T) {
 		"Function f {\n  let x: int = true\n}":                "mms/type-mismatch",
 		"Function f {\n  y = 1\n}":                            "mms/unknown-name",
 		"Function f {\n  if (1) {\n  }\n}":                    "mms/type-mismatch",
-		"Function f {\n  g(1)\n}\nFunction g {\n  /say hi\n}": "mms/arity",
+		"Function f {\n  g(1)\n}\nFunction g {\n  /say hi\n}": "mms/too-many-args",
 		"Function f {\n  let x = 1 / 0\n}":                    "mms/division-by-zero",
 		"Function f {\n  1 + 2\n}":                            "mms/unused-value",
 		"Function f(): int {\n  return true\n}":               "mms/type-mismatch",
@@ -223,6 +223,15 @@ func TestFunctionErrors(t *testing.T) {
 		if len(codes) == 0 || codes[0] != want {
 			t.Errorf("%q: errors %v, want %s", src, codes, want)
 		}
+	}
+	// A string return type is reported once, on the type, not on every
+	// return.
+	p := New(spec.MustDefault(), Config{Namespace: "demo"})
+	p.SetFile("main.mms", "Function f(n: int): string {\n  if (n > 0) {\n    return \"a\"\n  }\n  return \"b\"\n}\n")
+	r, _ := p.Analyze(context.Background())
+	ds := r.Diagnostics("main.mms")
+	if len(ds) != 1 || ds[0].Code != "mms/unsupported" || ds[0].Sp.Start != strings.Index("Function f(n: int): string", "string") {
+		t.Errorf("string return type: %v", ds)
 	}
 }
 

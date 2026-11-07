@@ -4,6 +4,7 @@
 package project
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"github.com/minecraftmetascript/mms/engine/sema"
@@ -100,6 +101,22 @@ func (c Config) Validate() error {
 	return nil
 }
 
+// ParseConfig reads the text of an mms.json over the defaults. A key it
+// does not know, such as a misspelt "namepsace", is an error; "$schema"
+// is allowed, since new projects get one.
+func ParseConfig(b []byte) (Config, error) {
+	w := struct {
+		Schema string `json:"$schema"`
+		Config
+	}{Config: DefaultConfig()}
+	d := json.NewDecoder(bytes.NewReader(b))
+	d.DisallowUnknownFields()
+	if err := d.Decode(&w); err != nil {
+		return w.Config, fmt.Errorf("mms.json: %w", err)
+	}
+	return w.Config, nil
+}
+
 // LoadConfig reads dir/mms.json, filling defaults for missing fields. A
 // missing file yields the default config.
 func LoadConfig(dir string) (Config, error) {
@@ -111,8 +128,9 @@ func LoadConfig(dir string) (Config, error) {
 	if err != nil {
 		return cfg, err
 	}
-	if err := json.Unmarshal(b, &cfg); err != nil {
-		return cfg, fmt.Errorf("mms.json: %w", err)
+	cfg, err = ParseConfig(b)
+	if err != nil {
+		return cfg, err
 	}
 	if cfg.Output == "" {
 		cfg.Output = "build"

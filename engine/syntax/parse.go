@@ -813,8 +813,6 @@ func (b *builder) expr(c parser.IExprContext, around Span) Expr {
 		return b.binary("&&", e.AllExpr(), sp)
 	case *parser.OrExprContext:
 		return b.binary("||", e.AllExpr(), sp)
-	case *parser.ArrowExprContext:
-		return b.binary("->", e.AllExpr(), sp)
 	case *parser.RangeExprContext:
 		r := &Range{Lo: b.expr(e.Expr(0), sp), Sp: sp}
 		if len(e.AllExpr()) > 1 {

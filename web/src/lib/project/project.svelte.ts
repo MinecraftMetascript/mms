@@ -18,6 +18,11 @@ export const isAssetPath = (p: string) => assetExtensions.some((e) => p.toLowerC
 export interface Config {
 	namespace: string;
 	description: string;
+	/**
+	 * The other mms.json keys, such as lint, icon and sources: the editor
+	 * does not use them, but keeps them for the project's zip.
+	 */
+	rest?: Record<string, unknown>;
 }
 
 export interface ProjectData {

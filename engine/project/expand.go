@@ -1,8 +1,6 @@
 package project
 
 import (
-	"strings"
-
 	"github.com/minecraftmetascript/mms/engine/eval"
 	"github.com/minecraftmetascript/mms/engine/prelude"
 	"github.com/minecraftmetascript/mms/engine/sema"
@@ -192,16 +190,9 @@ func (r *Result) missingFieldFixes(tenv *types.Env, kinds *sema.Kinds, source ma
 		}
 		for i := range f.Diags {
 			dg := &f.Diags[i]
-			if dg.Code != "mms/missing-field" || len(dg.Fixes) > 0 {
+			missing := f.Missing[dg.Sp]
+			if dg.Code != "mms/missing-field" || len(dg.Fixes) > 0 || len(missing) == 0 {
 				continue
-			}
-			_, list, ok := strings.Cut(dg.Message, " needs ")
-			if !ok {
-				continue
-			}
-			var missing []string
-			for _, m := range strings.Split(list, ", ") {
-				missing = append(missing, strings.Trim(m, "'"))
 			}
 			for _, d := range src.Decls {
 				if d.Kind == nil || d.Body == nil || !d.Sp.Contains(dg.Sp.Start) {

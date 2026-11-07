@@ -109,6 +109,10 @@ type FileOut struct {
 	// declarations are not in it.
 	Decls []*Decl
 	Diags []syntax.Diagnostic
+	// Missing are the Blueprint instances that leave out required fields,
+	// by the span their mms/missing-field error is at, for the quick fix
+	// that adds them.
+	Missing map[syntax.Span][]string
 	// Changed is false when Decls are exactly the file's own
 	// declarations, so a caller can keep using the parsed file.
 	Changed bool

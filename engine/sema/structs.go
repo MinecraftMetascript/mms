@@ -461,7 +461,7 @@ func (c *Checker) callStruct(e syntax.Expr, v tview) jsonv.Value {
 		} else if len(names) > 0 {
 			msg += "; expected one of " + strings.Join(limit(names, 10), ", ")
 		}
-		c.errorf("mms/unknown-callable", name.Sp, "%s", msg)
+		c.errorf("mms/unknown-helper", name.Sp, "%s", msg)
 		return nil
 	}
 	in := c.info(name)

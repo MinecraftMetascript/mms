@@ -58,5 +58,5 @@
   "left": -1,
   "right": "example:continents"
 }
-! 13: mms/unknown-callable 'Clmp' does not make a DensityFunction; did you mean Clamp(...)?
+! 13: mms/unknown-helper 'Clmp' does not make a DensityFunction; did you mean Clamp(...)?
 ! 14: mms/unknown-id unknown worldgen/noise 'minecraft:nope'

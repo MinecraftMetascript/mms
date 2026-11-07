@@ -398,18 +398,23 @@ func (c *ctx) object(x *syntax.Object) Value {
 		}
 	}
 	r := &Record{pos: p}
-	for _, it := range x.Body.Items {
+	// Each spread is reduced once, here: a Template call in one is
+	// recorded once, and nested spreads do not multiply the work.
+	spreads := map[int]Value{}
+	for i, it := range x.Body.Items {
 		if es, ok := it.(*syntax.ExprStmt); ok {
-			// A spread of something only the checker can read, such as
-			// a helper call: the object stays code.
-			switch c.reduce(es.X.(*syntax.Spread).X).(type) {
+			v := c.reduce(es.X.(*syntax.Spread).X)
+			switch v.(type) {
 			case *Record, *None:
+				spreads[i] = v
 			default:
+				// A spread of something only the checker can read, such
+				// as a helper call: the object stays code.
 				return &Code{p, &syntax.Object{Body: c.block(x.Body), Sp: c.span(x.Sp)}}
 			}
 		}
 	}
-	for _, it := range x.Body.Items {
+	for i, it := range x.Body.Items {
 		switch it := it.(type) {
 		case *syntax.FieldStmt:
 			if it.Key == nil {
@@ -425,15 +430,10 @@ func (c *ctx) object(x *syntax.Object) Value {
 			}
 			r.keySp[key] = [2]syntax.Span{c.span(it.Key.Sp), c.span(it.Sp)}
 		case *syntax.ExprStmt:
-			v := c.reduce(it.X.(*syntax.Spread).X)
-			switch v := v.(type) {
-			case *Record:
-				for i, k := range v.Keys {
-					r.set(k, v.Vals[i])
+			if v, ok := spreads[i].(*Record); ok {
+				for j, k := range v.Keys {
+					r.set(k, v.Vals[j])
 				}
-			case *None:
-			default:
-				c.errorf("mms/spread", it.Sp, "only an object can be spread into an object, not "+kindName(v))
 			}
 		}
 	}
@@ -510,7 +510,7 @@ func (c *ctx) binary(x *syntax.Binary) Value {
 			return v
 		}
 		if x.Op == "/" || x.Op == "%" {
-			c.errorf("mms/divide-by-zero", x.Sp, "division by zero")
+			c.errorf("mms/division-by-zero", x.Sp, "division by zero")
 			return &Num{p, 0, true}
 		}
 	}

@@ -300,6 +300,9 @@ func (c *Checker) CompileFunction(d *syntax.Decl, id string, src []rune) *fn.Fun
 	if f.sig.Ret != "" && !f.valueType(f.sig.Ret, d.Type) {
 		f.sig.Ret = tInt
 	}
+	if f.sig.Ret == tString {
+		c.errorf("mms/unsupported", d.Type.Span(), "functions return int or bool; pass strings back through a Global")
+	}
 	body := &fn.Block{}
 	f.block(body, d.Body)
 	if f.sig.Ret != "" && !terminates(d.Body) {
@@ -614,7 +617,9 @@ func (f *fc) returnStmt(out *fn.Block, s *syntax.ReturnStmt) {
 		return
 	}
 	if v.typ == tString {
-		f.c.errorf("mms/unsupported", s.Value.Span(), "functions return int or bool; pass strings back through a Global")
+		if f.sig.Ret != tString { // a string return type is reported once, where it is written
+			f.c.errorf("mms/unsupported", s.Value.Span(), "functions return int or bool; pass strings back through a Global")
+		}
 		return
 	}
 	if v.typ != f.sig.Ret {
@@ -780,7 +785,7 @@ func (f *fc) objScore(ix *syntax.Index) *fn.Score {
 	in.Symbol = sym
 	in.ID = id
 	if len(ix.Args) != 1 || ix.Args[0].Name != nil {
-		f.c.errorf("mms/arity", ix.Sp, "an objective takes one score holder: %s[@s]", name)
+		f.c.errorf(argCountCode(len(ix.Args), 1), ix.Sp, "an objective takes one score holder: %s[@s]", name)
 		return nil
 	}
 	var holder string
@@ -1219,7 +1224,7 @@ func (f *fc) call(pre *[]fn.Op, e *syntax.Call, wantValue bool) *val {
 	in.ID = id
 	sig := SigOf(sym.Decl)
 	if len(e.Args) != len(sig.Params) {
-		c.errorf("mms/arity", e.ArgsSp, "%s takes %d %s, but got %d", id, len(sig.Params), plural(len(sig.Params), "argument"), len(e.Args))
+		c.errorf(argCountCode(len(e.Args), len(sig.Params)), e.ArgsSp, "%s takes %d %s, but got %d", id, len(sig.Params), plural(len(sig.Params), "argument"), len(e.Args))
 		return nil
 	}
 	calleeNS, calleePath, _ := strings.Cut(id, ":")

@@ -165,7 +165,6 @@ expr
     | expr ANDAND expr                                   # andExpr
     | expr OROR expr                                     # orExpr
     | expr QQ expr                                       # coalesceExpr
-    | <assoc=right> expr ARROW expr                      # arrowExpr
     | ELLIPSIS expr                                      # spreadExpr
     | primary                                            # primaryExpr
     ;

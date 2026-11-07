@@ -9,6 +9,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
 	"syscall/js"
 
 	"github.com/minecraftmetascript/mms/engine/lsp"
@@ -41,6 +42,7 @@ func main() {
 		ready.Invoke(pack.Version)
 	}
 	s := lsp.NewServer(pipe, pack)
+	s.Log = os.Stderr // the browser console
 	if err := s.Run(context.Background()); err != nil {
 		fmt.Println("mms-wasm:", err)
 	}

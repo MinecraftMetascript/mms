@@ -203,7 +203,7 @@ func bookTextRule(c *Checker, e syntax.Expr, v tview) jsonv.Value {
 func bookPagesRule(c *Checker, e syntax.Expr, v tview) jsonv.Value {
 	call := e.(*syntax.Call)
 	if len(call.Args) != 1 {
-		c.errorf("mms/arity", call.Sp, "book_pages takes the book's text")
+		c.errorf(argCountCode(len(call.Args), 1), call.Sp, "book_pages takes the book's text")
 		return nil
 	}
 	sub := c.bookSub()

@@ -74,7 +74,6 @@ IDENT  : IDENT_START IDENT_CHAR*;
 NUMBER : DIGIT+ ('.' DIGIT+)? ([eE] [+-]? DIGIT+)?;
 STRING : '"' (ESC | ~["\\\r\n])* '"' | '\'' (ESC | ~['\\\r\n])* '\'';
 
-ARROW   : '->';
 ELLIPSIS: '...';
 DOTDOT  : '..';
 QQ      : '??';

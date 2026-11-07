@@ -136,6 +136,12 @@ func (s *Server) dispatch(ctx context.Context, m message) (result any, rerr *res
 		if r := recover(); r != nil {
 			s.logf("panic in %s: %v", m.Method, r)
 			result, rerr = nil, &respError{Code: codeInternal, Message: fmt.Sprintf("internal error: %v", r)}
+			if m.ID == nil {
+				// A notification has no reply to carry the error, so the
+				// client's log gets it: a lost didChange leaves stale
+				// diagnostics, which should not pass silently.
+				s.notify("window/logMessage", map[string]any{"type": 1, "message": fmt.Sprintf("mms: internal error in %s: %v", m.Method, r)})
+			}
 		}
 	}()
 	if s.projects == nil && m.Method != "initialize" {

@@ -1,7 +1,7 @@
 import { strFromU8, strToU8, unzipSync, zipSync, type Zippable } from 'fflate';
 import type { OutputAsset, OutputFile } from '../engine/engine.svelte';
 import { fromBase64, toBase64 } from './base64';
-import { isAssetPath, isSourcePath, safeProjectPath, type AssetFile, type ProjectData } from './project.svelte';
+import { isAssetPath, isSourcePath, safeProjectPath, type AssetFile, type Config, type ProjectData } from './project.svelte';
 
 const fixed = new Date(1980, 0, 1);
 
@@ -27,7 +27,8 @@ export const hasResourcePack = (files: OutputFile[], copies: OutputAsset[]) =>
 /** The project's sources and mms.json as a zip, the layout `mms build` reads. */
 export function projectZip(p: ProjectData): Uint8Array {
 	const z: Zippable = {};
-	z['mms.json'] = [strToU8(JSON.stringify({ $schema: 'https://minecraftmetascript.github.io/mms/mms.schema.json', namespace: p.config.namespace, description: p.config.description }, null, 2) + '\n'), { mtime: fixed }];
+	const cfg = { $schema: 'https://minecraftmetascript.github.io/mms/mms.schema.json', namespace: p.config.namespace, description: p.config.description, ...p.config.rest };
+	z['mms.json'] = [strToU8(JSON.stringify(cfg, null, 2) + '\n'), { mtime: fixed }];
 	for (const f of p.files) z[f.path] = [strToU8(f.text), { mtime: fixed }];
 	for (const a of p.assets ?? []) z[a.path] = [fromBase64(a.data), { mtime: fixed, level: 0 }];
 	return zipSync(z, { level: 6 });
@@ -79,7 +80,7 @@ export function isDataPack(files: Map<string, string>): boolean {
 
 /** Reads an MMS project zip. */
 export function readProjectZip(name: string, entries: Map<string, string>, assets: AssetFile[] = []): ProjectData {
-	const config = { namespace: 'mms', description: '' };
+	const config: Config = { namespace: 'mms', description: '' };
 	const files = [];
 	for (const [rel, text] of entries) {
 		if (rel === 'mms.json') {
@@ -87,6 +88,10 @@ export function readProjectZip(name: string, entries: Map<string, string>, asset
 				const j = JSON.parse(text);
 				if (typeof j?.namespace === 'string') config.namespace = j.namespace;
 				if (typeof j?.description === 'string') config.description = j.description;
+				if (j && typeof j === 'object' && !Array.isArray(j)) {
+					const { $schema: _s, namespace: _n, description: _d, ...rest } = j;
+					if (Object.keys(rest).length) config.rest = rest;
+				}
 			} catch {
 				/* keep defaults */
 			}

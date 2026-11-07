@@ -618,7 +618,7 @@ func fieldKey(s *syntax.FieldStmt) string {
 
 // precedence of binary operators, higher binds tighter.
 var precedence = map[string]int{
-	"->": 1, "??": 2, "||": 3, "&&": 4, "==": 5, "!=": 5,
+	"??": 2, "||": 3, "&&": 4, "==": 5, "!=": 5,
 	"<": 6, "<=": 6, ">": 6, ">=": 6, "..": 7,
 	"+": 8, "-": 8, "*": 9, "/": 9, "%": 9,
 }
@@ -804,8 +804,6 @@ func (p *printer) binary(b *syntax.Binary) doc {
 			parts = append(parts, ln, txt(b.Op+" "), p.operand(o, prec+1))
 		}
 		return grp(parts[0], ind(parts[1:]...))
-	case "->":
-		return cat(p.operand(b.L, prec+1), txt(" -> "), p.operand(b.R, prec))
 	}
 	// An object or list on the right hugs the operator and breaks inside
 	// itself: `components + {` on one line.

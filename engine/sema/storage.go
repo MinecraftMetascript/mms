@@ -436,7 +436,7 @@ func (f *fc) save(pre *[]fn.Op, l local, op fn.Operand) {
 func (f *fc) selectorTest(pre *[]fn.Op, name string, e *syntax.Call) *val {
 	c := f.c
 	if len(e.Args) != 1 || e.Args[0].Name != nil {
-		c.errorf("mms/arity", e.ArgsSp, "%s takes one selector: %s(@e[tag=boss])", name, name)
+		c.errorf(argCountCode(len(e.Args), 1), e.ArgsSp, "%s takes one selector: %s(@e[tag=boss])", name, name)
 		return nil
 	}
 	sel := selectorText(e.Args[0].Value)

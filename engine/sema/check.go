@@ -464,7 +464,7 @@ func (c *Checker) union(e syntax.Expr, v tview) jsonv.Value {
 				msg += "; did you mean " + s + "(...)?"
 			}
 			_, id, _, _ := unchain(e)
-			c.errorf("mms/unknown-callable", id.Sp, "%s", msg)
+			c.errorf("mms/unknown-helper", id.Sp, "%s", msg)
 			return nil
 		}
 		c.errorf("mms/type-mismatch", e.Span(), "expected %s, got %s%s", unionText(v), exprKind(e), colorHint(v))

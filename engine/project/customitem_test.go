@@ -292,7 +292,7 @@ Function give {
 	errs := map[string]string{
 		"CustomItem w { base = stick, on_right_click = nope }":                                                                                       "mms/unknown-name",
 		"CustomItem w { base = stick, on_hit = f }\nObjective f":                                                                                     "mms/unknown-name",
-		"CustomItem w { base = stick, on_kill = f }\nFunction f(n: int) {\n  /say hi\n}":                                                             "mms/arity",
+		"CustomItem w { base = stick, on_kill = f }\nFunction f(n: int) {\n  /say hi\n}":                                                             "mms/missing-arg",
 		"CustomItem w { base = apple, on_consume = f, on_hold_right_click = f }\nFunction f {\n}":                                                    "mms/custom-item",
 		"CustomItem w { base = stick, on_hit = f, consume_on_use = 1 }\nFunction f {\n}":                                                             "mms/custom-item",
 		"CustomItem w { base = stick, on_right_click = f, damage_on_use = 1 }\nFunction f {\n}":                                                      "mms/custom-item",
