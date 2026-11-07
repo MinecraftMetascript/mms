@@ -298,7 +298,7 @@ Function light_block {
 
 | Field | Runs when the player... |
 | --- | --- |
-| `on_right_click` | right-clicks with the item, once per press |
+| `on_right_click` | right-clicks with the item, once per press, unless `on_use_on_block` or `on_right_click_entity` runs for that press |
 | `on_hold_right_click` | holds right click with the item: every tick, from the first |
 | `on_use_on_block` | right-clicks a block with the item, once per press. It runs positioned at the centre of the block |
 | `on_right_click_entity` | right-clicks an entity with the item, once per press. It runs at the entity, which has the tag `mms_target` while the function runs, so `@e[tag=mms_target,limit=1]` is the entity |
@@ -318,7 +318,8 @@ Every hook marks the item with `mms_item: "<namespace>:<name>"` in its `custom_d
 - The item gets a `consumable` component that takes about eleven days to eat, with no animation, sound or particles, so right click "uses" it without using it up. It also gets `use_effects`, so the player is not slowed down while holding the button. Set `consumable` or `use_effects` in the item's `components` to use your own instead.
 - A `using_item` advancement, `.../press`, fires on every tick the button is held. `on_hold_right_click` runs on each of those ticks. For the others, a score, `mms_click.<namespace>`, notes that the player is still holding the button. The tick function counts it down, and they run only once it has reached 0.
 - `on_use_on_block` and `on_right_click_entity` step a ray from the player's eyes, 0.1 blocks at a time, out to their `block_interaction_range` and `entity_interaction_range`. It stops at the first block or entity it meets. The ray counts a whole block as solid, so it can stop short of a slab or a flower's actual shape, and it skips items, arrows, markers and display entities.
-- `on_right_click` runs on every press, whether or not the player is looking at a block or entity.
+- A press runs one hook. When the ray reaches a block and the item has `on_use_on_block`, or an entity and it has `on_right_click_entity`, that hook runs. Otherwise `on_right_click` runs, so in the `ember_wand` above, clicking a block lights it and clicking the air casts an ember. An item with only `on_right_click` runs it on every press.
+- The press score also notes which item was pressed, so holding the button while switching to another custom item counts as a new press of that item.
 
 **Use cost.** Two more fields make each right-click use cost something:
 
@@ -334,7 +335,7 @@ CustomItem ember_wand {
 - `consume_on_use = n` takes `n` of the item from the stack.
 - `damage_on_use = n` costs `n` points of durability. When the durability runs out, the item breaks with the break sound, and `on_break` runs. The item needs a `max_damage` component. MMS doesn't know vanilla items' durability, so a base item's own durability is not enough. A damageable item cannot stack, so the item gets `max_stack_size = 1` unless it sets one, and any other stack size is an error.
 
-The cost is paid once per press, from the hand that holds the item. With `on_right_click` it is paid on every press. Otherwise it is paid only when `on_use_on_block` or `on_right_click_entity` runs, so a click at the air costs nothing. `on_hold_right_click` alone pays no cost.
+The cost is paid once per press, from the hand that holds the item, by whichever hook the press runs. With `on_right_click` every press runs a hook, so every press pays. Without it, a click at the air runs nothing and costs nothing. `on_hold_right_click` alone pays no cost.
 
 A base item that already does something on right click keeps doing it, and then none of the right-click hooks runs. A block is still placed and a bow still draws, and a chest still opens when clicked. Pick a base such as `stick`, `paper` or `amethyst_shard` that does nothing on its own. A `use_cooldown` component has no effect, because the item is never finished being used. Keep a cooldown in a score instead. `on_consume` cannot be combined with the right-click hooks, because they stop the item from ever being finished.
 

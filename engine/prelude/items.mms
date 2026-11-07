@@ -28,7 +28,7 @@ Blueprint CustomItem {
   consume_on_use: int?
   /** How much durability each right-click use costs, paid like consume_on_use. The item needs a `max_damage` component, and gets `max_stack_size = 1` unless it sets one. When the durability runs out the item breaks, and on_break runs. */
   damage_on_use: int?
-  /** A `Function` without parameters to run, as and at the player, when they right-click with the item: once per press, not again while the button is held. */
+  /** A `Function` without parameters to run, as and at the player, when they right-click with the item: once per press, not again while the button is held. When the item also has on_use_on_block or on_right_click_entity, a press that runs one of those does not run this one too, so this is the click at anything else, such as the air. */
   on_right_click: Function?
   /** A `Function` without parameters to run, as and at the player, on every tick they hold right click with the item. */
   on_hold_right_click: Function?
@@ -268,8 +268,11 @@ Blueprint HeldHook {
  * item's consumable component never finishes, so holding right click
  * "uses" it every tick, which a using_item advancement sees. A per-player
  * score, set to 2 on each tick of use and counted down each tick, makes
- * the press hooks run once per press. The block and entity hooks cast a
- * ray from the player's eyes, as far as their interaction ranges.
+ * the press hooks run once per press; a second score names the item, so
+ * the countdown of one item does not swallow the press of another. The
+ * block and entity hooks cast a ray from the player's eyes, as far as
+ * their interaction ranges. A press runs one hook: the block or entity
+ * hook when the ray reaches what it hooks, otherwise the click hook.
  *
  * @internal
  */
@@ -286,6 +289,10 @@ Blueprint PressHook {
   on_break: Function?
 
   let obj = "mms_click.${self.namespace}"
+  // Which item the player last pressed with, so holding the button while
+  // switching to another custom item counts as a new press of that one.
+  let held = "mms_click_item.${self.namespace}"
+  let item_hash = hash(item)
   let marker = "${base}[custom_data~{mms_item:\"${item}\"}]"
   let pays = consume > 0 || damage > 0
   // set_damage works in fractions of max_damage and rounds the new
@@ -310,28 +317,47 @@ Blueprint PressHook {
         hold()
       }
       if (click != none || ray) {
-        // Still held since the last press: keep the score up and stop.
-        /execute if score @s ${obj} matches 1.. run return run scoreboard players set @s ${obj} 2
+        // Still held since the last press with this item: keep the score
+        // up and stop.
+        /execute if score @s ${obj} matches 1.. if score @s ${held} matches ${item_hash} run return run scoreboard players set @s ${obj} 2
         /scoreboard players set @s ${obj} 2
-      }
-      if (click != none) {
-        click()
-        if (pays) {
-          /function ${self.id}/cost
-        }
+        /scoreboard players set @s ${held} ${item_hash}
       }
       if (ray) {
         /tag @s add mms_clicker
         /execute store result score #block ${obj} run attribute @s block_interaction_range get 10
         /execute store result score #entity ${obj} run attribute @s entity_interaction_range get 10
         /scoreboard players set #ray ${obj} 0
+        if (click != none) {
+          // Set to 1 by the block or entity hook when it runs.
+          /scoreboard players set #hit ${obj} 0
+        }
         // Back to feet anchoring, or each step would add the eye height.
         /execute anchored eyes positioned ^ ^ ^ anchored feet run function ${self.id}/ray
         /tag @s remove mms_clicker
       }
+      if (click != none) {
+        if (ray) {
+          /execute if score #hit ${obj} matches 0 run function ${self.id}/click
+        } else {
+          click()
+          if (pays) {
+            /function ${self.id}/cost
+          }
+        }
+      }
+    }
+    if (click != none && ray) {
+      Function ${self.path}/click {
+        click()
+        if (pays) {
+          /function ${self.id}/cost
+        }
+      }
     }
     if (click != none || ray) {
       Objective mms_click.${self.namespace}
+      Objective mms_click_item.${self.namespace}
       OnTick {
         /scoreboard players remove @a[scores={${obj}=1..}] ${obj} 1
       }
@@ -381,17 +407,23 @@ Blueprint PressHook {
       }
       if (block != none) {
         Function ${self.path}/ray/block {
+          if (click != none) {
+            /scoreboard players set #hit ${obj} 1
+          }
           block()
-          if (pays && click == none) {
+          if (pays) {
             /function ${self.id}/cost
           }
         }
       }
       if (entity != none) {
         Function ${self.path}/ray/entity {
+          if (click != none) {
+            /scoreboard players set #hit ${obj} 1
+          }
           /tag @s add mms_target
           /execute at @s as @p[tag=mms_clicker] run function ${self.id}/ray/entity/run
-          if (pays && click == none) {
+          if (pays) {
             /execute as @p[tag=mms_clicker] run function ${self.id}/cost
           }
           /tag @s remove mms_target
