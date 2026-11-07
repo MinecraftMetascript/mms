@@ -145,14 +145,15 @@ func TestEvalCompletion(t *testing.T) {
 	}
 }
 
-// The outline lists consts, Templates, Types and Blueprints too.
+// The outline lists consts, Templates, Types and Blueprints too, and a
+// Blueprint instance as written rather than what it emits.
 func TestEvalSymbols(t *testing.T) {
 	s, _ := session(t, evalNamesSrc)
 	var got []string
 	for _, sym := range s.Symbols("main.mms") {
 		got = append(got, sym.Kind+":"+sym.Name)
 	}
-	want := "type:Size constant:amount template:twice template:shadow blueprint:Wand"
+	want := "type:Size constant:amount template:twice template:shadow blueprint:Wand resource:ruby"
 	if !strings.HasPrefix(strings.Join(got, " "), want) {
 		t.Errorf("symbols = %v", got)
 	}

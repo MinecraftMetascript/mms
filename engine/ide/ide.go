@@ -1203,7 +1203,22 @@ func (s *Session) Symbols(path string) []Symbol {
 		return nil
 	}
 	var out []Symbol
+	// What a Blueprint instance emits is listed as the instance, as
+	// written, below.
+	emitted := map[*syntax.Decl]bool{}
+	if s.R.Eval != nil {
+		if fo := s.R.Eval.Files[path]; fo != nil {
+			for _, od := range fo.Decls {
+				if od.Instance != nil {
+					emitted[od.D] = true
+				}
+			}
+		}
+	}
 	for _, d := range u.File.Decls {
+		if emitted[d] {
+			continue
+		}
 		sym := Symbol{Detail: d.Kind.Name, Span: d.Sp, Sel: d.Kind.Sp, Kind: "resource"}
 		if d.Name != nil {
 			sym.Name, sym.Sel = d.Name.Text, d.Name.Sp
@@ -1240,6 +1255,11 @@ func (s *Session) Symbols(path string) []Symbol {
 					continue
 				}
 				kind := map[string]string{"Template": "template", "Type": "type", "Blueprint": "blueprint"}[it.Kind.Name]
+				if kind == "" && s.R.Eval.Blueprints[it.Kind.Name] != nil && !it.Name.Templated() {
+					if bp := s.R.Eval.Blueprints[it.Kind.Name]; !bp.D.Extern {
+						kind = "resource" // a Blueprint instance, such as a CustomItem
+					}
+				}
 				if kind != "" {
 					out = append(out, Symbol{Name: it.Name.Text, Detail: it.Kind.Name, Kind: kind, Span: it.Sp, Sel: it.Name.Sp})
 				}
