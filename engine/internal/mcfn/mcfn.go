@@ -145,6 +145,27 @@ func (vm *VM) exec(line string) (result, error) {
 		}
 		vm.Said = append(vm.Said, t)
 		return result{value: 1, ok: true}, nil
+	case "give":
+		// give <targets> <item> [count]: there are no inventories, so the
+		// gift goes to Said, for `mms test -v`.
+		if len(w) < 3 || len(w) > 4 {
+			return result{}, fmt.Errorf("give needs a target, an item and maybe a count")
+		}
+		es, err := vm.selectEntities(w[1])
+		if err != nil {
+			return result{}, err
+		}
+		if len(es) == 0 {
+			return result{failed: true}, nil
+		}
+		n := int32(1)
+		if len(w) == 4 {
+			if n, err = atoi(w[3]); err != nil || n < 1 {
+				return result{}, fmt.Errorf("give needs a positive count, got %q", w[3])
+			}
+		}
+		vm.Said = append(vm.Said, fmt.Sprintf("gave %d %s", n, w[2]))
+		return result{value: int32(len(es)), ok: true}, nil
 	case "title":
 		// title <targets> title|subtitle|actionbar <text>, or times,
 		// clear and reset. The shown text goes to Said, as tellraw's.

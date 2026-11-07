@@ -802,3 +802,48 @@ Function f {
 		}
 	}
 }
+
+// A score holder written in a Template or a Blueprint's emit block is the
+// selector itself, not the text at the call.
+func TestScoreHoldersInTemplatesAndBlueprints(t *testing.T) {
+	p := New(spec.MustDefault(), Config{Namespace: "demo"})
+	p.SetFile("main.mms", `
+Objective coins
+
+Template pay(n: int): Commands {
+  coins[@s] -= n
+}
+
+Blueprint Price {
+  cost: int
+  emit {
+    primary Function ${self.path} {
+      coins[@e[tag=buyer, limit=1]] -= cost
+    }
+  }
+}
+
+Price bread {
+  cost = 5
+}
+
+Function f {
+  pay(3)
+}
+`)
+	r, _ := p.Analyze(context.Background())
+	for _, d := range r.Diagnostics("main.mms") {
+		if d.Severity == syntax.SeverityError {
+			t.Fatalf("%s: %s", d.Code, d.Message)
+		}
+	}
+	got := dumpFiles(r.Emit())
+	for _, want := range []string{
+		"scoreboard players remove @s coins 3\n",
+		"scoreboard players remove @e[tag=buyer,limit=1] coins 5\n",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("missing %q in:\n%s", want, got)
+		}
+	}
+}

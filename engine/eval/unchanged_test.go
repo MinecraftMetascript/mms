@@ -29,6 +29,15 @@ func TestPlainFilesPassThrough(t *testing.T) {
 		units = append(units, Unit{Path: p, File: syntax.Parse(string(b))})
 	}
 	r := Run(units, Options{Namespace: "demo"})
+	// A declaration of a project Blueprint's kind is one of the new forms.
+	blueprints := map[string]bool{}
+	for _, u := range units {
+		for _, d := range u.File.Decls {
+			if d.Kind != nil && d.Kind.Name == "Blueprint" {
+				blueprints[d.NameText()] = true
+			}
+		}
+	}
 	plain := 0
 	for _, u := range units {
 		out := r.Files[u.Path]
@@ -43,7 +52,7 @@ func TestPlainFilesPassThrough(t *testing.T) {
 		// A top-level const, let or for, or a Type, Template or Blueprint
 		// declaration, is one of the new forms, so the file is expected
 		// to change.
-		if len(u.File.Items) != len(u.File.Decls) || declaresForms(u.File) {
+		if len(u.File.Items) != len(u.File.Decls) || declaresForms(u.File) || usesKinds(u.File, blueprints) {
 			continue
 		}
 		plain++
@@ -78,6 +87,15 @@ func callsPrelude(f *syntax.File) bool {
 		return !found
 	})
 	return found
+}
+
+func usesKinds(f *syntax.File, kinds map[string]bool) bool {
+	for _, d := range f.Decls {
+		if d.Kind != nil && kinds[d.Kind.Name] {
+			return true
+		}
+	}
+	return false
 }
 
 func declaresForms(f *syntax.File) bool {

@@ -791,8 +791,13 @@ func (f *fc) objScore(ix *syntax.Index) *fn.Score {
 		// The formatter writes selector arguments as [type=zombie, limit=1],
 		// so drop the spaces between arguments. The game reads the selector
 		// either way, but other parts of the command it lands in might not.
-		sp := h.Span()
-		holder = compactSelector(string(f.src[sp.Start:sp.End]))
+		// Written from the value, not the source: in a Template or a
+		// Blueprint's emit block the span is the call's.
+		holder = selectorText(h)
+		if holder == "" {
+			f.c.errorf("mms/type-mismatch", h.Span(), "expected a selector such as @s, or a name in quotes")
+			return nil
+		}
 	default:
 		f.c.errorf("mms/type-mismatch", h.Span(), "expected a selector such as @s, or a name in quotes")
 		return nil

@@ -107,3 +107,18 @@ func TestTitle(t *testing.T) {
 		t.Errorf("said %q", got)
 	}
 }
+
+func TestGive(t *testing.T) {
+	vm := New(nil)
+	if err := vm.Exec("give @e bread 8"); err != nil {
+		t.Fatal(err)
+	}
+	for _, line := range []string{"summon armor_stand", "execute as @e run give @s bread 8", "execute as @e run give @s iron_pickaxe"} {
+		if err := vm.Exec(line); err != nil {
+			t.Fatalf("%s: %v", line, err)
+		}
+	}
+	if got := strings.Join(vm.Said, "|"); got != "gave 8 bread|gave 1 iron_pickaxe" {
+		t.Errorf("said %q", got)
+	}
+}

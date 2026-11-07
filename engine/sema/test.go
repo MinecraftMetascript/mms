@@ -151,10 +151,11 @@ func (f *fc) expect(out *fn.Block, x syntax.Expr, n int) bool {
 
 var compareOps = map[string]bool{"<": true, "<=": true, ">": true, ">=": true, "==": true, "!=": true}
 
-// keep writes an operand to storage.
+// keep writes an operand to storage. A score that is not set is left
+// out, so the failure can say so: the game compares it with nothing.
 func keep(at string, o fn.Operand) fn.Op {
 	if o.IsConst {
 		return fn.Cmd{Text: fmt.Sprintf("data modify storage %s set value %d", at, o.Const)}
 	}
-	return fn.Cmd{Text: fmt.Sprintf("execute store result storage %s int 1 run scoreboard players get %s", at, o.S)}
+	return fn.Cmd{Text: fmt.Sprintf("execute if score %s matches -2147483648.. store result storage %s int 1 run scoreboard players get %s", o.S, at, o.S)}
 }
