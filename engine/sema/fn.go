@@ -408,11 +408,7 @@ func (f *fc) stmt(out *fn.Block, s syntax.Stmt) {
 	switch s := s.(type) {
 	case *syntax.CommandStmt:
 		c.Command(s)
-		if strings.Contains(s.Text, "${") {
-			f.interpolate(out, s)
-			return
-		}
-		out.Add(fn.Cmd{Text: s.Text})
+		f.command(&out.Ops, s, "")
 	case *syntax.LetStmt:
 		if s.Name == nil {
 			return
@@ -426,7 +422,7 @@ func (f *fc) stmt(out *fn.Block, s syntax.Stmt) {
 		}
 		var v *val
 		if s.Value != nil {
-			v = f.expr(&out.Ops, s.Value)
+			v = f.valueFor(&out.Ops, s.Value, typ)
 			if v != nil && typ == "" {
 				typ = v.typ
 			}
@@ -454,14 +450,14 @@ func (f *fc) stmt(out *fn.Block, s syntax.Stmt) {
 		if target == nil {
 			return
 		}
-		f.store(&out.Ops, *target, f.expr(&out.Ops, s.Value), s.Value)
+		f.store(&out.Ops, *target, f.valueFor(&out.Ops, s.Value, target.typ), s.Value)
 	case *syntax.AssignStmt:
 		target := f.target(&out.Ops, s.Target)
 		if target == nil || s.Value == nil {
 			return
 		}
 		if s.Op == "=" {
-			f.store(&out.Ops, *target, f.expr(&out.Ops, s.Value), s.Value)
+			f.store(&out.Ops, *target, f.valueFor(&out.Ops, s.Value, target.typ), s.Value)
 			return
 		}
 		if target.typ == tString && s.Op == "+=" && target.choices != nil {
@@ -874,6 +870,8 @@ func (f *fc) expr(pre *[]fn.Op, e syntax.Expr) *val {
 		return &val{typ: tBool, op: fn.Const(v)}
 	case *syntax.Paren:
 		return f.expr(pre, e.X)
+	case *syntax.CommandStmt:
+		return f.commandValue(pre, e, "")
 	case *syntax.Ident, *syntax.ResLoc, *syntax.Member:
 		// `${len(modes)}` writes the number it computes, which reads as
 		// a name; it is that number.
@@ -1431,12 +1429,58 @@ func (f *fc) compareStrings(pre []fn.Op, op string, l, r *val) *val {
 	return &val{typ: tBool, cond: &fn.Cond{Pre: pre, Parts: []string{fmt.Sprintf("%s score %s matches 0", kw, t)}}}
 }
 
+// valueFor lowers the value of an assignment to a target of type want
+// ("" when the target takes the value's type). A command as the value is
+// its result, or for a bool whether it succeeded.
+func (f *fc) valueFor(pre *[]fn.Op, e syntax.Expr, want string) *val {
+	if cmd, ok := e.(*syntax.CommandStmt); ok {
+		return f.commandValue(pre, cmd, want)
+	}
+	return f.expr(pre, e)
+}
+
+// commandValue lowers `/command` as a value through `execute store`: its
+// result as an int, or its success as a bool when want is bool.
+func (f *fc) commandValue(pre *[]fn.Op, cmd *syntax.CommandStmt, want string) *val {
+	f.c.Command(cmd)
+	if want == tString {
+		f.c.errorf("mms/type-mismatch", cmd.Sp, "a command's result is a number: store it in an int, or in a bool for whether it succeeded")
+		return nil
+	}
+	kind, typ := "result", tInt
+	if want == tBool {
+		kind, typ = "success", tBool
+	}
+	t := f.temp()
+	prefix := fmt.Sprintf("execute store %s score %s ", kind, t)
+	// An execute command carries on the store: no "run execute".
+	inner := *cmd
+	if rest, ok := strings.CutPrefix(cmd.Text, "execute "); ok && !strings.HasPrefix(rest, "run ") {
+		inner.Text = rest
+		inner.Sp.Start += len("execute ")
+	} else {
+		prefix += "run "
+	}
+	f.command(pre, &inner, prefix)
+	return &val{typ: typ, op: fn.Of(t)}
+}
+
+// command lowers a raw command, written after prefix.
+func (f *fc) command(ops *[]fn.Op, cmd *syntax.CommandStmt, prefix string) {
+	if strings.Contains(cmd.Text, "${") {
+		f.interpolate(ops, cmd, prefix)
+		return
+	}
+	*ops = append(*ops, fn.Cmd{Text: prefix + cmd.Text})
+}
+
 // interpolate lowers a command holding ${expr} parts. Constant parts are
 // written into the line; the rest become macro arguments.
-func (f *fc) interpolate(out *fn.Block, cmd *syntax.CommandStmt) {
+func (f *fc) interpolate(ops *[]fn.Op, cmd *syntax.CommandStmt, prefix string) {
 	text := []rune(cmd.Text)
 	base := cmd.Sp.Start + 1
 	var line strings.Builder
+	line.WriteString(prefix)
 	var args []fn.MacroArg
 	var pre []fn.Op
 	for i := 0; i < len(text); i++ {
@@ -1491,12 +1535,12 @@ func (f *fc) interpolate(out *fn.Block, cmd *syntax.CommandStmt) {
 		}
 		i = j
 	}
-	out.Add(pre...)
+	*ops = append(*ops, pre...)
 	if len(args) == 0 {
-		out.Add(fn.Cmd{Text: line.String()})
+		*ops = append(*ops, fn.Cmd{Text: line.String()})
 		return
 	}
-	out.Add(fn.Macro{Line: line.String(), Args: args})
+	*ops = append(*ops, fn.Macro{Line: line.String(), Args: args})
 }
 
 // declID returns the id of the resource declaration a bare name in

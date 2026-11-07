@@ -852,6 +852,10 @@ func (b *builder) value(c parser.IValueContext, around Span) Expr {
 		return &Bad{Sp: Span{around.End, around.End}}
 	}
 	ctx := c.(*parser.ValueContext)
+	if t := ctx.COMMAND(); t != nil {
+		sp := span(ctx)
+		return &CommandStmt{Text: strings.TrimRight(strings.TrimPrefix(t.GetText(), "/"), " \t\r"), Sp: sp}
+	}
 	if ctx.IF() == nil {
 		return b.expr(ctx.Expr(), around)
 	}

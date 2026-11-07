@@ -334,9 +334,10 @@ func (a *at) command(t syntax.Token, off int) (syntax.Span, bool) {
 	if t.Kind == parser.MMSLexerCOMMAND && off > t.Sp.Start {
 		return t.Sp, true
 	}
-	// A lone `/` starting a line of function code is a command whose
-	// name is not typed yet; it lexes as SLASH until a letter follows.
-	if t.Kind == parser.MMSLexerSLASH && off == t.Sp.End && a.code() && lineStart(a.u.File.Src, t.Sp.Start) {
+	// A lone `/` starting a line of function code, or after the `=` of
+	// an assignment (`let n = /`), is a command whose name is not typed
+	// yet; it lexes as SLASH until a letter follows.
+	if t.Kind == parser.MMSLexerSLASH && off == t.Sp.End && a.code() && commandStart(a.u.File.Src, t.Sp.Start) {
 		return t.Sp, true
 	}
 	return syntax.Span{}, false
@@ -713,6 +714,22 @@ func lineStart(src []rune, off int) bool {
 		}
 	}
 	return true
+}
+
+// commandStart reports whether a '/' at off starts a command, as the
+// lexer decides: at the start of a line, or after a lone '='.
+func commandStart(src []rune, off int) bool {
+	if lineStart(src, off) {
+		return true
+	}
+	i := off - 1
+	for i >= 0 && (src[i] == ' ' || src[i] == '\t') {
+		i--
+	}
+	if i < 0 || src[i] != '=' {
+		return false
+	}
+	return i == 0 || !strings.ContainsRune("=!<>+-*/%", src[i-1])
 }
 
 // code reports whether the cursor is in function code.

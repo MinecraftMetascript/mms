@@ -182,7 +182,10 @@ type (
 	}
 	BreakStmt    struct{ Sp Span }
 	ContinueStmt struct{ Sp Span }
-	// CommandStmt is a raw command line, without the leading '/'.
+	// CommandStmt is a raw command line, without the leading '/'. It is
+	// also an expression as the value of an assignment,
+	// `let n = /data get block ~ ~ ~ Items`, where it stands for the
+	// command's result.
 	CommandStmt struct {
 		Text string
 		Sp   Span
@@ -468,6 +471,7 @@ func (*Call) expr()                 {}
 func (*Index) expr()                {}
 func (*Trailing) expr()             {}
 func (*Bad) expr()                  {}
+func (*CommandStmt) expr()          {}
 
 // TypeExpr is a type written in source: `int`, `Id<item>`, `[T]`,
 // `{string: T}`, `T?`, `A | B` or a literal word such as `"rigid"`.
