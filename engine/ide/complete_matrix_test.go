@@ -125,6 +125,11 @@ func TestCompletionMatrix(t *testing.T) {
 		{name: "command criterion", src: "Function f {\n  /scoreboard objectives add x |\n}", want: []string{"dummy", "deathCount"}},
 		{name: "command item", src: "Function f {\n  /give @s minecraft:dia|\n}", want: []string{"diamond"}, replace: "minecraft:dia"},
 		{name: "command in execute block", src: "Function f {\n  As(@a).At(@s) {\n    /|\n  }\n}", want: []string{"say"}},
+		{name: "command value name", src: "Function f {\n  let n = /da|\n}", want: []string{"data"}, replace: "da"},
+		{name: "command value argument", src: "Function f {\n  let n = /data get |\n}", want: []string{"block", "entity", "storage"}},
+		{name: "command value assignment", src: "Global g: int = 0\nFunction f {\n  g = /time query |\n}", want: []string{"gametime"}},
+		{name: "command value interpolation", src: "Function f(k: int) {\n  let n = /data get storage demo:x ${|}\n}", want: []string{"k"}},
+		{name: "command value inline", src: "CustomItem w { base = stick, on_use_on_block = run {\n  let ok: bool = /exec|\n} }", want: []string{"execute"}, replace: "exec"},
 
 		{name: "interpolation", src: "Function f(n: int) {\n  let x = 1\n  /say ${|}\n}", want: []string{"n", "x"}, not: []string{"say", "As"}},
 		{name: "interpolation prefix", src: "Global g: int = 0\nFunction f {\n  /say ${g|}\n}", want: []string{"g"}, replace: "g"},

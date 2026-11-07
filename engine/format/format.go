@@ -576,6 +576,10 @@ const (
 
 func (p *printer) expr(e syntax.Expr) doc {
 	switch e := e.(type) {
+	case *syntax.CommandStmt:
+		// A command as a value runs to the end of its line, as on a
+		// line of its own.
+		return txt("/" + strings.TrimRight(e.Text, " \t"))
 	case *syntax.Number:
 		return txt(e.Text)
 	case *syntax.String:

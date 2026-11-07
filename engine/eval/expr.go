@@ -226,6 +226,11 @@ func (c *ctx) reduce(x syntax.Expr) Value {
 			out.Else = c.lower(c.reduce(x.Else))
 		}
 		return &Code{p, out}
+	case *syntax.CommandStmt:
+		// A command as a value, `let n = /data get ...`: its ${...}
+		// parts are filled in as in a command line.
+		t, _ := c.interp(x.Text, x.Sp)
+		return &Code{p, &syntax.CommandStmt{Text: t, Sp: c.span(x.Sp)}}
 	case *syntax.RunExpr:
 		r := c.with()
 		r.compile, r.emit = false, nil

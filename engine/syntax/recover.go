@@ -202,9 +202,15 @@ func markMissingValues(toks []antlr.Token, synthetic map[antlr.Token]bool) ([]an
 		}
 		next := toks[def[k+1]]
 		switch next.GetTokenType() {
+		case parser.MMSLexerCOMMAND:
+			// A command on the line of the '=' is its value; one on the
+			// next line is a statement of its own.
+			if next.GetLine() != eq.GetLine() {
+				missing[i] = true
+			}
 		case parser.MMSLexerRBRACE, parser.MMSLexerRPAREN, parser.MMSLexerRBRACK, parser.MMSLexerCOMMA,
 			// Statements never start a value.
-			parser.MMSLexerCOMMAND, parser.MMSLexerLET, parser.MMSLexerCONST, parser.MMSLexerWHILE,
+			parser.MMSLexerLET, parser.MMSLexerCONST, parser.MMSLexerWHILE,
 			parser.MMSLexerRETURN, parser.MMSLexerBREAK, parser.MMSLexerCONTINUE:
 			missing[i] = true
 		case parser.MMSLexerIDENT, parser.MMSLexerRESLOC, parser.MMSLexerSTRING:

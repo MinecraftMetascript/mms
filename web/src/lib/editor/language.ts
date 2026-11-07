@@ -21,6 +21,8 @@ export const mmsLanguage = StreamLanguage.define<{ inBlock: boolean }>({
 			stream.eatSpace();
 			if (stream.match(/^\/[a-z][^\n]*/)) return 'meta';
 		}
+		// A command as the value of an assignment: `let n = /data get ...`.
+		if (/(^|[^=!<>+\-*/%])=\s*$/.test(stream.string.slice(0, stream.pos)) && stream.match(/^\s*\/[a-z][^\n]*/)) return 'meta';
 		if (stream.eatSpace()) return null;
 		if (stream.match('//')) {
 			stream.skipToEnd();

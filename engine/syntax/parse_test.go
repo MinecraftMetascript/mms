@@ -2,6 +2,7 @@ package syntax
 
 import (
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -33,5 +34,43 @@ func TestParseSketch(t *testing.T) {
 	}
 	if f.Decls[1].Doc != "Ridges used by the custom continent shape." {
 		t.Errorf("doc = %q", f.Decls[1].Doc)
+	}
+}
+
+// TestCommandValue checks that a command after a lone '=' is the value,
+// and that '/' anywhere else keeps its old meaning.
+func TestCommandValue(t *testing.T) {
+	cases := map[string]string{
+		"let n = /data get block ~ ~ ~ Items":    "    Let n\n      Command \"data get block ~ ~ ~ Items\"\n",
+		"g = /time query gametime":               "    Field g\n      Command \"time query gametime\"\n",
+		"kills[@s] = /data get entity @s Health": "Command \"data get entity @s Health\"\n",
+		"n = 1 /2":                               "      Binary /\n",
+		"n = 6/2":                                "      Binary /\n",
+	}
+	for line, want := range cases {
+		f := Parse("Function f {\n  " + line + "\n}\n")
+		if len(f.Diags) > 0 {
+			t.Errorf("%q: %v", line, f.Diags)
+			continue
+		}
+		if got := Dump(f); !strings.Contains(got, want) {
+			t.Errorf("%q: want %q in\n%s", line, want, got)
+		}
+	}
+	// A command on the line after '=' is a statement of its own, and the
+	// '=' is missing its value.
+	f := Parse("Function f {\n  let n =\n  /say hi\n}\n")
+	if len(f.Diags) != 1 || f.Diags[0].Code != "syntax/missing-value" {
+		t.Errorf("diags = %v", f.Diags)
+	}
+	if got := Dump(f); !strings.Contains(got, "    Command \"say hi\"\n") {
+		t.Errorf("the command should stay a statement:\n%s", got)
+	}
+	// After ==, <=, += and the like, '/' is not a command.
+	for _, line := range []string{"let b = n == /x", "n += /x"} {
+		f := Parse("Function f {\n  " + line + "\n}\n")
+		if strings.Contains(Dump(f), "Command") {
+			t.Errorf("%q lexed a command:\n%s", line, Dump(f))
+		}
 	}
 }

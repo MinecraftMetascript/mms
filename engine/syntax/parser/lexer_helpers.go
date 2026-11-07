@@ -22,3 +22,30 @@ func (l *MMSLexer) atLineStart() bool {
 	}
 	return true
 }
+
+// atCommandStart reports whether a '/' here starts a raw command: at the
+// start of a line, or as the whole value of an assignment, after a lone
+// '=' as in `let n = /data get block ~ ~ ~ Items`. No expression can
+// start with '/', so that '/' is never a division.
+func (l *MMSLexer) atCommandStart() bool {
+	if l.atLineStart() {
+		return true
+	}
+	in := l.GetInputStream()
+	at := func(i int) string { return in.GetTextFromInterval(antlr.NewInterval(i, i)) }
+	i := l.TokenStartCharIndex - 1
+	for i >= 0 && (at(i) == " " || at(i) == "\t") {
+		i--
+	}
+	if i < 0 || at(i) != "=" {
+		return false
+	}
+	if i == 0 {
+		return true
+	}
+	switch at(i - 1) {
+	case "=", "!", "<", ">", "+", "-", "*", "/", "%":
+		return false
+	}
+	return true
+}

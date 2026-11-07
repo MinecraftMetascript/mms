@@ -271,6 +271,8 @@ func (s shifter) expr(e Expr) Expr {
 		n = &Comprehension{Var: s.name(x.Var), Var2: s.name(x.Var2), Iter: s.expr(x.Iter), Cond: s.expr(x.Cond), Body: s.expr(x.Body), Sp: s.sp(x.Sp)}
 	case *Bad:
 		n = &Bad{Sp: s.sp(x.Sp)}
+	case *CommandStmt:
+		n = &CommandStmt{Text: x.Text, Sp: s.sp(x.Sp)}
 	default:
 		panic("syntax: shift: unknown expression")
 	}

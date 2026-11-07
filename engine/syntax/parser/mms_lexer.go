@@ -472,7 +472,7 @@ func (l *MMSLexer) Sempred(localctx antlr.RuleContext, ruleIndex, predIndex int)
 func (p *MMSLexer) COMMAND_Sempred(localctx antlr.RuleContext, predIndex int) bool {
 	switch predIndex {
 	case 0:
-		return p.atLineStart()
+		return p.atCommandStart()
 
 	default:
 		panic("No predicate with index: " + fmt.Sprint(predIndex))
