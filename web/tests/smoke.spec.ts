@@ -1145,3 +1145,20 @@ test('the Expanded tab shows what a template call or blueprint writes', async ({
 	await expect(page.getByTestId('expanded-text')).toHaveText('/particle flame ^0 ^1 ^0\n/particle flame ^1 ^1 ^0');
 	await expect(page.getByLabel('Expanded')).toContainText('Template ring');
 });
+
+test('go to definition on a built-in opens the prelude read-only', async ({ page }) => {
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	await replaceText(page, 'CustomItem ruby { base = diamond }\n');
+	await expect(status(page)).toHaveText(/No problems|problem/, { timeout: 15_000 });
+	await page.locator('.cm-line', { hasText: 'CustomItem ruby' }).click({ position: { x: 20, y: 5 } });
+	await expect(async () => {
+		await page.keyboard.press('F12');
+		await expect(page.getByTestId('prelude-view')).toBeVisible({ timeout: 2_000 });
+	}).toPass({ timeout: 15_000 });
+	await expect(page.locator('#prelude-title')).toContainText('items.mms');
+	// The definition is selected and scrolled into view.
+	await expect(page.getByTestId('prelude-view').locator('.cm-activeLine')).toContainText('Blueprint CustomItem');
+	await page.getByRole('button', { name: 'Close' }).click();
+	await expect(page.getByTestId('prelude-view')).toBeHidden();
+});

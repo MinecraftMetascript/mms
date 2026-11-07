@@ -220,12 +220,16 @@ func bookPagesRule(c *Checker, e syntax.Expr, v tview) jsonv.Value {
 }
 
 // stringSrc is the markup source of a string literal. Problems point
-// into the string when its text is as written; with escapes they point
+// into the string when its text is as written; with escapes, or when the
+// evaluator rewrote it (a const's value put in for ${name}), they point
 // at the whole string.
 func (c *Checker) stringSrc(s *syntax.String) *bookSrc {
 	val := []rune(s.Value)
 	raw := []rune(s.Raw)
 	exact := len(raw) == len(val)+2 && string(raw[1:len(raw)-1]) == s.Value
+	if exact && c.Src != nil && (s.Sp.End > len(c.Src) || string(c.Src[s.Sp.Start:s.Sp.End]) != s.Raw) {
+		exact = false
+	}
 	return &bookSrc{text: val, at: func(start, end int) syntax.Span {
 		if !exact || start < 0 || end > len(val) || end <= start {
 			return s.Sp

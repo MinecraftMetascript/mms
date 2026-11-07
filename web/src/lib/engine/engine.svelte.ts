@@ -310,6 +310,16 @@ export class Engine {
 		return this.client.request<object, ResourceKind[]>('mms/resourceKinds', {});
 	}
 
+	/** The text of a file of the language's prelude, by its mms-prelude: URI. */
+	async preludeFile(uri: string): Promise<string | null> {
+		await this.client.initializing;
+		try {
+			return (await this.client.request<object, { text: string }>('mms/preludeFile', { uri })).text;
+		} catch {
+			return null;
+		}
+	}
+
 	/** What the Template call or Blueprint instance at a position writes, or null. */
 	async expand(uri: string, position: { line: number; character: number }): Promise<Expansion | null> {
 		if (!this.client.connected) return null;

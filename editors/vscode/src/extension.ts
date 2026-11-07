@@ -20,6 +20,7 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 import { LanguageClient, type LanguageClientOptions, type ServerOptions } from 'vscode-languageclient/node';
 import { Expands } from './expand';
+import { PreludeFiles } from './prelude';
 import { JigsawView } from './jigsaw';
 import { PackOutput } from './output';
 import { PackView } from './packView';
@@ -234,6 +235,7 @@ export function activate(context: vscode.ExtensionContext) {
 		new JigsawView(context, pack, () => world.project()),
 		new Tests(() => client),
 		new Expands(() => client, pack.onDidChange),
+		new PreludeFiles(() => client),
 		vscode.commands.registerCommand('mms.showPreview', () => previews.show()),
 		vscode.commands.registerCommand('mms.previewDeclaration', (path: string, page?: number) => previews.show(path, page)),
 		vscode.commands.registerCommand('mms.renameAt', renameAt),

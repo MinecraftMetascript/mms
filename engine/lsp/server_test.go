@@ -889,3 +889,29 @@ func TestExpand(t *testing.T) {
 		t.Errorf("expansions = %v", all)
 	}
 }
+
+// Go to definition on a prelude name opens the prelude file read-only:
+// an mms-prelude: URI whose text mms/preludeFile gives.
+func TestPreludeDefinition(t *testing.T) {
+	c := start(t)
+	c.result("initialize", map[string]any{})
+	c.notify("initialized", map[string]any{})
+	uri := "file:///a.mms"
+	src := "CustomItem ruby { base = diamond }\n"
+	c.notify("textDocument/didOpen", map[string]any{"textDocument": map[string]any{"uri": uri, "languageId": "mms", "version": 1, "text": src}})
+	defs, _ := c.result("textDocument/definition", pos(uri, 0, 3)).([]any)
+	if len(defs) != 1 {
+		t.Fatalf("definition = %v", defs)
+	}
+	loc := defs[0].(map[string]any)
+	target := loc["uri"].(string)
+	if !strings.HasPrefix(target, PreludeScheme+":/") {
+		t.Fatalf("uri = %s", target)
+	}
+	file, _ := c.result("mms/preludeFile", map[string]any{"uri": target}).(map[string]any)
+	text, _ := file["text"].(string)
+	line := int(loc["range"].(map[string]any)["start"].(map[string]any)["line"].(float64))
+	if lines := strings.Split(text, "\n"); line >= len(lines) || !strings.Contains(lines[line], "Blueprint CustomItem") {
+		t.Errorf("line %d of %s is not the Blueprint", line, target)
+	}
+}
