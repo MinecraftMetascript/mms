@@ -249,3 +249,13 @@ func (c *Checker) removeFix(sp syntax.Span, title string) []syntax.Fix {
 	}
 	return []syntax.Fix{{Title: title, Edits: []syntax.TextEdit{{Sp: syntax.Span{Start: start, End: end}, Text: ""}}}}
 }
+
+// MissingFieldsFix is the quick fix that adds the missing fields to body,
+// an object of type t, such as a Blueprint instance's body.
+func (c *Checker) MissingFieldsFix(body *syntax.Block, t *spec.Type, missing []string) []syntax.Fix {
+	if body == nil || t == nil {
+		return nil
+	}
+	fs, _ := c.fields(tview{T: t}, "")
+	return c.missingFix(fixSite{block: body}, fs, missing)
+}

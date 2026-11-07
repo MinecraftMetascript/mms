@@ -125,17 +125,26 @@ func labelsAt(t *testing.T, src string) []string {
 }
 
 // A Template argument completes from the parameter's type, then the
-// consts and value Templates; the top level offers the new keywords.
+// consts and the value Templates whose result fits it; the top level
+// offers the new keywords.
 func TestEvalCompletion(t *testing.T) {
 	src := "const amount = 3\nTemplate pick(mode: \"rigid\" | \"terrain_matching\", n: int): int = n\nDensityFunction d = pick(^)\n"
 	got := strings.Join(labelsAt(t, src), " ")
-	for _, want := range []string{"rigid", "terrain_matching", "amount", "pick"} {
+	for _, want := range []string{"rigid", "terrain_matching", "amount"} {
 		if !strings.Contains(" "+got+" ", " "+want+" ") {
 			t.Errorf("pick(|) lacks %s: %s", want, got)
 		}
 	}
-	if strings.Contains(got, "Clamp") {
-		t.Errorf("pick(|) offers DensityFunction helpers: %s", got)
+	for _, unwanted := range []string{"Clamp", "pick", "cos"} {
+		if strings.Contains(" "+got+" ", " "+unwanted+" ") {
+			t.Errorf("pick(|) offers %s, which is not a mode: %s", unwanted, got)
+		}
+	}
+	got = strings.Join(labelsAt(t, strings.Replace(src, "pick(^)", "pick(\"rigid\", ^)", 1)), " ")
+	for _, want := range []string{"amount", "pick", "len"} {
+		if !strings.Contains(" "+got+" ", " "+want+" ") {
+			t.Errorf("pick(\"rigid\", |) lacks %s: %s", want, got)
+		}
 	}
 	got = strings.Join(labelsAt(t, "Te^"), " ")
 	for _, want := range []string{"const", "Template", "Type", "Blueprint", "for", "CustomItem"} {

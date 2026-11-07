@@ -24,6 +24,9 @@ import (
 type Session struct {
 	P *project.Project
 	R *project.Result
+
+	typed  []sema.TypedCandidate // typedEval's result, once worked out
+	repair bool                  // this session completes in a repaired copy
 }
 
 // Location is a span in a file.
@@ -76,6 +79,7 @@ func (s *Session) at(path string, off int) *at {
 	} else {
 		a.c = sema.NewChecker(s.P.Pack, s.P.Kinds, s.R.Syms, s.P.Config.Namespace)
 	}
+	a.c.Typed = s.typedEval()
 	return a
 }
 
@@ -102,6 +106,9 @@ type Item struct {
 // Completion lists completions at off, and the span the chosen item
 // replaces (the word being typed).
 func (s *Session) Completion(path string, off int) ([]Item, syntax.Span) {
+	if rs := s.repairedSession(path, off); rs != nil {
+		return rs.Completion(path, off)
+	}
 	// Book markup, in a .mmsbook file or a Book's text strings.
 	if items, replace, ok := s.bookCompletion(path, off); ok {
 		return items, replace
@@ -243,6 +250,9 @@ func (s *Session) TriggerApplies(path string, off int, ch string) bool {
 		if _, _, ok := sema.AssetFileType(h); ok || h == "TextFile" {
 			return true
 		}
+		if _, _, _, ok := s.templateAssetPath(h); ok {
+			return true
+		}
 	}
 	if i := f.TokenAt(off); ch == "/" && i >= 0 {
 		_, ok := a.command(f.Tokens[i], off)
@@ -344,7 +354,15 @@ func (s *Session) complete(a *at, off int) []sema.Candidate {
 				}
 			}
 			if in := a.info(n); in.HasType() {
-				return a.c.ValueCandidates(in)
+				out := a.c.ValueCandidates(in)
+				// A word typed as an argument may be the start of the
+				// argument's name: `Item(na|`.
+				if arg, ok := parent.(*syntax.Arg); ok && arg.Name == nil && i >= 2 {
+					if call, ok := a.path[i-2].(*syntax.Call); ok {
+						out = append(out, a.namedArgs(call)...)
+					}
+				}
+				return out
 			}
 			// The helper name of a call: the expected type is recorded on
 			// the outermost node of the chain.
@@ -465,6 +483,18 @@ func (s *Session) statementCandidates(a *at, off int) []sema.Candidate {
 		c.Rank += 100
 		out = append(out, c)
 	}
+	// Templates that give commands, called as a statement.
+	if e := s.R.Eval; e != nil {
+		for name, t := range e.Templates {
+			if t.D.Type == nil || syntax.TypeText(t.D.Type) != "Commands" || internal(t.D) {
+				continue
+			}
+			label, _ := templateHead(t.D)
+			doc, _ := docText(t.D.Doc)
+			out = append(out, sema.Candidate{Label: name, Kind: sema.CandCallable, Detail: "Template",
+				Doc: "```mms\nTemplate " + label + "\n```\n\n" + doc, Insert: name + "($1)", Rank: 180})
+		}
+	}
 	return out
 }
 
@@ -525,6 +555,13 @@ func startsStatement(path []syntax.Node, i int) bool {
 		switch p := path[j].(type) {
 		case *syntax.ExprStmt:
 			return true
+		case *syntax.AssignStmt:
+			// The target of `x += 1`, `score[@s] = 2`.
+			return p.Target == child
+		case *syntax.Index:
+			if p.X != child {
+				return false
+			}
 		case *syntax.Call:
 			if p.Fn != child {
 				return false

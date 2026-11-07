@@ -1,6 +1,7 @@
 package ide
 
 import (
+	"github.com/minecraftmetascript/mms/engine/spec"
 	"regexp"
 	"sort"
 	"strings"
@@ -434,10 +435,55 @@ func (s *Session) templateArgCandidates(path string, off int, c *sema.Checker) (
 	}
 	p := t.D.Params.Params[i]
 	var out []sema.Candidate
-	if p.Type != nil && s.R.TypeEnv != nil {
-		out = c.TypeCandidates(s.R.TypeEnv.Lookup(t.Path, p.Type))
+	if i == 0 {
+		// A path the Template turns into an asset file: Piece("|").
+		if helper, prefix, suffix, ok := s.templateAssetPath(t.D.Name.Text); ok {
+			ext, what, _ := sema.AssetFileType(helper)
+			for _, f := range s.P.Config.AssetFiles(s.P.Files, ext) {
+				if strings.HasPrefix(f, prefix) && strings.HasSuffix(f, suffix) && len(f) >= len(prefix)+len(suffix) {
+					f = f[len(prefix) : len(f)-len(suffix)]
+					out = append(out, sema.Candidate{Label: `"` + f + `"`, Kind: sema.CandFile, Detail: what, Rank: -1})
+				}
+			}
+		}
 	}
-	return append(out, s.evalValueCandidates()...), true
+	if p.Type != nil && s.R.TypeEnv != nil {
+		if want := s.R.TypeEnv.Lookup(t.Path, p.Type); want != nil {
+			// The values of its type, the consts and Templates that give
+			// one, and the consts whose type is not written.
+			out = append(out, c.TypeCandidates(want)...)
+			for _, k := range s.evalValueCandidates() {
+				if k.Kind == sema.CandID && s.R.Eval.Consts[k.Label] != nil && s.R.Eval.Consts[k.Label].S.Type == nil {
+					out = append(out, k)
+				}
+			}
+			return out, true
+		}
+	}
+	return s.evalValueCandidates(), true
+}
+
+// typedEval lists the consts and value Templates that have a written
+// type, to be offered wherever that type fits.
+func (s *Session) typedEval() []sema.TypedCandidate {
+	if s.typed != nil || s.R.Eval == nil || s.R.TypeEnv == nil {
+		return s.typed
+	}
+	s.typed = []sema.TypedCandidate{}
+	for _, c := range s.evalValueCandidates() {
+		var t *spec.Type
+		if k := s.R.Eval.Consts[c.Label]; k != nil && c.Kind == sema.CandID {
+			if k.S.Type != nil {
+				t = s.R.TypeEnv.Lookup(k.Path, k.S.Type)
+			}
+		} else if tm := s.R.Eval.Templates[c.Label]; tm != nil && tm.D.Type != nil {
+			t = s.R.TypeEnv.Lookup(tm.Path, tm.D.Type)
+		}
+		if t != nil {
+			s.typed = append(s.typed, sema.TypedCandidate{Candidate: c, Type: t})
+		}
+	}
+	return s.typed
 }
 
 // evalValueCandidates are the consts and value Templates a value can

@@ -65,7 +65,30 @@ func (c *Checker) ValueCandidates(in *Info) []Candidate {
 	if in == nil || !in.typed {
 		return nil
 	}
-	return dedupe(c.valueCandidates(in.Type, 0))
+	return dedupe(append(c.valueCandidates(in.Type, 0), c.typedCandidates(in.Type)...))
+}
+
+// TypedCandidate is a value offered where its type fits.
+type TypedCandidate struct {
+	Candidate
+	Type *spec.Type
+}
+
+// typedCandidates are the Typed values whose type fits v.
+func (c *Checker) typedCandidates(v tview) []Candidate {
+	var out []Candidate
+	for _, tc := range c.Typed {
+		if tc.Type != nil && c.convFits(tc.Type, v, 0) {
+			out = append(out, tc.Candidate)
+		}
+	}
+	return out
+}
+
+// Fits reports whether a value of type t can be written where a value of
+// type want is expected.
+func (c *Checker) Fits(t, want *spec.Type) bool {
+	return t != nil && want != nil && c.convFits(t, tview{T: want}, 0)
 }
 
 // TypeCandidates lists what can be written where a value of type t is
@@ -74,7 +97,7 @@ func (c *Checker) TypeCandidates(t *spec.Type) []Candidate {
 	if t == nil {
 		return nil
 	}
-	return dedupe(c.valueCandidates(tview{T: t}, 0))
+	return dedupe(append(c.valueCandidates(tview{T: t}, 0), c.typedCandidates(tview{T: t})...))
 }
 
 func (c *Checker) valueCandidates(v tview, depth int) []Candidate {

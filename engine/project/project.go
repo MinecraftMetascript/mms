@@ -404,6 +404,7 @@ func (p *Project) Analyze(ctx context.Context) (*Result, error) {
 		c.Files, c.Texts = p.Files, p.bookText
 		return c
 	})
+	r.missingFieldFixes(tenv, p.Kinds, source)
 	r.formErr = map[string][]syntax.Diagnostic{}
 	for path, f := range source {
 		if ds := checkForms(path, f); ds != nil {
@@ -642,4 +643,25 @@ func coversAny(sp syntax.Span, ds []syntax.Diagnostic) bool {
 		}
 	}
 	return false
+}
+
+// Fork returns a copy of the project whose files can be changed without
+// touching this one, such as to complete in a repaired copy of a file
+// being typed. It starts from this project's last analysis.
+func (p *Project) Fork() *Project {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	q := &Project{Pack: p.Pack, Kinds: p.Kinds, Config: p.Config, Files: p.Files, Root: p.Root,
+		files: make(map[string]*sema.Unit, len(p.files)), texts: make(map[string]string, len(p.texts)),
+		chunks: make(map[string][]syntax.Chunk, len(p.chunks)), moved: map[*syntax.Decl]syntax.Moved{}, last: p.last}
+	for k, v := range p.files {
+		q.files[k] = v
+	}
+	for k, v := range p.texts {
+		q.texts[k] = v
+	}
+	for k, v := range p.chunks {
+		q.chunks[k] = v
+	}
+	return q
 }

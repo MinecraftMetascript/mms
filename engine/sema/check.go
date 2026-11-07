@@ -78,6 +78,10 @@ type Callable struct {
 // Checker checks expressions against expected types and lowers them to
 // JSON in the same walk. One Checker serves one declaration.
 type Checker struct {
+	// Typed are values the editor offers wherever their type fits, such
+	// as the project's Templates by their result type: Piece where a
+	// WeightedElement goes.
+	Typed []TypedCandidate
 	Pack  *spec.Pack
 	Kinds *Kinds
 	Syms  *Table
