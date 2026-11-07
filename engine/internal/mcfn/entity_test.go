@@ -89,3 +89,21 @@ func TestEntityScores(t *testing.T) {
 		t.Error("reading one score of two entities did not fail")
 	}
 }
+
+func TestTitle(t *testing.T) {
+	vm := New(nil)
+	for _, line := range []string{
+		`title @a title {text:"Wave 1"}`,
+		`title @a subtitle "get ready"`,
+		`title @a actionbar {text:"go"}`,
+		`title @a times 10 70 20`,
+		`title @a clear`,
+	} {
+		if err := vm.Exec(line); err != nil {
+			t.Fatalf("%s: %v", line, err)
+		}
+	}
+	if got := strings.Join(vm.Said, "|"); got != "Wave 1|get ready|go" {
+		t.Errorf("said %q", got)
+	}
+}

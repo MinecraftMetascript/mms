@@ -202,6 +202,9 @@ func (c *ctx) reduce(x syntax.Expr) Value {
 				return &None{pos: p}
 			}
 		}
+		if _, sel := x.X.(*syntax.Selector); sel {
+			return &Code{p, &syntax.Index{X: c.lower(base), Args: c.selectorArgs(x.Args), Sp: c.span(x.Sp)}}
+		}
 		return &Code{p, &syntax.Index{X: c.lower(base), Args: c.args(x.Args), Sp: c.span(x.Sp)}}
 	case *syntax.Trailing:
 		fn := c.reduce(x.X)
@@ -597,6 +600,33 @@ func (c *ctx) member(x *syntax.Member) Value {
 		return &None{pos: p}
 	}
 	return &Code{p, &syntax.Member{X: c.lower(base), Name: &syntax.Name{Text: x.Name.Text, Sp: c.span(x.Name.Sp)}, Sp: c.span(x.Sp)}}
+}
+
+// selectorArgs evaluates a selector's arguments. A bare word stays as
+// written, as in `@e[tag=waves.spawn, type=!zombie]`, even where a const
+// has its name: a selector argument is the game's word. ${...} and
+// strings make words from values.
+func (c *ctx) selectorArgs(as []*syntax.Arg) []*syntax.Arg {
+	out := c.args(as)
+	for i, a := range as {
+		if selectorWord(a.Value) {
+			out[i].Value = c.clone(a.Value)
+		}
+	}
+	return out
+}
+
+// selectorWord reports whether e is a bare word, maybe dotted or negated.
+func selectorWord(e syntax.Expr) bool {
+	switch x := e.(type) {
+	case *syntax.Ident, *syntax.ResLoc:
+		return true
+	case *syntax.Member:
+		return selectorWord(x.X)
+	case *syntax.Unary:
+		return x.Op == "!" && selectorWord(x.X)
+	}
+	return false
 }
 
 func (c *ctx) args(as []*syntax.Arg) []*syntax.Arg {

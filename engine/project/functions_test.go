@@ -765,3 +765,40 @@ Function f {
 		}
 	}
 }
+
+// A bare word in a selector stays a word where a const has its name, and
+// a Storage field in text is shown from the storage.
+func TestSelectorWordsAndStorageText(t *testing.T) {
+	p := New(spec.MustDefault(), Config{Namespace: "demo"})
+	p.SetFile("main.mms", `
+Type Game { wave: int = 0 }
+Storage game: Game
+const waves = [1, 2]
+
+Template hit(): Commands {
+  As(@e[tag=waves.spawn, type=!zombie]) {
+    /say ${len(waves)}
+  }
+}
+
+Function f {
+  hit()
+  tell(@a, "Wave ${game.wave}")
+}
+`)
+	r, _ := p.Analyze(context.Background())
+	for _, d := range r.Diagnostics("main.mms") {
+		if d.Severity == syntax.SeverityError {
+			t.Fatalf("%s: %s", d.Code, d.Message)
+		}
+	}
+	got := dumpFiles(r.Emit())
+	for _, want := range []string{
+		"execute as @e[tag=waves.spawn,type=!zombie] run say 2\n",
+		`tellraw @a ["","Wave ",{nbt:"game.wave",storage:"demo:mms"}]`,
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("missing %q in:\n%s", want, got)
+		}
+	}
+}

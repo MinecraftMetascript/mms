@@ -145,6 +145,27 @@ func (vm *VM) exec(line string) (result, error) {
 		}
 		vm.Said = append(vm.Said, t)
 		return result{value: 1, ok: true}, nil
+	case "title":
+		// title <targets> title|subtitle|actionbar <text>, or times,
+		// clear and reset. The shown text goes to Said, as tellraw's.
+		if len(w) < 3 {
+			return result{}, fmt.Errorf("title needs a target and an action")
+		}
+		switch w[2] {
+		case "title", "subtitle", "actionbar":
+			if len(w) < 4 {
+				return result{}, fmt.Errorf("title %s needs a message", w[2])
+			}
+			t, err := vm.text(strings.Join(w[3:], " "))
+			if err != nil {
+				return result{}, err
+			}
+			vm.Said = append(vm.Said, t)
+		case "times", "clear", "reset":
+		default:
+			return result{}, fmt.Errorf("unknown title action %q", w[2])
+		}
+		return result{value: 1, ok: true}, nil
 	case "scoreboard":
 		return vm.scoreboard(w)
 	case "execute":
@@ -161,7 +182,9 @@ func (vm *VM) exec(line string) (result, error) {
 				return result{}, err
 			}
 			if !r.ok {
-				return result{}, fmt.Errorf("return run: the command produced no result or failed")
+				// The game returns fail when the command fails or gives
+				// no result, as a void function's early return does.
+				return result{returned: true}, nil
 			}
 			return result{value: r.value, ok: true, returned: true}, nil
 		}
