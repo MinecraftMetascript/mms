@@ -351,14 +351,28 @@ func lintAccidental(l *lintRun, d *Decl) {
 		if in == nil {
 			return true
 		}
+		seen := map[syntax.Span]bool{}
 		for _, sp := range in.Accidental {
+			if seen[sp] {
+				continue
+			}
+			seen[sp] = true
 			mark := string(d.Unit.File.Src[sp.Start:sp.End])
+			if !styleMarks[mark] {
+				// The text was rewritten (a const put in for ${name}), so
+				// the mark has no place in the source to fix.
+				l.report(d, sp, "a style mark in this text is never closed, so it is the character itself; write a backslash before it to say so")
+				continue
+			}
 			l.report(d, sp, "this "+mark+" is never closed, so it is the character itself; write \\"+mark+" to say so",
 				syntax.Fix{Title: "Write \\" + mark, Edits: []syntax.TextEdit{{Sp: syntax.Span{Start: sp.Start, End: sp.Start}, Text: "\\"}}, Safe: true})
 		}
 		return true
 	})
 }
+
+// styleMarks are the marks of text markup that open and close a style.
+var styleMarks = map[string]bool{"*": true, "**": true, "__": true, "~~": true, "||": true}
 
 func lintQuoted(l *lintRun, d *Decl) {
 	syntax.Walk(d.D, func(n syntax.Node) bool {

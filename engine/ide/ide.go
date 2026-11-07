@@ -1048,9 +1048,8 @@ func (s *Session) current(sym *sema.Symbol) *sema.Symbol {
 // Definition returns where the symbol at off is declared.
 func (s *Session) Definition(path string, off int) []Location {
 	if n, ok := s.evalNameAt(path, off); ok {
-		if strings.HasPrefix(n.Path, prelude.Prefix) {
-			return nil
-		}
+		// A prelude name's Path is its prelude file, which editors open
+		// read-only.
 		return []Location{{Path: n.Path, Span: n.Def}}
 	}
 	if cv := s.convertedAt(path, off); cv != nil && cv.Decl != nil && cv.Decl.Name != nil {

@@ -19,6 +19,7 @@ import (
 	"github.com/minecraftmetascript/mms/engine/format"
 	"github.com/minecraftmetascript/mms/engine/ide"
 	"github.com/minecraftmetascript/mms/engine/jsonv"
+	"github.com/minecraftmetascript/mms/engine/prelude"
 	"github.com/minecraftmetascript/mms/engine/project"
 	"github.com/minecraftmetascript/mms/engine/sema"
 	"github.com/minecraftmetascript/mms/engine/spec"
@@ -227,6 +228,7 @@ func init() {
 		"mms/setAssets":                    typed((*Server).setAssets),
 		"mms/importPack":                   typed((*Server).importPack),
 		"mms/resourceKinds":                typed((*Server).resourceKinds),
+		"mms/preludeFile":                  typed((*Server).preludeFile),
 		"mms/convertJSON":                  typed((*Server).convertJSON),
 		"mms/ping":                         func(*Server, context.Context, json.RawMessage) (any, *respError) { return "pong", nil },
 	}
@@ -648,6 +650,10 @@ func (s *Server) unit(uri string) (*workspace, *sema.Unit) {
 }
 
 func (s *Server) lines(uri string) *lines {
+	if prelude.Is(uri) {
+		text, _ := preludeText(uri)
+		return newLines(text)
+	}
 	if _, u := s.unit(uri); u != nil {
 		return newLines(string(u.File.Src))
 	}
@@ -754,9 +760,40 @@ func (s *Server) locations(locs []ide.Location) []location {
 			l = s.lines(loc.Path)
 			idx[loc.Path] = l
 		}
-		out = append(out, location{URI: loc.Path, Range: l.rng(loc.Span)})
+		uri := loc.Path
+		if rest, ok := strings.CutPrefix(loc.Path, prelude.Prefix); ok {
+			uri = PreludeScheme + ":/" + rest
+		}
+		out = append(out, location{URI: uri, Range: l.rng(loc.Span)})
 	}
 	return out
+}
+
+// PreludeScheme is the URI scheme of the prelude's files, which the
+// editors open read-only: mms-prelude:/core.mms. mms/preludeFile gives
+// their text.
+const PreludeScheme = "mms-prelude"
+
+// preludeText returns the text of a prelude file by its path or URI.
+func preludeText(path string) (string, bool) {
+	name := strings.TrimPrefix(strings.TrimPrefix(path, PreludeScheme+":"), "/")
+	name = strings.TrimPrefix(strings.TrimPrefix(name, "//"), prelude.Prefix)
+	for _, f := range prelude.Files() {
+		if f.Path == prelude.Prefix+name {
+			return f.Text, true
+		}
+	}
+	return "", false
+}
+
+func (s *Server) preludeFile(_ context.Context, p struct {
+	URI string `json:"uri"`
+}) (any, *respError) {
+	text, ok := preludeText(p.URI)
+	if !ok {
+		return nil, &respError{Code: codeInvalidParams, Message: "no prelude file " + p.URI}
+	}
+	return map[string]string{"text": text}, nil
 }
 
 func (s *Server) definition(_ context.Context, p posParams) (any, *respError) {

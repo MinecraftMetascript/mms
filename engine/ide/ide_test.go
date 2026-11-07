@@ -287,3 +287,31 @@ func TestRecipeIngredientCompletion(t *testing.T) {
 		})
 	}
 }
+
+// A string read as text markup is split into its marks, tags and
+// ${...} reads; a mark left open is text.
+func TestSemanticTokensMarkup(t *testing.T) {
+	plain := "Advancement a = { display = { title = \"**Ruby** 5 * 3\", description = \"d\" } }\n"
+	ps, _ := session(t, plain)
+	var pg []string
+	for _, tk := range ps.SemanticTokens("main.mms") {
+		pg = append(pg, TokenTypes[tk.Type]+":"+string([]rune(plain)[tk.Span.Start:tk.Span.End]))
+	}
+	if g := strings.Join(pg, " "); !strings.Contains(g, `string:" operator:** string:Ruby operator:** string: 5 * 3" property:description`) {
+		t.Errorf("plain tokens: %s", g)
+	}
+
+	src := "const who = \"x\"\nAdvancement a = { display = { title = \"**Ruby** {gold}gem ${who} 5 * 3\", description = \"d\", icon = { id = stone } }, criteria = { x = Tick() } }\n"
+	s, _ := session(t, src)
+	r := []rune(src)
+	var got []string
+	for _, tk := range s.SemanticTokens("main.mms") {
+		if tk.Span.Start > len([]rune(src[:strings.Index(src, "title =")])) {
+			got = append(got, TokenTypes[tk.Type]+":"+string(r[tk.Span.Start:tk.Span.End]))
+		}
+	}
+	want := `string:" operator:** string:Ruby operator:** string:  keyword:{gold} string:gem  variable:${who} string: 5 * 3" property:description`
+	if g := strings.Join(got, " "); !strings.Contains(g, want) {
+		t.Errorf("tokens:\n%s\nwant:\n%s", g, want)
+	}
+}

@@ -98,16 +98,38 @@ func (s *Session) SemanticTokens(path string) []SemToken {
 		_, ok := s.R.Eval.Nodes[n]
 		return ok
 	}
+	// A declaration the evaluator rebuilt (one that names a const, say)
+	// has nodes whose spans are only roughly where they were written:
+	// keys of a computed record take the record's span. From those only
+	// what needs the checker is taken, resolved names and markup; the
+	// source pass classifies the rest as written.
+	written := map[*syntax.Decl]bool{}
+	if src := s.R.Source[path]; src != nil {
+		for _, d := range src.Decls {
+			written[d] = true
+		}
+	}
 	for _, d := range f.Decls {
 		dr := s.R.Decls[d]
 		info := func(n syntax.Node) bool {
 			return dr != nil && dr.Info[n] != nil && dr.Info[n].Symbol != nil
 		}
+		rebuilt := s.R.Source[path] != nil && !written[d]
 		syntax.Walk(d, func(n syntax.Node) bool {
 			if copied(n) {
 				return false
 			}
+			switch n.(type) {
+			case *syntax.Ident, *syntax.ResLoc, *syntax.Tag, *syntax.String:
+			default:
+				if rebuilt {
+					return true
+				}
+			}
 			s.classify(n, set, byStart, info)
+			if str, ok := n.(*syntax.String); ok && dr != nil && dr.Info[n] != nil && dr.Info[n].Markup {
+				markupTokens(f.Src, str.Sp, dr.Info[n].Accidental, set)
+			}
 			return true
 		})
 	}
@@ -348,4 +370,77 @@ func (s *Session) sourceTokens(it syntax.Stmt, set func(syntax.Span, TokenType, 
 		}
 		return true
 	})
+}
+
+// markupTokens splits a string read as text markup into its pieces, as a
+// book file is highlighted: ${...} reads a value, {tag} styles, **, __,
+// ~~, || and * are style marks, and the rest is text.
+//
+// Marks in literal, such as the * of "5 * 3", are text.
+func markupTokens(src []rune, sp syntax.Span, literal []syntax.Span, set func(syntax.Span, TokenType, int)) {
+	isLiteral := func(i int) bool {
+		for _, l := range literal {
+			if l != sp && l.Contains(i) {
+				return true
+			}
+		}
+		return false
+	}
+	// A string the evaluator rewrote has its literal marks reported at
+	// the whole string; a lone * in it is then shown as text.
+	rewritten := false
+	for _, l := range literal {
+		rewritten = rewritten || l == sp
+	}
+	if sp.End > len(src) || sp.End-sp.Start < 2 || src[sp.Start] != '"' {
+		return
+	}
+	text := sp.Start // where the current run of text starts
+	flush := func(end int) {
+		if end > text {
+			set(syntax.Span{Start: text, End: end}, TokString, 0)
+		}
+	}
+	end := sp.End - 1 // the closing quote
+	if src[end] != '"' {
+		end = sp.End
+	}
+	closeAt := func(i int) int {
+		for j := i; j < end; j++ {
+			if src[j] == '}' {
+				return j + 1
+			}
+		}
+		return -1
+	}
+	for i := sp.Start + 1; i < end; {
+		var t TokenType
+		n := 0
+		switch {
+		case src[i] == '\\':
+			i += 2 // an escape is text
+			continue
+		case src[i] == '$' && i+1 < end && src[i+1] == '{':
+			if j := closeAt(i); j > 0 {
+				t, n = TokVariable, j-i
+			}
+		case src[i] == '{':
+			if j := closeAt(i); j > 0 {
+				t, n = TokKeyword, j-i
+			}
+		case i+1 < end && (src[i] == '*' && src[i+1] == '*' || src[i] == '_' && src[i+1] == '_' || src[i] == '~' && src[i+1] == '~' || src[i] == '|' && src[i+1] == '|'):
+			t, n = TokOperator, 2
+		case src[i] == '*' && !rewritten:
+			t, n = TokOperator, 1
+		}
+		if n == 0 || t == TokOperator && isLiteral(i) {
+			i++
+			continue
+		}
+		flush(i)
+		set(syntax.Span{Start: i, End: i + n}, t, 0)
+		i += n
+		text = i
+	}
+	flush(sp.End)
 }

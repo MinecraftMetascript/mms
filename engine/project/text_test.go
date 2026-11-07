@@ -109,3 +109,25 @@ func TestTextFile(t *testing.T) {
 		t.Errorf("pages = %v", pages)
 	}
 }
+
+// A string the evaluator rewrote, with a const's value put in for
+// ${name}, has no place in the source for a mark: the hint covers the
+// string and offers no fix that edits it.
+func TestAccidentalMarkupRewritten(t *testing.T) {
+	src := "const who = \"abc\"\n" + adv(`"${who} 5 * 3"`)
+	_, r := bookProject(t, src, nil)
+	for _, d := range r.Diagnostics("main.mms") {
+		if d.Code != "lint/accidental-markup" {
+			continue
+		}
+		safe := false
+		for _, f := range d.Fixes {
+			safe = safe || f.Safe
+		}
+		if got := src[d.Sp.Start:d.Sp.End]; got != `"${who} 5 * 3"` || safe {
+			t.Errorf("hint at %q with fixes %+v", got, d.Fixes)
+		}
+		return
+	}
+	t.Error("no accidental-markup hint")
+}
