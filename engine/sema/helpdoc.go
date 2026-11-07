@@ -40,7 +40,8 @@ type HelperDoc struct {
 	Example string            // MMS source
 }
 
-// ReferenceURL is the docs site's helper reference, which hovers link to.
+// ReferenceURL is the docs site's reference, which hovers link to. Each
+// helper group has a page of its own under helpers/.
 const ReferenceURL = "https://minecraftmetascript.github.io/mms/docs/reference"
 
 var helpDocs = sync.OnceValue(func() map[string]*HelperDoc {
@@ -153,12 +154,19 @@ func withDocs(key, dispatcher string, fs []field) []field {
 	return out
 }
 
-// RefAnchor is the id of a helper's entry on the reference page.
-func RefAnchor(dispatcher, name string) string {
+// RefPage is the page name of a helper group in the reference:
+// "material_condition" for minecraft:material_condition, and "objects"
+// for the helpers of undispatched types.
+func RefPage(dispatcher string) string {
 	if dispatcher == "" {
-		return "objects-" + name
+		return "objects"
 	}
-	return nonWord.ReplaceAllString(strings.TrimPrefix(dispatcher, "minecraft:"), "-") + "-" + name
+	return nonWord.ReplaceAllString(strings.TrimPrefix(dispatcher, "minecraft:"), "-")
+}
+
+// RefAnchor is the id of a helper's entry on its group's page.
+func RefAnchor(dispatcher, name string) string {
+	return RefPage(dispatcher) + "-" + name
 }
 
 var nonWord = regexp.MustCompile(`\W`)
@@ -168,7 +176,7 @@ func refLink(cl *Callable) string {
 	if cl.Disp != nil {
 		group = cl.Disp.Dispatcher
 	}
-	return ReferenceURL + "#" + RefAnchor(group, cl.Name)
+	return ReferenceURL + "/helpers/" + RefPage(group) + "#" + RefAnchor(group, cl.Name)
 }
 
 // groupNoun names what a dispatcher's helpers make, in words:

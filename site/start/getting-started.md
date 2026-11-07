@@ -109,7 +109,7 @@ A project is every `.mms` file under the folder that holds `mms.json`, including
 - **Folders are for you.** A file's folder does not change the ids it declares: `LootTable chests/buried` in `loot/chests.mms` is still `<namespace>:chests/buried`.
 - **Editors see the whole project.** The language server loads every project file, not only the open ones, so go-to-definition, references and rename work across files. The web editor's sidebar adds, renames and deletes files, and file names can include folders, such as `recipes/crafting.mms`.
 
-The [`treasure`](../examples/treasure/) and [`functions-advanced`](../examples/functions-advanced/) examples are split this way.
+The [`treasure`](../../examples/treasure/) and [`functions-advanced`](../../examples/functions-advanced/) examples are split this way.
 
 ## Values
 
@@ -118,18 +118,18 @@ The [`treasure`](../examples/treasure/) and [`functions-advanced`](../examples/f
 - **Enum values** are bare words: `action = show_text`, `color = red`. They are written exactly as the game spells them; only ids get `minecraft:`.
 - **Colors** (fields such as `shadow_color` or a biome's `water_color`) take `"#RRGGBB"`, or `"#AARRGGBB"` where the color has an alpha (alpha first, so `"#80FF0000"` is half-transparent red). The game's own forms work too: an integer, or `[r, g, b]` / `[r, g, b, a]` with each part from 0 to 1. MMS writes a `"#hex"` string as the integer where the game wants one.
 - **Ids** can drop `minecraft:`. A bare name such as `diamond` or `#gems` means your own declaration if one exists, otherwise the vanilla one.
-- **Helpers** build typed objects: `Pool(...)` is a loot pool, and `Noise(...)` is `{ type = noise, ... }`. Every dispatched type has a helper named after its type, and arguments can be positional or named. See [Writing resources](resources.md) and the [reference](https://minecraftmetascript.github.io/mms/docs/reference).
+- **Helpers** build typed objects: `Pool(...)` is a loot pool, and `Noise(...)` is `{ type = noise, ... }`. Every dispatched type has a helper named after its type, and arguments can be positional or named. See [Writing resources](../guides/resources.md) and the [reference](https://minecraftmetascript.github.io/mms/docs/reference).
 
 Every value is checked against the 26.3 schema as you type. Completion offers the fields, helpers and ids that fit where the cursor is, and hover shows the field's documentation.
 
 ## Formatting and lint
 
-`mms fmt` (and format-on-save in the editors) prints every file in one style, so there is nothing to configure. `mms check` reports errors and [lint](lint.md) findings, and `mms fix` applies the fixes that are always safe. `mms test` runs the project's [`Test` declarations](functions.md#tests).
+`mms fmt` (and format-on-save in the editors) prints every file in one style, so there is nothing to configure. `mms check` reports errors and [lint](../guides/lint.md) findings, and `mms fix` applies the fixes that are always safe. `mms test` runs the project's [`Test` declarations](../guides/functions.md#tests).
 
 ## Next
 
-- [Writing resources](resources.md): the shorthand for loot tables, recipes, density functions and more.
-- [Functions](functions.md): variables, control flow, calls and strings in function code.
+- [Writing resources](../guides/resources.md): the shorthand for loot tables, recipes, density functions and more.
+- [Functions](../guides/functions.md): variables, control flow, calls and strings in function code.
 - [Tutorial: a custom dimension](tutorial-dimension.md): a complete worldgen project.
 
 ## Importing

@@ -1,0 +1,154 @@
+/* Entries on the reference pages: helpers, types, kinds and rules. */
+.reference .entry {
+	border: 1px solid var(--c-line);
+	border-radius: 8px;
+	background: var(--c-panel);
+	padding: 0.75rem 1rem;
+	margin: 0.75rem 0;
+	scroll-margin-top: 4.5rem;
+	outline: none;
+}
+.reference .entry:target,
+.reference .entry:focus {
+	border-color: var(--c-accent);
+	box-shadow: 0 0 0 1px var(--c-accent);
+}
+.reference .entry-head {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	gap: 0.25rem 0.75rem;
+}
+.reference .entry-name {
+	font-family: var(--font-mono);
+	font-weight: 650;
+	font-size: 1rem;
+	color: var(--c-ink);
+	text-decoration: none;
+}
+.reference .entry-name:hover {
+	text-decoration: underline;
+}
+.reference .entry-meta {
+	color: var(--c-muted);
+	font-size: 13px;
+}
+.reference .shape,
+.reference .example {
+	margin: 0.4rem 0 0.6rem;
+	padding: 0.3rem 0.6rem;
+	font-size: 12.5px;
+	white-space: pre-wrap;
+}
+.reference .example {
+	margin: 0.6rem 0 0.2rem;
+	padding: 0.4rem 0.6rem;
+}
+.reference .entry-doc {
+	margin: 0.35rem 0;
+}
+.reference .params {
+	display: grid;
+	grid-template-columns: minmax(7rem, max-content) 1fr;
+	gap: 0;
+	margin: 0;
+	font-size: 14px;
+}
+.reference .params dt,
+.reference .params dd {
+	padding: 0.4rem 0;
+	border-top: 1px solid var(--c-line);
+	margin: 0;
+}
+.reference .params dt {
+	padding-right: 1rem;
+}
+.reference .params dd p {
+	margin: 0.15rem 0 0;
+	color: var(--c-muted);
+	line-height: 1.5;
+	white-space: pre-line;
+}
+.reference .params code {
+	background: none;
+	padding: 0;
+}
+.reference .opt {
+	display: block;
+	font-size: 11px;
+	color: var(--c-muted);
+}
+.reference code.type {
+	background: none;
+	padding: 0;
+	font-size: 13px;
+}
+.reference code.type a {
+	text-decoration: none;
+	border-bottom: 1px dotted currentColor;
+}
+.reference code.type a:hover {
+	border-bottom-style: solid;
+}
+.reference .values {
+	margin: 0.5rem 0 0;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.3rem;
+}
+/* A grid of links to reference pages, with a count or note on each. */
+.reference .cards {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+	gap: 0.5rem;
+	margin: 1rem 0 1.5rem;
+	padding: 0;
+	list-style: none;
+}
+.reference .cards li {
+	margin: 0;
+}
+.reference .cards a {
+	display: block;
+	height: 100%;
+	border: 1px solid var(--c-line);
+	border-radius: 8px;
+	background: var(--c-panel);
+	padding: 0.6rem 0.8rem;
+	color: var(--c-ink);
+	text-decoration: none;
+}
+.reference .cards a:hover {
+	border-color: var(--c-accent);
+}
+.reference .cards strong {
+	display: block;
+	font-weight: 600;
+}
+.reference .cards span {
+	display: block;
+	color: var(--c-muted);
+	font-size: 13px;
+	margin-top: 0.15rem;
+}
+.severity {
+	display: inline-block;
+	border: 1px solid var(--c-line);
+	border-radius: 999px;
+	padding: 0 0.5rem;
+	font-size: 12px;
+	color: var(--c-muted);
+}
+@media (max-width: 640px) {
+	.reference .params {
+		grid-template-columns: 1fr;
+	}
+	.reference .params dd {
+		border-top: 0;
+		padding-top: 0;
+	}
+	.reference .opt {
+		display: inline;
+		margin-left: 0.5rem;
+	}
+}

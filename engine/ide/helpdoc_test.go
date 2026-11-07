@@ -23,7 +23,7 @@ func TestHelperHoverAndSignature(t *testing.T) {
 		"- `offset`: *an integer, default `0`*. Extra depth",
 		"`.Add()` sets `add_surface_depth` to `true`",
 		"**Example**",
-		"(https://minecraftmetascript.github.io/mms/docs/reference#material_condition-StoneDepth)",
+		"(https://minecraftmetascript.github.io/mms/docs/reference/helpers/material_condition#material_condition-StoneDepth)",
 	} {
 		if !strings.Contains(h, want) {
 			t.Errorf("hover lacks %q:\n%s", want, h)

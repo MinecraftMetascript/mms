@@ -1,4 +1,4 @@
-// The custom-dimension tutorial (docs/tutorial-dimension.md) builds this
+// The custom-dimension tutorial (site/start/tutorial-dimension.md) builds this
 // project. The dimension, its type and its biome are here; the terrain is
 // in terrain.mms and the way in is in visit.mms. Names resolve across
 // files, so `settings = islands` below finds the NoiseSettings there.

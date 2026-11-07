@@ -5,6 +5,14 @@ export interface Reference {
 	kinds: { name: string; folder?: string; resources?: boolean; doc?: string }[];
 	groups: Group[];
 	types: TypeEntry[];
+	rules: Rule[];
+}
+
+/** A lint rule and its default severity. */
+export interface Rule {
+	id: string;
+	severity: 'error' | 'warning' | 'info' | 'hint';
+	doc?: string;
 }
 
 export interface Group {
@@ -64,38 +72,26 @@ export const groupId = (dispatcher: string) => (dispatcher ? dispatcher.replace(
 export const helperId = (dispatcher: string, name: string) => `${groupId(dispatcher)}-${name}`;
 export const typeId = (id: string) => `type-${id.replace(/\W/g, '-')}`;
 
-/** The anchor a type part links to, or "" for plain text. */
-export function linkId(link: TypePart['link']): string {
+/** URLs of reference pages, under base (the site's base path). */
+export const refURL = {
+	group: (base: string, dispatcher: string) => `${base}/docs/reference/helpers/${groupId(dispatcher)}`,
+	helper: (base: string, dispatcher: string, name: string) => `${refURL.group(base, dispatcher)}#${helperId(dispatcher, name)}`,
+	type: (base: string, id: string) => `${base}/docs/reference/types#${typeId(id)}`,
+	rule: (base: string, id: string) => `${base}/docs/reference/lint/${id}`
+};
+
+/** The URL a type part links to, or "" for plain text. */
+export function linkHref(base: string, link: TypePart['link']): string {
 	if (!link) return '';
-	if (link.type) return typeId(link.type);
+	if (link.type) return refURL.type(base, link.type);
 	if (link.group === undefined) return '';
-	return link.helper ? helperId(link.group, link.helper) : groupId(link.group);
+	return link.helper ? refURL.helper(base, link.group, link.helper) : refURL.group(base, link.group);
 }
 
 /** The call shape without types, such as `Noise(noise, xz_scale?, y_scale?)`. */
 export const callShape = (h: Helper) => `${h.name}(${(h.params ?? []).map((p) => p.name + (p.optional ? '?' : '')).join(', ')})`;
 
 const matches = (s: string, q: string) => s.toLowerCase().includes(q);
-
-/**
- * Groups with only the helpers that match q: by name, the type they make,
- * their group, or a parameter's name or type.
- */
-export function filterGroups(groups: Group[], q: string): Group[] {
-	const s = q.trim().toLowerCase();
-	if (!s) return groups;
-	return groups
-		.map((g) => {
-			if (matches(groupTitle(g.dispatcher), s) || matches(g.dispatcher, s)) return g;
-			return {
-				...g,
-				helpers: g.helpers.filter(
-					(h) => matches(h.name, s) || matches(h.case ?? '', s) || (h.params ?? []).some((p) => matches(p.name, s) || matches(p.type, s))
-				)
-			};
-		})
-		.filter((g) => g.helpers.length);
-}
 
 /** Types whose name matches q. */
 export function filterTypes(types: TypeEntry[], q: string): TypeEntry[] {

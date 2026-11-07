@@ -89,6 +89,22 @@ func ParseSeverity(s string) (syntax.Severity, bool) {
 	return 0, false
 }
 
+// SeverityName is the mms.json name of a severity, the reverse of
+// ParseSeverity.
+func SeverityName(s syntax.Severity) string {
+	switch s {
+	case syntax.SeverityError:
+		return "error"
+	case syntax.SeverityWarning:
+		return "warning"
+	case syntax.SeverityInfo:
+		return "info"
+	case syntax.SeverityHint:
+		return "hint"
+	}
+	return "off"
+}
+
 // unusedFolders are the kinds the game only reaches through a reference
 // from another resource or a command. Loot tables, recipes, advancements
 // and the like are loaded by the game itself.

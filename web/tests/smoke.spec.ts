@@ -491,36 +491,74 @@ test('loot tables, recipes and biomes show in the inspector', async ({ page }) =
 test('the docs render guides and the reference', async ({ page }) => {
 	await page.goto('./');
 	await page.getByRole('link', { name: 'Docs' }).click();
-	await expect(page.getByRole('heading', { level: 1 })).toHaveText('Getting started');
+	await expect(page.getByRole('heading', { level: 1 })).toHaveText('MMS docs');
 
-	// A guide, and a link from one guide to a section of another.
+	// A guide from the grouped sidebar, and a link from one guide to a
+	// section of another.
 	const nav = page.getByRole('navigation', { name: 'Docs' });
+	await expect(nav.getByRole('heading', { name: 'Concepts' })).toBeVisible();
 	await nav.getByRole('link', { name: 'Tutorial: a custom dimension' }).click();
 	await expect(page.getByRole('heading', { level: 1 })).toHaveText('Tutorial: a custom dimension');
 	await expect(page.getByRole('navigation', { name: 'On this page' }).getByRole('link').first()).toBeVisible();
-	await page.getByRole('main').getByRole('link', { name: 'Writing resources' }).click();
-	await expect(page).toHaveURL(/\/docs\/resources#density-functions$/);
+	await page.getByRole('article').getByRole('link', { name: 'Writing resources' }).click();
+	await expect(page).toHaveURL(/\/docs\/guides\/resources#density-functions$/);
 	await expect(page.locator('#density-functions')).toBeVisible();
+	await expect(page.getByRole('navigation', { name: 'Previous and next' }).getByRole('link', { name: /Functions/ })).toBeVisible();
 
-	// The generated reference, filtered.
-	await nav.getByRole('link', { name: 'Reference' }).click();
+	// An old guide URL redirects, keeping its anchor.
+	await page.goto('./docs/functions#calls');
+	await expect(page).toHaveURL(/\/docs\/guides\/functions#calls$/);
+
+	// The Reference tab: helpers by group, one page each.
+	await page.getByRole('navigation', { name: 'Sections' }).getByRole('link', { name: 'Reference' }).click();
+	await expect(page.getByRole('heading', { level: 1 })).toHaveText('Reference');
+	const refNav = page.getByRole('navigation', { name: 'Reference' });
+	await refNav.getByRole('link', { name: 'Declaration kinds' }).click();
 	await expect(page.getByRole('cell', { name: 'DensityFunction', exact: true })).toBeVisible();
-	const filter = page.getByRole('searchbox', { name: 'Filter helpers' });
-	const toc = page.getByRole('navigation', { name: 'On this page' });
-	await expect(toc.getByRole('link', { name: 'Loot function', exact: true })).toBeVisible();
-	await filter.fill('gradient');
-	// The page sections follow the filter.
-	await expect(toc.getByRole('link', { name: 'Loot function', exact: true })).toHaveCount(0);
-	await expect(toc.getByRole('link', { name: 'Density function', exact: true })).toBeVisible();
+	await refNav.getByRole('link', { name: 'Helpers' }).click();
+	await page.getByRole('main').getByRole('link', { name: /^Density function/ }).click();
+	await expect(page).toHaveURL(/\/docs\/reference\/helpers\/density_function$/);
 	await expect(page.getByText(/^Gradient\(axis, /)).toBeVisible();
-	await expect(page.getByRole('region', { name: 'Loot function' })).toHaveCount(0);
+	await expect(page.locator('#loot_function-SetCount')).toHaveCount(0);
 
-	// A type in a signature links to its entry, even from a filtered list.
-	const gradient = page.locator('#density_function-Gradient');
-	await gradient.getByRole('link', { name: 'Axis', exact: true }).click();
-	await expect(page).toHaveURL(/#type-util-direction-Axis$/);
-	await expect(filter).toHaveValue('');
+	// A type in a signature links to its entry on the Types page.
+	await page.locator('#density_function-Gradient').getByRole('link', { name: 'Axis', exact: true }).click();
+	await expect(page).toHaveURL(/\/docs\/reference\/types#type-util-direction-Axis$/);
 	await expect(page.locator('#type-util-direction-Axis')).toBeInViewport();
+
+	// A link into the old one-page reference lands on the entry's new page.
+	await page.goto('./docs/reference#loot_function-SetCount', { waitUntil: 'commit' });
+	await expect(page).toHaveURL(/\/docs\/reference\/helpers\/loot_function#loot_function-SetCount$/);
+
+	// A lint rule has a page of its own.
+	await page.goto('./docs/reference/lint');
+	await page.getByRole('table').getByRole('link', { name: 'unused', exact: true }).click();
+	await expect(page.getByRole('heading', { level: 1 })).toHaveText('unused');
+	await expect(page.getByText('hint by default')).toBeVisible();
+
+	// Search finds pages, helpers and rules from anywhere.
+	await page.keyboard.press('Control+k');
+	const search = page.getByRole('dialog', { name: 'Search the docs' });
+	const box = search.getByRole('searchbox');
+	// Words of a name in any order, a typo, and a guide's sub-section.
+	await box.fill('count set');
+	await expect(search.getByRole('option').first()).toContainText('SetCount');
+	await box.fill('jigsaw hole');
+	await expect(search.getByRole('option', { name: /Jigsaw holes.*Writing resources/ })).toBeVisible();
+	await box.fill('setcuont');
+	await expect(search.getByRole('option', { name: /SetCount/ })).toBeVisible();
+	await box.fill('setcount');
+	await expect(search.getByRole('option').first()).toContainText('SetCount');
+	await page.keyboard.press('Enter');
+	await expect(page).toHaveURL(/\/docs\/reference\/helpers\/loot_function#loot_function-SetCount$/);
+
+	// The reference for AI tools.
+	const llms = await (await page.request.get('./docs/llms.txt')).text();
+	expect(llms).toMatch(/^# MMS\n\n> /);
+	expect(llms).toContain('/docs/guides/functions');
+	const yaml = await (await page.request.get('./docs/reference.yaml')).text();
+	expect(yaml).toContain('lint_rules:');
+	expect(yaml).toContain('- name: "SetCount"');
 });
 
 test('the Project menu closes on outside click and Escape, and the editor header formats and fixes', async ({ page }) => {
@@ -721,7 +759,7 @@ test('built-in helpers explain themselves on hover and while typing', async ({ p
 		await expect(hover).toContainText('True for blocks close to a surface', { timeout: 1500 });
 	}).toPass({ timeout: 15_000 });
 	await expect(hover).toContainText('secondary_depth_range');
-	await expect(hover.locator('a[href*="reference#material_condition-StoneDepth"]')).toHaveCount(1);
+	await expect(hover.locator('a[href*="reference/helpers/material_condition#material_condition-StoneDepth"]')).toHaveCount(1);
 	await page.mouse.move(0, 0);
 
 	// Signature help shows the active parameter's meaning first.

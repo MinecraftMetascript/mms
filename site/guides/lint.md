@@ -11,7 +11,7 @@ The engine lints every declaration that checks without errors. Findings appear i
 | `custom-item-as-base` | hint | quick fix | A [custom item](resources.md#custom-items) or [Book](resources.md#books) in a field that takes a plain item id, such as a recipe ingredient or an item tag. It is written as its base item, so the field also matches the base item without the custom components. The quick fix writes the base item instead. |
 | `accidental-markup` | hint | safe | A style mark in text outside a book that is never closed, such as the `*` in `"5 * 3"`. It is written as the character itself; the fix puts a backslash before it to say so. |
 | `constant-expression` | hint | safe | Arithmetic on number literals, such as `2 * 0.25`, which is replaced by its value. |
-| `deprecated` | warning | none | A use of a declaration whose [doc comment](getting-started.md#doc-comments) has a `@deprecated` tag, anywhere in the project, commands included. The message carries the tag's text, and the editor strikes the use out. |
+| `deprecated` | warning | none | A use of a declaration whose [doc comment](../start/getting-started.md#doc-comments) has a `@deprecated` tag, anywhere in the project, commands included. The message carries the tag's text, and the editor strikes the use out. |
 | `external-asset` | warning | none | A texture, sound or structure id in a namespace the project declares that no `Texture`, `Sound` or `Structure` call in the project provides. The pack still loads, so this is a warning: the file has to come from another pack. See [Asset files](resources.md#asset-files). |
 | `unused-asset` | info | none | A `.png`, `.ogg` or `.nbt` file in the project that no `Texture`, `Sound` or `Structure` call and no `icon` uses, so the packs leave it out. It has no source line, so it shows on the file itself: in VS Code's Problems panel, in `mms check` output, and as an "unused" badge in the web editor's asset list. Nothing is reported while the project has errors. |
 | `jigsaw-unknown-name` | warning | quick fix | A jigsaw block in a structure file whose name or target is in a namespace that declares [`JigsawHole`](resources.md#jigsaw-holes)s but is not one of them, most likely a typo made in the game's jigsaw screen. The message names the closest declared hole; the quick fix declares the name. Namespaces without any `JigsawHole` are not checked. |
@@ -41,7 +41,7 @@ Every lint finding offers a quick fix that inserts the comment for you.
 
 Some checker errors have a quick fix too. A "missing field" error on an object or a helper call offers **Add missing fields**, which writes every required field with a placeholder value:
 
-```mms
+```mms error
 DensityFunction d = Clamp(1)            // missing fields 'min', 'max'
 DensityFunction d = Clamp(1, min = 0, max = 0)
 ```
