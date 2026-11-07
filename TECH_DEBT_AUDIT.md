@@ -50,9 +50,9 @@ Severity: **Critical** is a bug that loses data, miscompiles or is exploitable n
 
 | ID | Category | File:Line | Severity | Effort | Description | Recommendation |
 | --- | --- | --- | --- | --- | --- | --- |
-| F01 | Correctness | engine/sema/fn.go:369-373, engine/fn/gen.go:28, engine/fn/opt.go:19 | Critical | S | **(repro)** A user local is `#f.<name>`, a temp is `#f._t<n>`, a flag `#f._f<n>`, and a shadowed local `<name>_<k>`. `let _t0 = 5; let y = a*2 + a*3; return _t0 + y` emits `set #f._t0 5`, then overwrites `#f._t0` with `a*2`. `let x_1 = 7` plus a shadowed `x` makes the inner `x` write `#g.x_1`, so `g()` returns 4, not 9. `isTemp` (`Contains("._t")`) also treats user names containing `._t` as temps. | Put generated and shadow holders behind a character no identifier can contain (Top 5, #1). |
-| F02 | Security / data loss | engine/project/emit.go:310-322 | Critical | S | **(repro)** `WriteDir` joins `f.Path` without a containment check. `Function a/../../../../../evil { /say hi }` passes `mms check`, and `mms build` writes `<project>/evil.mcfunction`. The same paths go into `Zip`, a zip-slip for whoever unpacks the download. | Reject `..` segments in resource names in sema (as `CheckDimensionID` does, engine/project/dimreset.go:368), and refuse any non-`fs.ValidPath` in `WriteDir` and `Zip`. |
-| F03 | Security / data loss | engine/project/config.go:66-84 | Critical | S | **(repro)** `Validate` never checks `output` or `resourcePack.output`. `"output": "."` deleted the project's own `data/`; `"../victim"` wipes `../victim/data` and `assets`. | Require `filepath.IsLocal` and not `.` for both outputs. Keep the CLI `-out` flag unrestricted, since that is an explicit choice. |
+| F01 | Correctness | engine/sema/fn.go:369-373, engine/fn/gen.go:28, engine/fn/opt.go:19 | Critical | S | **(repro)** A user local is `#f.<name>`, a temp is `#f._t<n>`, a flag `#f._f<n>`, and a shadowed local `<name>_<k>`. `let _t0 = 5; let y = a*2 + a*3; return _t0 + y` emits `set #f._t0 5`, then overwrites `#f._t0` with `a*2`. `let x_1 = 7` plus a shadowed `x` makes the inner `x` write `#g.x_1`, so `g()` returns 4, not 9. `isTemp` (`Contains("._t")`) also treats user names containing `._t` as temps. String temps have the same problem: runtime concatenation writes `_s<n>` in local storage (engine/sema/fn.go:1343), which a string local named `_s0` shares. | Put generated and shadow names, both score holders and storage paths, behind a character no identifier can contain (Top 5, #1). |
+| F02 | Security / data loss | engine/project/emit.go:310-322 | Critical | S | **(repro)** `WriteDir` joins `f.Path` without a containment check. `Function a/../../../../../evil { /say hi }` passes `mms check`, and `mms build` writes `<project>/evil.mcfunction`. The same paths go into `Zip`, a zip-slip for whoever unpacks the download. | Reject `..` segments in resource names in sema (as `CheckDimensionID` does, engine/project/dimreset.go:368). In `WriteDir` and `Zip`, convert each path with `filepath.Localize` (which, unlike `fs.ValidPath`, rejects `\` on Windows) and refuse what fails. |
+| F03 | Security / data loss | engine/project/config.go:66-84 | Critical | S | **(repro)** `Validate` never checks `output` or `resourcePack.output`. `"output": "."` deleted the project's own `data/`; `"../victim"` wipes `../victim/data` and `assets`. | Require `filepath.IsLocal` and not `.` for both outputs. Before `WriteDir` removes anything, resolve the target with `filepath.EvalSymlinks` and check it is still inside the project, since a cloned project can ship `build` as a symlink to `../victim`. Keep the CLI `-out` flag unrestricted, since that is an explicit choice. |
 | F04 | Security / data loss | engine/project/config.go:63, engine/cmd/mms/build.go:189 | High | S | **(repro)** `nsPattern` accepts `.` and `..`. With namespace `..`, `mms build -world w` resolves the datapack folder to `w` itself, and `WriteDir` removed `w/data/raids.dat` (world saved data). | `^[a-z0-9_][a-z0-9_.\-]*$`, plus `filepath.IsLocal(ns)` before the join. |
 | F05 | Security | web/src/lib/engine/engine.svelte.ts:184 | High | S | `LSPClient` is built without `sanitizeHTML`; lsp-client assigns rendered Markdown to `innerHTML` (`@codemirror/lsp-client/dist/index.js:105`), and `engine/syntax/doc.go:161` passes doc text through as is. A doc comment with `<img onerror>` in an imported or example project runs script with access to IndexedDB. `javascript:` links in docs are not intercepted either (web/src/lib/editor/Editor.svelte:223). | Pass a `sanitizeHTML` (DOMPurify, links limited to http(s), `#` and relative) (Top 5, #3). |
 | F06 | Correctness | engine/fn/gen.go:440-442 | High | S | **(repro)** `fn.QuoteSNBT` escapes only `\` and `"`. `let s = "a\nb"` emits a command split over two mcfunction lines, which breaks the function. `sema.quoteSNBT` (engine/sema/customitem.go:119) already escapes control characters, and `quoteText` (engine/sema/tell.go:257) escapes a third set. | One quoter: move `sema.quoteSNBT`'s body into `fn.QuoteSNBT`, use it from sema and tell, and add a newline test. |
@@ -68,6 +68,7 @@ Severity: **Critical** is a bug that loses data, miscompiles or is exploitable n
 | F16 | Correctness | engine/lsp/workspace.go:31-46 | Medium | S | `contains` ignores `Config.Sources`, so a `.mms` file that `sources` excludes joins the project when it changes on disk, and editor diagnostics stop matching `mms build`. | Match against the source globs (reuse `globRegexp`). |
 | F17 | Correctness | engine/lsp/workspace.go:67-68 | Low | S | After an mms.json reload, `discover` builds new workspaces but never clears `s.assetDiags` (keyed by the old pointers), so stale unused-asset diagnostics stay. | Clear published asset diagnostics before `discover`. |
 | F18 | Correctness (import) | engine/importer/pack.go:211 | Medium | S | **(repro)** The `data/<ns>` folder name is used as the namespace without validation: `data/My Pack/` imports "successfully" and writes an mms.json that `mms check` then rejects. | Skip invalid namespaces into `Skipped` with a reason; call `cfg.Validate()` before writing. |
+| F90 | Error handling | engine/cmd/mms/fmt.go:44 | Medium | S | `runFmt` ignores the error from `io.WriteString(stdout, out)` and exits 0, so a script redirecting `mms fmt` output to a full disk accepts a truncated file. This is the formatted output itself, unlike the diagnostic prints listed as noise. | Return 1 when the write fails. |
 | F19 | Correctness | engine/cmd/mms/build.go:308-311 | Medium | S | `runInit` ignores the `WriteFile(main.mms)` error and says "created mms.json and main.mms" even when main.mms already existed. 0% coverage. | Check the error, say "kept existing main.mms", add a test. |
 
 ### Editor hot path and performance
@@ -187,9 +188,12 @@ Severity: **Critical** is a bug that loses data, miscompiles or is exploitable n
 +	s := f.score(fn.GenHolder(f.path, "t"+strconv.Itoa(f.temps)))
 -		holder = n.Text + "_" + strconv.Itoa(k)
 +		holder = n.Text + "%" + strconv.Itoa(k)
+// sema/fn.go string temps (line 1343): the same prefix for local storage paths
+-	fn.LocalPath(f.path, "_s"+strconv.Itoa(f.temps))
++	fn.LocalPath(f.path, "%s"+strconv.Itoa(f.temps))
 ```
 
-Refresh the pinned strings in engine/project/functions_test.go:375-377 and the example goldens, and add VM regression tests for `let _t0` and `let x_1` with a shadowed `x`. Do F06 (one SNBT quoter) in the same pass, since it is the other codegen bug that end-to-end tests missed, and add `fn/opt_test.go` (F70).
+Refresh the pinned strings in engine/project/functions_test.go:375-377 and the example goldens, and add VM regression tests for `let _t0`, `let x_1` with a shadowed `x`, and a string local `_s0` next to a concatenation. Do F06 (one SNBT quoter) in the same pass, since it is the other codegen bug that end-to-end tests missed, and add `fn/opt_test.go` (F70).
 
 ### 2. Keep every write inside the build folder (F02, F03, F04)
 
@@ -204,10 +208,14 @@ Refresh the pinned strings in engine/project/functions_test.go:375-377 and the e
 +		}
 +	}
 // engine/project/emit.go, in WriteDir and Zip before each file
-+	if !fs.ValidPath(f.Path) {
++	rel, err := filepath.Localize(f.Path) // rejects "..", absolute paths, and "\" on Windows
++	if err != nil {
 +		return fmt.Errorf("refusing to write %q outside the pack", f.Path)
 +	}
++	p := filepath.Join(dir, rel)
 ```
+
+`WriteDir` should also resolve `dir` with `filepath.EvalSymlinks` and confirm it is inside the project before its `RemoveAll` calls, so an in-project `build` symlink can't point the cleanup elsewhere.
 
 Then add a sema error for `..` or empty path segments in declaration names (the same rule as `CheckDimensionID`), so the problem shows at check time in the editor and not only at build time.
 
@@ -251,7 +259,7 @@ In `Reparse`, when a new chunk has errors, parse the whole file once; if that pa
 - [ ] F05 `sanitizeHTML` on the web `LSPClient`
 - [ ] F06 One SNBT quoter that escapes control characters
 - [ ] F07 Derive the reserved-word list from the lexer
-- [ ] F08 Fix the shadowed `err` in `mms import`
+- [ ] F08 / F90 Fix the shadowed `err` in `mms import` and the ignored write in `mms fmt`
 - [ ] F09 Chunk only where a top-level item can start
 - [ ] F11 Keep `.mmsbook`/`.mmstext` in zip import
 - [ ] F12 Show save failures in the web editor
@@ -267,7 +275,7 @@ In `Reparse`, when a new chunk has errors, parse the whole file once; if that pa
 
 ## Things that look bad but are actually fine
 
-- **About 150 unchecked `fmt.Fprint*` errors in `engine/cmd/mms`.** A CLI printing to stdout/stderr has nothing useful to do on failure. The real unchecked errors are listed separately (F08, F19).
+- **About 150 unchecked `fmt.Fprint*` errors in `engine/cmd/mms`.** A CLI printing to stdout/stderr has nothing useful to do on failure. The real unchecked errors are listed separately (F08, F19, F90).
 - **Unchecked `binary.Write` in engine/nbt/encode.go.** It writes to a `bytes.Buffer`, which can't fail, and `Encode` is used only by tests.
 - **`recover()` in `lsp.dispatch` (engine/lsp/server.go:135) and `project.checkDecl` (engine/project/project.go:570).** Boundary guards that turn a checker panic into an `mms/internal` diagnostic and re-panic under `debugPanics`, not control flow.
 - **Zip reading in `mms import`, `importPack` and `MergeWorldPack`.** All go through `fs.FS` (`zip.Reader` and `fstest.MapFS` reject `..`), and the world pack is only re-zipped in memory and written to one fixed path. The import problem is namespace validation (F18), not traversal.
