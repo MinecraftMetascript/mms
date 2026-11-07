@@ -64,8 +64,8 @@ func TestImportZip(t *testing.T) {
 func TestImportErrors(t *testing.T) {
 	src := t.TempDir()
 	for name, text := range map[string]string{
-		"pack.mcmeta":                         `{"pack":{"pack_format":121,"description":"x"}}`,
-		"data/ruby/function/load.mcfunction":  "say hi\n",
+		"pack.mcmeta":                        `{"pack":{"pack_format":121,"description":"x"}}`,
+		"data/ruby/function/load.mcfunction": "say hi\n",
 		"data/My Pack/function/f.mcfunction": "say no\n",
 	} {
 		p := filepath.Join(src, filepath.FromSlash(name))
