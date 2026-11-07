@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/minecraftmetascript/mms/engine/spec"
+	"github.com/minecraftmetascript/mms/engine/syntax"
 )
 
 func TestKinds(t *testing.T) {
@@ -27,5 +28,15 @@ func TestKinds(t *testing.T) {
 	}
 	if _, ok := ks.Lookup("Bogus"); ok {
 		t.Error("Bogus resolved")
+	}
+}
+
+// TestHookKindsAreCode checks that every hook kind is in the shared list
+// of kinds whose body is function code.
+func TestHookKindsAreCode(t *testing.T) {
+	for k := range HookKinds {
+		if !syntax.IsCodeKind(k) {
+			t.Errorf("%s is a hook kind but not a code kind", k)
+		}
 	}
 }

@@ -113,7 +113,7 @@ func parseHexColor(s string, alpha bool) (int64, bool) {
 }
 
 // isColorHexString reports whether e is a string that starts like a hex
-// color, which the color sugar takes.
+// color, which the color shorthand takes.
 func isColorHexString(e syntax.Expr) bool {
 	s, ok := e.(*syntax.String)
 	return ok && strings.HasPrefix(s.Value, "#")

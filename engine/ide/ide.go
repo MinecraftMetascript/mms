@@ -939,7 +939,7 @@ func (a *at) callArgs(call *syntax.Call, off int) []sema.Candidate {
 		}
 	}
 	if in == nil || in.Callable == nil {
-		// Sugar such as a criterion helper records the fields its named
+		// Shorthand such as a criterion helper records the fields its named
 		// arguments set.
 		if in != nil && in.Fields != nil {
 			named := map[string]bool{}

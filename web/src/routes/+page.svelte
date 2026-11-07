@@ -393,6 +393,9 @@
 				></span>
 				<span class="hidden sm:inline">{statusText}</span>
 			</span>
+			{#if engine?.configError}
+				<span class="rounded px-1.5 py-0.5 text-sm text-red-600" role="alert" title={engine.configError}>Settings not applied</span>
+			{/if}
 			{#if project.saveError}
 				<span class="rounded px-1.5 py-0.5 text-sm text-red-600" role="alert" title={project.saveError}>Not saved</span>
 			{/if}

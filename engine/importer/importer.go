@@ -1,5 +1,5 @@
 // Package importer turns data pack JSON into MMS source. The output uses
-// plain object literals, so it builds back to the same JSON; sugar is
+// plain object literals, so it builds back to the same JSON; shorthand is
 // applied where it is exact.
 package importer
 

@@ -21,3 +21,16 @@ func TestReservedMatchesGrammar(t *testing.T) {
 		}
 	}
 }
+
+func TestIsCodeKind(t *testing.T) {
+	for _, k := range []string{"Function", "Test", "OnLoad", "OnTick", "OnFirstJoin", "OnRespawn", "OnAdvancement"} {
+		if !IsCodeKind(k) {
+			t.Errorf("%s is code", k)
+		}
+	}
+	for _, k := range []string{"LootTable", "CustomItem", "Template", ""} {
+		if IsCodeKind(k) {
+			t.Errorf("%s is not code", k)
+		}
+	}
+}

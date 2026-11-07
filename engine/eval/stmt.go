@@ -348,7 +348,7 @@ func (c *ctx) decl(d *syntax.Decl, from *syntax.Decl) []*Decl {
 	}
 	bc := c.with()
 	bc.emit = nil
-	if fnKinds[d.Kind.Name] {
+	if syntax.IsCodeKind(d.Kind.Name) {
 		bc.compile = false
 	}
 	if d.Params != nil {

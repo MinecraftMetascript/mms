@@ -39,14 +39,11 @@ type Server struct {
 	roots []string // the editor's folders on disk; none in the browser
 	// projects are keyed by the folder holding mms.json; "" is the
 	// default project. nil until initialize.
-	projects map[string]*workspace
-	owners   map[string]*workspace // the project each file is in
-	last     *workspace            // the project of the last edited file
-	lastURI  string                // the last edited file
-	open     map[string]bool
-	// managed files were given by mms/setFiles: closing their editor
-	// keeps them in the project (the browser has no disk to fall back on).
-	managed   map[string]bool
+	projects  map[string]*workspace
+	owners    map[string]*workspace // the project each file is in
+	last      *workspace            // the project of the last edited file
+	lastURI   string                // the last edited file
+	open      map[string]bool
 	published map[string]bool
 	// assetDiags are the files of each project with unused-asset
 	// diagnostics published, so they clear when used again.
@@ -67,7 +64,7 @@ type Server struct {
 
 // NewServer returns a server over tr checking against pack.
 func NewServer(tr Transport, pack *spec.Pack) *Server {
-	return &Server{tr: tr, pack: pack, open: map[string]bool{}, managed: map[string]bool{}, published: map[string]bool{}, assetDiags: map[*workspace]map[string]bool{}}
+	return &Server{tr: tr, pack: pack, open: map[string]bool{}, published: map[string]bool{}, assetDiags: map[*workspace]map[string]bool{}}
 }
 
 type message struct {
@@ -230,7 +227,6 @@ func init() {
 		"mms/expand":                       typed((*Server).expand),
 		"textDocument/codeAction":          typed((*Server).codeAction),
 		"mms/setConfig":                    typed((*Server).setConfig),
-		"mms/setFiles":                     typed((*Server).setFiles),
 		"mms/setAssets":                    typed((*Server).setAssets),
 		"mms/importPack":                   typed((*Server).importPack),
 		"mms/resourceKinds":                typed((*Server).resourceKinds),
@@ -413,9 +409,6 @@ func (s *Server) didClose(ctx context.Context, p struct {
 }) (any, *respError) {
 	uri := p.TextDocument.URI
 	delete(s.open, uri)
-	if s.managed[uri] {
-		return nil, nil
-	}
 	w := s.at(uri)
 	if w == nil {
 		return nil, nil
@@ -495,30 +488,6 @@ func (s *Server) setConfig(ctx context.Context, cfg project.Config) (any, *respE
 	return nil, nil
 }
 
-// setFiles adds, replaces and removes project files that are not open in
-// an editor. The browser sends the whole project this way on start.
-func (s *Server) setFiles(ctx context.Context, p struct {
-	Files []struct {
-		URI  string `json:"uri"`
-		Text string `json:"text"`
-	} `json:"files"`
-	Remove []string `json:"remove"`
-}) (any, *respError) {
-	for _, f := range p.Files {
-		s.managed[f.URI] = true
-		if !s.open[f.URI] {
-			s.setFile(f.URI, f.Text)
-		}
-	}
-	for _, uri := range p.Remove {
-		delete(s.managed, uri)
-		delete(s.open, uri)
-		s.removeFile(uri)
-	}
-	s.analyzeAll(ctx)
-	return nil, nil
-}
-
 // setAssets adds, replaces and removes binary project files, by path
 // relative to the project; data is base64 in JSON. The browser sends them
 // because it has no disk; asset helpers such as Texture("a.png") read them.
@@ -574,7 +543,8 @@ func (s *Server) analyze(ctx context.Context, w *workspace) {
 }
 
 // publishAssets reports the project's files that nothing uses on the
-// files themselves, and clears the ones used again. Only a project on
+// files themselves, and clears the ones used again. A broken mms.json is
+// reported on it the same way. Only a project on
 // disk has file URIs; the browser shows them from mms/output.
 func (s *Server) publishAssets(w *workspace, r *project.Result) {
 	now := map[string]bool{}
@@ -589,6 +559,15 @@ func (s *Server) publishAssets(w *workspace, r *project.Result) {
 				"message": project.UnusedAssetMessage(p),
 			}}})
 		}
+	}
+	if w.configErr != nil && w.dir != "" {
+		uri := pathURI(filepath.Join(w.dir, project.ConfigFile))
+		now[uri] = true
+		s.notify("textDocument/publishDiagnostics", map[string]any{"uri": uri, "diagnostics": []any{map[string]any{
+			"range":    map[string]any{"start": Position{}, "end": Position{}},
+			"severity": int(syntax.SeverityError), "source": "mms", "code": "mms/config",
+			"message": w.configErr.Error() + "; the project uses the default settings until this is fixed",
+		}}})
 	}
 	for uri := range s.assetDiags[w] {
 		if !now[uri] {

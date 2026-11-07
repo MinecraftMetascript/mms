@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/minecraftmetascript/mms/engine/internal/near"
 	"github.com/minecraftmetascript/mms/engine/jsonv"
 	"github.com/minecraftmetascript/mms/engine/nbt"
 	"github.com/minecraftmetascript/mms/engine/sema"
@@ -935,36 +936,11 @@ func lintJigsawUnknownName(l *lintRun) {
 
 // nearHole suggests the declared hole closest to id, for a typo.
 func nearHole(id string, holes map[string]bool) string {
-	best, bestD := "", 3
-	for h := range holes {
-		if d := editDistance(id, h); d < bestD || (d == bestD && best != "" && h < best) {
-			best, bestD = h, d
-		}
-	}
+	best := near.ClosestKey(id, holes)
 	if best == "" {
 		return ""
 	}
 	return fmt.Sprintf(" (did you mean '%s'?)", best)
-}
-
-func editDistance(a, b string) int {
-	prev := make([]int, len(b)+1)
-	for j := range prev {
-		prev[j] = j
-	}
-	for i := 1; i <= len(a); i++ {
-		cur := make([]int, len(b)+1)
-		cur[0] = i
-		for j := 1; j <= len(b); j++ {
-			cost := 1
-			if a[i-1] == b[j-1] {
-				cost = 0
-			}
-			cur[j] = min(prev[j]+1, cur[j-1]+1, prev[j-1]+cost)
-		}
-		prev = cur
-	}
-	return prev[len(b)]
 }
 
 // newHoleFix adds `JigsawHole name` at the end of the file of the

@@ -433,7 +433,7 @@ func (c *Checker) callableNames(v tview) []string {
 				set[Pascal(fs[0].Key)] = true
 			}
 		}
-		for _, s := range sugarCallables[v.Name] {
+		for _, s := range shorthandCallables[v.Name] {
 			set[s] = true
 		}
 	}

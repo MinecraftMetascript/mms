@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/minecraftmetascript/mms/engine/fn"
+	"github.com/minecraftmetascript/mms/engine/internal/near"
 	"github.com/minecraftmetascript/mms/engine/jsonv"
 	"github.com/minecraftmetascript/mms/engine/spec"
 	"github.com/minecraftmetascript/mms/engine/syntax"
@@ -392,12 +393,7 @@ func (c *Checker) record(t *spec.Type) *spec.Type {
 
 // suggestOf offers the closest of names, as "; did you mean 'x'?".
 func suggestOf(name string, names []string) string {
-	best, bestD := "", 3
-	for _, n := range names {
-		if d := editDistance(name, n); d < bestD {
-			best, bestD = n, d
-		}
-	}
+	best := near.Closest(name, names)
 	if best == "" {
 		return ""
 	}

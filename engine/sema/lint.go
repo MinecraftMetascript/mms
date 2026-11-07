@@ -204,7 +204,7 @@ func AsCall(in, body *Info, o *syntax.Object, src []rune) (string, bool) {
 	}
 	for _, name := range typeNames(in.Type) {
 		if name == tCriterion {
-			return "", false // calls there are trigger sugar (criterionCall)
+			return "", false // calls there are trigger shorthand (criterionCall)
 		}
 	}
 	d := body.Disp

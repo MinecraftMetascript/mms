@@ -81,9 +81,9 @@ var structAliases = map[string]string{
 	"Pool": "LootPool",
 }
 
-// sugarCallables are helper names that sugar rules accept at a type, for
+// shorthandCallables are helper names that shorthand rules accept at a type, for
 // completion.
-var sugarCallables = map[string][]string{
+var shorthandCallables = map[string][]string{
 	tMaterialRule: {"If"},
 }
 
@@ -124,50 +124,50 @@ var overlays = map[string]*overlay{
 	},
 }
 
-type sugarRule struct {
+type shorthandRule struct {
 	apply func(c *Checker, e syntax.Expr, v tview) jsonv.Value
 }
 
-func (c *Checker) sugar(e syntax.Expr, v tview) *sugarRule {
+func (c *Checker) shorthand(e syntax.Expr, v tview) *shorthandRule {
 	if v.T == bookTextType {
-		return &sugarRule{bookTextRule}
+		return &shorthandRule{bookTextRule}
 	}
 	if v.T != nil && v.T.Kind == "list" && callName(e) == "book_pages" {
-		return &sugarRule{bookPagesRule}
+		return &shorthandRule{bookPagesRule}
 	}
 	switch v.Name {
 	case tMaterialRule:
 		switch e.(type) {
 		case *syntax.Call, *syntax.Trailing:
 			if callName(e) == "If" {
-				return &sugarRule{ruleIf}
+				return &shorthandRule{ruleIf}
 			}
 		}
 	case tMaterialCond:
 		if x, ok := e.(*syntax.Binary); ok && (x.Op == "&&" || x.Op == "||") {
-			return &sugarRule{condLogic}
+			return &shorthandRule{condLogic}
 		}
 	case tFullBlock:
 		if _, ok := e.(*syntax.Index); ok {
-			return &sugarRule{blockWithState}
+			return &shorthandRule{blockWithState}
 		}
 	case tRGB, tRGBA, tStringRGB, tStringARGB:
 		if isColorHexString(e) {
-			return &sugarRule{colorHex}
+			return &shorthandRule{colorHex}
 		}
 	case tText:
 		switch x := e.(type) {
 		case *syntax.String:
-			return &sugarRule{textString}
+			return &shorthandRule{textString}
 		case *syntax.Call:
 			if callName(x) == "TextFile" {
-				return &sugarRule{textFile}
+				return &shorthandRule{textFile}
 			}
 		}
 	case tCriterion:
 		if x, ok := e.(*syntax.Call); ok {
 			if id, ok := x.Fn.(*syntax.Ident); ok && id.Name != "AdvancementCriterion" {
-				return &sugarRule{criterionCall}
+				return &shorthandRule{criterionCall}
 			}
 		}
 	}

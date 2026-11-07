@@ -14,6 +14,7 @@ import (
 	"sync"
 
 	"github.com/minecraftmetascript/mms/engine/eval"
+	"github.com/minecraftmetascript/mms/engine/internal/near"
 	"github.com/minecraftmetascript/mms/engine/sema"
 	"github.com/minecraftmetascript/mms/engine/spec"
 	"github.com/minecraftmetascript/mms/engine/syntax"
@@ -262,43 +263,18 @@ func (e *Env) isResourceFolder(reg string) bool {
 
 // suggest offers a close type name.
 func (e *Env) suggest(name string) string {
-	best, bestD := "", 3
-	try := func(c string) {
-		if d := distance(strings.ToLower(name), strings.ToLower(c)); d < bestD {
-			best, bestD = c, d
-		}
-	}
+	var cands []string
 	for p := range primitives {
-		try(p)
+		cands = append(cands, p)
 	}
 	for n := range e.decls {
-		try(n)
+		cands = append(cands, n)
 	}
+	best := near.Closest(name, cands)
 	if best == "" {
 		return ""
 	}
 	return "; did you mean '" + best + "'?"
-}
-
-func distance(a, b string) int {
-	ra, rb := []rune(a), []rune(b)
-	prev := make([]int, len(rb)+1)
-	for j := range prev {
-		prev[j] = j
-	}
-	for i := 1; i <= len(ra); i++ {
-		cur := make([]int, len(rb)+1)
-		cur[0] = i
-		for j := 1; j <= len(rb); j++ {
-			cost := 1
-			if ra[i-1] == rb[j-1] {
-				cost = 0
-			}
-			cur[j] = min(prev[j]+1, cur[j-1]+1, prev[j-1]+cost)
-		}
-		prev = cur
-	}
-	return prev[len(rb)]
 }
 
 // idType is a string that names an id in a registry.

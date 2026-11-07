@@ -7,11 +7,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/minecraftmetascript/mms/engine/sema"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/minecraftmetascript/mms/engine/sema"
 )
 
 // ConfigFile is the project file name.

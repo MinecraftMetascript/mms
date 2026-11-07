@@ -38,3 +38,11 @@ func Reserved(w string) bool { return keywords[w] }
 
 // ReservedKey reports whether w can't be written bare as a field key.
 func ReservedKey(w string) bool { return keywords[w] && !keyWords[w] }
+
+// codeKinds are the declaration kinds whose body is function code.
+var codeKinds = map[string]bool{"Function": true, "Test": true, "OnLoad": true, "OnTick": true, "OnFirstJoin": true, "OnRespawn": true, "OnAdvancement": true}
+
+// IsCodeKind reports whether a declaration of the kind named k has a body
+// of function code: statements and commands rather than fields. It is
+// the one list the evaluator, the checker and the editor share.
+func IsCodeKind(k string) bool { return codeKinds[k] }

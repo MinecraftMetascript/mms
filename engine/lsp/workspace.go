@@ -25,6 +25,10 @@ type workspace struct {
 	extra []string
 	proj  *project.Project
 	res   *project.Result
+	// configErr is why mms.json could not be used, when it could not;
+	// the project then runs on the default config and the error is shown
+	// on mms.json.
+	configErr error
 }
 
 // contains reports whether the .mms file at path belongs to w on disk:
@@ -123,7 +127,7 @@ func (s *Server) load(dir string) *workspace {
 		s.logf("%v", err)
 		cfg = project.DefaultConfig()
 	}
-	w := &workspace{dir: dir, root: dir, proj: project.New(s.pack, cfg)}
+	w := &workspace{dir: dir, root: dir, proj: project.New(s.pack, cfg), configErr: err}
 	// Asset helpers such as Texture("a.png") read project files.
 	w.proj.Files = os.DirFS(dir)
 	w.proj.Root = pathURI(dir) + "/"
@@ -187,7 +191,7 @@ func (s *Server) removeFile(uri string) *workspace {
 }
 
 // reload rebuilds every project from disk after an mms.json changed,
-// appeared or went away, keeping the text of open and managed files.
+// appeared or went away, keeping the text of open files.
 func (s *Server) reload(ctx context.Context) {
 	texts := map[string]string{}
 	keep := func(uri string) {
@@ -196,9 +200,6 @@ func (s *Server) reload(ctx context.Context) {
 		}
 	}
 	for uri := range s.open {
-		keep(uri)
-	}
-	for uri := range s.managed {
 		keep(uri)
 	}
 	// The projects are rebuilt, so clear what was published for the old

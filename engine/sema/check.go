@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/minecraftmetascript/mms/engine/internal/near"
 	"github.com/minecraftmetascript/mms/engine/jsonv"
 	"github.com/minecraftmetascript/mms/engine/spec"
 	"github.com/minecraftmetascript/mms/engine/syntax"
@@ -294,7 +295,7 @@ func (c *Checker) check(e syntax.Expr, v tview) jsonv.Value {
 	if r, ok := c.formConvert(e, v); ok {
 		return r
 	}
-	if r := c.sugar(e, v); r != nil {
+	if r := c.shorthand(e, v); r != nil {
 		return r.apply(c, e, v)
 	}
 	if v.T == nil {
@@ -575,7 +576,7 @@ func (c *Checker) fits(e syntax.Expr, v tview) bool {
 		return true
 	}
 	v = c.norm(v)
-	if r := c.sugar(e, v); r != nil || c.formConversion(e, v) != nil {
+	if r := c.shorthand(e, v); r != nil || c.formConversion(e, v) != nil {
 		return true
 	}
 	if v.T == nil {
@@ -1133,38 +1134,7 @@ func contains(xs []string, x string) bool {
 
 // closest returns the candidate with the smallest edit distance to s, if
 // it is close enough to be a likely typo.
-func closest(s string, cands []string) string {
-	best, bestD := "", len(s)/3+2
-	for _, c := range cands {
-		if d := editDistance(s, c); d < bestD {
-			best, bestD = c, d
-		}
-	}
-	return best
-}
-
-func editDistance(a, b string) int {
-	if len(a) > 64 || len(b) > 64 {
-		return 99
-	}
-	prev := make([]int, len(b)+1)
-	cur := make([]int, len(b)+1)
-	for j := range prev {
-		prev[j] = j
-	}
-	for i := 1; i <= len(a); i++ {
-		cur[0] = i
-		for j := 1; j <= len(b); j++ {
-			cost := 1
-			if a[i-1] == b[j-1] {
-				cost = 0
-			}
-			cur[j] = min(prev[j]+1, cur[j-1]+1, prev[j-1]+cost)
-		}
-		prev, cur = cur, prev
-	}
-	return prev[len(b)]
-}
+func closest(s string, cands []string) string { return near.Closest(s, cands) }
 
 // inlineSound writes Sound("x.ogg") where a sound event may be given
 // inline (mcdoc's SoundEventRef: an id or { sound_id, range }) as

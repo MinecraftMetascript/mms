@@ -106,7 +106,7 @@ func (c *Checker) valueCandidates(v tview, depth int) []Candidate {
 			}
 			out = append(out, cand)
 		}
-		for _, s := range sugarCallables[v.Name] {
+		for _, s := range shorthandCallables[v.Name] {
 			if s == "If" {
 				out = append(out, Candidate{Label: "If", Kind: CandCallable, Insert: "If($1) {\n\t$0\n}", Detail: "condition", Rank: 0})
 			}
@@ -331,7 +331,7 @@ func (c *Checker) ListItemInfo(in *Info) *Info {
 			v = lv
 		}
 		// A surface rule field (an id or an inline rule) takes a list as
-		// Sequence sugar.
+		// Sequence shorthand.
 		if v.T != nil && v.T.Kind == "union" {
 			for _, m := range v.T.Members {
 				if mv := c.norm(tview{T: m, Env: v.Env}); mv.Name == tMaterialRule {

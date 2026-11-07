@@ -103,7 +103,7 @@ Recipe r = Shapeless(ingredients = [emerald_block], result = emerald * 9)
 	}
 	r, _ := p.Analyze(context.Background())
 	if after := dumpFiles(r.Emit()); after != before {
-		t.Errorf("sugar changed the output:\n%s\nwas\n%s", after, before)
+		t.Errorf("shorthand changed the output:\n%s\nwas\n%s", after, before)
 	}
 }
 

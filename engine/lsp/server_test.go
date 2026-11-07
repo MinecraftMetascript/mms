@@ -72,6 +72,13 @@ func (c *client) result(method string, params any) any {
 	return m["result"]
 }
 
+// openFiles opens each {uri, text} in the server, as an editor does.
+func (c *client) openFiles(files ...map[string]any) {
+	for _, f := range files {
+		c.notify("textDocument/didOpen", map[string]any{"textDocument": map[string]any{"uri": f["uri"], "languageId": "mms", "version": 1, "text": f["text"]}})
+	}
+}
+
 func pos(uri string, line, char int) map[string]any {
 	return map[string]any{"textDocument": map[string]any{"uri": uri}, "position": map[string]any{"line": line, "character": char}}
 }
@@ -196,44 +203,13 @@ func TestPositions(t *testing.T) {
 	}
 }
 
-func TestManagedFiles(t *testing.T) {
-	c := start(t)
-	c.result("initialize", map[string]any{})
-	a, b := "mem:///a.mms", "mem:///b.mms"
-	c.notify("mms/setFiles", map[string]any{"files": []any{
-		map[string]any{"uri": a, "text": "DensityFunction a = 1\n"},
-		map[string]any{"uri": b, "text": "DensityFunction b = a + 1\n"},
-	}})
-	c.notify("textDocument/didOpen", map[string]any{"textDocument": map[string]any{"uri": a, "text": "DensityFunction a = 2\n"}})
-	c.notify("textDocument/didClose", map[string]any{"textDocument": map[string]any{"uri": a}})
-	out := c.result("mms/output", map[string]any{}).(map[string]any)
-	texts := map[string]string{}
-	for _, f := range out["files"].([]any) {
-		m := f.(map[string]any)
-		texts[m["path"].(string)] = m["text"].(string)
-	}
-	if !strings.Contains(texts["data/mms/worldgen/density_function/a.json"], "2") {
-		t.Errorf("closing a managed file lost its edits: %v", texts)
-	}
-	c.notify("mms/setFiles", map[string]any{"remove": []any{b}})
-	out = c.result("mms/output", map[string]any{}).(map[string]any)
-	for _, f := range out["files"].([]any) {
-		if strings.Contains(f.(map[string]any)["path"].(string), "/b.json") {
-			t.Error("removed file still built")
-		}
-	}
-	if c.result("mms/ping", nil) != "pong" {
-		t.Error("ping")
-	}
-}
-
 func TestSetAssets(t *testing.T) {
 	c := start(t)
 	c.result("initialize", map[string]any{})
 	a := "mem:///a.mms"
-	c.notify("mms/setFiles", map[string]any{"files": []any{
+	c.openFiles(
 		map[string]any{"uri": a, "text": "PaintingVariant p { width = 1, height = 1, asset_id = Texture(\"art/p.png\") }\n"},
-	}})
+	)
 	assets := func() []any {
 		out := c.result("mms/output", map[string]any{}).(map[string]any)
 		if out["hasErrors"] == true {
@@ -543,7 +519,7 @@ func TestAssetPathCompletion(t *testing.T) {
 	c := start(t)
 	c.result("initialize", map[string]any{})
 	a := "mem:///a.mms"
-	c.notify("mms/setFiles", map[string]any{"files": []any{map[string]any{"uri": a, "text": text}}})
+	c.openFiles(map[string]any{"uri": a, "text": text})
 	c.notify("mms/setAssets", map[string]any{"files": []any{
 		map[string]any{"path": "art/p.png", "data": []byte("\x89PNG\r\n\x1a\n")},
 		map[string]any{"path": "music/m.ogg", "data": []byte("OggS")},
@@ -591,7 +567,7 @@ func TestKindCompletionRange(t *testing.T) {
 	c := start(t)
 	c.result("initialize", map[string]any{})
 	a := "mem:///a.mms"
-	c.notify("mms/setFiles", map[string]any{"files": []any{map[string]any{"uri": a, "text": "Feature f {}\nFe"}}})
+	c.openFiles(map[string]any{"uri": a, "text": "Feature f {}\nFe"})
 	res := c.result("textDocument/completion", pos(a, 1, 2)).(map[string]any)
 	for _, it := range res["items"].([]any) {
 		m := it.(map[string]any)
@@ -669,9 +645,9 @@ func TestOutputCustomItems(t *testing.T) {
 	c := start(t)
 	c.result("initialize", map[string]any{})
 	a := "mem:///a.mms"
-	c.notify("mms/setFiles", map[string]any{"files": []any{
+	c.openFiles(
 		map[string]any{"uri": a, "text": "\nCustomItem ruby {\n  base = stick\n  components = { max_stack_size = 1 }\n}\n"},
-	}})
+	)
 	out := c.result("mms/output", map[string]any{}).(map[string]any)
 	items := out["items"].([]any)
 	if len(items) != 1 {
@@ -741,9 +717,9 @@ func TestOutputStructureJigsaws(t *testing.T) {
 		t.Fatal(err)
 	}
 	c.notify("mms/setAssets", map[string]any{"files": []any{map[string]any{"path": "s/hall.nbt", "data": data}}})
-	c.notify("mms/setFiles", map[string]any{"files": []any{
+	c.openFiles(
 		map[string]any{"uri": "mem:///a.mms", "text": "TemplatePool rooms { fallback = minecraft:empty, elements = [{ weight = 1, element = { element_type = minecraft:single_pool_element, location = StructureFile(\"s/hall.nbt\"), projection = rigid, processors = minecraft:empty } }] }\n"},
-	}})
+	)
 	out := c.result("mms/output", map[string]any{}).(map[string]any)
 	assets := out["assets"].([]any)
 	if len(assets) != 1 {
@@ -804,9 +780,9 @@ func TestUnusedAssetDiagnostics(t *testing.T) {
 func TestOutputJigsawHoles(t *testing.T) {
 	c := start(t)
 	c.result("initialize", map[string]any{})
-	c.notify("mms/setFiles", map[string]any{"files": []any{
+	c.openFiles(
 		map[string]any{"uri": "mem:///a.mms", "text": "/** Where a road ends. */\nJigsawHole road_end\nJigsawHole arch\n"},
-	}})
+	)
 	out := c.result("mms/output", map[string]any{}).(map[string]any)
 	holes := out["jigsawHoles"].([]any)
 	if len(holes) != 2 {
@@ -860,9 +836,9 @@ func TestRunTests(t *testing.T) {
 	c := start(t)
 	c.result("initialize", map[string]any{})
 	a := "mem:///a.mms"
-	c.notify("mms/setFiles", map[string]any{"files": []any{
+	c.openFiles(
 		map[string]any{"uri": a, "text": "Global n: int = 0\nFunction bump {\n  n += 1\n}\nTest ok {\n  run bump()\n  expect n == 1\n}\nTest bad {\n  run bump()\n  expect n == 3\n}\n"},
-	}})
+	)
 	out := c.result("mms/runTests", map[string]any{"uri": a}).(map[string]any)
 	tests := out["tests"].([]any)
 	if len(tests) != 2 {
@@ -1021,5 +997,37 @@ func TestEditorRequests(t *testing.T) {
 	}
 	if !strings.Contains(strings.Join(labels, " "), "int") {
 		t.Errorf("inlay hints = %q, want the const's type", labels)
+	}
+}
+
+// TestBrokenConfig checks that an mms.json the server cannot use is
+// reported on mms.json, not only logged.
+func TestBrokenConfig(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "mms.json"), []byte(`{"namepsace": "demo"}`), 0o644)
+	main := filepath.Join(dir, "main.mms")
+	os.WriteFile(main, []byte("DensityFunction x = 1\n"), 0o644)
+	c := start(t)
+	c.result("initialize", map[string]any{"rootUri": pathURI(dir)})
+	c.notify("textDocument/didOpen", map[string]any{"textDocument": map[string]any{"uri": pathURI(main), "languageId": "mms", "version": 1, "text": "DensityFunction x = 1\n"}})
+	c.result("mms/ping", nil)
+	cfgURI := pathURI(filepath.Join(dir, "mms.json"))
+	found := false
+	for _, n := range c.notes {
+		if n["method"] != "textDocument/publishDiagnostics" {
+			continue
+		}
+		p := n["params"].(map[string]any)
+		if p["uri"] != cfgURI {
+			continue
+		}
+		for _, d := range p["diagnostics"].([]any) {
+			if strings.Contains(d.(map[string]any)["message"].(string), "namepsace") {
+				found = true
+			}
+		}
+	}
+	if !found {
+		t.Errorf("no diagnostic on %s in %v", cfgURI, c.notes)
 	}
 }

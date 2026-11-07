@@ -170,6 +170,8 @@ export class Engine {
 	hasTests = $state(false);
 	tests = $state<TestOutcome[]>([]);
 	testsError = $state('');
+	/** Why the server refused the project settings, such as a bad namespace. */
+	configError = $state('');
 	symbols = $state<Record<string, DocSymbol[]>>({});
 
 	readonly client: LSPClient;
@@ -214,7 +216,7 @@ export class Engine {
 	private connect() {
 		this.client.connect(this.supervisor.transport);
 		this.client.initializing.then(() => {
-			this.client.notification('mms/setConfig', this.config);
+			this.sendConfig();
 			if (this.assets.size) {
 				const files = [...this.assets].map(([path, data]) => ({ path, data }));
 				this.client.notification('mms/setAssets', { files });
@@ -233,9 +235,17 @@ export class Engine {
 		this.supervisor.restart();
 	}
 
+	/** Sends the settings; the server checks them and says what is wrong. */
+	private sendConfig() {
+		this.client.request('mms/setConfig', this.config).then(
+			() => (this.configError = ''),
+			(e: unknown) => (this.configError = e instanceof Error ? e.message : String(e))
+		);
+	}
+
 	setConfig(config: { namespace: string; description: string }) {
 		this.config = { ...config };
-		if (this.client.connected) this.client.notification('mms/setConfig', this.config);
+		if (this.client.connected) this.sendConfig();
 	}
 
 	/** Replaces the binary files the server reads, sending only changes. */

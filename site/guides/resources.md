@@ -8,7 +8,7 @@ Every JSON resource kind can be written as an object literal that mirrors the JS
 - `SurvivesExplosion()` is `{ type = survives_explosion }`.
 - Positional arguments fill fields in schema order. A list field takes the remaining arguments.
 
-**Sugar.** Shorthand for common shapes, listed below. Each one lowers to exactly the JSON shown, and the schema still checks every field.
+**Shorthand.** Short forms for common shapes, listed below. Each one lowers to exactly the JSON shown, and the schema still checks every field.
 
 The `use-shorthand` lint rule suggests the short forms, and imported packs use them automatically.
 

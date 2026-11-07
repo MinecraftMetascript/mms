@@ -402,10 +402,6 @@ func (e *evaluator) blueprint(path string, d *syntax.Decl) *Blueprint {
 // keeps for itself rather than output.
 func definitionKind(k string) bool { return k == "Template" || k == "Blueprint" || k == "Type" }
 
-// fnKinds are the declarations whose body is function code.
-var fnKinds = map[string]bool{"Function": true, "OnLoad": true, "OnTick": true, "OnFirstJoin": true,
-	"OnRespawn": true, "OnAdvancement": true, "Test": true}
-
 // expand writes one file's output declarations.
 func (e *evaluator) expand(u Unit, ns string) {
 	out := e.r.Files[u.Path]
