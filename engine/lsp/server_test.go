@@ -951,3 +951,75 @@ func TestWatchedFileOutsideSources(t *testing.T) {
 		}
 	}
 }
+
+// TestEditorRequests covers the requests the editors use that the other
+// tests do not: mms/setConfig, signature help, prepare rename and inlay
+// hints.
+func TestEditorRequests(t *testing.T) {
+	c := start(t)
+	c.result("initialize", map[string]any{"rootUri": nil})
+	c.notify("initialized", map[string]any{})
+	src := "const k = 3\n" +
+		"DensityFunction x = Clamp(1, 0, 1)\n" +
+		"Function f(n: int) {\n  /say hi\n}\n" +
+		"Function g {\n  f(k)\n}\n"
+	c.notify("textDocument/didOpen", map[string]any{"textDocument": map[string]any{"uri": uri, "languageId": "mms", "version": 1, "text": src}})
+
+	// setConfig: the output moves to the new namespace; a bad one is refused.
+	c.result("mms/setConfig", map[string]any{"namespace": "demo"})
+	out := c.result("mms/output", map[string]any{}).(map[string]any)
+	found := false
+	for _, f := range out["files"].([]any) {
+		if f.(map[string]any)["path"] == "data/demo/worldgen/density_function/x.json" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("after setConfig, output files = %v", out["files"])
+	}
+	if m := c.call("mms/setConfig", map[string]any{"namespace": "Not Valid"}); m["error"] == nil {
+		t.Errorf("setConfig with a bad namespace: %v", m)
+	}
+
+	// Signature help inside Clamp(...) and inside f(...).
+	for _, at := range []map[string]any{pos(uri, 1, 29), pos(uri, 6, 4)} {
+		sh, _ := c.result("textDocument/signatureHelp", at).(map[string]any)
+		if sigs, _ := sh["signatures"].([]any); len(sigs) == 0 {
+			t.Errorf("signatureHelp at %v = %v", at["position"], sh)
+		}
+	}
+
+	// prepareRename gives the name's range on a declaration, and nothing
+	// on a keyword.
+	pr, _ := c.result("textDocument/prepareRename", pos(uri, 2, 10)).(map[string]any)
+	if pr == nil {
+		t.Error("prepareRename on a function name gave nothing")
+	} else if r, _ := pr["range"].(map[string]any); r == nil {
+		if _, ok := pr["start"]; !ok {
+			t.Errorf("prepareRename = %v", pr)
+		}
+	}
+	if pr := c.call("textDocument/prepareRename", pos(uri, 2, 2)); pr["result"] != nil {
+		t.Errorf("prepareRename on the kind = %v", pr["result"])
+	}
+
+	// Inlay hints over the whole file include the const's type.
+	hints, _ := c.result("textDocument/inlayHint", map[string]any{
+		"textDocument": map[string]any{"uri": uri},
+		"range":        map[string]any{"start": map[string]any{"line": 0, "character": 0}, "end": map[string]any{"line": 8, "character": 0}},
+	}).([]any)
+	var labels []string
+	for _, h := range hints {
+		switch l := h.(map[string]any)["label"].(type) {
+		case string:
+			labels = append(labels, l)
+		case []any:
+			for _, p := range l {
+				labels = append(labels, p.(map[string]any)["value"].(string))
+			}
+		}
+	}
+	if !strings.Contains(strings.Join(labels, " "), "int") {
+		t.Errorf("inlay hints = %q, want the const's type", labels)
+	}
+}

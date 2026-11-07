@@ -71,8 +71,14 @@ type gen struct {
 
 // Generate lowers f and returns its files. Generated sub-function names
 // and flags are numbered in source order, so output is deterministic.
-func Generate(f Func) *Output {
-	Optimize(&f)
+func Generate(f Func) *Output { return generate(f, true) }
+
+// generate lowers f, optimising it first when optimize is set; tests
+// compare the two.
+func generate(f Func, optimize bool) *Output {
+	if optimize {
+		Optimize(&f)
+	}
 	ns, path, _ := strings.Cut(f.ID, ":")
 	g := &gen{ns: ns, path: path, obj: Objective(ns), out: &Output{Main: f.ID, Files: map[string][]string{}, Consts: map[int32]bool{}}}
 	fr := &frame{id: f.ID, kind: topFrame}
