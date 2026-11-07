@@ -14,8 +14,6 @@ var (
 	bareIdent  = regexp.MustCompile(`^[a-z_][a-z0-9_]*$`)
 	barePath   = regexp.MustCompile(`^[a-z_][a-z0-9_]*(/[a-z0-9_./-]+)+$`)
 	bareResLoc = regexp.MustCompile(`^[a-z0-9_.-]+:[a-z0-9_./-]+$`)
-	reserved   = map[string]bool{"let": true, "if": true, "else": true, "while": true, "for": true, "in": true,
-		"return": true, "break": true, "continue": true, "true": true, "false": true}
 )
 
 // BareString returns how a string literal could be written without
@@ -30,7 +28,7 @@ func BareString(in *Info, syms *Table, ns string, s *syntax.String) (string, boo
 	switch in.Bare {
 	case BareKey, BareEnum:
 		v := strings.TrimPrefix(s.Value, "minecraft:")
-		return v, bareIdent.MatchString(v) && !reserved[v]
+		return v, bareIdent.MatchString(v) && !syntax.Reserved(v)
 	case BareID:
 	default:
 		return "", false
@@ -65,7 +63,7 @@ func ShortName(in *Info, syms *Table, ns, name string) (string, bool) {
 	}
 	switch in.Bare {
 	case BareKey, BareEnum:
-		return path, bareIdent.MatchString(path) && !reserved[path]
+		return path, bareIdent.MatchString(path) && !syntax.Reserved(path)
 	case BareID:
 		return path, in.Folder != "" && syms.Find(in.Folder, ns+":"+path) == nil
 	}
@@ -73,7 +71,7 @@ func ShortName(in *Info, syms *Table, ns, name string) (string, bool) {
 }
 
 func lexesBare(s string) bool {
-	return (bareIdent.MatchString(s) && !reserved[s]) || barePath.MatchString(s) || bareResLoc.MatchString(s)
+	return (bareIdent.MatchString(s) && !syntax.Reserved(s)) || barePath.MatchString(s) || bareResLoc.MatchString(s)
 }
 
 // Simplify returns the shorthand that means the same as an object
@@ -221,7 +219,7 @@ func AsCall(in, body *Info, o *syntax.Object, src []rune) (string, bool) {
 	var args []string
 	for _, it := range o.Body.Items {
 		f, ok := it.(*syntax.FieldStmt)
-		if !ok || f.KeyQuoted || !bareIdent.MatchString(f.Key.Text) || reserved[f.Key.Text] {
+		if !ok || f.KeyQuoted || !bareIdent.MatchString(f.Key.Text) || syntax.ReservedKey(f.Key.Text) {
 			return "", false
 		}
 		if f.Key.Text == d.KeyField {

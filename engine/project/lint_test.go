@@ -155,3 +155,21 @@ func TestInstanceMissingFieldsFix(t *testing.T) {
 	}
 	t.Fatal("no missing-field error")
 }
+
+// TestQuotedKeywordsStayQuoted checks that the quoted-name lint never
+// offers to unquote a word the grammar can't take bare, such as `setup`.
+func TestQuotedKeywordsStayQuoted(t *testing.T) {
+	for _, w := range []string{"setup", "run", "check", "const", "extern", "primary", "as", "emit", "expect"} {
+		p := New(spec.MustDefault(), Config{Namespace: "demo", Description: "test"})
+		p.SetFile("main.mms", "FunctionTag t = [\""+w+"\"]\n")
+		r, err := p.Analyze(context.Background())
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, d := range r.Lints()["main.mms"] {
+			if d.Code == "lint/quoted-name" {
+				t.Errorf("%q: quoted-name offered to unquote it: %s", w, d.Message)
+			}
+		}
+	}
+}
