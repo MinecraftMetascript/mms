@@ -9,7 +9,7 @@
 // 16 blocks up or down of the banner. It runs in whatever dimension the banner is in.
 
 /** An empty void dimension that only holds the path field. It loads when the world starts, not on /reload. */
-DimensionType scratch = {
+DimensionType scratch {
   height = 384
   logical_height = 384
   min_y = -64
@@ -24,7 +24,7 @@ DimensionType scratch = {
   monster_spawn_light_level = 0
 }
 
-Dimension scratch = {
+Dimension scratch {
   type = scratch
   generator = {
     type = flat

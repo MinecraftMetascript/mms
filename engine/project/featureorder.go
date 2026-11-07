@@ -423,11 +423,14 @@ func stepSpan(d *Decl, step int) syntax.Span {
 	if d.D.Name != nil {
 		sp = d.D.Name.Sp
 	}
-	obj, ok := d.D.Value.(*syntax.Object)
-	if !ok || obj.Body == nil {
+	body := d.D.Body
+	if obj, ok := d.D.Value.(*syntax.Object); ok {
+		body = obj.Body
+	}
+	if body == nil {
 		return sp
 	}
-	for _, it := range obj.Body.Items {
+	for _, it := range body.Items {
 		f, ok := it.(*syntax.FieldStmt)
 		if !ok || f.Key == nil || f.Key.Text != "features" {
 			continue

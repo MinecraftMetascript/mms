@@ -2,7 +2,7 @@
 // this file and compares each output with the vanilla file of the same id.
 Namespace minecraft
 
-Noise ridge = {
+Noise ridge {
   base_octave = -7
   base_amplitude = 0.9147152149950137
   amplitude_modifiers = [1, 2, 1, 0, 0, 0]

@@ -61,7 +61,7 @@ func pagesOf(t *testing.T, lootJSON string) []any {
 }
 
 func TestBook(t *testing.T) {
-	const src = `Objective kills = "dummy"
+	const src = `Objective kills: dummy
 Global wave = 3
 Global motto: string = "Hold"
 Book guide {

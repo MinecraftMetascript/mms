@@ -574,7 +574,7 @@ Function grant {
 	errs := map[string]string{
 		"OnAdvancement a {\n  /say hi\n}": "mms/missing-value",
 		"OnAdvancement a = Tick()":        "mms/missing-value",
-		"Advancement a = { criteria = { x = Tick() } }\nOnAdvancement a = Tick() {\n  /say hi\n}": "mms/duplicate",
+		"Advancement a { criteria = { x = Tick() } }\nOnAdvancement a = Tick() {\n  /say hi\n}": "mms/duplicate",
 	}
 	for src, want := range errs {
 		p := New(spec.MustDefault(), Config{Namespace: "demo"})

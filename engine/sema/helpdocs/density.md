@@ -16,7 +16,7 @@ Samples a noise at the block's position, scaled per axis. The result is roughly 
 - shift_z: Added to z before sampling. Vanilla uses `ShiftB`.
 
 ```mms
-Noise hills = { base_octave = -7, amplitude_modifiers = [1, 1] }
+Noise hills { base_octave = -7, amplitude_modifiers = [1, 1] }
 DensityFunction land = Noise(hills, 1, 0) * 0.5
 ```
 

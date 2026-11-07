@@ -8,9 +8,9 @@ Global total_kills: int = 0
 Global reward_every: int = 5
 
 // Objective names are global to the world, so they carry the pack's name.
-Objective basics_kills = playerKillCount
-Objective basics_points = dummy
-Objective basics_online = dummy
+Objective basics_kills: playerKillCount
+Objective basics_points: dummy
+Objective basics_online: dummy
 
 OnLoad {
   tell(@a, "Points game loaded")

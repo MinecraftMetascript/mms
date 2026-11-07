@@ -25,7 +25,7 @@ Then chop a tree with any axe in survival.
 | `detect.mms` | Notices a player who mined a log with an axe, and finds where the log was. |
 | `fell.mms` | The flood fill, the felling and the axe's wear. |
 
-**Noticing the chop.** No advancement trigger fires when a block is broken, but the game keeps a "mined" statistic for every block, and an objective can watch one (`Objective chop_oak = minecraft.mined:minecraft.oak_log`). There is one per log that grows on trees. The tick function looks for players with a count and calls `chopped` with that wood's block tag (`"minecraft:oak_logs"`), which resets the counts and checks that they hold something in `#minecraft:axes` and are not sneaking.
+**Noticing the chop.** No advancement trigger fires when a block is broken, but the game keeps a "mined" statistic for every block, and an objective can watch one (`Objective chop_oak: minecraft.mined:minecraft.oak_log`). There is one per log that grows on trees. The tick function looks for players with a count and calls `chopped` with that wood's block tag (`"minecraft:oak_logs"`), which resets the counts and checks that they hold something in `#minecraft:axes` and are not sneaking.
 
 **Finding the log.** A broken block's drop appears inside the block's space, and the tick function runs before new items move. So the nearest new log item (`Age:0s`) near the player, aligned to its block, is where the log was.
 

@@ -5,7 +5,7 @@ Predicate stormy_night = WeatherCheck(thundering = true)
   && (TimeCheck(clock = overworld, value = 13000..23000) || RandomChance(0.5))
 
 /** Granted the first time a player picks up a gem. */
-Advancement first_gem = {
+Advancement first_gem {
   criteria = { has_gem = InventoryChanged(items = [{ items = #gems }]) }
   rewards = { function = treasure:found_gem }
 }

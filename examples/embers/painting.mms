@@ -3,7 +3,7 @@
 // the painting_variant field sets the painting/ prefix.
 
 /** A 2x1 hearth fire, drawn at 16 pixels per block (32x16). */
-PaintingVariant hearth = {
+PaintingVariant hearth {
   width = 2
   height = 1
   asset_id = Texture("art/hearth.png")

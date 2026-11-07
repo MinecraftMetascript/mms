@@ -466,6 +466,20 @@ func lintShorthand(l *lintRun, d *Decl) {
 			syntax.Fix{Title: "Write " + clip(short), Edits: []syntax.TextEdit{{Sp: o.Sp, Text: short}}, Safe: true})
 		return true
 	})
+	// A body, `Kind name { ... }`, is an object too: it can become
+	// `Kind name = Short(...)`.
+	if b := d.D.Body; b != nil && d.D.Value == nil && d.D.Name != nil && d.Kind.IsResource() {
+		o := &syntax.Object{Body: b, Sp: b.Sp}
+		short, _, ok := sema.Simplify(l.r.pack, d.Info[d.D], o, src)
+		if !ok {
+			short, ok = sema.AsCall(d.Info[d.D], d.Info[b], o, src)
+		}
+		if ok {
+			sp := syntax.Span{Start: head(d.D), End: b.Sp.End}
+			l.report(d, b.Sp, "this can be written = "+clip(short),
+				syntax.Fix{Title: "Write = " + clip(short), Edits: []syntax.TextEdit{{Sp: sp, Text: " = " + short}}, Safe: true})
+		}
+	}
 }
 
 func clip(s string) string {

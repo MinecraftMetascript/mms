@@ -15,7 +15,7 @@
  * Oak, birch and spruce woods. Glowstone in the roof and glow berries
  * light the floor, so saplings regrow.
  */
-Biome rootwood_hollow = {
+Biome rootwood_hollow {
   temperature = 0.6
   downfall = 0.7
   has_precipitation = false
@@ -113,7 +113,7 @@ Biome rootwood_hollow = {
  * froglights above and glow caps below, with cows, sheep, pigs and
  * chickens, wheat seeds from the grass, flowers and pumpkins.
  */
-Biome glowmeadow = {
+Biome glowmeadow {
   temperature = 0.8
   downfall = 0.4
   has_precipitation = false
@@ -213,7 +213,7 @@ Biome glowmeadow = {
 }
 
 /** Mushrooms and mooshrooms: food without light. Hostile mobs don't spawn here, as in vanilla. */
-Biome mycelium_deeps = {
+Biome mycelium_deeps {
   temperature = 0.9
   downfall = 1
   has_precipitation = false
@@ -272,7 +272,7 @@ Biome mycelium_deeps = {
  * Deep and rare: dark oak, jungle and cherry trees, cocoa on the jungle
  * logs, bamboo and melons, lit by verdant froglight crystals.
  */
-Biome darkroot_grove = {
+Biome darkroot_grove {
   temperature = 0.95
   downfall = 0.9
   has_precipitation = false
@@ -370,7 +370,7 @@ Biome darkroot_grove = {
  * Lakes with sandy shores: sand and sandstone floors, sugar cane, kelp,
  * fish and squid. Clay comes from the shared ore list.
  */
-Biome sunken_lake = {
+Biome sunken_lake {
   temperature = 0.7
   downfall = 0.8
   has_precipitation = false
@@ -460,7 +460,7 @@ Biome sunken_lake = {
  * Lava pools on basalt and blackstone floors, for early obsidian. Hot and
  * dangerous, so Rifts should avoid it.
  */
-Biome ash_vents = {
+Biome ash_vents {
   temperature = 2
   downfall = 0
   has_precipitation = false

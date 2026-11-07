@@ -17,7 +17,7 @@ func TestNonPositionalAttributeFix(t *testing.T) {
 }
 
 func testNonPositionalFix(t *testing.T, nl string) {
-	src := "Biome b = {\n  temperature = 1\n  downfall = 0\n  has_precipitation = false\n  effects = { water_color = 1 }\n  carvers = []\n  features = []\n  attributes = {\n    \"minecraft:gameplay/fast_lava\" = true\n    \"minecraft:visual/fog_color\" = \"#330808\"\n  }\n}\n"
+	src := "Biome b {\n  temperature = 1\n  downfall = 0\n  has_precipitation = false\n  effects = { water_color = 1 }\n  carvers = []\n  features = []\n  attributes = {\n    \"minecraft:gameplay/fast_lava\" = true\n    \"minecraft:visual/fog_color\" = \"#330808\"\n  }\n}\n"
 	src = strings.ReplaceAll(src, "\n", nl)
 	p := New(spec.MustDefault(), Config{Namespace: "demo"})
 	p.SetFile("a.mms", src)

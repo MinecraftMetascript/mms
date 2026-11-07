@@ -31,7 +31,7 @@ Function code computes with whole numbers (`int`, 32-bit, wrapping like the game
 
 ```
 Global deaths: int = 0          // one value for the whole pack
-Objective kills = deathCount    // a score per player
+Objective kills: deathCount    // a score per player
 
 Function on_death {
   deaths += 1

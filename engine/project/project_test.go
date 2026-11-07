@@ -119,7 +119,7 @@ func TestCachingAndDeterminism(t *testing.T) {
 		t.Error("a was re-checked although no name it uses changed")
 	}
 	// Declaring demo:continentalness changes what a's noise resolves to.
-	p.SetFile("c.mms", "Namespace demo\nNoise continentalness = { base_octave = -1, amplitude_modifiers = [1] }\n")
+	p.SetFile("c.mms", "Namespace demo\nNoise continentalness { base_octave = -1, amplitude_modifiers = [1] }\n")
 	r3b, _ := p.Analyze(context.Background())
 	if r3.Order[0] == r3b.Order[0] {
 		t.Error("a kept its result although a name it uses was declared")
@@ -155,8 +155,8 @@ FunctionTag minecraft:tick = [demo:tick]
 Function tick {
   /say hi
 }
-Objective kills = deathCount
-Noise Bad_Name = { base_octave = 0 }
+Objective kills: deathCount
+Noise Bad_Name { base_octave = 0 }
 DensityFunction dup = 1
 DensityFunction dup = 2
 `)
@@ -194,11 +194,11 @@ func TestIncrementalMatchesFresh(t *testing.T) {
 	edits := []func(string) string{
 		func(s string) string { return "// top\n" + s },
 		func(s string) string { return strings.Replace(s, "Clmp", "Clamp", 1) },
-		func(s string) string { return s + "\nNoise extra = { base_octave = -2, amplitude_modifiers = [1] }\n" },
+		func(s string) string { return s + "\nNoise extra { base_octave = -2, amplitude_modifiers = [1] }\n" },
 		func(s string) string { return strings.Replace(s, "// top\n", "", 1) },
 		func(s string) string { return strings.Replace(s, "Namespace example", "Namespace other", 1) },
 		func(s string) string {
-			return "Noise continentalness = { base_octave = -1, amplitude_modifiers = [1] }\n" + s
+			return "Noise continentalness { base_octave = -1, amplitude_modifiers = [1] }\n" + s
 		},
 	}
 	p := New(spec.MustDefault(), DefaultConfig())
@@ -245,7 +245,7 @@ Function a {
 Function b {
   /say hi
 }
-Predicate night = { type = time_check, clock = overworld, value = 0..12000 }
+Predicate night { type = time_check, clock = overworld, value = 0..12000 }
 FunctionTag hooks = [demo:b]
 `
 	p.SetFile("a.mms", src)

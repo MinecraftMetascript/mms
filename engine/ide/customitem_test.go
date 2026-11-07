@@ -76,7 +76,7 @@ func TestColorHover(t *testing.T) {
 // What the prelude's Blueprints write for an instance is not offered by
 // name, and neither are its @internal Blueprints.
 func TestPreludeOutputHidden(t *testing.T) {
-	s, off := session(t, "CustomItem w {\n  base = stick\n  on_right_click = run {\n    /say hi\n  }\n}\nAdvancement a = { rewards = { function = |} }")
+	s, off := session(t, "CustomItem w {\n  base = stick\n  on_right_click = run {\n    /say hi\n  }\n}\nAdvancement a { rewards = { function = |} }")
 	items, _ := s.Completion("main.mms", off)
 	for _, l := range labels(items) {
 		if strings.Contains(l, "mms_gen") {

@@ -27,7 +27,7 @@ This writes `mms.json` and a starter `main.mms`. You can put everything below in
 ## 2. The dimension type
 
 ```
-DimensionType islands = {
+DimensionType islands {
   height = 256
   logical_height = 256
   min_y = 0
@@ -53,7 +53,7 @@ The world runs from y = 0 to y = 255. Low clouds at y = 40 drift below the islan
 ## 3. A biome
 
 ```
-Biome meadow = {
+Biome meadow {
   temperature = 0.7
   downfall = 0.6
   has_precipitation = true
@@ -70,7 +70,7 @@ With no carvers and no features, the islands are bare stone, grass and dirt. To 
 Terrain comes from a density function. Where it is above 0 the generator places `default_block`, and where it is below 0 it leaves air (or `default_fluid` below the sea level).
 
 ```
-Noise island_noise = {
+Noise island_noise {
   base_octave = -6
   amplitude_modifiers = [1, 1, 0.5]
 }
@@ -111,7 +111,7 @@ The rules are tried in order. The top block of each floor becomes grass, and the
 ## 6. The generator settings
 
 ```
-NoiseSettings islands = {
+NoiseSettings islands {
   sea_level = 0
   default_block = stone
   default_fluid = air
@@ -141,7 +141,7 @@ NoiseSettings islands = {
 ## 7. The dimension
 
 ```
-Dimension islands = {
+Dimension islands {
   type = islands
   generator = {
     type = noise

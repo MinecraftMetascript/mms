@@ -238,7 +238,13 @@ func (c *Checker) Resource(d *syntax.Decl, k Kind) jsonv.Value {
 	var v jsonv.Value
 	switch {
 	case d.Body != nil:
-		v = c.check(&syntax.Object{Body: d.Body, Sp: d.Body.Sp}, root)
+		obj := &syntax.Object{Body: d.Body, Sp: d.Body.Sp}
+		v = c.check(obj, root)
+		// The body's object is not in the tree; its Info is kept on the
+		// declaration, for lints that read the body as a value.
+		if in := c.Info[obj]; in != nil {
+			c.Info[d] = in
+		}
 		if k.Resource == "block_definition" {
 			c.blockState(d, d.Body)
 		}

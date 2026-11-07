@@ -8,7 +8,7 @@ import (
 )
 
 func adv(title string) string {
-	return "Advancement a = { display = { title = " + title + ", description = \"d\", icon = { id = stone }, background = \"minecraft:block/stone\" }, criteria = { x = Tick() } }\n"
+	return "Advancement a { display = { title = " + title + ", description = \"d\", icon = { id = stone }, background = \"minecraft:block/stone\" }, criteria = { x = Tick() } }\n"
 }
 
 // A string where a text component goes is markup; one with no markup

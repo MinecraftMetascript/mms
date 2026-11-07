@@ -22,14 +22,14 @@ func orderSrc(biomes map[string]string, extra string) string {
 		}
 	}
 	for n := range names {
-		fmt.Fprintf(&b, "PlacedFeature %s = { feature = minecraft:oak, placement = [] }\n", n)
+		fmt.Fprintf(&b, "PlacedFeature %s { feature = minecraft:oak, placement = [] }\n", n)
 	}
 	for _, n := range []string{"one", "two", "three"} {
 		if list, ok := biomes[n]; ok {
 			if !strings.HasPrefix(list, "#") {
 				list = "[" + list + "]"
 			}
-			fmt.Fprintf(&b, `Biome %s = {
+			fmt.Fprintf(&b, `Biome %s {
   temperature = 0.5
   downfall = 0.5
   has_precipitation = false
@@ -105,13 +105,13 @@ func TestFeatureOrderCycle(t *testing.T) {
 	}
 
 	// Biomes in different dimensions never share a feature order.
-	dims := `Dimension d1 = { type = minecraft:overworld, generator = { type = noise, settings = minecraft:overworld, biome_source = { type = fixed, biome = one } } }
-Dimension d2 = { type = minecraft:overworld, generator = { type = noise, settings = minecraft:overworld, biome_source = { type = fixed, biome = two } } }
+	dims := `Dimension d1 { type = minecraft:overworld, generator = { type = noise, settings = minecraft:overworld, biome_source = { type = fixed, biome = one } } }
+Dimension d2 { type = minecraft:overworld, generator = { type = noise, settings = minecraft:overworld, biome_source = { type = fixed, biome = two } } }
 `
 	if got := orderDiags(t, orderSrc(map[string]string{"one": "a, b", "two": "b, a"}, dims)); len(got) != 0 {
 		t.Errorf("separate dimensions reported: %q", got)
 	}
-	dims = `Dimension d1 = { type = minecraft:overworld, generator = { type = noise, settings = minecraft:overworld, biome_source = { type = checkerboard, biomes = [one, two] } } }
+	dims = `Dimension d1 { type = minecraft:overworld, generator = { type = noise, settings = minecraft:overworld, biome_source = { type = checkerboard, biomes = [one, two] } } }
 `
 	if got := orderDiags(t, orderSrc(map[string]string{"one": "a, b", "two": "b, a", "three": "a, b"}, dims)); len(got) != 2 {
 		t.Errorf("shared dimension = %q", got)

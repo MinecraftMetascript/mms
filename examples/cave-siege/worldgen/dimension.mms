@@ -14,7 +14,7 @@
  * timelines are the overworld's, so a day still lasts 20 minutes: that is
  * the siege clock.
  */
-DimensionType caves = {
+DimensionType caves {
   height = 256
   logical_height = 256
   min_y = -64
@@ -67,7 +67,7 @@ DimensionType caves = {
 }
 
 /** The generator: our terrain, our surface rules, no oceans and no aquifers. */
-NoiseSettings caves = {
+NoiseSettings caves {
   sea_level = -64
   default_block = stone
   default_fluid = water
@@ -99,7 +99,7 @@ NoiseSettings caves = {
 }
 
 /** The cave world as its own dimension, for existing worlds. */
-Dimension caves = {
+Dimension caves {
   type = caves
   generator = {
     type = noise
@@ -239,7 +239,7 @@ Dimension caves = {
  * "Cave Siege" on the world type list. The overworld becomes caves; the
  * Nether and the End are vanilla.
  */
-WorldPreset cave_siege = {
+WorldPreset cave_siege {
   dimensions = {
     "minecraft:overworld" = {
       type = caves

@@ -70,7 +70,7 @@ Recipe rubies = Shapeless([emerald_block], emerald * 9)
 ## Advancements
 
 ```
-Advancement first_gem = {
+Advancement first_gem {
   criteria = { has_gem = InventoryChanged(items = [{ items = [diamond, emerald] }]) }
 }
 ```
@@ -155,12 +155,12 @@ DensityFunction hills = Noise({ base_octave = -6, amplitude_modifiers = [1, 1] }
 
 This writes `worldgen/noise/mms_gen/hills/noise.json` and gives `hills` the noise `<ns>:mms_gen/hills/noise`. A second inline value of the same kind in the same declaration is named `noise_2`, and so on. Each inline noise gets its own id, so two identical inline noises still produce different noise. To share one noise, declare it with a name. Where the game does take inline values, such as density functions, features and surface rules, they stay inline.
 
-To turn an inline value into a declaration of its own, put the cursor in it and open the code actions (Ctrl/⌘+. in VS Code and the web editor). **Extract { ... } to a Noise declaration** moves the value above the declaration that holds it, as `Noise hills_noise = { ... }`, and writes `hills_noise` in its place. The action is offered for every value the build would write under `mms_gen/`, and for any inline value where an id of its kind would also do, such as an inline density function or predicate. The new name is the holding declaration's name and the field's name (or the kind's, for an argument), with a number added if it is taken. VS Code and the web editor open the rename box on it straight away.
+To turn an inline value into a declaration of its own, put the cursor in it and open the code actions (Ctrl/⌘+. in VS Code and the web editor). **Extract { ... } to a Noise declaration** moves the value above the declaration that holds it, as `Noise hills_noise { ... }`, and writes `hills_noise` in its place. The action is offered for every value the build would write under `mms_gen/`, and for any inline value where an id of its kind would also do, such as an inline density function or predicate. The new name is the holding declaration's name and the field's name (or the kind's, for an argument), with a number added if it is taken. VS Code and the web editor open the rename box on it straight away.
 
 A function id takes `run { }`, a block of commands compiled as a `Function` with no parameters:
 
 ```mms
-Advancement found = {
+Advancement found {
   criteria = { got = { trigger = inventory_changed } }
   rewards = { function = run {
     /say found it
@@ -175,9 +175,9 @@ A plain `{ }` there is an error, with a quick fix that adds `run`.
 Textures, sounds and structure templates are files, not declarations. Keep them anywhere in the project and name them where they are used:
 
 ```
-PaintingVariant sunset = { width = 2, height = 1, asset_id = Texture("art/sunset.png") }
-JukeboxSong tune = { sound_event = Sound("music/tune.ogg"), description = "Tune", length_in_seconds = 30, comparator_output = 3 }
-TemplatePool houses = { fallback = minecraft:empty, elements = [WeightedElement(1, SinglePoolElement(rigid, StructureFile("builds/house.nbt"), minecraft:empty))] }
+PaintingVariant sunset { width = 2, height = 1, asset_id = Texture("art/sunset.png") }
+JukeboxSong tune { sound_event = Sound("music/tune.ogg"), description = "Tune", length_in_seconds = 30, comparator_output = 3 }
+TemplatePool houses { fallback = minecraft:empty, elements = [WeightedElement(1, SinglePoolElement(rigid, StructureFile("builds/house.nbt"), minecraft:empty))] }
 ```
 
 Each call stands for the id the file gets in your namespace: its base name, lowercased, or the second argument, as in `Texture("art/Sunset Final.png", "sunset")`. Only files that code uses are copied, to the path the game expects:
@@ -209,7 +209,7 @@ The [`embers`](../../examples/embers/) example ships its own art: [custom items]
 Block states, models and the other JSON files of a resource pack are declarations too. They are written to `assets/<ns>/...` in the resource pack, and the schema checks them like any other resource.
 
 ```
-BlockState minecraft:glowstone = {
+BlockState minecraft:glowstone {
   variants = {
     "" = [
       { model = block/glowstone_1, weight = 3 },
@@ -217,8 +217,8 @@ BlockState minecraft:glowstone = {
     ]
   }
 }
-Model block/glowstone_1 = { parent = block/cube_all, textures = { all = Texture("art/glow1.png", "block/glowstone_1") } }
-Model block/glowstone_2 = { parent = block/cube_all, textures = { all = Texture("art/glow2.png", "block/glowstone_2") } }
+Model block/glowstone_1 { parent = block/cube_all, textures = { all = Texture("art/glow1.png", "block/glowstone_1") } }
+Model block/glowstone_2 { parent = block/cube_all, textures = { all = Texture("art/glow2.png", "block/glowstone_2") } }
 ```
 
 | Kind | Writes | For |
@@ -226,7 +226,7 @@ Model block/glowstone_2 = { parent = block/cube_all, textures = { all = Texture(
 | `BlockState` | `blockstates/` | which model a block shows in each state: `variants`, weighted lists, `multipart` |
 | `Model` | `models/` | block and item models, with `parent`, `textures` and `elements` |
 | `ItemModel` | `items/` | the item model definition that the `item_model` component names |
-| `Lang` | `lang/` | translations, such as `Lang en_us = { "item.my_pack.charm" = "Charm" }` |
+| `Lang` | `lang/` | translations, such as `Lang en_us { "item.my_pack.charm" = "Charm" }` |
 | `Equipment` | `equipment/` | worn armour layers, named by the `equippable` component's `asset_id` |
 | `Font`, `Atlas`, `Particle`, `PostEffect`, `WaypointStyle` | `font/`, `atlases/`, `particles/`, `post_effect/`, `waypoint_style/` | as in the game |
 
@@ -287,7 +287,7 @@ To run code when a player right-clicks with the item, hits with it, eats it and 
 A `Book` is a written book. Its pages are written in book markup, a small Markdown-like format, instead of text components:
 
 ```
-Objective deaths = "deathCount"
+Objective deaths: deathCount
 
 Book guide {
   title = "Library Guide"
@@ -336,7 +336,7 @@ The book's name stands for the book wherever a [custom item](#custom-items) name
 Book markup is the language's one text format. Wherever a text component goes, such as an advancement's title, a text display, a sign, an item's `lore` or a dialog, a string is markup. A string with no markup in it is the same string in the output, so plain names stay plain:
 
 ```
-Advancement first_gem = {
+Advancement first_gem {
   display = {
     title = "**First gem**"
     description = "{gray}Mine a {aqua}diamond{/} or an {green}emerald"
