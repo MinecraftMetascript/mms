@@ -5,12 +5,14 @@ package ide
 
 import (
 	"fmt"
+	"regexp"
 	"slices"
 	"sort"
 	"strings"
 
 	"github.com/minecraftmetascript/mms/engine/command"
 	"github.com/minecraftmetascript/mms/engine/eval"
+	"github.com/minecraftmetascript/mms/engine/fn"
 	"github.com/minecraftmetascript/mms/engine/format"
 	"github.com/minecraftmetascript/mms/engine/jsonv"
 	"github.com/minecraftmetascript/mms/engine/prelude"
@@ -1563,6 +1565,12 @@ func (s *Session) commandItems(text string, off int) ([]Item, int) {
 		if tg, ok := strings.CutPrefix(reg, "tag/"); ok {
 			folder = "tags/" + tg
 		}
+		if reg == "storage" {
+			return s.storageIDs()
+		}
+		if id, ok := strings.CutPrefix(reg, "storage "); ok {
+			return s.storagePaths(id)
+		}
 		var out []string
 		for _, sym := range s.R.Syms.All() {
 			switch {
@@ -1590,6 +1598,73 @@ func (s *Session) commandItems(text string, off int) ([]Item, int) {
 		items = append(items, it)
 	}
 	return items, ws
+}
+
+// storageRef finds the storage ids that commands in the project use.
+var storageRef = regexp.MustCompile(`\bstorage +([a-z0-9_.\-]+:[a-z0-9_.\-/]+)`)
+
+// storageIDs are the command storages a `storage` argument can name: the
+// one the project's Storage declarations keep their records in, then the
+// ones the project's commands already use.
+func (s *Session) storageIDs() []string {
+	seen := map[string]bool{}
+	var out []string
+	add := func(id string) {
+		if !seen[id] {
+			seen[id] = true
+			out = append(out, id)
+		}
+	}
+	for _, sym := range s.R.Syms.All() {
+		if sym.Kind.MMS == "Storage" {
+			add(fn.Storage(sym.NS))
+		}
+	}
+	var used []string
+	for _, u := range s.R.Units {
+		if u.File == nil || prelude.Is(u.Path) {
+			continue
+		}
+		for _, t := range u.File.Tokens {
+			if t.Kind != parser.MMSLexerCOMMAND {
+				continue
+			}
+			for _, m := range storageRef.FindAllStringSubmatch(string(u.File.Src[t.Sp.Start:t.Sp.End]), -1) {
+				used = append(used, m[1])
+			}
+		}
+	}
+	sort.Strings(used)
+	for _, id := range used {
+		add(id)
+	}
+	return out
+}
+
+// storagePaths are the paths a command can write after storage id: the
+// Storage declarations kept there and their fields, `game` and
+// `game.wave`.
+func (s *Session) storagePaths(id string) []string {
+	var out []string
+	for _, sym := range s.R.Syms.All() {
+		if sym.Kind.MMS != "Storage" || fn.Storage(sym.NS) != id {
+			continue
+		}
+		name := sym.Path
+		out = append(out, name)
+		tn, ok := sym.Decl.Type.(*syntax.TypeName)
+		if !ok {
+			continue
+		}
+		if t := s.R.Syms.Types["::mms::"+tn.Name]; t != nil && t.Kind == "struct" {
+			for _, f := range t.Fields {
+				if f.Kind == "pair" && f.Key != "" {
+					out = append(out, name+"."+f.Key)
+				}
+			}
+		}
+	}
+	return out
 }
 
 // InlayHint is a label shown after a span, such as the base item a custom

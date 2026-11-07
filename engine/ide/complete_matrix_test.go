@@ -135,6 +135,9 @@ func TestCompletionMatrix(t *testing.T) {
 		{name: "command name", src: "Function f {\n  /scoreb|\n}", want: []string{"scoreboard"}, replace: "scoreb"},
 		{name: "command criterion", src: "Function f {\n  /scoreboard objectives add x |\n}", want: []string{"dummy", "deathCount"}},
 		{name: "command item", src: "Function f {\n  /give @s minecraft:dia|\n}", want: []string{"diamond"}, replace: "minecraft:dia"},
+		{name: "command storage", src: "Type S { wave: int = 0 }\nStorage game: S\nFunction f {\n  /data get storage other:x\n  /data modify storage |\n}", want: []string{"test:mms", "other:x"}},
+		{name: "command storage in execute", src: "Type S { wave: int = 0 }\nStorage game: S\nFunction f {\n  /execute store result storage |\n}", want: []string{"test:mms"}},
+		{name: "command storage path", src: "Type S { wave: int = 0 }\nStorage game: S\nFunction f {\n  /data modify storage test:mms |\n}", want: []string{"game", "game.wave"}},
 		{name: "command in execute block", src: "Function f {\n  As(@a).At(@s) {\n    /|\n  }\n}", want: []string{"say"}},
 
 		{name: "interpolation", src: "Function f(n: int) {\n  let x = 1\n  /say ${|}\n}", want: []string{"n", "x"}, not: []string{"say", "As"}},

@@ -74,6 +74,10 @@ func (c *Checker) Complete(text string, off int, ids func(registry string) []str
 		for _, a := range args {
 			ch := n.Children[a]
 			detail := argLabel(a, ch)
+			for _, v := range c.storageValues(ch, src[:ws], ids) {
+				v.Detail = detail
+				add(v)
+			}
 			for _, v := range c.values(ch, ids) {
 				v.Detail = detail
 				add(v)
@@ -81,6 +85,33 @@ func (c *Checker) Complete(text string, off int, ids func(registry string) []str
 		}
 	}
 	return out, ws
+}
+
+// storageValues suggests the storages after `storage`, as in
+// `data modify storage |`, from ids("storage"), and the paths in one
+// after its id, `storage demo:mms |`, from ids("storage " + id). Other
+// ids have no registry to come from.
+func (c *Checker) storageValues(n *spec.CommandNode, before []rune, ids func(string) []string) []Suggestion {
+	if ids == nil {
+		return nil
+	}
+	words := strings.Fields(string(before))
+	var list []string
+	switch strings.TrimPrefix(n.Parser, "minecraft:") {
+	case "resource_location":
+		if len(words) >= 1 && words[len(words)-1] == "storage" {
+			list = ids("storage")
+		}
+	case "nbt_path":
+		if len(words) >= 2 && words[len(words)-2] == "storage" {
+			list = ids("storage " + words[len(words)-1])
+		}
+	}
+	out := make([]Suggestion, 0, len(list))
+	for _, id := range list {
+		out = append(out, Suggestion{Label: id, ID: true})
+	}
+	return out
 }
 
 // values suggests values for an argument.
