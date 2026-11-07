@@ -297,6 +297,18 @@
 		}
 		return out;
 	});
+	// The pack's structure files as data URLs, by pack path, so the jigsaw
+	// simulation can draw their blocks.
+	const structures = $derived.by(() => {
+		const out: Record<string, string> = {};
+		if (!engine) return out;
+		for (const a of engine.outputAssets) {
+			if (!a.path.endsWith('.nbt')) continue;
+			const f = project.assets.find((x) => x.path === a.src);
+			if (f) out[a.path] = `data:application/octet-stream;base64,${f.data}`;
+		}
+		return out;
+	});
 	function exportPack(resources = false) {
 		if (!engine) return;
 		if (engine.hasErrors && !confirm('The project has errors, so the pack is incomplete. Download it anyway?')) return;
@@ -483,6 +495,7 @@
 							texts={engine.outputTexts}
 							assets={engine.outputAssets}
 							{textures}
+							{structures}
 							page={bookPage}
 							path={previewPath}
 							{pinned}

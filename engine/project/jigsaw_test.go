@@ -131,6 +131,33 @@ func TestJigsawOrientationAndJoint(t *testing.T) {
 	}
 }
 
+// Selection and placement priorities are read as whatever integer type
+// the file stores them in, and are 0 when absent.
+func TestJigsawPriorities(t *testing.T) {
+	palette := []any{map[string]any{"Name": "minecraft:jigsaw", "Properties": map[string]any{"orientation": "north_up"}}}
+	jig := func(x int32, extra map[string]any) any {
+		data := map[string]any{"id": "minecraft:jigsaw", "pool": "demo:a", "name": "demo:b", "target": "demo:c"}
+		for k, v := range extra {
+			data[k] = v
+		}
+		return map[string]any{"pos": []any{x, int32(0), int32(0)}, "state": int32(0), "nbt": data}
+	}
+	got := Jigsaws(map[string]any{"palette": palette, "blocks": []any{
+		jig(0, nil),
+		jig(1, map[string]any{"selection_priority": int32(3), "placement_priority": int32(-2)}),
+		jig(2, map[string]any{"selection_priority": int8(1)}),
+	}})
+	want := [][2]int{{0, 0}, {3, -2}, {1, 0}}
+	if len(got) != len(want) {
+		t.Fatalf("got %v", got)
+	}
+	for i, j := range got {
+		if p := [2]int{j.SelectionPriority, j.PlacementPriority}; p != want[i] {
+			t.Errorf("jigsaw %d priorities = %v, want %v", i, p, want[i])
+		}
+	}
+}
+
 // orientedPiece builds a structure file of the given size whose jigsaw
 // blocks are each x,y,z|orientation|pool|name|target.
 func orientedPiece(t *testing.T, size [3]int32, jigsaws ...string) []byte {

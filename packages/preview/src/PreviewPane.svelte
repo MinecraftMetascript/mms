@@ -10,6 +10,7 @@
 	import { itemContext } from './inspect/items';
 	import { inspectable } from './inspect/common';
 	import JigsawView from './jigsaw/JigsawView.svelte';
+	import JigsawSim from './jigsaw/JigsawSim.svelte';
 	import { jigsawGraph } from './jigsaw/graph';
 	import { bookAt, itemPath, jigsawable, runnable, shows } from './paths';
 	import FunctionRun from './run/FunctionRun.svelte';
@@ -41,8 +42,12 @@
 		 * by their path in the pack, so a custom item shows its icon.
 		 */
 		textures?: Record<string, string>;
+		/** The pack's copied structure files as data: URLs, by their path in the pack, for the jigsaw simulation's blocks. */
+		structures?: Record<string, string>;
 	}
-	let { output, path, pinned, onunpin, createWorker, hint, unpinLabel = 'unpin it', items = [], texts = [], page = 0, assets = [], textures = {} }: Props = $props();
+	let { output, path, pinned, onunpin, createWorker, hint, unpinLabel = 'unpin it', items = [], texts = [], page = 0, assets = [], textures = {}, structures = {} }: Props = $props();
+	// A jigsaw structure shows its connections or a simulated layout.
+	let jigsawTab = $state<'connections' | 'simulation'>('connections');
 	const itemInfo = $derived(itemContext(output, items, textures));
 
 	const file = $derived(output.find((f) => f.path === path) ?? null);
@@ -65,6 +70,27 @@
 			<BookView stack={book.text} {output} {page} />
 		{:else if text}
 			<ChatView {text} {output} />
+		{:else if jigsaw && jigsaw.root.kind === 'structure' && file}
+			<div class="flex h-full flex-col">
+				<div class="flex gap-1 border-b border-line px-2 pt-1 text-xs" role="tablist" aria-label="Jigsaw preview">
+					{#each [['connections', 'Connections'], ['simulation', 'Simulation']] as [id, label] (id)}
+						<button
+							type="button"
+							role="tab"
+							aria-selected={jigsawTab === id}
+							class="-mb-px border-b-2 px-2 py-1 {jigsawTab === id ? 'border-accent font-medium' : 'border-transparent text-muted hover:text-ink'}"
+							onclick={() => (jigsawTab = id as typeof jigsawTab)}>{label}</button
+						>
+					{/each}
+				</div>
+				<div class="min-h-0 flex-1">
+					{#if jigsawTab === 'simulation'}
+						<JigsawSim path={file.path} {output} {assets} {structures} />
+					{:else}
+						<JigsawView graph={jigsaw} />
+					{/if}
+				</div>
+			</div>
 		{:else if jigsaw}
 			<JigsawView graph={jigsaw} />
 		{:else if file && jigsawable(file.path)}

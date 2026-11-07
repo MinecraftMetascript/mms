@@ -27,7 +27,7 @@ export interface OutputAsset {
 	/** "resources" for a resource pack file. */
 	pack?: string;
 	/** For a structure file: its jigsaw blocks. */
-	jigsaws?: { pos: [number, number, number]; pool: string; name: string; target: string; orientation?: string; joint?: string; final_state?: string; label?: string }[];
+	jigsaws?: { pos: [number, number, number]; pool: string; name: string; target: string; orientation?: string; joint?: string; final_state?: string; label?: string; selection_priority?: number; placement_priority?: number }[];
 	/** For a structure file: its size in blocks, x y z. */
 	size?: [number, number, number];
 }
@@ -59,6 +59,8 @@ export type ToPanel =
 			assets: OutputAsset[];
 			/** The pack's copied .png textures as data URLs, by pack path: custom item icons. */
 			textures?: Record<string, string>;
+			/** The pack's structure files as data URLs, by pack path: blocks for the jigsaw simulation. */
+			structures?: Record<string, string>;
 	  }
 	/**
 	 * The output path to show, chosen with a Preview CodeLens or the

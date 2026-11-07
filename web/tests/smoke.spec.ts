@@ -1049,6 +1049,48 @@ test('Deepslate is credited in About, on previews, and in the shipped licenses',
 	expect(text).toContain('Copyright (c) 2022 SpyglassMC');
 });
 
+test('a jigsaw structure simulates a layout in 3D, with a seed, blocks and a slice', async ({ page }) => {
+	const errors: string[] = [];
+	page.on('pageerror', (e) => errors.push(e.message));
+	page.on('dialog', (d) => d.accept());
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	await page.getByRole('button', { name: /Examples/ }).click();
+	await page.getByRole('button', { name: /jigsaw/ }).click();
+	await expect(status(page)).toHaveText(/No problems/);
+	await page.locator('.cm-line', { hasText: 'JigsawStructure dungeon {' }).click();
+	await page.getByRole('tab', { name: 'Simulation' }).click();
+	const sim = page.getByLabel('Jigsaw simulation');
+	const summary = sim.getByLabel('Simulation summary');
+	// The dungeon is six pieces deep, and caps close the doors past that.
+	await expect(summary).toContainText(/\d+ pieces · 7 deep \(size 6\)/);
+	const first = await summary.textContent();
+	// The same seed gives the same layout; another seed another one.
+	await sim.getByLabel('Layout seed').fill('42');
+	await expect(summary).toContainText('46 pieces');
+	await sim.getByLabel('Layout seed').fill('0');
+	await expect(summary).toHaveText(first!);
+
+	// Clicking the middle of the view picks a piece and shows what joined it.
+	const canvas = sim.getByLabel('Simulated structure');
+	await page.getByRole('button', { name: 'Fit' }).click();
+	const box = (await canvas.boundingBox())!;
+	await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+	const piece = sim.getByLabel('Simulated piece');
+	await expect(piece).toContainText(/start|halls|rooms|caps/);
+	await page.screenshot({ path: 'test-results/jigsaw-boxes.png' });
+
+	// Blocks reads the structure files; a slice cuts through them.
+	await sim.getByRole('button', { name: 'Blocks' }).click();
+	await expect(sim).not.toContainText('Blocks not read');
+	await sim.getByRole('group', { name: 'Slice' }).getByRole('button', { name: 'y' }).click();
+	await expect(sim.getByLabel('Slice position')).toBeVisible();
+	await sim.getByLabel('Slice position').fill('1');
+	await expect(sim).toContainText('y ≤ 1');
+	await page.screenshot({ path: 'test-results/jigsaw-blocks.png' });
+	expect(errors).toEqual([]);
+});
+
 test('a jigsaw structure previews which pieces join which, and marks dead ends', async ({ page }) => {
 	const errors: string[] = [];
 	page.on('pageerror', (e) => errors.push(e.message));

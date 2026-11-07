@@ -126,6 +126,12 @@ The structure set's `salt` is made from the structure's id unless you set it, so
 
 `biomes` has the type `Ids<worldgen/biome>`: a list of ids, or one id or tag. A Blueprint field can use `Ids<...>` the same way.
 
+### Simulating a jigsaw structure
+
+The Preview of a jigsaw structure has two tabs. **Connections** shows which pools grow into which. **Simulation** grows one layout the way the game does and shows it in 3D: **Boxes** draws each piece as a box coloured by its depth, with its jigsaw blocks marked green (joined), red (found nothing) or grey (an end on purpose); **Blocks** draws the pieces' blocks as plain coloured cubes. **Slice** cuts the view along x, y or z to see inside. Click a piece to see its pool, its depth, how it is turned and what each of its jigsaw blocks joined. The **layout seed** picks the layout, and **Re-roll** picks another.
+
+The simulation is best effort. It follows the game's rules for pools, weights, fallbacks, `depth`, `max_distance`, rotations, overlaps and jigsaw priorities, but leaves out the terrain (`terrain_matching` pieces are placed like rigid ones, and `heightmap` and `terrain_adaptation` are ignored), processors, pool aliases and world height limits. A layout seed is not a world seed: the same layout seed always gives the same layout, but not the one a world shows in some chunk.
+
 ### Jigsaw holes
 
 A jigsaw block joins pieces by name: its target is the name of a jigsaw block in a piece of its pool. Those names are typed into the game's jigsaw screen, so a typo only shows as a structure that stops growing. `JigsawHole` declares a name, and writes no file:
