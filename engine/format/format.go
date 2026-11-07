@@ -349,10 +349,10 @@ func (p *printer) decl(d *syntax.Decl) doc {
 		parts = append(parts, p.params(d.Params))
 	}
 	if d.Type != nil {
-		parts = append(parts, txt(": "+syntax.TypeText(d.Type)))
+		parts = append(parts, txt(": "), p.typ(d.Type))
 	}
 	if d.TypeValue != nil {
-		parts = append(parts, txt(" = "+syntax.TypeText(d.TypeValue)))
+		parts = append(parts, txt(" = "), p.typ(d.TypeValue))
 	}
 	if d.Value != nil {
 		parts = append(parts, p.assigned(d.Value))
@@ -403,13 +403,64 @@ func (p *printer) typed(word string, name *syntax.Name, t syntax.TypeExpr, v syn
 	if name != nil {
 		s += name.Text
 	}
-	if t != nil {
-		s += ": " + syntax.TypeText(t)
+	if t == nil {
+		if v == nil {
+			return txt(s)
+		}
+		return cat(txt(s), p.assigned(v))
 	}
+	d := cat(txt(s+": "), p.typ(t))
 	if v == nil {
-		return txt(s)
+		return d
 	}
-	return cat(txt(s), p.assigned(v))
+	return cat(d, p.assigned(v))
+}
+
+// typ prints a type. A record written in place, `{ x: int }`, prints as
+// a block of field declarations, keeping their doc comments and defaults.
+func (p *printer) typ(t syntax.TypeExpr) doc {
+	if !hasRecord(t) {
+		return txt(syntax.TypeText(t))
+	}
+	switch t := t.(type) {
+	case *syntax.TypeRecord:
+		items := make([]syntax.Stmt, len(t.Fields))
+		for i, f := range t.Fields {
+			items[i] = f
+		}
+		// One line when the author wrote it so, like a value block.
+		return p.blockDoc(&syntax.Block{Items: items, Sp: t.Sp}, !oneLine(p.f, t.Sp))
+	case *syntax.TypeOptional:
+		return cat(p.typ(t.X), txt("?"))
+	case *syntax.TypeList:
+		return cat(txt("["), p.typ(t.Elem), txt("]"))
+	case *syntax.TypeParen:
+		return cat(txt("("), p.typ(t.X), txt(")"))
+	case *syntax.TypeMap:
+		return cat(txt("{"+syntax.TypeText(t.Key)+": "), p.typ(t.Value), txt("}"))
+	case *syntax.TypeUnion:
+		var parts []doc
+		for i, a := range t.Arms {
+			if i > 0 {
+				parts = append(parts, txt(" | "))
+			}
+			parts = append(parts, p.typ(a))
+		}
+		return cat(parts...)
+	}
+	return txt(syntax.TypeText(t))
+}
+
+// hasRecord reports whether a record written in place is anywhere in t.
+func hasRecord(t syntax.TypeExpr) bool {
+	found := false
+	syntax.Walk(t, func(n syntax.Node) bool {
+		if _, ok := n.(*syntax.TypeRecord); ok {
+			found = true
+		}
+		return !found
+	})
+	return found
 }
 
 // block prints `{ ... }`. Statement blocks and declaration bodies always
@@ -420,6 +471,11 @@ func (p *printer) block(b *syntax.Block, forceBreak bool) doc {
 		// items stays on one line only when the author wrote it so.
 		forceBreak = hasStatements(b) || len(b.Items) > 1 && !oneLine(p.f, b.Span())
 	}
+	return p.blockDoc(b, forceBreak)
+}
+
+// blockDoc prints `{ ... }`, on one line when it fits unless forceBreak.
+func (p *printer) blockDoc(b *syntax.Block, forceBreak bool) doc {
 	if len(b.Items) == 0 {
 		inner := p.dangling(b.Span().End)
 		if inner == nil {

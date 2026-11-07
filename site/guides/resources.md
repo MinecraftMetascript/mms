@@ -120,7 +120,7 @@ JigsawStructure dungeon {
 }
 ```
 
-Each entry of `pools` is a `TemplatePool` of that name, so a jigsaw block draws from `<namespace>:halls`. An entry is a list of pieces, or a whole pool with its `fallback`. `Piece("halls/hall", 3)` is the structure file `structures/halls/hall.nbt` with weight 3. It also takes `processors` and `projection`. Any other pool element, such as a vanilla template, can go in the list too.
+Each entry of `pools` is a `TemplatePool` of that name, so a jigsaw block draws from `<namespace>:halls`. An entry is a list of pieces, or a whole pool with its `fallback`. `Piece("halls/hall", 3)` is the structure file `structures/halls/hall.nbt` with weight 3. It also takes `projection`, and `processors`: a processor list's id, such as `processors = minecraft:street_plains`, or the processors written inline, such as `processors = [BlockRot(integrity = 0.8)]`. Any other pool element, such as a vanilla template, can go in the list too.
 
 The structure set's `salt` is made from the structure's id unless you set it, so two structures never share one by accident. `heightmap = WORLD_SURFACE_WG` measures `height` from the ground, as villages do. `terrain_adaptation` and `max_distance` (80 by default) are the `Structure`'s fields of those names. The name stands for the structure's id in a command, as in `/locate structure ${dungeon}`. The [`jigsaw`](../../examples/jigsaw/) and [`treasure`](../../examples/treasure/) examples use it.
 

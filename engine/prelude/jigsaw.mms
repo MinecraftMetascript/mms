@@ -4,12 +4,14 @@
 /**
  * One structure file as a weighted pool entry: `Piece("halls/hall", 3)`
  * reads structures/halls/hall.nbt and gives it weight 3. The file becomes
- * the structure `<namespace>:halls/hall` in the pack.
+ * the structure `<namespace>:halls/hall` in the pack. `processors` is a
+ * processor list's id, or the processors written inline:
+ * `Piece("halls/hall", processors = [BlockRot(integrity = 0.8)])`.
  */
 Template Piece(
   path: string,
   weight: int = 1,
-  processors: Id<worldgen/processor_list> = minecraft:empty,
+  processors: Id<worldgen/processor_list> | ProcessorList = minecraft:empty,
   projection: Projection = rigid,
 ): WeightedElement =
   WeightedElement(weight, SinglePoolElement(projection, StructureFile("structures/${path}.nbt", path), processors))

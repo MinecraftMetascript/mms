@@ -2,6 +2,7 @@ package project
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -83,6 +84,13 @@ func TestStorageErrors(t *testing.T) {
 		{"Type S { a: int = 0 }\nStorage g: S", "keeps its own values"},
 		{"Type S { a: int = 0 }\nStorage s: S = {}", "starts from its type's defaults"},
 		{"Type S { a: int = 0 }\nStorage s: S\nFunction f {\n  s.a = true\n}", "expected int"},
+		{"Type S { mode: \"x\" | \"y\" }\nStorage s: S\nFunction f {\n  s.mode = \"z\"\n}", `expected one of "x" or "y", but this is "z"`},
+		{"Type S { mode: \"x\" | \"y\" }\nStorage s: S\nFunction f {\n  s.mode += \"x\"\n}", "set it with ="},
+		{"Type S {\n  blah: { x: int, y: int }\n}\nStorage s: S\nFunction f {\n  s.blah.z = 1\n}", "s.blah has no field 'z'"},
+		{"Type S {\n  a: int\n}\nStorage s: S\nFunction f {\n  s.a.b = 1\n}", "s.a is an integer, not a record"},
+		{"Type S {\n  blah: { x: int, y }\n}", "a record's field needs a type: y: Type"},
+		{"const modes: [string] = [\"a\", \"b\"]\nFunction f {\n  let m = modes[2]\n}", "index 2 is outside the list of 2"},
+		{"Global g: int = 0\nconst xs: [int] = [1, g]\nFunction f {\n  let m = xs[g]\n}", "holds int or string constants"},
 		{"Function f(): bool {\n  return exists(\"x\")\n}", "expected a selector"},
 		{"Function f(): int {\n  return count()\n}", "takes one selector"},
 	} {
@@ -97,6 +105,120 @@ func TestStorageErrors(t *testing.T) {
 		}
 		if len(msgs) == 0 || !strings.Contains(strings.Join(msgs, "\n"), tc.want) {
 			t.Errorf("%q: errors %q, want %q", tc.src, msgs, tc.want)
+		}
+	}
+}
+
+// A field of a union of string literals is a string functions read and
+// write, and it starts at the first of them.
+func TestStorageChoices(t *testing.T) {
+	src := `Type S {
+  mode: "x" | "y"
+}
+Storage s: S
+Function f(): int {
+  tell(@a, "Mode ${s.mode}")
+  if (s.mode == "x") {
+    s.mode = "y"
+    return 1
+  }
+  return 0
+}
+`
+	_, r := bookProject(t, src, nil)
+	if d := diagText(r); d != "" {
+		t.Fatal(d)
+	}
+	ld := emitted(t, r, "data/demo/function/mms_gen/load.mcfunction")
+	if want := `execute unless data storage demo:mms s.mode run data modify storage demo:mms s.mode set value "x"`; !strings.Contains(ld, want) {
+		t.Errorf("load lacks %s:\n%s", want, ld)
+	}
+	vm := load(t, r, "demo")
+	if got := call(t, vm, "demo:f"); got != 1 {
+		t.Errorf("f = %d, want 1", got)
+	}
+	if got := call(t, vm, "demo:f"); got != 0 {
+		t.Errorf("f again = %d, want 0", got)
+	}
+}
+
+// A field can hold a record written in place, or a Type; functions reach
+// its fields by path, and the load function sets each one's default.
+func TestStorageNested(t *testing.T) {
+	src := `Type Pos {
+  x: int
+  y: int = 64
+}
+Type S {
+  blah: {
+    x: int
+    y: int = 2
+    /** The way it faces. */
+    facing: "north" | "south"
+  }
+  home: Pos
+}
+Storage s: S
+Function f(): int {
+  s.blah.x += 3
+  s.home.x = s.blah.x + s.blah.y
+  if (s.blah.facing == "north") {
+    s.blah.facing = "south"
+  }
+  return s.home.x + s.home.y
+}
+`
+	_, r := bookProject(t, src, nil)
+	if d := diagText(r); d != "" {
+		t.Fatal(d)
+	}
+	ld := emitted(t, r, "data/demo/function/mms_gen/load.mcfunction")
+	for _, want := range []string{
+		"execute unless data storage demo:mms s.blah.x run data modify storage demo:mms s.blah.x set value 0",
+		"execute unless data storage demo:mms s.blah.y run data modify storage demo:mms s.blah.y set value 2",
+		`execute unless data storage demo:mms s.blah.facing run data modify storage demo:mms s.blah.facing set value "north"`,
+		"execute unless data storage demo:mms s.home.y run data modify storage demo:mms s.home.y set value 64",
+	} {
+		if !strings.Contains(ld, want) {
+			t.Errorf("load lacks %s:\n%s", want, ld)
+		}
+	}
+	vm := load(t, r, "demo")
+	if got := call(t, vm, "demo:f"); got != 69 {
+		t.Errorf("f = %d, want 69", got)
+	}
+	if got := call(t, vm, "demo:f"); got != 72 {
+		t.Errorf("f again = %d, want 72", got)
+	}
+}
+
+// A const list read at an index known only when the function runs picks
+// its item then: cycling through modes kept in storage.
+func TestConstListIndex(t *testing.T) {
+	src := `Type S {
+  mode: int
+}
+Storage st: S
+const modes: [string] = ["Measure", "Replace", "Copy"]
+const costs: [int] = [1, 5, 9]
+Function next(): int {
+  st.mode = (st.mode + 1) % len(modes)
+  let name = modes[st.mode]
+  tell(@a, "Mode: ${modes[st.mode]}")
+  if (name == "Copy") {
+    return 100 + costs[st.mode]
+  }
+  return costs[st.mode] + ${len(costs)} * 10
+}
+`
+	_, r := bookProject(t, src, nil)
+	if d := diagText(r); d != "" {
+		t.Fatal(d)
+	}
+	vm := load(t, r, "demo")
+	for i, want := range []int32{35, 109, 31, 35} {
+		if got := call(t, vm, "demo:next"); got != want {
+			t.Errorf("call %d: next = %d, want %d", i+1, got, want)
 		}
 	}
 }
@@ -117,5 +239,73 @@ func TestStorageDeps(t *testing.T) {
 	}
 	if !found {
 		t.Errorf("b.mms was not rechecked: %v", r.Diagnostics("b.mms"))
+	}
+}
+
+// TestStorageOptionalRecordDefaults keeps the inner defaults of a record
+// field whose type is wrapped in parentheses or marked optional.
+func TestStorageOptionalRecordDefaults(t *testing.T) {
+	src := `Type S {
+  a: ({ x: int = 5 })
+  b: { y: int = 7 }?
+}
+Storage s: S
+`
+	_, r := bookProject(t, src, nil)
+	if d := diagText(r); d != "" {
+		t.Fatal(d)
+	}
+	ld := emitted(t, r, "data/demo/function/mms_gen/load.mcfunction")
+	for _, want := range []string{
+		"s.a.x set value 5",
+		"s.b.y set value 7",
+	} {
+		if !strings.Contains(ld, want) {
+			t.Errorf("load lacks %s:\n%s", want, ld)
+		}
+	}
+}
+
+// TestStorageIncremental checks that a change to a nested field or to a
+// field's choices reaches functions that use the Storage.
+func TestStorageIncremental(t *testing.T) {
+	src := `Namespace demo
+Type S {
+  blah: { x: int }
+  mode: "a" | "b"
+}
+Storage s: S
+Function f {
+  s.blah.x = 1
+  s.mode = "b"
+}
+`
+	edits := []func(string) string{
+		func(s string) string { return strings.Replace(s, "blah: { x: int }", "blah: { x: string }", 1) },
+		func(s string) string { return strings.Replace(s, `"a" | "b"`, `"a" | "c"`, 1) },
+		func(s string) string { return strings.Replace(s, "blah: { x: string }", "blah: { x: int }", 1) },
+		func(s string) string { return strings.Replace(s, `"a" | "c"`, `"a" | "b"`, 1) },
+	}
+	describe := func(r *Result) string {
+		var sb strings.Builder
+		for _, d := range r.Diagnostics("main.mms") {
+			fmt.Fprintf(&sb, "%v %s %s\n", d.Sp, d.Code, d.Message)
+		}
+		sb.WriteString(dumpFiles(r.Emit()))
+		return sb.String()
+	}
+	p := New(spec.MustDefault(), DefaultConfig())
+	p.SetFile("main.mms", src)
+	p.Analyze(context.Background())
+	for i, edit := range edits {
+		src = edit(src)
+		p.SetFile("main.mms", src)
+		got, _ := p.Analyze(context.Background())
+		fresh := New(spec.MustDefault(), DefaultConfig())
+		fresh.SetFile("main.mms", src)
+		want, _ := fresh.Analyze(context.Background())
+		if g, w := describe(got), describe(want); g != w {
+			t.Errorf("edit %d: incremental result differs\n--- incremental\n%s\n--- fresh\n%s", i, g, w)
+		}
 	}
 }

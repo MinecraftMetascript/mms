@@ -86,6 +86,17 @@ func TestCompletionMatrix(t *testing.T) {
 		{name: "inline definition object", src: "Advancement a {\n  parent = {\n    |\n  }\n}", want: []string{"criteria"}},
 		{name: "function reference", src: "Function g {}\nAdvancement a { rewards = { function = |} }", want: []string{"g"}},
 
+		// Template arguments: a processor list's id goes where the whole
+		// list does, and inside an inline list its processors go.
+		{name: "template arg list items", src: "JigsawStructure v {\n  pools = {\n    o = [Piece(\"a\", processors = [|])]\n  }\n}", want: []string{"Rule", "BlockRot"}, not: []string{"projection", "bottom_rampart", "empty"}},
+		{name: "template arg list items in pool", src: "JigsawStructure v {\n  pools = {\n    o = { elements = [Piece(\"a\", processors=[|])] }\n  }\n}", want: []string{"Rule"}, not: []string{"projection", "bottom_rampart"}},
+		{name: "template arg list item prefix", src: "JigsawStructure v {\n  pools = {\n    o = [Piece(\"a\", processors = [Ru|])]\n  }\n}", want: []string{"Rule"}, replace: "Ru"},
+		{name: "template arg list second item", src: "JigsawStructure v {\n  pools = {\n    o = [Piece(\"a\", processors = [Nop(), |])]\n  }\n}", want: []string{"Rule"}, not: []string{"projection"}},
+		{name: "template arg nested call", src: "JigsawStructure v {\n  pools = {\n    o = [Piece(\"a\", processors = [BlockRot(|)])]\n  }\n}", want: []string{"integrity", "rottable_blocks"}, not: []string{"projection"}},
+		{name: "template named arg value", src: "JigsawStructure v {\n  pools = {\n    o = [Piece(\"a\", processors = |)]\n  }\n}", want: []string{"bottom_rampart", "empty"}, not: []string{"projection", "weight"}},
+		{name: "template args", src: "JigsawStructure v {\n  pools = {\n    o = [Piece(\"a\", |)]\n  }\n}", want: []string{"weight", "processors", "projection"}},
+		{name: "inline processor list in pool", src: "TemplatePool p = { fallback = minecraft:empty, elements = [{ weight = 1, element = { element_type = minecraft:single_pool_element, location = minecraft:a, projection = rigid, processors = [|] } }] }", want: []string{"Rule", "BlockRot"}},
+
 		// Tags.
 		{name: "tag entries", src: "ItemTag gems = [|]", want: []string{"diamond", "#logs", "Optional"}, not: []string{"#gems"}},
 		{name: "tag entry prefix", src: "ItemTag gems = [dia|]", want: []string{"diamond"}, replace: "dia"},
@@ -124,6 +135,12 @@ func TestCompletionMatrix(t *testing.T) {
 		{name: "command name", src: "Function f {\n  /scoreb|\n}", want: []string{"scoreboard"}, replace: "scoreb"},
 		{name: "command criterion", src: "Function f {\n  /scoreboard objectives add x |\n}", want: []string{"dummy", "deathCount"}},
 		{name: "command item", src: "Function f {\n  /give @s minecraft:dia|\n}", want: []string{"diamond"}, replace: "minecraft:dia"},
+		{name: "command storage", src: "Type S { wave: int = 0 }\nStorage game: S\nFunction f {\n  /data get storage other:x\n  /data modify storage |\n}", want: []string{"test:mms", "other:x"}},
+		{name: "command storage in execute", src: "Type S { wave: int = 0 }\nStorage game: S\nFunction f {\n  /execute store result storage |\n}", want: []string{"test:mms"}},
+		{name: "command storage path", src: "Type S { wave: int = 0 }\nStorage game: S\nFunction f {\n  /data modify storage test:mms |\n}", want: []string{"game", "game.wave"}},
+		{name: "command nested storage path", src: "Type P { x: int }\nType S { blah: { y: int }\n home: P }\nStorage game: S\nFunction f {\n  /data modify storage test:mms |\n}", want: []string{"game.blah", "game.blah.y", "game.home.x"}},
+		{name: "nested storage field", src: "Type S {\n  blah: {\n    x: int\n    y: int\n  }\n}\nStorage s: S\nFunction f {\n  s.blah.|\n}", want: []string{"x", "y"}, not: []string{"blah"}},
+		{name: "record field type", src: "Type S {\n  blah: {\n    x: in|\n  }\n}", want: []string{"int"}, replace: "in"},
 		{name: "command in execute block", src: "Function f {\n  As(@a).At(@s) {\n    /|\n  }\n}", want: []string{"say"}},
 		{name: "command value slash", src: "Function f {\n  let n = /|\n}", want: []string{"data", "execute", "time"}},
 		{name: "command value slash assignment", src: "Global g: int = 0\nFunction f {\n  g = /|\n}", want: []string{"data"}},

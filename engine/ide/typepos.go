@@ -25,6 +25,13 @@ func (s *Session) typeCompletion(a *at, off int) ([]sema.Candidate, bool) {
 	prev := prevToken(f, start)
 	path := a.path
 	inner := path[len(path)-1]
+	// The name of a record's only field may be a map's key type being
+	// typed: `{st|: string}` is on its way to `{string: string}`.
+	if _, ok := inner.(*syntax.Name); ok && len(path) >= 3 {
+		if r, ok := path[len(path)-3].(*syntax.TypeRecord); ok && len(r.Fields) == 1 && inTypes(path) {
+			return s.typeNameCandidates(), true
+		}
+	}
 	if _, ok := inner.(*syntax.TypeName); !ok {
 		if prev == nil {
 			return nil, false
@@ -168,7 +175,7 @@ func inTypes(path []syntax.Node) bool {
 func inTypeExpr(path []syntax.Node) bool {
 	for _, n := range path {
 		switch n.(type) {
-		case *syntax.TypeName, *syntax.TypeList, *syntax.TypeMap, *syntax.TypeUnion, *syntax.TypeOptional, *syntax.TypeParen:
+		case *syntax.TypeName, *syntax.TypeList, *syntax.TypeMap, *syntax.TypeRecord, *syntax.TypeUnion, *syntax.TypeOptional, *syntax.TypeParen:
 			return true
 		}
 	}

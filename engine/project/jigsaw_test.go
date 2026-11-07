@@ -495,6 +495,39 @@ Function f {
 	}
 }
 
+// Piece takes its processors as a processor list's id or written inline.
+func TestPieceProcessors(t *testing.T) {
+	files := fstest.MapFS{"structures/start.nbt": {Data: piece(t)}}
+	src := `JigsawStructure ruin {
+  biomes = #minecraft:is_overworld
+  step = surface_structures
+  spacing = 32
+  separation = 12
+  height = Constant(Absolute(64))
+  start = start
+  pools = {
+    start = [Piece("start", processors = [BlockRot(integrity = 0.5)])]
+    worn = [Piece("start", processors = minecraft:street_plains)]
+  }
+}
+`
+	_, r := assetProject(t, files, src)
+	for _, d := range r.Diagnostics("main.mms") {
+		if d.Severity == syntax.SeverityError {
+			t.Errorf("%s: %s", d.Code, d.Message)
+		}
+	}
+	start := emitted(t, r, "data/demo/worldgen/template_pool/start.json")
+	for _, want := range []string{`"processor_type": "minecraft:block_rot"`, `"integrity": 0.5`} {
+		if !strings.Contains(start, want) {
+			t.Errorf("start pool lacks %s:\n%s", want, start)
+		}
+	}
+	if worn := emitted(t, r, "data/demo/worldgen/template_pool/worn.json"); !strings.Contains(worn, `"processors": "minecraft:street_plains"`) {
+		t.Errorf("worn pool:\n%s", worn)
+	}
+}
+
 func TestJigsawStructureChecks(t *testing.T) {
 	for _, tc := range []struct{ fields, want string }{
 		{"spacing = 8\n  separation = 8", "separation must be less than spacing"},

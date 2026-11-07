@@ -68,7 +68,7 @@ Function next_wave {
 }
 ```
 
-The load function sets each missing field to its default, or to `0`, `false` or `""` when it has none. A `/reload` keeps the values, and a field added later starts at its default. The record is at `<namespace>:mms <name>`, so `/data get storage siege:mms game` shows it in the game. Fields of other types, such as `queue`, are stored and given their defaults, but functions do not read them yet. Completion after `game.` lists the fields, and hovering one shows its type and doc comment.
+A field that holds a record, written in place or as another `Type`, is reached by its path, such as `game.spawn.x`. A field can also hold one of a few strings, such as `mode: "siege" | "raid"`. Functions read it as a string, and setting it to any other string literal is an error. The load function sets each missing field to its default. A field without one starts at `0`, `false`, `""`, or the first of its strings. A `/reload` keeps the values, and a field added later starts at its default. The record is at `<namespace>:mms <name>`, so `/data get storage siege:mms game` shows it in the game. Fields of other types, such as `queue`, are stored and given their defaults, but functions do not read them yet. Completion after `game.` lists the fields, and hovering one shows its type and doc comment.
 
 A field costs a storage read and write each time a function uses it. A `Global` is a score, so it is cheaper in a tight loop.
 
@@ -131,6 +131,25 @@ Function welcome(name: string) {
     line += " Nice to meet you."
   }
   tell(@a, "${line}")
+}
+```
+
+### Lists of constants
+
+A `const` list of ints or strings can be read in function code. `len(list)` is its length, and `list[i]` is an item. When `i` is known only as the function runs, such as a Storage field, each item gets its own branch. An index outside the list gives `0` or `""`. Shift-right-clicking an item to cycle through modes looks like this:
+
+```mms
+const modes: [string] = ["Measure", "Replace"]
+
+Type ToolState {
+  mode: int
+}
+
+Storage tool: ToolState
+
+Function next_mode {
+  tool.mode = (tool.mode + 1) % len(modes)
+  actionbar(@s, "Mode: ${modes[tool.mode]}")
 }
 ```
 
