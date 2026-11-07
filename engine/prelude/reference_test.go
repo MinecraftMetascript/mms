@@ -30,6 +30,9 @@ func TestReference(t *testing.T) {
 	if _, ok := by["Function"]; ok {
 		t.Error("a compiler kind is listed")
 	}
+	if r := by["Range"]; len(r.Uses) < 3 || r.Uses[0].Type != "IntNumberProviderRef" || r.Uses[0].Doc == "" {
+		t.Errorf("Range uses = %+v", r.Uses)
+	}
 	if lt := by["LangText"]; lt.Signature != "LangText = string | {string: string}" {
 		t.Errorf("LangText = %+v", lt)
 	}

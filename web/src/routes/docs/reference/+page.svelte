@@ -35,6 +35,7 @@
 	<ul class="cards">
 		<li><a href={resolve('/docs/reference/kinds')}><strong>Declaration kinds</strong><span>{c.kinds} kinds, and the folder each one writes to.</span></a></li>
 		<li><a href={resolve('/docs/reference/helpers')}><strong>Helpers</strong><span>{c.helpers} helpers in {c.groups} groups, each building one typed object.</span></a></li>
+		<li><a href={resolve('/docs/reference/prelude')}><strong>Templates and forms</strong><span>The prelude's templates and types, and what each operator means by type.</span></a></li>
 		<li><a href={resolve('/docs/reference/types')}><strong>Types</strong><span>{c.types} named types that parameters refer to.</span></a></li>
 		<li><a href={resolve('/docs/reference/lint')}><strong>Lint rules</strong><span>{c.rules} rules, their default severity and what they catch.</span></a></li>
 	</ul>

@@ -2,7 +2,7 @@
 // /docs/search.json. The browser side is find.ts.
 
 import { docGroups, groupPages, referenceGroups, sections, type Group } from './site.ts';
-import { ref } from './refdata.ts';
+import { blueprints, forms, preludeTemplates, preludeTypes, ref } from './refdata.ts';
 import { groupId, groupTitle, helperId, typeId } from './reference.ts';
 import type { Entry } from './find.ts';
 
@@ -24,6 +24,13 @@ export function searchIndex(): Entry[] {
 			where: 'Declaration kinds',
 			path: `/docs/reference/kinds#kind-${k.name}`,
 			text: k.doc ?? (k.folder ? `${k.resources ? 'assets' : 'data'}/<namespace>/${k.folder}/` : '')
+		})),
+		...blueprints.map((b) => ({ title: b.name, where: 'Declaration kinds', path: `/docs/reference/kinds/${b.name}`, text: (b.doc ?? '').slice(0, 300) })),
+		...[...preludeTemplates, ...preludeTypes, ...forms].map((d) => ({
+			title: d.name,
+			where: 'Templates and forms',
+			path: `/docs/reference/prelude#prelude-${d.name}`,
+			text: (d.doc ?? d.signature).slice(0, 300)
 		})),
 		...ref.groups.flatMap((g) => [
 			{ title: groupTitle(g.dispatcher), where: 'Helpers', path: `/docs/reference/helpers/${groupId(g.dispatcher)}`, text: `${g.helpers.length} helpers` },

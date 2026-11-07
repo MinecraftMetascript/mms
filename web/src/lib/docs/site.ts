@@ -24,7 +24,13 @@ export const docGroups: Group[] = [
 	{ dir: 'guides', title: 'Guides', order: ['resources', 'functions', 'lint'] },
 	{ dir: 'concepts', title: 'Concepts', order: ['how-functions-compile'] }
 ];
-export const referenceGroups: Group[] = [{ dir: 'reference/language', title: 'Language', order: [] }];
+export const referenceGroups: Group[] = [
+	{
+		dir: 'reference/language',
+		title: 'Language',
+		order: ['declarations', 'values', 'reuse', 'blueprints', 'functions', 'text', 'tests']
+	}
+];
 
 export interface Page {
 	/** The path under /docs, such as "guides/functions". */

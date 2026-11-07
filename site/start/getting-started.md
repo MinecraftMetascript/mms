@@ -17,7 +17,7 @@ mms init -namespace gems
 
 `mms init` writes `mms.json` (the namespace, the pack description, the output folder) and a starter file. Its `$schema` line points at the [mms.json schema](https://minecraftmetascript.github.io/mms/mms.schema.json), so editors with JSON Schema support (VS Code, JetBrains) complete, describe and check every field. The VS Code extension knows the schema even without that line. Every `.mms` file in the folder belongs to the project. Put this in `gems.mms`:
 
-```
+```mms
 /** Gems that drop from the gem chest. */
 ItemTag gems = [diamond, emerald, amethyst_shard]
 
@@ -27,7 +27,7 @@ LootTable chests/gems {
 
 Recipe gem_block = Shaped(["GG", "GG"], { G = #gems }, emerald_block)
 
-Objective found = dummy
+Objective found
 
 Function find {
   found[@s] += 1
@@ -53,7 +53,7 @@ Each declaration is `Kind name = value`, or `Kind name { fields }` for an object
 
 A `Namespace` line switches the namespace for the rest of the file:
 
-```
+```mms
 Namespace minecraft
 
 ItemTag swords = [diamond_sword]
@@ -65,7 +65,9 @@ Replacing a vanilla resource like this is allowed. The editor notes that it happ
 
 A comment that starts with `/**` documents the declaration, `let` or parameter list that follows it. Only blank space may come between the two. The text is Markdown, and it appears on hover over the name, both where it is declared and wherever it is used: in other files, in calls, in `kills[@s]` scores, inside commands such as `/function gems:find`, and in `${...}`. Completion and signature help show it too.
 
-```
+```mms
+Objective found
+
 /**
  * Gives a player their reward and counts it.
  *
@@ -131,6 +133,7 @@ Every value is checked against the 26.3 schema as you type. Completion offers th
 - [Writing resources](../guides/resources.md): the shorthand for loot tables, recipes, density functions and more.
 - [Functions](../guides/functions.md): variables, control flow, calls and strings in function code.
 - [Tutorial: a custom dimension](tutorial-dimension.md): a complete worldgen project.
+- [Language reference](../reference/language/declarations.md): declarations, values, constants and templates, Blueprints, functions, text and tests, each with examples.
 
 ## Importing
 
