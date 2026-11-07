@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { starter, type Project } from '../project/project.svelte';
+	import { starter, storageError, type Project } from '../project/project.svelte';
 	import { onProjectsChanged, requestPersistence, type StorageState } from '../project/store';
 
 	interface Props {
@@ -30,6 +30,8 @@
 		try {
 			await fn();
 			if (switches) onswitch?.();
+		} catch (e) {
+			alert(storageError(e));
 		} finally {
 			busy = false;
 		}

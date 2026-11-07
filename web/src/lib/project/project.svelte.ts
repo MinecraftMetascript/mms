@@ -70,6 +70,8 @@ export class Project {
 	active = $state('');
 	/** Every saved project, most recent first, for the switcher. */
 	saved = $state<store.ProjectMeta[]>([]);
+	/** Why the last save failed, or '' when the project is saved. */
+	saveError = $state('');
 	private saveTimer: ReturnType<typeof setTimeout> | null = null;
 
 	activeFile = $derived(this.files.find((f) => f.path === this.active) ?? null);
@@ -233,7 +235,8 @@ export class Project {
 
 	/** Adds or replaces a binary file. */
 	setAsset(path: string, data: string) {
-		path = path.trim().replace(/\\/g, '/').replace(/^\/+/, '');
+		path = safeProjectPath(path);
+		if (!path) return;
 		const f = this.assets.find((f) => f.path === path);
 		if (f) f.data = data;
 		else {
@@ -262,8 +265,12 @@ export class Project {
 		if (!this.id || (!pending && !force)) return;
 		try {
 			await store.saveProject(this.id, this.data());
-		} catch {
-			/* storage can be unavailable (private windows); the session still works */
+			this.saveError = '';
+		} catch (e) {
+			// Storage can be unavailable (private windows) or full; the
+			// session still works, but the user must know it isn't kept.
+			this.saveError = storageError(e);
+			return;
 		}
 		// Keep the switcher's order and names current without re-reading.
 		const meta = { id: this.id, name: this.name, updated: Date.now(), files: this.files.length };
@@ -271,13 +278,29 @@ export class Project {
 	}
 }
 
-export function normalizePath(p: string): string {
-	p = p
+/** Says why browser storage refused a write, for the user. */
+export function storageError(e: unknown): string {
+	if (e instanceof DOMException && e.name === 'QuotaExceededError') return 'Not saved: browser storage is full. Export the project to keep it.';
+	return 'Not saved: this browser is not keeping projects (a private window?). Export the project to keep it.';
+}
+
+/**
+ * A project file's path in the one form the project stores: slashes, no
+ * leading slash, and no empty, '.' or '..' parts, so no path can point
+ * outside the project when it is exported. '' when nothing is left.
+ */
+export function safeProjectPath(p: string): string {
+	return p
 		.trim()
 		.replace(/\\/g, '/')
-		.replace(/^\/+/, '')
-		.replace(/\/{2,}/g, '/');
-	if (!p) p = 'untitled';
+		.split('/')
+		.filter((s) => s !== '' && s !== '.' && s !== '..')
+		.join('/');
+}
+
+/** A source file's path as typed by the user, made safe and given an extension. */
+export function normalizePath(p: string): string {
+	p = safeProjectPath(p) || 'untitled';
 	if (!isSourcePath(p)) p += '.mms';
 	return p;
 }

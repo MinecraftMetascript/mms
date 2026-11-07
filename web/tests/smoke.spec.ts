@@ -402,6 +402,26 @@ test('data packs and pasted JSON import as MMS', async ({ page }) => {
 	await expect(page.getByRole('button', { name: 'hello.mcfunction' })).toBeVisible();
 });
 
+test('project zips keep book and text files, and their paths stay inside', async ({ page }) => {
+	page.on('dialog', (d) => d.accept());
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	const { zipSync, strToU8 } = await import('fflate');
+	const zip = zipSync({
+		'shelf/mms.json': strToU8('{"namespace":"shelf","description":"Shelf","output":"build"}'),
+		'shelf/main.mms': strToU8('Function hello {\n  /say hi\n}\n'),
+		'shelf/guide.mmsbook': strToU8('Page one\n---\nPage two\n'),
+		'shelf/notes.mmstext': strToU8('Some *notes*\n'),
+		'shelf/../escape.mms': strToU8('Function escape {\n  /say out\n}\n')
+	});
+	await page.locator('input[type=file][accept=".zip"]').setInputFiles({ name: 'shelf.zip', mimeType: 'application/zip', buffer: Buffer.from(zip) });
+	await page.getByRole('tab', { name: 'Sources' }).click();
+	await expect(page.getByRole('button', { name: 'guide.mmsbook' })).toBeVisible();
+	await expect(page.getByRole('button', { name: 'notes.mmstext' })).toBeVisible();
+	await expect(page.getByRole('button', { name: 'escape.mms', exact: true })).toBeVisible();
+	await expect(page.getByRole('button', { name: /\.\./ })).toHaveCount(0);
+});
+
 test('lint fixes apply from the editor', async ({ page }) => {
 	await page.goto('./');
 	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
@@ -620,6 +640,28 @@ test('doc comments show on hover over a use', async ({ page }) => {
 	await page.locator('.cm-deprecated').hover();
 	const tip = page.locator('.cm-tooltip-hover, .cm-tooltip-lint').filter({ hasText: 'Kills needed' });
 	await expect(tip.first()).toContainText('Deprecated.');
+});
+
+test('doc comments cannot run script in a hover', async ({ page }) => {
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	await replaceText(
+		page,
+		'/**\n * Pwned <img src=x onerror="window.__pwned=1"> [link](javascript:window.__pwned=2)\n * @deprecated use reward_every\n */\nGlobal every: int = 5\n\nFunction f {\n  /say ${every}\n}\n'
+	);
+	await expect(page.locator('.cm-deprecated')).toHaveCount(1);
+	const tip = page.locator('.cm-lsp-hover-tooltip').filter({ hasText: 'Pwned' });
+	// The first hover can land while the line is redrawn; hover again.
+	await expect(async () => {
+		await page.mouse.move(0, 0);
+		await page.locator('.cm-deprecated').hover();
+		await expect(tip).toBeVisible({ timeout: 1500 });
+	}).toPass({ timeout: 15_000 });
+	await expect(tip.locator('img')).toHaveCount(0);
+	await expect(tip.locator('a', { hasText: 'link' })).not.toHaveAttribute('href');
+	// Highlighting classes on the signature survive.
+	await expect(tip.locator('code.language-mms')).toHaveCount(1);
+	expect(await page.evaluate(() => (window as { __pwned?: number }).__pwned)).toBeUndefined();
 });
 
 test('right-click opens editor actions with quick fixes', async ({ page }) => {

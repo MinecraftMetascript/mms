@@ -2,6 +2,7 @@ import { LSPClient, languageServerExtensions } from '@codemirror/lsp-client';
 import type { EditorView } from '@codemirror/view';
 import { Supervisor, type EngineStatus } from './supervisor';
 import { ProjectWorkspace } from './workspace';
+import { sanitizeHTML } from './sanitize';
 import { showDiagnostics } from '../editor/diagnostics';
 import type { InlayHint } from '../editor/inlay';
 import type { OutputJigsaw } from '@mms/preview';
@@ -183,6 +184,8 @@ export class Engine {
 		let ws: ProjectWorkspace | null = null;
 		this.client = new LSPClient({
 			timeout: 10000,
+			// Docs come from project files, which may be imported from anyone.
+			sanitizeHTML,
 			workspace: (client) => (ws = new ProjectWorkspace(client, hooks)),
 			extensions: languageServerExtensions(),
 			notificationHandlers: {

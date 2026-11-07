@@ -1,7 +1,7 @@
 import { strFromU8, strToU8, unzipSync, zipSync, type Zippable } from 'fflate';
 import type { OutputAsset, OutputFile } from '../engine/engine.svelte';
 import { fromBase64, toBase64 } from './base64';
-import { isAssetPath, isSourcePath, type AssetFile, type ProjectData } from './project.svelte';
+import { isAssetPath, isSourcePath, safeProjectPath, type AssetFile, type ProjectData } from './project.svelte';
 
 const fixed = new Date(1980, 0, 1);
 
@@ -33,30 +33,42 @@ export function projectZip(p: ProjectData): Uint8Array {
 	return zipSync(z, { level: 6 });
 }
 
-/** A zip's files, by path with a single top-level folder stripped. */
-function unzipEntries(data: Uint8Array): Map<string, Uint8Array> {
-	const entries = unzipSync(data);
-	const paths = Object.keys(entries).filter((p) => !p.endsWith('/') && !p.startsWith('__MACOSX/'));
+/** Entries larger than this are left out: no project file comes near it. */
+const maxEntry = 32 << 20;
+
+/** A zip's text files and assets, read in one pass. */
+export interface ZipContents {
+	/** Text files (sources, JSON, mcfunction), by path. */
+	texts: Map<string, string>;
+	/** Textures, sounds and structures. */
+	assets: AssetFile[];
+}
+
+const isTextPath = (p: string) => isSourcePath(p) || /\.(json|mcmeta|mcfunction)$/.test(p);
+
+/**
+ * Reads a zip once: its files by path, with a single top-level folder
+ * stripped and every path made safe (no '..', no leading '/', no '\\').
+ * Folders, macOS metadata and oversized entries are skipped.
+ */
+export function readZip(data: Uint8Array): ZipContents {
+	const entries = unzipSync(data, {
+		filter: (f) => !f.name.endsWith('/') && !f.name.startsWith('__MACOSX/') && f.originalSize <= maxEntry
+	});
+	const paths = Object.keys(entries);
 	const tops = new Set(paths.map((p) => p.split('/')[0]));
 	let prefix = '';
 	if (tops.size === 1 && paths.every((p) => p.includes('/'))) prefix = [...tops][0] + '/';
-	return new Map(paths.map((p) => [p.slice(prefix.length), entries[p]]));
-}
-
-/** A zip's text files, with a single top-level folder stripped. */
-export function readZip(data: Uint8Array): Map<string, string> {
-	const out = new Map<string, string>();
-	for (const [rel, bytes] of unzipEntries(data)) {
-		if (/\.(mms|json|mcmeta|mcfunction)$/.test(rel) || rel === 'mms.json') out.set(rel, strFromU8(bytes));
+	const texts = new Map<string, string>();
+	const assets: AssetFile[] = [];
+	for (const p of paths) {
+		const rel = safeProjectPath(p.slice(prefix.length));
+		if (!rel) continue;
+		if (isTextPath(rel)) texts.set(rel, strFromU8(entries[p]));
+		else if (isAssetPath(rel)) assets.push({ path: rel, data: toBase64(entries[p]) });
 	}
-	return out;
-}
-
-/** A project zip's textures, sounds and structures. */
-export function readZipAssets(data: Uint8Array): AssetFile[] {
-	const out: AssetFile[] = [];
-	for (const [rel, bytes] of unzipEntries(data)) if (isAssetPath(rel)) out.push({ path: rel, data: toBase64(bytes) });
-	return out.sort((a, b) => a.path.localeCompare(b.path));
+	assets.sort((a, b) => a.path.localeCompare(b.path));
+	return { texts, assets };
 }
 
 /** Whether a zip holds a data pack rather than an MMS project. */
@@ -72,7 +84,9 @@ export function readProjectZip(name: string, entries: Map<string, string>, asset
 	for (const [rel, text] of entries) {
 		if (rel === 'mms.json') {
 			try {
-				Object.assign(config, JSON.parse(text));
+				const j = JSON.parse(text);
+				if (typeof j?.namespace === 'string') config.namespace = j.namespace;
+				if (typeof j?.description === 'string') config.description = j.description;
 			} catch {
 				/* keep defaults */
 			}
