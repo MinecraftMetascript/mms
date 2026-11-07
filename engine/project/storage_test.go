@@ -223,6 +223,35 @@ Function next(): int {
 	}
 }
 
+// TestConstListIndexConst reads a list at an index the function compiler
+// knows, such as `${len(xs)} - 1`, which the evaluator does not fold.
+func TestConstListIndexConst(t *testing.T) {
+	src := `const costs: [int] = [1, 5, 9]
+Function last(): int {
+  return costs[${len(costs)} - 1]
+}
+`
+	_, r := bookProject(t, src, nil)
+	if d := diagText(r); d != "" {
+		t.Fatal(d)
+	}
+	vm := load(t, r, "demo")
+	if got := call(t, vm, "demo:last"); got != 9 {
+		t.Errorf("last = %d, want 9", got)
+	}
+
+	p := New(spec.MustDefault(), Config{Namespace: "demo"})
+	p.SetFile("main.mms", "const costs: [int] = [1, 5, 9]\nFunction f(): int {\n  return costs[${len(costs)}]\n}")
+	r2, _ := p.Analyze(context.Background())
+	var msgs []string
+	for _, d := range r2.Diagnostics("main.mms") {
+		msgs = append(msgs, d.Message)
+	}
+	if want := "index 3 is outside the list, which has 3 items (0 to 2)"; !strings.Contains(strings.Join(msgs, "\n"), want) {
+		t.Errorf("diagnostics %q lack %q", msgs, want)
+	}
+}
+
 // Changing a field's type rechecks the functions that use it.
 func TestStorageDeps(t *testing.T) {
 	p := New(spec.MustDefault(), Config{Namespace: "demo"})
