@@ -11,6 +11,7 @@ import (
 	"github.com/minecraftmetascript/mms/engine/prelude"
 	"github.com/minecraftmetascript/mms/engine/sema"
 	"github.com/minecraftmetascript/mms/engine/syntax"
+	"github.com/minecraftmetascript/mms/engine/syntax/parser"
 )
 
 // The names the evaluator binds (consts, Templates, Blueprints and Types)
@@ -434,7 +435,18 @@ func (s *Session) templateArgCandidates(path string, off int, c *sema.Checker) (
 		return nil, false
 	}
 	p := t.D.Params.Params[i]
-	out := templateNamedArgs(t, call, i)
+	// Inside a list, object or call written as the argument, such as
+	// `Piece("a", processors = [|])`, the checker's types for the argument
+	// (see templateArgInfo) say what fits.
+	if arg := argAt(call, off); arg != nil && inside(arg.Value, off) {
+		return nil, false
+	}
+	var out []sema.Candidate
+	// The value of a named argument, `processors = |`, is not where the
+	// other parameters' names go.
+	if !afterAssign(src, off) {
+		out = templateNamedArgs(t, call, i)
+	}
 	if i == 0 {
 		// A path the Template turns into an asset file: Piece("|").
 		if helper, prefix, suffix, ok := s.templateAssetPath(t.D.Name.Text); ok {
@@ -461,6 +473,50 @@ func (s *Session) templateArgCandidates(path string, off int, c *sema.Checker) (
 		}
 	}
 	return append(out, s.evalValueCandidates()...), true
+}
+
+// argAt is the argument of call that off is in, or nil.
+func argAt(call *syntax.Call, off int) *syntax.Arg {
+	for _, a := range call.Args {
+		if a.Value != nil && a.Value.Span().Start <= off && off <= a.Value.Span().End {
+			return a
+		}
+	}
+	return nil
+}
+
+// inside reports whether off is within the brackets of a list, object
+// or call in e, rather than at e itself.
+func inside(e syntax.Expr, off int) bool {
+	found := false
+	syntax.Walk(e, func(n syntax.Node) bool {
+		var open syntax.Span
+		switch n := n.(type) {
+		case *syntax.List:
+			open = n.Sp
+		case *syntax.Object:
+			open = n.Sp
+		case *syntax.Call:
+			open = n.ArgsSp
+		default:
+			return !found
+		}
+		if off > open.Start && off < open.End {
+			found = true
+		}
+		return !found
+	})
+	return found
+}
+
+// afterAssign reports whether the token before the word at off is `=`.
+func afterAssign(f *syntax.File, off int) bool {
+	start := off
+	if sp, ok := wordAt(f, off); ok {
+		start = sp.Start
+	}
+	prev := prevToken(f, start)
+	return prev != nil && prev.Kind == parser.MMSLexerASSIGN
 }
 
 // templateNamedArgs offers the parameters after the i-th that the call

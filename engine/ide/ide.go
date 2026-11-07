@@ -98,7 +98,95 @@ func (s *Session) at(path string, off int) *at {
 	if a.decl != nil && a.decl.Emitter != nil {
 		a.c.Typed = append(s.blueprintFields(a.decl.Emitter), a.c.Typed...)
 	}
+	s.templateArgInfo(a)
 	return a
+}
+
+// templateArgInfo checks the argument of a Template call that the cursor
+// is in against the parameter's type, so that completion and hover deep
+// inside it, as in `Piece("a", processors = [Rule(|)])`, read the types
+// there. The checker sees a Template call as a value of its result type
+// and does not look inside its arguments.
+func (s *Session) templateArgInfo(a *at) {
+	if a.decl == nil || s.R.Eval == nil || s.R.TypeEnv == nil {
+		return
+	}
+	for i := len(a.path) - 2; i >= 1; i-- {
+		arg, ok := a.path[i+1].(*syntax.Arg)
+		if !ok || arg.Value == nil {
+			continue
+		}
+		call, ok := a.path[i].(*syntax.Call)
+		if !ok {
+			continue
+		}
+		id, ok := call.Fn.(*syntax.Ident)
+		if !ok {
+			continue
+		}
+		t := s.R.Eval.Templates[id.Name]
+		if t == nil || t.D.Params == nil {
+			continue
+		}
+		p := templateParam(t.D.Params.Params, call, arg)
+		if p == nil || p.Type == nil {
+			return
+		}
+		want := s.R.TypeEnv.Lookup(t.Path, p.Type)
+		if want == nil || want.Kind == "any" {
+			return
+		}
+		c := sema.NewChecker(s.P.Pack, s.P.Kinds, s.R.Syms, a.decl.NS)
+		c.CheckType(arg.Value, want, syntax.TypeText(p.Type))
+		d := *a.decl
+		d.Info = make(map[syntax.Node]*sema.Info, len(a.decl.Info)+len(c.Info))
+		for n, in := range a.decl.Info {
+			d.Info[n] = in
+		}
+		for n, in := range c.Info {
+			d.Info[n] = in
+		}
+		a.decl = &d
+		return
+	}
+}
+
+// templateParam is the parameter that arg of call sets: the one it
+// names, or the next one in order that no argument names.
+func templateParam(params []*syntax.Param, call *syntax.Call, arg *syntax.Arg) *syntax.Param {
+	if arg.Name != nil {
+		for _, p := range params {
+			if p.Name != nil && p.Name.Text == arg.Name.Text {
+				return p
+			}
+		}
+		return nil
+	}
+	named := map[string]bool{}
+	for _, x := range call.Args {
+		if x.Name != nil {
+			named[x.Name.Text] = true
+		}
+	}
+	var free []*syntax.Param
+	for _, p := range params {
+		if p.Name != nil && !named[p.Name.Text] {
+			free = append(free, p)
+		}
+	}
+	k := 0
+	for _, x := range call.Args {
+		if x == arg {
+			break
+		}
+		if x.Name == nil {
+			k++
+		}
+	}
+	if k < len(free) {
+		return free[k]
+	}
+	return nil
 }
 
 func (a *at) info(n syntax.Node) *sema.Info {

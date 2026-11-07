@@ -349,12 +349,8 @@ func (c *Checker) ListItemInfo(in *Info) *Info {
 	}
 	v := c.norm(in.Type)
 	if v.T != nil && v.T.Kind == "union" {
-		for _, m := range v.T.Members {
-			mv := c.norm(tview{T: m, Env: v.Env})
-			if mv.T != nil && mv.T.Kind == "list" {
-				v = mv
-				break
-			}
+		if lv, ok := c.listMember(v, 0); ok {
+			v = lv
 		}
 		// A surface rule field (an id or an inline rule) takes a list as
 		// Sequence sugar.
@@ -374,6 +370,37 @@ func (c *Checker) ListItemInfo(in *Info) *Info {
 		return nil
 	}
 	return &Info{Type: c.norm(tview{T: v.T.Item, Env: v.Env}), typed: true}
+}
+
+// listMember finds the list among a union's members, looking through
+// members that are unions themselves: a processor list field is an id or
+// an inline list, and the inline list is a list or an object.
+func (c *Checker) listMember(v tview, depth int) (tview, bool) {
+	if depth > 8 || v.T == nil || v.T.Kind != "union" {
+		return tview{}, false
+	}
+	for _, m := range v.T.Members {
+		mv := c.norm(tview{T: m, Env: v.Env})
+		if mv.T == nil {
+			continue
+		}
+		if mv.T.Kind == "list" {
+			return mv, true
+		}
+		if lv, ok := c.listMember(mv, depth+1); ok {
+			return lv, true
+		}
+	}
+	return tview{}, false
+}
+
+// TypeInfo returns an Info expecting a value of type t, such as a
+// Template parameter's.
+func (c *Checker) TypeInfo(t *spec.Type) *Info {
+	if t == nil {
+		return nil
+	}
+	return &Info{Type: c.norm(tview{T: t}), typed: true}
 }
 
 func (c *Checker) requiredSlots(cl *Callable) []field {
