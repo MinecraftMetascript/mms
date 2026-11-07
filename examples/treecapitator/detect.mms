@@ -7,22 +7,31 @@
 // where the log was: a broken block's item appears inside the block's
 // space, and the tick function runs before items move for the first time.
 
-/**
- * Every wood that grows on a tree: its name, its log block, the block tag
- * of its logs, and whether it is the stem of a huge fungus.
- */
-const woods = [
-  { name = "oak", log = "oak_log", tag = "minecraft:oak_logs", nether = false },
-  { name = "spruce", log = "spruce_log", tag = "minecraft:spruce_logs", nether = false },
-  { name = "birch", log = "birch_log", tag = "minecraft:birch_logs", nether = false },
-  { name = "jungle", log = "jungle_log", tag = "minecraft:jungle_logs", nether = false },
-  { name = "acacia", log = "acacia_log", tag = "minecraft:acacia_logs", nether = false },
-  { name = "dark_oak", log = "dark_oak_log", tag = "minecraft:dark_oak_logs", nether = false },
-  { name = "mangrove", log = "mangrove_log", tag = "minecraft:mangrove_logs", nether = false },
-  { name = "cherry", log = "cherry_log", tag = "minecraft:cherry_logs", nether = false },
-  { name = "pale_oak", log = "pale_oak_log", tag = "minecraft:pale_oak_logs", nether = false },
-  { name = "crimson", log = "crimson_stem", tag = "minecraft:crimson_stems", nether = true },
-  { name = "warped", log = "warped_stem", tag = "minecraft:warped_stems", nether = true },
+/** A wood that grows on a tree. */
+Type Wood {
+  /** Names its objective: chop_<name>. */
+  name: string
+  /** The log block, whose mined statistic the objective watches. */
+  log: Id<block>
+  /** The block tag of every log of this wood, which the fill follows. */
+  tag: string
+  /** Whether it is the stem of a huge fungus, capped with wart blocks. */
+  nether: bool = false
+}
+
+/** Every wood that grows on a tree. */
+const woods: [Wood] = [
+  { name = "oak", log = oak_log, tag = "minecraft:oak_logs" },
+  { name = "spruce", log = spruce_log, tag = "minecraft:spruce_logs" },
+  { name = "birch", log = birch_log, tag = "minecraft:birch_logs" },
+  { name = "jungle", log = jungle_log, tag = "minecraft:jungle_logs" },
+  { name = "acacia", log = acacia_log, tag = "minecraft:acacia_logs" },
+  { name = "dark_oak", log = dark_oak_log, tag = "minecraft:dark_oak_logs" },
+  { name = "mangrove", log = mangrove_log, tag = "minecraft:mangrove_logs" },
+  { name = "cherry", log = cherry_log, tag = "minecraft:cherry_logs" },
+  { name = "pale_oak", log = pale_oak_log, tag = "minecraft:pale_oak_logs" },
+  { name = "crimson", log = crimson_stem, tag = "minecraft:crimson_stems", nether = true },
+  { name = "warped", log = warped_stem, tag = "minecraft:warped_stems", nether = true },
 ]
 
 for w in woods {

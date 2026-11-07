@@ -554,7 +554,7 @@ func (c *ctx) bindParams(tc *ctx, d *syntax.Decl, what string, args []argValue, 
 			continue
 		}
 		if v, have := got[pr.Name.Text]; have {
-			tc.sc.bind(pr.Name.Text, v)
+			tc.sc.bind(pr.Name.Text, tc.withDefaults(v, pr.Type))
 			continue
 		}
 		switch {

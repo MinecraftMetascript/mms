@@ -750,6 +750,11 @@ func (a *at) codeRoot() *syntax.Decl {
 		}
 	}
 	if sema.IsCodeKind(a.decl.Kind) {
+		// OnAdvancement name = Trigger(...) { ... }: the code is the
+		// trigger's block.
+		if t, ok := a.decl.D.Value.(*syntax.Trailing); ok && a.decl.D.Body == nil && t.Block != nil {
+			return &syntax.Decl{Kind: a.decl.D.Kind, Body: t.Block, Sp: a.decl.D.Sp}
+		}
 		return a.decl.D
 	}
 	return nil

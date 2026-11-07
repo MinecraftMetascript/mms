@@ -91,6 +91,7 @@ func (c *ctx) instance(d *syntax.Decl, n *syntax.Name, bp *Blueprint, from *synt
 			missing = append(missing, f.Name.Text)
 			v = &None{pos: bc.pos(f.Sp)}
 		}
+		v = bc.withDefaults(v, f.Type)
 		bc.sc.bind(f.Name.Text, v)
 		inst.Fields.set(f.Name.Text, v)
 	}

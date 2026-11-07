@@ -723,3 +723,45 @@ Function f {
 		t.Errorf("a ${...} was written as is:\n%s", got)
 	}
 }
+
+// A record's fields that a const, a Blueprint field or a Template
+// argument leaves out take their defaults from its Type.
+func TestRecordDefaults(t *testing.T) {
+	p := New(spec.MustDefault(), Config{Namespace: "demo"})
+	p.SetFile("main.mms", `
+Type Wave {
+  mob: Id<entity_type>
+  count: int = 1
+  spawn: { x: int, z: int = 7 } = { x = 0 }
+}
+
+const waves: [Wave] = [{ mob = zombie, count = 3 }, { mob = skeleton, spawn = { x = 2 } }]
+
+Template announce(w: Wave): Commands {
+  /say ${w.mob} x${w.count} at ${w.spawn.x} ${w.spawn.z}
+}
+
+Function f {
+  for w in waves {
+    /say ${w.mob} ${w.count} ${w.spawn.z}
+  }
+  announce({ mob = creeper })
+}
+`)
+	r, _ := p.Analyze(context.Background())
+	for _, d := range r.Diagnostics("main.mms") {
+		if d.Severity == syntax.SeverityError {
+			t.Fatalf("%s: %s", d.Code, d.Message)
+		}
+	}
+	got := dumpFiles(r.Emit())
+	for _, want := range []string{
+		"say zombie 3 7\n",
+		"say skeleton 1 7\n",
+		"say creeper x1 at 0 7\n",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("missing %q in:\n%s", want, got)
+		}
+	}
+}

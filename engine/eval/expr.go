@@ -295,7 +295,7 @@ func (c *ctx) constValue(k *Const, use syntax.Span) Value {
 		kc.errorf("mms/const-value", k.S.Sp, "a const needs a value: const "+k.Name()+" = ...")
 		k.val = &None{}
 	} else {
-		k.val = kc.reduce(k.S.Value)
+		k.val = kc.withDefaults(kc.reduce(k.S.Value), k.S.Type)
 	}
 	k.state = 2
 	return k.val
