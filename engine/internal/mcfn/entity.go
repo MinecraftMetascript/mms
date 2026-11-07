@@ -95,12 +95,12 @@ func (vm *VM) summon(w []string) (result, error) {
 			}
 			l, ok := v.([]any)
 			if !ok {
-				return result{}, fmt.Errorf("Tags must be a list of strings")
+				return result{}, fmt.Errorf("the Tags tag must be a list of strings")
 			}
 			for _, t := range l {
 				s, ok := t.(string)
 				if !ok {
-					return result{}, fmt.Errorf("Tags must be a list of strings")
+					return result{}, fmt.Errorf("the Tags tag must be a list of strings")
 				}
 				e.Tags[s] = true
 			}

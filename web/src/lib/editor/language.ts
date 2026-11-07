@@ -58,28 +58,36 @@ export const mmsHighlight = syntaxHighlighting(
 	])
 );
 
-/** Book markup (.mmsbook): headings, page breaks, style tags, links and ${...}. */
-export const bookLanguage = StreamLanguage.define<{ heading: boolean }>({
-	name: 'mmsbook',
-	startState: () => ({ heading: false }),
-	token(stream, state) {
-		if (stream.sol()) {
-			state.heading = false;
-			if (stream.match(/^\s*---\s*$/)) return 'meta';
-			if (stream.match('# ')) {
-				state.heading = true;
-				return 'keyword';
+/**
+ * Text markup: headings, style tags, links and ${...}, and in a book
+ * (.mmsbook) page breaks. Chat text (.mmstext) has no pages, so a `---`
+ * line there is plain text, which the checker reports.
+ */
+const markupLanguage = (name: string, pages: boolean) =>
+	StreamLanguage.define<{ heading: boolean }>({
+		name,
+		startState: () => ({ heading: false }),
+		token(stream, state) {
+			if (stream.sol()) {
+				state.heading = false;
+				if (pages && stream.match(/^\s*---\s*$/)) return 'meta';
+				if (stream.match('# ')) {
+					state.heading = true;
+					return 'keyword';
+				}
 			}
+			if (stream.match(/^\\./)) return 'string';
+			if (stream.match(/^\$\{[^}]*\}?/)) return 'atom';
+			if (stream.match(/^\{[^}]*\}?/)) return 'keyword';
+			if (stream.match(/^\[[^\]]*\]\([^)]*\)?/)) return 'string';
+			if (stream.match(/^(\*\*|__|~~|\|\||\*)/)) return 'operator';
+			stream.next();
+			return state.heading ? 'heading' : null;
 		}
-		if (stream.match(/^\\./)) return 'string';
-		if (stream.match(/^\$\{[^}]*\}?/)) return 'atom';
-		if (stream.match(/^\{[^}]*\}?/)) return 'keyword';
-		if (stream.match(/^\[[^\]]*\]\([^)]*\)?/)) return 'string';
-		if (stream.match(/^(\*\*|__|~~|\|\||\*)/)) return 'operator';
-		stream.next();
-		return state.heading ? 'heading' : null;
-	}
-});
+	});
+
+export const bookLanguage = markupLanguage('mmsbook', true);
+export const textLanguage = markupLanguage('mmstext', false);
 
 export const bookHighlight = syntaxHighlighting(
 	HighlightStyle.define([

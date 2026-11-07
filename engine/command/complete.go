@@ -255,9 +255,7 @@ func (c *Checker) selectorInside(src []rune, ws, off int, ids func(string) []str
 				at--
 			}
 			if ids != nil {
-				for _, o := range sorted(ids("objective")) {
-					vals = append(vals, o)
-				}
+				vals = append(vals, sorted(ids("objective"))...)
 			}
 			break
 		}

@@ -1,9 +1,8 @@
 # yaml-language-server: $schema=https://taskfile.dev/schema.json
 
+# Shortcuts for the builds and checks CI runs. Each task calls the same
+# go and npm commands as .github/workflows, so either works.
 version: '3'
-
-vars:
-  GREETING: Hello, world!
 
 tasks:
   rebuild-all:
@@ -11,6 +10,8 @@ tasks:
     cmds:
       - task: rebuild-mms
       - task: rebuild-vscode
+      - task: rebuild-web
+
   rebuild-mms:
     dir: engine
     desc: Rebuild the MMS Command Line
@@ -24,3 +25,45 @@ tasks:
     cmds:
       - npm install
       - npm run build
+
+  rebuild-web:
+    dir: web
+    desc: Rebuild the web editor, its WASM engine included
+    cmds:
+      - npm install
+      - npm run wasm
+      - npm run build
+
+  grammar:
+    dir: engine/syntax
+    desc: Regenerate the ANTLR parser after a grammar change
+    cmds:
+      - ./gen.sh
+
+  test:
+    desc: Run the engine checks and tests, and the web and VS Code type checks
+    cmds:
+      - task: test-engine
+      - task: check-web
+      - task: check-vscode
+
+  test-engine:
+    dir: engine
+    desc: gofmt, go vet, staticcheck and the engine tests
+    cmds:
+      - test -z "$(gofmt -l . | grep -v syntax/parser)"
+      - go vet $(go list ./... | grep -v /syntax/parser)
+      - go run honnef.co/go/tools/cmd/staticcheck@2025.1.1 $(go list ./... | grep -v /syntax/parser)
+      - go test ./...
+
+  check-web:
+    dir: web
+    desc: Type-check the web editor
+    cmds:
+      - npm run check
+
+  check-vscode:
+    dir: editors/vscode
+    desc: Type-check the VS Code extension
+    cmds:
+      - npm run check

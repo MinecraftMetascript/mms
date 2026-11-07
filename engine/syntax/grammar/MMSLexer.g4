@@ -1,6 +1,6 @@
 // Lexer for Minecraft Metascript. Every character ends up in some token:
 // whitespace and comments go to the hidden channel so the formatter and
-// doc-comment lookup can see them (docs/plan.md, "ANTLR setup").
+// doc-comment lookup can see them.
 lexer grammar MMSLexer;
 
 // MISSING and SEP are never lexed. Recovery inserts MISSING where a
@@ -8,7 +8,7 @@ lexer grammar MMSLexer;
 // parser does not read the next field as the value. SEP ends a statement
 // whose last word is followed by a word on a later line, so `x` then `y = 1`
 // on the next line stay two statements instead of reading as a
-// declaration `x y = 1` (see separateLines).
+// declaration `x y = 1` (see separateWords in recover.go).
 tokens { MISSING, SEP }
 
 // Keywords are lowercase words only. Declaration kinds and helpers are

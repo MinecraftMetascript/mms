@@ -485,8 +485,7 @@ func (e *evaluator) walkTouches(d *syntax.Decl) bool {
 		}
 	}
 	found := false
-	var visit func(n syntax.Node) bool
-	visit = func(n syntax.Node) bool {
+	visit := func(n syntax.Node) bool {
 		if found {
 			return false
 		}

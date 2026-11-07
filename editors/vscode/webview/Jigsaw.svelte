@@ -5,7 +5,7 @@
 	// World view's. Clicking a row loads it into the form; its copy icon
 	// copies its command straight away. The extension (src/jigsaw.ts) sends
 	// the lists; the form lives here and is kept across reloads.
-	import { CHAT_LIMIT, fullId, giveCommand, sameBlock } from '../src/jigsawGive';
+	import { CHAT_LIMIT, fullId, giveCommand, sameBlock } from '@mms/preview/jigsaw/give';
 	import type { FromJigsaw, JigsawConfig, JigsawExisting, JigsawRecent, JigsawState, ToJigsaw } from '../src/messages';
 
 	type Saved = { state?: JigsawState; form?: JigsawConfig };

@@ -11,7 +11,7 @@ export interface AssetFile {
 	data: string;
 }
 
-/** The binary files asset helpers read: Texture, Sound and Structure. */
+/** The binary files asset helpers read: Texture, Sound and StructureFile. */
 export const assetExtensions = ['.png', '.ogg', '.nbt'];
 export const isAssetPath = (p: string) => assetExtensions.some((e) => p.toLowerCase().endsWith(e));
 

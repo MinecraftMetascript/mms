@@ -23,6 +23,10 @@ jobs:
         run: test -z "$(gofmt -l . | grep -v syntax/parser)"
       # ANTLR's generated parser trips vet's unreachable-code check.
       - run: go vet $(go list ./... | grep -v /syntax/parser)
+      # Unused code, ineffective assignments and simplifications; pinned so
+      # a new release cannot turn main red on its own.
+      - name: staticcheck
+        run: go run honnef.co/go/tools/cmd/staticcheck@2025.1.1 $(go list ./... | grep -v /syntax/parser)
       - run: go test ./...
       - name: WASM build
         run: GOOS=js GOARCH=wasm go build -o mms.wasm ./cmd/mms-wasm && ls -l mms.wasm

@@ -957,13 +957,11 @@ func encodeTokens(l *lines, toks []ide.SemToken) []int {
 	for _, t := range toks {
 		start, end := l.pos(t.Span.Start), l.pos(t.Span.End)
 		for line := start.Line; line <= end.Line; line++ {
-			a, b := Position{Line: line}, Position{Line: line}
+			a, b := Position{Line: line}, end
 			if line == start.Line {
 				a = start
 			}
-			if line == end.Line {
-				b = end
-			} else {
+			if line != end.Line {
 				b = l.pos(lineEnd(l, line))
 			}
 			emit(a, b, int(t.Type), t.Mods)
