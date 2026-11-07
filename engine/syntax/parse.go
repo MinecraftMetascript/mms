@@ -442,10 +442,50 @@ func (b *builder) typeAtom(c parser.ITypeAtomContext) TypeExpr {
 		return &TypeString{Value: unquote(raw), Raw: raw, Sp: sp}
 	case *parser.ListTypeContext:
 		return &TypeList{Elem: b.typeOrEmpty(t.TypeExpr(), sp), Sp: sp}
+	case *parser.RecordTypeContext:
+		r := &TypeRecord{Sp: sp}
+		for _, fc := range t.AllTypeField() {
+			f := fc.(*parser.TypeFieldContext)
+			fd := &FieldDecl{Name: &Name{Text: f.IDENT().GetText(), Sp: nodeSpan(f.IDENT())}, Sp: span(f)}
+			if f.TypeAnnotation() != nil {
+				fd.Type = b.typeAnn(f.TypeAnnotation())
+			}
+			if f.ASSIGN() != nil {
+				fd.Default = b.value(f.Value(), fd.Sp)
+			}
+			fd.Doc = b.docBefore(f.GetStart().GetTokenIndex())
+			r.Fields = append(r.Fields, fd)
+		}
+		// `{string: T}` and `{Kind: T}` are maps: a record's fields are
+		// lowercase names, and no field is called string.
+		if len(r.Fields) == 1 {
+			f := r.Fields[0]
+			if n := f.Name.Text; f.Default == nil && f.Type != nil && (n == "string" || n[0] >= 'A' && n[0] <= 'Z') {
+				return &TypeMap{Key: &TypeName{Name: n, Sp: f.Name.Sp}, Value: f.Type, Sp: sp}
+			}
+		}
+		return r
 	case *parser.MapTypeContext:
-		return &TypeMap{Key: b.typeOrEmpty(t.TypeExpr(0), sp), Value: b.typeOrEmpty(t.TypeExpr(1), sp), Sp: sp}
+		return &TypeMap{Key: b.mapKey(t.MapKey().(*parser.MapKeyContext)), Value: b.typeOrEmpty(t.TypeExpr(), sp), Sp: sp}
 	case *parser.ParenTypeContext:
 		return &TypeParen{X: b.typeOrEmpty(t.TypeExpr(), sp), Sp: sp}
+	}
+	return &TypeName{Sp: sp}
+}
+
+func (b *builder) mapKey(c *parser.MapKeyContext) TypeExpr {
+	sp := span(c)
+	switch {
+	case c.TypeName() != nil:
+		n := &TypeName{Name: c.TypeName().GetText(), Sp: sp}
+		for _, a := range c.AllTypeExpr() {
+			n.Args = append(n.Args, b.typeExpr(a))
+		}
+		return n
+	case c.RESLOC() != nil:
+		return &TypeName{Name: c.RESLOC().GetText(), Sp: sp}
+	case len(c.AllTypeExpr()) == 1:
+		return &TypeParen{X: b.typeExpr(c.TypeExpr(0)), Sp: sp}
 	}
 	return &TypeName{Sp: sp}
 }

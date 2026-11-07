@@ -18,10 +18,25 @@ func (s *Session) assetPathCompletion(f *syntax.File, off int) (items []Item, re
 	}
 	helper := assetHelperBefore(f, start-1)
 	if helper == "TextFile" {
+		seen := map[string]bool{}
 		for _, u := range s.R.Units {
-			if sema.IsBookFile(u.Path) {
-				items = append(items, Item{Label: u.Path, Kind: sema.CandFile, Detail: "book text", Sort: sortKey(len(items))})
+			if !sema.IsBookFile(u.Path) {
+				continue
 			}
+			// TextFile takes a path in the project; a host that names
+			// files by URI, such as the language server, has them under
+			// the project's Root.
+			rel := u.Path
+			if s.P.Root != "" && strings.HasPrefix(rel, s.P.Root) {
+				rel = rel[len(s.P.Root):]
+			} else if strings.Contains(rel, "://") {
+				continue // not in this project
+			}
+			if seen[rel] {
+				continue
+			}
+			seen[rel] = true
+			items = append(items, Item{Label: rel, Kind: sema.CandFile, Detail: "book text", Sort: sortKey(len(items))})
 		}
 		return items, syntax.Span{Start: start, End: end}, true
 	}

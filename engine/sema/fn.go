@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -224,6 +225,9 @@ type local struct {
 	nbt  string
 	typ  string
 	info *Local
+	// choices are the strings a Storage field of a union of string
+	// literals can hold; nil for any string.
+	choices []string
 }
 
 // Local describes a function parameter, local variable or loop variable,
@@ -456,6 +460,10 @@ func (f *fc) stmt(out *fn.Block, s syntax.Stmt) {
 			f.store(&out.Ops, *target, f.valueFor(&out.Ops, s.Value, target.typ), s.Value)
 			return
 		}
+		if target.typ == tString && s.Op == "+=" && target.choices != nil {
+			c.errorf("mms/type-mismatch", s.Sp, "+= would leave a string that is none of %s; set it with =", quoteChoices(target.choices))
+			return
+		}
 		if target.typ == tString && s.Op == "+=" {
 			v := f.expr(&out.Ops, s.Value)
 			if v == nil {
@@ -654,6 +662,10 @@ func (f *fc) store(pre *[]fn.Op, l local, v *val, e syntax.Expr) {
 		return
 	}
 	if l.typ == tString {
+		if v.str != nil && l.choices != nil && !slices.Contains(l.choices, *v.str) {
+			f.c.errorf("mms/type-mismatch", e.Span(), "expected one of %s, but this is %q", quoteChoices(l.choices), *v.str)
+			return
+		}
 		*pre = append(*pre, f.setString(l.path, v))
 		return
 	}
@@ -666,6 +678,18 @@ func (f *fc) store(pre *[]fn.Op, l local, v *val, e syntax.Expr) {
 		return
 	}
 	*pre = append(*pre, fn.Set{Dst: l.s, Src: f.operand(pre, v)})
+}
+
+// quoteChoices lists strings as "x", "y" or "z".
+func quoteChoices(cs []string) string {
+	q := make([]string, len(cs))
+	for i, c := range cs {
+		q[i] = strconv.Quote(c)
+	}
+	if len(q) == 1 {
+		return q[0]
+	}
+	return strings.Join(q[:len(q)-1], ", ") + " or " + q[len(q)-1]
 }
 
 // variable resolves a name to a local, parameter or Global.
@@ -849,6 +873,18 @@ func (f *fc) expr(pre *[]fn.Op, e syntax.Expr) *val {
 	case *syntax.CommandStmt:
 		return f.commandValue(pre, e, "")
 	case *syntax.Ident, *syntax.ResLoc, *syntax.Member:
+		// `${len(modes)}` writes the number it computes, which reads as
+		// a name; it is that number.
+		var word string
+		switch x := e.(type) {
+		case *syntax.Ident:
+			word = x.Name
+		case *syntax.ResLoc:
+			word = x.Text
+		}
+		if n, err := strconv.ParseInt(word, 10, 32); err == nil {
+			return &val{typ: tInt, op: fn.Const(int32(n))}
+		}
 		var l *local
 		if m, ok := e.(*syntax.Member); ok {
 			var isStorage bool
@@ -872,6 +908,9 @@ func (f *fc) expr(pre *[]fn.Op, e syntax.Expr) *val {
 		v := e.Value
 		return &val{typ: tString, str: &v}
 	case *syntax.Index:
+		if l, ok := e.X.(*syntax.List); ok {
+			return f.listIndex(pre, l, e)
+		}
 		s := f.objScore(e)
 		if s == nil {
 			return nil
@@ -1584,4 +1623,76 @@ func compactSelector(s string) string {
 func isString(e syntax.Expr) bool {
 	_, ok := e.(*syntax.String)
 	return ok
+}
+
+// listIndex reads an item of a list written in the code, which is what a
+// const list becomes: `modes[game.mode]`. A constant index picks the item
+// when compiling; any other int picks it when the function runs, with one
+// branch per item, and an index outside the list gives 0 or "".
+func (f *fc) listIndex(pre *[]fn.Op, l *syntax.List, e *syntax.Index) *val {
+	if len(e.Args) != 1 || e.Args[0].Name != nil || e.Args[0].Value == nil {
+		f.c.errorf("mms/syntax", e.Sp, "a list takes one index: list[i]")
+		return nil
+	}
+	ix := e.Args[0].Value
+	idx := f.intExpr(pre, ix)
+	if idx == nil {
+		return nil
+	}
+	if len(l.Elems) == 0 {
+		f.c.errorf("mms/type-mismatch", e.Sp, "the list is empty")
+		return nil
+	}
+	if idx.IsConst {
+		i := int(idx.Const)
+		if i < 0 || i >= len(l.Elems) {
+			f.c.errorf("mms/type-mismatch", ix.Span(), "index %d is outside the list, which has %d items (0 to %d)", i, len(l.Elems), len(l.Elems)-1)
+			return nil
+		}
+		return f.expr(pre, l.Elems[i])
+	}
+	// Each item is a constant, so reading it adds no commands.
+	vals := make([]*val, len(l.Elems))
+	for i, x := range l.Elems {
+		var none []fn.Op
+		v := f.expr(&none, x)
+		if v == nil {
+			return nil
+		}
+		if len(none) > 0 || !(v.str != nil || v.typ == tInt && v.op.IsConst) {
+			f.c.errorf("mms/unsupported", x.Span(), "a list read at an index known only when the function runs holds int or string constants")
+			return nil
+		}
+		if v.typ != firstTyp(vals, v) {
+			f.c.errorf("mms/type-mismatch", x.Span(), "the list's items are %s and %s; a list read at a run-time index holds one type", vals[0].typ, v.typ)
+			return nil
+		}
+		vals[i] = v
+	}
+	src := idx.S
+	branch := func(i int, op fn.Op) fn.Op {
+		return fn.If{Cond: fn.Cond{Parts: []string{fmt.Sprintf("if score %s matches %d", src, i)}}, Then: &fn.Block{Ops: []fn.Op{op}}}
+	}
+	if vals[0].typ == tString {
+		dst := f.tempPath()
+		*pre = append(*pre, f.setString(dst, &val{typ: tString, str: new(string)}))
+		for i, v := range vals {
+			*pre = append(*pre, branch(i, f.setString(dst, v)))
+		}
+		return &val{typ: tString, path: dst}
+	}
+	t := f.temp()
+	*pre = append(*pre, fn.Set{Dst: t, Src: fn.Const(0)})
+	for i, v := range vals {
+		*pre = append(*pre, branch(i, fn.Set{Dst: t, Src: v.op}))
+	}
+	return &val{typ: tInt, op: fn.Of(t)}
+}
+
+// firstTyp is the type of the first value in vals, or v's when there is none yet.
+func firstTyp(vals []*val, v *val) string {
+	if vals[0] != nil {
+		return vals[0].typ
+	}
+	return v.typ
 }

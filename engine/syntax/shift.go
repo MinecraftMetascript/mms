@@ -110,6 +110,12 @@ func (s shifter) typ(t TypeExpr) TypeExpr {
 		n = &TypeList{Elem: s.typ(x.Elem), Sp: s.sp(x.Sp)}
 	case *TypeMap:
 		n = &TypeMap{Key: s.typ(x.Key), Value: s.typ(x.Value), Sp: s.sp(x.Sp)}
+	case *TypeRecord:
+		r := &TypeRecord{Sp: s.sp(x.Sp)}
+		for _, f := range x.Fields {
+			r.Fields = append(r.Fields, s.stmt(f).(*FieldDecl))
+		}
+		n = r
 	case *TypeUnion:
 		u := &TypeUnion{Sp: s.sp(x.Sp)}
 		for _, a := range x.Arms {

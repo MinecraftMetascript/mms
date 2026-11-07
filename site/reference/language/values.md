@@ -102,4 +102,6 @@ Type Label = string | {string: string}
 const waves: [Wave] = [{ mob = zombie, count = 3 }, { mob = skeleton }]
 ```
 
+A field can hold a record written in place, with its fields between braces as in a `Type` body: `spawn: { x: int, z: int = 0 }`. A lone field named `string`, as in `{string: string}`, is a map instead.
+
 A record's fields get completion, hover and the missing-field fix, like the game's own types. Records are used by [Templates](reuse.md#templates), [Blueprints](blueprints.md) and [Storage](functions.md#values).

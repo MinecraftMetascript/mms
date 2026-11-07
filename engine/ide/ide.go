@@ -5,17 +5,20 @@ package ide
 
 import (
 	"fmt"
+	"regexp"
 	"slices"
 	"sort"
 	"strings"
 
 	"github.com/minecraftmetascript/mms/engine/command"
 	"github.com/minecraftmetascript/mms/engine/eval"
+	"github.com/minecraftmetascript/mms/engine/fn"
 	"github.com/minecraftmetascript/mms/engine/format"
 	"github.com/minecraftmetascript/mms/engine/jsonv"
 	"github.com/minecraftmetascript/mms/engine/prelude"
 	"github.com/minecraftmetascript/mms/engine/project"
 	"github.com/minecraftmetascript/mms/engine/sema"
+	"github.com/minecraftmetascript/mms/engine/spec"
 	"github.com/minecraftmetascript/mms/engine/syntax"
 	"github.com/minecraftmetascript/mms/engine/syntax/parser"
 )
@@ -98,7 +101,95 @@ func (s *Session) at(path string, off int) *at {
 	if a.decl != nil && a.decl.Emitter != nil {
 		a.c.Typed = append(s.blueprintFields(a.decl.Emitter), a.c.Typed...)
 	}
+	s.templateArgInfo(a)
 	return a
+}
+
+// templateArgInfo checks the argument of a Template call that the cursor
+// is in against the parameter's type, so that completion and hover deep
+// inside it, as in `Piece("a", processors = [Rule(|)])`, read the types
+// there. The checker sees a Template call as a value of its result type
+// and does not look inside its arguments.
+func (s *Session) templateArgInfo(a *at) {
+	if a.decl == nil || s.R.Eval == nil || s.R.TypeEnv == nil {
+		return
+	}
+	for i := len(a.path) - 2; i >= 1; i-- {
+		arg, ok := a.path[i+1].(*syntax.Arg)
+		if !ok || arg.Value == nil {
+			continue
+		}
+		call, ok := a.path[i].(*syntax.Call)
+		if !ok {
+			continue
+		}
+		id, ok := call.Fn.(*syntax.Ident)
+		if !ok {
+			continue
+		}
+		t := s.R.Eval.Templates[id.Name]
+		if t == nil || t.D.Params == nil {
+			continue
+		}
+		p := templateParam(t.D.Params.Params, call, arg)
+		if p == nil || p.Type == nil {
+			return
+		}
+		want := s.R.TypeEnv.Lookup(t.Path, p.Type)
+		if want == nil || want.Kind == "any" {
+			return
+		}
+		c := sema.NewChecker(s.P.Pack, s.P.Kinds, s.R.Syms, a.decl.NS)
+		c.CheckType(arg.Value, want, syntax.TypeText(p.Type))
+		d := *a.decl
+		d.Info = make(map[syntax.Node]*sema.Info, len(a.decl.Info)+len(c.Info))
+		for n, in := range a.decl.Info {
+			d.Info[n] = in
+		}
+		for n, in := range c.Info {
+			d.Info[n] = in
+		}
+		a.decl = &d
+		return
+	}
+}
+
+// templateParam is the parameter that arg of call sets: the one it
+// names, or the next one in order that no argument names.
+func templateParam(params []*syntax.Param, call *syntax.Call, arg *syntax.Arg) *syntax.Param {
+	if arg.Name != nil {
+		for _, p := range params {
+			if p.Name != nil && p.Name.Text == arg.Name.Text {
+				return p
+			}
+		}
+		return nil
+	}
+	named := map[string]bool{}
+	for _, x := range call.Args {
+		if x.Name != nil {
+			named[x.Name.Text] = true
+		}
+	}
+	var free []*syntax.Param
+	for _, p := range params {
+		if p.Name != nil && !named[p.Name.Text] {
+			free = append(free, p)
+		}
+	}
+	k := 0
+	for _, x := range call.Args {
+		if x == arg {
+			break
+		}
+		if x.Name == nil {
+			k++
+		}
+	}
+	if k < len(free) {
+		return free[k]
+	}
+	return nil
 }
 
 func (a *at) info(n syntax.Node) *sema.Info {
@@ -1492,6 +1583,12 @@ func (s *Session) commandItems(text string, off int) ([]Item, int) {
 		if tg, ok := strings.CutPrefix(reg, "tag/"); ok {
 			folder = "tags/" + tg
 		}
+		if reg == "storage" {
+			return s.storageIDs()
+		}
+		if id, ok := strings.CutPrefix(reg, "storage "); ok {
+			return s.storagePaths(id)
+		}
 		var out []string
 		for _, sym := range s.R.Syms.All() {
 			switch {
@@ -1519,6 +1616,85 @@ func (s *Session) commandItems(text string, off int) ([]Item, int) {
 		items = append(items, it)
 	}
 	return items, ws
+}
+
+// storageRef finds the storage ids that commands in the project use.
+var storageRef = regexp.MustCompile(`\bstorage +([a-z0-9_.\-]+:[a-z0-9_.\-/]+)`)
+
+// storageIDs are the command storages a `storage` argument can name: the
+// one the project's Storage declarations keep their records in, then the
+// ones the project's commands already use.
+func (s *Session) storageIDs() []string {
+	seen := map[string]bool{}
+	var out []string
+	add := func(id string) {
+		if !seen[id] {
+			seen[id] = true
+			out = append(out, id)
+		}
+	}
+	for _, sym := range s.R.Syms.All() {
+		if sym.Kind.MMS == "Storage" {
+			add(fn.Storage(sym.NS))
+		}
+	}
+	var used []string
+	for _, u := range s.R.Units {
+		if u.File == nil || prelude.Is(u.Path) {
+			continue
+		}
+		for _, t := range u.File.Tokens {
+			if t.Kind != parser.MMSLexerCOMMAND {
+				continue
+			}
+			for _, m := range storageRef.FindAllStringSubmatch(string(u.File.Src[t.Sp.Start:t.Sp.End]), -1) {
+				used = append(used, m[1])
+			}
+		}
+	}
+	sort.Strings(used)
+	for _, id := range used {
+		add(id)
+	}
+	return out
+}
+
+// storagePaths are the paths a command can write after storage id: the
+// Storage declarations kept there and their fields, `game` and
+// `game.wave`.
+func (s *Session) storagePaths(id string) []string {
+	var out []string
+	for _, sym := range s.R.Syms.All() {
+		if sym.Kind.MMS != "Storage" || fn.Storage(sym.NS) != id {
+			continue
+		}
+		name := sym.Path
+		out = append(out, name)
+		tn, ok := sym.Decl.Type.(*syntax.TypeName)
+		if !ok {
+			continue
+		}
+		out = s.recordPaths(out, name, s.R.Syms.Types["::mms::"+tn.Name], 0)
+	}
+	return out
+}
+
+// recordPaths adds the dotted path of each field of t under name, and of
+// the fields of nested records.
+func (s *Session) recordPaths(out []string, name string, t *spec.Type, depth int) []string {
+	for i := 0; t != nil && t.Kind == "reference" && i < 8; i++ {
+		t = s.R.Syms.Types[t.Path]
+	}
+	if t == nil || t.Kind != "struct" || depth > 16 {
+		return out
+	}
+	for _, f := range t.Fields {
+		if f.Kind == "pair" && f.Key != "" {
+			out = append(out, name+"."+f.Key)
+			out = s.recordPaths(out, name+"."+f.Key, f.Type, depth+1)
+		}
+	}
+	return out
 }
 
 // InlayHint is a label shown after a span, such as the base item a custom
