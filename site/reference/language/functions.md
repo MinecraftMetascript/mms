@@ -38,6 +38,7 @@ Function next_wave {
 | --- | --- |
 | `/say hi` | a command, checked against the game's command tree |
 | `let n = 3`, `let ok: bool = n > 2` | a local variable |
+| `let n = /data get block ~ ~ ~ Items`, `let ok: bool = /execute if block ~ ~ ~ chest` | a command's result, or for a bool whether it succeeded |
 | `const n = 3` | a value folded into every use |
 | `n = 1`, `n += 1`, `-=`, `*=`, `/=`, `%=` | assignment |
 | `if (c) { } else if (c) { } else { }` | a branch |

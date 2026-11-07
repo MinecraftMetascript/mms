@@ -339,6 +339,8 @@ func (d *dumper) expr(e Expr) {
 		})
 	case *Bad:
 		d.line("Bad %d-%d", e.Sp.Start, e.Sp.End)
+	case *CommandStmt:
+		d.line("Command %q", e.Text)
 	case nil:
 		d.line("<nil>")
 	}

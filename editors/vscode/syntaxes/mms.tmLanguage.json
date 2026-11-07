@@ -18,7 +18,7 @@
     },
     "command": {
       "name": "meta.command.mms",
-      "begin": "^\\s*(/)([a-z]+)",
+      "begin": "(?:^\\s*|(?<=[^=!<>+\\-*/%]=)\\s*)(/)([a-z]+)",
       "beginCaptures": {
         "1": { "name": "punctuation.definition.command.mms" },
         "2": { "name": "support.function.command.mms" }

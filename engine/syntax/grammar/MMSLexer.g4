@@ -41,9 +41,11 @@ TRUE     : 'true';
 FALSE    : 'false';
 
 // A raw command: a line in a function body whose first non-blank character
-// is '/' followed by a command name. The whole line is one token; the
-// command checker parses it against the command tree.
-COMMAND : '/' {p.atLineStart()}? [a-z] ~[\r\n]*;
+// is '/' followed by a command name, or the value of an assignment, after
+// '=' (`let n = /data get block ~ ~ ~ Items`). It runs to the end of the
+// line and is one token; the command checker parses it against the
+// command tree.
+COMMAND : '/' {p.atCommandStart()}? [a-z] ~[\r\n]*;
 
 DOC_COMMENT   : '/**' .*? '*/' -> channel(HIDDEN);
 BLOCK_COMMENT : '/*' .*? '*/' -> channel(HIDDEN);

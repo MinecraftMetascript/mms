@@ -97,6 +97,27 @@ Function check {
 
 Constant parts are folded at compile time.
 
+### Command results
+
+A command after `=` is a value: what the command returns, as `execute store result` would store it. Assigned to a `bool`, it is whether the command succeeded, as `execute store success` would store it.
+
+```mms
+Objective checks
+
+Function inspect {
+  let items = /data get block ~ ~ ~ Items
+  let is_chest: bool = /execute if block ~ ~ ~ chest
+  if (is_chest && items > 20) {
+    /say this chest is nearly full
+  }
+  checks[@s] = /time query gametime
+}
+```
+
+- The command runs to the end of the line, as a command on a line of its own does, and `${...}` works in it the same way.
+- It works wherever a value is assigned: `let`, `=` to a local, a `Global`, a score or a `Storage` field. It is not part of a larger expression, so write `let n = /data get ...` and then use `n`.
+- A result is a whole number. To read text, such as a block's id, copy it into a `Storage` field with `/data modify storage ... set from ...` and read the field.
+
 ### Strings
 
 `string` values live in command storage (`<namespace>:mms`). They can be joined with `+`, appended with `+=`, and compared with `==` and `!=`. Ints and bools join as their text.

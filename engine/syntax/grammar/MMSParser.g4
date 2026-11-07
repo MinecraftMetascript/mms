@@ -134,8 +134,11 @@ fieldKey : word | RESLOC | STRING;
 // `item_name = if (name != none) Translate(...)`. If expressions sit only
 // where a value is expected, so a statement that starts with `if` is always
 // an if statement.
+// A command as a value, `let n = /data get block ~ ~ ~ Items`, is its
+// result (or, for a bool, whether it succeeded).
 value
     : IF LPAREN expr RPAREN value (ELSE value)?
+    | COMMAND
     | expr
     ;
 
