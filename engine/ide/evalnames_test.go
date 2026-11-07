@@ -1,9 +1,13 @@
 package ide
 
 import (
+	"context"
 	"sort"
 	"strings"
 	"testing"
+
+	"github.com/minecraftmetascript/mms/engine/project"
+	"github.com/minecraftmetascript/mms/engine/spec"
 )
 
 const evalNamesSrc = "Type Size { w: int }\n" +
@@ -97,5 +101,59 @@ func TestTemplateSignature(t *testing.T) {
 	md, _ = s.Hover("main.mms", strings.LastIndex(src, "amount")+1)
 	if !strings.Contains(md, "const amount: int = 4") {
 		t.Errorf("const hover = %q", md)
+	}
+}
+
+// labelsAt completes at the ^ in src, whose other text may hold `|`.
+func labelsAt(t *testing.T, src string) []string {
+	t.Helper()
+	i := strings.Index(src, "^")
+	src = src[:i] + src[i+1:]
+	p := project.New(spec.MustDefault(), project.Config{Namespace: "test"})
+	p.SetFile("main.mms", src)
+	r, err := p.Analyze(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := &Session{P: p, R: r}
+	items, _ := s.Completion("main.mms", len([]rune(src[:i])))
+	var out []string
+	for _, it := range items {
+		out = append(out, it.Label)
+	}
+	return out
+}
+
+// A Template argument completes from the parameter's type, then the
+// consts and value Templates; the top level offers the new keywords.
+func TestEvalCompletion(t *testing.T) {
+	src := "const amount = 3\nTemplate pick(mode: \"rigid\" | \"terrain_matching\", n: int): int = n\nDensityFunction d = pick(^)\n"
+	got := strings.Join(labelsAt(t, src), " ")
+	for _, want := range []string{"rigid", "terrain_matching", "amount", "pick"} {
+		if !strings.Contains(" "+got+" ", " "+want+" ") {
+			t.Errorf("pick(|) lacks %s: %s", want, got)
+		}
+	}
+	if strings.Contains(got, "Clamp") {
+		t.Errorf("pick(|) offers DensityFunction helpers: %s", got)
+	}
+	got = strings.Join(labelsAt(t, "Te^"), " ")
+	for _, want := range []string{"const", "Template", "Type", "Blueprint", "for", "CustomItem"} {
+		if !strings.Contains(" "+got+" ", " "+want+" ") {
+			t.Errorf("top level lacks %s", want)
+		}
+	}
+}
+
+// The outline lists consts, Templates, Types and Blueprints too.
+func TestEvalSymbols(t *testing.T) {
+	s, _ := session(t, evalNamesSrc)
+	var got []string
+	for _, sym := range s.Symbols("main.mms") {
+		got = append(got, sym.Kind+":"+sym.Name)
+	}
+	want := "type:Size constant:amount template:twice template:shadow blueprint:Wand"
+	if !strings.HasPrefix(strings.Join(got, " "), want) {
+		t.Errorf("symbols = %v", got)
 	}
 }

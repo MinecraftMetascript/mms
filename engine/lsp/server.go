@@ -840,7 +840,8 @@ func (s *Server) formatting(_ context.Context, p struct {
 	return []any{map[string]any{"range": Range{Start: Position{}, End: l.pos(len(l.src))}, "newText": out}}, nil
 }
 
-var symbolKinds = map[string]int{"resource": 23, "function": 12, "namespace": 3, "tag": 18, "objective": 13}
+var symbolKinds = map[string]int{"resource": 23, "function": 12, "namespace": 3, "tag": 18, "objective": 13,
+	"constant": 14, "template": 12, "type": 23, "blueprint": 5}
 
 func (s *Server) documentSymbol(_ context.Context, p struct {
 	TextDocument docID `json:"textDocument"`

@@ -56,9 +56,9 @@ extern Template hash(text: string): int
 extern Template tell(target: Selector, message: Text): Commands
 /** Shows `message` in large text in the middle of the screen of each player `target` selects, with `subtitle` under it. */
 extern Template title(target: Selector, message: Text, subtitle: Text?): Commands
-/** Shows `message` just above the hotbar of each player `target` selects. */
 /** Whether `target` selects at least one entity, in a function: `if (exists(@e[tag=boss])) { ... }`. */
 extern Template exists(target: Selector): bool
 /** How many entities `target` selects, in a function: `let n = count(@e[type=zombie, distance=..16])`. */
 extern Template count(target: Selector): int
+/** Shows `message` just above the hotbar of each player `target` selects. */
 extern Template actionbar(target: Selector, message: Text): Commands

@@ -179,6 +179,18 @@ func (e *Env) Resolve(path string, t syntax.TypeExpr) (rt *spec.Type, optional b
 	return &spec.Type{Kind: "any"}, false
 }
 
+// Lookup resolves a type expression for an editor, after checking: it
+// reports nothing and changes nothing, so it is safe to call while other
+// editor requests read the environment. Every Type declaration was
+// resolved by New, so the copy only reads e.Types.
+func (e *Env) Lookup(path string, t syntax.TypeExpr) *spec.Type {
+	q := *e
+	q.Diags = map[string][]syntax.Diagnostic{}
+	q.busy = map[string]bool{}
+	rt, _ := q.Resolve(path, t)
+	return rt
+}
+
 // primitives are the language's own value types.
 var primitives = map[string]string{
 	"int": "int", "float": "float", "double": "double", "bool": "boolean", "string": "string", "any": "any",

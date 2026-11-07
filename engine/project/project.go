@@ -158,6 +158,8 @@ type Result struct {
 	Eval  *eval.Result
 	Syms  *sema.Table
 	Units []*sema.Unit
+	// TypeEnv resolves type expressions: Template parameters, fields.
+	TypeEnv *types.Env
 	// Source holds each file as parsed, before expansion: with its
 	// const, Template, Blueprint and for items and the calls as written.
 	Source map[string]*syntax.File
@@ -349,6 +351,7 @@ func (p *Project) Analyze(ctx context.Context) (*Result, error) {
 	syms.Hidden = preludeEmitted(ev)
 	syms.Conversions = tenv.Conversions(ev, p.Config.Namespace)
 	r := &Result{Syms: syms, Units: units, Source: source, Decls: map[*syntax.Decl]*Decl{}, collect: collect, pack: p.Pack, cfg: p.Config, files: p.Files, Eval: ev}
+	r.TypeEnv = tenv
 	r.typeErr = tenv.Check(ev, p.Config.Namespace, func(ns string) *sema.Checker {
 		c := sema.NewChecker(p.Pack, p.Kinds, syms, ns)
 		c.Files, c.Texts = p.Files, p.bookText

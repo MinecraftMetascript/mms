@@ -11,7 +11,7 @@ import (
 // declKinds lists what can start a declaration: the kinds, then the
 // Blueprints in scope, except those whose doc says @internal.
 func (s *Session) declKinds() []sema.Candidate {
-	out := s.P.Kinds.DeclKinds()
+	out := append(s.P.Kinds.DeclKinds(), evalKeywords...)
 	if s.R == nil || s.R.Eval == nil {
 		return out
 	}
