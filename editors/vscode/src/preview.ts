@@ -4,12 +4,14 @@
 // the panel on it, and the panel stays on that declaration while you edit
 // elsewhere, redrawing as the pack changes. The pack comes from the
 // server's `mms/output` (output.ts). A Book previews as its pages: its declaration
-// has a lens, and so does each page of its .mmsbook file.
+// has a lens, and so does each page of its .mmsbook file. A tell, title or
+// actionbar message previews as the game shows it, from a lens at the
+// command (or over the .mmstext file it reads).
 import { bookPageAt, itemPath, shows } from '@mms/preview/paths';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
-import type { OutputItem, ToExtension, ToPanel } from './messages';
+import type { OutputItem, OutputText, ToExtension, ToPanel } from './messages';
 import { isSource, key, type PackOutput } from './output';
 import { configDir } from './world';
 
@@ -31,11 +33,11 @@ export class Previews implements vscode.Disposable, vscode.CodeLensProvider {
 	) {
 		this.subscriptions.push(
 			this.lenses,
-			vscode.languages.registerCodeLensProvider([{ language: 'mms' }, { language: 'mmsbook' }], this),
+			vscode.languages.registerCodeLensProvider([{ language: 'mms' }, { language: 'mmsbook' }, { language: 'mmstext' }], this),
 			output.onDidChange(() => {
 				this.lenses.fire();
-				this.post({ type: 'output', files: this.files, items: this.items, assets: this.output.assets, textures: this.textures(), structures: this.structures() });
-				if (this.panel) this.panel.title = title(this.target, this.items);
+				this.post({ type: 'output', files: this.files, items: this.items, texts: this.output.texts, assets: this.output.assets, textures: this.textures(), structures: this.structures() });
+				if (this.panel) this.panel.title = title(this.target, this.items, this.output.texts);
 			}),
 			vscode.window.registerWebviewPanelSerializer(viewType, {
 				deserializeWebviewPanel: async (panel, state?: { path?: string | null; page?: number }) => {
@@ -163,6 +165,18 @@ export class Previews implements vscode.Disposable, vscode.CodeLensProvider {
 				);
 			});
 		}
+		for (const t of this.output.texts) {
+			if (key(vscode.Uri.parse(t.uri)) !== here || lines.has(t.range.start.line)) continue;
+			lines.add(t.range.start.line);
+			lenses.push(
+				new vscode.CodeLens(new vscode.Range(t.range.start.line, 0, t.range.start.line, 0), {
+					title: '$(open-preview) Preview',
+					tooltip: `Show this ${t.kind === 'chat' ? 'chat message' : t.kind} in the MMS preview`,
+					command: 'mms.previewDeclaration',
+					arguments: [t.id]
+				})
+			);
+		}
 		return lenses;
 	}
 
@@ -170,7 +184,7 @@ export class Previews implements vscode.Disposable, vscode.CodeLensProvider {
 		this.target = path;
 		this.page = page;
 		this.post({ type: 'target', path, page });
-		if (this.panel) this.panel.title = title(path, this.items);
+		if (this.panel) this.panel.title = title(path, this.items, this.output.texts);
 	}
 
 	/** The output declared at a line of a document, if it has a preview. */
@@ -188,12 +202,14 @@ export class Previews implements vscode.Disposable, vscode.CodeLensProvider {
 			const inDecl = key(vscode.Uri.parse(it.uri)) === here && it.range.start.line <= line && line <= it.range.end.line;
 			if (page !== null || inDecl) return { path, page: page ?? 0 };
 		}
+		const t = this.output.texts.find((t) => key(vscode.Uri.parse(t.uri)) === here && t.range.start.line <= line && line <= t.range.end.line);
+		if (t) return { path: t.id };
 	}
 
 	private adopt(panel: vscode.WebviewPanel) {
 		this.panel = panel;
 		const root = vscode.Uri.joinPath(this.context.extensionUri, 'out', 'webview');
-		panel.title = title(this.target, this.items);
+		panel.title = title(this.target, this.items, this.output.texts);
 		panel.iconPath = vscode.Uri.joinPath(this.context.extensionUri, 'icons', 'preview.svg');
 		panel.webview.options = { enableScripts: true, localResourceRoots: [root] };
 		panel.webview.html = this.html(panel.webview, root);
@@ -205,7 +221,7 @@ export class Previews implements vscode.Disposable, vscode.CodeLensProvider {
 
 	private async receive(m: ToExtension) {
 		if (m.type === 'ready') {
-			this.post({ type: 'output', files: this.files, items: this.items, assets: this.output.assets, textures: this.textures(), structures: this.structures() });
+			this.post({ type: 'output', files: this.files, items: this.items, texts: this.output.texts, assets: this.output.assets, textures: this.textures(), structures: this.structures() });
 			this.setTarget(this.target, this.page);
 			await this.output.refresh();
 		} else if (m.type === 'clear') {
@@ -263,7 +279,8 @@ export class Previews implements vscode.Disposable, vscode.CodeLensProvider {
 }
 
 /** The panel's tab title: the declaration it shows. */
-function title(path: string | null, items: OutputItem[]): string {
-	const id = path ? shows(path, items)?.id : undefined;
+function title(path: string | null, items: OutputItem[], texts: OutputText[]): string {
+	if (path?.startsWith('text:')) return 'Preview message';
+	const id = path ? shows(path, items, texts)?.id : undefined;
 	return id ? `Preview ${id.replace(/^[^:]+:/, '')}` : 'MMS Preview';
 }

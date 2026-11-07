@@ -71,13 +71,33 @@ export function structureCall(rel: string, s: WorldStructure): string {
 
 /** Whether the project has the structure, and the same bytes as the world. */
 export function status(s: WorldStructure, dest: string): Status {
-	let mine: Buffer;
+	const mine = fileHash(dest);
+	if (mine === undefined) return 'new';
+	return mine === fileHash(s.file) ? 'imported' : 'changed';
+}
+
+/** Hashes by path, kept while a file's size and modification time stay the same. */
+const hashes = new Map<string, { key: string; hash: string }>();
+
+/** A file's hash, read again only when it changed; undefined when it cannot be read. */
+function fileHash(file: string): string | undefined {
+	let st: fs.Stats;
 	try {
-		mine = fs.readFileSync(dest);
+		st = fs.statSync(file);
 	} catch {
-		return 'new';
+		hashes.delete(file);
+		return undefined;
 	}
-	return hash(mine) === hash(fs.readFileSync(s.file)) ? 'imported' : 'changed';
+	const key = `${st.size}:${st.mtimeMs}`;
+	const got = hashes.get(file);
+	if (got?.key === key) return got.hash;
+	try {
+		const h = hash(fs.readFileSync(file));
+		hashes.set(file, { key, hash: h });
+		return h;
+	} catch {
+		return undefined;
+	}
 }
 
 /** Copies a structure into the project, making folders as needed. */

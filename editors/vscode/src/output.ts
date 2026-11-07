@@ -5,11 +5,13 @@
 // picks the project (the nearest mms.json) in a workspace with several.
 import * as vscode from 'vscode';
 import type { LanguageClient } from 'vscode-languageclient/node';
-import type { OutputAsset, OutputFile, OutputHole, OutputItem } from './messages';
+import type { OutputAsset, OutputFile, OutputHole, OutputItem, OutputText } from './messages';
 
 export class PackOutput implements vscode.Disposable {
 	files: OutputFile[] = [];
 	items: OutputItem[] = [];
+	/** The messages tell, title and actionbar show, for the text preview. */
+	texts: OutputText[] = [];
 	assets: OutputAsset[] = [];
 	/** The project's JigsawHole declarations. */
 	jigsawHoles: OutputHole[] = [];
@@ -70,7 +72,7 @@ export class PackOutput implements vscode.Disposable {
 		try {
 			const asked = this.document;
 			const uri = asked?.toString();
-			const out = await client.sendRequest<{ files: OutputFile[]; items?: OutputItem[]; assets?: OutputAsset[]; jigsawHoles?: OutputHole[]; unusedAssets?: string[]; hasErrors: boolean }>(
+			const out = await client.sendRequest<{ files: OutputFile[]; items?: OutputItem[]; texts?: OutputText[]; assets?: OutputAsset[]; jigsawHoles?: OutputHole[]; unusedAssets?: string[]; hasErrors: boolean }>(
 				'mms/output',
 				uri ? { uri } : {}
 			);
@@ -79,6 +81,7 @@ export class PackOutput implements vscode.Disposable {
 			if (asked !== this.document) return;
 			this.files = out.files;
 			this.items = out.items ?? [];
+			this.texts = out.texts ?? [];
 			this.assets = out.assets ?? [];
 			this.jigsawHoles = out.jigsawHoles ?? [];
 			this.hasErrors = out.hasErrors;

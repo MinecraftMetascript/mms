@@ -50,12 +50,24 @@ export interface OutputItem {
 	pages?: { uri: string; range: Range }[];
 }
 
+/** A message a tell, title or actionbar command shows; matches packages/preview's OutputText. */
+export interface OutputText {
+	/** text:<uri>:<offset>, the key the preview selects it by. */
+	id: string;
+	kind: 'chat' | 'title' | 'actionbar';
+	text: string;
+	subtitle?: string;
+	uri: string;
+	range: Range;
+}
+
 export type ToPanel =
 	/** The generated pack and custom items, refreshed after each analysis. */
 	| {
 			type: 'output';
 			files: OutputFile[];
 			items: OutputItem[];
+			texts: OutputText[];
 			assets: OutputAsset[];
 			/** The pack's copied .png textures as data URLs, by pack path: custom item icons. */
 			textures?: Record<string, string>;
