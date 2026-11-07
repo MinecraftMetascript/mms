@@ -42,7 +42,7 @@ Function f {
 		`title @s actionbar {`,
 		`bold:true`,
 		`{score:{name:"#f.n",objective:"mms.demo"}}`,
-		`{score:{name:"#f._t0",objective:"mms.demo"}}`,
+		`{score:{name:"#f.-t0",objective:"mms.demo"}}`,
 		`{nbt:"l.\"f\".name",storage:"demo:mms"}`,
 	} {
 		if !strings.Contains(got, want) {

@@ -369,7 +369,7 @@ func (f *fc) declare(n *syntax.Name, typ string) local {
 	}
 	holder := n.Text
 	if k := f.names[n.Text]; k > 0 {
-		holder = n.Text + "_" + strconv.Itoa(k)
+		holder = n.Text + fn.Gen + strconv.Itoa(k)
 	}
 	f.names[n.Text]++
 	what := "let"
@@ -389,7 +389,7 @@ func (f *fc) declare(n *syntax.Name, typ string) local {
 }
 
 func (f *fc) temp() fn.Score {
-	s := f.score(fn.Holder(f.path, "_t"+strconv.Itoa(f.temps)))
+	s := f.score(fn.GenHolder(f.path, "t"+strconv.Itoa(f.temps)))
 	f.temps++
 	f.frame = append(f.frame, s)
 	return s
@@ -1340,7 +1340,7 @@ func (f *fc) setString(dst string, v *val) fn.Op {
 }
 
 func (f *fc) tempPath() string {
-	p := fn.Storage(f.ns) + " " + fn.LocalPath(f.path, "_s"+strconv.Itoa(f.temps))
+	p := fn.Storage(f.ns) + " " + fn.LocalPath(f.path, fn.Gen+"s"+strconv.Itoa(f.temps))
 	f.temps++
 	f.strings = true
 	return p

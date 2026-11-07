@@ -54,17 +54,17 @@ Reader read_a { path = "a.b" }
 	}
 	f := files["data/demo/function/f.mcfunction"]
 	for _, want := range []string{
-		"execute store result score #f._t0 mms.demo run data get block ~ ~ ~ Items\n",
-		"execute store success score #f._t1 mms.demo if block ~ ~ ~ chest\n",
-		"execute store result score #f._t2 mms.demo run time query gametime\nscoreboard players operation $g mms.demo = #f._t2 mms.demo\n",
-		"execute store result score #f._t3 mms.demo run data get entity @s Health\nscoreboard players operation @s kills = #f._t3 mms.demo\n",
-		"execute store success score #f._t4 mms.demo if data block ~ ~ ~ Items[26]\nexecute store result storage demo:mms probe.full byte 1 run scoreboard players get #f._t4 mms.demo\n",
+		"execute store result score #f.-t0 mms.demo run data get block ~ ~ ~ Items\n",
+		"execute store success score #f.-t1 mms.demo if block ~ ~ ~ chest\n",
+		"execute store result score #f.-t2 mms.demo run time query gametime\nscoreboard players operation $g mms.demo = #f.-t2 mms.demo\n",
+		"execute store result score #f.-t3 mms.demo run data get entity @s Health\nscoreboard players operation @s kills = #f.-t3 mms.demo\n",
+		"execute store success score #f.-t4 mms.demo if data block ~ ~ ~ Items[26]\nexecute store result storage demo:mms probe.full byte 1 run scoreboard players get #f.-t4 mms.demo\n",
 	} {
 		if !strings.Contains(f, want) {
 			t.Errorf("f lacks %q:\n%s", want, f)
 		}
 	}
-	if m := files["data/demo/function/f/_macro0.mcfunction"]; m != "$execute store result score #f._t5 mms.demo run data get storage demo:x list[$(a0)]\n" {
+	if m := files["data/demo/function/f/_macro0.mcfunction"]; m != "$execute store result score #f.-t5 mms.demo run data get storage demo:x list[$(a0)]\n" {
 		t.Errorf("macro = %q", m)
 	}
 	if got := files["data/demo/function/read_a.mcfunction"]; !strings.Contains(got, "run data get storage demo:x a.b\n") {

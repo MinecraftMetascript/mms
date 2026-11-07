@@ -591,3 +591,47 @@ Function grant {
 		}
 	}
 }
+
+// TestGeneratedNamesKeepApart checks that the compiler's own scores and
+// storage paths (temporaries, flags, shadowed locals) never share a name
+// with a user's local, whatever the user calls it.
+func TestGeneratedNamesKeepApart(t *testing.T) {
+	vm := world(t, `
+Function temps(a: int): int {
+  let _t0 = 5
+  let y = a * 2 + a * 3
+  return _t0 + y
+}
+
+Function shadow: int {
+  let x_1 = 7
+  let x = 1
+  if (x > 0) {
+    let x = 2
+    x_1 = x_1 + x
+  }
+  return x_1
+}
+
+Function strings(who: string) {
+  let _s0 = "kept"
+  let msg = "hi " + who
+  /say ${_s0} ${msg}
+}
+
+Function run {
+  strings("alex")
+}
+`)
+	vm.Scores["mms.demo"]["#temps.a"] = 1
+	if v := call(t, vm, "demo:temps"); v != 10 {
+		t.Errorf("temps(1) = %d, want 5 + 1*2 + 1*3 = 10", v)
+	}
+	if v := call(t, vm, "demo:shadow"); v != 9 {
+		t.Errorf("shadow = %d, want 7 + 2 = 9", v)
+	}
+	call(t, vm, "demo:run")
+	if got := strings.Join(vm.Said, "\n"); got != "kept hi alex" {
+		t.Errorf("said %q, want %q", got, "kept hi alex")
+	}
+}

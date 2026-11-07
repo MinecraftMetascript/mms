@@ -16,7 +16,7 @@ func Optimize(f *Func) {
 	l.block(f.Body, nil)
 }
 
-func isTemp(s Score) bool { return strings.Contains(s.Holder, "._t") }
+func isTemp(s Score) bool { return strings.Contains(s.Holder, "."+Gen+"t") }
 
 // countUses counts each score's appearances, in operands and in text.
 func countUses(b *Block, uses map[Score]int) {

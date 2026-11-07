@@ -23,9 +23,18 @@ type Output struct {
 // Objective is the scoreboard objective for a namespace's values.
 func Objective(ns string) string { return "mms." + ns }
 
-// Holder returns the score holder of a function's parameter, local or
-// temporary, named name, for the function at path.
+// Holder returns the score holder of a function's parameter or local
+// named name, for the function at path.
 func Holder(path, name string) string { return "#" + path + "." + name }
+
+// Gen marks a name the compiler made (a temporary, a flag, a shadowed
+// local's copy). '-' never appears in an MMS identifier, so these names
+// cannot collide with a user's, yet it is still valid in score holders
+// and unquoted NBT keys.
+const Gen = "-"
+
+// GenHolder returns the score holder of a compiler-made value.
+func GenHolder(path, name string) string { return Holder(path, Gen+name) }
 
 // Control-flow codes in #cf.
 const (
@@ -90,7 +99,7 @@ func (g *gen) next(kind string) string {
 }
 
 func (g *gen) flag() Score {
-	s := g.score(Holder(g.path, "_f"+strconv.Itoa(g.n)))
+	s := g.score(GenHolder(g.path, "f"+strconv.Itoa(g.n)))
 	g.n++
 	return s
 }

@@ -53,19 +53,19 @@ scoreboard players set $north mms.treecap 0
 scoreboard players set $top mms.treecap 0
 summon marker ~ ~ ~ {Tags:["treecap.node","treecap.origin"]}
 function treecap:spread
-scoreboard players set #fell._f0 mms.treecap 0
-execute if score $logs mms.treecap > $max_logs mms.treecap run scoreboard players set #fell._f0 mms.treecap 1
-execute if score #fell._f0 mms.treecap matches 1 run title @s actionbar {text:"That is too big to fell at once",color:"gray"}
-execute unless score #fell._f0 mms.treecap matches 1 run function treecap:fell/_else1
+scoreboard players set #fell.-f0 mms.treecap 0
+execute if score $logs mms.treecap > $max_logs mms.treecap run scoreboard players set #fell.-f0 mms.treecap 1
+execute if score #fell.-f0 mms.treecap matches 1 run title @s actionbar {text:"That is too big to fell at once",color:"gray"}
+execute unless score #fell.-f0 mms.treecap matches 1 run function treecap:fell/_else1
 kill @e[type=marker,tag=treecap.node]
 kill @e[type=marker,tag=treecap.leaf]
 === data/treecap/function/fell/_else1.mcfunction
-scoreboard players set #fell._t1 mms.treecap 0
+scoreboard players set #fell.-t1 mms.treecap 0
 execute if score $logs mms.treecap matches 1.. run function treecap:fell/_if2
-execute if score #fell._t1 mms.treecap matches 1 run function treecap:fell/_if3
+execute if score #fell.-t1 mms.treecap matches 1 run function treecap:fell/_if3
 === data/treecap/function/fell/_if2.mcfunction
-execute store result score #fell._t0 mms.treecap run function treecap:is_tree
-execute if score #fell._t0 mms.treecap matches 1 run scoreboard players set #fell._t1 mms.treecap 1
+execute store result score #fell.-t0 mms.treecap run function treecap:is_tree
+execute if score #fell.-t0 mms.treecap matches 1 run scoreboard players set #fell.-t1 mms.treecap 1
 === data/treecap/function/fell/_if3.mcfunction
 execute if score $break_leaves mms.treecap matches 1 unless score $nether mms.treecap matches 1 as @e[type=marker,tag=treecap.node] at @s run function treecap:leaves_by_log
 execute as @e[type=marker,tag=treecap.node,tag=!treecap.origin] at @s run setblock ~ ~ ~ air destroy
@@ -74,22 +74,22 @@ execute as @e[type=marker,tag=treecap.node,tag=!treecap.origin] at @s as @e[type
 execute as @e[type=marker,tag=treecap.leaf] at @s as @e[type=item,distance=..1,nbt={Age:0s}] run tp @s @e[type=marker,tag=treecap.origin,limit=1]
 function treecap:wear_axe
 === data/treecap/function/is_tree.mcfunction
-scoreboard players operation #is_tree._t1 mms.treecap = $east mms.treecap
-scoreboard players operation #is_tree._t1 mms.treecap += $west mms.treecap
-scoreboard players operation #is_tree._t1 mms.treecap += $south mms.treecap
-scoreboard players operation #is_tree._t3 mms.treecap = #is_tree._t1 mms.treecap
-scoreboard players operation #is_tree._t3 mms.treecap += $north mms.treecap
-scoreboard players operation #is_tree._t3 mms.treecap += $top mms.treecap
-scoreboard players operation #is_tree.sides mms.treecap = #is_tree._t3 mms.treecap
+scoreboard players operation #is_tree.-t1 mms.treecap = $east mms.treecap
+scoreboard players operation #is_tree.-t1 mms.treecap += $west mms.treecap
+scoreboard players operation #is_tree.-t1 mms.treecap += $south mms.treecap
+scoreboard players operation #is_tree.-t3 mms.treecap = #is_tree.-t1 mms.treecap
+scoreboard players operation #is_tree.-t3 mms.treecap += $north mms.treecap
+scoreboard players operation #is_tree.-t3 mms.treecap += $top mms.treecap
+scoreboard players operation #is_tree.sides mms.treecap = #is_tree.-t3 mms.treecap
 execute if score $nether mms.treecap matches 1 run function treecap:is_tree/_if0
 execute if score #cf mms.treecap matches 3 run return run function treecap:mms_gen/ret
-scoreboard players set #is_tree._t5 mms.treecap 0
-execute if score #is_tree.sides mms.treecap matches 4.. run scoreboard players set #is_tree._t5 mms.treecap 1
-return run scoreboard players get #is_tree._t5 mms.treecap
+scoreboard players set #is_tree.-t5 mms.treecap 0
+execute if score #is_tree.sides mms.treecap matches 4.. run scoreboard players set #is_tree.-t5 mms.treecap 1
+return run scoreboard players get #is_tree.-t5 mms.treecap
 === data/treecap/function/is_tree/_if0.mcfunction
-scoreboard players set #is_tree._t4 mms.treecap 0
-execute if score #is_tree.sides mms.treecap matches 1.. run scoreboard players set #is_tree._t4 mms.treecap 1
-scoreboard players operation #rv mms.treecap = #is_tree._t4 mms.treecap
+scoreboard players set #is_tree.-t4 mms.treecap 0
+execute if score #is_tree.sides mms.treecap matches 1.. run scoreboard players set #is_tree.-t4 mms.treecap 1
+scoreboard players operation #rv mms.treecap = #is_tree.-t4 mms.treecap
 scoreboard players set #cf mms.treecap 3
 return 0
 === data/treecap/function/leaf.mcfunction
@@ -280,10 +280,10 @@ $execute positioned ~1 ~1 ~ if block ~ ~ ~ #$(a0) unless entity @e[type=marker,t
 summon marker ~ ~ ~ {Tags:["treecap.node"]}
 scoreboard players add $logs mms.treecap 1
 execute if score $logs mms.treecap > $max_logs mms.treecap run return 0
-scoreboard players set #visit._f0 mms.treecap 0
-execute if score $nether mms.treecap matches 1 run scoreboard players set #visit._f0 mms.treecap 1
-execute if score #visit._f0 mms.treecap matches 1 run function treecap:visit/_if1
-execute unless score #visit._f0 mms.treecap matches 1 run function treecap:visit/_else2
+scoreboard players set #visit.-f0 mms.treecap 0
+execute if score $nether mms.treecap matches 1 run scoreboard players set #visit.-f0 mms.treecap 1
+execute if score #visit.-f0 mms.treecap matches 1 run function treecap:visit/_if1
+execute unless score #visit.-f0 mms.treecap matches 1 run function treecap:visit/_else2
 function treecap:spread
 === data/treecap/function/visit/_else2.mcfunction
 execute if block ~1 ~ ~ #minecraft:leaves[persistent=false] run scoreboard players set $east mms.treecap 1
@@ -307,14 +307,14 @@ scoreboard players set $unbreaking mms.treecap 0
 execute if items entity @s weapon.mainhand *[minecraft:enchantments~[{enchantments:"minecraft:unbreaking",levels:1}]] run scoreboard players set $unbreaking mms.treecap 1
 execute if items entity @s weapon.mainhand *[minecraft:enchantments~[{enchantments:"minecraft:unbreaking",levels:2}]] run scoreboard players set $unbreaking mms.treecap 2
 execute if items entity @s weapon.mainhand *[minecraft:enchantments~[{enchantments:"minecraft:unbreaking",levels:3}]] run scoreboard players set $unbreaking mms.treecap 3
-scoreboard players operation #wear_axe._t0 mms.treecap = $unbreaking mms.treecap
-scoreboard players add #wear_axe._t0 mms.treecap 1
+scoreboard players operation #wear_axe.-t0 mms.treecap = $unbreaking mms.treecap
+scoreboard players add #wear_axe.-t0 mms.treecap 1
 scoreboard players operation #wear_axe.cost mms.treecap = $logs mms.treecap
-scoreboard players operation #wear_axe.cost mms.treecap /= #wear_axe._t0 mms.treecap
-scoreboard players operation #wear_axe._t2 mms.treecap = $unbreaking mms.treecap
-scoreboard players add #wear_axe._t2 mms.treecap 1
+scoreboard players operation #wear_axe.cost mms.treecap /= #wear_axe.-t0 mms.treecap
+scoreboard players operation #wear_axe.-t2 mms.treecap = $unbreaking mms.treecap
+scoreboard players add #wear_axe.-t2 mms.treecap 1
 scoreboard players operation #wear_axe.rest mms.treecap = $logs mms.treecap
-scoreboard players operation #wear_axe.rest mms.treecap %= #wear_axe._t2 mms.treecap
+scoreboard players operation #wear_axe.rest mms.treecap %= #wear_axe.-t2 mms.treecap
 execute if score #wear_axe.rest mms.treecap matches 1.. run function treecap:wear_axe/_if0
 execute if score #wear_axe.cost mms.treecap matches 0 run return 0
 summon item_display ~ ~ ~ {Tags:["treecap.tmp"]}
