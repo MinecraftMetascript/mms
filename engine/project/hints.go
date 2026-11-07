@@ -40,12 +40,44 @@ func (r *Result) emittedDecl(d *syntax.Decl) bool {
 // preludeEmitted are the declarations the prelude's Blueprints emitted.
 func preludeEmitted(ev *eval.Result) map[*syntax.Decl]bool {
 	out := map[*syntax.Decl]bool{}
+	written := map[*syntax.Decl]map[string]bool{}
 	for _, f := range ev.Files {
 		for _, od := range f.Decls {
-			if od.Instance != nil && prelude.Is(od.Instance.Blueprint.Path) {
+			if od.Instance == nil || !prelude.Is(od.Instance.Blueprint.Path) {
+				continue
+			}
+			// A name the user wrote in the instance, such as a JigsawStructure's
+			// pool `halls`, is one they refer to, so it stays offered.
+			names, ok := written[od.From]
+			if !ok {
+				names = writtenNames(od.From)
+				written[od.From] = names
+			}
+			if od.D.Name == nil || !names[od.D.Name.Text] {
 				out[od.D] = true
 			}
 		}
+	}
+	return out
+}
+
+// writtenNames lists the names in a Blueprint instance as written: its own
+// name and the keys of its body.
+func writtenNames(d *syntax.Decl) map[string]bool {
+	out := map[string]bool{}
+	if d == nil {
+		return out
+	}
+	for _, n := range d.Names() {
+		out[n.Text] = true
+	}
+	if d.Body != nil {
+		syntax.Walk(d.Body, func(n syntax.Node) bool {
+			if f, ok := n.(*syntax.FieldStmt); ok && f.Key != nil {
+				out[f.Key.Text] = true
+			}
+			return true
+		})
 	}
 	return out
 }

@@ -78,6 +78,10 @@ type Callable struct {
 // Checker checks expressions against expected types and lowers them to
 // JSON in the same walk. One Checker serves one declaration.
 type Checker struct {
+	// Typed are values the editor offers wherever their type fits, such
+	// as the project's Templates by their result type: Piece where a
+	// WeightedElement goes.
+	Typed []TypedCandidate
 	Pack  *spec.Pack
 	Kinds *Kinds
 	Syms  *Table
@@ -453,6 +457,7 @@ func (c *Checker) union(e syntax.Expr, v tview) jsonv.Value {
 		}
 	}
 	cands = c.preferInline(e, cands)
+	cands = c.preferKnownKeys(e, cands)
 	switch len(cands) {
 	case 0:
 		if name := callName(e); name != "" {
@@ -481,6 +486,56 @@ func (c *Checker) union(e syntax.Expr, v tview) jsonv.Value {
 		}
 	}
 	return c.check(e, cands[best])
+}
+
+// preferKnownKeys keeps, of the struct members an object might be, those
+// that know every key it writes, so a half-written entry still narrows to
+// the member its other keys name: `{ modifier = overlay, argument = ... }`
+// is a modifier however broken the argument is.
+func (c *Checker) preferKnownKeys(e syntax.Expr, cands []tview) []tview {
+	o, ok := e.(*syntax.Object)
+	if !ok || o.Body == nil || len(cands) < 2 {
+		return cands
+	}
+	var keys []string
+	for _, it := range o.Body.Items {
+		if f, ok := it.(*syntax.FieldStmt); ok && f.Key != nil {
+			keys = append(keys, f.Key.Text)
+		}
+	}
+	if len(keys) == 0 {
+		return cands
+	}
+	var keep []tview
+	for _, m := range cands {
+		if m.T == nil || m.T.Kind != "struct" {
+			return cands
+		}
+		fs, disp := c.fields(m, "")
+		if disp != nil {
+			return cands
+		}
+		known := map[string]bool{}
+		for _, f := range fs {
+			if f.KeyType != nil {
+				return cands // a map takes any key
+			}
+			known[f.Key] = true
+		}
+		all := true
+		for _, k := range keys {
+			if !known[k] {
+				all = false
+			}
+		}
+		if all {
+			keep = append(keep, m)
+		}
+	}
+	if len(keep) == 0 {
+		return cands
+	}
+	return keep
 }
 
 func unionText(v tview) string {

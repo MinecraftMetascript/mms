@@ -138,3 +138,20 @@ Function reward {
 		t.Errorf("got %s\nwant %s", g, want)
 	}
 }
+
+// A Blueprint instance missing required fields gets the quick fix that
+// adds them, as a vanilla resource does.
+func TestInstanceMissingFieldsFix(t *testing.T) {
+	p := New(spec.MustDefault(), Config{Namespace: "demo"})
+	p.SetFile("a.mms", "JigsawStructure d {\n}\n")
+	r, _ := p.Analyze(context.Background())
+	for _, d := range r.Diagnostics("a.mms") {
+		if d.Code == "mms/missing-field" {
+			if len(d.Fixes) == 0 || !strings.HasPrefix(d.Fixes[0].Title, "Add missing fields 'biomes'") {
+				t.Fatalf("missing-field fixes = %v", d.Fixes)
+			}
+			return
+		}
+	}
+	t.Fatal("no missing-field error")
+}

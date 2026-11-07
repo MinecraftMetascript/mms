@@ -3,6 +3,7 @@ package project
 import (
 	"context"
 	"fmt"
+	"github.com/minecraftmetascript/mms/engine/prelude"
 	"hash/fnv"
 	"io/fs"
 	"runtime/debug"
@@ -164,6 +165,9 @@ type Result struct {
 	// const, Template, Blueprint and for items and the calls as written.
 	Source map[string]*syntax.File
 	Decls  map[*syntax.Decl]*Decl
+	// Consts are the file-level consts with a type, each value checked
+	// for the editor against it. D stands in for the const statement.
+	Consts map[*syntax.ConstStmt]*Decl
 	// Order lists declarations in file and source order.
 	Order []*Decl
 	// Instances are the Blueprint instances the user wrote, in order,
@@ -214,7 +218,13 @@ type Decl struct {
 	// Blueprint is set on a Blueprint instance's body, checked for the
 	// editor only.
 	Blueprint *eval.Blueprint
-	Diags     []syntax.Diagnostic
+	// Template is set on a Template's body, checked for the editor only
+	// against its return type, or read as function code for Commands.
+	Template *eval.Template
+	// Emitter is set on a declaration in a Blueprint's emit block,
+	// checked for the editor only.
+	Emitter *eval.Blueprint
+	Diags   []syntax.Diagnostic
 	// Extern are problems in other files, such as a Book's .mmsbook
 	// file, by path.
 	Extern map[string][]syntax.Diagnostic
@@ -404,6 +414,75 @@ func (p *Project) Analyze(ctx context.Context) (*Result, error) {
 		c.Files, c.Texts = p.Files, p.bookText
 		return c
 	})
+	r.templateDecls(tenv, p.Kinds, func(ns string) *sema.Checker {
+		c := sema.NewChecker(p.Pack, p.Kinds, syms, ns)
+		c.Files, c.Texts = p.Files, p.bookText
+		return c
+	})
+	// A declaration in a Blueprint's emit block is checked as written,
+	// for the editor: its Blueprint's fields are names the checker does
+	// not know, so its diagnostics are dropped, and it writes nothing.
+	for _, bp := range ev.Blueprints {
+		u := r.Unit(bp.Path)
+		if u == nil || prelude.Is(bp.Path) {
+			continue
+		}
+		// The Blueprint's own head: each `as` value checked against its
+		// type.
+		c := sema.NewChecker(p.Pack, p.Kinds, syms, p.Config.Namespace)
+		c.Files, c.Texts, c.Src = p.Files, p.bookText, u.File.Src
+		for _, as := range bp.As {
+			if as.Value == nil {
+				continue
+			}
+			if want := tenv.Lookup(bp.Path, as.Type); want != nil && want.Kind != "any" {
+				c.CheckType(as.Value, want, syntax.TypeText(as.Type))
+			}
+		}
+		r.Decls[bp.D] = &Decl{Unit: u, D: bp.D, NS: p.Config.Namespace, Info: c.Info, Emitter: bp}
+		for _, b := range bp.Emits {
+			syntax.Walk(b, func(n syntax.Node) bool {
+				d, ok := n.(*syntax.Decl)
+				if !ok {
+					return true
+				}
+				if d.Kind == nil || r.Decls[d] != nil {
+					return false
+				}
+				// Another Blueprint's instance, such as a CustomItem.
+				if inner := ev.Blueprints[d.Kind.Name]; inner != nil && d.Body != nil {
+					c := sema.NewChecker(p.Pack, p.Kinds, syms, p.Config.Namespace)
+					c.Files, c.Texts, c.Src = p.Files, p.bookText, u.File.Src
+					c.CheckType(&syntax.Object{Body: d.Body, Sp: d.Body.Sp}, tenv.InstanceType(inner), d.Kind.Name)
+					r.Decls[d] = &Decl{Unit: u, D: d, NS: p.Config.Namespace, Info: c.Info, Emitter: bp, Blueprint: inner}
+					return false
+				}
+				k, ok := p.Kinds.Lookup(d.Kind.Name)
+				if !ok {
+					return false
+				}
+				dr := p.checkDecl(u, d, k, syms)
+				dr.NS, dr.Diags, dr.Extern, dr.Emitter = p.Config.Namespace, nil, nil, bp
+				r.Decls[d] = dr
+				return false
+			})
+		}
+	}
+	r.Consts = map[*syntax.ConstStmt]*Decl{}
+	for _, k := range ev.Consts {
+		u := r.Unit(k.Path)
+		if u == nil || prelude.Is(k.Path) || k.S.Type == nil || k.S.Value == nil {
+			continue
+		}
+		c := sema.NewChecker(p.Pack, p.Kinds, syms, p.Config.Namespace)
+		c.Files, c.Texts, c.Src = p.Files, p.bookText, u.File.Src
+		if want := tenv.Lookup(k.Path, k.S.Type); want != nil && want.Kind != "any" {
+			c.CheckType(k.S.Value, want, syntax.TypeText(k.S.Type))
+		}
+		d := &syntax.Decl{Name: k.S.Name, Type: k.S.Type, Value: k.S.Value, Doc: k.S.Doc, Sp: k.S.Sp}
+		r.Consts[k.S] = &Decl{Unit: u, D: d, NS: p.Config.Namespace, Info: c.Info}
+	}
+	r.missingFieldFixes(tenv, p.Kinds, source)
 	r.formErr = map[string][]syntax.Diagnostic{}
 	for path, f := range source {
 		if ds := checkForms(path, f); ds != nil {
@@ -642,4 +721,25 @@ func coversAny(sp syntax.Span, ds []syntax.Diagnostic) bool {
 		}
 	}
 	return false
+}
+
+// Fork returns a copy of the project whose files can be changed without
+// touching this one, such as to complete in a repaired copy of a file
+// being typed. It starts from this project's last analysis.
+func (p *Project) Fork() *Project {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	q := &Project{Pack: p.Pack, Kinds: p.Kinds, Config: p.Config, Files: p.Files, Root: p.Root,
+		files: make(map[string]*sema.Unit, len(p.files)), texts: make(map[string]string, len(p.texts)),
+		chunks: make(map[string][]syntax.Chunk, len(p.chunks)), moved: map[*syntax.Decl]syntax.Moved{}, last: p.last}
+	for k, v := range p.files {
+		q.files[k] = v
+	}
+	for k, v := range p.texts {
+		q.texts[k] = v
+	}
+	for k, v := range p.chunks {
+		q.chunks[k] = v
+	}
+	return q
 }

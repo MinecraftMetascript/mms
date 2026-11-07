@@ -23,6 +23,16 @@ func (s *Session) mmsComplete(a *at, off int) ([]sema.Candidate, bool) {
 	if prev == nil {
 		return nil, false
 	}
+	// An objective's criterion: `Objective kills: |`.
+	// The old `= criterion` form is an error with a fix, but still lists them.
+	if a.decl.Kind.MMS == "Objective" && (prev.Kind == parser.MMSLexerCOLON || prev.Kind == parser.MMSLexerASSIGN) {
+		return criteria(), true
+	}
+	// A Storage's record type: `Storage siege: |`.
+	if a.decl.Kind.MMS == "Storage" && prev.Kind == parser.MMSLexerCOLON && s.R.TypeEnv != nil &&
+		(a.decl.D.Value == nil || !a.decl.D.Value.Span().Contains(off)) {
+		return s.typeNameCandidates(), true
+	}
 	// A type annotation: `Global g: |`, `Function f(n: |)`, `let x: |`.
 	if prev.Kind == parser.MMSLexerCOLON {
 		if a.decl.Kind.MMS == "Global" || a.code() {
@@ -42,10 +52,6 @@ func (s *Session) mmsComplete(a *at, off int) ([]sema.Candidate, bool) {
 				}
 			}
 			return out, true
-		}
-	case a.decl.Kind.MMS == "Objective":
-		if prev.Kind == parser.MMSLexerASSIGN {
-			return criteria(), true
 		}
 	}
 	if !a.code() || a.fn.Body == nil || !a.fn.Body.Sp.Contains(off) {
@@ -68,6 +74,9 @@ func (s *Session) mmsComplete(a *at, off int) ([]sema.Candidate, bool) {
 	return nil, false
 }
 
+// codeTypes are the types function code computes with.
+var codeTypes = map[string]bool{"int": true, "float": true, "double": true, "long": true, "bool": true, "string": true}
+
 // exprStart reports whether a token of kind k is followed by an
 // expression in function code.
 func exprStart(k syntax.TokenKind) bool {
@@ -76,7 +85,8 @@ func exprStart(k syntax.TokenKind) bool {
 		parser.MMSLexerSLASH_EQ, parser.MMSLexerPCT_EQ, parser.MMSLexerEQEQ, parser.MMSLexerNEQ,
 		parser.MMSLexerLE, parser.MMSLexerGE, parser.MMSLexerLT, parser.MMSLexerGT,
 		parser.MMSLexerANDAND, parser.MMSLexerOROR, parser.MMSLexerBANG, parser.MMSLexerDOTDOT,
-		parser.MMSLexerRETURN, parser.MMSLexerIF, parser.MMSLexerWHILE, parser.MMSLexerIN:
+		parser.MMSLexerRETURN, parser.MMSLexerIF, parser.MMSLexerWHILE, parser.MMSLexerIN,
+		parser.MMSLexerEXPECT, parser.MMSLexerRUN:
 		return true
 	}
 	return mathOp(k)
@@ -124,6 +134,17 @@ func enclosingCall(f *syntax.File, open *syntax.Token) (name string, index int, 
 func (s *Session) codeValues(a *at, off int) []sema.Candidate {
 	out := locals(a.u.File, a.fn, off)
 	out = append(out, s.projectNames(a)...)
+	// The consts, and the Templates that give a number, a bool or a
+	// string, which is what code computes with.
+	for _, c := range s.evalValueCandidates() {
+		if t := s.R.Eval.Templates[c.Label]; t != nil && c.Kind == sema.CandCallable {
+			if t.D.Extern || t.D.Type == nil || !codeTypes[syntax.TypeText(t.D.Type)] {
+				continue
+			}
+		}
+		c.Rank += 70
+		out = append(out, c)
+	}
 	out = append(out,
 		sema.Candidate{Label: "true", Kind: sema.CandKeyword, Rank: 200},
 		sema.Candidate{Label: "false", Kind: sema.CandKeyword, Rank: 201})

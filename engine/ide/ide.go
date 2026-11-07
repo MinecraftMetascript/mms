@@ -24,6 +24,9 @@ import (
 type Session struct {
 	P *project.Project
 	R *project.Result
+
+	typed  []sema.TypedCandidate // typedEval's result, once worked out
+	repair bool                  // this session completes in a repaired copy
 }
 
 // Location is a span in a file.
@@ -66,8 +69,20 @@ func (s *Session) at(path string, off int) *at {
 		}
 	}
 	if len(a.path) > 1 {
-		if d, ok := a.path[1].(*syntax.Decl); ok {
+		switch d := a.path[1].(type) {
+		case *syntax.Decl:
 			a.decl = s.R.Decls[d]
+		case *syntax.ConstStmt:
+			a.decl = s.R.Consts[d]
+		}
+	}
+	// A declaration in a Blueprint's emit block was checked on its own.
+	for i := len(a.path) - 1; i > 1; i-- {
+		if d, ok := a.path[i].(*syntax.Decl); ok {
+			if dr := s.R.Decls[d]; dr != nil && dr.Emitter != nil {
+				a.decl = dr
+				break
+			}
 		}
 	}
 	a.fn = a.codeRoot()
@@ -75,6 +90,13 @@ func (s *Session) at(path string, off int) *at {
 		a.c = sema.NewChecker(s.P.Pack, s.P.Kinds, s.R.Syms, a.decl.NS)
 	} else {
 		a.c = sema.NewChecker(s.P.Pack, s.P.Kinds, s.R.Syms, s.P.Config.Namespace)
+	}
+	a.c.Typed = s.typedEval()
+	if a.decl != nil && a.decl.Template != nil {
+		a.c.Typed = append(s.templateParams(a.decl.Template), a.c.Typed...)
+	}
+	if a.decl != nil && a.decl.Emitter != nil {
+		a.c.Typed = append(s.blueprintFields(a.decl.Emitter), a.c.Typed...)
 	}
 	return a
 }
@@ -102,6 +124,9 @@ type Item struct {
 // Completion lists completions at off, and the span the chosen item
 // replaces (the word being typed).
 func (s *Session) Completion(path string, off int) ([]Item, syntax.Span) {
+	if rs := s.repairedSession(path, off); rs != nil {
+		return rs.Completion(path, off)
+	}
 	// Book markup, in a .mmsbook file or a Book's text strings.
 	if items, replace, ok := s.bookCompletion(path, off); ok {
 		return items, replace
@@ -149,7 +174,13 @@ func (s *Session) Completion(path string, off int) ([]Item, syntax.Span) {
 			replace = sp
 		}
 	}
-	cands, ok := s.templateArgCandidates(path, off, a.c)
+	cands, ok := s.selectorCompletion(a, off)
+	if !ok {
+		cands, ok = s.typeCompletion(a, off)
+	}
+	if !ok {
+		cands, ok = s.templateArgCandidates(path, off, a.c)
+	}
 	if !ok {
 		cands = s.complete(a, off)
 	}
@@ -243,6 +274,9 @@ func (s *Session) TriggerApplies(path string, off int, ch string) bool {
 		if _, _, ok := sema.AssetFileType(h); ok || h == "TextFile" {
 			return true
 		}
+		if _, _, _, ok := s.templateAssetPath(h); ok {
+			return true
+		}
 	}
 	if i := f.TokenAt(off); ch == "/" && i >= 0 {
 		_, ok := a.command(f.Tokens[i], off)
@@ -322,6 +356,10 @@ func (s *Session) complete(a *at, off int) []sema.Candidate {
 			}
 		}
 	}
+	// `co| = 1` in function code assigns a Global or a local.
+	if a.code() && assignTarget(a.path) {
+		return s.statementCandidates(a, off)
+	}
 	for i := len(a.path) - 1; i >= 1; i-- {
 		n := a.path[i]
 		var parent syntax.Node
@@ -335,6 +373,10 @@ func (s *Session) complete(a *at, off int) []sema.Candidate {
 			if a.code() && startsStatement(a.path, i) {
 				return s.statementCandidates(a, off)
 			}
+			// A line of a Blueprint's check block.
+			if inCheck(a.path) && startsStatement(a.path, i) {
+				return s.checkCandidates(a)
+			}
 			// A bare word in an object body is a field being typed.
 			if _, ok := parent.(*syntax.ExprStmt); ok && i >= 2 {
 				if b, ok := a.path[i-2].(*syntax.Block); ok {
@@ -344,7 +386,15 @@ func (s *Session) complete(a *at, off int) []sema.Candidate {
 				}
 			}
 			if in := a.info(n); in.HasType() {
-				return a.c.ValueCandidates(in)
+				out := a.c.ValueCandidates(in)
+				// A word typed as an argument may be the start of the
+				// argument's name: `Item(na|`.
+				if arg, ok := parent.(*syntax.Arg); ok && arg.Name == nil && i >= 2 {
+					if call, ok := a.path[i-2].(*syntax.Call); ok {
+						out = append(out, a.namedArgs(call)...)
+					}
+				}
+				return out
 			}
 			// The helper name of a call: the expected type is recorded on
 			// the outermost node of the chain.
@@ -465,6 +515,87 @@ func (s *Session) statementCandidates(a *at, off int) []sema.Candidate {
 		c.Rank += 100
 		out = append(out, c)
 	}
+	// In a Blueprint's emit block, its Function and Commands fields are
+	// called: `cast()`.
+	if a.decl != nil && a.decl.Emitter != nil {
+		for _, f := range a.decl.Emitter.Fields {
+			if f.Name != nil && f.Type != nil && (syntax.TypeText(f.Type) == "Function" || syntax.TypeText(f.Type) == "Commands") {
+				out = append(out, sema.Candidate{Label: f.Name.Text, Kind: sema.CandCallable, Detail: "field: " + syntax.TypeText(f.Type), Insert: f.Name.Text + "()", Rank: 50})
+			}
+		}
+	}
+	// Templates that give commands, called as a statement.
+	if e := s.R.Eval; e != nil {
+		names := make([]string, 0, len(e.Templates))
+		for name := range e.Templates {
+			names = append(names, name)
+		}
+		sort.Strings(names)
+		for _, name := range names {
+			t := e.Templates[name]
+			if t.D.Type == nil || syntax.TypeText(t.D.Type) != "Commands" || internal(t.D) {
+				continue
+			}
+			label, _ := templateHead(t.D)
+			doc, _ := docText(t.D.Doc)
+			out = append(out, sema.Candidate{Label: name, Kind: sema.CandCallable, Detail: "Template",
+				Doc: "```mms\nTemplate " + label + "\n```\n\n" + doc, Insert: name + "($1)", Rank: 180})
+		}
+	}
+	return out
+}
+
+// assignTarget reports whether path ends at the key of a `key = value`
+// line in a block of statements, which function code reads as an
+// assignment, not an object field.
+func assignTarget(path []syntax.Node) bool {
+	n := len(path)
+	if n < 4 {
+		return false
+	}
+	name, ok := path[n-1].(*syntax.Name)
+	if !ok {
+		return false
+	}
+	fs, ok := path[n-2].(*syntax.FieldStmt)
+	if !ok || fs.Key != name {
+		return false
+	}
+	if _, ok := path[n-3].(*syntax.Block); !ok {
+		return false
+	}
+	switch path[n-4].(type) {
+	case *syntax.Decl, *syntax.IfStmt, *syntax.WhileStmt, *syntax.ForStmt, *syntax.Trailing, *syntax.RunExpr, *syntax.Block, *syntax.SectionStmt:
+		return true
+	}
+	return false
+}
+
+// inCheck reports whether path is in a Blueprint's check { } block.
+func inCheck(path []syntax.Node) bool {
+	for _, n := range path {
+		if sec, ok := n.(*syntax.SectionStmt); ok && sec.Word != nil && sec.Word.Name == "check" {
+			return true
+		}
+	}
+	return false
+}
+
+// checkCandidates lists what can start a line of a Blueprint's check
+// block: error and warn, the statement keywords, and the fields.
+func (s *Session) checkCandidates(a *at) []sema.Candidate {
+	out := []sema.Candidate{
+		{Label: "error", Kind: sema.CandCallable, Detail: "check", Doc: "Reports an error at a field: `error(cooldown, \"a cooldown is at least one tick\")`.", Insert: "error($1)"},
+		{Label: "warn", Kind: sema.CandCallable, Detail: "check", Doc: "Reports a warning with a lint rule's name: `warn(cooldown, \"slow-wand\", \"...\")`.", Insert: "warn($1)", Rank: 1},
+	}
+	for i, kw := range []string{"if", "for", "let", "const"} {
+		out = append(out, sema.Candidate{Label: kw, Kind: sema.CandKeyword, Rank: 10 + i})
+	}
+	for _, tc := range a.c.Typed {
+		c := tc.Candidate
+		c.Rank += 20
+		out = append(out, c)
+	}
 	return out
 }
 
@@ -525,6 +656,13 @@ func startsStatement(path []syntax.Node, i int) bool {
 		switch p := path[j].(type) {
 		case *syntax.ExprStmt:
 			return true
+		case *syntax.AssignStmt:
+			// The target of `x += 1`, `score[@s] = 2`.
+			return p.Target == child
+		case *syntax.Index:
+			if p.X != child {
+				return false
+			}
 		case *syntax.Call:
 			if p.Fn != child {
 				return false
@@ -653,6 +791,10 @@ func (a *at) baseInfo(e syntax.Expr) *sema.Info {
 }
 
 func (a *at) namedArgs(call *syntax.Call) []sema.Candidate {
+	// A method's arguments are not its receiver's fields.
+	if _, method := call.Fn.(*syntax.Member); method {
+		return nil
+	}
 	base := sema.ChainBase(call)
 	in := a.info(base)
 	if in == nil {
@@ -788,9 +930,24 @@ func commaBetween(f *syntax.File, from, to int) bool {
 // Hover returns Markdown for the node at off and the span it describes.
 func (s *Session) Hover(path string, off int) (string, syntax.Span) {
 	md, sp := s.hover(path, off)
-	if md == "" || strings.HasPrefix(md, "Expected:") {
+	// A bound name wins over what its word means elsewhere: an id
+	// (`minecraft:rolls`) or a book's generic `${...}` hover.
+	if l, lsp, ok := s.localAt(path, off); ok && (md == "" || strings.HasPrefix(md, "Expected:") || strings.Contains(md, "`minecraft:") || lsp != sp && sp.Contains(lsp.Start)) {
+		lmd := localHover(l)
+		if strings.HasPrefix(md, "Expected:") {
+			lmd += "\n\n" + md
+		} else if i := strings.Index(md, "Expected:"); i >= 0 {
+			lmd += "\n\n" + md[i:]
+		}
+		md, sp = lmd, lsp
+	} else if md == "" || strings.HasPrefix(md, "Expected:") {
 		if emd, esp, ok := s.evalHover(path, off); ok {
 			md, sp = emd, esp
+		}
+	}
+	if md == "" {
+		if tmd, tsp, ok := s.typeHover(path, off); ok {
+			md, sp = tmd, tsp
 		}
 	}
 	for _, c := range s.commandCalls(path) {
@@ -1047,6 +1204,9 @@ func (s *Session) current(sym *sema.Symbol) *sema.Symbol {
 
 // Definition returns where the symbol at off is declared.
 func (s *Session) Definition(path string, off int) []Location {
+	if l, _, ok := s.localAt(path, off); ok {
+		return []Location{{Path: path, Span: l.Name.Sp}}
+	}
 	if n, ok := s.evalNameAt(path, off); ok {
 		// A prelude name's Path is its prelude file, which editors open
 		// read-only.
@@ -1065,6 +1225,13 @@ func (s *Session) Definition(path string, off int) []Location {
 // References returns every use of the symbol at off, with its declaration
 // first when includeDecl is set.
 func (s *Session) References(path string, off int, includeDecl bool) []Location {
+	if l, _, ok := s.localAt(path, off); ok {
+		out := s.localUses(path, l)
+		if !includeDecl {
+			out = out[1:]
+		}
+		return out
+	}
 	if n, ok := s.evalNameAt(path, off); ok {
 		var out []Location
 		for _, l := range s.evalUses(n) {
@@ -1124,6 +1291,10 @@ type Edit struct {
 
 // PrepareRename returns the span of the renamable name at off.
 func (s *Session) PrepareRename(path string, off int) (syntax.Span, bool) {
+	if l, sp, ok := s.localAt(path, off); ok {
+		// Callers and instances name parameters and fields too.
+		return sp, l.What != "parameter" && l.What != "field"
+	}
 	if n, ok := s.evalNameAt(path, off); ok {
 		if strings.HasPrefix(n.Path, prelude.Prefix) {
 			return syntax.Span{}, false
@@ -1147,6 +1318,19 @@ func (s *Session) PrepareRename(path string, off int) (syntax.Span, bool) {
 // Rename renames the symbol at off to newPath (a resource path such as
 // `hills` or `terrain/hills`), editing the declaration and every use.
 func (s *Session) Rename(path string, off int, newPath string) ([]Edit, string) {
+	if l, _, ok := s.localAt(path, off); ok {
+		if l.What == "parameter" || l.What == "field" {
+			return nil, "a " + l.What + " is named by its callers too, so it can't be renamed here yet"
+		}
+		if !identRe.MatchString(newPath) {
+			return nil, "a name is letters, digits and underscores"
+		}
+		var edits []Edit
+		for _, u := range s.localUses(path, l) {
+			edits = append(edits, Edit{Path: u.Path, Span: u.Span, Text: newPath})
+		}
+		return edits, ""
+	}
 	if n, ok := s.evalNameAt(path, off); ok {
 		return s.renameEval(n, newPath)
 	}

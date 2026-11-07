@@ -4,6 +4,7 @@ import (
 	"github.com/minecraftmetascript/mms/engine/sema"
 	"github.com/minecraftmetascript/mms/engine/syntax"
 	"github.com/minecraftmetascript/mms/engine/syntax/parser"
+	"strings"
 )
 
 // assetPathCompletion offers project files for the path argument of an
@@ -24,14 +25,60 @@ func (s *Session) assetPathCompletion(f *syntax.File, off int) (items []Item, re
 		}
 		return items, syntax.Span{Start: start, End: end}, true
 	}
+	prefix, suffix := "", ""
 	ext, what, ok := sema.AssetFileType(helper)
 	if !ok {
-		return nil, replace, false
+		// A Template that passes its first parameter on as part of an
+		// asset path, as Piece("halls/hall") does with
+		// StructureFile("structures/${path}.nbt").
+		helper, prefix, suffix, ok = s.templateAssetPath(helper)
+		if !ok {
+			return nil, replace, false
+		}
+		ext, what, _ = sema.AssetFileType(helper)
 	}
-	for i, p := range s.P.Config.AssetFiles(s.P.Files, ext) {
-		items = append(items, Item{Label: p, Kind: sema.CandFile, Detail: what, Sort: sortKey(i)})
+	for _, p := range s.P.Config.AssetFiles(s.P.Files, ext) {
+		if !strings.HasPrefix(p, prefix) || !strings.HasSuffix(p, suffix) || len(p) < len(prefix)+len(suffix) {
+			continue
+		}
+		p = p[len(prefix) : len(p)-len(suffix)]
+		items = append(items, Item{Label: p, Kind: sema.CandFile, Detail: what, Sort: sortKey(len(items))})
 	}
 	return items, syntax.Span{Start: start, End: end}, true
+}
+
+// templateAssetPath finds, in the Template name, a call of an asset
+// helper whose path is the Template's first parameter with text around
+// it: StructureFile("structures/${path}.nbt") gives StructureFile,
+// "structures/" and ".nbt".
+func (s *Session) templateAssetPath(name string) (helper, prefix, suffix string, ok bool) {
+	if s.R.Eval == nil {
+		return "", "", "", false
+	}
+	t := s.R.Eval.Templates[name]
+	if t == nil || t.D.Params == nil || len(t.D.Params.Params) == 0 || t.D.Params.Params[0].Name == nil || t.D.Value == nil {
+		return "", "", "", false
+	}
+	hole := "${" + t.D.Params.Params[0].Name.Text + "}"
+	syntax.Walk(t.D.Value, func(n syntax.Node) bool {
+		c, isCall := n.(*syntax.Call)
+		if ok || !isCall || len(c.Args) == 0 {
+			return !ok
+		}
+		id, isIdent := c.Fn.(*syntax.Ident)
+		str, isStr := c.Args[0].Value.(*syntax.String)
+		if !isIdent || !isStr {
+			return true
+		}
+		if _, _, known := sema.AssetFileType(id.Name); !known {
+			return true
+		}
+		if before, after, found := strings.Cut(str.Value, hole); found && !strings.Contains(after, "${") && !strings.Contains(before, "${") {
+			helper, prefix, suffix, ok = id.Name, before, after, true
+		}
+		return !ok
+	})
+	return helper, prefix, suffix, ok
 }
 
 // assetPathString finds the string literal the cursor is in and returns

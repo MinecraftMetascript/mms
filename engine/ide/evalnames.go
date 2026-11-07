@@ -1,6 +1,7 @@
 package ide
 
 import (
+	"github.com/minecraftmetascript/mms/engine/spec"
 	"regexp"
 	"sort"
 	"strings"
@@ -433,11 +434,132 @@ func (s *Session) templateArgCandidates(path string, off int, c *sema.Checker) (
 		return nil, false
 	}
 	p := t.D.Params.Params[i]
-	var out []sema.Candidate
+	out := templateNamedArgs(t, call, i)
+	if i == 0 {
+		// A path the Template turns into an asset file: Piece("|").
+		if helper, prefix, suffix, ok := s.templateAssetPath(t.D.Name.Text); ok {
+			ext, what, _ := sema.AssetFileType(helper)
+			for _, f := range s.P.Config.AssetFiles(s.P.Files, ext) {
+				if strings.HasPrefix(f, prefix) && strings.HasSuffix(f, suffix) && len(f) >= len(prefix)+len(suffix) {
+					f = f[len(prefix) : len(f)-len(suffix)]
+					out = append(out, sema.Candidate{Label: `"` + f + `"`, Kind: sema.CandFile, Detail: what, Rank: -1})
+				}
+			}
+		}
+	}
 	if p.Type != nil && s.R.TypeEnv != nil {
-		out = c.TypeCandidates(s.R.TypeEnv.Lookup(t.Path, p.Type))
+		if want := s.R.TypeEnv.Lookup(t.Path, p.Type); want != nil {
+			// The values of its type, the consts and Templates that give
+			// one, and the consts whose type is not written.
+			out = append(out, c.TypeCandidates(want)...)
+			for _, k := range s.evalValueCandidates() {
+				if k.Kind == sema.CandID && s.R.Eval.Consts[k.Label] != nil && s.R.Eval.Consts[k.Label].S.Type == nil {
+					out = append(out, k)
+				}
+			}
+			return out, true
+		}
 	}
 	return append(out, s.evalValueCandidates()...), true
+}
+
+// templateNamedArgs offers the parameters after the i-th that the call
+// does not set by name yet, as named arguments: `title(@a, "x", subtitle = ...)`.
+func templateNamedArgs(t *eval.Template, call *syntax.Call, i int) []sema.Candidate {
+	present := map[string]bool{}
+	for _, a := range call.Args {
+		if a.Name != nil {
+			present[a.Name.Text] = true
+		}
+	}
+	var out []sema.Candidate
+	for j, p := range t.D.Params.Params {
+		if j < i || p.Name == nil || present[p.Name.Text] {
+			continue
+		}
+		detail := "parameter"
+		if p.Type != nil {
+			detail = syntax.TypeText(p.Type)
+		}
+		out = append(out, sema.Candidate{Label: p.Name.Text, Kind: sema.CandField, Insert: p.Name.Text + " = $1", Detail: detail, Rank: 200 + j})
+	}
+	return out
+}
+
+// typedEval lists the consts and value Templates that have a written
+// type, to be offered wherever that type fits.
+func (s *Session) typedEval() []sema.TypedCandidate {
+	if s.typed != nil || s.R.Eval == nil || s.R.TypeEnv == nil {
+		return s.typed
+	}
+	s.typed = []sema.TypedCandidate{}
+	for _, c := range s.evalValueCandidates() {
+		var t *spec.Type
+		if k := s.R.Eval.Consts[c.Label]; k != nil && c.Kind == sema.CandID {
+			if k.S.Type != nil {
+				t = s.R.TypeEnv.Lookup(k.Path, k.S.Type)
+			}
+		} else if tm := s.R.Eval.Templates[c.Label]; tm != nil && tm.D.Type != nil {
+			t = s.R.TypeEnv.Lookup(tm.Path, tm.D.Type)
+		}
+		if t != nil {
+			s.typed = append(s.typed, sema.TypedCandidate{Candidate: c, Type: t})
+		}
+	}
+	return s.typed
+}
+
+// templateParams are the parameters of t, which its body can name, each
+// offered where its type fits. A parameter without a type fits anywhere.
+func (s *Session) templateParams(t *eval.Template) []sema.TypedCandidate {
+	if t.D.Params == nil {
+		return nil
+	}
+	var out []sema.TypedCandidate
+	for _, p := range t.D.Params.Params {
+		if p.Name == nil {
+			continue
+		}
+		c := sema.Candidate{Label: p.Name.Text, Kind: sema.CandID, Detail: "parameter", Rank: -2}
+		ty := &spec.Type{Kind: "any"}
+		if p.Type != nil {
+			c.Detail += ": " + syntax.TypeText(p.Type)
+			ty = s.R.TypeEnv.Lookup(t.Path, p.Type)
+		}
+		out = append(out, sema.TypedCandidate{Candidate: c, Type: ty})
+	}
+	return out
+}
+
+// blueprintFields are the fields and lets of bp, which its emit block can name,
+// each offered where its type fits.
+func (s *Session) blueprintFields(bp *eval.Blueprint) []sema.TypedCandidate {
+	var out []sema.TypedCandidate
+	for _, f := range bp.Fields {
+		if f.Name == nil {
+			continue
+		}
+		c := sema.Candidate{Label: f.Name.Text, Kind: sema.CandID, Detail: "field", Rank: -2}
+		ty := &spec.Type{Kind: "any"}
+		if f.Type != nil {
+			c.Detail += ": " + syntax.TypeText(f.Type)
+			ty = s.R.TypeEnv.Lookup(bp.Path, f.Type)
+		}
+		out = append(out, sema.TypedCandidate{Candidate: c, Type: ty})
+	}
+	for _, l := range bp.Lets {
+		if l.Name == nil {
+			continue
+		}
+		c := sema.Candidate{Label: l.Name.Text, Kind: sema.CandID, Detail: "let", Rank: -2}
+		ty := &spec.Type{Kind: "any"}
+		if l.Type != nil {
+			c.Detail += ": " + syntax.TypeText(l.Type)
+			ty = s.R.TypeEnv.Lookup(bp.Path, l.Type)
+		}
+		out = append(out, sema.TypedCandidate{Candidate: c, Type: ty})
+	}
+	return out
 }
 
 // evalValueCandidates are the consts and value Templates a value can

@@ -508,15 +508,57 @@ func idPrefix(t *spec.Type) (string, bool) {
 // dispatch on the key itself (`dispatcher[[%key]]`) pick the key's case.
 func (c *Checker) mapValueType(f *field, key string) tview {
 	t := f.Type.T
-	if t != nil && t.Kind == "dispatcher" && len(t.ParallelIndices) == 1 && t.ParallelIndices[0].Kind == "dynamic" {
-		acc := t.ParallelIndices[0].Accessor
-		if len(acc) == 1 && strings.Contains(string(acc[0]), `"key"`) {
-			k := strings.TrimPrefix(strings.TrimPrefix(key, "!"), "minecraft:")
-			if cs, ok := c.Pack.Dispatch(t.Registry, k); ok {
-				return tview{T: cs, Env: f.Type.Env}
+	k := strings.TrimPrefix(strings.TrimPrefix(key, "!"), "minecraft:")
+	if byKey(t) {
+		if cs, ok := c.Pack.Dispatch(t.Registry, k); ok {
+			return tview{T: cs, Env: f.Type.Env}
+		}
+		return tview{Env: f.Type.Env}
+	}
+	// A union of fields of the key's case, as an environment attribute
+	// takes: `dispatcher[[%key]][value] | dispatcher[[%key]][modifier]`.
+	if t != nil && t.Kind == "union" && len(t.Members) > 0 {
+		var reg string
+		var picks []string
+		for _, m := range t.Members {
+			idx, ok := staticIndex(m.ParallelIndices)
+			if m.Kind != "indexed" || !ok || !byKey(m.Child) || (reg != "" && m.Child.Registry != reg) {
+				return f.Type
 			}
+			reg = m.Child.Registry
+			picks = append(picks, idx)
+		}
+		cs, ok := c.Pack.Dispatch(reg, k)
+		if !ok {
 			return tview{Env: f.Type.Env}
 		}
+		fs, _ := c.fields(c.norm(tview{T: cs, Env: f.Type.Env}), "")
+		u := &spec.Type{Kind: "union"}
+		var e *env
+		for _, pick := range picks {
+			for _, cf := range fs {
+				if cf.Key == pick && cf.Type.T != nil && (e == nil || cf.Type.Env == e) {
+					e = cf.Type.Env
+					u.Members = append(u.Members, cf.Type.T)
+				}
+			}
+		}
+		switch len(u.Members) {
+		case 0:
+			return tview{Env: f.Type.Env}
+		case 1:
+			return tview{T: u.Members[0], Env: e}
+		}
+		return tview{T: u, Env: e}
 	}
 	return f.Type
+}
+
+// byKey reports whether t dispatches on the map key: dispatcher[[%key]].
+func byKey(t *spec.Type) bool {
+	if t == nil || t.Kind != "dispatcher" || len(t.ParallelIndices) != 1 || t.ParallelIndices[0].Kind != "dynamic" {
+		return false
+	}
+	acc := t.ParallelIndices[0].Accessor
+	return len(acc) == 1 && strings.Contains(string(acc[0]), `"key"`)
 }

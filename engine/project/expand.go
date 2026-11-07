@@ -1,6 +1,8 @@
 package project
 
 import (
+	"strings"
+
 	"github.com/minecraftmetascript/mms/engine/eval"
 	"github.com/minecraftmetascript/mms/engine/prelude"
 	"github.com/minecraftmetascript/mms/engine/sema"
@@ -109,5 +111,79 @@ func (r *Result) instanceDecls(tenv *types.Env, newChecker types.Checkers) {
 		d.Diags, d.Extern = c.BookDiags, c.Extern
 		r.Decls[inst.D] = d
 		r.Instances = append(r.Instances, d)
+	}
+}
+
+// templateDecls checks the body of each Template the user wrote against
+// its return type, for the editor, as instanceDecls does an instance's
+// body: completion and hover inside `= Pool(rolls, item)` read the Info.
+// A Commands Template's block is function code, so its result is given
+// the Function kind. Diagnostics are dropped, since its parameters are
+// not names the checker knows; calls are checked where they are made.
+func (r *Result) templateDecls(tenv *types.Env, kinds *sema.Kinds, newChecker types.Checkers) {
+	units := map[string]*sema.Unit{}
+	for _, u := range r.Units {
+		units[u.Path] = u
+	}
+	for _, t := range r.Eval.Templates {
+		u := units[t.Path]
+		if u == nil || prelude.Is(t.Path) {
+			continue
+		}
+		d := &Decl{Unit: u, D: t.D, NS: r.cfg.Namespace, Template: t}
+		switch {
+		case t.D.Body != nil:
+			d.Kind, _ = kinds.Lookup("Function")
+		case t.D.Value != nil:
+			c := newChecker(r.cfg.Namespace)
+			c.Src = u.File.Src
+			if want := tenv.Lookup(t.Path, t.D.Type); want != nil && want.Kind != "any" {
+				c.CheckType(t.D.Value, want, t.D.NameText())
+			}
+			d.Info = c.Info
+		default:
+			d.Info = map[syntax.Node]*sema.Info{}
+		}
+		r.Decls[t.D] = d
+	}
+}
+
+// missingFieldFixes gives a Blueprint instance's missing-field error the
+// quick fix that adds the fields, with placeholder values of their types.
+func (r *Result) missingFieldFixes(tenv *types.Env, kinds *sema.Kinds, source map[string]*syntax.File) {
+	if r.Eval == nil {
+		return
+	}
+	for path, f := range r.Eval.Files {
+		src := source[path]
+		if src == nil {
+			continue
+		}
+		for i := range f.Diags {
+			dg := &f.Diags[i]
+			if dg.Code != "mms/missing-field" || len(dg.Fixes) > 0 {
+				continue
+			}
+			_, list, ok := strings.Cut(dg.Message, " needs ")
+			if !ok {
+				continue
+			}
+			var missing []string
+			for _, m := range strings.Split(list, ", ") {
+				missing = append(missing, strings.Trim(m, "'"))
+			}
+			for _, d := range src.Decls {
+				if d.Kind == nil || d.Body == nil || !d.Sp.Contains(dg.Sp.Start) {
+					continue
+				}
+				bp := r.Eval.Blueprints[d.Kind.Name]
+				if bp == nil {
+					continue
+				}
+				c := sema.NewChecker(r.pack, kinds, r.Syms, r.cfg.Namespace)
+				c.Src = src.Src
+				dg.Fixes = c.MissingFieldsFix(d.Body, tenv.InstanceType(bp), missing)
+			}
+		}
 	}
 }

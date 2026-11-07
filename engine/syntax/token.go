@@ -91,6 +91,11 @@ type TextEdit struct {
 func (f *File) TokenAt(off int) int {
 	best := -1
 	for i, t := range f.Tokens {
+		// A synthetic separator is not text: the word it follows is
+		// what the cursor is at.
+		if t.Synthetic {
+			continue
+		}
 		if t.Sp.Start <= off && off <= t.Sp.End {
 			if best == -1 || (t.Sp.End == off && !t.Hidden) {
 				best = i

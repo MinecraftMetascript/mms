@@ -35,7 +35,10 @@ func (c *Checker) instanceCandidates(v tview) []Candidate {
 	var out []Candidate
 	for id, cs := range c.Syms.Conversions {
 		for _, cv := range cs {
-			if cv.Hint != "" || cv.Type == nil || !c.convFits(cv.Type, v, 0) {
+			// A conversion with a hint, such as a CustomItem standing for
+			// its base item, is still offered: the hint explains it if
+			// the place takes it differently than meant.
+			if cv.Type == nil || !c.convFits(cv.Type, v, 0) {
 				continue
 			}
 			label := id

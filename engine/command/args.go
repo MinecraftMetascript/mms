@@ -2,6 +2,7 @@ package command
 
 import (
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -537,4 +538,15 @@ func (s *state) selectorOptions(from, to int, opts map[string]string) bool {
 		}
 	}
 	return true
+}
+
+// SelectorOptionNames lists the selector options, `type` and `tag` among
+// them, in order.
+func SelectorOptionNames() []string {
+	out := make([]string, 0, len(selectorOptions))
+	for k := range selectorOptions {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
 }
