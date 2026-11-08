@@ -414,6 +414,9 @@ func (s *Session) complete(a *at, off int) []sema.Candidate {
 		}
 		return nil
 	}
+	if emitStatementStart(f, a.path, off) {
+		return s.emitCandidates()
+	}
 	if a.decl == nil {
 		return nil
 	}

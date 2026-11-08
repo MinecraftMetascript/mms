@@ -108,12 +108,19 @@ func typeDecl(path []syntax.Node) *syntax.Decl {
 }
 
 // inTypes reports whether path is where types are written outside
-// function code: in a Template's or Type's head, a Blueprint's fields and
-// `as` types,
-// or a file-level const's annotation, but not in a value or body.
+// function code: in a Template's or Type's head, a Blueprint's fields,
+// parameters, result and `as` types, or a file-level const's annotation,
+// but not in a value or body.
 func inTypes(path []syntax.Node) bool {
 	if len(path) < 2 {
 		return false
+	}
+	for _, n := range path[2:] {
+		if _, ok := n.(*syntax.Decl); ok {
+			// A declaration in an emit block, such as `Objective o: |`,
+			// completes like one at the top level.
+			return false
+		}
 	}
 	ok := false
 	if _, isConst := path[1].(*syntax.ConstStmt); isConst {
@@ -125,11 +132,20 @@ func inTypes(path []syntax.Node) bool {
 		case "Template":
 			ok = true
 		case "Blueprint":
+			// Its fields, `as` types, parameters (`Blueprint b(label: |)`)
+			// and result type.
+			// A `name: type` inside a section, such as a half-typed
+			// `Objective o: |` in emit, is not a field.
 			for _, n := range path {
 				switch n.(type) {
-				case *syntax.FieldDecl, *syntax.AsStmt:
+				case *syntax.SectionStmt:
+					return false
+				case *syntax.FieldDecl, *syntax.AsStmt, *syntax.ParamList, *syntax.Param:
 					ok = true
 				}
+			}
+			if len(path) > 2 && d.Type != nil && path[2] == syntax.Node(d.Type) {
+				ok = true
 			}
 		}
 	}

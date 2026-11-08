@@ -30,6 +30,15 @@ func (s *Session) mmsComplete(a *at, off int) ([]sema.Candidate, bool) {
 	if a.decl.Kind.MMS == "Objective" && (prev.Kind == parser.MMSLexerCOLON || prev.Kind == parser.MMSLexerASSIGN) {
 		return criteria(), true
 	}
+	// One being typed in an emit block, which reads as `Objective` then
+	// a field `o: |` until its criterion is there.
+	if prev.Kind == parser.MMSLexerCOLON {
+		if name := prevToken(f, prev.Sp.Start); name != nil && name.Kind == parser.MMSLexerIDENT {
+			if kind := prevToken(f, name.Sp.Start); kind != nil && kind.Text == "Objective" {
+				return criteria(), true
+			}
+		}
+	}
 	// A Storage's record type: `Storage siege: |`.
 	if a.decl.Kind.MMS == "Storage" && prev.Kind == parser.MMSLexerCOLON && s.R.TypeEnv != nil &&
 		(a.decl.D.Value == nil || !a.decl.D.Value.Span().Contains(off)) {

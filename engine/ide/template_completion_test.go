@@ -34,6 +34,17 @@ func TestTemplateCompletion(t *testing.T) {
 		{"const x: In^ = 3", []string{"int", "Id"}, nil},
 		{"const x: int = ^", nil, []string{"Id", "LootPool"}},
 		{"Blueprint B {\n  name: string\n  emit {\n    LootTable t { po^ }\n  }\n}", []string{"pools"}, nil},
+		// A statement in an emit block: declaration kinds, Blueprints and
+		// the emit keywords, on an empty line or the first word typed.
+		{"Blueprint throttle(): none {\n  emit {\n    Objective write_cooldown: dummy\n    ^\n  }\n}", []string{"Objective", "Function", "LootTable", "primary", "const", "if", "for", "throttle"}, []string{"Template", "Type", "Blueprint", "dummy"}},
+		{"Blueprint B {\n  emit {\n    ^\n  }\n}", []string{"Objective", "primary"}, nil},
+		{"Blueprint B {\n  emit {\n    Objective o: dummy\n    Fu^\n  }\n}", []string{"Function"}, nil},
+		{"Blueprint B {\n  on: bool\n  emit {\n    if (on) {\n      ^\n    }\n  }\n}", []string{"Objective", "primary"}, nil},
+		{"Blueprint B {\n  emit {\n    Objective o: ^\n  }\n}", []string{"dummy"}, []string{"primary", "Function"}},
+		{"Blueprint B {\n  emit {\n    Function f {\n      ^\n    }\n  }\n}", []string{"As", "let"}, []string{"primary", "Objective"}},
+		// A Blueprint's parameter and result types.
+		{"Blueprint throttle(label: ^): none {\n  emit {\n  }\n}", []string{"string", "int", "Id"}, nil},
+		{"Blueprint throttle(label: st^) {\n  emit {\n  }\n}", []string{"string"}, nil},
 		{"Blueprint W {\n  cooldown: int = 20\n  check {\n    if (cooldown < 1) {\n      er^\n    }\n  }\n}", []string{"error", "warn", "cooldown"}, nil},
 		{"Blueprint W {\n  cast: Function\n  emit {\n    primary CustomItem ${self.path} {\n      base = stick\n      on_right_click = run {\n        ca^\n      }\n    }\n  }\n}", []string{"cast", "As"}, nil},
 		{"Blueprint W {\n  title: string\n  emit {\n    primary CustomItem ${self.path} {\n      base = stick\n      na^\n    }\n  }\n}", []string{"name", "on_hit"}, nil},
