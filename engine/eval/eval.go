@@ -100,6 +100,10 @@ type Result struct {
 	// somewhere other than their span: inside a Template, a Blueprint or
 	// a const.
 	Nodes map[syntax.Node]Prov
+	// Lines holds the provenance of the statements a Blueprint or
+	// Template body wrote: each sits at the span of its use, and its Def
+	// is the line in the body.
+	Lines map[syntax.Node]Prov
 }
 
 // FileOut is one file's expansion.
@@ -235,7 +239,7 @@ type evaluator struct {
 // Run expands units, which must be in a stable order.
 func Run(units []Unit, opt Options) *Result {
 	e := &evaluator{r: &Result{Files: map[string]*FileOut{}, Consts: map[string]*Const{}, Templates: map[string]*Template{},
-		Blueprints: map[string]*Blueprint{}, Types: map[string]*TypeDef{}, Nodes: map[syntax.Node]Prov{}}, budget: opt.Budget, values: map[string]bool{}}
+		Blueprints: map[string]*Blueprint{}, Types: map[string]*TypeDef{}, Nodes: map[syntax.Node]Prov{}, Lines: map[syntax.Node]Prov{}}, budget: opt.Budget, values: map[string]bool{}}
 	if e.budget <= 0 {
 		e.budget = DefaultBudget
 	}
@@ -299,11 +303,25 @@ func (e *evaluator) report(path string, d syntax.Diagnostic) {
 		e.r.Files[path] = f
 	}
 	for _, o := range f.Diags {
-		if o.Sp == d.Sp && o.Message == d.Message {
+		if o.Sp == d.Sp && o.Message == d.Message && sameRelated(o.Related, d.Related) {
 			return // the same problem, met again in another iteration
 		}
 	}
 	f.Diags = append(f.Diags, d)
+}
+
+// sameRelated reports whether two problems point at the same places:
+// one problem met on two lines of a Blueprint body is two problems.
+func sameRelated(a, b []syntax.Related) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i].Path != b[i].Path || a[i].Sp != b[i].Sp {
+			return false
+		}
+	}
+	return true
 }
 
 // collect records the file's const, Template, Type and Blueprint
@@ -356,15 +374,16 @@ func (e *evaluator) collect(u Unit) {
 					errorf(it.Name.Sp, "Blueprint '"+name+"' is already declared")
 					continue
 				}
-				e.r.Blueprints[name] = e.blueprint(u.Path, it)
+				e.r.Blueprints[name] = e.blueprint(u.Path, u.File.Src, it)
 			}
 		}
 	}
 }
 
 // blueprint splits a Blueprint body into its parts.
-func (e *evaluator) blueprint(path string, d *syntax.Decl) *Blueprint {
+func (e *evaluator) blueprint(path string, src []rune, d *syntax.Decl) *Blueprint {
 	bp := &Blueprint{Path: path, D: d}
+	e.blueprintShape(path, src, d)
 	if d.Body == nil {
 		if d.Value != nil {
 			e.report(path, syntax.Diagnostic{Code: "mms/blueprint", Severity: syntax.SeverityError,
@@ -380,6 +399,12 @@ func (e *evaluator) blueprint(path string, d *syntax.Decl) *Blueprint {
 			bp.Lets = append(bp.Lets, it)
 		case *syntax.AsStmt:
 			bp.As = append(bp.As, it)
+			if id, ok := it.Value.(*syntax.Ident); ok && typeWords[id.Name] && it.Type != nil {
+				t := strings.TrimSpace(string(src[it.Type.Span().Start:it.Type.Span().End]))
+				e.report(path, syntax.Diagnostic{Code: "mms/blueprint", Severity: syntax.SeverityError, Sp: id.Sp,
+					Message: "'" + id.Name + "' is a type, not a value. `as " + t + " = value` says what the declaration's name means where a " + t +
+						" is expected. For a " + t + " that gives " + id.Name + ", emit it with the declaration's own name and mark it primary: primary " + t + " ${self.path}: " + id.Name + " { ... }"})
+			}
 		case *syntax.SectionStmt:
 			switch it.Word.Name {
 			case "check":
@@ -396,6 +421,78 @@ func (e *evaluator) blueprint(path string, d *syntax.Decl) *Blueprint {
 		}
 	}
 	return bp
+}
+
+// typeWords are the value types, which an `as` value is not.
+var typeWords = map[string]bool{"int": true, "float": true, "double": true, "bool": true, "string": true,
+	"byte": true, "short": true, "long": true, "any": true}
+
+// blueprintShape reports the parts of a Template a Blueprint does not
+// have: parameters in ( ), which are its fields, and a result type.
+// Both would otherwise be dropped without a word, and the body's use of
+// a parameter would fail far from the cause.
+func (e *evaluator) blueprintShape(path string, src []rune, d *syntax.Decl) {
+	text := func(sp syntax.Span) string {
+		if sp.Start < 0 || sp.End > len(src) || sp.Start > sp.End {
+			return ""
+		}
+		return string(src[sp.Start:sp.End])
+	}
+	if d.Params != nil {
+		var fields []string
+		for _, p := range d.Params.Params {
+			if t := strings.TrimSpace(text(p.Sp)); t != "" {
+				fields = append(fields, t)
+			}
+		}
+		msg := "a Blueprint has no parameters: its fields go in its body, one per line"
+		if len(fields) > 0 {
+			msg += ", as in " + fields[0]
+		}
+		dg := syntax.Diagnostic{Code: "mms/blueprint", Severity: syntax.SeverityError, Message: msg, Sp: d.Params.Sp}
+		if b := d.Body; b != nil && len(fields) > 0 && b.Sp.Start < len(src) && src[b.Sp.Start] == '{' {
+			indent := lineIndent(src, d.Sp.Start) + "  "
+			ins := ""
+			for _, f := range fields {
+				ins += "\n" + indent + f
+			}
+			dg.Fixes = []syntax.Fix{{Title: "Move the parameters into the body as fields", Safe: true, Edits: []syntax.TextEdit{
+				{Sp: d.Params.Sp},
+				{Sp: syntax.Span{Start: b.Sp.Start + 1, End: b.Sp.Start + 1}, Text: ins},
+			}}}
+		}
+		e.report(path, dg)
+	}
+	if d.Type != nil {
+		t := strings.TrimSpace(text(d.Type.Span()))
+		sp := d.Type.Span()
+		// Take the ':' before the type along.
+		for i := sp.Start - 1; i >= 0 && i < len(src); i-- {
+			if src[i] == ':' {
+				sp.Start = i
+				break
+			}
+			if src[i] != ' ' && src[i] != '\t' {
+				break
+			}
+		}
+		e.report(path, syntax.Diagnostic{Code: "mms/blueprint", Severity: syntax.SeverityError, Sp: sp,
+			Message: "a Blueprint has no result type. For its name to stand for a " + t + ", emit one with the declaration's own name and mark it primary: primary " + t + " ${self.path} { ... }",
+			Fixes:   []syntax.Fix{{Title: "Remove the result type", Safe: true, Edits: []syntax.TextEdit{{Sp: sp}}}}})
+	}
+}
+
+// lineIndent is the indentation of the line holding off.
+func lineIndent(src []rune, off int) string {
+	start := off
+	for start > 0 && src[start-1] != '\n' {
+		start--
+	}
+	end := start
+	for end < len(src) && (src[end] == ' ' || src[end] == '\t') {
+		end++
+	}
+	return string(src[start:end])
 }
 
 // definitionKind reports whether a kind declares something this package
@@ -586,6 +683,6 @@ func (s *Const) Lowered() syntax.Expr {
 	if s.state != 2 || s.val == nil {
 		return nil
 	}
-	c := &ctx{e: &evaluator{r: &Result{Nodes: map[syntax.Node]Prov{}}}, path: s.Path, defPath: s.Path, sc: &scope{}}
+	c := &ctx{e: &evaluator{r: &Result{Nodes: map[syntax.Node]Prov{}, Lines: map[syntax.Node]Prov{}}}, path: s.Path, defPath: s.Path, sc: &scope{}}
 	return c.lower(s.val)
 }

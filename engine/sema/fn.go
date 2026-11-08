@@ -442,6 +442,16 @@ func (f *fc) block(out *fn.Block, b *syntax.Block) {
 
 func (f *fc) stmt(out *fn.Block, s syntax.Stmt) {
 	c := f.c
+	// Problems found while compiling s are about s, unless a statement
+	// inside it, compiled first, already claimed them.
+	n := len(c.Diags)
+	defer func() {
+		for i := n; i < len(c.Diags); i++ {
+			if c.Diags[i].At == nil {
+				c.Diags[i].At = s
+			}
+		}
+	}()
 	switch s := s.(type) {
 	case *syntax.CommandStmt:
 		c.Command(s)
@@ -483,7 +493,7 @@ func (f *fc) stmt(out *fn.Block, s syntax.Stmt) {
 		if s.Key == nil || s.Value == nil {
 			return
 		}
-		target := f.variable(&syntax.Ident{Name: s.Key.Text, Sp: s.Key.Sp})
+		target := f.assignee(&syntax.Ident{Name: s.Key.Text, Sp: s.Key.Sp})
 		if target == nil {
 			return
 		}
@@ -794,6 +804,19 @@ func (f *fc) target(pre *[]fn.Op, e syntax.Expr) *local {
 		}
 		return &local{s: *s, typ: tInt}
 	}
+	return f.assignee(e)
+}
+
+// assignee resolves a variable that is set: an objective named alone
+// says how to set a score instead of how to read one.
+func (f *fc) assignee(e syntax.Expr) *local {
+	if id, ok := e.(*syntax.Ident); ok {
+		if _, local := f.lookup(id.Name); !local && f.c.findSig("Global", f.ns+":"+id.Name) == nil &&
+			f.c.find("Objective", f.ns+":"+id.Name) != nil {
+			f.c.errorf("mms/type-mismatch", id.Sp, "'%s' is an objective, not a variable; set a score with %s[@s] = ...", id.Name, id.Name)
+			return nil
+		}
+	}
 	return f.variable(e)
 }
 
@@ -806,6 +829,8 @@ func (f *fc) objScore(ix *syntax.Index) *fn.Score {
 	case *syntax.ResLoc:
 		id = x.Text
 		_, name, _ = strings.Cut(x.Text, ":")
+	case *syntax.Bad:
+		return nil // reported where it was written
 	default:
 		f.c.errorf("mms/unsupported", ix.Sp, "expected an objective's score, such as kills[@s]")
 		return nil

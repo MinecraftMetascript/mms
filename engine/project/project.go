@@ -187,6 +187,9 @@ type Result struct {
 	lintMu   sync.Mutex
 	relOnce  sync.Once
 	written  map[eval.Origin]eval.Prov // see relate
+	diagOnce sync.Once
+	own      map[string][]syntax.Diagnostic // each file's own problems, see Diagnostics
+	echoes   map[string][]syntax.Diagnostic // problems shown again where they were written
 	lintDone bool
 	lints    map[string][]syntax.Diagnostic
 	symKey   uint64
@@ -270,7 +273,78 @@ func (r *Result) Unit(path string) *sema.Unit {
 }
 
 // Diagnostics returns every diagnostic for one file, sorted by position.
+// A problem in text a Blueprint, Template or const wrote is reported
+// where it is used, and shown again at the line of the body that wrote
+// it, marked Echo.
 func (r *Result) Diagnostics(path string) []syntax.Diagnostic {
+	r.diagOnce.Do(r.diagnose)
+	own, echoes := r.own[path], r.echoes[path]
+	if own == nil && echoes == nil {
+		return nil
+	}
+	out := make([]syntax.Diagnostic, 0, len(own)+len(echoes))
+	out = append(append(out, own...), echoes...)
+	sort.SliceStable(out, func(i, j int) bool { return out[i].Sp.Start < out[j].Sp.Start })
+	return out
+}
+
+// diagnose works out every file's problems, and the echoes of those
+// whose text was written in another place.
+func (r *Result) diagnose() {
+	r.own, r.echoes = map[string][]syntax.Diagnostic{}, map[string][]syntax.Diagnostic{}
+	type key struct {
+		path string
+		sp   syntax.Span
+		code string
+		msg  string
+	}
+	at := map[key]int{}
+	for _, u := range r.Units {
+		ds := r.fileDiagnostics(u.Path)
+		r.own[u.Path] = ds
+		for _, d := range ds {
+			if d.Echo {
+				continue
+			}
+			for _, rel := range d.Related {
+				if r.Unit(rel.Path) == nil || (rel.Path == u.Path && rel.Sp == d.Sp) {
+					continue // the prelude, say, which nobody edits
+				}
+				back := syntax.Related{Path: u.Path, Sp: d.Sp, Message: usedAt(u, d.Sp)}
+				k := key{rel.Path, rel.Sp, d.Code, d.Message}
+				if i, ok := at[k]; ok {
+					// Every use of the Blueprint met the same problem:
+					// one echo, pointing at each use.
+					e := &r.echoes[rel.Path][i]
+					if len(e.Related) < maxEchoUses {
+						e.Related = append(e.Related, back)
+					}
+					continue
+				}
+				at[k] = len(r.echoes[rel.Path])
+				r.echoes[rel.Path] = append(r.echoes[rel.Path], syntax.Diagnostic{Code: d.Code, Severity: d.Severity,
+					Message: d.Message, Sp: rel.Sp, Related: []syntax.Related{back}, Echo: true})
+			}
+		}
+	}
+}
+
+// maxEchoUses is how many uses an echoed problem points back at.
+const maxEchoUses = 5
+
+// usedAt describes the use at sp, by its line: "found at throttle
+// spellbook {}".
+func usedAt(u *sema.Unit, sp syntax.Span) string {
+	line, _ := u.File.LineCol(sp.Start)
+	text := strings.TrimSpace(u.File.LineText(line))
+	if r := []rune(text); len(r) > 60 {
+		text = string(r[:57]) + "..."
+	}
+	return "found where it is used: " + text
+}
+
+// fileDiagnostics is one file's own problems, sorted by position.
+func (r *Result) fileDiagnostics(path string) []syntax.Diagnostic {
 	u := r.Unit(path)
 	if u == nil {
 		return nil

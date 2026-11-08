@@ -121,7 +121,7 @@ statement
     | IDENT typeAnnotation (ASSIGN value)?                        # fieldDeclStmt
     | fieldKey ASSIGN value                                       # fieldStmt
     | IDENT (DOT IDENT)+ ASSIGN value                             # pathAssignStmt
-    | IDENT LBRACK arg RBRACK ASSIGN value                        # indexAssignStmt
+    | target=(IDENT | TNAME) LBRACK arg RBRACK ASSIGN value       # indexAssignStmt
     | expr op=(PLUS_EQ | MINUS_EQ | STAR_EQ | SLASH_EQ | PCT_EQ) expr # compoundAssignStmt
     | expr                                                        # exprStmt
     ;

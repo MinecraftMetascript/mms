@@ -43,22 +43,16 @@ func (r *Result) relate(path string, ds []syntax.Diagnostic) {
 		if len(d.Related) > 0 {
 			continue
 		}
-		p, ok := r.written[eval.Origin{Path: path, Sp: d.Sp}]
-		if !ok {
-			continue
+		// The statement the checker found the problem in names the
+		// line exactly; failing that, the span names what wrote there.
+		p, ok := r.Eval.Lines[d.At]
+		if !ok || p.At.Path != path || p.At.Sp != d.Sp {
+			if p, ok = r.written[eval.Origin{Path: path, Sp: d.Sp}]; !ok {
+				continue
+			}
 		}
-		ds[i].Related = []syntax.Related{{Path: p.Def.Path, Sp: p.Def.Sp, Message: writtenIn(p.Frames)}}
+		ds[i].Related = []syntax.Related{{Path: p.Def.Path, Sp: p.Def.Sp, Message: eval.WrittenIn(p.Frames)}}
 	}
-}
-
-// writtenIn names the innermost Template, Blueprint or const of frames.
-func writtenIn(frames []eval.Frame) string {
-	for i := len(frames) - 1; i >= 0; i-- {
-		if f := frames[i]; f.Kind != eval.FrameFor && f.Name != "" {
-			return "written in " + f.Kind.String() + " " + f.Name
-		}
-	}
-	return "written here"
 }
 
 // sharedFrame is the innermost named frame two expansions both came

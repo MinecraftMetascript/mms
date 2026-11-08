@@ -82,3 +82,23 @@ func TestCommandValue(t *testing.T) {
 		}
 	}
 }
+
+// TestTemplatedScoreAssign checks that a score of an objective with a
+// templated name can be set, as in a Blueprint body.
+func TestTemplatedScoreAssign(t *testing.T) {
+	f := Parse("Function f {\n  ${label}_cd[@s] = rate\n}\n")
+	if len(f.Diags) > 0 {
+		t.Fatalf("diags = %v", f.Diags)
+	}
+	as, ok := f.Decls[0].Body.Items[0].(*AssignStmt)
+	if !ok {
+		t.Fatalf("got %T", f.Decls[0].Body.Items[0])
+	}
+	ix, ok := as.Target.(*Index)
+	if !ok {
+		t.Fatalf("target %T", as.Target)
+	}
+	if n, ok := ix.X.(*TemplatedName); !ok || n.Text != "${label}_cd" || len(n.Parts) != 2 {
+		t.Errorf("name = %+v", ix.X)
+	}
+}
