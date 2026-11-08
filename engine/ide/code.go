@@ -1,6 +1,8 @@
 package ide
 
 import (
+	"strings"
+
 	"github.com/minecraftmetascript/mms/engine/command"
 	"github.com/minecraftmetascript/mms/engine/sema"
 	"github.com/minecraftmetascript/mms/engine/syntax"
@@ -27,6 +29,15 @@ func (s *Session) mmsComplete(a *at, off int) ([]sema.Candidate, bool) {
 	// The old `= criterion` form is an error with a fix, but still lists them.
 	if a.decl.Kind.MMS == "Objective" && (prev.Kind == parser.MMSLexerCOLON || prev.Kind == parser.MMSLexerASSIGN) {
 		return criteria(), true
+	}
+	// One being typed in an emit block, which reads as `Objective` then
+	// a field `o: |` until its criterion is there.
+	if prev.Kind == parser.MMSLexerCOLON {
+		if name := prevToken(f, prev.Sp.Start); name != nil && name.Kind == parser.MMSLexerIDENT {
+			if kind := prevToken(f, name.Sp.Start); kind != nil && kind.Text == "Objective" {
+				return criteria(), true
+			}
+		}
 	}
 	// A Storage's record type: `Storage siege: |`.
 	if a.decl.Kind.MMS == "Storage" && prev.Kind == parser.MMSLexerCOLON && s.R.TypeEnv != nil &&
@@ -133,7 +144,7 @@ func enclosingCall(f *syntax.File, open *syntax.Token) (name string, index int, 
 // objectives (read as `name[@s]`) and the functions, then true and false.
 func (s *Session) codeValues(a *at, off int) []sema.Candidate {
 	out := locals(a.u.File, a.fn, off)
-	out = append(out, s.projectNames(a)...)
+	out = append(out, s.projectNames(a.decl.NS)...)
 	// The consts, and the Templates that give a number, a bool or a
 	// string, which is what code computes with.
 	for _, c := range s.evalValueCandidates() {
@@ -152,9 +163,8 @@ func (s *Session) codeValues(a *at, off int) []sema.Candidate {
 }
 
 // projectNames lists the Globals, objectives and functions code can use.
-func (s *Session) projectNames(a *at) []sema.Candidate {
+func (s *Session) projectNames(ns string) []sema.Candidate {
 	var out []sema.Candidate
-	ns := a.decl.NS
 	short := func(sym *sema.Symbol) string {
 		if sym.NS == ns {
 			return sym.Path
@@ -259,8 +269,8 @@ func criteria() []sema.Candidate {
 }
 
 // interpolationCompletion completes the expression of a `${...}` in a
-// raw command, from base (the command's first rune after `/`) to off: the
-// values codeValues lists, plus custom items, which a command can take
+// raw command, from base (the command's first rune after `/`) to off:
+// what exprCompletion lists, plus custom items, which a command can take
 // as an item argument. ok is false when off is not inside an open ${.
 func (s *Session) interpolationCompletion(a *at, base, off int) ([]Item, syntax.Span, bool) {
 	src := a.u.File.Src
@@ -282,28 +292,109 @@ func (s *Session) interpolationCompletion(a *at, base, off int) ([]Item, syntax.
 	if open < 0 || !a.code() {
 		return nil, syntax.Span{}, false
 	}
-	start := off
+	cands, start, member := s.exprCompletion(a, src, open, off)
+	if !member {
+		for _, c := range a.c.StackCandidates() {
+			c.Rank = 80
+			cands = append(cands, c)
+		}
+	}
+	return candidateItems(cands), syntax.Span{Start: start, End: wordEnd(src, off)}, true
+}
+
+// exprCompletion completes the expression of a `${...}`, in a command or
+// in text markup, from open (the rune after `${`) to off in src: after a
+// `.`, the fields of the Storage record before it (`${game.|}`,
+// `${modes[game.|]}`); otherwise what the expression can name. In
+// function code that is what codeValues lists; elsewhere, where the text
+// is shown without running code, the Globals, Storage, objectives and
+// consts. It returns where the word being typed starts, and whether it
+// follows a `.`.
+func (s *Session) exprCompletion(a *at, src []rune, open, off int) (cands []sema.Candidate, start int, member bool) {
+	start = off
 	for start > open && identRune(src[start-1]) {
 		start--
 	}
-	end := off
-	for end < len(src) && identRune(src[end]) {
-		end++
+	if start > open && src[start-1] == '.' {
+		recv := strings.TrimSpace(string(src[receiverStart(src, open, start-1) : start-1]))
+		if x, diags := syntax.ParseExpr(recv, 0); x != nil && len(diags) == 0 {
+			cands = a.c.StorageFieldCandidates(x)
+		}
+		return cands, start, true
 	}
-	cands := s.codeValues(a, start)
-	for _, c := range a.c.StackCandidates() {
-		c.Rank = 80
-		cands = append(cands, c)
+	if a.code() {
+		return s.codeValues(a, start), start, false
 	}
+	ns := s.P.Config.Namespace
+	if a.decl != nil {
+		ns = a.decl.NS
+	}
+	for _, c := range s.projectNames(ns) {
+		if c.Kind != sema.CandCallable { // no function runs to fill it in
+			cands = append(cands, c)
+		}
+	}
+	for _, c := range s.evalValueCandidates() {
+		if c.Kind != sema.CandCallable {
+			c.Rank += 70
+			cands = append(cands, c)
+		}
+	}
+	return cands, start, false
+}
+
+// receiverStart walks back from dot, the `.` of a member being typed, over
+// the expression before it: names, dots and bracketed indexes or call
+// arguments, such as `game.waves[i]`. It stops at open.
+func receiverStart(src []rune, open, dot int) int {
+	i := dot
+	for i > open {
+		switch r := src[i-1]; {
+		case identRune(r) || r == '.':
+			i--
+		case r == ']' || r == ')':
+			depth, j := 0, i-1
+			for ; j >= open; j-- {
+				switch src[j] {
+				case ']', ')':
+					depth++
+				case '[', '(':
+					depth--
+				}
+				if depth == 0 {
+					break // j is the opening bracket
+				}
+			}
+			if j < open {
+				return i
+			}
+			i = j
+		default:
+			return i
+		}
+	}
+	return i
+}
+
+// wordEnd is the end of the identifier that off is in or before.
+func wordEnd(src []rune, off int) int {
+	for off < len(src) && identRune(src[off]) {
+		off++
+	}
+	return off
+}
+
+// candidateItems turns candidates into completion items, in order.
+func candidateItems(cands []sema.Candidate) []Item {
 	items := make([]Item, 0, len(cands))
 	for i, c := range cands {
-		it := Item{Label: c.Label, Kind: c.Kind, Detail: c.Detail, Doc: c.Doc, Sort: sortKey(i)}
+		it := Item{Label: c.Label, Kind: c.Kind, Detail: c.Detail, Doc: c.Doc, Deprecated: c.Deprecated, Sort: sortKey(i)}
 		if c.Insert != "" {
 			it.Insert, it.Snippet = c.Insert, true
 		}
 		items = append(items, it)
 	}
-	return items, syntax.Span{Start: start, End: end}, true
+	return items
 }
 
 func identRune(r rune) bool {

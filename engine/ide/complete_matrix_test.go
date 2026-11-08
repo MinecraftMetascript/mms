@@ -10,6 +10,10 @@ import (
 // labels that must be offered (want), labels that must not (not), and the
 // text the chosen item replaces (replace, "" for an empty span). A row
 // with none set expects no items at all.
+// markupDecls are the names the ${...} rows complete, after the shape of
+// a spellbook: a const list, a Storage record, a Global and an objective.
+const markupDecls = "Type S {\n  mode: int\n}\nconst modes: [string] = [\"a\", \"b\"]\nStorage st: S\nGlobal g: int = 0\nObjective kills: dummy\n"
+
 func TestCompletionMatrix(t *testing.T) {
 	cases := []struct {
 		name, src string
@@ -155,6 +159,24 @@ func TestCompletionMatrix(t *testing.T) {
 		{name: "interpolation", src: "Function f(n: int) {\n  let x = 1\n  /say ${|}\n}", want: []string{"n", "x"}, not: []string{"say", "As"}},
 		{name: "interpolation prefix", src: "Global g: int = 0\nFunction f {\n  /say ${g|}\n}", want: []string{"g"}, replace: "g"},
 		{name: "interpolation custom item", src: "CustomItem shard { base = stick }\nFunction f {\n  /give @s ${|}\n}", want: []string{"shard"}},
+		{name: "interpolation storage field", src: "Type S { mode: int }\nStorage st: S\nGlobal g: int = 0\nFunction f {\n  /say ${st.|}\n}", want: []string{"mode"}, not: []string{"g", "st"}},
+		{name: "interpolation storage field in index", src: "const modes: [string] = [\"a\", \"b\"]\nType S { mode: int }\nStorage st: S\nFunction f {\n  /say ${modes[st.mo|]}\n}", want: []string{"mode"}, not: []string{"modes"}, replace: "mo"},
+		{name: "interpolation const", src: "const modes: [string] = [\"a\", \"b\"]\nFunction f {\n  /say ${mod|}\n}", want: []string{"modes"}, replace: "mod"},
+
+		// ${...} in text markup, as in a spellbook item: the same names
+		// as code there, and Storage fields after a dot.
+		{name: "markup interpolation", src: markupDecls + "Function f {\n  let x = 1\n  actionbar(@s, \"Mode ${|}\")\n}", want: []string{"x", "g", "modes", "st", "kills"}},
+		{name: "markup interpolation prefix", src: markupDecls + "Function f {\n  actionbar(@s, \"Mode ${mod|}\")\n}", want: []string{"modes"}, replace: "mod"},
+		{name: "markup interpolation index", src: markupDecls + "Function f {\n  actionbar(@s, \"Mode ${modes[st|]}\")\n}", want: []string{"st"}, replace: "st"},
+		{name: "markup interpolation index empty", src: markupDecls + "Function f {\n  let x = 1\n  actionbar(@s, \"Mode ${modes[|]}\")\n}", want: []string{"st", "x", "g"}},
+		{name: "markup interpolation storage field", src: markupDecls + "Function f {\n  actionbar(@s, \"Mode ${modes[st.|]}\")\n}", want: []string{"mode"}, not: []string{"g", "st", "modes"}},
+		{name: "markup interpolation storage field typed", src: markupDecls + "Function f {\n  actionbar(@s, \"${st.mo|de}\")\n}", want: []string{"mode"}, replace: "mode"},
+		{name: "markup interpolation after call", src: markupDecls + "Function f {\n  let x = 1\n  actionbar(@s, \"${len(modes) - |}\")\n}", want: []string{"x", "st"}},
+		{name: "markup interpolation item hook", src: markupDecls + "CustomItem w {\n  base = stick\n  on_right_click = run {\n    let x = 1\n    actionbar(@s, \"Mode ${modes[st.|]}\")\n  }\n}", want: []string{"mode"}, not: []string{"x"}},
+		{name: "markup interpolation item hook names", src: markupDecls + "CustomItem w {\n  base = stick\n  on_right_click = run {\n    let x = 1\n    actionbar(@s, \"Mode ${|}\")\n  }\n}", want: []string{"x", "modes", "st", "g"}},
+		{name: "markup interpolation outside code", src: markupDecls + "Function fn {\n}\nAdvancement a { display = { title = \"${|}\", description = \"d\", icon = { id = stone } }, criteria = { x = Tick() } }", want: []string{"g", "modes", "st", "kills"}, not: []string{"fn", "true"}},
+		{name: "markup interpolation outside code field", src: markupDecls + "Advancement a { display = { title = \"${st.|}\", description = \"d\", icon = { id = stone } }, criteria = { x = Tick() } }", want: []string{"mode"}, not: []string{"g"}},
+		{name: "markup after interpolation", src: markupDecls + "Function f {\n  let x = 1\n  actionbar(@s, \"${x} th|\")\n}", none: true},
 		{name: "after interpolation", src: "Function f {\n  let x = 1\n  /scoreboard players set @s ${x} |\n}", not: []string{"x"}},
 
 		// Inline function blocks, where a function id is needed: the same

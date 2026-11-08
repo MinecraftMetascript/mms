@@ -6,6 +6,7 @@ import (
 	"github.com/minecraftmetascript/mms/engine/eval"
 	"github.com/minecraftmetascript/mms/engine/sema"
 	"github.com/minecraftmetascript/mms/engine/syntax"
+	"github.com/minecraftmetascript/mms/engine/syntax/parser"
 )
 
 // declKinds lists what can start a declaration: the kinds, then the
@@ -31,6 +32,70 @@ func (s *Session) declKinds() []sema.Candidate {
 		})
 	}
 	return out
+}
+
+// emitKeywords start the statements of an emit block other than a
+// declaration.
+var emitKeywords = []sema.Candidate{
+	{Label: "primary", Kind: sema.CandKeyword, Detail: "the declaration the instance stands for", Insert: "primary ",
+		Doc: "Marks the emitted declaration that the instance's name refers to: `primary CustomItem ${self.path} { ... }`."},
+	{Label: "const", Kind: sema.CandKeyword, Detail: "a named value", Insert: "const ${1:name} = $0",
+		Doc: "A value with a name, for the declarations after it: `const id = \"${self.path}\"`."},
+	{Label: "if", Kind: sema.CandKeyword, Detail: "declarations when a condition holds", Insert: "if (${1:cond}) {\n\t$0\n}",
+		Doc: "Emits the declarations in its body only when the condition, worked out when the pack is built, holds."},
+	{Label: "for", Kind: sema.CandKeyword, Detail: "declarations for each value", Insert: "for ${1:x} in ${2:[]} {\n\t$0\n}",
+		Doc: "Repeats the declarations in its body for each value, with `${x}` in their names."},
+}
+
+// emitCandidates lists what starts a statement in a Blueprint's emit
+// block: the declaration kinds, the project's Blueprints and the emit
+// keywords. Template, Type and Blueprint are file-level only.
+func (s *Session) emitCandidates() []sema.Candidate {
+	var out []sema.Candidate
+	for _, c := range s.declKinds() {
+		switch c.Label {
+		case "Template", "Type", "Blueprint", "const", "for":
+			continue
+		}
+		out = append(out, c)
+	}
+	return append(out, emitKeywords...)
+}
+
+// emitStatementStart reports whether off starts a statement directly in
+// a Blueprint's emit block, or in an if or for inside it: an empty line,
+// or the first word of one, not inside an emitted declaration.
+func emitStatementStart(f *syntax.File, path []syntax.Node, off int) bool {
+	last := len(path) - 1
+	if last < 0 {
+		return false
+	}
+	if _, ok := path[last].(*syntax.Block); !ok {
+		// The first word being typed: `Fu|`, read as an expression.
+		if _, ok := path[last].(*syntax.Ident); !ok || last < 2 {
+			return false
+		}
+		if _, ok := path[last-1].(*syntax.ExprStmt); !ok {
+			return false
+		}
+		last -= 2
+		if _, ok := path[last].(*syntax.Block); !ok {
+			return false
+		}
+	} else if prev := prevToken(f, off); prev != nil && lineOf(f, prev.Sp.End) == lineOf(f, off) && prev.Kind != parser.MMSLexerLBRACE {
+		// Not after something else on the same line.
+		return false
+	}
+	for i := last - 1; i >= 1; i-- {
+		switch n := path[i].(type) {
+		case *syntax.SectionStmt:
+			return n.Word != nil && n.Word.Name == "emit"
+		case *syntax.IfStmt, *syntax.ForStmt, *syntax.Block:
+		default:
+			return false
+		}
+	}
+	return false
 }
 
 func internal(d *syntax.Decl) bool {
