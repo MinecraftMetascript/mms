@@ -185,6 +185,8 @@ type Result struct {
 	jigsaw   *jigsawModel                   // structure files' jigsaw blocks, for the jigsaw rules
 	files    fs.FS
 	lintMu   sync.Mutex
+	relOnce  sync.Once
+	written  map[eval.Origin]eval.Prov // see relate
 	lintDone bool
 	lints    map[string][]syntax.Diagnostic
 	symKey   uint64
@@ -309,6 +311,7 @@ func (r *Result) Diagnostics(path string) []syntax.Diagnostic {
 	}
 	out = r.configure(path, out)
 	out = append(out, r.Lints()[path]...)
+	r.relate(path, out)
 	sort.SliceStable(out, func(i, j int) bool { return out[i].Sp.Start < out[j].Sp.Start })
 	return out
 }

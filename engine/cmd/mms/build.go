@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/minecraftmetascript/mms/engine/prelude"
 	"github.com/minecraftmetascript/mms/engine/project"
 	"github.com/minecraftmetascript/mms/engine/spec"
 	"github.com/minecraftmetascript/mms/engine/syntax"
@@ -70,6 +71,9 @@ func report(w io.Writer, r *project.Result, hints bool) int {
 			text := u.File.LineText(line)
 			width := max(1, min(d.Sp.End-d.Sp.Start, len([]rune(text))-col+1))
 			fmt.Fprintf(w, "    %s\n    %s%s\n", strings.ReplaceAll(text, "\t", " "), strings.Repeat(" ", col-1), strings.Repeat("^", width))
+			for _, rel := range d.Related {
+				fmt.Fprintf(w, "    note: %s, at %s\n", rel.Message, relatedAt(r, rel))
+			}
 		}
 	}
 	for _, msg := range r.ConfigWarnings() {
@@ -433,4 +437,20 @@ func insideProject(dir, out string) error {
 		return fmt.Errorf("%s resolves to %s, outside the project; mms.json's output folders must stay inside it", out, p)
 	}
 	return nil
+}
+
+// relatedAt is path:line:col for a related location, in a project file
+// or the prelude.
+func relatedAt(r *project.Result, rel syntax.Related) string {
+	if u := r.Unit(rel.Path); u != nil {
+		line, col := u.File.LineCol(rel.Sp.Start)
+		return fmt.Sprintf("%s:%d:%d", rel.Path, line, col)
+	}
+	for _, f := range prelude.Files() {
+		if f.Path == rel.Path {
+			line, col := (&syntax.File{Src: []rune(f.Text)}).LineCol(rel.Sp.Start)
+			return fmt.Sprintf("%s:%d:%d", rel.Path, line, col)
+		}
+	}
+	return rel.Path
 }

@@ -48,15 +48,20 @@ The same pull request then fixed most of these. What is left needs a decision fr
 
 **Resolved:** F01 to F19, F23, F31 to F34, F36 to F38, F43, F47, F49, F52 to F59, F67 to F70, F73, F76, F80, F82, F84 to F88 and F90. F44 too: the function-run preview and its vendored cmdlib simulator were removed, so Go `mcfn` (`mms test`) is the only simulator. That also settles Q1 and Q13.
 
+**Resolved after the maintainer's answers:**
+
+- F40 and F41 (Q9): each kind and helper has one spelling. `SurfaceRule`/`SurfaceCondition` stay (they are the same Minecraft files as mcdoc's `MaterialRule`/`MaterialCondition`), as do `Shaped`, `Shapeless`, `AboveWater`, `AboveSurface` and `Pool`. The other spellings are errors that name the one to use and fix it. `NoiseSettings` was already the folder's own name, so its alias is gone.
+- F42 (Q7): list elements need commas. Recovery still keeps a list with a missing one, and `syntax/missing-comma` offers to insert it.
+- F60 (Q4): yes. docs/tasks.md now says how the overhaul landed, including that `types` resolves and `sema` checks.
+- F35 and F83 (Q3): a Blueprint's named `warn` and `hint` rules are `lint/<rule>`, set in mms.json and silenced by `// mms-ignore` like the built-in rules. A setting for a rule nothing has is a warning on mms.json with the closest name.
+- F51 (Q2): a problem in text that a Template, Blueprint or const wrote keeps its place in the user's code, and now carries a related location at the line that wrote it ("written in Blueprint Wand"). VS Code shows it under the problem, the web editor offers "Go to Blueprint Wand" on it, and `mms check` prints it as a note.
+
 **Partly resolved:**
 
 - F24: the World and Structures views no longer redraw while they are hidden, and structure hashes are cached. `level.dat` is still read on each visible redraw.
 - F66: the pre-index project migration and the scaffold `index.ts` are gone. The old docs redirects stay until Q6 is answered.
 - F72: the fuzz test no longer excuses Reparse/Parse differences, and the whitespace test checks Reparse on every layout. Whitespace-removal variants (`total/2`, `a:int`) are still missing.
 - F81: VS Code is on TypeScript 6.0.3 like the other packages. The pinning policy and a root workspace wait on Q8.
-- F83: lint.md now links to the generated rule reference. Whether Blueprint hints can be configured waits on Q3.
-
-**Waiting on a decision:** F35 (Q3), F40 and F41 (Q9), F42 (Q7), F51 (Q2), F60 and F22 (Q4).
 
 **Deferred as larger work (M or L effort):** the editor hot-path items F20, F21, F22 and F25 to F29; the typed `mms/*` protocol F30; F39, F45, F46, F48, F50, F71, F74, F75 and F89; and the god files F61 to F65.
 
@@ -331,14 +336,14 @@ In `Reparse`, when a new chunk has errors, parse the whole file once; if that pa
 ## Open questions for the maintainer
 
 1. ~~**Which simulator is authoritative?** Go `mcfn` (`mms test`) and TS cmdlib (function-run preview) run the same output and can disagree (F44). Should one go, or do they share a golden corpus?~~ Settled: the cmdlib preview was removed.
-2. **Provenance:** wire `Frames` into related information and Template-body go to definition, or delete it (F51)?
-3. **Are Blueprint `check` and `hint(...)` rule names configurable in mms.json** like the Go rules? This decides F35 and the `custom-item-as-base` docs bug (F83).
-4. **Is "types resolves, sema checks" the final design?** If yes, tasks.md should say so (F60) and the double check (F22) belongs in project; if not, it belongs in types.
+2. ~~**Provenance:** wire `Frames` into related information and Template-body go to definition, or delete it (F51)?~~ Settled: wired into related information.
+3. ~~**Are Blueprint `check` and `hint(...)` rule names configurable in mms.json** like the Go rules? This decides F35 and the `custom-item-as-base` docs bug (F83).~~ Settled: yes.
+4. ~~**Is "types resolves, sema checks" the final design?** If yes, tasks.md should say so (F60) and the double check (F22) belongs in project; if not, it belongs in types.~~ Settled: yes, recorded in tasks.md. F22 stays deferred work.
 5. **Should the web editor keep the full mms.json** (lint, icon, sources), or only namespace and description (F38)?
 6. **Do old docs URLs need to keep working?** No users, but the site is public on GitHub Pages, so external links may exist (F66).
-7. **Were optional list commas deliberate** (for a recovery case), or a side effect of the overhaul grammar (F42)?
+7. ~~**Were optional list commas deliberate** (for a recovery case), or a side effect of the overhaul grammar (F42)?~~ Settled: a side effect; commas are now required.
 8. **A root npm workspace?** It would remove three lockfiles and the version drift (F81), at the cost of changing CI caching.
-9. **Are `SurfaceRule`, `Shaped`, `AboveWater` and friends the official names**, or compatibility aliases that "no aliases" says to remove (F40, F41)?
+9. ~~**Are `SurfaceRule`, `Shaped`, `AboveWater` and friends the official names**, or compatibility aliases that "no aliases" says to remove (F40, F41)?~~ Settled: one spelling each, the short ones.
 10. **Is the jigsaw hole picker, and the World/Structures view, intentionally VS Code only?** `mms/output` returns `jigsawHoles`, and nothing in web reads them.
 11. **Function signatures use string type names** (`tInt`, `tBool`, engine/sema/fn.go:17-21), so `Type N = int` is "unknown type" in a function. Intended?
 12. **Should namespaces `.` and `..` be banned?** Minecraft allows them; F04 recommends banning them.

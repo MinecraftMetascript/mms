@@ -664,6 +664,22 @@ test('doc comments cannot run script in a hover', async ({ page }) => {
 	expect(await page.evaluate(() => (window as { __pwned?: number }).__pwned)).toBeUndefined();
 });
 
+test('a problem in text a Blueprint wrote links to the line that wrote it', async ({ page }) => {
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	await replaceText(
+		page,
+		'Blueprint Thing {\n  n: int\n  emit {\n    Noise ${self.path} { base_octave = n, amplitude_modifiers = "oops" }\n  }\n}\nThing a { n = 1 }\n'
+	);
+	const range = page.locator('.cm-lintRange-error').last();
+	await expect(range).toBeVisible();
+	await range.hover();
+	const go = page.locator('.cm-tooltip-lint').getByRole('button', { name: 'Go to Blueprint Thing' });
+	await expect(go).toBeVisible();
+	await go.click();
+	await expect(page.locator('.cm-activeLine')).toContainText('amplitude_modifiers = "oops"');
+});
+
 test('right-click opens editor actions with quick fixes', async ({ page }) => {
 	await page.goto('./');
 	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });

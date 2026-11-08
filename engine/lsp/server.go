@@ -602,6 +602,15 @@ func (s *Server) publish(u *sema.Unit, ds []syntax.Diagnostic) {
 		case d.Deprecated:
 			m["tags"] = []int{2}
 		}
+		if len(d.Related) > 0 {
+			rel := make([]any, 0, len(d.Related))
+			for _, r := range d.Related {
+				if locs := s.locations([]ide.Location{{Path: r.Path, Span: r.Sp}}); len(locs) == 1 {
+					rel = append(rel, map[string]any{"location": locs[0], "message": r.Message})
+				}
+			}
+			m["relatedInformation"] = rel
+		}
 		if len(d.Fixes) > 0 {
 			// The web editor applies fixes straight from the diagnostic.
 			m["data"] = map[string]any{"fixes": fixesJSON(l, d.Fixes)}

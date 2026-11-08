@@ -41,7 +41,23 @@ function actions(fixes: Fix[] | undefined): Action[] {
 	}));
 }
 
-/** Shows server diagnostics, with their fixes as actions, in a view. */
+/** Opens each related place, such as "written in Template Piece". */
+function related(plugin: LSPPlugin, d: Diagnostic): Action[] {
+	return (d.relatedInformation ?? []).map((r) => ({
+		name: r.message.replace(/^written in /, 'Go to '),
+		apply: async () => {
+			const view = await plugin.client.workspace.displayFile(r.location.uri);
+			if (!view) return;
+			const { line, character } = r.location.range.start;
+			const doc = view.state.doc;
+			const at = line + 1 > doc.lines ? doc.length : Math.min(doc.line(line + 1).from + character, doc.line(line + 1).to);
+			view.dispatch({ selection: { anchor: at }, scrollIntoView: true });
+			view.focus();
+		}
+	}));
+}
+
+/** Shows server diagnostics, with their fixes and related places as actions, in a view. */
 export function showDiagnostics(view: EditorView, ds: Diagnostic[]) {
 	const plugin = LSPPlugin.get(view);
 	if (!plugin) return;
@@ -53,7 +69,7 @@ export function showDiagnostics(view: EditorView, ds: Diagnostic[]) {
 		message: d.message,
 		source: d.code,
 		markClass: d.tags?.includes(1) ? 'cm-unnecessary' : d.tags?.includes(2) ? 'cm-deprecated' : undefined,
-		actions: actions(d.data?.fixes)
+		actions: [...actions(d.data?.fixes), ...related(plugin, d)]
 	}));
 	view.dispatch(setDiagnostics(view.state, out));
 }

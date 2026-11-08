@@ -15,6 +15,8 @@ export interface Diagnostic {
 	/** 1 marks unnecessary code. */
 	tags?: number[];
 	data?: { fixes?: Fix[] };
+	/** Other places that explain the problem, such as the Template line that wrote it. */
+	relatedInformation?: { location: { uri: string; range: Diagnostic['range'] }; message: string }[];
 }
 
 export interface TextEdit {
