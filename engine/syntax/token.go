@@ -53,6 +53,15 @@ type Diagnostic struct {
 	// Related are other places that explain the problem, such as the
 	// line of a Template body that wrote the value.
 	Related []Related
+	// At is the statement of expanded code the problem was found in,
+	// when the checker knows it. Code a Blueprint or Template wrote sits
+	// at the span of its use, so the span alone cannot tell which line
+	// of the body wrote it; At can.
+	At Node `json:"-"`
+	// Echo marks a copy of a problem found where a Blueprint, Template
+	// or const is used, shown again at the line of its body that wrote
+	// the text. Its Related points back at the use.
+	Echo bool `json:"-"`
 }
 
 // Related is a place a diagnostic points to, in any file.

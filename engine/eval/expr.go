@@ -99,7 +99,13 @@ func (c *ctx) pos(sp syntax.Span) pos {
 }
 
 func (c *ctx) diag(sev syntax.Severity, code string, sp syntax.Span, msg string) {
-	c.e.report(c.path, syntax.Diagnostic{Code: code, Severity: sev, Message: msg, Sp: c.span(sp)})
+	d := syntax.Diagnostic{Code: code, Severity: sev, Message: msg, Sp: c.span(sp)}
+	if c.site != nil {
+		// The problem is in a Blueprint or Template body, met where it
+		// is used: point at the text in the body as well.
+		d.Related = []syntax.Related{{Path: c.defPath, Sp: sp, Message: WrittenIn(c.fr)}}
+	}
+	c.e.report(c.path, d)
 }
 
 func (c *ctx) errorf(code string, sp syntax.Span, msg string) {
@@ -315,12 +321,30 @@ func (c *ctx) nameParts(parts []syntax.NamePart, sp syntax.Span) (string, bool) 
 		v := c.reduce(pt.X)
 		t, ok := text(v)
 		if !ok || isNone(v) {
-			c.errorf("mms/name-piece", pt.Sp, "a ${...} in a name must be known at compile time, but this is "+kindName(v))
+			if cd, bad := v.(*Code); bad {
+				if _, bad := cd.X.(*syntax.Bad); bad {
+					return "", false // reported already
+				}
+			}
+			c.errorf("mms/name-piece", pt.Sp, "a ${...} in a name must be known at compile time, but "+c.pieceKind(pt.X, v))
 			return "", false
 		}
 		b.WriteString(t)
 	}
 	return b.String(), true
+}
+
+// pieceKind says what a name piece's value is, for the error that it is
+// not known at compile time: "this is a string", or for a name nothing
+// at compile time has, that it is unknown.
+func (c *ctx) pieceKind(x syntax.Expr, v Value) string {
+	if id, ok := x.(*syntax.Ident); ok {
+		_, bound, hidden := c.sc.lookup(id.Name)
+		if !bound && !hidden && !c.e.values[id.Name] {
+			return "nothing at compile time is named '" + id.Name + "'. A const, a for variable, a Template parameter or a Blueprint field can go here"
+		}
+	}
+	return "this is " + kindName(v)
 }
 
 func isNone(v Value) bool {
@@ -594,6 +618,16 @@ func (c *ctx) member(x *syntax.Member) Value {
 	case *Record:
 		if v, ok := b.get(x.Name.Text); ok {
 			return v
+		}
+		if b.id != nil {
+			// self: its fields are fixed, so another name is a mistake,
+			// such as self.title for a let, which is read as title.
+			msg := "self has no field '" + x.Name.Text + "'; it has " + strings.Join(b.Keys, ", ")
+			if _, ok, _ := c.sc.lookup(x.Name.Text); ok {
+				msg += ". A let or field of the Blueprint is read by its name: " + x.Name.Text
+			}
+			c.errorf("mms/unknown-field", x.Name.Sp, msg)
+			return &Code{p, &syntax.Bad{Sp: c.span(x.Sp)}}
 		}
 		return &None{pos: p}
 	case *None:

@@ -687,8 +687,15 @@ func (b *builder) stmt(c parser.IStatementContext) Stmt {
 		}
 		return &AssignStmt{Target: target, Op: "=", Value: b.value(s.Value(), sp), Sp: sp}
 	case *parser.IndexAssignStmtContext:
-		id := s.IDENT()
-		target := &Index{X: &Ident{Name: id.GetText(), Sp: tokSpan(id.GetSymbol())}, Args: b.args([]parser.IArgContext{s.Arg()}), Sp: Span{sp.Start, tokSpan(s.RBRACK().GetSymbol()).End}}
+		// `kills[@s] = 1`, or `${name}_kills[@s] = 1` in a Template or
+		// Blueprint body.
+		id := s.GetTarget()
+		var x Expr = &Ident{Name: id.GetText(), Sp: tokSpan(id)}
+		if id.GetTokenType() == parser.MMSLexerTNAME {
+			isp := tokSpan(id)
+			x = &TemplatedName{Text: id.GetText(), Parts: b.nameParts(id.GetText(), isp.Start), Sp: isp}
+		}
+		target := &Index{X: x, Args: b.args([]parser.IArgContext{s.Arg()}), Sp: Span{sp.Start, tokSpan(s.RBRACK().GetSymbol()).End}}
 		return &AssignStmt{Target: target, Op: "=", Value: b.value(s.Value(), sp), Sp: sp}
 	case *parser.ExprStmtContext:
 		return &ExprStmt{X: b.expr(s.Expr(), sp), Sp: sp}

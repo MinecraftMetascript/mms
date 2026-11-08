@@ -24,6 +24,17 @@ const (
 	FrameConst                      // a const copied in where it is named
 )
 
+// WrittenIn names the innermost Template, Blueprint or const of frames:
+// "written in Blueprint throttle".
+func WrittenIn(frames []Frame) string {
+	for i := len(frames) - 1; i >= 0; i-- {
+		if f := frames[i]; f.Kind != FrameFor && f.Name != "" {
+			return "written in " + f.Kind.String() + " " + f.Name
+		}
+	}
+	return "written here"
+}
+
 func (k FrameKind) String() string {
 	switch k {
 	case FrameFor:

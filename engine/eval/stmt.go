@@ -32,7 +32,10 @@ func (c *ctx) stmt(it syntax.Stmt, out *[]syntax.Stmt) {
 	if !c.step(it.Span()) {
 		return
 	}
-	add := func(st syntax.Stmt) { *out = append(*out, st) }
+	add := func(st syntax.Stmt) {
+		c.line(st, it)
+		*out = append(*out, st)
+	}
 	switch st := it.(type) {
 	case *syntax.Decl:
 		if c.emit != nil {
@@ -225,7 +228,19 @@ func (c *ctx) ifStmt(st *syntax.IfStmt, out *[]syntax.Stmt) {
 			n.Else = &syntax.Block{Items: more, Closed: true, Sp: c.span(e.Sp)}
 		}
 	}
+	c.line(n, st)
 	*out = append(*out, n)
+}
+
+// line remembers that st, built at the span of a Blueprint or Template's
+// use, was written at src's line of the body, so a problem the checker
+// finds in it can point there. A statement passed in from elsewhere,
+// such as a run block a field holds, keeps its own span and is not this
+// body's.
+func (c *ctx) line(st, src syntax.Stmt) {
+	if c.site != nil && st != nil && st.Span() == *c.site {
+		c.e.r.Lines[st] = Prov{At: Origin{c.path, *c.site}, Def: &Origin{c.defPath, src.Span()}, Frames: c.fr}
+	}
 }
 
 // forStmt unrolls a loop over a list or record, and in compile-time code

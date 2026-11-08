@@ -57,6 +57,11 @@ func report(w io.Writer, r *project.Result, hints bool) int {
 			if d.Severity == syntax.SeverityHint && !hints {
 				continue
 			}
+			if d.Echo {
+				// Printed once, where it is used, with a note at the
+				// line that wrote it.
+				continue
+			}
 			line, col := u.File.LineCol(d.Sp.Start)
 			sev := "error"
 			switch d.Severity {
