@@ -1,0 +1,37 @@
+== worldgen/material_condition test:c
+== worldgen/material_condition test:d
+{
+  "type": "minecraft:water",
+  "offset": 0,
+  "surface_depth_multiplier": 0,
+  "add_stone_depth": false
+}
+== recipe test:e
+== recipe test:f
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    "minecraft:stone"
+  ],
+  "result": {
+    "id": "minecraft:stone"
+  }
+}
+== loot_table test:g
+{
+  "pools": []
+}
+== loot_table test:h
+{
+  "pools": [
+    {
+      "rolls": 1,
+      "entries": []
+    }
+  ]
+}
+! 3: mms/unknown-kind 'MaterialRule' is written SurfaceRule
+! 4: mms/unknown-kind 'MaterialCondition' is written SurfaceCondition
+! 5: mms/unknown-helper 'Water' is written AboveWater
+! 7: mms/unknown-helper 'CraftingShapeless' is written Shapeless
+! 9: mms/unknown-helper 'LootPool' is written Pool

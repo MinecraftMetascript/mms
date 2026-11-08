@@ -50,6 +50,16 @@ type Diagnostic struct {
 	Deprecated bool
 	// Fixes are edits that resolve the problem, best first.
 	Fixes []Fix
+	// Related are other places that explain the problem, such as the
+	// line of a Template body that wrote the value.
+	Related []Related
+}
+
+// Related is a place a diagnostic points to, in any file.
+type Related struct {
+	Path    string
+	Sp      Span
+	Message string
 }
 
 // Shift returns the diagnostic moved by delta runes, fixes included.

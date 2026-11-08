@@ -91,12 +91,18 @@ func (c *ctx) instance(d *syntax.Decl, n *syntax.Name, bp *Blueprint, from *synt
 			missing = append(missing, f.Name.Text)
 			v = &None{pos: bc.pos(f.Sp)}
 		}
+		v = bc.withDefaults(v, f.Type)
 		bc.sc.bind(f.Name.Text, v)
 		inst.Fields.set(f.Name.Text, v)
 	}
 	if len(missing) > 0 {
 		c.e.report(c.path, syntax.Diagnostic{Code: "mms/missing-field", Severity: syntax.SeverityError, Sp: site,
 			Message: bpName + " " + name.Text + " needs " + strings.Join(quoteAll(missing), ", ")})
+		if f := c.e.r.Files[c.path]; f.Missing == nil {
+			f.Missing = map[syntax.Span][]string{site: missing}
+		} else {
+			f.Missing[site] = missing
+		}
 		return nil
 	}
 	for _, l := range bp.Lets {
@@ -217,9 +223,10 @@ func checkRule(sev syntax.Severity) intrinsic {
 				sp = fsp
 			}
 		}
-		// A rule without a name is reported under the Blueprint's:
-		// mms/custom-item for CustomItem.
-		code := "check"
+		// A named rule is a lint rule, lint/<rule>, which mms.json can
+		// configure. One without a name is reported under the
+		// Blueprint's: mms/custom-item for CustomItem.
+		code := "mms/check"
 		if c.inst != nil {
 			code = "mms/" + kebab(c.inst.Blueprint.D.NameText())
 		}
@@ -229,7 +236,7 @@ func checkRule(sev syntax.Severity) intrinsic {
 				c.errorf("mms/check-args", x.Sp, "a rule name is a string")
 				return &None{pos: p}
 			}
-			code = r.S
+			code = "lint/" + r.S
 		}
 		msg, ok := args[len(args)-1].v.(*Str)
 		if !ok {

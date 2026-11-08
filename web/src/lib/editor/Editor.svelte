@@ -9,7 +9,7 @@
 	import { onMount, untrack } from 'svelte';
 	import type { Engine } from '../engine/engine.svelte';
 	import { isMarkupPath, uriOf } from '../project/project.svelte';
-	import { bookHighlight, bookLanguage, mmsHighlight, mmsLanguage } from './language';
+	import { bookHighlight, bookLanguage, mmsHighlight, mmsLanguage, textLanguage } from './language';
 	import { semanticHighlighting } from './semantic';
 	import { inlayHints } from './inlay';
 	import { forEachDiagnostic } from '@codemirror/lint';
@@ -160,8 +160,8 @@
 				indentUnit.of('  '),
 				EditorView.lineWrapping,
 				EditorState.tabSize.of(2),
-				...(book ? [bookLanguage, bookHighlight] : [mmsLanguage, mmsHighlight]),
-				engine.client.plugin(uriOf(p), book ? 'mmsbook' : 'mms'),
+				...(book ? [p.endsWith('.mmstext') ? textLanguage : bookLanguage, bookHighlight] : [mmsLanguage, mmsHighlight]),
+				engine.client.plugin(uriOf(p), book ? (p.endsWith('.mmstext') ? 'mmstext' : 'mmsbook') : 'mms'),
 				semanticHighlighting((uri) => engine.semanticTokens(uri)),
 				inlayHints((uri) => engine.inlayHints(uri)),
 				inlineRename(),

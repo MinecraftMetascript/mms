@@ -23,9 +23,18 @@ type Output struct {
 // Objective is the scoreboard objective for a namespace's values.
 func Objective(ns string) string { return "mms." + ns }
 
-// Holder returns the score holder of a function's parameter, local or
-// temporary, named name, for the function at path.
+// Holder returns the score holder of a function's parameter or local
+// named name, for the function at path.
 func Holder(path, name string) string { return "#" + path + "." + name }
+
+// Gen marks a name the compiler made (a temporary, a flag, a shadowed
+// local's copy). '-' never appears in an MMS identifier, so these names
+// cannot collide with a user's, yet it is still valid in score holders
+// and unquoted NBT keys.
+const Gen = "-"
+
+// GenHolder returns the score holder of a compiler-made value.
+func GenHolder(path, name string) string { return Holder(path, Gen+name) }
 
 // Control-flow codes in #cf.
 const (
@@ -62,8 +71,14 @@ type gen struct {
 
 // Generate lowers f and returns its files. Generated sub-function names
 // and flags are numbered in source order, so output is deterministic.
-func Generate(f Func) *Output {
-	Optimize(&f)
+func Generate(f Func) *Output { return generate(f, true) }
+
+// generate lowers f, optimising it first when optimize is set; tests
+// compare the two.
+func generate(f Func, optimize bool) *Output {
+	if optimize {
+		Optimize(&f)
+	}
 	ns, path, _ := strings.Cut(f.ID, ":")
 	g := &gen{ns: ns, path: path, obj: Objective(ns), out: &Output{Main: f.ID, Files: map[string][]string{}, Consts: map[int32]bool{}}}
 	fr := &frame{id: f.ID, kind: topFrame}
@@ -90,7 +105,7 @@ func (g *gen) next(kind string) string {
 }
 
 func (g *gen) flag() Score {
-	s := g.score(Holder(g.path, "_f"+strconv.Itoa(g.n)))
+	s := g.score(GenHolder(g.path, "f"+strconv.Itoa(g.n)))
 	g.n++
 	return s
 }
@@ -436,9 +451,29 @@ func (g *gen) macro(o Macro) []string {
 	return append(lines, fmt.Sprintf("function %s with storage %s m", id, st))
 }
 
-// QuoteSNBT quotes a string for SNBT.
+// QuoteSNBT quotes a string for SNBT, escaping control characters so a
+// newline in the string cannot split the command line.
 func QuoteSNBT(s string) string {
-	return `"` + strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(s) + `"`
+	var b strings.Builder
+	b.WriteByte('"')
+	for _, r := range s {
+		switch {
+		case r == '\\':
+			b.WriteString(`\\`)
+		case r == '"':
+			b.WriteString(`\"`)
+		case r == '\n':
+			b.WriteString(`\n`)
+		case r == '\t':
+			b.WriteString(`\t`)
+		case r < 0x20 || (r >= 0x7f && r <= 0x9f):
+			fmt.Fprintf(&b, `\u%04x`, r)
+		default:
+			b.WriteRune(r)
+		}
+	}
+	b.WriteByte('"')
+	return b.String()
 }
 
 func (g *gen) call(fr *frame, o Call) []string {

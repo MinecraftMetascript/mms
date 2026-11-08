@@ -119,7 +119,7 @@
 						{@const unused = engine.unusedAssets.includes(a.path)}
 						<li
 							class="group flex items-center rounded hover:bg-hover"
-							title="{unused ? 'Not used, so the pack leaves it out. ' : ''}Use it with {a.path.endsWith('.nbt') ? 'Structure' : a.path.endsWith('.ogg') ? 'Sound' : 'Texture'}(&quot;{a.path}&quot;)"
+							title="{unused ? 'Not used, so the pack leaves it out. ' : ''}Use it with {a.path.endsWith('.nbt') ? 'StructureFile' : a.path.endsWith('.ogg') ? 'Sound' : 'Texture'}(&quot;{a.path}&quot;)"
 						>
 							<span class="flex min-w-0 flex-1 items-center gap-1.5 px-2 py-0.5">
 								{#if a.path.endsWith('.png')}

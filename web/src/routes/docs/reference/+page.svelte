@@ -5,13 +5,6 @@
 	let { data }: PageProps = $props();
 	const base = resolve('/').replace(/\/$/, '');
 	const c = $derived(data.counts);
-
-	// Links into the old one-page reference, such as editor hovers from
-	// before it was split, land on the entry's new page.
-	$effect(() => {
-		const to = location.hash && data.moved[decodeURIComponent(location.hash.slice(1))];
-		if (to) location.replace(to);
-	});
 </script>
 
 <svelte:head><title>Reference · MMS docs</title></svelte:head>

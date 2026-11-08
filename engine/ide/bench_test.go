@@ -11,7 +11,7 @@ import (
 )
 
 // benchSource is a realistic 2,000-line file: noises, density functions
-// with sugar, and surface rules.
+// with shorthand, and surface rules.
 func benchSource() string {
 	var sb strings.Builder
 	for i := 0; sb.Len() == 0 || strings.Count(sb.String(), "\n") < 2000; i++ {

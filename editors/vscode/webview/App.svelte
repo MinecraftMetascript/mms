@@ -5,13 +5,14 @@
 	// on that declaration while you edit elsewhere.
 	import { itemPath, PreviewPane, type OutputFile, type OutputItem } from '@mms/preview';
 	import PreviewWorker from '@mms/preview/worker?worker&inline';
-	import type { OutputAsset, ToPanel, ToExtension } from '../src/messages';
+	import type { OutputAsset, OutputText, ToPanel, ToExtension } from '../src/messages';
 
 	// The state is what VS Code hands back when it restores the panel.
 	const vscode = acquireVsCodeApi<{ path: string | null; page?: number }>();
 
 	let output = $state<OutputFile[]>([]);
 	let items = $state<OutputItem[]>([]);
+	let texts = $state<OutputText[]>([]);
 	let assets = $state<OutputAsset[]>([]);
 	let textures = $state<Record<string, string>>({});
 	let structures = $state<Record<string, string>>({});
@@ -27,6 +28,7 @@
 		if (m.type === 'output') {
 			output = m.files;
 			items = m.items;
+			texts = m.texts ?? [];
 			assets = m.assets;
 			textures = m.textures ?? {};
 			structures = m.structures ?? {};
@@ -43,7 +45,9 @@
 		const f = output.find((f) => f.path === path);
 		if (f) return { label: f.path, uri: f.uri, range: f.range };
 		const it = items.find((it) => itemPath(it.id) === path);
-		return it ? { label: it.id, uri: it.uri, range: it.range } : undefined;
+		if (it) return { label: it.id, uri: it.uri, range: it.range };
+		const t = texts.find((t) => t.id === path);
+		return t ? { label: t.kind === 'chat' ? 'chat message' : t.kind, uri: t.uri, range: t.range } : undefined;
 	});
 </script>
 
@@ -63,6 +67,7 @@
 			<PreviewPane
 				{output}
 				{items}
+				{texts}
 				{assets}
 				{textures}
 				{structures}

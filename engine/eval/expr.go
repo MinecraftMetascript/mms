@@ -202,6 +202,9 @@ func (c *ctx) reduce(x syntax.Expr) Value {
 				return &None{pos: p}
 			}
 		}
+		if _, sel := x.X.(*syntax.Selector); sel {
+			return &Code{p, &syntax.Index{X: c.lower(base), Args: c.selectorArgs(x.Args), Sp: c.span(x.Sp)}}
+		}
 		return &Code{p, &syntax.Index{X: c.lower(base), Args: c.args(x.Args), Sp: c.span(x.Sp)}}
 	case *syntax.Trailing:
 		fn := c.reduce(x.X)
@@ -295,7 +298,7 @@ func (c *ctx) constValue(k *Const, use syntax.Span) Value {
 		kc.errorf("mms/const-value", k.S.Sp, "a const needs a value: const "+k.Name()+" = ...")
 		k.val = &None{}
 	} else {
-		k.val = kc.reduce(k.S.Value)
+		k.val = kc.withDefaults(kc.reduce(k.S.Value), k.S.Type)
 	}
 	k.state = 2
 	return k.val
@@ -395,18 +398,23 @@ func (c *ctx) object(x *syntax.Object) Value {
 		}
 	}
 	r := &Record{pos: p}
-	for _, it := range x.Body.Items {
+	// Each spread is reduced once, here: a Template call in one is
+	// recorded once, and nested spreads do not multiply the work.
+	spreads := map[int]Value{}
+	for i, it := range x.Body.Items {
 		if es, ok := it.(*syntax.ExprStmt); ok {
-			// A spread of something only the checker can read, such as
-			// a helper call: the object stays code.
-			switch c.reduce(es.X.(*syntax.Spread).X).(type) {
+			v := c.reduce(es.X.(*syntax.Spread).X)
+			switch v.(type) {
 			case *Record, *None:
+				spreads[i] = v
 			default:
+				// A spread of something only the checker can read, such
+				// as a helper call: the object stays code.
 				return &Code{p, &syntax.Object{Body: c.block(x.Body), Sp: c.span(x.Sp)}}
 			}
 		}
 	}
-	for _, it := range x.Body.Items {
+	for i, it := range x.Body.Items {
 		switch it := it.(type) {
 		case *syntax.FieldStmt:
 			if it.Key == nil {
@@ -417,16 +425,15 @@ func (c *ctx) object(x *syntax.Object) Value {
 				key, _ = c.interp(key, it.Key.Sp)
 			}
 			r.set(key, c.reduce(it.Value))
+			if r.keySp == nil {
+				r.keySp = map[string][2]syntax.Span{}
+			}
+			r.keySp[key] = [2]syntax.Span{c.span(it.Key.Sp), c.span(it.Sp)}
 		case *syntax.ExprStmt:
-			v := c.reduce(it.X.(*syntax.Spread).X)
-			switch v := v.(type) {
-			case *Record:
-				for i, k := range v.Keys {
-					r.set(k, v.Vals[i])
+			if v, ok := spreads[i].(*Record); ok {
+				for j, k := range v.Keys {
+					r.set(k, v.Vals[j])
 				}
-			case *None:
-			default:
-				c.errorf("mms/spread", it.Sp, "only an object can be spread into an object, not "+kindName(v))
 			}
 		}
 	}
@@ -503,7 +510,7 @@ func (c *ctx) binary(x *syntax.Binary) Value {
 			return v
 		}
 		if x.Op == "/" || x.Op == "%" {
-			c.errorf("mms/divide-by-zero", x.Sp, "division by zero")
+			c.errorf("mms/division-by-zero", x.Sp, "division by zero")
 			return &Num{p, 0, true}
 		}
 	}
@@ -593,6 +600,33 @@ func (c *ctx) member(x *syntax.Member) Value {
 		return &None{pos: p}
 	}
 	return &Code{p, &syntax.Member{X: c.lower(base), Name: &syntax.Name{Text: x.Name.Text, Sp: c.span(x.Name.Sp)}, Sp: c.span(x.Sp)}}
+}
+
+// selectorArgs evaluates a selector's arguments. A bare word stays as
+// written, as in `@e[tag=waves.spawn, type=!zombie]`, even where a const
+// has its name: a selector argument is the game's word. ${...} and
+// strings make words from values.
+func (c *ctx) selectorArgs(as []*syntax.Arg) []*syntax.Arg {
+	out := c.args(as)
+	for i, a := range as {
+		if selectorWord(a.Value) {
+			out[i].Value = c.clone(a.Value)
+		}
+	}
+	return out
+}
+
+// selectorWord reports whether e is a bare word, maybe dotted or negated.
+func selectorWord(e syntax.Expr) bool {
+	switch x := e.(type) {
+	case *syntax.Ident, *syntax.ResLoc:
+		return true
+	case *syntax.Member:
+		return selectorWord(x.X)
+	case *syntax.Unary:
+		return x.Op == "!" && selectorWord(x.X)
+	}
+	return false
 }
 
 func (c *ctx) args(as []*syntax.Arg) []*syntax.Arg {

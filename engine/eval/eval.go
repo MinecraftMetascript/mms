@@ -109,6 +109,10 @@ type FileOut struct {
 	// declarations are not in it.
 	Decls []*Decl
 	Diags []syntax.Diagnostic
+	// Missing are the Blueprint instances that leave out required fields,
+	// by the span their mms/missing-field error is at, for the quick fix
+	// that adds them.
+	Missing map[syntax.Span][]string
 	// Changed is false when Decls are exactly the file's own
 	// declarations, so a caller can keep using the parsed file.
 	Changed bool
@@ -398,10 +402,6 @@ func (e *evaluator) blueprint(path string, d *syntax.Decl) *Blueprint {
 // keeps for itself rather than output.
 func definitionKind(k string) bool { return k == "Template" || k == "Blueprint" || k == "Type" }
 
-// fnKinds are the declarations whose body is function code.
-var fnKinds = map[string]bool{"Function": true, "OnLoad": true, "OnTick": true, "OnFirstJoin": true,
-	"OnRespawn": true, "OnAdvancement": true, "Test": true}
-
 // expand writes one file's output declarations.
 func (e *evaluator) expand(u Unit, ns string) {
 	out := e.r.Files[u.Path]
@@ -481,8 +481,7 @@ func (e *evaluator) walkTouches(d *syntax.Decl) bool {
 		}
 	}
 	found := false
-	var visit func(n syntax.Node) bool
-	visit = func(n syntax.Node) bool {
+	visit := func(n syntax.Node) bool {
 		if found {
 			return false
 		}

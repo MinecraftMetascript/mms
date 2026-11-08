@@ -374,6 +374,8 @@ func (c *Checker) callableByName(name string, v tview) *Callable {
 		key := Snake(name)
 		if a, ok := callAliases[disp.Dispatcher][name]; ok {
 			key = a
+		} else if _, ok := Spelled(name); ok {
+			return nil
 		}
 		if c.hasDispatchKey(disp, key) {
 			cfs, _ := c.fields(v, key)
@@ -383,7 +385,7 @@ func (c *Checker) callableByName(name string, v tview) *Callable {
 	}
 	if v.Name != "" {
 		short := spec.ShortPath(v.Name)
-		if name == short || structAliases[name] == short {
+		if (name == short && !isAliased(short)) || structAliases[name] == short {
 			return &Callable{Name: name, Struct: v, Fields: withDocs(short, "", fs), Ov: overlays[short]}
 		}
 	}
@@ -433,7 +435,7 @@ func (c *Checker) callableNames(v tview) []string {
 				set[Pascal(fs[0].Key)] = true
 			}
 		}
-		for _, s := range sugarCallables[v.Name] {
+		for _, s := range shorthandCallables[v.Name] {
 			set[s] = true
 		}
 	}
@@ -453,6 +455,9 @@ func (c *Checker) callStruct(e syntax.Expr, v tview) jsonv.Value {
 		return nil
 	}
 	cl := c.callableByName(name.Name, v)
+	if cl == nil && c.respelled(name.Name, name.Sp) {
+		return nil
+	}
 	if cl == nil {
 		names := c.callableNames(v)
 		msg := "'" + name.Name + "' does not make a " + describe(v)
@@ -461,7 +466,7 @@ func (c *Checker) callStruct(e syntax.Expr, v tview) jsonv.Value {
 		} else if len(names) > 0 {
 			msg += "; expected one of " + strings.Join(limit(names, 10), ", ")
 		}
-		c.errorf("mms/unknown-callable", name.Sp, "%s", msg)
+		c.errorf("mms/unknown-helper", name.Sp, "%s", msg)
 		return nil
 	}
 	in := c.info(name)
@@ -539,7 +544,29 @@ func (c *Checker) callStruct(e syntax.Expr, v tview) jsonv.Value {
 			return secondaryKey(keys, k)
 		})
 		fs = withDocs(cl.Disp.Dispatcher+"/"+cl.Case, cl.Disp.Dispatcher, fs)
-		fs = withDocs(cl.Disp.Dispatcher+"/"+cl.Case, cl.Disp.Dispatcher, fs)
+		// Completion offers the fields these keys bring in, such as a
+		// multi-noise source's biomes when it has no preset. The last
+		// positional word may be a name still being typed, MultiNoise(b|),
+		// so the fields without the key it gives are offered too.
+		ci.Fields = fs
+		if n := len(pos); n > 0 && n <= len(free) && keys[free[n-1].Key] != "" {
+			if _, word := pos[n-1].(*syntax.Ident); word {
+				typing, _ := c.fieldsWith(cl.Struct, func(k string) string {
+					if k == cl.Disp.KeyField {
+						return cl.Case
+					}
+					if k == free[n-1].Key {
+						return noneKey
+					}
+					return secondaryKey(keys, k)
+				})
+				for _, f := range typing {
+					if !hasField(ci.Fields, f.Key) {
+						ci.Fields = append(ci.Fields, f)
+					}
+				}
+			}
+		}
 	}
 	return c.buildStruct(fs, disp, cl.Case, as, name.Sp, cl.Ov, v, fixSite{call: base})
 }

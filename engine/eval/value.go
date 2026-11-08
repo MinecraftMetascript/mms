@@ -119,6 +119,9 @@ type (
 		// Blueprint's self, whose fields are id, namespace and path, is
 		// its id.
 		id *Word
+		// keySp are where an object literal wrote each key and its field,
+		// so the editor finds the field at the cursor.
+		keySp map[string][2]syntax.Span
 	}
 	// RangeV is `lo..hi`, both ends included; either may be nil.
 	RangeV struct {

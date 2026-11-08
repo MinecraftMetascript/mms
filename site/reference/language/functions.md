@@ -82,7 +82,7 @@ Function report {
 }
 ```
 
-Parameters are `int`, `bool` or `string`, and a function returns `int` or `bool`. A function with a return type must return on every path.
+Parameters are `int`, `bool` or `string`, and a function returns `int` or `bool`. A `Type` that is one of these, such as `Type Count = int` or a union of strings like `Type Mode = "easy" | "hard"`, works in their place, and in `let` and `Global` too. A function with a return type must return on every path.
 
 ## Interpolation
 

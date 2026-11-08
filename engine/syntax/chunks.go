@@ -48,11 +48,28 @@ func Reparse(src string, prev []Chunk) (*File, []Chunk, map[*Decl]Moved) {
 			cf = Parse(text)
 			cf = shiftFile(cf, start, nil)
 		}
+		if n := len(chunks); n > 0 && len(cf.Diags) > 0 {
+			// The boundary may have cut one item in two (a line that
+			// only continues the one above). Chunks are an optimisation
+			// and must never be stricter than Parse, so read the pair
+			// together and keep that if it parses cleanly.
+			prevC := chunks[n-1]
+			joined := prevC.Text + text
+			if jf := Parse(joined); len(jf.Diags) == 0 {
+				for _, d := range prevC.File.Decls {
+					delete(moved, d)
+				}
+				chunks[n-1] = Chunk{Text: joined, Off: prevC.Off, File: shiftFile(jf, prevC.Off, nil)}
+				continue
+			}
+		}
 		chunks = append(chunks, Chunk{Text: text, Off: start, File: cf})
-		f.Items = append(f.Items, cf.Items...)
-		f.Decls = append(f.Decls, cf.Decls...)
-		f.Tokens = append(f.Tokens, cf.Tokens...)
-		f.Diags = append(f.Diags, cf.Diags...)
+	}
+	for _, c := range chunks {
+		f.Items = append(f.Items, c.File.Items...)
+		f.Decls = append(f.Decls, c.File.Decls...)
+		f.Tokens = append(f.Tokens, c.File.Tokens...)
+		f.Diags = append(f.Diags, c.File.Diags...)
 	}
 	return f, chunks, moved
 }
@@ -156,23 +173,33 @@ func splitChunks(src []rune) []int {
 	return bounds
 }
 
-// startsDecl reports whether the line at i starts `Ident name` (the same
-// test the parser uses to stop a missing value from swallowing the next
-// declaration).
+// startsDecl reports whether the line at i starts a top-level item: a
+// PascalCase kind followed by a name, or const, let, for or extern
+// followed by a word. It is the same rule as startsTopItem in recover.go,
+// read from the text: a line such as `else 2` continues the item above.
 func startsDecl(src []rune, i int) bool {
 	isStart := func(r rune) bool { return r == '_' || r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' }
 	isChar := func(r rune) bool { return isStart(r) || r >= '0' && r <= '9' }
 	if i >= len(src) || !isStart(src[i]) {
 		return false
 	}
+	start := i
 	for i < len(src) && isChar(src[i]) {
 		i++
 	}
+	first := string(src[start:i])
 	if i >= len(src) || (src[i] != ' ' && src[i] != '\t') {
 		return false
 	}
 	for i < len(src) && (src[i] == ' ' || src[i] == '\t') {
 		i++
 	}
-	return i < len(src) && (isChar(src[i]) || src[i] == '.' || src[i] == '-' || src[i] == '$')
+	if i >= len(src) {
+		return false
+	}
+	switch first {
+	case "const", "let", "for", "extern":
+		return isStart(src[i])
+	}
+	return first[0] >= 'A' && first[0] <= 'Z' && (isChar(src[i]) || src[i] == '.' || src[i] == '-' || src[i] == '$')
 }

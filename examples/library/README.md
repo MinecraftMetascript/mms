@@ -3,7 +3,7 @@
 Written books, made with `Book` declarations in `books.mms`, and the same text markup in chat and titles.
 
 - **`guide`** is given to each player the first time they join (`OnFirstJoin`), along with a title, a welcome in chat that names them with `${@s}`, and the rules from `text/rules.mmstext`. `/function library:guide` gives another copy, with a note above the hotbar. It shows the reader's own keys with `{key:...}`, links between its pages, a link that runs `/function library:chest`, and the reader's death count from a score.
-- **`diary_12`, `diary_13`, `diary_14`** are tattered diaries whose text is in `books/*.mmsbook` files. The `old_chest` loot table holds one of them, with some clutter.
+- **`diary_12`, `diary_13`, `diary_14`** are tattered diaries whose text is in `books/*.mmsbook` files. A top-level `for` declares all three, each reading its own file. The `old_chest` loot table holds one of them, with some clutter.
 
 Try it in a world:
 

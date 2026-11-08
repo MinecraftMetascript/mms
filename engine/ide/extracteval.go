@@ -6,10 +6,6 @@ import (
 	"github.com/minecraftmetascript/mms/engine/syntax"
 )
 
-// codeKinds are the declarations whose body is function code, where a
-// run of statements can become a Commands Template.
-var codeKinds = map[string]bool{"Function": true, "Test": true, "OnLoad": true, "OnTick": true, "OnFirstJoin": true, "OnRespawn": true, "OnAdvancement": true}
-
 // evalExtractions offers the language's own extractions for a selection,
 // read from the source as written: a value to a const, and statements of
 // a function to a Commands Template. Neither is offered for text that
@@ -45,7 +41,7 @@ func (s *Session) evalExtractions(path string, from, to int) []Extraction {
 			},
 		})
 	}
-	if d, ok := item.(*syntax.Decl); ok && d.Kind != nil && codeKinds[d.Kind.Name] {
+	if d, ok := item.(*syntax.Decl); ok && d.Kind != nil && syntax.IsCodeKind(d.Kind.Name) {
 		if stmts := selectedStmts(d, from, to); len(stmts) > 0 && !stmtsReadBound(src.Src, stmts, bound) {
 			name := s.newEvalName("commands")
 			sp := syntax.Span{Start: stmts[0].Span().Start, End: stmts[len(stmts)-1].Span().End}

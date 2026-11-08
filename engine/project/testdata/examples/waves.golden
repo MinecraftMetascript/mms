@@ -1,0 +1,118 @@
+=== data/minecraft/tags/function/load.json
+{
+  "values": [
+    "waves:mms_gen/load"
+  ]
+}
+=== data/minecraft/tags/function/tick.json
+{
+  "values": [
+    "waves:mms_gen/tick"
+  ]
+}
+=== data/waves/function/mark_spawn.mcfunction
+summon marker ~ ~ ~ {Tags:["waves.spawn"]}
+tellraw @s {text:"Spawn point marked",color:"gray"}
+=== data/waves/function/mms_gen/load.mcfunction
+scoreboard objectives add wave_of dummy
+scoreboard objectives add mms.waves dummy
+scoreboard players set #cf mms.waves 0
+execute unless data storage waves:mms arena.phase run data modify storage waves:mms arena.phase set value "idle"
+execute unless data storage waves:mms arena.wave run data modify storage waves:mms arena.wave set value 0
+execute unless data storage waves:mms arena.timer run data modify storage waves:mms arena.timer set value 0
+=== data/waves/function/mms_gen/ret.mcfunction
+scoreboard players set #cf mms.waves 0
+return run scoreboard players get #rv mms.waves
+=== data/waves/function/mms_gen/tick.mcfunction
+function waves:mms_gen/tick/8d0c4e0d
+=== data/waves/function/mms_gen/tick/8d0c4e0d.mcfunction
+function waves:tick
+=== data/waves/function/next_wave.mcfunction
+execute store result score #next_wave.-t0 mms.waves run data get storage waves:mms arena.wave
+scoreboard players add #next_wave.-t0 mms.waves 1
+execute store result storage waves:mms arena.wave int 1 run scoreboard players get #next_wave.-t0 mms.waves
+execute store result score #next_wave.-t1 mms.waves run data get storage waves:mms arena.wave
+execute if score #next_wave.-t1 mms.waves matches 5.. run function waves:next_wave/_if0
+execute if score #cf mms.waves matches 3 run return run function waves:mms_gen/ret
+data modify storage waves:mms arena.phase set value "resting"
+execute store result score #next_wave.-t2 mms.waves run data get storage waves:mms arena.wave
+execute if score #next_wave.-t2 mms.waves matches 1 run data modify storage waves:mms arena.timer set value 100
+execute store result score #next_wave.-t3 mms.waves run data get storage waves:mms arena.wave
+execute if score #next_wave.-t3 mms.waves matches 2 run data modify storage waves:mms arena.timer set value 100
+execute store result score #next_wave.-t4 mms.waves run data get storage waves:mms arena.wave
+execute if score #next_wave.-t4 mms.waves matches 3 run data modify storage waves:mms arena.timer set value 60
+execute store result score #next_wave.-t5 mms.waves run data get storage waves:mms arena.wave
+execute if score #next_wave.-t5 mms.waves matches 4 run data modify storage waves:mms arena.timer set value 200
+tellraw @a ["",{text:"Wave ",color:"yellow"},{nbt:"arena.wave",storage:"waves:mms",color:"yellow"},{text:" of 4 is coming",color:"yellow"}]
+title @a title ["",{text:"Wave ",color:"yellow"},{nbt:"arena.wave",storage:"waves:mms",color:"yellow"},{text:" of 4 is coming",color:"yellow"}]
+=== data/waves/function/next_wave/_if0.mcfunction
+data modify storage waves:mms arena.phase set value "won"
+tellraw @a {text:"The arena is yours!",color:"gold"}
+title @a title {text:"The arena is yours!",color:"gold"}
+scoreboard players set #cf mms.waves 3
+return 0
+=== data/waves/function/spawn.mcfunction
+execute store result score #spawn.-t0 mms.waves run data get storage waves:mms arena.wave
+execute if score #spawn.-t0 mms.waves matches 1 run function waves:spawn/_if0
+execute store result score #spawn.-t1 mms.waves run data get storage waves:mms arena.wave
+execute if score #spawn.-t1 mms.waves matches 2 run function waves:spawn/_if2
+execute store result score #spawn.-t2 mms.waves run data get storage waves:mms arena.wave
+execute if score #spawn.-t2 mms.waves matches 3 run function waves:spawn/_if4
+execute store result score #spawn.-t3 mms.waves run data get storage waves:mms arena.wave
+execute if score #spawn.-t3 mms.waves matches 4 run function waves:spawn/_if6
+execute store result score #spawn.-t4 mms.waves run data get storage waves:mms arena.wave
+scoreboard players operation @e[tag=waves.new] wave_of = #spawn.-t4 mms.waves
+tag @e[tag=waves.new] remove waves.new
+data modify storage waves:mms arena.phase set value "fighting"
+=== data/waves/function/spawn/_exec1.mcfunction
+summon zombie ~ ~ ~ {Tags:["waves.enemy","waves.new"]}
+summon zombie ~ ~ ~ {Tags:["waves.enemy","waves.new"]}
+=== data/waves/function/spawn/_exec3.mcfunction
+summon skeleton ~ ~ ~ {Tags:["waves.enemy","waves.new"]}
+summon skeleton ~ ~ ~ {Tags:["waves.enemy","waves.new"]}
+=== data/waves/function/spawn/_exec5.mcfunction
+summon zombie ~ ~ ~ {Tags:["waves.enemy","waves.new"]}
+summon zombie ~ ~ ~ {Tags:["waves.enemy","waves.new"]}
+summon zombie ~ ~ ~ {Tags:["waves.enemy","waves.new"]}
+summon zombie ~ ~ ~ {Tags:["waves.enemy","waves.new"]}
+=== data/waves/function/spawn/_if0.mcfunction
+execute as @e[tag=waves.spawn] at @s run function waves:spawn/_exec1
+=== data/waves/function/spawn/_if2.mcfunction
+execute as @e[tag=waves.spawn] at @s run function waves:spawn/_exec3
+=== data/waves/function/spawn/_if4.mcfunction
+execute as @e[tag=waves.spawn] at @s run function waves:spawn/_exec5
+=== data/waves/function/spawn/_if6.mcfunction
+execute as @e[tag=waves.spawn] at @s run summon witch ~ ~ ~ {Tags:["waves.enemy","waves.new"]}
+=== data/waves/function/start.mcfunction
+kill @e[tag=waves.enemy]
+data modify storage waves:mms arena.wave set value 0
+function waves:next_wave
+=== data/waves/function/tick.mcfunction
+data modify storage waves:mms l."tick".-s0 set from storage waves:mms arena.phase
+execute store success score #tick.-t1 mms.waves run data modify storage waves:mms l."tick".-s0 set value "resting"
+scoreboard players set #tick.-f0 mms.waves 0
+execute if score #tick.-t1 mms.waves matches 0 run scoreboard players set #tick.-f0 mms.waves 1
+execute if score #tick.-f0 mms.waves matches 1 run function waves:tick/_if1
+execute unless score #tick.-f0 mms.waves matches 1 run function waves:tick/_else2
+=== data/waves/function/tick/_else2.mcfunction
+data modify storage waves:mms l."tick".-s4 set from storage waves:mms arena.phase
+execute store success score #tick.-t5 mms.waves run data modify storage waves:mms l."tick".-s4 set value "fighting"
+execute if score #tick.-t5 mms.waves matches 0 run function waves:tick/_if3
+=== data/waves/function/tick/_if1.mcfunction
+execute store result score #tick.-t2 mms.waves run data get storage waves:mms arena.timer
+scoreboard players remove #tick.-t2 mms.waves 1
+execute store result storage waves:mms arena.timer int 1 run scoreboard players get #tick.-t2 mms.waves
+execute store result score #tick.-t3 mms.waves run data get storage waves:mms arena.timer
+execute if score #tick.-t3 mms.waves matches ..0 run function waves:spawn
+=== data/waves/function/tick/_if3.mcfunction
+execute store result score #tick.-t6 mms.waves if entity @e[tag=waves.enemy]
+scoreboard players operation #tick.alive mms.waves = #tick.-t6 mms.waves
+execute if score #tick.alive mms.waves matches 0 run function waves:next_wave
+=== pack.mcmeta
+{
+  "pack": {
+    "description": "An arena of waves: typed records and Storage, Templates that unroll at compile time, and tests",
+    "min_format": 121,
+    "max_format": 121
+  }
+}

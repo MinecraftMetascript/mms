@@ -113,3 +113,21 @@ func TestSiteSamples(t *testing.T) {
 		}
 	}
 }
+
+// TestSiteListsLanguageTypes checks that the values reference names every
+// type the language offers, so the page keeps up with types.Env.Names.
+func TestSiteListsLanguageTypes(t *testing.T) {
+	b, err := os.ReadFile("../../site/reference/language/values.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, _ := New(spec.MustDefault(), Config{Namespace: "demo"}).Analyze(context.Background())
+	for _, n := range r.TypeEnv.Names() {
+		switch n.Detail {
+		case "value type", "language type":
+			if !strings.Contains(string(b), "`"+n.Name+"`") {
+				t.Errorf("site/reference/language/values.md does not name the type %s", n.Name)
+			}
+		}
+	}
+}

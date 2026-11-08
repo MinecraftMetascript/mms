@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/minecraftmetascript/mms/engine/prelude"
 	"github.com/minecraftmetascript/mms/engine/project"
 	"github.com/minecraftmetascript/mms/engine/spec"
 	"github.com/minecraftmetascript/mms/engine/syntax"
@@ -70,7 +71,13 @@ func report(w io.Writer, r *project.Result, hints bool) int {
 			text := u.File.LineText(line)
 			width := max(1, min(d.Sp.End-d.Sp.Start, len([]rune(text))-col+1))
 			fmt.Fprintf(w, "    %s\n    %s%s\n", strings.ReplaceAll(text, "\t", " "), strings.Repeat(" ", col-1), strings.Repeat("^", width))
+			for _, rel := range d.Related {
+				fmt.Fprintf(w, "    note: %s, at %s\n", rel.Message, relatedAt(r, rel))
+			}
 		}
+	}
+	for _, msg := range r.ConfigWarnings() {
+		fmt.Fprintf(w, "%s: warning: %s\n", project.ConfigFile, msg)
 	}
 	// Files nothing uses have no line to point at.
 	if paths, sev := r.UnusedAssets(); sev != syntax.SeverityHint || hints {
@@ -259,6 +266,13 @@ func runBuild(args []string, stdout, stderr io.Writer) int {
 	resOut := filepath.Join(dir, p.Config.ResourceOutput())
 	if *out == "" {
 		*out = filepath.Join(dir, p.Config.Output)
+		// mms.json comes with the project, so its folders must stay inside
+		// it even through a symlink; -out is the user's own choice.
+		for _, o := range []string{*out, resOut} {
+			if err := insideProject(dir, o); err != nil {
+				return fail(err)
+			}
+		}
 	} else {
 		resOut = filepath.Clean(*out) + "-resources"
 	}
@@ -298,17 +312,25 @@ func runInit(args []string, stdout, stderr io.Writer) int {
 		abs, _ := filepath.Abs(dir)
 		*ns = sanitizeNS(filepath.Base(abs))
 	}
-	cfg := fmt.Sprintf("{\n  \"$schema\": %q,\n  \"namespace\": %q,\n  \"description\": \"A data pack built with MMS\",\n  \"output\": \"build\"\n}\n", project.SchemaURL, *ns)
-	src := fmt.Sprintf("Namespace %s\n\n/** A gentle hill shape. */\nDensityFunction hills = Noise(minecraft:ridge, 0.25, 0) * 0.5\n\nOnLoad {\n  /say %s loaded\n}\n", *ns, *ns)
-	if err := os.WriteFile(filepath.Join(dir, project.ConfigFile), []byte(cfg), 0o644); err != nil {
+	cfg := project.Config{Namespace: *ns, Description: "A data pack built with MMS", Output: "build"}
+	if err := cfg.Validate(); err != nil {
 		fmt.Fprintln(stderr, "mms:", err)
 		return 1
 	}
-	main := filepath.Join(dir, "main.mms")
-	if _, err := os.Stat(main); os.IsNotExist(err) {
-		os.WriteFile(main, []byte(src), 0o644)
+	src := fmt.Sprintf("Namespace %s\n\n/** A gentle hill shape. */\nDensityFunction hills = Noise(minecraft:ridge, 0.25, 0) * 0.5\n\nOnLoad {\n  /say %s loaded\n}\n", *ns, *ns)
+	if err := os.WriteFile(filepath.Join(dir, project.ConfigFile), cfg.File(), 0o644); err != nil {
+		fmt.Fprintln(stderr, "mms:", err)
+		return 1
 	}
-	fmt.Fprintf(stdout, "created %s and main.mms; run `mms build %s`\n", project.ConfigFile, dir)
+	made := project.ConfigFile + " and main.mms"
+	main := filepath.Join(dir, "main.mms")
+	if _, err := os.Stat(main); err == nil {
+		made = project.ConfigFile + " (kept the existing main.mms)"
+	} else if err := os.WriteFile(main, []byte(src), 0o644); err != nil {
+		fmt.Fprintln(stderr, "mms:", err)
+		return 1
+	}
+	fmt.Fprintf(stdout, "created %s; run `mms build %s`\n", made, dir)
 	return 0
 }
 
@@ -384,4 +406,51 @@ func (f *resetFlag) Set(v string) error {
 		return fmt.Errorf("no dimension ids in %q", v)
 	}
 	return nil
+}
+
+// insideProject says why out, an output folder from mms.json, resolves to
+// somewhere outside the project folder dir, if it does. A folder that does
+// not exist yet is checked through its nearest existing parent.
+func insideProject(dir, out string) error {
+	root, err := filepath.EvalSymlinks(dir)
+	if err != nil {
+		return err
+	}
+	p, rest := filepath.Clean(out), ""
+	for {
+		real, err := filepath.EvalSymlinks(p)
+		if err == nil {
+			p = filepath.Join(real, rest)
+			break
+		}
+		if !os.IsNotExist(err) {
+			return err
+		}
+		parent := filepath.Dir(p)
+		if parent == p {
+			break
+		}
+		rest = filepath.Join(filepath.Base(p), rest)
+		p = parent
+	}
+	if rel, err := filepath.Rel(root, p); err != nil || rel == "." || !filepath.IsLocal(rel) {
+		return fmt.Errorf("%s resolves to %s, outside the project; mms.json's output folders must stay inside it", out, p)
+	}
+	return nil
+}
+
+// relatedAt is path:line:col for a related location, in a project file
+// or the prelude.
+func relatedAt(r *project.Result, rel syntax.Related) string {
+	if u := r.Unit(rel.Path); u != nil {
+		line, col := u.File.LineCol(rel.Sp.Start)
+		return fmt.Sprintf("%s:%d:%d", rel.Path, line, col)
+	}
+	for _, f := range prelude.Files() {
+		if f.Path == rel.Path {
+			line, col := (&syntax.File{Src: []rune(f.Text)}).LineCol(rel.Sp.Start)
+			return fmt.Sprintf("%s:%d:%d", rel.Path, line, col)
+		}
+	}
+	return rel.Path
 }

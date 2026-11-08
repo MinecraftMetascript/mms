@@ -65,6 +65,40 @@ func SigOf(d *syntax.Decl) FuncSig {
 	return s
 }
 
+// valueType is the function value type a type name stands for: int, bool
+// or string itself, or a project Type that is one of them, such as
+// `Type Count = int` or a union of strings. Other names come back as
+// written, for the check to report.
+func (t *Table) valueType(name string) string {
+	switch name {
+	case tInt, tBool, tString:
+		return name
+	}
+	if t == nil {
+		return name
+	}
+	st := t.Types[typePrefix+name]
+	for i := 0; st != nil && st.Kind == "reference" && i < 8; i++ {
+		st = t.Types[st.Path]
+	}
+	if k := storageKind(st); k != "" {
+		return k
+	}
+	return name
+}
+
+// sigIn is d's signature with project Types resolved to value types.
+func sigIn(t *Table, d *syntax.Decl) FuncSig {
+	s := SigOf(d)
+	for i := range s.Params {
+		s.Params[i].Type = t.valueType(s.Params[i].Type)
+	}
+	if s.Ret != "" {
+		s.Ret = t.valueType(s.Ret)
+	}
+	return s
+}
+
 // SymSig is the signature part of a symbol that other declarations
 // depend on; it is "" for most kinds.
 func SymSig(s *Symbol) string {
@@ -90,11 +124,11 @@ func symSig(s *Symbol) string {
 		if s.Decl.Type == nil {
 			return tInt
 		}
-		return syntax.TypeText(s.Decl.Type)
+		return s.table.valueType(syntax.TypeText(s.Decl.Type))
 	}
 	// Callers also depend on what the function calls, which decides
 	// whether a call is recursive.
-	return SigOf(s.Decl).String() + " calls " + strings.Join(callees(s.Decl, s.NS), ",")
+	return sigIn(s.table, s.Decl).String() + " calls " + strings.Join(callees(s.Decl, s.NS), ",")
 }
 
 // callees lists the functions a body calls, by id, sorted: calls in
@@ -270,7 +304,7 @@ func (c *Checker) CompileFunction(d *syntax.Decl, id string, src []rune) *fn.Fun
 		return nil
 	}
 	ns, path, _ := strings.Cut(id, ":")
-	f := &fc{c: c, src: src, ns: ns, path: path, obj: fn.Objective(ns), sig: SigOf(d), names: map[string]int{}, selfID: id}
+	f := &fc{c: c, src: src, ns: ns, path: path, obj: fn.Objective(ns), sig: sigIn(c.Syms, d), names: map[string]int{}, selfID: id}
 	f.push()
 	if d.Params != nil {
 		for i, p := range d.Params.Params {
@@ -300,6 +334,9 @@ func (c *Checker) CompileFunction(d *syntax.Decl, id string, src []rune) *fn.Fun
 	if f.sig.Ret != "" && !f.valueType(f.sig.Ret, d.Type) {
 		f.sig.Ret = tInt
 	}
+	if f.sig.Ret == tString {
+		c.errorf("mms/unsupported", d.Type.Span(), "functions return int or bool; pass strings back through a Global")
+	}
 	body := &fn.Block{}
 	f.block(body, d.Body)
 	if f.sig.Ret != "" && !terminates(d.Body) {
@@ -317,7 +354,7 @@ func (f *fc) valueType(t string, at syntax.TypeExpr) bool {
 	if at != nil {
 		sp = at.Span()
 	}
-	f.c.errorf("mms/unknown-type", sp, "unknown type '%s'; function values are int, bool or string", t)
+	f.c.errorf("mms/unknown-type", sp, "unknown type '%s'; function values are int, bool or string, or a Type that is one of them", t)
 	return false
 }
 
@@ -369,7 +406,7 @@ func (f *fc) declare(n *syntax.Name, typ string) local {
 	}
 	holder := n.Text
 	if k := f.names[n.Text]; k > 0 {
-		holder = n.Text + "_" + strconv.Itoa(k)
+		holder = n.Text + fn.Gen + strconv.Itoa(k)
 	}
 	f.names[n.Text]++
 	what := "let"
@@ -389,7 +426,7 @@ func (f *fc) declare(n *syntax.Name, typ string) local {
 }
 
 func (f *fc) temp() fn.Score {
-	s := f.score(fn.Holder(f.path, "_t"+strconv.Itoa(f.temps)))
+	s := f.score(fn.GenHolder(f.path, "t"+strconv.Itoa(f.temps)))
 	f.temps++
 	f.frame = append(f.frame, s)
 	return s
@@ -415,7 +452,7 @@ func (f *fc) stmt(out *fn.Block, s syntax.Stmt) {
 		}
 		typ := ""
 		if s.Type != nil {
-			typ = syntax.TypeText(s.Type)
+			typ = f.c.Syms.valueType(syntax.TypeText(s.Type))
 			if !f.valueType(typ, s.Type) {
 				typ = tInt
 			}
@@ -614,7 +651,9 @@ func (f *fc) returnStmt(out *fn.Block, s *syntax.ReturnStmt) {
 		return
 	}
 	if v.typ == tString {
-		f.c.errorf("mms/unsupported", s.Value.Span(), "functions return int or bool; pass strings back through a Global")
+		if f.sig.Ret != tString { // a string return type is reported once, where it is written
+			f.c.errorf("mms/unsupported", s.Value.Span(), "functions return int or bool; pass strings back through a Global")
+		}
 		return
 	}
 	if v.typ != f.sig.Ret {
@@ -780,7 +819,7 @@ func (f *fc) objScore(ix *syntax.Index) *fn.Score {
 	in.Symbol = sym
 	in.ID = id
 	if len(ix.Args) != 1 || ix.Args[0].Name != nil {
-		f.c.errorf("mms/arity", ix.Sp, "an objective takes one score holder: %s[@s]", name)
+		f.c.errorf(argCountCode(len(ix.Args), 1), ix.Sp, "an objective takes one score holder: %s[@s]", name)
 		return nil
 	}
 	var holder string
@@ -791,8 +830,13 @@ func (f *fc) objScore(ix *syntax.Index) *fn.Score {
 		// The formatter writes selector arguments as [type=zombie, limit=1],
 		// so drop the spaces between arguments. The game reads the selector
 		// either way, but other parts of the command it lands in might not.
-		sp := h.Span()
-		holder = compactSelector(string(f.src[sp.Start:sp.End]))
+		// Written from the value, not the source: in a Template or a
+		// Blueprint's emit block the span is the call's.
+		holder = selectorText(h)
+		if holder == "" {
+			f.c.errorf("mms/type-mismatch", h.Span(), "expected a selector such as @s, or a name in quotes")
+			return nil
+		}
 	default:
 		f.c.errorf("mms/type-mismatch", h.Span(), "expected a selector such as @s, or a name in quotes")
 		return nil
@@ -1212,9 +1256,9 @@ func (f *fc) call(pre *[]fn.Op, e *syntax.Call, wantValue bool) *val {
 	in := c.info(e.Fn)
 	in.Symbol = sym
 	in.ID = id
-	sig := SigOf(sym.Decl)
+	sig := sigIn(c.Syms, sym.Decl)
 	if len(e.Args) != len(sig.Params) {
-		c.errorf("mms/arity", e.ArgsSp, "%s takes %d %s, but got %d", id, len(sig.Params), plural(len(sig.Params), "argument"), len(e.Args))
+		c.errorf(argCountCode(len(e.Args), len(sig.Params)), e.ArgsSp, "%s takes %d %s, but got %d", id, len(sig.Params), plural(len(sig.Params), "argument"), len(e.Args))
 		return nil
 	}
 	calleeNS, calleePath, _ := strings.Cut(id, ":")
@@ -1284,9 +1328,9 @@ func (c *Checker) Global(d *syntax.Decl) []string {
 	}
 	typ := tInt
 	if d.Type != nil {
-		typ = syntax.TypeText(d.Type)
+		typ = c.Syms.valueType(syntax.TypeText(d.Type))
 		if typ != tInt && typ != tBool && typ != tString {
-			c.errorf("mms/unknown-type", d.Type.Span(), "unknown type '%s'; globals are int, bool or string", typ)
+			c.errorf("mms/unknown-type", d.Type.Span(), "unknown type '%s'; globals are int, bool or string, or a Type that is one of them", typ)
 			return nil
 		}
 	}
@@ -1340,7 +1384,7 @@ func (f *fc) setString(dst string, v *val) fn.Op {
 }
 
 func (f *fc) tempPath() string {
-	p := fn.Storage(f.ns) + " " + fn.LocalPath(f.path, "_s"+strconv.Itoa(f.temps))
+	p := fn.Storage(f.ns) + " " + fn.LocalPath(f.path, fn.Gen+"s"+strconv.Itoa(f.temps))
 	f.temps++
 	f.strings = true
 	return p

@@ -39,18 +39,6 @@ func ind(ds ...doc) doc    { return indent{ds} }
 func txt(s string) doc     { return text(s) }
 func whenBroken(d doc) doc { return ifBreak{broken: d, flat: text("")} }
 
-// join puts sep between docs.
-func join(sep doc, ds []doc) doc {
-	out := make(concat, 0, 2*len(ds))
-	for i, d := range ds {
-		if i > 0 {
-			out = append(out, sep)
-		}
-		out = append(out, d)
-	}
-	return out
-}
-
 type mode int
 
 const (

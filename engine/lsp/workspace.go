@@ -25,9 +25,15 @@ type workspace struct {
 	extra []string
 	proj  *project.Project
 	res   *project.Result
+	// configErr is why mms.json could not be used, when it could not;
+	// the project then runs on the default config and the error is shown
+	// on mms.json.
+	configErr error
 }
 
-// contains reports whether the .mms file at path belongs to w on disk.
+// contains reports whether the .mms file at path belongs to w on disk:
+// for a project with mms.json, whether its `sources` take it, the same
+// files mms build reads.
 func (w *workspace) contains(path string) bool {
 	if !strings.HasSuffix(path, ".mms") && !sema.IsBookFile(path) {
 		return false
@@ -37,9 +43,10 @@ func (w *workspace) contains(path string) bool {
 			continue
 		}
 		rel, err := filepath.Rel(root, path)
-		if err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
-			return true
+		if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+			continue
 		}
+		return w.dir == "" || w.proj.Config.IsSource(filepath.ToSlash(rel))
 	}
 	return false
 }
@@ -120,7 +127,7 @@ func (s *Server) load(dir string) *workspace {
 		s.logf("%v", err)
 		cfg = project.DefaultConfig()
 	}
-	w := &workspace{dir: dir, root: dir, proj: project.New(s.pack, cfg)}
+	w := &workspace{dir: dir, root: dir, proj: project.New(s.pack, cfg), configErr: err}
 	// Asset helpers such as Texture("a.png") read project files.
 	w.proj.Files = os.DirFS(dir)
 	w.proj.Root = pathURI(dir) + "/"
@@ -184,7 +191,7 @@ func (s *Server) removeFile(uri string) *workspace {
 }
 
 // reload rebuilds every project from disk after an mms.json changed,
-// appeared or went away, keeping the text of open and managed files.
+// appeared or went away, keeping the text of open files.
 func (s *Server) reload(ctx context.Context) {
 	texts := map[string]string{}
 	keep := func(uri string) {
@@ -195,9 +202,14 @@ func (s *Server) reload(ctx context.Context) {
 	for uri := range s.open {
 		keep(uri)
 	}
-	for uri := range s.managed {
-		keep(uri)
+	// The projects are rebuilt, so clear what was published for the old
+	// ones; the next analysis publishes what still holds.
+	for _, uris := range s.assetDiags {
+		for uri := range uris {
+			s.notify("textDocument/publishDiagnostics", map[string]any{"uri": uri, "diagnostics": []any{}})
+		}
 	}
+	s.assetDiags = map[*workspace]map[string]bool{}
 	s.discover(s.projects[""].proj.Config)
 	for uri, t := range texts {
 		s.setFile(uri, t)

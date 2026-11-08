@@ -47,9 +47,6 @@ func (k Kind) Folder() string {
 	switch k.MMS {
 	case "Function":
 		return "function"
-	case "CustomItem":
-		// Its name stands for an item where item stacks are expected.
-		return "item"
 	case "OnAdvancement":
 		// It declares an advancement, so commands such as `advancement
 		// grant` find it, and an Advancement of the same name clashes.
@@ -63,15 +60,20 @@ func (k Kind) Folder() string {
 var kindAliases = map[string]string{
 	"SurfaceRule":      "worldgen/material_rule",
 	"SurfaceCondition": "worldgen/material_condition",
-	"NoiseSettings":    "worldgen/noise_settings",
 	// Resource-pack kinds named after their folder or the component that
 	// uses them, rather than mcdoc's block_definition / item_definition.
 	"BlockState": "block_definition",
 	"ItemModel":  "item_definition",
 }
 
-// renamed are resource kinds that only an alias names.
-var renamed = map[string]bool{"block_definition": true, "item_definition": true}
+// renamed are resource kinds that only an alias names, so each kind has
+// one spelling.
+var renamed = map[string]bool{
+	"block_definition":            true,
+	"item_definition":             true,
+	"worldgen/material_rule":      true,
+	"worldgen/material_condition": true,
+}
 
 // Kinds resolves declaration kinds against one spec pack.
 type Kinds struct {

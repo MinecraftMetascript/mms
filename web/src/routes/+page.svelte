@@ -12,7 +12,7 @@
 	import { Engine, itemKey, outputKey, type Diagnostic, type DocSymbol, type Expansion, type OutputFile } from '#lib/engine/engine.svelte.ts';
 	import { Project, pathOf, uriOf, starter, type ProjectData } from '#lib/project/project.svelte.ts';
 	import { examples } from '#lib/project/examples.ts';
-	import { download, hasResourcePack, isDataPack, packZip, projectZip, readProjectZip, readZip, readZipAssets } from '#lib/project/zip.ts';
+	import { download, hasResourcePack, isDataPack, packZip, projectZip, readProjectZip, readZip } from '#lib/project/zip.ts';
 	import PasteJson from '#lib/components/PasteJson.svelte';
 	import ProjectsDialog from '#lib/components/ProjectsDialog.svelte';
 	import AboutDialog from '#lib/components/AboutDialog.svelte';
@@ -247,7 +247,7 @@
 		if (!file) return;
 		try {
 			const bytes = new Uint8Array(await file.arrayBuffer());
-			const entries = readZip(bytes);
+			const { texts: entries, assets } = readZip(bytes);
 			if (isDataPack(entries)) {
 				if (!engine) return;
 				const res = await engine.importPack([...entries].map(([path, text]) => ({ path, text })));
@@ -263,7 +263,7 @@
 				});
 				return;
 			}
-			await openAsNew(readProjectZip(file.name, entries, readZipAssets(bytes)));
+			await openAsNew(readProjectZip(file.name, entries, assets));
 		} catch (err) {
 			alert(`Could not import ${file.name}: ${err instanceof Error ? err.message : err}`);
 		}
@@ -393,6 +393,14 @@
 				></span>
 				<span class="hidden sm:inline">{statusText}</span>
 			</span>
+			{#if engine?.configError}
+				<span class="rounded px-1.5 py-0.5 text-sm text-red-600" role="alert" title={engine.configError}>Settings not applied</span>
+			{:else if engine?.configWarnings.length}
+				<span class="rounded px-1.5 py-0.5 text-sm text-amber-600" role="status" title={engine.configWarnings.join('\n')}>Check settings</span>
+			{/if}
+			{#if project.saveError}
+				<span class="rounded px-1.5 py-0.5 text-sm text-red-600" role="alert" title={project.saveError}>Not saved</span>
+			{/if}
 			<a class="rounded px-1.5 py-1 hover:bg-hover sm:px-2" href={resolve('/docs')}>Docs</a>
 			<button class="hidden rounded p-1.5 hover:bg-hover sm:inline-block" onclick={() => about?.open()} aria-label="About and credits" title="About MMS, and credits: previews by Deepslate"
 				><svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 8h.01" /></svg></button

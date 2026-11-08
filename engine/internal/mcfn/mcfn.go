@@ -22,6 +22,7 @@ type VM struct {
 	Steps     int                       // commands run
 	MaxSteps  int
 	Entities  []*Entity // summoned entities, oldest first
+	summoned  int       // entities summoned so far, for their score holders
 	depth     int
 	self      *Entity    // the executor, nil for the server
 	pos       [3]float64 // the execution position
@@ -144,6 +145,48 @@ func (vm *VM) exec(line string) (result, error) {
 		}
 		vm.Said = append(vm.Said, t)
 		return result{value: 1, ok: true}, nil
+	case "give":
+		// give <targets> <item> [count]: there are no inventories, so the
+		// gift goes to Said, for `mms test -v`.
+		if len(w) < 3 || len(w) > 4 {
+			return result{}, fmt.Errorf("give needs a target, an item and maybe a count")
+		}
+		es, err := vm.selectEntities(w[1])
+		if err != nil {
+			return result{}, err
+		}
+		if len(es) == 0 {
+			return result{failed: true}, nil
+		}
+		n := int32(1)
+		if len(w) == 4 {
+			if n, err = atoi(w[3]); err != nil || n < 1 {
+				return result{}, fmt.Errorf("give needs a positive count, got %q", w[3])
+			}
+		}
+		vm.Said = append(vm.Said, fmt.Sprintf("gave %d %s", n, w[2]))
+		return result{value: int32(len(es)), ok: true}, nil
+	case "title":
+		// title <targets> title|subtitle|actionbar <text>, or times,
+		// clear and reset. The shown text goes to Said, as tellraw's.
+		if len(w) < 3 {
+			return result{}, fmt.Errorf("title needs a target and an action")
+		}
+		switch w[2] {
+		case "title", "subtitle", "actionbar":
+			if len(w) < 4 {
+				return result{}, fmt.Errorf("title %s needs a message", w[2])
+			}
+			t, err := vm.text(strings.Join(w[3:], " "))
+			if err != nil {
+				return result{}, err
+			}
+			vm.Said = append(vm.Said, t)
+		case "times", "clear", "reset":
+		default:
+			return result{}, fmt.Errorf("unknown title action %q", w[2])
+		}
+		return result{value: 1, ok: true}, nil
 	case "scoreboard":
 		return vm.scoreboard(w)
 	case "execute":
@@ -160,7 +203,9 @@ func (vm *VM) exec(line string) (result, error) {
 				return result{}, err
 			}
 			if !r.ok {
-				return result{}, fmt.Errorf("return run: the command produced no result or failed")
+				// The game returns fail when the command fails or gives
+				// no result, as a void function's early return does.
+				return result{returned: true}, nil
 			}
 			return result{value: r.value, ok: true, returned: true}, nil
 		}
@@ -258,10 +303,34 @@ func (vm *VM) scoreboard(w []string) (result, error) {
 	if len(w) < 4 || w[1] != "players" {
 		return result{}, fmt.Errorf("unsupported scoreboard command")
 	}
-	holder, obj := w[3], ""
+	obj := ""
 	if len(w) > 4 {
 		obj = w[4]
 	}
+	hs, err := vm.holders(w[3])
+	if err != nil {
+		return result{}, err
+	}
+	if len(hs) == 0 {
+		return result{failed: true}, nil // no entity was found
+	}
+	if w[2] == "get" && len(hs) > 1 {
+		return result{}, fmt.Errorf("scoreboard players get reads one score, but %s selects %d entities", w[3], len(hs))
+	}
+	// Each holder in turn; the game reports the last result.
+	var last result
+	for _, holder := range hs {
+		r, err := vm.scoreboardOne(w, holder, obj)
+		if err != nil || r.failed {
+			return r, err
+		}
+		last = r
+	}
+	return last, nil
+}
+
+// scoreboardOne runs a scoreboard players command for one holder.
+func (vm *VM) scoreboardOne(w []string, holder, obj string) (result, error) {
 	switch w[2] {
 	case "set", "add", "remove":
 		if len(w) != 6 {
@@ -293,7 +362,14 @@ func (vm *VM) scoreboard(w []string) (result, error) {
 			return result{}, fmt.Errorf("scoreboard players operation needs 5 arguments")
 		}
 		a, _ := vm.Score(holder, obj)
-		b, ok := vm.Score(w[6], w[7])
+		src, found, err := vm.holder(w[6])
+		if err != nil {
+			return result{}, err
+		}
+		if !found {
+			return result{failed: true}, nil
+		}
+		b, ok := vm.Score(src, w[7])
 		if !ok {
 			return result{}, fmt.Errorf("%s has no score on %s", w[6], w[7])
 		}
@@ -322,7 +398,7 @@ func (vm *VM) scoreboard(w []string) (result, error) {
 		case ">":
 			v = max(a, b)
 		case "><":
-			if err := vm.set(w[6], w[7], a); err != nil {
+			if err := vm.set(src, w[7], a); err != nil {
 				return result{}, err
 			}
 			v = b
@@ -372,14 +448,20 @@ func (vm *VM) stored(stores []store, r result) error {
 		if r.failed {
 			v = 0
 		}
-		var err error
 		if s.storage != nil {
-			err = vm.storeTo(s.storage, v)
-		} else {
-			err = vm.set(s.holder, s.obj, v)
+			if err := vm.storeTo(s.storage, v); err != nil {
+				return err
+			}
+			continue
 		}
+		hs, err := vm.holders(s.holder)
 		if err != nil {
 			return err
+		}
+		for _, h := range hs {
+			if err := vm.set(h, s.obj, v); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -489,7 +571,12 @@ func (vm *VM) condition(w []string) (bool, int, int, error) {
 		return len(es) > 0, 2, len(es), nil
 	}
 	if len(w) >= 4 && w[0] == "score" {
-		a, aok := vm.Score(w[1], w[2])
+		ha, found, err := vm.holder(w[1])
+		if err != nil {
+			return false, 0, 0, err
+		}
+		a, aok := vm.Score(ha, w[2])
+		aok = aok && found
 		if w[3] == "matches" {
 			lo, hi, err := parseRange(w[4])
 			if err != nil {
@@ -497,8 +584,15 @@ func (vm *VM) condition(w []string) (bool, int, int, error) {
 			}
 			return aok && a >= lo && a <= hi, 5, -1, nil
 		}
-		b, bok := vm.Score(w[4], w[5])
-		if !aok || !bok {
+		if len(w) < 6 {
+			return false, 0, 0, fmt.Errorf("score comparison needs another score")
+		}
+		hb, found, err := vm.holder(w[4])
+		if err != nil {
+			return false, 0, 0, err
+		}
+		b, bok := vm.Score(hb, w[5])
+		if !aok || !bok || !found {
 			return false, 6, -1, nil
 		}
 		var ok bool

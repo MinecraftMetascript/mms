@@ -169,7 +169,11 @@ DensityFunction floor = Gradient(
  * only a few blocks tall, and interpolation would smear them away.
  */
 DensityFunction caves = Min(
-  Interpolated(Min(cheese, starter_cavern) + Noise(wall_roughness, 1, 1) * 0.06, 4, 8),
+  Interpolated(
+    Min(cheese, starter_cavern) + Noise(wall_roughness, 1, 1) * 0.06,
+    4,
+    8,
+  ),
   tunnels,
 ) +
   roof +

@@ -407,31 +407,31 @@
   },
   "scripts": {
     "build": "npm run build:extension && npm run build:webview && npm run licenses",
-    "licenses": "node ../../scripts/third-party-licenses.mjs . out/third-party-licenses.txt vscode-languageclient deepslate svelte --notice ../../packages/preview/src/vendor/cmdlib/NOTICE.md",
+    "licenses": "node ../../scripts/third-party-licenses.mjs . out/third-party-licenses.txt vscode-languageclient deepslate svelte",
     "build:extension": "esbuild src/extension.ts --bundle --platform=node --format=cjs --external:vscode --outfile=out/extension.js --minify",
     "build:webview": "vite build --config webview/vite.config.ts && vite build --config webview/world.vite.config.ts && vite build --config webview/jigsaw.vite.config.ts",
     "check": "tsc --noEmit && svelte-check --tsconfig ./webview/tsconfig.json",
     "test": "esbuild test/suite.ts --bundle --platform=node --format=cjs --external:vscode --outfile=out-test/suite.js && node test/run.mjs",
-    "package": "npm run check && npm run build && node -e \"require('node:fs').rmSync('bin', { recursive: true, force: true })\" && vsce package --skip-license",
+    "package": "npm run check && npm run build && node -e \"require('node:fs').rmSync('bin', { recursive: true, force: true })\" && vsce package --skip-license --no-dependencies",
     "package:targets": "npm run check && npm run build && node scripts/package-targets.mjs"
   },
   "dependencies": {
     "vscode-languageclient": "9.0.1"
   },
   "devDependencies": {
-    "@mms/preview": "file:../../packages/preview",
-    "@sveltejs/vite-plugin-svelte": "7.3.1",
-    "@tailwindcss/vite": "4.3.3",
+    "@mms/preview": "*",
+    "@sveltejs/vite-plugin-svelte": "^7.2.0",
+    "@tailwindcss/vite": "^4.3.3",
     "@types/node": "20.19.43",
     "@types/vscode": "1.85.0",
     "@vscode/test-electron": "3.1.0",
     "@vscode/vsce": "3.2.1",
-    "deepslate": "0.27.2",
+    "deepslate": "^0.27.2",
     "esbuild": "0.27.7",
-    "svelte": "5.57.3",
-    "svelte-check": "4.7.7",
-    "tailwindcss": "4.3.3",
-    "typescript": "5.9.3",
-    "vite": "8.3.5"
+    "svelte": "^5.57.1",
+    "svelte-check": "^4.6.0",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^6.0.3",
+    "vite": "^8.3.0"
   }
 }

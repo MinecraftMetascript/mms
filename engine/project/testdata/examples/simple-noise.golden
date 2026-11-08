@@ -1,4 +1,19 @@
-=== data/test_files/worldgen/noise/my_noise.json
+=== data/simple_noise/worldgen/density_function/hills.json
+{
+  "type": "minecraft:add",
+  "left": {
+    "type": "minecraft:mul",
+    "left": {
+      "type": "minecraft:noise",
+      "noise": "simple_noise:rolling",
+      "xz_scale": 1,
+      "y_scale": 1
+    },
+    "right": 0.5
+  },
+  "right": 0.25
+}
+=== data/simple_noise/worldgen/noise/rolling.json
 {
   "base_octave": -1,
   "amplitude_modifiers": [
@@ -12,7 +27,7 @@
 === pack.mcmeta
 {
   "pack": {
-    "description": "Port of the old simple_noise example",
+    "description": "Noise: a noise and a density function that uses it, with previews",
     "min_format": 121,
     "max_format": 121
   }

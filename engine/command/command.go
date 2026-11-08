@@ -94,7 +94,7 @@ func (s *state) fail(start, end int, msg string) bool {
 // children of the node it redirects to. A literal with neither, such as
 // `execute run`, redirects to the root.
 func (s *state) targets(n *spec.CommandNode) *spec.CommandNode {
-	if n.Redirect != nil && len(n.Redirect) > 0 {
+	if len(n.Redirect) > 0 {
 		t := s.c.pack.Commands
 		for _, name := range n.Redirect {
 			if t = t.Children[name]; t == nil {

@@ -13,7 +13,7 @@ import (
 
 // tview is a type seen from a position: the type, the template bindings in
 // scope, and the path of the last reference followed to reach it (which
-// names it for messages, sugar rules and callables).
+// names it for messages, shorthand rules and callables).
 type tview struct {
 	T    *spec.Type
 	Env  *env

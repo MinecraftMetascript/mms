@@ -211,3 +211,23 @@ func sevName(s syntax.Severity) string {
 	}
 	return "info"
 }
+
+// TestSpreadReducedOnce checks that a Template call spread into an object
+// is evaluated and recorded once, however deep the spreads nest.
+func TestSpreadReducedOnce(t *testing.T) {
+	src := "Template base(): any = { a = 1 }\n" +
+		"const one = { ...base(), b = 2 }\n" +
+		"const two = { ...{ ...{ ...base() } }, c = 3 }\n" +
+		"Function f {\n  let x = one.a + two.a\n}\n"
+	f := syntax.Parse(src)
+	if len(f.Diags) > 0 {
+		t.Fatal(f.Diags)
+	}
+	r := Run([]Unit{{Path: "main.mms", File: f}}, Options{Namespace: "demo"})
+	if out := r.Files["main.mms"]; out != nil && len(out.Diags) > 0 {
+		t.Fatal(out.Diags)
+	}
+	if len(r.Calls) != 2 {
+		t.Errorf("recorded %d calls of base, want 2 (one per use)", len(r.Calls))
+	}
+}

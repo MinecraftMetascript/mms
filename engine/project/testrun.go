@@ -115,24 +115,25 @@ func (r *Result) RunTests(keep func(name string) bool) ([]TestResult, error) {
 
 // seen says what the two sides of a failed comparison were.
 func seen(vm *mcfn.VM, ns string, e sema.TestExpect) string {
-	val := func(side string) string {
-		v, err := vm.Get(fn.Storage(ns), sema.ExpectStorage+"."+side)
+	// A side's text and value: "x is 3", or "x has no score" when it
+	// reads a score that is not set.
+	side := func(text, key string) string {
+		v, err := vm.Get(fn.Storage(ns), sema.ExpectStorage+"."+key)
 		if err != nil {
-			return "?"
+			return text + " has no score"
 		}
-		return mcfn.SNBT(v)
+		return text + " is " + mcfn.SNBT(v)
 	}
-	l, r := val("left"), val("right")
 	lit := func(text string) bool { _, err := strconv.Atoi(text); return err == nil }
 	switch {
 	case lit(e.Right) && lit(e.Left):
 		return "it does not hold"
 	case lit(e.Right):
-		return e.Left + " is " + l
+		return side(e.Left, "left")
 	case lit(e.Left):
-		return e.Right + " is " + r
+		return side(e.Right, "right")
 	}
-	return e.Left + " is " + l + " and " + e.Right + " is " + r
+	return side(e.Left, "left") + " and " + side(e.Right, "right")
 }
 
 func runTag(vm *mcfn.VM, tags map[string][]string, tag string, seen map[string]bool) error {

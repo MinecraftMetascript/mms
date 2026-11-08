@@ -733,6 +733,24 @@ func (p *bookParser) expr(src *bookSrc, start, end int, click *jsonv.Object, hov
 		f.selfID, f.frame, f.strings = o.selfID, o.frame, o.strings
 		f.scopes = append(append([]map[string]local(nil), o.scopes...), map[string]local{})
 	}
+	// A Storage field is shown from the storage itself, so it needs no
+	// function to read it first: `${game.wave}`.
+	if m, ok := file.Decls[0].Value.(*syntax.Member); ok {
+		if l, ok := f.storageField(m); ok && l != nil && len(sub.Diags) == 0 {
+			loc, path := l.path, ""
+			if l.nbt != "" {
+				loc = l.nbt
+			}
+			loc, path, _ = strings.Cut(loc, " ")
+			if path != "" {
+				o := &jsonv.Object{}
+				o.Set("nbt", jsonv.String(path))
+				o.Set("storage", jsonv.String(loc))
+				p.addObj(src, start-2, o, 48, click, hover)
+				return
+			}
+		}
+	}
 	var pre []fn.Op
 	v := f.expr(&pre, file.Decls[0].Value)
 	if o := p.fn; o != nil {

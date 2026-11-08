@@ -94,22 +94,6 @@
     "result_state": "minecraft:orange_terracotta"
   }
 }
-=== data/badlands_demo/worldgen/material_rule/orange_terracotta.json
-{
-  "type": "minecraft:condition",
-  "if_true": {
-    "type": "minecraft:y_above",
-    "anchor": {
-      "absolute": 63
-    },
-    "surface_depth_multiplier": 0,
-    "add_stone_depth": false
-  },
-  "then_run": {
-    "type": "minecraft:block",
-    "result_state": "minecraft:orange_terracotta"
-  }
-}
 === data/badlands_demo/worldgen/material_rule/orange_terracotta_edge.json
 {
   "type": "minecraft:condition",
@@ -293,7 +277,7 @@
 === pack.mcmeta
 {
   "pack": {
-    "description": "Port of the old overworld badlands surface rules",
+    "description": "Surface rules: the vanilla badlands bands, terracotta and red sand",
     "min_format": 121,
     "max_format": 121
   }

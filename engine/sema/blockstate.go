@@ -27,9 +27,7 @@ func (c *Checker) blockState(d *syntax.Decl, body *syntax.Block) {
 	id := ns + ":" + path
 	var props map[string][]string
 	if ns == "minecraft" {
-		if bs := c.Pack.Blocks["minecraft:"+path]; bs != nil {
-			props = bs.Properties
-		} else if bs := c.Pack.Blocks[path]; bs != nil {
+		if bs := c.Pack.Blocks[path]; bs != nil {
 			props = bs.Properties
 		}
 	}

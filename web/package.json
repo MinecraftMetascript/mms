@@ -12,7 +12,7 @@
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"wasm": "./scripts/build-wasm.sh",
 		"test": "playwright test",
-		"licenses": "node ../scripts/third-party-licenses.mjs . static/third-party-licenses.txt @codemirror/autocomplete @codemirror/commands @codemirror/language @codemirror/lint @codemirror/lsp-client @codemirror/state @codemirror/view @lezer/highlight codemirror deepslate fflate flexsearch idb-keyval marked svelte @sveltejs/kit --notice ../engine/THIRD_PARTY_NOTICES.txt --notice ../packages/preview/src/vendor/cmdlib/NOTICE.md"
+		"licenses": "node ../scripts/third-party-licenses.mjs . static/third-party-licenses.txt @codemirror/autocomplete @codemirror/commands @codemirror/language @codemirror/lint @codemirror/lsp-client @codemirror/state @codemirror/view @lezer/highlight codemirror deepslate fflate flexsearch idb-keyval marked svelte @sveltejs/kit --notice ../engine/THIRD_PARTY_NOTICES.txt"
 	},
 	"devDependencies": {
 		"@playwright/test": "^1.63.0",
@@ -40,10 +40,10 @@
 		"@codemirror/state": "^6.7.6",
 		"@codemirror/view": "^6.43.15",
 		"@lezer/highlight": "^1.2.5",
-		"@mms/preview": "file:../packages/preview",
+		"@mms/preview": "*",
 		"codemirror": "^6.0.2",
 		"deepslate": "^0.27.2",
-		"fflate": "^0.8.2",
+		"fflate": "^0.8.3",
 		"flexsearch": "0.8.212",
 		"idb-keyval": "^6.3.0",
 		"marked": "15.0.12"

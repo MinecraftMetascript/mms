@@ -487,7 +487,7 @@ func (p *snbt) word() (string, error) {
 			case '\\':
 				j++
 				if j < len(p.s) {
-					sb.WriteByte(p.s[j])
+					j = unescape(&sb, p.s, j)
 				}
 			case q:
 				p.i = j + 1
@@ -510,3 +510,23 @@ func (p *snbt) word() (string, error) {
 
 // Get reads a storage value at a path, such as "game.wave".
 func (vm *VM) Get(id, path string) (any, error) { return vm.get(id, path) }
+
+// unescape writes the character an SNBT escape stands for, the one at
+// s[j] after a backslash, and returns the index of its last byte. The
+// game reads \n, \t, \r, \b, \f, \s and \xHH, \uHHHH, \UHHHHHHHH; any
+// other character stands for itself.
+func unescape(sb *strings.Builder, s string, j int) int {
+	simple := map[byte]rune{'n': '\n', 't': '\t', 'r': '\r', 'b': '\b', 'f': '\f', 's': ' '}
+	if r, ok := simple[s[j]]; ok {
+		sb.WriteRune(r)
+		return j
+	}
+	if n := map[byte]int{'x': 2, 'u': 4, 'U': 8}[s[j]]; n > 0 && j+n < len(s) {
+		if v, err := strconv.ParseUint(s[j+1:j+1+n], 16, 32); err == nil {
+			sb.WriteRune(rune(v))
+			return j + n
+		}
+	}
+	sb.WriteByte(s[j])
+	return j
+}

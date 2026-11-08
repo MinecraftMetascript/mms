@@ -36,7 +36,7 @@ DimensionType islands {
   has_skylight = true
   has_ceiling = false
   has_ender_dragon_fight = false
-  infiniburn = "#minecraft:infiniburn_overworld"
+  infiniburn = #infiniburn_overworld
   default_clock = overworld
   monster_spawn_block_light_limit = 0
   monster_spawn_light_level = 0
@@ -143,18 +143,11 @@ NoiseSettings islands {
 ```
 Dimension islands {
   type = islands
-  generator = {
-    type = noise
-    settings = islands
-    biome_source = {
-      type = fixed
-      biome = meadow
-    }
-  }
+  generator = Noise(settings = islands, biome_source = Fixed(biome = meadow))
 }
 ```
 
-The names on the right are resolved by the field they are in: `type` names a `DimensionType`, `settings` names a `NoiseSettings`, and `biome` names a `Biome`. They all become `sky:islands` and `sky:meadow` in the JSON. If you mistype one, the editor reports it at once.
+`Noise(...)` and `Fixed(...)` are shorthand for the generator and biome source objects, `{ type = noise, ... }` and `{ type = fixed, ... }`, and completion lists their fields. The names on the right are resolved by the field they are in: `type` names a `DimensionType`, `settings` names a `NoiseSettings`, and `biome` names a `Biome`. They all become `sky:islands` and `sky:meadow` in the JSON. If you mistype one, the editor reports it at once.
 
 ## 8. A way in
 

@@ -14,8 +14,6 @@ var (
 	bareIdent  = regexp.MustCompile(`^[a-z_][a-z0-9_]*$`)
 	barePath   = regexp.MustCompile(`^[a-z_][a-z0-9_]*(/[a-z0-9_./-]+)+$`)
 	bareResLoc = regexp.MustCompile(`^[a-z0-9_.-]+:[a-z0-9_./-]+$`)
-	reserved   = map[string]bool{"let": true, "if": true, "else": true, "while": true, "for": true, "in": true,
-		"return": true, "break": true, "continue": true, "true": true, "false": true}
 )
 
 // BareString returns how a string literal could be written without
@@ -30,7 +28,7 @@ func BareString(in *Info, syms *Table, ns string, s *syntax.String) (string, boo
 	switch in.Bare {
 	case BareKey, BareEnum:
 		v := strings.TrimPrefix(s.Value, "minecraft:")
-		return v, bareIdent.MatchString(v) && !reserved[v]
+		return v, bareIdent.MatchString(v) && !syntax.Reserved(v)
 	case BareID:
 	default:
 		return "", false
@@ -65,7 +63,7 @@ func ShortName(in *Info, syms *Table, ns, name string) (string, bool) {
 	}
 	switch in.Bare {
 	case BareKey, BareEnum:
-		return path, bareIdent.MatchString(path) && !reserved[path]
+		return path, bareIdent.MatchString(path) && !syntax.Reserved(path)
 	case BareID:
 		return path, in.Folder != "" && syms.Find(in.Folder, ns+":"+path) == nil
 	}
@@ -73,7 +71,7 @@ func ShortName(in *Info, syms *Table, ns, name string) (string, bool) {
 }
 
 func lexesBare(s string) bool {
-	return (bareIdent.MatchString(s) && !reserved[s]) || barePath.MatchString(s) || bareResLoc.MatchString(s)
+	return (bareIdent.MatchString(s) && !syntax.Reserved(s)) || barePath.MatchString(s) || bareResLoc.MatchString(s)
 }
 
 // Simplify returns the shorthand that means the same as an object
@@ -197,13 +195,6 @@ func NeedsParens(parent string, right bool, child string) bool {
 
 var precedence = map[string]int{"||": 1, "&&": 2, "+": 3, "-": 3, "*": 4, "/": 4}
 
-func btoi(b bool) int {
-	if b {
-		return 1
-	}
-	return 0
-}
-
 // AsCall returns a dispatched object literal written as its helper call,
 // `{ type = noise, noise = ridge }` as `Noise(noise = ridge)`, when the call
 // checks to the same value. in is the object's Info and body its body's.
@@ -213,7 +204,7 @@ func AsCall(in, body *Info, o *syntax.Object, src []rune) (string, bool) {
 	}
 	for _, name := range typeNames(in.Type) {
 		if name == tCriterion {
-			return "", false // calls there are trigger sugar (criterionCall)
+			return "", false // calls there are trigger shorthand (criterionCall)
 		}
 	}
 	d := body.Disp
@@ -221,7 +212,7 @@ func AsCall(in, body *Info, o *syntax.Object, src []rune) (string, bool) {
 	var args []string
 	for _, it := range o.Body.Items {
 		f, ok := it.(*syntax.FieldStmt)
-		if !ok || f.KeyQuoted || !bareIdent.MatchString(f.Key.Text) || reserved[f.Key.Text] {
+		if !ok || f.KeyQuoted || !bareIdent.MatchString(f.Key.Text) || syntax.ReservedKey(f.Key.Text) {
 			return "", false
 		}
 		if f.Key.Text == d.KeyField {

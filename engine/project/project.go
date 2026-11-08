@@ -185,6 +185,8 @@ type Result struct {
 	jigsaw   *jigsawModel                   // structure files' jigsaw blocks, for the jigsaw rules
 	files    fs.FS
 	lintMu   sync.Mutex
+	relOnce  sync.Once
+	written  map[eval.Origin]eval.Prov // see relate
 	lintDone bool
 	lints    map[string][]syntax.Diagnostic
 	symKey   uint64
@@ -232,6 +234,9 @@ type Decl struct {
 	Expects []sema.TestExpect
 	// Deps are the symbol lookups the check made (see sema.DepsHold).
 	Deps map[string]bool
+	// id is a Blueprint instance's id, which a top-level for gives each
+	// copy of one declaration.
+	id string
 
 	lints    []syntax.Diagnostic            // cached lint findings, valid for lintKey
 	extLints map[string][]syntax.Diagnostic // the same, in other files
@@ -242,6 +247,9 @@ type Decl struct {
 
 // ID returns "ns:path" for a named declaration.
 func (d *Decl) ID() string {
+	if d.id != "" {
+		return d.id
+	}
 	if d.D.Name == nil {
 		return ""
 	}
@@ -301,7 +309,9 @@ func (r *Result) Diagnostics(path string) []syntax.Diagnostic {
 		}
 		out = append(out, d.Extern[path]...)
 	}
+	out = r.configure(path, out)
 	out = append(out, r.Lints()[path]...)
+	r.relate(path, out)
 	sort.SliceStable(out, func(i, j int) bool { return out[i].Sp.Start < out[j].Sp.Start })
 	return out
 }
@@ -657,22 +667,6 @@ func (p *Project) checkDecl(u *sema.Unit, d *syntax.Decl, k sema.Kind, syms *sem
 			})
 		}
 	}
-	if it := dr.Item; it != nil && !hasErrors(dr.Diags) {
-		for _, f := range []struct {
-			res string
-			v   jsonv.Value
-		}{{"model", it.Model}, {"item_definition", it.ItemModel}} {
-			if f.v == nil {
-				continue
-			}
-			if errs := sema.Validate(p.Pack, p.Kinds, f.res, f.v); len(errs) > 0 {
-				dr.Diags = append(dr.Diags, syntax.Diagnostic{
-					Code: "mms/internal", Severity: syntax.SeverityError, Sp: d.Kind.Sp,
-					Message: "internal error: the generated " + f.res + " JSON does not match the schema (" + errs[0] + "). Please report this with the declaration's source.",
-				})
-			}
-		}
-	}
 	return dr
 }
 
@@ -695,7 +689,9 @@ func objective(c *sema.Checker, d *syntax.Decl) []string {
 		return nil
 	}
 	criterion := "dummy"
-	if d.Type != nil {
+	if ts, ok := d.Type.(*syntax.TypeString); ok {
+		criterion = ts.Value
+	} else if d.Type != nil {
 		criterion = syntax.TypeText(d.Type)
 	}
 	switch v := d.Value.(type) {

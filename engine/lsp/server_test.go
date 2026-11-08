@@ -72,6 +72,13 @@ func (c *client) result(method string, params any) any {
 	return m["result"]
 }
 
+// openFiles opens each {uri, text} in the server, as an editor does.
+func (c *client) openFiles(files ...map[string]any) {
+	for _, f := range files {
+		c.notify("textDocument/didOpen", map[string]any{"textDocument": map[string]any{"uri": f["uri"], "languageId": "mms", "version": 1, "text": f["text"]}})
+	}
+}
+
 func pos(uri string, line, char int) map[string]any {
 	return map[string]any{"textDocument": map[string]any{"uri": uri}, "position": map[string]any{"line": line, "character": char}}
 }
@@ -196,44 +203,13 @@ func TestPositions(t *testing.T) {
 	}
 }
 
-func TestManagedFiles(t *testing.T) {
-	c := start(t)
-	c.result("initialize", map[string]any{})
-	a, b := "mem:///a.mms", "mem:///b.mms"
-	c.notify("mms/setFiles", map[string]any{"files": []any{
-		map[string]any{"uri": a, "text": "DensityFunction a = 1\n"},
-		map[string]any{"uri": b, "text": "DensityFunction b = a + 1\n"},
-	}})
-	c.notify("textDocument/didOpen", map[string]any{"textDocument": map[string]any{"uri": a, "text": "DensityFunction a = 2\n"}})
-	c.notify("textDocument/didClose", map[string]any{"textDocument": map[string]any{"uri": a}})
-	out := c.result("mms/output", map[string]any{}).(map[string]any)
-	texts := map[string]string{}
-	for _, f := range out["files"].([]any) {
-		m := f.(map[string]any)
-		texts[m["path"].(string)] = m["text"].(string)
-	}
-	if !strings.Contains(texts["data/mms/worldgen/density_function/a.json"], "2") {
-		t.Errorf("closing a managed file lost its edits: %v", texts)
-	}
-	c.notify("mms/setFiles", map[string]any{"remove": []any{b}})
-	out = c.result("mms/output", map[string]any{}).(map[string]any)
-	for _, f := range out["files"].([]any) {
-		if strings.Contains(f.(map[string]any)["path"].(string), "/b.json") {
-			t.Error("removed file still built")
-		}
-	}
-	if c.result("mms/ping", nil) != "pong" {
-		t.Error("ping")
-	}
-}
-
 func TestSetAssets(t *testing.T) {
 	c := start(t)
 	c.result("initialize", map[string]any{})
 	a := "mem:///a.mms"
-	c.notify("mms/setFiles", map[string]any{"files": []any{
+	c.openFiles(
 		map[string]any{"uri": a, "text": "PaintingVariant p { width = 1, height = 1, asset_id = Texture(\"art/p.png\") }\n"},
-	}})
+	)
 	assets := func() []any {
 		out := c.result("mms/output", map[string]any{}).(map[string]any)
 		if out["hasErrors"] == true {
@@ -319,7 +295,10 @@ func TestCodeActions(t *testing.T) {
 	for _, a := range acts {
 		titles = append(titles, a.(map[string]any)["title"].(string))
 	}
-	if got := strings.Join(titles, "|"); got != "Write minecraft:diamond|Ignore use-shorthand on this line|Write item|Ignore quoted-name on this line|Fix all MMS problems" {
+	// No "Fix all" here: the lightbulb asks on every cursor move, and fix
+	// all analyses the project in rounds.
+	want := "Write minecraft:diamond|Ignore use-shorthand on this line|Write item|Ignore quoted-name on this line"
+	if got := strings.Join(titles, "|"); got != want {
 		t.Errorf("actions = %s", got)
 	}
 	all := c.result("textDocument/codeAction", map[string]any{"textDocument": map[string]any{"uri": uri}, "range": rng(0, 0),
@@ -330,6 +309,15 @@ func TestCodeActions(t *testing.T) {
 	edit := all[0].(map[string]any)["edit"].(map[string]any)["changes"].(map[string]any)[uri].([]any)[0].(map[string]any)
 	if want := "LootTable t { pools = [{ rolls = 1, entries = [diamond] }] }\n"; edit["newText"] != want {
 		t.Errorf("fix all text = %q", edit["newText"])
+	}
+	// Fixing all is only offered: the open file's problems are unchanged.
+	again := c.result("textDocument/codeAction", map[string]any{"textDocument": map[string]any{"uri": uri}, "range": rng(60, 60), "context": map[string]any{"diagnostics": []any{}}}).([]any)
+	titles = titles[:0]
+	for _, a := range again {
+		titles = append(titles, a.(map[string]any)["title"].(string))
+	}
+	if got := strings.Join(titles, "|"); got != want {
+		t.Errorf("actions after fix all = %s", got)
 	}
 }
 
@@ -531,7 +519,7 @@ func TestAssetPathCompletion(t *testing.T) {
 	c := start(t)
 	c.result("initialize", map[string]any{})
 	a := "mem:///a.mms"
-	c.notify("mms/setFiles", map[string]any{"files": []any{map[string]any{"uri": a, "text": text}}})
+	c.openFiles(map[string]any{"uri": a, "text": text})
 	c.notify("mms/setAssets", map[string]any{"files": []any{
 		map[string]any{"path": "art/p.png", "data": []byte("\x89PNG\r\n\x1a\n")},
 		map[string]any{"path": "music/m.ogg", "data": []byte("OggS")},
@@ -579,7 +567,7 @@ func TestKindCompletionRange(t *testing.T) {
 	c := start(t)
 	c.result("initialize", map[string]any{})
 	a := "mem:///a.mms"
-	c.notify("mms/setFiles", map[string]any{"files": []any{map[string]any{"uri": a, "text": "Feature f {}\nFe"}}})
+	c.openFiles(map[string]any{"uri": a, "text": "Feature f {}\nFe"})
 	res := c.result("textDocument/completion", pos(a, 1, 2)).(map[string]any)
 	for _, it := range res["items"].([]any) {
 		m := it.(map[string]any)
@@ -657,9 +645,9 @@ func TestOutputCustomItems(t *testing.T) {
 	c := start(t)
 	c.result("initialize", map[string]any{})
 	a := "mem:///a.mms"
-	c.notify("mms/setFiles", map[string]any{"files": []any{
+	c.openFiles(
 		map[string]any{"uri": a, "text": "\nCustomItem ruby {\n  base = stick\n  components = { max_stack_size = 1 }\n}\n"},
-	}})
+	)
 	out := c.result("mms/output", map[string]any{}).(map[string]any)
 	items := out["items"].([]any)
 	if len(items) != 1 {
@@ -729,9 +717,9 @@ func TestOutputStructureJigsaws(t *testing.T) {
 		t.Fatal(err)
 	}
 	c.notify("mms/setAssets", map[string]any{"files": []any{map[string]any{"path": "s/hall.nbt", "data": data}}})
-	c.notify("mms/setFiles", map[string]any{"files": []any{
+	c.openFiles(
 		map[string]any{"uri": "mem:///a.mms", "text": "TemplatePool rooms { fallback = minecraft:empty, elements = [{ weight = 1, element = { element_type = minecraft:single_pool_element, location = StructureFile(\"s/hall.nbt\"), projection = rigid, processors = minecraft:empty } }] }\n"},
-	}})
+	)
 	out := c.result("mms/output", map[string]any{}).(map[string]any)
 	assets := out["assets"].([]any)
 	if len(assets) != 1 {
@@ -792,9 +780,9 @@ func TestUnusedAssetDiagnostics(t *testing.T) {
 func TestOutputJigsawHoles(t *testing.T) {
 	c := start(t)
 	c.result("initialize", map[string]any{})
-	c.notify("mms/setFiles", map[string]any{"files": []any{
+	c.openFiles(
 		map[string]any{"uri": "mem:///a.mms", "text": "/** Where a road ends. */\nJigsawHole road_end\nJigsawHole arch\n"},
-	}})
+	)
 	out := c.result("mms/output", map[string]any{}).(map[string]any)
 	holes := out["jigsawHoles"].([]any)
 	if len(holes) != 2 {
@@ -848,9 +836,9 @@ func TestRunTests(t *testing.T) {
 	c := start(t)
 	c.result("initialize", map[string]any{})
 	a := "mem:///a.mms"
-	c.notify("mms/setFiles", map[string]any{"files": []any{
+	c.openFiles(
 		map[string]any{"uri": a, "text": "Global n: int = 0\nFunction bump {\n  n += 1\n}\nTest ok {\n  run bump()\n  expect n == 1\n}\nTest bad {\n  run bump()\n  expect n == 3\n}\n"},
-	}})
+	)
 	out := c.result("mms/runTests", map[string]any{"uri": a}).(map[string]any)
 	tests := out["tests"].([]any)
 	if len(tests) != 2 {
@@ -913,5 +901,140 @@ func TestPreludeDefinition(t *testing.T) {
 	line := int(loc["range"].(map[string]any)["start"].(map[string]any)["line"].(float64))
 	if lines := strings.Split(text, "\n"); line >= len(lines) || !strings.Contains(lines[line], "Blueprint CustomItem") {
 		t.Errorf("line %d of %s is not the Blueprint", line, target)
+	}
+}
+
+// TestWatchedFileOutsideSources checks that a .mms file that mms.json's
+// sources leave out stays out of the project when it changes on disk, as
+// it does for mms build.
+func TestWatchedFileOutsideSources(t *testing.T) {
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, "src"), 0o755)
+	os.MkdirAll(filepath.Join(dir, "scratch"), 0o755)
+	os.WriteFile(filepath.Join(dir, "mms.json"), []byte(`{"namespace": "demo", "sources": ["src/**/*.mms"]}`), 0o644)
+	os.WriteFile(filepath.Join(dir, "src", "main.mms"), []byte("DensityFunction kept = 1\n"), 0o644)
+	main := pathURI(filepath.Join(dir, "src", "main.mms"))
+	c := start(t)
+	c.result("initialize", map[string]any{"workspaceFolders": []any{map[string]any{"uri": pathURI(dir)}}})
+	c.notify("initialized", map[string]any{})
+	scratch := filepath.Join(dir, "scratch", "draft.mms")
+	os.WriteFile(scratch, []byte("DensityFunction draft = 2\n"), 0o644)
+	c.notify("workspace/didChangeWatchedFiles", map[string]any{"changes": []any{map[string]any{"uri": pathURI(scratch), "type": 1}}})
+	out := c.result("mms/output", map[string]any{"uri": main}).(map[string]any)
+	for _, f := range out["files"].([]any) {
+		if strings.Contains(f.(map[string]any)["path"].(string), "draft") {
+			t.Errorf("output has %v, from a file sources leave out", f.(map[string]any)["path"])
+		}
+	}
+}
+
+// TestEditorRequests covers the requests the editors use that the other
+// tests do not: mms/setConfig, signature help, prepare rename and inlay
+// hints.
+func TestEditorRequests(t *testing.T) {
+	c := start(t)
+	c.result("initialize", map[string]any{"rootUri": nil})
+	c.notify("initialized", map[string]any{})
+	src := "const k = 3\n" +
+		"DensityFunction x = Clamp(1, 0, 1)\n" +
+		"Function f(n: int) {\n  /say hi\n}\n" +
+		"Function g {\n  f(k)\n}\n"
+	c.notify("textDocument/didOpen", map[string]any{"textDocument": map[string]any{"uri": uri, "languageId": "mms", "version": 1, "text": src}})
+
+	// setConfig: the output moves to the new namespace; a bad one is refused.
+	c.result("mms/setConfig", map[string]any{"namespace": "demo"})
+	out := c.result("mms/output", map[string]any{}).(map[string]any)
+	found := false
+	for _, f := range out["files"].([]any) {
+		if f.(map[string]any)["path"] == "data/demo/worldgen/density_function/x.json" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("after setConfig, output files = %v", out["files"])
+	}
+	if m := c.call("mms/setConfig", map[string]any{"namespace": "Not Valid"}); m["error"] == nil {
+		t.Errorf("setConfig with a bad namespace: %v", m)
+	}
+	// A lint setting for a rule nothing has is taken, with a warning;
+	// the rest of mms.json, such as icon, comes along.
+	r, _ := c.result("mms/setConfig", map[string]any{"namespace": "demo", "icon": "pack.png", "lint": map[string]any{"unusd": "off"}}).(map[string]any)
+	if ws, _ := r["warnings"].([]any); len(ws) != 1 || !strings.Contains(ws[0].(string), `did you mean "unused"`) {
+		t.Errorf("setConfig warnings = %v", r)
+	}
+	c.result("mms/setConfig", map[string]any{"namespace": "demo"})
+
+	// Signature help inside Clamp(...) and inside f(...).
+	for _, at := range []map[string]any{pos(uri, 1, 29), pos(uri, 6, 4)} {
+		sh, _ := c.result("textDocument/signatureHelp", at).(map[string]any)
+		if sigs, _ := sh["signatures"].([]any); len(sigs) == 0 {
+			t.Errorf("signatureHelp at %v = %v", at["position"], sh)
+		}
+	}
+
+	// prepareRename gives the name's range on a declaration, and nothing
+	// on a keyword.
+	pr, _ := c.result("textDocument/prepareRename", pos(uri, 2, 10)).(map[string]any)
+	if pr == nil {
+		t.Error("prepareRename on a function name gave nothing")
+	} else if r, _ := pr["range"].(map[string]any); r == nil {
+		if _, ok := pr["start"]; !ok {
+			t.Errorf("prepareRename = %v", pr)
+		}
+	}
+	if pr := c.call("textDocument/prepareRename", pos(uri, 2, 2)); pr["result"] != nil {
+		t.Errorf("prepareRename on the kind = %v", pr["result"])
+	}
+
+	// Inlay hints over the whole file include the const's type.
+	hints, _ := c.result("textDocument/inlayHint", map[string]any{
+		"textDocument": map[string]any{"uri": uri},
+		"range":        map[string]any{"start": map[string]any{"line": 0, "character": 0}, "end": map[string]any{"line": 8, "character": 0}},
+	}).([]any)
+	var labels []string
+	for _, h := range hints {
+		switch l := h.(map[string]any)["label"].(type) {
+		case string:
+			labels = append(labels, l)
+		case []any:
+			for _, p := range l {
+				labels = append(labels, p.(map[string]any)["value"].(string))
+			}
+		}
+	}
+	if !strings.Contains(strings.Join(labels, " "), "int") {
+		t.Errorf("inlay hints = %q, want the const's type", labels)
+	}
+}
+
+// TestBrokenConfig checks that an mms.json the server cannot use is
+// reported on mms.json, not only logged.
+func TestBrokenConfig(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "mms.json"), []byte(`{"namepsace": "demo"}`), 0o644)
+	main := filepath.Join(dir, "main.mms")
+	os.WriteFile(main, []byte("DensityFunction x = 1\n"), 0o644)
+	c := start(t)
+	c.result("initialize", map[string]any{"rootUri": pathURI(dir)})
+	c.notify("textDocument/didOpen", map[string]any{"textDocument": map[string]any{"uri": pathURI(main), "languageId": "mms", "version": 1, "text": "DensityFunction x = 1\n"}})
+	c.result("mms/ping", nil)
+	cfgURI := pathURI(filepath.Join(dir, "mms.json"))
+	found := false
+	for _, n := range c.notes {
+		if n["method"] != "textDocument/publishDiagnostics" {
+			continue
+		}
+		p := n["params"].(map[string]any)
+		if p["uri"] != cfgURI {
+			continue
+		}
+		for _, d := range p["diagnostics"].([]any) {
+			if strings.Contains(d.(map[string]any)["message"].(string), "namepsace") {
+				found = true
+			}
+		}
+	}
+	if !found {
+		t.Errorf("no diagnostic on %s in %v", cfgURI, c.notes)
 	}
 }

@@ -1,5 +1,5 @@
 // Package importer turns data pack JSON into MMS source. The output uses
-// plain object literals, so it builds back to the same JSON; sugar is
+// plain object literals, so it builds back to the same JSON; shorthand is
 // applied where it is exact.
 package importer
 
@@ -10,12 +10,11 @@ import (
 
 	"github.com/minecraftmetascript/mms/engine/jsonv"
 	"github.com/minecraftmetascript/mms/engine/sema"
+	"github.com/minecraftmetascript/mms/engine/syntax"
 )
 
 var (
 	identRe  = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
-	keywords = map[string]bool{"let": true, "if": true, "else": true, "while": true, "for": true, "in": true,
-		"return": true, "break": true, "continue": true, "true": true, "false": true}
 	resLocRe = regexp.MustCompile(`^[a-z0-9_.-]+:[a-z0-9_./-]+$`)
 	pathRe   = regexp.MustCompile(`^[a-z_][a-z0-9_]*(/[a-z0-9_./-]+)*$`)
 )
@@ -72,7 +71,7 @@ func name(ns, id string) string {
 	if !ok {
 		n, path = "minecraft", id
 	}
-	if n == ns && pathRe.MatchString(path) && !keywords[path] {
+	if n == ns && pathRe.MatchString(path) && !syntax.Reserved(path) {
 		return path
 	}
 	return n + ":" + path
@@ -128,7 +127,7 @@ func expr(sb *strings.Builder, v jsonv.Value) {
 }
 
 func key(k string) string {
-	if identRe.MatchString(k) && !keywords[k] {
+	if identRe.MatchString(k) && !syntax.ReservedKey(k) {
 		return k
 	}
 	return strconv.Quote(k)

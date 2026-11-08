@@ -17,7 +17,10 @@ Function arena_maze {
   /setblock ~2 ~-1 ~3 minecraft:emerald_block
   /setblock ~2 ~-1 ~21 minecraft:gold_block
   /time set midnight
-  tell(@s, "Maze built. Place the banner on the gold block, then spawn enemies on the emerald block.")
+  tell(
+    @s,
+    "Maze built. Place the banner on the gold block, then spawn enemies on the emerald block.",
+  )
 }
 
 /** Walls the planted banner in with a 5 by 5 cobblestone box, to test the breakers. */

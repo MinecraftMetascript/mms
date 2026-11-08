@@ -39,3 +39,32 @@ func TestRecovery(t *testing.T) {
 		})
 	}
 }
+
+// TestMissingListComma checks that list elements need commas, that the
+// list still parses whole, and that the fix inserts each comma.
+func TestMissingListComma(t *testing.T) {
+	src := "const x = [a, b\n  c d]\n"
+	f := Parse(src)
+	var got []string
+	for _, d := range f.Diags {
+		if d.Code != "syntax/missing-comma" {
+			t.Errorf("unexpected %s: %s", d.Code, d.Message)
+			continue
+		}
+		got = append(got, d.Fixes[0].Edits[0].Text)
+	}
+	if len(got) != 2 {
+		t.Fatalf("got %d missing-comma errors, want 2: %v", len(got), f.Diags)
+	}
+	fixed := []rune(src)
+	for i := len(f.Diags) - 1; i >= 0; i-- {
+		e := f.Diags[i].Fixes[0].Edits[0]
+		fixed = append(fixed[:e.Sp.Start], append([]rune(e.Text), fixed[e.Sp.End:]...)...)
+	}
+	if string(fixed) != "const x = [a, b,\n  c, d]\n" {
+		t.Errorf("fixed = %q", string(fixed))
+	}
+	if d := Parse(string(fixed)).Diags; len(d) != 0 {
+		t.Errorf("fixed source still has %v", d)
+	}
+}

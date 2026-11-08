@@ -84,6 +84,8 @@ func TestCompletion(t *testing.T) {
 		{"execute nested", "OnTick {\n  As(@a) {\n    P|\n  }\n}", []string{"Positioned"}, false},
 		{"advancement trigger", "OnAdvancement a = Pla|", []string{"PlacedBlock"}, false},
 		{"advancement condition", "OnAdvancement a = PlacedBlock(|) {\n  /say hi\n}", []string{"location"}, false},
+		{"advancement body value", "Global held: int = 0\nOnAdvancement a = PlacedBlock() {\n  held = h|\n}", []string{"held"}, false},
+		{"advancement body condition", "Global held: int = 0\nOnAdvancement a = PlacedBlock() {\n  if (h| == 1) {\n    /say hi\n  }\n}", []string{"held"}, false},
 		{"hook kind", "OnFirst|", []string{"OnFirstJoin"}, false},
 		{"model parent", "Model block/x { parent = minecraft:block/cube_a| }", []string{"block/cube_all"}, false},
 	}

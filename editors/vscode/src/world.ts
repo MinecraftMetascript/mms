@@ -340,7 +340,9 @@ export class WorldView implements vscode.Disposable {
 	}
 
 	private redraw() {
-		if (!this.views.size) return;
+		// A hidden view is redrawn when it is shown again, so
+		// edits do not walk the world folders while nobody is looking.
+		if (![...this.views.values()].some((v) => v.visible)) return;
 		const state = this.state();
 		for (const v of this.views.values()) void v.webview.postMessage({ type: 'state', state } satisfies ToWorld);
 	}

@@ -46,3 +46,79 @@ func TestEntityUnsupported(t *testing.T) {
 		}
 	}
 }
+
+// Each entity keeps its own scores, which selectors read with scores=
+// and which go when it is killed.
+func TestEntityScores(t *testing.T) {
+	vm := New(map[string][]string{
+		"t:run": {
+			"scoreboard objectives add hp dummy",
+			"scoreboard objectives add o dummy",
+			"summon zombie 0 64 0 {Tags:[\"a\"]}",
+			"summon zombie 0 64 0 {Tags:[\"b\"]}",
+			"scoreboard players set @e[type=zombie] hp 10",
+			"execute as @e[tag=b] run scoreboard players remove @s hp 4",
+			"scoreboard players set #two o 2",
+			"execute as @e[tag=a] run scoreboard players operation @s hp *= #two o",
+			"execute store result score #hurt o if entity @e[scores={hp=..9}]",
+			"execute as @e[tag=a] store result score @s o run scoreboard players get @s hp",
+			"kill @e[scores={hp=..9}]",
+			"execute if score @e[tag=a,limit=1] hp matches 20 run return run scoreboard players get #hurt o",
+			"return 0",
+		},
+	})
+	got, ok, err := vm.Run("t:run")
+	if err != nil || !ok || got != 1 {
+		t.Fatalf("run = %d %v %v, want 1", got, ok, err)
+	}
+	if len(vm.Entities) != 1 {
+		t.Fatalf("%d entities left, want 1", len(vm.Entities))
+	}
+	if v, _ := vm.Score(vm.Entities[0].key, "o"); v != 20 {
+		t.Errorf("stored score = %d, want 20", v)
+	}
+	for _, m := range vm.Scores {
+		if _, ok := m["\x00entity2"]; ok {
+			t.Errorf("the killed zombie still has a score")
+		}
+	}
+	if err := vm.Exec("summon zombie"); err != nil {
+		t.Fatal(err)
+	}
+	if err := vm.Exec("scoreboard players get @e hp"); err == nil {
+		t.Error("reading one score of two entities did not fail")
+	}
+}
+
+func TestTitle(t *testing.T) {
+	vm := New(nil)
+	for _, line := range []string{
+		`title @a title {text:"Wave 1"}`,
+		`title @a subtitle "get ready"`,
+		`title @a actionbar {text:"go"}`,
+		`title @a times 10 70 20`,
+		`title @a clear`,
+	} {
+		if err := vm.Exec(line); err != nil {
+			t.Fatalf("%s: %v", line, err)
+		}
+	}
+	if got := strings.Join(vm.Said, "|"); got != "Wave 1|get ready|go" {
+		t.Errorf("said %q", got)
+	}
+}
+
+func TestGive(t *testing.T) {
+	vm := New(nil)
+	if err := vm.Exec("give @e bread 8"); err != nil {
+		t.Fatal(err)
+	}
+	for _, line := range []string{"summon armor_stand", "execute as @e run give @s bread 8", "execute as @e run give @s iron_pickaxe"} {
+		if err := vm.Exec(line); err != nil {
+			t.Fatalf("%s: %v", line, err)
+		}
+	}
+	if got := strings.Join(vm.Said, "|"); got != "gave 8 bread|gave 1 iron_pickaxe" {
+		t.Errorf("said %q", got)
+	}
+}

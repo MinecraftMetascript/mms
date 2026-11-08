@@ -87,12 +87,13 @@ func (s *Server) codeAction(ctx context.Context, p struct {
 			out = append(out, a)
 		}
 	}
-	if want("source.fixAll.mms") {
+	// Fix all analyses the project in rounds, so it is offered only when
+	// asked for by kind (on save, or the Source Action menu), never for
+	// the lightbulb request an editor sends on every cursor move.
+	if len(p.Context.Only) > 0 && want("source.fixAll.mms") {
 		// Fixes can expose more (an object inside one that became a call),
-		// so fix in rounds on the project, then put the text back.
-		orig := string(u.File.Src)
-		files, n, err := w.proj.FixAll(ctx, uri)
-		w.proj.SetFile(uri, orig)
+		// so fix in rounds, on a fork so the live project keeps its state.
+		files, n, err := w.proj.Fork().FixAll(ctx, uri)
 		if err != nil {
 			return nil, &respError{Code: codeRequestFailed, Message: err.Error()}
 		}

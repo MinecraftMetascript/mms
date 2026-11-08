@@ -31,8 +31,7 @@ const (
 	tAnchor          = "::java::data::worldgen::VerticalAnchor"
 	tFullBlock       = "::java::util::block_state::FullBlockState"
 
-	tLootCondition = "::java::data::loot::condition::LootCondition"
-	// tLootConditionRef is an alias of tLootCondition used by loot tables.
+	// tLootConditionRef is the loot condition type loot tables use.
 	tLootConditionRef = "::java::data::loot::LootCondition"
 	tPredicateRef     = "::java::data::predicate::PredicateRef"
 	tPredicate        = "::java::data::predicate::Predicate"
@@ -82,9 +81,51 @@ var structAliases = map[string]string{
 	"Pool": "LootPool",
 }
 
-// sugarCallables are helper names that sugar rules accept at a type, for
+func isAliased(short string) bool {
+	for _, s := range structAliases {
+		if s == short {
+			return true
+		}
+	}
+	return false
+}
+
+// Spelled maps a kind or helper name that an alias replaces to the one
+// spelling MMS accepts, such as CraftingShaped to Shaped, so the error
+// can say so and fix it.
+func Spelled(name string) (string, bool) {
+	for k, r := range kindAliases {
+		if renamed[r] && Pascal(lastSeg(r)) == name {
+			return k, true
+		}
+	}
+	for _, as := range callAliases {
+		for a, key := range as {
+			if Pascal(key) == name {
+				return a, true
+			}
+		}
+	}
+	for a, s := range structAliases {
+		if s == name {
+			return a, true
+		}
+	}
+	return "", false
+}
+
+// respell is the error for a name that has another spelling.
+func respell(code string, sp syntax.Span, name, want string) syntax.Diagnostic {
+	return syntax.Diagnostic{
+		Code: code, Severity: syntax.SeverityError, Sp: sp,
+		Message: "'" + name + "' is written " + want,
+		Fixes:   []syntax.Fix{{Title: "Write " + want, Edits: []syntax.TextEdit{{Sp: sp, Text: want}}, Safe: true}},
+	}
+}
+
+// shorthandCallables are helper names that shorthand rules accept at a type, for
 // completion.
-var sugarCallables = map[string][]string{
+var shorthandCallables = map[string][]string{
 	tMaterialRule: {"If"},
 }
 
@@ -125,50 +166,50 @@ var overlays = map[string]*overlay{
 	},
 }
 
-type sugarRule struct {
+type shorthandRule struct {
 	apply func(c *Checker, e syntax.Expr, v tview) jsonv.Value
 }
 
-func (c *Checker) sugar(e syntax.Expr, v tview) *sugarRule {
+func (c *Checker) shorthand(e syntax.Expr, v tview) *shorthandRule {
 	if v.T == bookTextType {
-		return &sugarRule{bookTextRule}
+		return &shorthandRule{bookTextRule}
 	}
 	if v.T != nil && v.T.Kind == "list" && callName(e) == "book_pages" {
-		return &sugarRule{bookPagesRule}
+		return &shorthandRule{bookPagesRule}
 	}
 	switch v.Name {
 	case tMaterialRule:
 		switch e.(type) {
 		case *syntax.Call, *syntax.Trailing:
 			if callName(e) == "If" {
-				return &sugarRule{ruleIf}
+				return &shorthandRule{ruleIf}
 			}
 		}
 	case tMaterialCond:
 		if x, ok := e.(*syntax.Binary); ok && (x.Op == "&&" || x.Op == "||") {
-			return &sugarRule{condLogic}
+			return &shorthandRule{condLogic}
 		}
 	case tFullBlock:
 		if _, ok := e.(*syntax.Index); ok {
-			return &sugarRule{blockWithState}
+			return &shorthandRule{blockWithState}
 		}
 	case tRGB, tRGBA, tStringRGB, tStringARGB:
 		if isColorHexString(e) {
-			return &sugarRule{colorHex}
+			return &shorthandRule{colorHex}
 		}
 	case tText:
 		switch x := e.(type) {
 		case *syntax.String:
-			return &sugarRule{textString}
+			return &shorthandRule{textString}
 		case *syntax.Call:
 			if callName(x) == "TextFile" {
-				return &sugarRule{textFile}
+				return &shorthandRule{textFile}
 			}
 		}
 	case tCriterion:
 		if x, ok := e.(*syntax.Call); ok {
 			if id, ok := x.Fn.(*syntax.Ident); ok && id.Name != "AdvancementCriterion" {
-				return &sugarRule{criterionCall}
+				return &shorthandRule{criterionCall}
 			}
 		}
 	}
@@ -206,8 +247,6 @@ func isNilExpr(e syntax.Expr) bool {
 	return false
 }
 
-func word(text string, sp syntax.Span) *syntax.Ident { return &syntax.Ident{Name: text, Sp: sp} }
-
 // criterionCall lowers `InventoryChanged(items = [...])` to a criterion
 // whose trigger is inventory_changed and whose conditions are the named
 // arguments.
@@ -217,7 +256,7 @@ func criterionCall(c *Checker, e syntax.Expr, v tview) jsonv.Value {
 	cond := &syntax.Block{Closed: true, Sp: call.ArgsSp}
 	for _, a := range call.Args {
 		if a.Name == nil {
-			c.errorf("mms/missing-field", a.Sp, "criterion conditions are named: %s(player = ...)", name.Name)
+			c.errorf("mms/positional-arg", a.Sp, "criterion conditions are named: %s(player = ...)", name.Name)
 			continue
 		}
 		cond.Items = append(cond.Items, &syntax.FieldStmt{Key: a.Name, Value: a.Value, Sp: a.Sp})

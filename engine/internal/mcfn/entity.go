@@ -14,6 +14,43 @@ type Entity struct {
 	Tags map[string]bool
 	Pos  [3]float64
 	NBT  map[string]any // the rest of the summon data, as given
+	// key is the entity's score holder in VM.Scores: a name no fake
+	// player can have.
+	key string
+}
+
+// holders resolves a score holder: a fake player such as #x or $x is
+// itself, and a selector is the holders of the entities it selects.
+func (vm *VM) holders(h string) ([]string, error) {
+	if !strings.HasPrefix(h, "@") {
+		return []string{h}, nil
+	}
+	es, err := vm.selectEntities(h)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]string, len(es))
+	for i, e := range es {
+		out[i] = e.key
+	}
+	return out, nil
+}
+
+// holder resolves a score holder that must be one: the source of an
+// operation, or the score of a condition. ok is false when it selects
+// no entity.
+func (vm *VM) holder(h string) (string, bool, error) {
+	hs, err := vm.holders(h)
+	if err != nil {
+		return "", false, err
+	}
+	switch len(hs) {
+	case 0:
+		return "", false, nil
+	case 1:
+		return hs[0], true, nil
+	}
+	return "", false, fmt.Errorf("%s selects %d entities, where one score is read", h, len(hs))
 }
 
 func fullID(s string) string {
@@ -28,7 +65,8 @@ func (vm *VM) summon(w []string) (result, error) {
 	if len(w) == 0 {
 		return result{}, fmt.Errorf("summon needs an entity type")
 	}
-	e := &Entity{Type: fullID(w[0]), Tags: map[string]bool{}, NBT: map[string]any{}}
+	vm.summoned++
+	e := &Entity{Type: fullID(w[0]), Tags: map[string]bool{}, NBT: map[string]any{}, key: "\x00entity" + strconv.Itoa(vm.summoned)}
 	rest := w[1:]
 	if len(rest) >= 3 {
 		pos, err := vm.position(rest[:3])
@@ -57,12 +95,12 @@ func (vm *VM) summon(w []string) (result, error) {
 			}
 			l, ok := v.([]any)
 			if !ok {
-				return result{}, fmt.Errorf("Tags must be a list of strings")
+				return result{}, fmt.Errorf("the Tags tag must be a list of strings")
 			}
 			for _, t := range l {
 				s, ok := t.(string)
 				if !ok {
-					return result{}, fmt.Errorf("Tags must be a list of strings")
+					return result{}, fmt.Errorf("the Tags tag must be a list of strings")
 				}
 				e.Tags[s] = true
 			}
@@ -116,6 +154,10 @@ func (vm *VM) kill(w []string) (result, error) {
 	for _, e := range vm.Entities {
 		if !dead[e] {
 			kept = append(kept, e)
+			continue
+		}
+		for _, m := range vm.Scores {
+			delete(m, e.key)
 		}
 	}
 	vm.Entities = kept
@@ -148,7 +190,7 @@ func (vm *VM) tag(w []string) (result, error) {
 	return result{value: int32(n), ok: true}, nil
 }
 
-// selectEntities resolves @e and @s with the type, tag and limit
+// selectEntities resolves @e and @s with the type, tag, scores and limit
 // arguments. Other selectors and arguments fail, so a test never passes
 // by ignoring a filter. @a selects nobody: the VM has no players.
 func (vm *VM) selectEntities(sel string) ([]*Entity, error) {
@@ -199,6 +241,25 @@ func (vm *VM) selectEntities(sel string) ([]*Entity, error) {
 				}
 				return e.Tags[name] != neg
 			})
+		case "scores":
+			if neg || !strings.HasPrefix(v, "{") || !strings.HasSuffix(v, "}") {
+				return nil, fmt.Errorf("scores takes {objective=range, ...}, got %q", v)
+			}
+			for _, sa := range splitArgs(v[1 : len(v)-1]) {
+				obj, rng, ok := strings.Cut(sa, "=")
+				if !ok {
+					return nil, fmt.Errorf("scores argument %q has no range", sa)
+				}
+				obj = strings.TrimSpace(obj)
+				lo, hi, err := parseRange(strings.TrimSpace(rng))
+				if err != nil {
+					return nil, err
+				}
+				tests = append(tests, func(e *Entity) bool {
+					v, ok := vm.Score(e.key, obj)
+					return ok && v >= lo && v <= hi
+				})
+			}
 		case "limit":
 			n, err := strconv.Atoi(v)
 			if err != nil || n < 1 || neg {

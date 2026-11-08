@@ -4,6 +4,7 @@
 *.out
 
 # Web
+/node_modules/
 /web/node_modules/
 /web/dist/
 /web/.svelte-kit/
@@ -13,6 +14,9 @@
 
 # Spec generation cache
 /engine/specgen/.cache/
+
+# The ANTLR jar gen.sh downloads
+/engine/syntax/.cache/
 
 # Editors and OS
 .DS_Store

@@ -13,7 +13,7 @@ DimensionType islands {
   has_skylight = true
   has_ceiling = false
   has_ender_dragon_fight = false
-  infiniburn = "#minecraft:infiniburn_overworld"
+  infiniburn = #infiniburn_overworld
   default_clock = overworld
   monster_spawn_block_light_limit = 0
   monster_spawn_light_level = 0
@@ -37,12 +37,5 @@ Biome meadow {
 // 5. The dimension: ties the type, the biomes and the terrain together.
 Dimension islands {
   type = islands
-  generator = {
-    type = noise
-    settings = islands
-    biome_source = {
-      type = fixed
-      biome = meadow
-    }
-  }
+  generator = Noise(settings = islands, biome_source = Fixed(biome = meadow))
 }

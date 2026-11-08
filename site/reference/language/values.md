@@ -12,7 +12,7 @@ Values look like the JSON they become, with less punctuation. Every value is che
 | `diamond`, `minecraft:stone`, `chests/gems` | an id, or an enum word such as `rigid` |
 | `#gems`, `#minecraft:logs` | a tag |
 | `1..3`, `5..`, `..10` | a range: a number provider, or bounds |
-| `[a, b, c]` | a list. Commas between items are optional. |
+| `[a, b, c]` | a list. Items are separated by commas, and a comma after the last one is allowed. |
 | `{ key = value }` | an object. Fields are separated by newlines or commas. |
 | `none` | no value: a field set to `none` is left out |
 
@@ -73,7 +73,15 @@ The `use-shorthand` lint hint points at an object that has a shorter form, with 
 
 ## Types
 
-Types come from three places: the game's own schema (`ItemStack`, `LootPool`, `HeightProvider`), the language (`int`, `float`, `bool`, `string`, `Text`, `Function`, `Commands`) and `Type` declarations.
+Types come from three places: the game's own schema (`ItemStack`, `LootPool`, `HeightProvider`), the language, and `Type` declarations. The language's types are:
+
+- Numbers and words: `int`, `float`, `double`, `long`, `short`, `byte`, `bool`, `string`, and `any` for a value of any type.
+- `Text`: a text component, written as [text markup](text.md).
+- `BookText`: a book's text, a list of markup lines or `TextFile("books/guide.mmsbook")`, where `---` starts a page.
+- `Commands`: the statements a Template writes where it is called.
+- `Function`: a function, by its name.
+- `Selector`: a target selector such as `@e[tag=boss]`.
+- `Texture`, `Sound` and `StructureFile`: an asset file in the project, read by the helper of the same name.
 
 | Write | Means |
 | --- | --- |

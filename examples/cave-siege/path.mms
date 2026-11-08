@@ -18,7 +18,7 @@ DimensionType scratch {
   has_skylight = false
   has_ceiling = false
   has_ender_dragon_fight = false
-  infiniburn = "#minecraft:infiniburn_overworld"
+  infiniburn = #infiniburn_overworld
   default_clock = overworld
   monster_spawn_block_light_limit = 0
   monster_spawn_light_level = 0
@@ -26,28 +26,27 @@ DimensionType scratch {
 
 Dimension scratch {
   type = scratch
-  generator = {
-    type = flat
+  generator = Flat(
     settings = {
-      biome = "minecraft:the_void"
+      biome = the_void
       layers = []
       features = false
       lakes = false
-    }
-  }
+    },
+  )
 }
 
 /** Blocks an enemy must not stand in or on. */
 BlockTag hazard = [
-  minecraft:lava,
-  minecraft:water,
-  minecraft:bubble_column,
-  minecraft:fire,
-  minecraft:soul_fire,
-  minecraft:magma_block,
-  minecraft:powder_snow,
-  minecraft:cactus,
-  minecraft:sweet_berry_bush,
+  lava,
+  water,
+  bubble_column,
+  fire,
+  soul_fire,
+  magma_block,
+  powder_snow,
+  cactus,
+  sweet_berry_bush,
 ]
 
 /** 0 when idle; 1 to 5 while clearing the old field, one slab a tick; 6 while flooding. */

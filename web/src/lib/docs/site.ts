@@ -70,15 +70,6 @@ export function groupPages(g: Group): Page[] {
 /** Every hand-written page in reading order: Docs, then Reference. */
 export const readingOrder = (): Page[] => [...docGroups, ...referenceGroups].flatMap(groupPages);
 
-/** The guides' old URLs, before they were grouped, and where they went. */
-export const moved: Record<string, string> = {
-	'getting-started': 'start/getting-started',
-	'tutorial-dimension': 'start/tutorial-dimension',
-	resources: 'guides/resources',
-	functions: 'guides/functions',
-	lint: 'guides/lint'
-};
-
 /** The first paragraph of a page, without Markdown. */
 function summaryOf(md: string): string {
 	const para = md

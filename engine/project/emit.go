@@ -304,19 +304,47 @@ func splitID(id string) (string, string) {
 	return "minecraft", id
 }
 
+// localPath turns a pack file's slash path into an OS path that stays
+// inside the pack folder, or says why it can't. Names are checked when
+// they are declared; this is the last guard before anything touches disk.
+func localPath(p string) (string, error) {
+	// A backslash is a separator on Windows and when a zip is unpacked
+	// there, and pack paths never need one.
+	rel, err := filepath.Localize(p)
+	if err != nil || !filepath.IsLocal(rel) || strings.Contains(p, `\`) {
+		return "", fmt.Errorf("refusing to write %q: it is not a path inside the pack", p)
+	}
+	return rel, nil
+}
+
 // WriteDir writes one pack's files under dir, removing what a previous
 // build left there first (data/, assets/ and pack.png) so deleted
 // declarations and unused assets do not linger.
 func WriteDir(dir string, files []OutFile) error {
+	rels := make([]string, len(files))
+	for i, f := range files {
+		rel, err := localPath(f.Path)
+		if err != nil {
+			return err
+		}
+		rels[i] = rel
+	}
 	for _, old := range []string{"data", "assets", "pack.png"} {
 		if err := os.RemoveAll(filepath.Join(dir, old)); err != nil {
 			return err
 		}
 	}
-	for _, f := range files {
-		p := filepath.Join(dir, filepath.FromSlash(f.Path))
+	for i, f := range files {
+		p := filepath.Join(dir, rels[i])
 		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
 			return err
+		}
+		// A file kept from the last build, such as pack.mcmeta, may be a
+		// symlink. Replace it rather than write through it out of dir.
+		if fi, err := os.Lstat(p); err == nil && fi.Mode()&os.ModeSymlink != 0 {
+			if err := os.Remove(p); err != nil {
+				return err
+			}
 		}
 		if err := os.WriteFile(p, f.Data, 0o644); err != nil {
 			return err
@@ -331,6 +359,9 @@ func Zip(files []OutFile) ([]byte, error) {
 	var buf bytes.Buffer
 	zw := zip.NewWriter(&buf)
 	for _, f := range files {
+		if _, err := localPath(f.Path); err != nil {
+			return nil, err
+		}
 		w, err := zw.CreateHeader(&zip.FileHeader{Name: f.Path, Method: zip.Deflate})
 		if err != nil {
 			return nil, err

@@ -1,0 +1,84 @@
+=== data/minecraft/tags/function/load.json
+{
+  "values": [
+    "shop:mms_gen/load"
+  ]
+}
+=== data/shop/advancement/mms_gen/first_join.json
+{
+  "criteria": {
+    "join": {
+      "trigger": "minecraft:tick"
+    }
+  },
+  "rewards": {
+    "function": "shop:mms_gen/first_join"
+  }
+}
+=== data/shop/function/bread.mcfunction
+execute if score @s coins matches ..4 run function shop:bread/_if0
+execute if score #cf mms.shop matches 3 run return run function shop:mms_gen/ret
+scoreboard players remove @s coins 5
+scoreboard players add @s bought_bread 1
+function shop:give_bread
+tellraw @s {text:"Thanks!",color:"green"}
+=== data/shop/function/bread/_if0.mcfunction
+tellraw @s {text:"That costs 5 coins",color:"red"}
+scoreboard players set #cf mms.shop 3
+return 0
+=== data/shop/function/give_bread.mcfunction
+give @s bread 8
+=== data/shop/function/give_pick.mcfunction
+give @s iron_pickaxe
+=== data/shop/function/give_potion.mcfunction
+give @s potion[potion_contents={potion:"minecraft:healing"}]
+=== data/shop/function/mms_gen/first_join.mcfunction
+function shop:mms_gen/first_join/058fd553
+=== data/shop/function/mms_gen/first_join/058fd553.mcfunction
+scoreboard players set @s coins 50
+=== data/shop/function/mms_gen/load.mcfunction
+scoreboard objectives add coins dummy
+scoreboard objectives add bought_bread dummy
+scoreboard objectives add bought_pickaxe dummy
+scoreboard objectives add bought_potion dummy
+scoreboard objectives add mms.shop dummy
+scoreboard players set #cf mms.shop 0
+=== data/shop/function/mms_gen/ret.mcfunction
+scoreboard players set #cf mms.shop 0
+return run scoreboard players get #rv mms.shop
+=== data/shop/function/pickaxe.mcfunction
+execute if score @s bought_pickaxe matches 1.. run function shop:pickaxe/_if0
+execute if score #cf mms.shop matches 3 run return run function shop:mms_gen/ret
+execute if score @s coins matches ..39 run function shop:pickaxe/_if1
+execute if score #cf mms.shop matches 3 run return run function shop:mms_gen/ret
+scoreboard players remove @s coins 40
+scoreboard players add @s bought_pickaxe 1
+function shop:give_pick
+tellraw @s {text:"Mind the lava",color:"green"}
+=== data/shop/function/pickaxe/_if0.mcfunction
+tellraw @s {text:"You can't buy any more of these",color:"red"}
+scoreboard players set #cf mms.shop 3
+return 0
+=== data/shop/function/pickaxe/_if1.mcfunction
+tellraw @s {text:"That costs 40 coins",color:"red"}
+scoreboard players set #cf mms.shop 3
+return 0
+=== data/shop/function/potion.mcfunction
+execute if score @s coins matches ..14 run function shop:potion/_if0
+execute if score #cf mms.shop matches 3 run return run function shop:mms_gen/ret
+scoreboard players remove @s coins 15
+scoreboard players add @s bought_potion 1
+function shop:give_potion
+tellraw @s {text:"Thanks!",color:"green"}
+=== data/shop/function/potion/_if0.mcfunction
+tellraw @s {text:"That costs 15 coins",color:"red"}
+scoreboard players set #cf mms.shop 3
+return 0
+=== pack.mcmeta
+{
+  "pack": {
+    "description": "A coin shop written as a Blueprint: its own kind of declaration, with checks, defaults and tests",
+    "min_format": 121,
+    "max_format": 121
+  }
+}

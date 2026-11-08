@@ -224,7 +224,7 @@ A function with a return type must end with `return` on every path.
 
 A call looks like `add(1, 2)`, or `other_ns:add(1, 2)` for a function in another namespace. Arguments are passed by position. A call can stand on its own, or be used as a value when the function has a return type.
 
-Parameters are `int`, `bool` or `string`. Functions return `int` or `bool`. To hand a string back, assign it to a Global.
+Parameters are `int`, `bool` or `string`. Functions return `int` or `bool`. A `Type` that names one of these, such as `Type Count = int`, can be used instead. To hand a string back, assign it to a Global.
 
 ## Command templates
 
@@ -447,6 +447,6 @@ Each test runs in a fresh world after the pack's load functions. `setup` holds f
 
 `mms test` runs every test and exits with 1 when one fails. `-run <regexp>` runs the tests whose names match, and `-v` lists the passing tests too and prints what each test's commands said. The web editor shows a Tests tab once the project has a test, and runs the tests after every edit. VS Code lists them in its Testing view. All three run the same interpreter, so they give the same results.
 
-Tests compile to functions under `<namespace>:mms_test/` that the pack never includes. The interpreter runs the commands that functions compile to (scoreboard, storage, `execute`, `function`, `return`, `say` and `tellraw`) and keeps entities that `summon` creates, with their type, tags and position, for `kill`, `tag`, `execute as`, `execute at` and `if entity`. Selectors are `@e` and `@s`, with `type`, `tag`, `limit` and `sort=arbitrary`. There are no players, blocks or ticks, so `@a` selects no one. A command or selector argument the interpreter does not know fails the test and names it, so a test never passes by skipping a command.
+Tests compile to functions under `<namespace>:mms_test/` that the pack never includes. The interpreter runs the commands that functions compile to (scoreboard, storage, `execute`, `function`, `return`, `say`, `tellraw`, `title` and `give`, which a verbose run lists) and keeps entities that `summon` creates, with their type, tags, position and scores, for `kill`, `tag`, `execute as`, `execute at` and `if entity`. Selectors are `@e` and `@s`, with `type`, `tag`, `scores`, `limit` and `sort=arbitrary`, and work as score holders: `hp[@s] -= 1` changes the score of the entity running the code. There are no players, blocks or ticks, so `@a` selects no one. A command or selector argument the interpreter does not know fails the test and names it, so a test never passes by skipping a command.
 
 To see what functions become in the data pack, read [How functions compile](../concepts/how-functions-compile.md).

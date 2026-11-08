@@ -1,5 +1,5 @@
 {
   "$schema": "https://minecraftmetascript.github.io/mms/mms.schema.json",
-  "namespace": "mms_demo",
-  "description": "Port of the old surface_rules example"
+  "namespace": "surface_demo",
+  "description": "Surface rules: named conditions and rules, picked by biome"
 }

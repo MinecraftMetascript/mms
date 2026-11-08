@@ -2,7 +2,6 @@ package sema
 
 import (
 	"regexp"
-	"sort"
 	"strings"
 
 	"github.com/minecraftmetascript/mms/engine/spec"
@@ -94,20 +93,25 @@ func (t *Table) OtherKind(folder, id string) *Symbol {
 // All returns every symbol in declaration order.
 func (t *Table) All() []*Symbol { return t.all }
 
-// InNamespace returns the symbols of one folder in a namespace, sorted.
-func (t *Table) InNamespace(folder, ns string) []*Symbol {
-	var out []*Symbol
-	for _, s := range t.all {
-		if s.NS == ns && s.Kind.Folder() == folder {
-			out = append(out, s)
-		}
-	}
-	sort.Slice(out, func(i, j int) bool { return out[i].Path < out[j].Path })
-	return out
+var validPath = regexp.MustCompile(`^[a-z0-9_.\-/]+$`)
+var validNSChars = regexp.MustCompile(`^[a-z0-9_.\-]+$`)
+
+// ValidNamespace reports whether ns can name a namespace. "." and ".."
+// would name a folder above data/, so they can't.
+func ValidNamespace(ns string) bool {
+	return validNSChars.MatchString(ns) && strings.Trim(ns, ".") != ""
 }
 
-var validPath = regexp.MustCompile(`^[a-z0-9_.\-/]+$`)
-var validNS = regexp.MustCompile(`^[a-z0-9_.\-]+$`)
+// pathEscapes reports whether a resource path has an empty, "." or ".."
+// segment, which would write outside the namespace's folder.
+func pathEscapes(path string) bool {
+	for _, part := range strings.Split(path, "/") {
+		if part == "" || part == "." || part == ".." {
+			return true
+		}
+	}
+	return false
+}
 
 // Collect builds the symbol table. defaultNS applies until a file's first
 // `Namespace x` declaration. It returns the table and its diagnostics,
@@ -123,6 +127,10 @@ func Collect(units []*Unit, kinds *Kinds, defaultNS string) (*Table, map[string]
 		for _, d := range u.File.Decls {
 			k, ok := kinds.Lookup(d.Kind.Name)
 			if !ok {
+				if want, ok := Spelled(d.Kind.Name); ok {
+					diags[u.Path] = append(diags[u.Path], respell("mms/unknown-kind", d.Kind.Sp, d.Kind.Name, want))
+					continue
+				}
 				report(u, "mms/unknown-kind", d.Kind.Sp, "unknown declaration kind '"+d.Kind.Name+"'")
 				continue
 			}
@@ -131,7 +139,7 @@ func Collect(units []*Unit, kinds *Kinds, defaultNS string) (*Table, map[string]
 				if d.Name == nil {
 					continue
 				}
-				if !validNS.MatchString(d.Name.Text) {
+				if !ValidNamespace(d.Name.Text) {
 					report(u, "mms/invalid-name", d.Name.Sp, "namespace '"+d.Name.Text+"' must be lowercase letters, digits, '_', '-' or '.'")
 					continue
 				}
@@ -146,8 +154,12 @@ func Collect(units []*Unit, kinds *Kinds, defaultNS string) (*Table, map[string]
 			if sns == "" {
 				sns = ns
 			}
-			if !validPath.MatchString(path) || !validNS.MatchString(sns) {
+			if !validPath.MatchString(path) || !ValidNamespace(sns) {
 				report(u, "mms/invalid-name", d.Name.Sp, "resource names must be lowercase: use '"+Snake(d.Name.Text)+"'")
+				continue
+			}
+			if pathEscapes(path) {
+				report(u, "mms/invalid-name", d.Name.Sp, "a resource name's parts between '/' can't be empty, '.' or '..'")
 				continue
 			}
 			if ext := fileExt(path); ext != "" {

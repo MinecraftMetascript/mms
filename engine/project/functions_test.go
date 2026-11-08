@@ -201,7 +201,7 @@ func TestFunctionErrors(t *testing.T) {
 		"Function f {\n  let x: int = true\n}":                "mms/type-mismatch",
 		"Function f {\n  y = 1\n}":                            "mms/unknown-name",
 		"Function f {\n  if (1) {\n  }\n}":                    "mms/type-mismatch",
-		"Function f {\n  g(1)\n}\nFunction g {\n  /say hi\n}": "mms/arity",
+		"Function f {\n  g(1)\n}\nFunction g {\n  /say hi\n}": "mms/too-many-args",
 		"Function f {\n  let x = 1 / 0\n}":                    "mms/division-by-zero",
 		"Function f {\n  1 + 2\n}":                            "mms/unused-value",
 		"Function f(): int {\n  return true\n}":               "mms/type-mismatch",
@@ -223,6 +223,15 @@ func TestFunctionErrors(t *testing.T) {
 		if len(codes) == 0 || codes[0] != want {
 			t.Errorf("%q: errors %v, want %s", src, codes, want)
 		}
+	}
+	// A string return type is reported once, on the type, not on every
+	// return.
+	p := New(spec.MustDefault(), Config{Namespace: "demo"})
+	p.SetFile("main.mms", "Function f(n: int): string {\n  if (n > 0) {\n    return \"a\"\n  }\n  return \"b\"\n}\n")
+	r, _ := p.Analyze(context.Background())
+	ds := r.Diagnostics("main.mms")
+	if len(ds) != 1 || ds[0].Code != "mms/unsupported" || ds[0].Sp.Start != strings.Index("Function f(n: int): string", "string") {
+		t.Errorf("string return type: %v", ds)
 	}
 }
 
@@ -588,6 +597,262 @@ Function grant {
 		}
 		if len(codes) == 0 || codes[0] != want {
 			t.Errorf("%q: errors %v, want %s", src, codes, want)
+		}
+	}
+}
+
+// TestGeneratedNamesKeepApart checks that the compiler's own scores and
+// storage paths (temporaries, flags, shadowed locals) never share a name
+// with a user's local, whatever the user calls it.
+func TestGeneratedNamesKeepApart(t *testing.T) {
+	vm := world(t, `
+Function temps(a: int): int {
+  let _t0 = 5
+  let y = a * 2 + a * 3
+  return _t0 + y
+}
+
+Function shadow: int {
+  let x_1 = 7
+  let x = 1
+  if (x > 0) {
+    let x = 2
+    x_1 = x_1 + x
+  }
+  return x_1
+}
+
+Function strings(who: string) {
+  let _s0 = "kept"
+  let msg = "hi " + who
+  /say ${_s0} ${msg}
+}
+
+Function run {
+  strings("alex")
+}
+`)
+	vm.Scores["mms.demo"]["#temps.a"] = 1
+	if v := call(t, vm, "demo:temps"); v != 10 {
+		t.Errorf("temps(1) = %d, want 5 + 1*2 + 1*3 = 10", v)
+	}
+	if v := call(t, vm, "demo:shadow"); v != 9 {
+		t.Errorf("shadow = %d, want 7 + 2 = 9", v)
+	}
+	call(t, vm, "demo:run")
+	if got := strings.Join(vm.Said, "\n"); got != "kept hi alex" {
+		t.Errorf("said %q, want %q", got, "kept hi alex")
+	}
+}
+
+// TestStringControlCharacters checks that a newline or tab in a string
+// stays inside one command line and reaches the game as itself.
+func TestStringControlCharacters(t *testing.T) {
+	src := `
+Function greet(who: string) {
+  let m = "a\nb" + who
+  /say ${m}
+}
+
+Function run {
+  greet("c\td")
+}
+`
+	p := New(spec.MustDefault(), Config{Namespace: "demo", Description: "test"})
+	p.SetFile("main.mms", src)
+	r, err := p.Analyze(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range r.Emit() {
+		if !strings.HasSuffix(f.Path, ".mcfunction") {
+			continue
+		}
+		for _, line := range strings.Split(string(f.Data), "\n") {
+			if strings.Count(line, `"`)%2 != 0 {
+				t.Errorf("%s has a line with an unclosed string, so a string was split: %q", f.Path, line)
+			}
+		}
+	}
+	vm := world(t, src)
+	call(t, vm, "demo:run")
+	if got := strings.Join(vm.Said, "|"); got != "a\nbc\td" {
+		t.Errorf("said %q, want %q", got, "a\nbc\td")
+	}
+}
+
+// Execute helpers and objectives take what a loop or a Template filled
+// in, not the source as written.
+func TestExecuteHelpersInLoopsAndTemplates(t *testing.T) {
+	p := New(spec.MustDefault(), Config{Namespace: "demo"})
+	p.SetFile("main.mms", `
+const woods = ["oak", "birch"]
+
+Objective plain: "dummy"
+
+for w in woods {
+  Objective chop_${w}: "minecraft.mined:minecraft.${w}_log"
+}
+
+Template greet(who: string): Commands {
+  As(@e[tag=${who}]) {
+    /say hi
+  }
+}
+
+Function f {
+  for w in woods {
+    As(@a[scores={ "chop_${w}" = 1.. }]).At(@e[tag=${w}, limit=1]) {
+      /say ${w}
+    }
+  }
+  greet("guest")
+}
+`)
+	r, _ := p.Analyze(context.Background())
+	for _, d := range r.Diagnostics("main.mms") {
+		if d.Severity == syntax.SeverityError {
+			t.Fatalf("%s: %s", d.Code, d.Message)
+		}
+	}
+	got := dumpFiles(r.Emit())
+	for _, want := range []string{
+		"scoreboard objectives add plain dummy\n",
+		"scoreboard objectives add chop_oak minecraft.mined:minecraft.oak_log\n",
+		"scoreboard objectives add chop_birch minecraft.mined:minecraft.birch_log\n",
+		"execute as @a[scores={chop_oak=1..}] at @e[tag=oak,limit=1] run say oak\n",
+		"execute as @a[scores={chop_birch=1..}] at @e[tag=birch,limit=1] run say birch\n",
+		"execute as @e[tag=guest] run say hi\n",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("missing %q in:\n%s", want, got)
+		}
+	}
+	if strings.Contains(got, "${") {
+		t.Errorf("a ${...} was written as is:\n%s", got)
+	}
+}
+
+// A record's fields that a const, a Blueprint field or a Template
+// argument leaves out take their defaults from its Type.
+func TestRecordDefaults(t *testing.T) {
+	p := New(spec.MustDefault(), Config{Namespace: "demo"})
+	p.SetFile("main.mms", `
+Type Wave {
+  mob: Id<entity_type>
+  count: int = 1
+  spawn: { x: int, z: int = 7 } = { x = 0 }
+}
+
+const waves: [Wave] = [{ mob = zombie, count = 3 }, { mob = skeleton, spawn = { x = 2 } }]
+
+Template announce(w: Wave): Commands {
+  /say ${w.mob} x${w.count} at ${w.spawn.x} ${w.spawn.z}
+}
+
+Function f {
+  for w in waves {
+    /say ${w.mob} ${w.count} ${w.spawn.z}
+  }
+  announce({ mob = creeper })
+}
+`)
+	r, _ := p.Analyze(context.Background())
+	for _, d := range r.Diagnostics("main.mms") {
+		if d.Severity == syntax.SeverityError {
+			t.Fatalf("%s: %s", d.Code, d.Message)
+		}
+	}
+	got := dumpFiles(r.Emit())
+	for _, want := range []string{
+		"say zombie 3 7\n",
+		"say skeleton 1 7\n",
+		"say creeper x1 at 0 7\n",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("missing %q in:\n%s", want, got)
+		}
+	}
+}
+
+// A bare word in a selector stays a word where a const has its name, and
+// a Storage field in text is shown from the storage.
+func TestSelectorWordsAndStorageText(t *testing.T) {
+	p := New(spec.MustDefault(), Config{Namespace: "demo"})
+	p.SetFile("main.mms", `
+Type Game { wave: int = 0 }
+Storage game: Game
+const waves = [1, 2]
+
+Template hit(): Commands {
+  As(@e[tag=waves.spawn, type=!zombie]) {
+    /say ${len(waves)}
+  }
+}
+
+Function f {
+  hit()
+  tell(@a, "Wave ${game.wave}")
+}
+`)
+	r, _ := p.Analyze(context.Background())
+	for _, d := range r.Diagnostics("main.mms") {
+		if d.Severity == syntax.SeverityError {
+			t.Fatalf("%s: %s", d.Code, d.Message)
+		}
+	}
+	got := dumpFiles(r.Emit())
+	for _, want := range []string{
+		"execute as @e[tag=waves.spawn,type=!zombie] run say 2\n",
+		`tellraw @a ["","Wave ",{nbt:"game.wave",storage:"demo:mms"}]`,
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("missing %q in:\n%s", want, got)
+		}
+	}
+}
+
+// A score holder written in a Template or a Blueprint's emit block is the
+// selector itself, not the text at the call.
+func TestScoreHoldersInTemplatesAndBlueprints(t *testing.T) {
+	p := New(spec.MustDefault(), Config{Namespace: "demo"})
+	p.SetFile("main.mms", `
+Objective coins
+
+Template pay(n: int): Commands {
+  coins[@s] -= n
+}
+
+Blueprint Price {
+  cost: int
+  emit {
+    primary Function ${self.path} {
+      coins[@e[tag=buyer, limit=1]] -= cost
+    }
+  }
+}
+
+Price bread {
+  cost = 5
+}
+
+Function f {
+  pay(3)
+}
+`)
+	r, _ := p.Analyze(context.Background())
+	for _, d := range r.Diagnostics("main.mms") {
+		if d.Severity == syntax.SeverityError {
+			t.Fatalf("%s: %s", d.Code, d.Message)
+		}
+	}
+	got := dumpFiles(r.Emit())
+	for _, want := range []string{
+		"scoreboard players remove @s coins 3\n",
+		"scoreboard players remove @e[tag=buyer,limit=1] coins 5\n",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("missing %q in:\n%s", want, got)
 		}
 	}
 }

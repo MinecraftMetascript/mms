@@ -237,7 +237,7 @@ func componentSNBT(v jsonv.Value) string {
 			}
 			b.WriteByte(']')
 		case jsonv.String:
-			b.WriteString(quoteText(string(v)))
+			b.WriteString(fn.QuoteSNBT(string(v)))
 		case jsonv.Number:
 			b.WriteString(string(v))
 		case jsonv.Bool:
@@ -250,12 +250,6 @@ func componentSNBT(v jsonv.Value) string {
 	}
 	write(v)
 	return b.String()
-}
-
-// quoteText quotes a string for SNBT, with a line break as \n so the
-// command stays on one line.
-func quoteText(s string) string {
-	return `"` + strings.NewReplacer(`\`, `\\`, `"`, `\"`, "\n", `\n`).Replace(s) + `"`
 }
 
 func plainKey(k string) bool {
@@ -283,4 +277,13 @@ func TextCommandSignature(name string) (label string, params []string, doc strin
 		return textCommandHead(d), params, syntax.ParseDoc(d.Doc).Text
 	}
 	return "", nil, ""
+}
+
+// argCountCode is the code for a call with got arguments where want are
+// expected: mms/missing-arg for too few, mms/too-many-args for too many.
+func argCountCode(got, want int) string {
+	if got > want {
+		return "mms/too-many-args"
+	}
+	return "mms/missing-arg"
 }

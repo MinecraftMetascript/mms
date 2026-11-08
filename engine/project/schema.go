@@ -62,13 +62,13 @@ func ConfigSchema() []byte {
 		Properties: map[string]*schemaNode{
 			"$schema": {Type: "string", Description: "The JSON Schema for this file.", Default: SchemaURL},
 			"namespace": md(&schemaNode{
-				Type: "string", Pattern: nsPattern.String(), Default: def.Namespace,
-				PatternErrorMessage: "A namespace is lowercase letters, digits, '_', '-' or '.'.",
+				Type: "string", Pattern: `^(?!\.+$)[a-z0-9_.\-]+$`, Default: def.Namespace,
+				PatternErrorMessage: "A namespace is lowercase letters, digits, '_', '-' or '.', and not only dots.",
 			}, "The default namespace for files without a `Namespace` declaration."),
 			"description": md(&schemaNode{Type: "string", Default: def.Description},
 				"The data pack's description, shown in the game's pack list (`pack.mcmeta`)."),
 			"output": md(&schemaNode{Type: "string", Default: def.Output},
-				"The folder `mms build` writes the data pack to, relative to the project."),
+				"The folder `mms build` writes the data pack to: a folder inside the project, relative to it."),
 			"sources": md(&schemaNode{
 				Type:     "array",
 				Items:    md(&schemaNode{Type: "string", Examples: []any{"src/**/*.mms"}}, "A glob relative to the project: `*` matches within a folder, `**` any number of folders and `?` one character."),

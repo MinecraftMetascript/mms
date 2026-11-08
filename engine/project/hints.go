@@ -122,8 +122,14 @@ func lintHints(l *lintRun, d *Decl, rule string) {
 		to := format.Expr(cv.X)
 		fix := syntax.Fix{Title: "Replace with " + to, Edits: []syntax.TextEdit{{Sp: n.Span(), Text: to}}}
 		if rule == "" {
-			*l.cur = append(*l.cur, syntax.Diagnostic{Code: "lint/" + cv.Rule, Severity: syntax.SeverityHint,
-				Message: cv.Hint, Sp: n.Span(), Fixes: []syntax.Fix{fix}})
+			sev := syntax.SeverityHint
+			if s, ok := l.r.cfg.Lint[cv.Rule]; ok {
+				sev, _ = ParseSeverity(s)
+			}
+			if sev != 0 {
+				*l.cur = append(*l.cur, syntax.Diagnostic{Code: "lint/" + cv.Rule, Severity: sev,
+					Message: cv.Hint, Sp: n.Span(), Fixes: []syntax.Fix{fix}})
+			}
 			return true
 		}
 		l.report(d, n.Span(), cv.Hint, fix)

@@ -1,0 +1,5 @@
+{
+  "$schema": "https://minecraftmetascript.github.io/mms/mms.schema.json",
+  "namespace": "shop",
+  "description": "A coin shop written as a Blueprint: its own kind of declaration, with checks, defaults and tests"
+}

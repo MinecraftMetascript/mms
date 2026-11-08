@@ -2,6 +2,9 @@ package ide
 
 import (
 	"context"
+	"os"
+	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
@@ -169,5 +172,60 @@ func TestEvalSymbols(t *testing.T) {
 	want := "type:Size constant:amount template:twice template:shadow blueprint:Wand resource:ruby"
 	if !strings.HasPrefix(strings.Join(got, " "), want) {
 		t.Errorf("symbols = %v", got)
+	}
+}
+
+// A helper's named arguments include the fields a secondary key brings in:
+// a multi-noise source without a preset lists its biomes, also while the
+// first argument is still being typed.
+func TestCompletionSecondaryDispatchFields(t *testing.T) {
+	for _, src := range []string{
+		"Dimension d {\n  type = overworld\n  generator = Noise(settings = overworld, biome_source = MultiNoise(^))\n}\n",
+		"Dimension d {\n  type = overworld\n  generator = Noise(settings = overworld, biome_source = MultiNoise(b^))\n}\n",
+	} {
+		got := labelsAt(t, src)
+		if !slices.Contains(got, "biomes") || !slices.Contains(got, "preset") {
+			t.Errorf("%q offers %v", src, got)
+		}
+	}
+}
+
+// A field of an object the evaluator worked out completes where it is
+// written: its key keeps its own place, not the whole object's. The
+// cave-siege world preset, whose overworld uses a const generator, once
+// offered the dimensions map's keys there.
+func TestCompletionInEvaluatedObject(t *testing.T) {
+	dir := "../../examples/cave-siege"
+	cfg, err := project.LoadConfig(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	paths, err := cfg.SourceFiles(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := project.New(spec.MustDefault(), cfg)
+	p.Files = os.DirFS(dir)
+	for _, rel := range paths {
+		b, err := os.ReadFile(filepath.Join(dir, rel))
+		if err != nil {
+			t.Fatal(err)
+		}
+		p.SetFile(rel, string(b))
+	}
+	b, _ := os.ReadFile(filepath.Join(dir, "worldgen", "dimension.mms"))
+	src := string(b)
+	at := strings.Index(src, "      type = the_nether") + len("      t")
+	if at < len("      t") {
+		t.Fatal("no the_nether entry in the cave-siege world preset")
+	}
+	p.SetFile("worldgen/dimension.mms", src[:at]+src[at+len("ype"):])
+	r, err := p.Analyze(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	items, _ := (&Session{P: p, R: r}).Completion("worldgen/dimension.mms", at)
+	if got := labels(items); !slices.Contains(got, "type") {
+		t.Errorf("offers %v, want type", got)
 	}
 }

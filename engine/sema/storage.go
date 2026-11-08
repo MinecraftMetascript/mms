@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/minecraftmetascript/mms/engine/fn"
+	"github.com/minecraftmetascript/mms/engine/internal/near"
 	"github.com/minecraftmetascript/mms/engine/jsonv"
 	"github.com/minecraftmetascript/mms/engine/spec"
 	"github.com/minecraftmetascript/mms/engine/syntax"
@@ -242,7 +243,7 @@ func snbtKey(k string) string {
 	if bareSNBTKey.MatchString(k) {
 		return k
 	}
-	return quoteSNBT(k)
+	return fn.QuoteSNBT(k)
 }
 
 // storageSig fingerprints a Storage declaration's fields, which functions
@@ -392,12 +393,7 @@ func (c *Checker) record(t *spec.Type) *spec.Type {
 
 // suggestOf offers the closest of names, as "; did you mean 'x'?".
 func suggestOf(name string, names []string) string {
-	best, bestD := "", 3
-	for _, n := range names {
-		if d := editDistance(name, n); d < bestD {
-			best, bestD = n, d
-		}
-	}
+	best := near.Closest(name, names)
 	if best == "" {
 		return ""
 	}
@@ -436,7 +432,7 @@ func (f *fc) save(pre *[]fn.Op, l local, op fn.Operand) {
 func (f *fc) selectorTest(pre *[]fn.Op, name string, e *syntax.Call) *val {
 	c := f.c
 	if len(e.Args) != 1 || e.Args[0].Name != nil {
-		c.errorf("mms/arity", e.ArgsSp, "%s takes one selector: %s(@e[tag=boss])", name, name)
+		c.errorf(argCountCode(len(e.Args), 1), e.ArgsSp, "%s takes one selector: %s(@e[tag=boss])", name, name)
 		return nil
 	}
 	sel := selectorText(e.Args[0].Value)

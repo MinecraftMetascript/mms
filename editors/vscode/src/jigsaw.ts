@@ -11,7 +11,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
-import { sameBlock } from './jigsawGive';
+import { sameBlock } from '@mms/preview/jigsaw/give';
 import type { FromJigsaw, JigsawConfig, JigsawExisting, JigsawRecent, JigsawState, ToJigsaw } from './messages';
 import { key, type PackOutput } from './output';
 

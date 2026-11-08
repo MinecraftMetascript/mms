@@ -2,6 +2,7 @@ import { LSPClient, languageServerExtensions } from '@codemirror/lsp-client';
 import type { EditorView } from '@codemirror/view';
 import { Supervisor, type EngineStatus } from './supervisor';
 import { ProjectWorkspace } from './workspace';
+import { sanitizeHTML } from './sanitize';
 import { showDiagnostics } from '../editor/diagnostics';
 import type { InlayHint } from '../editor/inlay';
 import type { OutputJigsaw } from '@mms/preview';
@@ -14,6 +15,8 @@ export interface Diagnostic {
 	/** 1 marks unnecessary code. */
 	tags?: number[];
 	data?: { fixes?: Fix[] };
+	/** Other places that explain the problem, such as the Template line that wrote it. */
+	relatedInformation?: { location: { uri: string; range: Diagnostic['range'] }; message: string }[];
 }
 
 export interface TextEdit {
@@ -169,12 +172,16 @@ export class Engine {
 	hasTests = $state(false);
 	tests = $state<TestOutcome[]>([]);
 	testsError = $state('');
+	/** Why the server refused the project settings, such as a bad namespace. */
+	configError = $state('');
+	/** Settings the server took but doubts, such as a lint rule nothing has. */
+	configWarnings = $state<string[]>([]);
 	symbols = $state<Record<string, DocSymbol[]>>({});
 
 	readonly client: LSPClient;
 	readonly workspace!: ProjectWorkspace;
 	private supervisor: Supervisor;
-	private config: { namespace: string; description: string } = { namespace: 'mms', description: '' };
+	private config: Record<string, unknown> = { namespace: 'mms', description: '' };
 	private refreshTimer: ReturnType<typeof setTimeout> | null = null;
 	/** The binary files the server holds, path to base64. */
 	private assets = new Map<string, string>();
@@ -183,6 +190,8 @@ export class Engine {
 		let ws: ProjectWorkspace | null = null;
 		this.client = new LSPClient({
 			timeout: 10000,
+			// Docs come from project files, which may be imported from anyone.
+			sanitizeHTML,
 			workspace: (client) => (ws = new ProjectWorkspace(client, hooks)),
 			extensions: languageServerExtensions(),
 			notificationHandlers: {
@@ -211,7 +220,7 @@ export class Engine {
 	private connect() {
 		this.client.connect(this.supervisor.transport);
 		this.client.initializing.then(() => {
-			this.client.notification('mms/setConfig', this.config);
+			this.sendConfig();
 			if (this.assets.size) {
 				const files = [...this.assets].map(([path, data]) => ({ path, data }));
 				this.client.notification('mms/setAssets', { files });
@@ -230,9 +239,22 @@ export class Engine {
 		this.supervisor.restart();
 	}
 
-	setConfig(config: { namespace: string; description: string }) {
-		this.config = { ...config };
-		if (this.client.connected) this.client.notification('mms/setConfig', this.config);
+	/** Sends the settings; the server checks them and says what is wrong. */
+	private sendConfig() {
+		this.client.request<unknown, { warnings?: string[] } | null>('mms/setConfig', this.config).then(
+			(r) => {
+				this.configError = '';
+				this.configWarnings = r?.warnings ?? [];
+			},
+			(e: unknown) => (this.configError = e instanceof Error ? e.message : String(e))
+		);
+	}
+
+	/** Sends the whole mms.json, lint settings and all, as VS Code's server reads it from disk. */
+	setConfig(config: { namespace: string; description: string; rest?: Record<string, unknown> }) {
+		const { rest, ...known } = config;
+		this.config = { ...rest, ...known };
+		if (this.client.connected) this.sendConfig();
 	}
 
 	/** Replaces the binary files the server reads, sending only changes. */

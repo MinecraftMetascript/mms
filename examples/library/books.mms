@@ -31,10 +31,15 @@ Book guide {
   ]
 }
 
-/** One of the miner's diaries, worn by time. */
-Book diary_12 { title = "Diary, Day 12", author = "A Miner", generation = tattered, text = TextFile("books/day_12.mmsbook") }
-Book diary_13 { title = "Diary, Day 13", author = "A Miner", generation = tattered, text = TextFile("books/day_13.mmsbook") }
-Book diary_14 { title = "Diary, Day 14", author = "A Miner", generation = tattered, text = TextFile("books/day_14.mmsbook") }
+for day in [12, 13, 14] {
+  /** The miner's diary for day ${day}, worn by time. */
+  Book diary_${day} {
+    title = "Diary, Day ${day}"
+    author = "A Miner"
+    generation = tattered
+    text = TextFile("books/day_${day}.mmsbook")
+  }
+}
 
 /** A chest of old things: one diary, and some clutter. */
 LootTable old_chest {
@@ -45,7 +50,8 @@ LootTable old_chest {
 }
 
 /** The welcome a new reader sees in chat. */
-const welcome: Text = "Welcome to the {gold}Library{/}, ${@s}! Press {key:inventory} to find your guide."
+const welcome: Text =
+  "Welcome to the {gold}Library{/}, ${@s}! Press {key:inventory} to find your guide."
 
 OnFirstJoin {
   /give @s ${guide}

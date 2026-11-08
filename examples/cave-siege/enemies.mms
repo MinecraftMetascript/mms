@@ -10,7 +10,7 @@
 DamageType creeper_ping {
   message_id = "generic"
   exhaustion = 0
-  scaling = "never"
+  scaling = never
 }
 
 /** Without this, the 0.01 damage of a ping knocks a creeper away from its waypoint. */

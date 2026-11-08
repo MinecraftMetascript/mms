@@ -24,7 +24,12 @@ JigsawStructure wreck {
   depth = 1
   start = wreck
   pools = {
-    wreck = [WeightedElement(1, SinglePoolElement(rigid, minecraft:shipwreck/rightsideup_backhalf, wreck_loot))]
+    wreck = [
+      WeightedElement(
+        1,
+        SinglePoolElement(rigid, minecraft:shipwreck/rightsideup_backhalf, wreck_loot),
+      ),
+    ]
   }
 }
 
@@ -68,6 +73,6 @@ ProcessorList wreck_loot {
         },
       ],
     ),
-    BlockRot(integrity = 0.85, rottable_blocks = #minecraft:planks),
+    BlockRot(integrity = 0.85, rottable_blocks = #planks),
   ]
 }

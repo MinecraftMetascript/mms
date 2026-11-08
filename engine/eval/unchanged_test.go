@@ -29,16 +29,30 @@ func TestPlainFilesPassThrough(t *testing.T) {
 		units = append(units, Unit{Path: p, File: syntax.Parse(string(b))})
 	}
 	r := Run(units, Options{Namespace: "demo"})
+	// A declaration of a project Blueprint's kind is one of the new forms.
+	blueprints := map[string]bool{}
+	for _, u := range units {
+		for _, d := range u.File.Decls {
+			if d.Kind != nil && d.Kind.Name == "Blueprint" {
+				blueprints[d.NameText()] = true
+			}
+		}
+	}
 	plain := 0
 	for _, u := range units {
 		out := r.Files[u.Path]
+		// The prelude, which declares helpers such as len and count, is
+		// not loaded here.
+		if callsPrelude(u.File) {
+			continue
+		}
 		if len(out.Diags) > 0 {
 			t.Errorf("%s: %s", u.Path, out.Diags[0].Message)
 		}
 		// A top-level const, let or for, or a Type, Template or Blueprint
 		// declaration, is one of the new forms, so the file is expected
 		// to change.
-		if len(u.File.Items) != len(u.File.Decls) || declaresForms(u.File) {
+		if len(u.File.Items) != len(u.File.Decls) || declaresForms(u.File) || usesKinds(u.File, blueprints) {
 			continue
 		}
 		plain++
@@ -58,6 +72,30 @@ func TestPlainFilesPassThrough(t *testing.T) {
 	if plain < 20 {
 		t.Errorf("only %d files use none of the new forms", plain)
 	}
+}
+
+// callsPrelude reports whether f calls an intrinsic the prelude
+// declares, such as len, or count in a Test.
+func callsPrelude(f *syntax.File) bool {
+	found := false
+	syntax.Walk(f, func(n syntax.Node) bool {
+		if c, ok := n.(*syntax.Call); ok {
+			if id, ok := c.Fn.(*syntax.Ident); ok && (id.Name == "count" || id.Name == "exists" || id.Name == "len") {
+				found = true
+			}
+		}
+		return !found
+	})
+	return found
+}
+
+func usesKinds(f *syntax.File, kinds map[string]bool) bool {
+	for _, d := range f.Decls {
+		if d.Kind != nil && kinds[d.Kind.Name] {
+			return true
+		}
+	}
+	return false
 }
 
 func declaresForms(f *syntax.File) bool {

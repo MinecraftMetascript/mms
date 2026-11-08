@@ -4,13 +4,15 @@
 package project
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/minecraftmetascript/mms/engine/sema"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/minecraftmetascript/mms/engine/sema"
 )
 
 // ConfigFile is the project file name.
@@ -60,25 +62,59 @@ func DefaultConfig() Config {
 	return Config{Namespace: "mms", Description: "Built with MMS", Output: "build"}
 }
 
-var nsPattern = regexp.MustCompile(`^[a-z0-9_.\-]+$`)
+// File returns c as the text of a new mms.json, with the $schema line
+// that gives editors completion and checks for it.
+func (c Config) File() []byte {
+	b, err := json.MarshalIndent(struct {
+		Schema string `json:"$schema"`
+		Config
+	}{SchemaURL, c}, "", "  ")
+	if err != nil {
+		panic(err) // Config is plain data
+	}
+	return append(b, '\n')
+}
 
 // Validate reports a problem with the config, or nil.
 func (c Config) Validate() error {
-	if !nsPattern.MatchString(c.Namespace) {
+	if !sema.ValidNamespace(c.Namespace) {
 		return fmt.Errorf("mms.json: namespace %q must be lowercase letters, digits, '_', '-' or '.'", c.Namespace)
 	}
 	if c.Icon != "" && !strings.HasSuffix(strings.ToLower(c.Icon), ".png") {
 		return fmt.Errorf("mms.json: icon %q must be a .png file", c.Icon)
 	}
-	for id, sev := range c.Lint {
-		if RuleByID(id) == nil {
-			return fmt.Errorf("mms.json: lint: unknown rule %q", id)
+	for _, o := range []struct{ key, dir string }{{"output", c.Output}, {"resourcePack.output", c.ResourcePack.Output}} {
+		if o.dir == "" {
+			continue
 		}
+		if d := filepath.FromSlash(o.dir); !filepath.IsLocal(d) || filepath.Clean(d) == "." {
+			return fmt.Errorf("mms.json: %s %q must be a folder inside the project, such as \"build\"", o.key, o.dir)
+		}
+	}
+	// Rule names are checked after analysis, against the built-in rules
+	// and those the project's Blueprints name (Result.ConfigWarnings).
+	for id, sev := range c.Lint {
 		if _, ok := ParseSeverity(sev); !ok {
 			return fmt.Errorf("mms.json: lint: %s: severity must be error, warning, info, hint or off, not %q", id, sev)
 		}
 	}
 	return nil
+}
+
+// ParseConfig reads the text of an mms.json over the defaults. A key it
+// does not know, such as a misspelt "namepsace", is an error; "$schema"
+// is allowed, since new projects get one.
+func ParseConfig(b []byte) (Config, error) {
+	w := struct {
+		Schema string `json:"$schema"`
+		Config
+	}{Config: DefaultConfig()}
+	d := json.NewDecoder(bytes.NewReader(b))
+	d.DisallowUnknownFields()
+	if err := d.Decode(&w); err != nil {
+		return w.Config, fmt.Errorf("mms.json: %w", err)
+	}
+	return w.Config, nil
 }
 
 // LoadConfig reads dir/mms.json, filling defaults for missing fields. A
@@ -92,8 +128,9 @@ func LoadConfig(dir string) (Config, error) {
 	if err != nil {
 		return cfg, err
 	}
-	if err := json.Unmarshal(b, &cfg); err != nil {
-		return cfg, fmt.Errorf("mms.json: %w", err)
+	cfg, err = ParseConfig(b)
+	if err != nil {
+		return cfg, err
 	}
 	if cfg.Output == "" {
 		cfg.Output = "build"
@@ -104,14 +141,6 @@ func LoadConfig(dir string) (Config, error) {
 // SourceFiles lists the project's .mms files, sorted, relative to dir.
 // Folders holding their own mms.json are other projects and left out.
 func (c Config) SourceFiles(dir string) ([]string, error) {
-	patterns := c.Sources
-	if len(patterns) == 0 {
-		patterns = []string{"**/*.mms"}
-	}
-	var res []*regexp.Regexp
-	for _, p := range patterns {
-		res = append(res, globRegexp(p))
-	}
 	var out []string
 	err := filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
@@ -131,20 +160,31 @@ func (c Config) SourceFiles(dir string) ([]string, error) {
 			}
 			return nil
 		}
-		if sema.IsBookFile(rel) {
-			// Book text belongs to the project wherever it is.
+		if c.IsSource(rel) {
 			out = append(out, rel)
-			return nil
-		}
-		for _, re := range res {
-			if re.MatchString(rel) {
-				out = append(out, rel)
-				break
-			}
 		}
 		return nil
 	})
 	return out, err
+}
+
+// IsSource reports whether the file at rel, a slash path relative to the
+// project, is one of its sources by `sources`. Book and text files belong
+// to the project wherever they are. Folders are not checked here.
+func (c Config) IsSource(rel string) bool {
+	if sema.IsBookFile(rel) {
+		return true
+	}
+	patterns := c.Sources
+	if len(patterns) == 0 {
+		patterns = []string{"**/*.mms"}
+	}
+	for _, p := range patterns {
+		if globRegexp(p).MatchString(rel) {
+			return true
+		}
+	}
+	return false
 }
 
 // globRegexp compiles a glob with *, ** and ? into an anchored regexp.

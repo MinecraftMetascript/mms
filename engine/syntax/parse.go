@@ -813,8 +813,6 @@ func (b *builder) expr(c parser.IExprContext, around Span) Expr {
 		return b.binary("&&", e.AllExpr(), sp)
 	case *parser.OrExprContext:
 		return b.binary("||", e.AllExpr(), sp)
-	case *parser.ArrowExprContext:
-		return b.binary("->", e.AllExpr(), sp)
 	case *parser.RangeExprContext:
 		r := &Range{Lo: b.expr(e.Expr(0), sp), Sp: sp}
 		if len(e.AllExpr()) > 1 {
@@ -977,11 +975,36 @@ func (b *builder) primary(c parser.IPrimaryContext, sp Span) Expr {
 		for _, e := range p.AllValue() {
 			l.Elems = append(l.Elems, b.value(e, sp))
 		}
+		b.listCommas(p)
 		return l
 	case *parser.ObjectLitContext:
 		return &Object{Body: b.block(p.Block()), Sp: sp}
 	}
 	return &Bad{Sp: sp}
+}
+
+// listCommas reports list elements with no comma between them. The
+// grammar lets the comma go missing so that recovery keeps the list, but
+// the language has one way to write a list, with commas, and the
+// formatter writes them.
+func (b *builder) listCommas(p *parser.ListLitContext) {
+	var prev antlr.ParserRuleContext
+	for _, ch := range p.GetChildren() {
+		v, ok := ch.(parser.IValueContext)
+		if !ok {
+			prev = nil
+			continue
+		}
+		if prev != nil {
+			end := span(prev).End
+			b.file.Diags = append(b.file.Diags, Diagnostic{
+				Code: "syntax/missing-comma", Severity: SeverityError, Sp: span(v),
+				Message: "missing ',' between list elements",
+				Fixes:   []Fix{{Title: "Insert ','", Edits: []TextEdit{{Sp: Span{end, end}, Text: ","}}, Safe: true}},
+			})
+		}
+		prev = v
+	}
 }
 
 // exprAt converts the i'th expression of a list, or a Bad one when
@@ -993,21 +1016,47 @@ func (b *builder) exprAt(xs []parser.IExprContext, i int, around Span) Expr {
 	return &Bad{Sp: Span{around.End, around.End}}
 }
 
-func (b *builder) sourceText(sp Span) string {
-	if sp.Start < 0 || sp.End > len(b.file.Src) || sp.Start > sp.End {
-		return ""
-	}
-	return string(b.file.Src[sp.Start:sp.End])
-}
-
+// unquote reads a string literal's value. It resolves the language's own
+// escapes (\" \' \\ \n \t \r \uHHHH) and keeps every other backslash as
+// written, since \{, \$, \* and the like belong to the markup and
+// interpolation layers, which read the value after this.
 func unquote(s string) string {
-	if len(s) >= 2 && s[0] == '\'' {
-		s = `"` + strings.ReplaceAll(strings.ReplaceAll(s[1:len(s)-1], `\'`, `'`), `"`, `\"`) + `"`
+	if len(s) < 2 {
+		return s
 	}
-	if u, err := strconv.Unquote(s); err == nil {
-		return u
+	body := []rune(s[1 : len(s)-1])
+	var b strings.Builder
+	for i := 0; i < len(body); i++ {
+		r := body[i]
+		if r != '\\' || i+1 == len(body) {
+			b.WriteRune(r)
+			continue
+		}
+		i++
+		switch c := body[i]; c {
+		case 'n':
+			b.WriteRune('\n')
+		case 't':
+			b.WriteRune('\t')
+		case 'r':
+			b.WriteRune('\r')
+		case '"', '\'', '\\':
+			b.WriteRune(c)
+		case 'u':
+			if i+4 < len(body) {
+				if v, err := strconv.ParseUint(string(body[i+1:i+5]), 16, 32); err == nil {
+					b.WriteRune(rune(v))
+					i += 4
+					continue
+				}
+			}
+			b.WriteString(`\u`)
+		default:
+			b.WriteRune('\\')
+			b.WriteRune(c)
+		}
 	}
-	return strings.Trim(s, `"'`)
+	return b.String()
 }
 
 // coordText spells a coordinate group from its tokens, one space between

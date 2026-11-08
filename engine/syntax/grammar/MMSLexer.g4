@@ -1,6 +1,6 @@
 // Lexer for Minecraft Metascript. Every character ends up in some token:
 // whitespace and comments go to the hidden channel so the formatter and
-// doc-comment lookup can see them (docs/plan.md, "ANTLR setup").
+// doc-comment lookup can see them.
 lexer grammar MMSLexer;
 
 // MISSING and SEP are never lexed. Recovery inserts MISSING where a
@@ -8,7 +8,7 @@ lexer grammar MMSLexer;
 // parser does not read the next field as the value. SEP ends a statement
 // whose last word is followed by a word on a later line, so `x` then `y = 1`
 // on the next line stay two statements instead of reading as a
-// declaration `x y = 1` (see separateLines).
+// declaration `x y = 1` (see separateWords in recover.go).
 tokens { MISSING, SEP }
 
 // Keywords are lowercase words only. Declaration kinds and helpers are
@@ -66,13 +66,14 @@ RESLOC
 // A templated name: a name or resource location with `${...}` pieces, as
 // in `${w}_crate` or `item/${self.path}`. Only declaration names and name
 // expressions use it; strings and commands have their own interpolation.
-TNAME : TNAME_CHAR* INTERP (TNAME_CHAR | INTERP)*;
+// It never ends in ':', so `Objective kills_${w}: ...` is a name and a
+// colon.
+TNAME : TNAME_CHAR* INTERP ((TNAME_CHAR | INTERP)* (TNAME_END | INTERP))?;
 
 IDENT  : IDENT_START IDENT_CHAR*;
 NUMBER : DIGIT+ ('.' DIGIT+)? ([eE] [+-]? DIGIT+)?;
 STRING : '"' (ESC | ~["\\\r\n])* '"' | '\'' (ESC | ~['\\\r\n])* '\'';
 
-ARROW   : '->';
 ELLIPSIS: '...';
 DOTDOT  : '..';
 QQ      : '??';
@@ -122,5 +123,6 @@ fragment NS_CHAR     : [a-z0-9_.-];
 fragment PATH_CHAR   : [a-z0-9_./-];
 fragment DIGIT       : [0-9];
 fragment TNAME_CHAR  : [a-zA-Z0-9_./:-];
+fragment TNAME_END   : [a-zA-Z0-9_./-];
 fragment INTERP      : '${' ~[}\r\n]* '}';
 fragment ESC         : '\\' .;

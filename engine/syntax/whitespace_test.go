@@ -44,23 +44,39 @@ func TestWhitespaceAgnostic(t *testing.T) {
 			if got := Dump(g); got != base {
 				t.Errorf("%s, %s: tree differs\n%s", path, v.name, firstDiff(base, got))
 			}
+			// The editor and the CLI read files in chunks (Reparse); that
+			// must agree with Parse on every layout too.
+			if r, _, _ := Reparse(text, nil); len(r.Diags) > 0 {
+				t.Errorf("%s, %s: Reparse: %s at %d", path, v.name, r.Diags[0].Message, r.Diags[0].Sp.Start)
+			} else if got := Dump(r); got != base {
+				t.Errorf("%s, %s: Reparse tree differs\n%s", path, v.name, firstDiff(base, got))
+			}
 		}
 	}
 }
 
 // rejoin writes f's tokens with sep between them and no comments. A raw
-// command goes on a line of its own, with cmd before and after it.
+// command goes on a line of its own, with cmd before and after it, except
+// a command value (`let n = /data get ...`), which stays on the line of
+// its '=': on the next line it is a statement of its own.
 func rejoin(f *File, sep, cmd string) string {
 	var b strings.Builder
+	prev := TokenKind(-1)
 	for _, tk := range f.Tokens {
 		if tk.Hidden || tk.Synthetic {
 			continue
 		}
-		if tk.Kind == parser.MMSLexerCOMMAND {
+		switch {
+		case tk.Kind == parser.MMSLexerCOMMAND && prev == parser.MMSLexerASSIGN:
+			s := strings.TrimRight(b.String(), " \t\n")
+			b.Reset()
+			b.WriteString(s + " " + tk.Text + cmd)
+		case tk.Kind == parser.MMSLexerCOMMAND:
 			b.WriteString(cmd + tk.Text + cmd)
-			continue
+		default:
+			b.WriteString(tk.Text + sep)
 		}
-		b.WriteString(tk.Text + sep)
+		prev = tk.Kind
 	}
 	return b.String()
 }
@@ -74,4 +90,24 @@ func firstDiff(a, b string) string {
 		}
 	}
 	return "lengths differ"
+}
+
+// TestReparseContinuationLines checks that a line which only continues
+// the item above, such as an `else` arm, is not read as a new chunk.
+func TestReparseContinuationLines(t *testing.T) {
+	for _, src := range []string{
+		"Global flag: bool = true\nconst x: int = if (flag) 1\nelse 2\n",
+		"const xs = [1,\n2]\nconst y = 3\n",
+		"Function f {\n  /say hi\n}\nlet_me = 1\n",
+	} {
+		whole := Parse(src)
+		r, _, _ := Reparse(src, nil)
+		if (len(whole.Diags) == 0) != (len(r.Diags) == 0) {
+			t.Errorf("%q: Parse has %d problems, Reparse %d", src, len(whole.Diags), len(r.Diags))
+			continue
+		}
+		if len(whole.Diags) == 0 && Dump(whole) != Dump(r) {
+			t.Errorf("%q: trees differ\n%s", src, firstDiff(Dump(whole), Dump(r)))
+		}
+	}
 }

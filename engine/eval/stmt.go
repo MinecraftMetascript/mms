@@ -330,6 +330,11 @@ func (c *ctx) decl(d *syntax.Decl, from *syntax.Decl) []*Decl {
 	if c.inst != nil {
 		nd.Sp = c.inst.D.Sp
 	}
+	// An objective's criterion written as a string, as in a top-level
+	// for: `Objective mined_${w}: "minecraft.mined:minecraft.${w}_log"`.
+	if ts, ok := nd.Type.(*syntax.TypeString); ok && d.Kind.Name == "Objective" {
+		ts.Value, _ = c.interp(ts.Value, ts.Sp)
+	}
 	if d.Name != nil {
 		nd.Name = c.declName(d.Name)
 		if nd.Name == nil {
@@ -343,7 +348,7 @@ func (c *ctx) decl(d *syntax.Decl, from *syntax.Decl) []*Decl {
 	}
 	bc := c.with()
 	bc.emit = nil
-	if fnKinds[d.Kind.Name] {
+	if syntax.IsCodeKind(d.Kind.Name) {
 		bc.compile = false
 	}
 	if d.Params != nil {
@@ -549,7 +554,7 @@ func (c *ctx) bindParams(tc *ctx, d *syntax.Decl, what string, args []argValue, 
 			continue
 		}
 		if v, have := got[pr.Name.Text]; have {
-			tc.sc.bind(pr.Name.Text, v)
+			tc.sc.bind(pr.Name.Text, tc.withDefaults(v, pr.Type))
 			continue
 		}
 		switch {

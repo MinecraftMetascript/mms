@@ -39,14 +39,11 @@ type Server struct {
 	roots []string // the editor's folders on disk; none in the browser
 	// projects are keyed by the folder holding mms.json; "" is the
 	// default project. nil until initialize.
-	projects map[string]*workspace
-	owners   map[string]*workspace // the project each file is in
-	last     *workspace            // the project of the last edited file
-	lastURI  string                // the last edited file
-	open     map[string]bool
-	// managed files were given by mms/setFiles: closing their editor
-	// keeps them in the project (the browser has no disk to fall back on).
-	managed   map[string]bool
+	projects  map[string]*workspace
+	owners    map[string]*workspace // the project each file is in
+	last      *workspace            // the project of the last edited file
+	lastURI   string                // the last edited file
+	open      map[string]bool
 	published map[string]bool
 	// assetDiags are the files of each project with unused-asset
 	// diagnostics published, so they clear when used again.
@@ -67,7 +64,7 @@ type Server struct {
 
 // NewServer returns a server over tr checking against pack.
 func NewServer(tr Transport, pack *spec.Pack) *Server {
-	return &Server{tr: tr, pack: pack, open: map[string]bool{}, managed: map[string]bool{}, published: map[string]bool{}, assetDiags: map[*workspace]map[string]bool{}}
+	return &Server{tr: tr, pack: pack, open: map[string]bool{}, published: map[string]bool{}, assetDiags: map[*workspace]map[string]bool{}}
 }
 
 type message struct {
@@ -136,6 +133,12 @@ func (s *Server) dispatch(ctx context.Context, m message) (result any, rerr *res
 		if r := recover(); r != nil {
 			s.logf("panic in %s: %v", m.Method, r)
 			result, rerr = nil, &respError{Code: codeInternal, Message: fmt.Sprintf("internal error: %v", r)}
+			if m.ID == nil {
+				// A notification has no reply to carry the error, so the
+				// client's log gets it: a lost didChange leaves stale
+				// diagnostics, which should not pass silently.
+				s.notify("window/logMessage", map[string]any{"type": 1, "message": fmt.Sprintf("mms: internal error in %s: %v", m.Method, r)})
+			}
 		}
 	}()
 	if s.projects == nil && m.Method != "initialize" {
@@ -224,7 +227,6 @@ func init() {
 		"mms/expand":                       typed((*Server).expand),
 		"textDocument/codeAction":          typed((*Server).codeAction),
 		"mms/setConfig":                    typed((*Server).setConfig),
-		"mms/setFiles":                     typed((*Server).setFiles),
 		"mms/setAssets":                    typed((*Server).setAssets),
 		"mms/importPack":                   typed((*Server).importPack),
 		"mms/resourceKinds":                typed((*Server).resourceKinds),
@@ -407,9 +409,6 @@ func (s *Server) didClose(ctx context.Context, p struct {
 }) (any, *respError) {
 	uri := p.TextDocument.URI
 	delete(s.open, uri)
-	if s.managed[uri] {
-		return nil, nil
-	}
 	w := s.at(uri)
 	if w == nil {
 		return nil, nil
@@ -486,30 +485,14 @@ func (s *Server) setConfig(ctx context.Context, cfg project.Config) (any, *respE
 	}
 	w.proj = np
 	s.analyze(ctx, w)
-	return nil, nil
-}
-
-// setFiles adds, replaces and removes project files that are not open in
-// an editor. The browser sends the whole project this way on start.
-func (s *Server) setFiles(ctx context.Context, p struct {
-	Files []struct {
-		URI  string `json:"uri"`
-		Text string `json:"text"`
-	} `json:"files"`
-	Remove []string `json:"remove"`
-}) (any, *respError) {
-	for _, f := range p.Files {
-		s.managed[f.URI] = true
-		if !s.open[f.URI] {
-			s.setFile(f.URI, f.Text)
+	// Settings that only analysis can check, such as a lint rule that
+	// neither MMS nor a Blueprint has; the browser has no mms.json to
+	// show them on.
+	if w.res != nil {
+		if ws := w.res.ConfigWarnings(); len(ws) > 0 {
+			return map[string]any{"warnings": ws}, nil
 		}
 	}
-	for _, uri := range p.Remove {
-		delete(s.managed, uri)
-		delete(s.open, uri)
-		s.removeFile(uri)
-	}
-	s.analyzeAll(ctx)
 	return nil, nil
 }
 
@@ -568,7 +551,8 @@ func (s *Server) analyze(ctx context.Context, w *workspace) {
 }
 
 // publishAssets reports the project's files that nothing uses on the
-// files themselves, and clears the ones used again. Only a project on
+// files themselves, and clears the ones used again. A broken mms.json is
+// reported on it the same way. Only a project on
 // disk has file URIs; the browser shows them from mms/output.
 func (s *Server) publishAssets(w *workspace, r *project.Result) {
 	now := map[string]bool{}
@@ -582,6 +566,26 @@ func (s *Server) publishAssets(w *workspace, r *project.Result) {
 				"severity": int(sev), "source": "mms", "code": "lint/unused-asset", "tags": []int{1},
 				"message": project.UnusedAssetMessage(p),
 			}}})
+		}
+	}
+	if w.dir != "" {
+		var ds []any
+		at := map[string]any{"start": Position{}, "end": Position{}}
+		if w.configErr != nil {
+			ds = append(ds, map[string]any{
+				"range": at, "severity": int(syntax.SeverityError), "source": "mms", "code": "mms/config",
+				"message": w.configErr.Error() + "; the project uses the default settings until this is fixed",
+			})
+		}
+		for _, msg := range r.ConfigWarnings() {
+			ds = append(ds, map[string]any{
+				"range": at, "severity": int(syntax.SeverityWarning), "source": "mms", "code": "mms/config", "message": msg,
+			})
+		}
+		if len(ds) > 0 {
+			uri := pathURI(filepath.Join(w.dir, project.ConfigFile))
+			now[uri] = true
+			s.notify("textDocument/publishDiagnostics", map[string]any{"uri": uri, "diagnostics": ds})
 		}
 	}
 	for uri := range s.assetDiags[w] {
@@ -605,6 +609,15 @@ func (s *Server) publish(u *sema.Unit, ds []syntax.Diagnostic) {
 			m["tags"] = []int{1}
 		case d.Deprecated:
 			m["tags"] = []int{2}
+		}
+		if len(d.Related) > 0 {
+			rel := make([]any, 0, len(d.Related))
+			for _, r := range d.Related {
+				if locs := s.locations([]ide.Location{{Path: r.Path, Span: r.Sp}}); len(locs) == 1 {
+					rel = append(rel, map[string]any{"location": locs[0], "message": r.Message})
+				}
+			}
+			m["relatedInformation"] = rel
 		}
 		if len(d.Fixes) > 0 {
 			// The web editor applies fixes straight from the diagnostic.
@@ -951,13 +964,11 @@ func encodeTokens(l *lines, toks []ide.SemToken) []int {
 	for _, t := range toks {
 		start, end := l.pos(t.Span.Start), l.pos(t.Span.End)
 		for line := start.Line; line <= end.Line; line++ {
-			a, b := Position{Line: line}, Position{Line: line}
+			a, b := Position{Line: line}, end
 			if line == start.Line {
 				a = start
 			}
-			if line == end.Line {
-				b = end
-			} else {
+			if line != end.Line {
 				b = l.pos(lineEnd(l, line))
 			}
 			emit(a, b, int(t.Type), t.Mods)

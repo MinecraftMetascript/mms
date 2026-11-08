@@ -7,8 +7,7 @@ import (
 )
 
 // verify checks that out parses to the same tree as the input and keeps
-// every comment. Formatting must never change meaning (docs/plan.md,
-// "Safety").
+// every comment. Formatting must never change meaning.
 func verify(in *syntax.File, out string) error {
 	re := syntax.Parse(out)
 	if len(re.Diags) > 0 || syntax.Dump(re) != syntax.Dump(in) {

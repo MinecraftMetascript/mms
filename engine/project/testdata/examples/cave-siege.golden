@@ -475,9 +475,9 @@ function siege:reset
 === data/siege/function/banner_second.mcfunction
 execute at @e[tag=cs_core,limit=1] unless block ~ ~ ~ #minecraft:banners run function siege:restore_banner
 execute at @e[tag=cs_core,limit=1] run kill @e[type=minecraft:item,distance=..3,nbt={Item:{id:"minecraft:white_banner"}}]
-scoreboard players set #banner_second._t2 mms.siege 0
+scoreboard players set #banner_second.-t2 mms.siege 0
 execute if score $path_phase mms.siege matches 0 run function siege:banner_second/_if0
-execute if score #banner_second._t2 mms.siege matches 1 run function siege:repath
+execute if score #banner_second.-t2 mms.siege matches 1 run function siege:repath
 function siege:carrot_second
 scoreboard players set #lost cs_tmp 0
 execute as @e[tag=cs_parked] run function siege:parked_damage
@@ -489,14 +489,14 @@ execute store result storage siege:mms m.a0 int 1 run scoreboard players get $ba
 function siege:banner_second/_macro4 with storage siege:mms m
 bossbar set siege:banner players @a
 === data/siege/function/banner_second/_if0.mcfunction
-scoreboard players set #banner_second._t1 mms.siege 0
-execute if score $path_dirty mms.siege matches 1 run scoreboard players set #banner_second._t1 mms.siege 1
-execute unless score #banner_second._t1 mms.siege matches 1 run function siege:banner_second/_if1
-execute if score #banner_second._t1 mms.siege matches 1 run scoreboard players set #banner_second._t2 mms.siege 1
+scoreboard players set #banner_second.-t1 mms.siege 0
+execute if score $path_dirty mms.siege matches 1 run scoreboard players set #banner_second.-t1 mms.siege 1
+execute unless score #banner_second.-t1 mms.siege matches 1 run function siege:banner_second/_if1
+execute if score #banner_second.-t1 mms.siege matches 1 run scoreboard players set #banner_second.-t2 mms.siege 1
 === data/siege/function/banner_second/_if1.mcfunction
-scoreboard players operation #banner_second._t0 mms.siege = $ticks mms.siege
-scoreboard players operation #banner_second._t0 mms.siege %= #c200 mms.siege
-execute if score #banner_second._t0 mms.siege matches 0 run scoreboard players set #banner_second._t1 mms.siege 1
+scoreboard players operation #banner_second.-t0 mms.siege = $ticks mms.siege
+scoreboard players operation #banner_second.-t0 mms.siege %= #c200 mms.siege
+execute if score #banner_second.-t0 mms.siege matches 0 run scoreboard players set #banner_second.-t1 mms.siege 1
 === data/siege/function/banner_second/_if2.mcfunction
 scoreboard players operation $banner_hp mms.siege -= #banner_second.lost mms.siege
 execute at @e[tag=cs_core,limit=1] run particle minecraft:damage_indicator ~ ~1 ~ 0.3 0.5 0.3 0 5
@@ -508,10 +508,10 @@ return 0
 $bossbar set siege:banner value $(a0)
 === data/siege/function/bow_check.mcfunction
 execute unless entity @s[type=#minecraft:skeletons] run return 0
-scoreboard players set #bow_check._f0 mms.siege 0
-execute if score #bow_check.parked mms.siege matches 1 run scoreboard players set #bow_check._f0 mms.siege 1
-execute if score #bow_check._f0 mms.siege matches 1 run function siege:bow_check/_if1
-execute unless score #bow_check._f0 mms.siege matches 1 if entity @s[tag=!cs_bowless] if items entity @s weapon.mainhand minecraft:bow run function siege:take_bow
+scoreboard players set #bow_check.-f0 mms.siege 0
+execute if score #bow_check.parked mms.siege matches 1 run scoreboard players set #bow_check.-f0 mms.siege 1
+execute if score #bow_check.-f0 mms.siege matches 1 run function siege:bow_check/_if1
+execute unless score #bow_check.-f0 mms.siege matches 1 if entity @s[tag=!cs_bowless] if items entity @s weapon.mainhand minecraft:bow run function siege:take_bow
 === data/siege/function/bow_check/_if1.mcfunction
 execute if entity @s[tag=cs_bowless] run item replace entity @s weapon.mainhand with minecraft:bow
 tag @s remove cs_bowless
@@ -573,53 +573,53 @@ execute in siege:scratch if block ~ ~ ~ minecraft:blue_wool at @s run return run
 execute facing entity @e[tag=cs_core,limit=1] feet rotated ~ 0 positioned ^ ^ ^1 align xyz positioned ~0.5 ~ ~0.5 if block ~ ~ ~ #siege:walkable if block ~ ~1 ~ #siege:walkable run tp @s ~ ~ ~
 === data/siege/function/clear_slab.mcfunction
 scoreboard players operation #clear_slab.x mms.siege = #cx cs_tmp
-scoreboard players operation #clear_slab._t0 mms.siege = #cy cs_tmp
-scoreboard players remove #clear_slab._t0 mms.siege 16
-scoreboard players operation #clear_slab._t2 mms.siege = #clear_slab.n mms.siege
-scoreboard players remove #clear_slab._t2 mms.siege 1
-scoreboard players operation #clear_slab._t2 mms.siege *= #c7 mms.siege
-scoreboard players operation #clear_slab.y mms.siege = #clear_slab._t0 mms.siege
-scoreboard players operation #clear_slab.y mms.siege += #clear_slab._t2 mms.siege
+scoreboard players operation #clear_slab.-t0 mms.siege = #cy cs_tmp
+scoreboard players remove #clear_slab.-t0 mms.siege 16
+scoreboard players operation #clear_slab.-t2 mms.siege = #clear_slab.n mms.siege
+scoreboard players remove #clear_slab.-t2 mms.siege 1
+scoreboard players operation #clear_slab.-t2 mms.siege *= #c7 mms.siege
+scoreboard players operation #clear_slab.y mms.siege = #clear_slab.-t0 mms.siege
+scoreboard players operation #clear_slab.y mms.siege += #clear_slab.-t2 mms.siege
 scoreboard players operation #clear_slab.z mms.siege = #cz cs_tmp
 scoreboard players operation #clear_slab.top mms.siege = #clear_slab.y mms.siege
 scoreboard players add #clear_slab.top mms.siege 6
-scoreboard players operation #clear_slab._t5 mms.siege = #cy cs_tmp
-scoreboard players add #clear_slab._t5 mms.siege 16
-execute if score #clear_slab.top mms.siege > #clear_slab._t5 mms.siege run function siege:clear_slab/_if0
-scoreboard players operation #clear_slab._t7 mms.siege = #clear_slab.x mms.siege
-scoreboard players remove #clear_slab._t7 mms.siege 32
-execute store result storage siege:mms m.a1 int 1 run scoreboard players get #clear_slab._t7 mms.siege
+scoreboard players operation #clear_slab.-t5 mms.siege = #cy cs_tmp
+scoreboard players add #clear_slab.-t5 mms.siege 16
+execute if score #clear_slab.top mms.siege > #clear_slab.-t5 mms.siege run function siege:clear_slab/_if0
+scoreboard players operation #clear_slab.-t7 mms.siege = #clear_slab.x mms.siege
+scoreboard players remove #clear_slab.-t7 mms.siege 32
+execute store result storage siege:mms m.a1 int 1 run scoreboard players get #clear_slab.-t7 mms.siege
 function siege:clear_slab/_macro1 with storage siege:mms m
-data modify storage siege:mms m.a0 set from storage siege:mms l."clear_slab"._s8
+data modify storage siege:mms m.a0 set from storage siege:mms l."clear_slab".-s8
 function siege:clear_slab/_macro2 with storage siege:mms m
-data modify storage siege:mms m.a0 set from storage siege:mms l."clear_slab"._s9
+data modify storage siege:mms m.a0 set from storage siege:mms l."clear_slab".-s9
 execute store result storage siege:mms m.a1 int 1 run scoreboard players get #clear_slab.y mms.siege
 function siege:clear_slab/_macro3 with storage siege:mms m
-data modify storage siege:mms m.a0 set from storage siege:mms l."clear_slab"._s10
+data modify storage siege:mms m.a0 set from storage siege:mms l."clear_slab".-s10
 function siege:clear_slab/_macro4 with storage siege:mms m
-scoreboard players operation #clear_slab._t12 mms.siege = #clear_slab.z mms.siege
-scoreboard players remove #clear_slab._t12 mms.siege 32
-data modify storage siege:mms m.a0 set from storage siege:mms l."clear_slab"._s11
-execute store result storage siege:mms m.a1 int 1 run scoreboard players get #clear_slab._t12 mms.siege
+scoreboard players operation #clear_slab.-t12 mms.siege = #clear_slab.z mms.siege
+scoreboard players remove #clear_slab.-t12 mms.siege 32
+data modify storage siege:mms m.a0 set from storage siege:mms l."clear_slab".-s11
+execute store result storage siege:mms m.a1 int 1 run scoreboard players get #clear_slab.-t12 mms.siege
 function siege:clear_slab/_macro5 with storage siege:mms m
-data modify storage siege:mms l."clear_slab".from set from storage siege:mms l."clear_slab"._s13
-scoreboard players operation #clear_slab._t14 mms.siege = #clear_slab.x mms.siege
-scoreboard players add #clear_slab._t14 mms.siege 32
-execute store result storage siege:mms m.a1 int 1 run scoreboard players get #clear_slab._t14 mms.siege
+data modify storage siege:mms l."clear_slab".from set from storage siege:mms l."clear_slab".-s13
+scoreboard players operation #clear_slab.-t14 mms.siege = #clear_slab.x mms.siege
+scoreboard players add #clear_slab.-t14 mms.siege 32
+execute store result storage siege:mms m.a1 int 1 run scoreboard players get #clear_slab.-t14 mms.siege
 function siege:clear_slab/_macro6 with storage siege:mms m
-data modify storage siege:mms m.a0 set from storage siege:mms l."clear_slab"._s15
+data modify storage siege:mms m.a0 set from storage siege:mms l."clear_slab".-s15
 function siege:clear_slab/_macro7 with storage siege:mms m
-data modify storage siege:mms m.a0 set from storage siege:mms l."clear_slab"._s16
+data modify storage siege:mms m.a0 set from storage siege:mms l."clear_slab".-s16
 execute store result storage siege:mms m.a1 int 1 run scoreboard players get #clear_slab.top mms.siege
 function siege:clear_slab/_macro8 with storage siege:mms m
-data modify storage siege:mms m.a0 set from storage siege:mms l."clear_slab"._s17
+data modify storage siege:mms m.a0 set from storage siege:mms l."clear_slab".-s17
 function siege:clear_slab/_macro9 with storage siege:mms m
-scoreboard players operation #clear_slab._t19 mms.siege = #clear_slab.z mms.siege
-scoreboard players add #clear_slab._t19 mms.siege 32
-data modify storage siege:mms m.a0 set from storage siege:mms l."clear_slab"._s18
-execute store result storage siege:mms m.a1 int 1 run scoreboard players get #clear_slab._t19 mms.siege
+scoreboard players operation #clear_slab.-t19 mms.siege = #clear_slab.z mms.siege
+scoreboard players add #clear_slab.-t19 mms.siege 32
+data modify storage siege:mms m.a0 set from storage siege:mms l."clear_slab".-s18
+execute store result storage siege:mms m.a1 int 1 run scoreboard players get #clear_slab.-t19 mms.siege
 function siege:clear_slab/_macro10 with storage siege:mms m
-data modify storage siege:mms l."clear_slab".to set from storage siege:mms l."clear_slab"._s20
+data modify storage siege:mms l."clear_slab".to set from storage siege:mms l."clear_slab".-s20
 data modify storage siege:mms m.a0 set from storage siege:mms l."clear_slab".from
 data modify storage siege:mms m.a1 set from storage siege:mms l."clear_slab".to
 function siege:clear_slab/_macro11 with storage siege:mms m
@@ -628,27 +628,27 @@ execute if score #clear_slab.n mms.siege matches 1 run function siege:save_banne
 scoreboard players operation #clear_slab.top mms.siege = #cy cs_tmp
 scoreboard players add #clear_slab.top mms.siege 16
 === data/siege/function/clear_slab/_macro1.mcfunction
-$data modify storage siege:mms l."clear_slab"._s8 set value "$(a1)"
+$data modify storage siege:mms l."clear_slab".-s8 set value "$(a1)"
 === data/siege/function/clear_slab/_macro10.mcfunction
-$data modify storage siege:mms l."clear_slab"._s20 set value "$(a0)$(a1)"
+$data modify storage siege:mms l."clear_slab".-s20 set value "$(a0)$(a1)"
 === data/siege/function/clear_slab/_macro11.mcfunction
 $execute in siege:scratch run fill $(a0) $(a1) minecraft:air
 === data/siege/function/clear_slab/_macro2.mcfunction
-$data modify storage siege:mms l."clear_slab"._s9 set value "$(a0) "
+$data modify storage siege:mms l."clear_slab".-s9 set value "$(a0) "
 === data/siege/function/clear_slab/_macro3.mcfunction
-$data modify storage siege:mms l."clear_slab"._s10 set value "$(a0)$(a1)"
+$data modify storage siege:mms l."clear_slab".-s10 set value "$(a0)$(a1)"
 === data/siege/function/clear_slab/_macro4.mcfunction
-$data modify storage siege:mms l."clear_slab"._s11 set value "$(a0) "
+$data modify storage siege:mms l."clear_slab".-s11 set value "$(a0) "
 === data/siege/function/clear_slab/_macro5.mcfunction
-$data modify storage siege:mms l."clear_slab"._s13 set value "$(a0)$(a1)"
+$data modify storage siege:mms l."clear_slab".-s13 set value "$(a0)$(a1)"
 === data/siege/function/clear_slab/_macro6.mcfunction
-$data modify storage siege:mms l."clear_slab"._s15 set value "$(a1)"
+$data modify storage siege:mms l."clear_slab".-s15 set value "$(a1)"
 === data/siege/function/clear_slab/_macro7.mcfunction
-$data modify storage siege:mms l."clear_slab"._s16 set value "$(a0) "
+$data modify storage siege:mms l."clear_slab".-s16 set value "$(a0) "
 === data/siege/function/clear_slab/_macro8.mcfunction
-$data modify storage siege:mms l."clear_slab"._s17 set value "$(a0)$(a1)"
+$data modify storage siege:mms l."clear_slab".-s17 set value "$(a0)$(a1)"
 === data/siege/function/clear_slab/_macro9.mcfunction
-$data modify storage siege:mms l."clear_slab"._s18 set value "$(a0) "
+$data modify storage siege:mms l."clear_slab".-s18 set value "$(a0) "
 === data/siege/function/create_core.mcfunction
 summon minecraft:marker ~ ~ ~ {Tags:["cs_core"]}
 execute store result score #cx cs_tmp run data get entity @e[tag=cs_core,limit=1] Pos[0]
@@ -681,9 +681,9 @@ execute if entity @s[tag=cs_sapper] run scoreboard players set @s cs_stuck 10000
 === data/siege/function/enemy_update.mcfunction
 scoreboard players add @s cs_age 1
 function siege:steer
-scoreboard players operation #enemy_update._t0 mms.siege = @s cs_age
-scoreboard players operation #enemy_update._t0 mms.siege %= #c25 mms.siege
-execute if score #enemy_update._t0 mms.siege matches 0 run function siege:stuck_check
+scoreboard players operation #enemy_update.-t0 mms.siege = @s cs_age
+scoreboard players operation #enemy_update.-t0 mms.siege %= #c25 mms.siege
+execute if score #enemy_update.-t0 mms.siege matches 0 run function siege:stuck_check
 execute if score @s cs_stuck matches 1.. run function siege:enemy_update/_if0
 === data/siege/function/enemy_update/_if0.mcfunction
 scoreboard players remove @s cs_stuck 1
@@ -716,68 +716,68 @@ tag @e[tag=cs_new_carrot] remove cs_new_carrot
 execute in minecraft:overworld run spreadplayers 0 0 0 8 under 40 false @s
 execute at @s run setworldspawn ~ ~ ~
 === data/siege/function/mark.mcfunction
-scoreboard players operation #mark._t1 mms.siege = #h cs_tmp
-scoreboard players operation #mark._t1 mms.siege *= #c3 mms.siege
-scoreboard players operation #mark._t1 mms.siege += #v cs_tmp
-scoreboard players operation #mark.d mms.siege = #mark._t1 mms.siege
-scoreboard players set #mark._f0 mms.siege 0
-execute if score #mark.d mms.siege matches 0 run scoreboard players set #mark._f0 mms.siege 1
-execute if score #mark._f0 mms.siege matches 1 in siege:scratch run setblock ~ ~ ~ minecraft:white_wool
-execute unless score #mark._f0 mms.siege matches 1 run function siege:mark/_else1
+scoreboard players operation #mark.-t1 mms.siege = #h cs_tmp
+scoreboard players operation #mark.-t1 mms.siege *= #c3 mms.siege
+scoreboard players operation #mark.-t1 mms.siege += #v cs_tmp
+scoreboard players operation #mark.d mms.siege = #mark.-t1 mms.siege
+scoreboard players set #mark.-f0 mms.siege 0
+execute if score #mark.d mms.siege matches 0 run scoreboard players set #mark.-f0 mms.siege 1
+execute if score #mark.-f0 mms.siege matches 1 in siege:scratch run setblock ~ ~ ~ minecraft:white_wool
+execute unless score #mark.-f0 mms.siege matches 1 run function siege:mark/_else1
 data modify storage siege:path queue append value {x:0,y:0,z:0}
 execute store result storage siege:path queue[-1].x int 1 run scoreboard players get #nx cs_tmp
 execute store result storage siege:path queue[-1].y int 1 run scoreboard players get #ny cs_tmp
 execute store result storage siege:path queue[-1].z int 1 run scoreboard players get #nz cs_tmp
 === data/siege/function/mark/_else1.mcfunction
-scoreboard players set #mark._f2 mms.siege 0
-execute if score #mark.d mms.siege matches 1 run scoreboard players set #mark._f2 mms.siege 1
-execute if score #mark._f2 mms.siege matches 1 in siege:scratch run setblock ~ ~ ~ minecraft:orange_wool
-execute unless score #mark._f2 mms.siege matches 1 run function siege:mark/_else3
+scoreboard players set #mark.-f2 mms.siege 0
+execute if score #mark.d mms.siege matches 1 run scoreboard players set #mark.-f2 mms.siege 1
+execute if score #mark.-f2 mms.siege matches 1 in siege:scratch run setblock ~ ~ ~ minecraft:orange_wool
+execute unless score #mark.-f2 mms.siege matches 1 run function siege:mark/_else3
 === data/siege/function/mark/_else11.mcfunction
-scoreboard players set #mark._f12 mms.siege 0
-execute if score #mark.d mms.siege matches 6 run scoreboard players set #mark._f12 mms.siege 1
-execute if score #mark._f12 mms.siege matches 1 in siege:scratch run setblock ~ ~ ~ minecraft:pink_wool
-execute unless score #mark._f12 mms.siege matches 1 run function siege:mark/_else13
+scoreboard players set #mark.-f12 mms.siege 0
+execute if score #mark.d mms.siege matches 6 run scoreboard players set #mark.-f12 mms.siege 1
+execute if score #mark.-f12 mms.siege matches 1 in siege:scratch run setblock ~ ~ ~ minecraft:pink_wool
+execute unless score #mark.-f12 mms.siege matches 1 run function siege:mark/_else13
 === data/siege/function/mark/_else13.mcfunction
-scoreboard players set #mark._f14 mms.siege 0
-execute if score #mark.d mms.siege matches 7 run scoreboard players set #mark._f14 mms.siege 1
-execute if score #mark._f14 mms.siege matches 1 in siege:scratch run setblock ~ ~ ~ minecraft:gray_wool
-execute unless score #mark._f14 mms.siege matches 1 run function siege:mark/_else15
+scoreboard players set #mark.-f14 mms.siege 0
+execute if score #mark.d mms.siege matches 7 run scoreboard players set #mark.-f14 mms.siege 1
+execute if score #mark.-f14 mms.siege matches 1 in siege:scratch run setblock ~ ~ ~ minecraft:gray_wool
+execute unless score #mark.-f14 mms.siege matches 1 run function siege:mark/_else15
 === data/siege/function/mark/_else15.mcfunction
-scoreboard players set #mark._f16 mms.siege 0
-execute if score #mark.d mms.siege matches 8 run scoreboard players set #mark._f16 mms.siege 1
-execute if score #mark._f16 mms.siege matches 1 in siege:scratch run setblock ~ ~ ~ minecraft:light_gray_wool
-execute unless score #mark._f16 mms.siege matches 1 run function siege:mark/_else17
+scoreboard players set #mark.-f16 mms.siege 0
+execute if score #mark.d mms.siege matches 8 run scoreboard players set #mark.-f16 mms.siege 1
+execute if score #mark.-f16 mms.siege matches 1 in siege:scratch run setblock ~ ~ ~ minecraft:light_gray_wool
+execute unless score #mark.-f16 mms.siege matches 1 run function siege:mark/_else17
 === data/siege/function/mark/_else17.mcfunction
-scoreboard players set #mark._f18 mms.siege 0
-execute if score #mark.d mms.siege matches 9 run scoreboard players set #mark._f18 mms.siege 1
-execute if score #mark._f18 mms.siege matches 1 in siege:scratch run setblock ~ ~ ~ minecraft:cyan_wool
-execute unless score #mark._f18 mms.siege matches 1 run function siege:mark/_else19
+scoreboard players set #mark.-f18 mms.siege 0
+execute if score #mark.d mms.siege matches 9 run scoreboard players set #mark.-f18 mms.siege 1
+execute if score #mark.-f18 mms.siege matches 1 in siege:scratch run setblock ~ ~ ~ minecraft:cyan_wool
+execute unless score #mark.-f18 mms.siege matches 1 run function siege:mark/_else19
 === data/siege/function/mark/_else19.mcfunction
-scoreboard players set #mark._f20 mms.siege 0
-execute if score #mark.d mms.siege matches 10 run scoreboard players set #mark._f20 mms.siege 1
-execute if score #mark._f20 mms.siege matches 1 in siege:scratch run setblock ~ ~ ~ minecraft:purple_wool
-execute unless score #mark._f20 mms.siege matches 1 in siege:scratch run setblock ~ ~ ~ minecraft:blue_wool
+scoreboard players set #mark.-f20 mms.siege 0
+execute if score #mark.d mms.siege matches 10 run scoreboard players set #mark.-f20 mms.siege 1
+execute if score #mark.-f20 mms.siege matches 1 in siege:scratch run setblock ~ ~ ~ minecraft:purple_wool
+execute unless score #mark.-f20 mms.siege matches 1 in siege:scratch run setblock ~ ~ ~ minecraft:blue_wool
 === data/siege/function/mark/_else3.mcfunction
-scoreboard players set #mark._f4 mms.siege 0
-execute if score #mark.d mms.siege matches 2 run scoreboard players set #mark._f4 mms.siege 1
-execute if score #mark._f4 mms.siege matches 1 in siege:scratch run setblock ~ ~ ~ minecraft:magenta_wool
-execute unless score #mark._f4 mms.siege matches 1 run function siege:mark/_else5
+scoreboard players set #mark.-f4 mms.siege 0
+execute if score #mark.d mms.siege matches 2 run scoreboard players set #mark.-f4 mms.siege 1
+execute if score #mark.-f4 mms.siege matches 1 in siege:scratch run setblock ~ ~ ~ minecraft:magenta_wool
+execute unless score #mark.-f4 mms.siege matches 1 run function siege:mark/_else5
 === data/siege/function/mark/_else5.mcfunction
-scoreboard players set #mark._f6 mms.siege 0
-execute if score #mark.d mms.siege matches 3 run scoreboard players set #mark._f6 mms.siege 1
-execute if score #mark._f6 mms.siege matches 1 in siege:scratch run setblock ~ ~ ~ minecraft:light_blue_wool
-execute unless score #mark._f6 mms.siege matches 1 run function siege:mark/_else7
+scoreboard players set #mark.-f6 mms.siege 0
+execute if score #mark.d mms.siege matches 3 run scoreboard players set #mark.-f6 mms.siege 1
+execute if score #mark.-f6 mms.siege matches 1 in siege:scratch run setblock ~ ~ ~ minecraft:light_blue_wool
+execute unless score #mark.-f6 mms.siege matches 1 run function siege:mark/_else7
 === data/siege/function/mark/_else7.mcfunction
-scoreboard players set #mark._f8 mms.siege 0
-execute if score #mark.d mms.siege matches 4 run scoreboard players set #mark._f8 mms.siege 1
-execute if score #mark._f8 mms.siege matches 1 in siege:scratch run setblock ~ ~ ~ minecraft:yellow_wool
-execute unless score #mark._f8 mms.siege matches 1 run function siege:mark/_else9
+scoreboard players set #mark.-f8 mms.siege 0
+execute if score #mark.d mms.siege matches 4 run scoreboard players set #mark.-f8 mms.siege 1
+execute if score #mark.-f8 mms.siege matches 1 in siege:scratch run setblock ~ ~ ~ minecraft:yellow_wool
+execute unless score #mark.-f8 mms.siege matches 1 run function siege:mark/_else9
 === data/siege/function/mark/_else9.mcfunction
-scoreboard players set #mark._f10 mms.siege 0
-execute if score #mark.d mms.siege matches 5 run scoreboard players set #mark._f10 mms.siege 1
-execute if score #mark._f10 mms.siege matches 1 in siege:scratch run setblock ~ ~ ~ minecraft:lime_wool
-execute unless score #mark._f10 mms.siege matches 1 run function siege:mark/_else11
+scoreboard players set #mark.-f10 mms.siege 0
+execute if score #mark.d mms.siege matches 5 run scoreboard players set #mark.-f10 mms.siege 1
+execute if score #mark.-f10 mms.siege matches 1 in siege:scratch run setblock ~ ~ ~ minecraft:lime_wool
+execute unless score #mark.-f10 mms.siege matches 1 run function siege:mark/_else11
 === data/siege/function/mms_gen/load.mcfunction
 scoreboard objectives add cs_tmp dummy
 scoreboard objectives add cs_group dummy
@@ -819,9 +819,9 @@ scoreboard players set #ray cs_tmp 0
 execute at @s anchored eyes positioned ^ ^ ^ run function siege:find_banner
 === data/siege/function/parked_damage.mcfunction
 execute store result score #hp cs_tmp run data get entity @s Health
-scoreboard players set #parked_damage._t0 mms.siege 1024
-scoreboard players operation #parked_damage._t0 mms.siege -= #hp cs_tmp
-scoreboard players operation #lost cs_tmp += #parked_damage._t0 mms.siege
+scoreboard players set #parked_damage.-t0 mms.siege 1024
+scoreboard players operation #parked_damage.-t0 mms.siege -= #hp cs_tmp
+scoreboard players operation #lost cs_tmp += #parked_damage.-t0 mms.siege
 data modify entity @s Health set value 1024f
 execute at @e[tag=cs_core,limit=1] run tp @s ~ ~ ~
 === data/siege/function/path_step.mcfunction
@@ -833,40 +833,40 @@ scoreboard players operation #path_step.x mms.siege = #px cs_tmp
 scoreboard players operation #path_step.y mms.siege = #py cs_tmp
 scoreboard players operation #path_step.z mms.siege = #pz cs_tmp
 scoreboard players set #h cs_tmp 0
-scoreboard players operation #path_step._t0 mms.siege = #path_step.x mms.siege
-scoreboard players add #path_step._t0 mms.siege 1
-scoreboard players operation #visit.x mms.siege = #path_step._t0 mms.siege
+scoreboard players operation #path_step.-t0 mms.siege = #path_step.x mms.siege
+scoreboard players add #path_step.-t0 mms.siege 1
+scoreboard players operation #visit.x mms.siege = #path_step.-t0 mms.siege
 scoreboard players operation #visit.y mms.siege = #path_step.y mms.siege
 scoreboard players operation #visit.z mms.siege = #path_step.z mms.siege
 function siege:visit
 scoreboard players set #h cs_tmp 1
-scoreboard players operation #path_step._t1 mms.siege = #path_step.x mms.siege
-scoreboard players remove #path_step._t1 mms.siege 1
-scoreboard players operation #visit.x mms.siege = #path_step._t1 mms.siege
+scoreboard players operation #path_step.-t1 mms.siege = #path_step.x mms.siege
+scoreboard players remove #path_step.-t1 mms.siege 1
+scoreboard players operation #visit.x mms.siege = #path_step.-t1 mms.siege
 scoreboard players operation #visit.y mms.siege = #path_step.y mms.siege
 scoreboard players operation #visit.z mms.siege = #path_step.z mms.siege
 function siege:visit
 scoreboard players set #h cs_tmp 2
-scoreboard players operation #path_step._t2 mms.siege = #path_step.z mms.siege
-scoreboard players add #path_step._t2 mms.siege 1
+scoreboard players operation #path_step.-t2 mms.siege = #path_step.z mms.siege
+scoreboard players add #path_step.-t2 mms.siege 1
 scoreboard players operation #visit.x mms.siege = #path_step.x mms.siege
 scoreboard players operation #visit.y mms.siege = #path_step.y mms.siege
-scoreboard players operation #visit.z mms.siege = #path_step._t2 mms.siege
+scoreboard players operation #visit.z mms.siege = #path_step.-t2 mms.siege
 function siege:visit
 scoreboard players set #h cs_tmp 3
-scoreboard players operation #path_step._t3 mms.siege = #path_step.z mms.siege
-scoreboard players remove #path_step._t3 mms.siege 1
+scoreboard players operation #path_step.-t3 mms.siege = #path_step.z mms.siege
+scoreboard players remove #path_step.-t3 mms.siege 1
 scoreboard players operation #visit.x mms.siege = #path_step.x mms.siege
 scoreboard players operation #visit.y mms.siege = #path_step.y mms.siege
-scoreboard players operation #visit.z mms.siege = #path_step._t3 mms.siege
+scoreboard players operation #visit.z mms.siege = #path_step.-t3 mms.siege
 function siege:visit
 === data/siege/function/path_tick.mcfunction
 execute if score $path_phase mms.siege matches ..5 run function siege:path_tick/_if0
 execute if score #cf mms.siege matches 3 run return run function siege:mms_gen/ret
 execute at @e[tag=cs_core,limit=1] run function siege:path_work
 === data/siege/function/path_tick/_if0.mcfunction
-execute store result score #path_tick._t0 mms.siege run function siege:scratch_loaded
-execute unless score #path_tick._t0 mms.siege matches 1 run function siege:path_tick/_if1
+execute store result score #path_tick.-t0 mms.siege run function siege:scratch_loaded
+execute unless score #path_tick.-t0 mms.siege matches 1 run function siege:path_tick/_if1
 execute if score #cf mms.siege matches 1.. run return 0
 scoreboard players operation #clear_slab.n mms.siege = $path_phase mms.siege
 function siege:clear_slab
@@ -903,47 +903,47 @@ kill @s
 === data/siege/function/repath.mcfunction
 scoreboard players operation #repath.x mms.siege = #cx cs_tmp
 scoreboard players operation #repath.z mms.siege = #cz cs_tmp
-scoreboard players operation #repath._t0 mms.siege = #repath.x mms.siege
-scoreboard players remove #repath._t0 mms.siege 32
-execute store result storage siege:mms m.a1 int 1 run scoreboard players get #repath._t0 mms.siege
+scoreboard players operation #repath.-t0 mms.siege = #repath.x mms.siege
+scoreboard players remove #repath.-t0 mms.siege 32
+execute store result storage siege:mms m.a1 int 1 run scoreboard players get #repath.-t0 mms.siege
 function siege:repath/_macro0 with storage siege:mms m
-data modify storage siege:mms m.a0 set from storage siege:mms l."repath"._s1
+data modify storage siege:mms m.a0 set from storage siege:mms l."repath".-s1
 function siege:repath/_macro1 with storage siege:mms m
-scoreboard players operation #repath._t3 mms.siege = #repath.z mms.siege
-scoreboard players remove #repath._t3 mms.siege 32
-data modify storage siege:mms m.a0 set from storage siege:mms l."repath"._s2
-execute store result storage siege:mms m.a1 int 1 run scoreboard players get #repath._t3 mms.siege
+scoreboard players operation #repath.-t3 mms.siege = #repath.z mms.siege
+scoreboard players remove #repath.-t3 mms.siege 32
+data modify storage siege:mms m.a0 set from storage siege:mms l."repath".-s2
+execute store result storage siege:mms m.a1 int 1 run scoreboard players get #repath.-t3 mms.siege
 function siege:repath/_macro2 with storage siege:mms m
-data modify storage siege:mms l."repath".from set from storage siege:mms l."repath"._s4
-scoreboard players operation #repath._t5 mms.siege = #repath.x mms.siege
-scoreboard players add #repath._t5 mms.siege 32
-execute store result storage siege:mms m.a1 int 1 run scoreboard players get #repath._t5 mms.siege
+data modify storage siege:mms l."repath".from set from storage siege:mms l."repath".-s4
+scoreboard players operation #repath.-t5 mms.siege = #repath.x mms.siege
+scoreboard players add #repath.-t5 mms.siege 32
+execute store result storage siege:mms m.a1 int 1 run scoreboard players get #repath.-t5 mms.siege
 function siege:repath/_macro3 with storage siege:mms m
-data modify storage siege:mms m.a0 set from storage siege:mms l."repath"._s6
+data modify storage siege:mms m.a0 set from storage siege:mms l."repath".-s6
 function siege:repath/_macro4 with storage siege:mms m
-scoreboard players operation #repath._t8 mms.siege = #repath.z mms.siege
-scoreboard players add #repath._t8 mms.siege 32
-data modify storage siege:mms m.a0 set from storage siege:mms l."repath"._s7
-execute store result storage siege:mms m.a1 int 1 run scoreboard players get #repath._t8 mms.siege
+scoreboard players operation #repath.-t8 mms.siege = #repath.z mms.siege
+scoreboard players add #repath.-t8 mms.siege 32
+data modify storage siege:mms m.a0 set from storage siege:mms l."repath".-s7
+execute store result storage siege:mms m.a1 int 1 run scoreboard players get #repath.-t8 mms.siege
 function siege:repath/_macro5 with storage siege:mms m
-data modify storage siege:mms l."repath".to set from storage siege:mms l."repath"._s9
+data modify storage siege:mms l."repath".to set from storage siege:mms l."repath".-s9
 data modify storage siege:mms m.a0 set from storage siege:mms l."repath".from
 data modify storage siege:mms m.a1 set from storage siege:mms l."repath".to
 function siege:repath/_macro6 with storage siege:mms m
 scoreboard players set $path_dirty mms.siege 0
 scoreboard players set $path_phase mms.siege 1
 === data/siege/function/repath/_macro0.mcfunction
-$data modify storage siege:mms l."repath"._s1 set value "$(a1)"
+$data modify storage siege:mms l."repath".-s1 set value "$(a1)"
 === data/siege/function/repath/_macro1.mcfunction
-$data modify storage siege:mms l."repath"._s2 set value "$(a0) "
+$data modify storage siege:mms l."repath".-s2 set value "$(a0) "
 === data/siege/function/repath/_macro2.mcfunction
-$data modify storage siege:mms l."repath"._s4 set value "$(a0)$(a1)"
+$data modify storage siege:mms l."repath".-s4 set value "$(a0)$(a1)"
 === data/siege/function/repath/_macro3.mcfunction
-$data modify storage siege:mms l."repath"._s6 set value "$(a1)"
+$data modify storage siege:mms l."repath".-s6 set value "$(a1)"
 === data/siege/function/repath/_macro4.mcfunction
-$data modify storage siege:mms l."repath"._s7 set value "$(a0) "
+$data modify storage siege:mms l."repath".-s7 set value "$(a0) "
 === data/siege/function/repath/_macro5.mcfunction
-$data modify storage siege:mms l."repath"._s9 set value "$(a0)$(a1)"
+$data modify storage siege:mms l."repath".-s9 set value "$(a0)$(a1)"
 === data/siege/function/repath/_macro6.mcfunction
 $execute in siege:scratch run forceload add $(a0) $(a1)
 === data/siege/function/reset.mcfunction
@@ -973,124 +973,124 @@ execute at @e[tag=cs_core,limit=1] if block ~ ~ ~ #minecraft:banners run clone ~
 scoreboard players operation #scratch_loaded.x mms.siege = #cx cs_tmp
 scoreboard players operation #scratch_loaded.y mms.siege = #cy cs_tmp
 scoreboard players operation #scratch_loaded.z mms.siege = #cz cs_tmp
-scoreboard players operation #scratch_loaded._t0 mms.siege = #scratch_loaded.x mms.siege
-scoreboard players remove #scratch_loaded._t0 mms.siege 32
-execute store result storage siege:mms m.a1 int 1 run scoreboard players get #scratch_loaded._t0 mms.siege
+scoreboard players operation #scratch_loaded.-t0 mms.siege = #scratch_loaded.x mms.siege
+scoreboard players remove #scratch_loaded.-t0 mms.siege 32
+execute store result storage siege:mms m.a1 int 1 run scoreboard players get #scratch_loaded.-t0 mms.siege
 function siege:scratch_loaded/_macro0 with storage siege:mms m
-data modify storage siege:mms m.a0 set from storage siege:mms l."scratch_loaded"._s1
+data modify storage siege:mms m.a0 set from storage siege:mms l."scratch_loaded".-s1
 function siege:scratch_loaded/_macro1 with storage siege:mms m
-data modify storage siege:mms m.a0 set from storage siege:mms l."scratch_loaded"._s2
+data modify storage siege:mms m.a0 set from storage siege:mms l."scratch_loaded".-s2
 execute store result storage siege:mms m.a1 int 1 run scoreboard players get #scratch_loaded.y mms.siege
 function siege:scratch_loaded/_macro2 with storage siege:mms m
-data modify storage siege:mms m.a0 set from storage siege:mms l."scratch_loaded"._s3
+data modify storage siege:mms m.a0 set from storage siege:mms l."scratch_loaded".-s3
 function siege:scratch_loaded/_macro3 with storage siege:mms m
-scoreboard players operation #scratch_loaded._t5 mms.siege = #scratch_loaded.z mms.siege
-scoreboard players remove #scratch_loaded._t5 mms.siege 32
-data modify storage siege:mms m.a0 set from storage siege:mms l."scratch_loaded"._s4
-execute store result storage siege:mms m.a1 int 1 run scoreboard players get #scratch_loaded._t5 mms.siege
+scoreboard players operation #scratch_loaded.-t5 mms.siege = #scratch_loaded.z mms.siege
+scoreboard players remove #scratch_loaded.-t5 mms.siege 32
+data modify storage siege:mms m.a0 set from storage siege:mms l."scratch_loaded".-s4
+execute store result storage siege:mms m.a1 int 1 run scoreboard players get #scratch_loaded.-t5 mms.siege
 function siege:scratch_loaded/_macro4 with storage siege:mms m
-data modify storage siege:mms l."scratch_loaded".a set from storage siege:mms l."scratch_loaded"._s6
-scoreboard players operation #scratch_loaded._t7 mms.siege = #scratch_loaded.x mms.siege
-scoreboard players add #scratch_loaded._t7 mms.siege 32
-execute store result storage siege:mms m.a1 int 1 run scoreboard players get #scratch_loaded._t7 mms.siege
+data modify storage siege:mms l."scratch_loaded".a set from storage siege:mms l."scratch_loaded".-s6
+scoreboard players operation #scratch_loaded.-t7 mms.siege = #scratch_loaded.x mms.siege
+scoreboard players add #scratch_loaded.-t7 mms.siege 32
+execute store result storage siege:mms m.a1 int 1 run scoreboard players get #scratch_loaded.-t7 mms.siege
 function siege:scratch_loaded/_macro5 with storage siege:mms m
-data modify storage siege:mms m.a0 set from storage siege:mms l."scratch_loaded"._s8
+data modify storage siege:mms m.a0 set from storage siege:mms l."scratch_loaded".-s8
 function siege:scratch_loaded/_macro6 with storage siege:mms m
-data modify storage siege:mms m.a0 set from storage siege:mms l."scratch_loaded"._s9
+data modify storage siege:mms m.a0 set from storage siege:mms l."scratch_loaded".-s9
 execute store result storage siege:mms m.a1 int 1 run scoreboard players get #scratch_loaded.y mms.siege
 function siege:scratch_loaded/_macro7 with storage siege:mms m
-data modify storage siege:mms m.a0 set from storage siege:mms l."scratch_loaded"._s10
+data modify storage siege:mms m.a0 set from storage siege:mms l."scratch_loaded".-s10
 function siege:scratch_loaded/_macro8 with storage siege:mms m
-scoreboard players operation #scratch_loaded._t12 mms.siege = #scratch_loaded.z mms.siege
-scoreboard players remove #scratch_loaded._t12 mms.siege 32
-data modify storage siege:mms m.a0 set from storage siege:mms l."scratch_loaded"._s11
-execute store result storage siege:mms m.a1 int 1 run scoreboard players get #scratch_loaded._t12 mms.siege
+scoreboard players operation #scratch_loaded.-t12 mms.siege = #scratch_loaded.z mms.siege
+scoreboard players remove #scratch_loaded.-t12 mms.siege 32
+data modify storage siege:mms m.a0 set from storage siege:mms l."scratch_loaded".-s11
+execute store result storage siege:mms m.a1 int 1 run scoreboard players get #scratch_loaded.-t12 mms.siege
 function siege:scratch_loaded/_macro9 with storage siege:mms m
-data modify storage siege:mms l."scratch_loaded".b set from storage siege:mms l."scratch_loaded"._s13
-scoreboard players operation #scratch_loaded._t14 mms.siege = #scratch_loaded.x mms.siege
-scoreboard players remove #scratch_loaded._t14 mms.siege 32
-execute store result storage siege:mms m.a1 int 1 run scoreboard players get #scratch_loaded._t14 mms.siege
+data modify storage siege:mms l."scratch_loaded".b set from storage siege:mms l."scratch_loaded".-s13
+scoreboard players operation #scratch_loaded.-t14 mms.siege = #scratch_loaded.x mms.siege
+scoreboard players remove #scratch_loaded.-t14 mms.siege 32
+execute store result storage siege:mms m.a1 int 1 run scoreboard players get #scratch_loaded.-t14 mms.siege
 function siege:scratch_loaded/_macro10 with storage siege:mms m
-data modify storage siege:mms m.a0 set from storage siege:mms l."scratch_loaded"._s15
+data modify storage siege:mms m.a0 set from storage siege:mms l."scratch_loaded".-s15
 function siege:scratch_loaded/_macro11 with storage siege:mms m
-data modify storage siege:mms m.a0 set from storage siege:mms l."scratch_loaded"._s16
+data modify storage siege:mms m.a0 set from storage siege:mms l."scratch_loaded".-s16
 execute store result storage siege:mms m.a1 int 1 run scoreboard players get #scratch_loaded.y mms.siege
 function siege:scratch_loaded/_macro12 with storage siege:mms m
-data modify storage siege:mms m.a0 set from storage siege:mms l."scratch_loaded"._s17
+data modify storage siege:mms m.a0 set from storage siege:mms l."scratch_loaded".-s17
 function siege:scratch_loaded/_macro13 with storage siege:mms m
-scoreboard players operation #scratch_loaded._t19 mms.siege = #scratch_loaded.z mms.siege
-scoreboard players add #scratch_loaded._t19 mms.siege 32
-data modify storage siege:mms m.a0 set from storage siege:mms l."scratch_loaded"._s18
-execute store result storage siege:mms m.a1 int 1 run scoreboard players get #scratch_loaded._t19 mms.siege
+scoreboard players operation #scratch_loaded.-t19 mms.siege = #scratch_loaded.z mms.siege
+scoreboard players add #scratch_loaded.-t19 mms.siege 32
+data modify storage siege:mms m.a0 set from storage siege:mms l."scratch_loaded".-s18
+execute store result storage siege:mms m.a1 int 1 run scoreboard players get #scratch_loaded.-t19 mms.siege
 function siege:scratch_loaded/_macro14 with storage siege:mms m
-data modify storage siege:mms l."scratch_loaded".c set from storage siege:mms l."scratch_loaded"._s20
-scoreboard players operation #scratch_loaded._t21 mms.siege = #scratch_loaded.x mms.siege
-scoreboard players add #scratch_loaded._t21 mms.siege 32
-execute store result storage siege:mms m.a1 int 1 run scoreboard players get #scratch_loaded._t21 mms.siege
+data modify storage siege:mms l."scratch_loaded".c set from storage siege:mms l."scratch_loaded".-s20
+scoreboard players operation #scratch_loaded.-t21 mms.siege = #scratch_loaded.x mms.siege
+scoreboard players add #scratch_loaded.-t21 mms.siege 32
+execute store result storage siege:mms m.a1 int 1 run scoreboard players get #scratch_loaded.-t21 mms.siege
 function siege:scratch_loaded/_macro15 with storage siege:mms m
-data modify storage siege:mms m.a0 set from storage siege:mms l."scratch_loaded"._s22
+data modify storage siege:mms m.a0 set from storage siege:mms l."scratch_loaded".-s22
 function siege:scratch_loaded/_macro16 with storage siege:mms m
-data modify storage siege:mms m.a0 set from storage siege:mms l."scratch_loaded"._s23
+data modify storage siege:mms m.a0 set from storage siege:mms l."scratch_loaded".-s23
 execute store result storage siege:mms m.a1 int 1 run scoreboard players get #scratch_loaded.y mms.siege
 function siege:scratch_loaded/_macro17 with storage siege:mms m
-data modify storage siege:mms m.a0 set from storage siege:mms l."scratch_loaded"._s24
+data modify storage siege:mms m.a0 set from storage siege:mms l."scratch_loaded".-s24
 function siege:scratch_loaded/_macro18 with storage siege:mms m
-scoreboard players operation #scratch_loaded._t26 mms.siege = #scratch_loaded.z mms.siege
-scoreboard players add #scratch_loaded._t26 mms.siege 32
-data modify storage siege:mms m.a0 set from storage siege:mms l."scratch_loaded"._s25
-execute store result storage siege:mms m.a1 int 1 run scoreboard players get #scratch_loaded._t26 mms.siege
+scoreboard players operation #scratch_loaded.-t26 mms.siege = #scratch_loaded.z mms.siege
+scoreboard players add #scratch_loaded.-t26 mms.siege 32
+data modify storage siege:mms m.a0 set from storage siege:mms l."scratch_loaded".-s25
+execute store result storage siege:mms m.a1 int 1 run scoreboard players get #scratch_loaded.-t26 mms.siege
 function siege:scratch_loaded/_macro19 with storage siege:mms m
-data modify storage siege:mms l."scratch_loaded".d set from storage siege:mms l."scratch_loaded"._s27
+data modify storage siege:mms l."scratch_loaded".d set from storage siege:mms l."scratch_loaded".-s27
 data modify storage siege:mms m.a0 set from storage siege:mms l."scratch_loaded".a
 data modify storage siege:mms m.a1 set from storage siege:mms l."scratch_loaded".b
 data modify storage siege:mms m.a2 set from storage siege:mms l."scratch_loaded".c
 data modify storage siege:mms m.a3 set from storage siege:mms l."scratch_loaded".d
 function siege:scratch_loaded/_macro20 with storage siege:mms m
-scoreboard players set #scratch_loaded._t28 mms.siege 0
-execute if score #ld cs_tmp matches 1 run scoreboard players set #scratch_loaded._t28 mms.siege 1
-return run scoreboard players get #scratch_loaded._t28 mms.siege
+scoreboard players set #scratch_loaded.-t28 mms.siege 0
+execute if score #ld cs_tmp matches 1 run scoreboard players set #scratch_loaded.-t28 mms.siege 1
+return run scoreboard players get #scratch_loaded.-t28 mms.siege
 === data/siege/function/scratch_loaded/_macro0.mcfunction
-$data modify storage siege:mms l."scratch_loaded"._s1 set value "$(a1)"
+$data modify storage siege:mms l."scratch_loaded".-s1 set value "$(a1)"
 === data/siege/function/scratch_loaded/_macro1.mcfunction
-$data modify storage siege:mms l."scratch_loaded"._s2 set value "$(a0) "
+$data modify storage siege:mms l."scratch_loaded".-s2 set value "$(a0) "
 === data/siege/function/scratch_loaded/_macro10.mcfunction
-$data modify storage siege:mms l."scratch_loaded"._s15 set value "$(a1)"
+$data modify storage siege:mms l."scratch_loaded".-s15 set value "$(a1)"
 === data/siege/function/scratch_loaded/_macro11.mcfunction
-$data modify storage siege:mms l."scratch_loaded"._s16 set value "$(a0) "
+$data modify storage siege:mms l."scratch_loaded".-s16 set value "$(a0) "
 === data/siege/function/scratch_loaded/_macro12.mcfunction
-$data modify storage siege:mms l."scratch_loaded"._s17 set value "$(a0)$(a1)"
+$data modify storage siege:mms l."scratch_loaded".-s17 set value "$(a0)$(a1)"
 === data/siege/function/scratch_loaded/_macro13.mcfunction
-$data modify storage siege:mms l."scratch_loaded"._s18 set value "$(a0) "
+$data modify storage siege:mms l."scratch_loaded".-s18 set value "$(a0) "
 === data/siege/function/scratch_loaded/_macro14.mcfunction
-$data modify storage siege:mms l."scratch_loaded"._s20 set value "$(a0)$(a1)"
+$data modify storage siege:mms l."scratch_loaded".-s20 set value "$(a0)$(a1)"
 === data/siege/function/scratch_loaded/_macro15.mcfunction
-$data modify storage siege:mms l."scratch_loaded"._s22 set value "$(a1)"
+$data modify storage siege:mms l."scratch_loaded".-s22 set value "$(a1)"
 === data/siege/function/scratch_loaded/_macro16.mcfunction
-$data modify storage siege:mms l."scratch_loaded"._s23 set value "$(a0) "
+$data modify storage siege:mms l."scratch_loaded".-s23 set value "$(a0) "
 === data/siege/function/scratch_loaded/_macro17.mcfunction
-$data modify storage siege:mms l."scratch_loaded"._s24 set value "$(a0)$(a1)"
+$data modify storage siege:mms l."scratch_loaded".-s24 set value "$(a0)$(a1)"
 === data/siege/function/scratch_loaded/_macro18.mcfunction
-$data modify storage siege:mms l."scratch_loaded"._s25 set value "$(a0) "
+$data modify storage siege:mms l."scratch_loaded".-s25 set value "$(a0) "
 === data/siege/function/scratch_loaded/_macro19.mcfunction
-$data modify storage siege:mms l."scratch_loaded"._s27 set value "$(a0)$(a1)"
+$data modify storage siege:mms l."scratch_loaded".-s27 set value "$(a0)$(a1)"
 === data/siege/function/scratch_loaded/_macro2.mcfunction
-$data modify storage siege:mms l."scratch_loaded"._s3 set value "$(a0)$(a1)"
+$data modify storage siege:mms l."scratch_loaded".-s3 set value "$(a0)$(a1)"
 === data/siege/function/scratch_loaded/_macro20.mcfunction
 $execute store success score #ld cs_tmp in siege:scratch if loaded $(a0) if loaded $(a1) if loaded $(a2) if loaded $(a3)
 === data/siege/function/scratch_loaded/_macro3.mcfunction
-$data modify storage siege:mms l."scratch_loaded"._s4 set value "$(a0) "
+$data modify storage siege:mms l."scratch_loaded".-s4 set value "$(a0) "
 === data/siege/function/scratch_loaded/_macro4.mcfunction
-$data modify storage siege:mms l."scratch_loaded"._s6 set value "$(a0)$(a1)"
+$data modify storage siege:mms l."scratch_loaded".-s6 set value "$(a0)$(a1)"
 === data/siege/function/scratch_loaded/_macro5.mcfunction
-$data modify storage siege:mms l."scratch_loaded"._s8 set value "$(a1)"
+$data modify storage siege:mms l."scratch_loaded".-s8 set value "$(a1)"
 === data/siege/function/scratch_loaded/_macro6.mcfunction
-$data modify storage siege:mms l."scratch_loaded"._s9 set value "$(a0) "
+$data modify storage siege:mms l."scratch_loaded".-s9 set value "$(a0) "
 === data/siege/function/scratch_loaded/_macro7.mcfunction
-$data modify storage siege:mms l."scratch_loaded"._s10 set value "$(a0)$(a1)"
+$data modify storage siege:mms l."scratch_loaded".-s10 set value "$(a0)$(a1)"
 === data/siege/function/scratch_loaded/_macro8.mcfunction
-$data modify storage siege:mms l."scratch_loaded"._s11 set value "$(a0) "
+$data modify storage siege:mms l."scratch_loaded".-s11 set value "$(a0) "
 === data/siege/function/scratch_loaded/_macro9.mcfunction
-$data modify storage siege:mms l."scratch_loaded"._s13 set value "$(a0)$(a1)"
+$data modify storage siege:mms l."scratch_loaded".-s13 set value "$(a0)$(a1)"
 === data/siege/function/seal_banner.mcfunction
 execute at @e[tag=cs_core,limit=1] run fill ~-2 ~-1 ~-2 ~2 ~2 ~2 minecraft:cobblestone outline
 tellraw @s "Banner sealed in cobblestone. Enemies should get stuck, then dig in."
@@ -1102,17 +1102,17 @@ scoreboard players operation #seed.y mms.siege = #cy cs_tmp
 scoreboard players operation #seed.z mms.siege = #cz cs_tmp
 execute store result storage siege:mms m.a1 int 1 run scoreboard players get #seed.x mms.siege
 function siege:seed/_macro0 with storage siege:mms m
-data modify storage siege:mms m.a0 set from storage siege:mms l."seed"._s0
+data modify storage siege:mms m.a0 set from storage siege:mms l."seed".-s0
 function siege:seed/_macro1 with storage siege:mms m
-data modify storage siege:mms m.a0 set from storage siege:mms l."seed"._s1
+data modify storage siege:mms m.a0 set from storage siege:mms l."seed".-s1
 execute store result storage siege:mms m.a1 int 1 run scoreboard players get #seed.y mms.siege
 function siege:seed/_macro2 with storage siege:mms m
-data modify storage siege:mms m.a0 set from storage siege:mms l."seed"._s2
+data modify storage siege:mms m.a0 set from storage siege:mms l."seed".-s2
 function siege:seed/_macro3 with storage siege:mms m
-data modify storage siege:mms m.a0 set from storage siege:mms l."seed"._s3
+data modify storage siege:mms m.a0 set from storage siege:mms l."seed".-s3
 execute store result storage siege:mms m.a1 int 1 run scoreboard players get #seed.z mms.siege
 function siege:seed/_macro4 with storage siege:mms m
-data modify storage siege:mms l."seed".at set from storage siege:mms l."seed"._s4
+data modify storage siege:mms l."seed".at set from storage siege:mms l."seed".-s4
 data modify storage siege:mms m.a0 set from storage siege:mms l."seed".at
 function siege:seed/_macro5 with storage siege:mms m
 data modify storage siege:path queue set value []
@@ -1121,48 +1121,48 @@ execute store result storage siege:path queue[0].x int 1 run scoreboard players 
 execute store result storage siege:path queue[0].y int 1 run scoreboard players get #cy cs_tmp
 execute store result storage siege:path queue[0].z int 1 run scoreboard players get #cz cs_tmp
 === data/siege/function/seed/_macro0.mcfunction
-$data modify storage siege:mms l."seed"._s0 set value "$(a1)"
+$data modify storage siege:mms l."seed".-s0 set value "$(a1)"
 === data/siege/function/seed/_macro1.mcfunction
-$data modify storage siege:mms l."seed"._s1 set value "$(a0) "
+$data modify storage siege:mms l."seed".-s1 set value "$(a0) "
 === data/siege/function/seed/_macro2.mcfunction
-$data modify storage siege:mms l."seed"._s2 set value "$(a0)$(a1)"
+$data modify storage siege:mms l."seed".-s2 set value "$(a0)$(a1)"
 === data/siege/function/seed/_macro3.mcfunction
-$data modify storage siege:mms l."seed"._s3 set value "$(a0) "
+$data modify storage siege:mms l."seed".-s3 set value "$(a0) "
 === data/siege/function/seed/_macro4.mcfunction
-$data modify storage siege:mms l."seed"._s4 set value "$(a0)$(a1)"
+$data modify storage siege:mms l."seed".-s4 set value "$(a0)$(a1)"
 === data/siege/function/seed/_macro5.mcfunction
 $execute in siege:scratch run setblock $(a0) minecraft:gold_block
 === data/siege/function/siege_tick.mcfunction
 scoreboard players add $ticks mms.siege 1
 scoreboard players operation #siege_tick.g mms.siege = $ticks mms.siege
 scoreboard players operation #siege_tick.g mms.siege %= #c4 mms.siege
-scoreboard players set #siege_tick._f0 mms.siege 0
-execute if score #siege_tick.g mms.siege matches 0 run scoreboard players set #siege_tick._f0 mms.siege 1
-execute if score #siege_tick._f0 mms.siege matches 1 as @e[tag=cs_enemy,scores={cs_group=0}] at @s run function siege:enemy_update
-execute unless score #siege_tick._f0 mms.siege matches 1 run function siege:siege_tick/_else1
+scoreboard players set #siege_tick.-f0 mms.siege 0
+execute if score #siege_tick.g mms.siege matches 0 run scoreboard players set #siege_tick.-f0 mms.siege 1
+execute if score #siege_tick.-f0 mms.siege matches 1 as @e[tag=cs_enemy,scores={cs_group=0}] at @s run function siege:enemy_update
+execute unless score #siege_tick.-f0 mms.siege matches 1 run function siege:siege_tick/_else1
 execute if score $path_phase mms.siege matches 1.. run function siege:path_tick
-scoreboard players operation #siege_tick._t1 mms.siege = $ticks mms.siege
-scoreboard players operation #siege_tick._t1 mms.siege %= #c20 mms.siege
-execute if score #siege_tick._t1 mms.siege matches 0 run function siege:banner_second
+scoreboard players operation #siege_tick.-t1 mms.siege = $ticks mms.siege
+scoreboard players operation #siege_tick.-t1 mms.siege %= #c20 mms.siege
+execute if score #siege_tick.-t1 mms.siege matches 0 run function siege:banner_second
 === data/siege/function/siege_tick/_else1.mcfunction
-scoreboard players set #siege_tick._f2 mms.siege 0
-execute if score #siege_tick.g mms.siege matches 1 run scoreboard players set #siege_tick._f2 mms.siege 1
-execute if score #siege_tick._f2 mms.siege matches 1 as @e[tag=cs_enemy,scores={cs_group=1}] at @s run function siege:enemy_update
-execute unless score #siege_tick._f2 mms.siege matches 1 run function siege:siege_tick/_else3
+scoreboard players set #siege_tick.-f2 mms.siege 0
+execute if score #siege_tick.g mms.siege matches 1 run scoreboard players set #siege_tick.-f2 mms.siege 1
+execute if score #siege_tick.-f2 mms.siege matches 1 as @e[tag=cs_enemy,scores={cs_group=1}] at @s run function siege:enemy_update
+execute unless score #siege_tick.-f2 mms.siege matches 1 run function siege:siege_tick/_else3
 === data/siege/function/siege_tick/_else3.mcfunction
-scoreboard players set #siege_tick._f4 mms.siege 0
-execute if score #siege_tick.g mms.siege matches 2 run scoreboard players set #siege_tick._f4 mms.siege 1
-execute if score #siege_tick._f4 mms.siege matches 1 as @e[tag=cs_enemy,scores={cs_group=2}] at @s run function siege:enemy_update
-execute unless score #siege_tick._f4 mms.siege matches 1 as @e[tag=cs_enemy,scores={cs_group=3}] at @s run function siege:enemy_update
+scoreboard players set #siege_tick.-f4 mms.siege 0
+execute if score #siege_tick.g mms.siege matches 2 run scoreboard players set #siege_tick.-f4 mms.siege 1
+execute if score #siege_tick.-f4 mms.siege matches 1 as @e[tag=cs_enemy,scores={cs_group=2}] at @s run function siege:enemy_update
+execute unless score #siege_tick.-f4 mms.siege matches 1 as @e[tag=cs_enemy,scores={cs_group=3}] at @s run function siege:enemy_update
 === data/siege/function/spawn.mcfunction
 scoreboard players set #spawn.i mms.siege 1
-scoreboard players operation #spawn._t0 mms.siege = #spawn.count mms.siege
+scoreboard players operation #spawn.-t0 mms.siege = #spawn.count mms.siege
 function siege:spawn/_while0
 execute as @e[tag=cs_new] run function siege:enemy_init
 === data/siege/function/spawn/_macro1.mcfunction
 $summon $(a0) ~ ~ ~ {Tags:["cs_enemy","cs_new"],PersistenceRequired:1b}
 === data/siege/function/spawn/_while0.mcfunction
-execute unless score #spawn.i mms.siege <= #spawn._t0 mms.siege run return 0
+execute unless score #spawn.i mms.siege <= #spawn.-t0 mms.siege run return 0
 data modify storage siege:mms m.a0 set from storage siege:mms l."spawn".kind
 function siege:spawn/_macro1 with storage siege:mms m
 scoreboard players add #spawn.i mms.siege 1
@@ -1196,23 +1196,23 @@ function siege:spawn
 === data/siege/function/standable.mcfunction
 scoreboard players operation #standable.dy mms.siege = #ny cs_tmp
 scoreboard players operation #standable.dy mms.siege -= #cy cs_tmp
-scoreboard players set #standable._t1 mms.siege 0
-execute if score #standable.dy mms.siege matches 17.. run scoreboard players set #standable._t1 mms.siege 1
-execute unless score #standable._t1 mms.siege matches 1 run function siege:standable/_if0
-execute if score #standable._t1 mms.siege matches 1 run return 0
+scoreboard players set #standable.-t1 mms.siege 0
+execute if score #standable.dy mms.siege matches 17.. run scoreboard players set #standable.-t1 mms.siege 1
+execute unless score #standable.-t1 mms.siege matches 1 run function siege:standable/_if0
+execute if score #standable.-t1 mms.siege matches 1 run return 0
 execute store success score #ok cs_tmp if block ~ ~ ~ #siege:walkable if block ~ ~1 ~ #siege:walkable unless block ~ ~-1 ~ #siege:walkable unless block ~ ~ ~ #siege:hazard unless block ~ ~-1 ~ #siege:hazard in siege:scratch if block ~ ~ ~ minecraft:air
-scoreboard players set #standable._t2 mms.siege 0
-execute if score #ok cs_tmp matches 1 run scoreboard players set #standable._t2 mms.siege 1
-return run scoreboard players get #standable._t2 mms.siege
+scoreboard players set #standable.-t2 mms.siege 0
+execute if score #ok cs_tmp matches 1 run scoreboard players set #standable.-t2 mms.siege 1
+return run scoreboard players get #standable.-t2 mms.siege
 === data/siege/function/standable/_if0.mcfunction
-execute if score #standable.dy mms.siege matches ..-17 run scoreboard players set #standable._t1 mms.siege 1
+execute if score #standable.dy mms.siege matches ..-17 run scoreboard players set #standable.-t1 mms.siege 1
 === data/siege/function/status.mcfunction
 execute store result score #enemies cs_tmp if entity @e[tag=cs_enemy]
 scoreboard players operation #status.enemies mms.siege = #enemies cs_tmp
-scoreboard players set #status._f0 mms.siege 0
-execute if score $banner_placed mms.siege matches 1 run scoreboard players set #status._f0 mms.siege 1
-execute if score #status._f0 mms.siege matches 1 run tellraw @s ["","Banner: ",{score:{name:"$banner_hp",objective:"mms.siege"}}," / ",{score:{name:"$banner_max",objective:"mms.siege"}}," health, ",{score:{name:"#status.enemies",objective:"mms.siege"}}," enemies alive"]
-execute unless score #status._f0 mms.siege matches 1 run tellraw @s ["","No banner is planted, ",{score:{name:"#status.enemies",objective:"mms.siege"}}," enemies alive"]
+scoreboard players set #status.-f0 mms.siege 0
+execute if score $banner_placed mms.siege matches 1 run scoreboard players set #status.-f0 mms.siege 1
+execute if score #status.-f0 mms.siege matches 1 run tellraw @s ["","Banner: ",{score:{name:"$banner_hp",objective:"mms.siege"}}," / ",{score:{name:"$banner_max",objective:"mms.siege"}}," health, ",{score:{name:"#status.enemies",objective:"mms.siege"}}," enemies alive"]
+execute unless score #status.-f0 mms.siege matches 1 run tellraw @s ["","No banner is planted, ",{score:{name:"#status.enemies",objective:"mms.siege"}}," enemies alive"]
 === data/siege/function/steer.mcfunction
 scoreboard players set #tgt cs_tmp 0
 execute on target run scoreboard players set #tgt cs_tmp 1
@@ -1221,14 +1221,14 @@ execute on target if entity @s[tag=cs_parked] run scoreboard players set #tgt cs
 scoreboard players operation #steer.tgt mms.siege = #tgt cs_tmp
 execute if score #steer.tgt mms.siege matches 0 run function siege:steer/_if0
 execute if score #steer.tgt mms.siege matches 2.. run function siege:steer/_if1
-scoreboard players set #steer._t1 mms.siege 0
-execute if score #steer.tgt mms.siege matches 3 run scoreboard players set #steer._t1 mms.siege 1
-scoreboard players operation #bow_check.parked mms.siege = #steer._t1 mms.siege
+scoreboard players set #steer.-t1 mms.siege 0
+execute if score #steer.tgt mms.siege matches 3 run scoreboard players set #steer.-t1 mms.siege 1
+scoreboard players operation #bow_check.parked mms.siege = #steer.-t1 mms.siege
 function siege:bow_check
 === data/siege/function/steer/_if0.mcfunction
-scoreboard players operation #steer._t0 mms.siege = @s cs_age
-scoreboard players operation #steer._t0 mms.siege %= #c5 mms.siege
-execute if score #steer._t0 mms.siege matches 1 unless entity @e[tag=cs_carrot,distance=..5] run function siege:give_carrot
+scoreboard players operation #steer.-t0 mms.siege = @s cs_age
+scoreboard players operation #steer.-t0 mms.siege %= #c5 mms.siege
+execute if score #steer.-t0 mms.siege matches 1 unless entity @e[tag=cs_carrot,distance=..5] run function siege:give_carrot
 === data/siege/function/steer/_if1.mcfunction
 execute on target run scoreboard players set @s cs_age 0
 execute if entity @s[type=minecraft:creeper] on target if entity @s[distance=..5] at @s run function siege:carrot_far
@@ -1246,27 +1246,27 @@ scoreboard players operation #stuck_check.dz mms.siege -= #cz cs_tmp
 execute if score #stuck_check.dx mms.siege matches ..-1 run function siege:stuck_check/_if0
 execute if score #stuck_check.dy mms.siege matches ..-1 run function siege:stuck_check/_if1
 execute if score #stuck_check.dz mms.siege matches ..-1 run function siege:stuck_check/_if2
-scoreboard players operation #stuck_check._t7 mms.siege = #stuck_check.dx mms.siege
-scoreboard players operation #stuck_check._t7 mms.siege += #stuck_check.dy mms.siege
-scoreboard players operation #stuck_check._t7 mms.siege += #stuck_check.dz mms.siege
-scoreboard players operation #stuck_check.d mms.siege = #stuck_check._t7 mms.siege
+scoreboard players operation #stuck_check.-t7 mms.siege = #stuck_check.dx mms.siege
+scoreboard players operation #stuck_check.-t7 mms.siege += #stuck_check.dy mms.siege
+scoreboard players operation #stuck_check.-t7 mms.siege += #stuck_check.dz mms.siege
+scoreboard players operation #stuck_check.d mms.siege = #stuck_check.-t7 mms.siege
 execute store result score #near cs_tmp if entity @a[distance=..8,gamemode=!spectator,gamemode=!creative]
-scoreboard players operation #stuck_check._t8 mms.siege = @s cs_prev
-scoreboard players remove #stuck_check._t8 mms.siege 2
-execute if score #stuck_check.d mms.siege > #stuck_check._t8 mms.siege if score @s cs_stuck matches ..0 if score #near cs_tmp matches 0 run scoreboard players set @s cs_stuck 50
+scoreboard players operation #stuck_check.-t8 mms.siege = @s cs_prev
+scoreboard players remove #stuck_check.-t8 mms.siege 2
+execute if score #stuck_check.d mms.siege > #stuck_check.-t8 mms.siege if score @s cs_stuck matches ..0 if score #near cs_tmp matches 0 run scoreboard players set @s cs_stuck 50
 scoreboard players operation @s cs_prev = #stuck_check.d mms.siege
 === data/siege/function/stuck_check/_if0.mcfunction
-scoreboard players set #stuck_check._t3 mms.siege 0
-scoreboard players operation #stuck_check._t3 mms.siege -= #stuck_check.dx mms.siege
-scoreboard players operation #stuck_check.dx mms.siege = #stuck_check._t3 mms.siege
+scoreboard players set #stuck_check.-t3 mms.siege 0
+scoreboard players operation #stuck_check.-t3 mms.siege -= #stuck_check.dx mms.siege
+scoreboard players operation #stuck_check.dx mms.siege = #stuck_check.-t3 mms.siege
 === data/siege/function/stuck_check/_if1.mcfunction
-scoreboard players set #stuck_check._t4 mms.siege 0
-scoreboard players operation #stuck_check._t4 mms.siege -= #stuck_check.dy mms.siege
-scoreboard players operation #stuck_check.dy mms.siege = #stuck_check._t4 mms.siege
+scoreboard players set #stuck_check.-t4 mms.siege 0
+scoreboard players operation #stuck_check.-t4 mms.siege -= #stuck_check.dy mms.siege
+scoreboard players operation #stuck_check.dy mms.siege = #stuck_check.-t4 mms.siege
 === data/siege/function/stuck_check/_if2.mcfunction
-scoreboard players set #stuck_check._t5 mms.siege 0
-scoreboard players operation #stuck_check._t5 mms.siege -= #stuck_check.dz mms.siege
-scoreboard players operation #stuck_check.dz mms.siege = #stuck_check._t5 mms.siege
+scoreboard players set #stuck_check.-t5 mms.siege 0
+scoreboard players operation #stuck_check.-t5 mms.siege -= #stuck_check.dz mms.siege
+scoreboard players operation #stuck_check.dz mms.siege = #stuck_check.-t5 mms.siege
 === data/siege/function/take_bow.mcfunction
 item replace entity @s weapon.mainhand with minecraft:air
 tag @s add cs_bowless
@@ -1275,16 +1275,16 @@ scoreboard players operation #visit.dx mms.siege = #visit.x mms.siege
 scoreboard players operation #visit.dx mms.siege -= #cx cs_tmp
 scoreboard players operation #visit.dz mms.siege = #visit.z mms.siege
 scoreboard players operation #visit.dz mms.siege -= #cz cs_tmp
-scoreboard players set #visit._t2 mms.siege 0
-execute if score #visit.dx mms.siege matches 33.. run scoreboard players set #visit._t2 mms.siege 1
-execute unless score #visit._t2 mms.siege matches 1 run function siege:visit/_if0
-scoreboard players set #visit._t3 mms.siege 0
-execute if score #visit._t2 mms.siege matches 1 run scoreboard players set #visit._t3 mms.siege 1
-execute unless score #visit._t3 mms.siege matches 1 run function siege:visit/_if1
-scoreboard players set #visit._t4 mms.siege 0
-execute if score #visit._t3 mms.siege matches 1 run scoreboard players set #visit._t4 mms.siege 1
-execute unless score #visit._t4 mms.siege matches 1 run function siege:visit/_if2
-execute if score #visit._t4 mms.siege matches 1 run return 0
+scoreboard players set #visit.-t2 mms.siege 0
+execute if score #visit.dx mms.siege matches 33.. run scoreboard players set #visit.-t2 mms.siege 1
+execute unless score #visit.-t2 mms.siege matches 1 run function siege:visit/_if0
+scoreboard players set #visit.-t3 mms.siege 0
+execute if score #visit.-t2 mms.siege matches 1 run scoreboard players set #visit.-t3 mms.siege 1
+execute unless score #visit.-t3 mms.siege matches 1 run function siege:visit/_if1
+scoreboard players set #visit.-t4 mms.siege 0
+execute if score #visit.-t3 mms.siege matches 1 run scoreboard players set #visit.-t4 mms.siege 1
+execute unless score #visit.-t4 mms.siege matches 1 run function siege:visit/_if2
+execute if score #visit.-t4 mms.siege matches 1 run return 0
 scoreboard players operation #nx cs_tmp = #visit.x mms.siege
 scoreboard players operation #nz cs_tmp = #visit.z mms.siege
 execute store result storage siege:mms m.a0 int 1 run scoreboard players get #visit.x mms.siege
@@ -1292,11 +1292,11 @@ execute store result storage siege:mms m.a1 int 1 run scoreboard players get #vi
 execute store result storage siege:mms m.a2 int 1 run scoreboard players get #visit.z mms.siege
 function siege:visit/_macro3 with storage siege:mms m
 === data/siege/function/visit/_if0.mcfunction
-execute if score #visit.dx mms.siege matches ..-33 run scoreboard players set #visit._t2 mms.siege 1
+execute if score #visit.dx mms.siege matches ..-33 run scoreboard players set #visit.-t2 mms.siege 1
 === data/siege/function/visit/_if1.mcfunction
-execute if score #visit.dz mms.siege matches 33.. run scoreboard players set #visit._t3 mms.siege 1
+execute if score #visit.dz mms.siege matches 33.. run scoreboard players set #visit.-t3 mms.siege 1
 === data/siege/function/visit/_if2.mcfunction
-execute if score #visit.dz mms.siege matches ..-33 run scoreboard players set #visit._t4 mms.siege 1
+execute if score #visit.dz mms.siege matches ..-33 run scoreboard players set #visit.-t4 mms.siege 1
 === data/siege/function/visit/_macro3.mcfunction
 $execute positioned $(a0) $(a1) $(a2) run function siege:visit_column
 === data/siege/function/visit_caves.mcfunction

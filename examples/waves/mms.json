@@ -1,0 +1,5 @@
+{
+  "$schema": "https://minecraftmetascript.github.io/mms/mms.schema.json",
+  "namespace": "waves",
+  "description": "An arena of waves: typed records and Storage, Templates that unroll at compile time, and tests"
+}

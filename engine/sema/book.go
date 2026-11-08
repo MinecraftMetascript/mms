@@ -97,13 +97,6 @@ func BookTextType() *spec.Type { return bookTextType }
 // bookTextDoc documents TextFile in completion.
 const bookTextDoc = "```mms\nTextFile(path: string)\n```\n\nReads text markup from a file in the project: a `.mmstext` file, or a `.mmsbook` file whose `---` lines break pages, such as `TextFile(\"books/guide.mmsbook\")`. Pages work only in a book's text. The editor checks and completes the markup in that file."
 
-// bookMarkupDoc is the short markup reference in hovers.
-const bookMarkupDoc = "Markup: `# heading`, `**bold**`, `*italic*`, `__underlined__`, `~~struck~~`, `||obfuscated||`, " +
-	"`{gold}...{/}` (colors, `#ff8800`, `bold`, `shadow:#000000`, `font:uniform`, combined as `{bold red}`), " +
-	"`{key:jump}`, `{sprite:item/diamond}`, `{head:Notch}`, `{t:translation.key}`, " +
-	"`[text](page:2)` (also `run:/command`, `suggest:/command`, `copy:text`, `hover:text`, `https://...`; add `\"hover text\"` after the target), " +
-	"`${kills[@s]}` for a score or Global, `\\` before a character to write it as is."
-
 // BookLayout is a book's text laid out as pages, for the editor and the
 // book-page-overflow lint.
 type BookLayout struct {
@@ -210,7 +203,7 @@ func bookTextRule(c *Checker, e syntax.Expr, v tview) jsonv.Value {
 func bookPagesRule(c *Checker, e syntax.Expr, v tview) jsonv.Value {
 	call := e.(*syntax.Call)
 	if len(call.Args) != 1 {
-		c.errorf("mms/arity", call.Sp, "book_pages takes the book's text")
+		c.errorf(argCountCode(len(call.Args), 1), call.Sp, "book_pages takes the book's text")
 		return nil
 	}
 	sub := c.bookSub()

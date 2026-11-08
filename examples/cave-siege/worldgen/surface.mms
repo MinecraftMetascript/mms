@@ -28,8 +28,8 @@ SurfaceRule meadow_floor = If(grassy) {
 /** Podzol and coarse dirt patches among the grass, then rooted dirt. */
 SurfaceRule darkroot_floor = If(Biome(darkroot_grove)) {
   If(StoneDepth(Floor)) {
-    If(NoiseThreshold(minecraft:surface).Min(0.2).Max(1)) { Block(podzol) }
-    If(NoiseThreshold(minecraft:surface).Min(-1).Max(-0.6)) { Block(coarse_dirt) }
+    If(NoiseThreshold(surface).Min(0.2).Max(1)) { Block(podzol) }
+    If(NoiseThreshold(surface).Min(-1).Max(-0.6)) { Block(coarse_dirt) }
     Block(grass_block)
   }
   If(topsoil) { Block(dirt) }
@@ -51,8 +51,8 @@ SurfaceRule lake_floor = If(Biome(sunken_lake)) {
 /** Basalt and blackstone floors with magma seams; blackstone roofs. */
 SurfaceRule ash_floor = If(Biome(ash_vents)) {
   If(StoneDepth(Floor)) {
-    If(NoiseThreshold(minecraft:surface).Min(0.4).Max(1)) { Block(magma_block) }
-    If(NoiseThreshold(minecraft:surface).Min(-0.2).Max(0.4)) { Block(basalt) }
+    If(NoiseThreshold(surface).Min(0.4).Max(1)) { Block(magma_block) }
+    If(NoiseThreshold(surface).Min(-0.2).Max(0.4)) { Block(basalt) }
     Block(blackstone)
   }
   If(StoneDepth(Floor).Offset(2)) { Block(basalt) }

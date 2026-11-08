@@ -101,7 +101,7 @@ NoiseSettings custom {
 func TestHoistIDOnly(t *testing.T) {
 	out := emitText(t, `
 SurfaceRule surface = [
-  If(NoiseThreshold({ base_octave = -5, amplitude_modifiers = [1, 0.5] }, 0, 1)) { Block(sand) }
+  If(NoiseThreshold({ base_octave = -5, amplitude_modifiers = [1, 0.5] }, 0, 1)) { Block(sand) },
   Block(stone)
 ]
 `)
