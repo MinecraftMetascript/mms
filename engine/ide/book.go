@@ -58,10 +58,16 @@ func bookContextAt(text []rune, off int) (bookContext, bool) {
 	if off > len(text) {
 		off = len(text)
 	}
+	// The ) of a call or a group in a ${...} before the cursor is
+	// skipped; elsewhere a ) ends the context.
+	parens, skipped := 0, false
 	for i := off - 1; i >= 0; i-- {
 		switch text[i] {
-		case '\n', '}', ')':
+		case '\n', '}':
 			return bookContext{}, false
+		case ')':
+			parens++
+			skipped = true
 		case '{':
 			if i > 0 && text[i-1] == '\\' {
 				return bookContext{}, false
@@ -69,9 +75,16 @@ func bookContextAt(text []rune, off int) (bookContext, bool) {
 			if i > 0 && text[i-1] == '$' {
 				return bookContext{kind: "expr", typed: string(text[i+1 : off]), start: i + 1}, true
 			}
+			if skipped {
+				return bookContext{}, false
+			}
 			return bookContext{kind: "tag", typed: string(text[i+1 : off]), start: i + 1}, true
 		case '(':
-			if i > 0 && text[i-1] == ']' {
+			if parens > 0 {
+				parens--
+				continue
+			}
+			if i > 0 && text[i-1] == ']' && !skipped {
 				return bookContext{kind: "target", typed: string(text[i+1 : off]), start: i + 1}, true
 			}
 		}
@@ -189,31 +202,18 @@ func (s *Session) bookCompletion(path string, off int) ([]Item, syntax.Span, boo
 		}
 		return items, replace(ctx.start), true
 	case "expr":
-		w := ctx.typed
-		for _, sym := range s.R.Syms.All() {
-			switch sym.Kind.MMS {
-			case "Objective":
-				add(sym.Path, sema.CandID, "objective: write "+sym.Path+"[@s]", sema.DocMarkdown(sym.Decl.Doc))
-			case "Global":
-				add(sym.Path, sema.CandID, "Global", sema.DocMarkdown(sym.Decl.Doc))
-			}
+		// The same names as a ${...} in a command, and in function code
+		// its locals; a book or a text shown outside code reads Globals,
+		// Storage, scores and consts.
+		a := s.at(path, off)
+		if a == nil {
+			return nil, syntax.Span{Start: off, End: off}, true
 		}
-		return items, replace(ctx.start + len([]rune(w)) - len([]rune(lastIdent(w)))), true
+		src := a.u.File.Src
+		cands, start, _ := s.exprCompletion(a, src, base+ctx.start, off)
+		return candidateItems(cands), syntax.Span{Start: start, End: wordEnd(src, off)}, true
 	}
 	return nil, syntax.Span{Start: off, End: off}, true
-}
-
-func lastIdent(s string) string {
-	i := len(s)
-	for i > 0 {
-		c := s[i-1]
-		if c == '_' || c == ':' || c == '.' || c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' {
-			i--
-			continue
-		}
-		break
-	}
-	return s[i:]
 }
 
 func (s *Session) specEnum(path string) []string {
@@ -273,7 +273,7 @@ func (s *Session) bookHover(path string, off int) (string, syntax.Span, bool) {
 		return "", syntax.Span{}, true
 	}
 	if lo > 0 && text[lo-1] == '$' {
-		return s.markupExprHover(path, off, body), sp, true
+		return s.markupExprHover(path, off, nameChainAt(text[lo+1:hi], o-lo-1)), sp, true
 	}
 	if k, v, ok := strings.Cut(body, ":"); ok && bookTagHelp[k+":"] != "" && !strings.Contains(k, " ") {
 		doc := bookTagHelp[k+":"]
@@ -312,8 +312,9 @@ func (s *Session) bookTrigger(path string, off int) bool {
 	return ok
 }
 
-// markupExprHover describes `${body}` in text markup: the Global or
-// Storage field it names, and when it is filled in, which depends on
+// markupExprHover describes the name at the cursor in a `${...}` in text
+// markup, body with the names and dots before it: the Global, Storage,
+// Storage field or const it names, and when it is filled in, which depends on
 // where the text is. A book fills it in when the reader first opens it,
 // function code when the line runs, and other text when it is shown.
 func (s *Session) markupExprHover(path string, off int, body string) string {
@@ -325,13 +326,32 @@ func (s *Session) markupExprHover(path string, off int, body string) string {
 	case a != nil && a.code():
 		when = "A value the function computes, filled in when this line runs: a local, a parameter, a Global, a Storage field, a score or a constant."
 	}
-	if md := s.markupNameHover(body); md != "" {
+	md := s.markupNameHover(body)
+	if md == "" {
+		// A const, such as the list in `${modes[i]}`.
+		md, _, _ = s.evalHover(path, off)
+	}
+	if md != "" {
 		return strings.TrimSpace(md) + "\n\n" + when
 	}
 	return when
 }
 
-// markupNameHover describes a Global, `g`, or a Storage field,
+// nameChainAt is the name at i in the runes of a ${...} body with the
+// names and dots before it: `game.wave` at `wave` in `${modes[game.wave]}`.
+func nameChainAt(body []rune, i int) string {
+	i = max(0, min(i, len(body)))
+	start, end := i, i
+	for start > 0 && (identRune(body[start-1]) || body[start-1] == '.') {
+		start--
+	}
+	for end < len(body) && identRune(body[end]) {
+		end++
+	}
+	return strings.Trim(string(body[start:end]), ".")
+}
+
+// markupNameHover describes a Global or Storage, `g`, or a Storage field,
 // `game.wave`, by the name written in ${...}; "" for anything else.
 func (s *Session) markupNameHover(body string) string {
 	name, field, isField := strings.Cut(body, ".")
@@ -340,7 +360,7 @@ func (s *Session) markupNameHover(body string) string {
 			continue
 		}
 		switch {
-		case !isField && sym.Kind.MMS == "Global":
+		case !isField && (sym.Kind.MMS == "Global" || sym.Kind.MMS == "Storage"):
 			if d := s.R.Decls[sym.Decl]; d != nil {
 				return s.declHover(d)
 			}

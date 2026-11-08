@@ -56,6 +56,11 @@ func TestBookCompletion(t *testing.T) {
 			t.Errorf("%s: completions %v lack %v", tc.name, got, tc.want)
 		}
 	}
+	// A book shows its text without running a function, so ${...} lists
+	// no functions to call.
+	if s, off := bookSession(t, "${wa|"); has(labels(func() []Item { it, _ := s.Completion("b.mmsbook", off); return it }()), "start") {
+		t.Error("${...} in a book offers a function")
+	}
 	// The word being typed is what the item replaces.
 	s, off := bookSession(t, "{key:ju|")
 	_, rep := s.Completion("b.mmsbook", off)

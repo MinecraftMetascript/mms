@@ -603,7 +603,7 @@ func (s *Session) statementCandidates(a *at, off int) []sema.Candidate {
 	for i, kw := range []string{"let", "if", "while", "for", "return"} {
 		out = append(out, sema.Candidate{Label: kw, Kind: sema.CandKeyword, Rank: 100 + i})
 	}
-	for _, c := range s.projectNames(a) {
+	for _, c := range s.projectNames(a.decl.NS) {
 		c.Rank += 100
 		out = append(out, c)
 	}
