@@ -318,6 +318,7 @@ func (c *Checker) CompileFunction(d *syntax.Decl, id string, src []rune) *fn.Fun
 			if _, dup := f.scopes[0][p.Name.Text]; dup {
 				c.errorf("mms/duplicate", p.Name.Sp, "parameter '%s' is already declared", p.Name.Text)
 			}
+			f.hidesPredicate(p.Name)
 			f.names[p.Name.Text]++
 			l := local{s: f.score(fn.Holder(path, p.Name.Text)), typ: t,
 				info: &Local{Name: p.Name.Text, Type: t, What: "parameter", Doc: syntax.ParseDoc(d.Doc).Param(p.Name.Text)}}
@@ -399,11 +400,24 @@ func (f *fc) lookup(name string) (local, bool) {
 	return local{}, false
 }
 
+// hidesPredicate hints that a local or parameter named n hides the
+// Predicate of the same name, which code in its scope can then no longer
+// test by name.
+func (f *fc) hidesPredicate(n *syntax.Name) {
+	id := f.ns + ":" + n.Text
+	if f.c.trial || f.c.find("predicate", id) == nil {
+		return
+	}
+	f.c.Diags = append(f.c.Diags, syntax.Diagnostic{Code: "mms/shadowed-predicate", Severity: syntax.SeverityHint,
+		Message: fmt.Sprintf("'%s' hides the Predicate %s here; test the Predicate as %s, or rename this", n.Text, id, id), Sp: n.Sp})
+}
+
 // declare adds a local. A name shadowing an outer one gets its own holder.
 func (f *fc) declare(n *syntax.Name, typ string) local {
 	if _, dup := f.scopes[len(f.scopes)-1][n.Text]; dup {
 		f.c.errorf("mms/duplicate", n.Sp, "'%s' is already declared in this block", n.Text)
 	}
+	f.hidesPredicate(n)
 	holder := n.Text
 	if k := f.names[n.Text]; k > 0 {
 		holder = n.Text + fn.Gen + strconv.Itoa(k)
@@ -787,8 +801,8 @@ func (f *fc) predicate(e syntax.Expr) *val {
 		return nil
 	}
 	if f.c.findSig("Global", id) != nil {
-		f.c.errorf("mms/duplicate", e.Span(), "'%s' is both a Global and a Predicate; rename one of them", id)
-		return &val{typ: tBool, cond: &fn.Cond{Never: true}}
+		f.c.warnf("mms/shadowed-predicate", e.Span(), "'%s' is both a Global and a Predicate; this reads the Global, so rename one of them to test the Predicate", id)
+		return nil
 	}
 	in := f.c.info(e)
 	in.Symbol = sym

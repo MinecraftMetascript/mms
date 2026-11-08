@@ -102,7 +102,7 @@ Function on_use {
 }
 ```
 
-It works wherever a condition does, with `!`, `&&` and `||`, and a predicate of another namespace is written with its id, as in `other:sneaking`. A local of the same name hides it, and a `Global` of the same name is an error, since the name could mean either.
+It works wherever a condition does, with `!`, `&&` and `||`, and a predicate of another namespace is written with its id, as in `other:sneaking`. A local or parameter of the same name hides it, with a hint, and a `Global` of the same name wins, with a warning. Either way, `<namespace>:sneaking` still names the predicate.
 
 ### Operators
 
