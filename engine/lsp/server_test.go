@@ -956,6 +956,13 @@ func TestEditorRequests(t *testing.T) {
 	if m := c.call("mms/setConfig", map[string]any{"namespace": "Not Valid"}); m["error"] == nil {
 		t.Errorf("setConfig with a bad namespace: %v", m)
 	}
+	// A lint setting for a rule nothing has is taken, with a warning;
+	// the rest of mms.json, such as icon, comes along.
+	r, _ := c.result("mms/setConfig", map[string]any{"namespace": "demo", "icon": "pack.png", "lint": map[string]any{"unusd": "off"}}).(map[string]any)
+	if ws, _ := r["warnings"].([]any); len(ws) != 1 || !strings.Contains(ws[0].(string), `did you mean "unused"`) {
+		t.Errorf("setConfig warnings = %v", r)
+	}
+	c.result("mms/setConfig", map[string]any{"namespace": "demo"})
 
 	// Signature help inside Clamp(...) and inside f(...).
 	for _, at := range []map[string]any{pos(uri, 1, 29), pos(uri, 6, 4)} {

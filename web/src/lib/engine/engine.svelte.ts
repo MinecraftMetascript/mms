@@ -174,12 +174,14 @@ export class Engine {
 	testsError = $state('');
 	/** Why the server refused the project settings, such as a bad namespace. */
 	configError = $state('');
+	/** Settings the server took but doubts, such as a lint rule nothing has. */
+	configWarnings = $state<string[]>([]);
 	symbols = $state<Record<string, DocSymbol[]>>({});
 
 	readonly client: LSPClient;
 	readonly workspace!: ProjectWorkspace;
 	private supervisor: Supervisor;
-	private config: { namespace: string; description: string } = { namespace: 'mms', description: '' };
+	private config: Record<string, unknown> = { namespace: 'mms', description: '' };
 	private refreshTimer: ReturnType<typeof setTimeout> | null = null;
 	/** The binary files the server holds, path to base64. */
 	private assets = new Map<string, string>();
@@ -239,14 +241,19 @@ export class Engine {
 
 	/** Sends the settings; the server checks them and says what is wrong. */
 	private sendConfig() {
-		this.client.request('mms/setConfig', this.config).then(
-			() => (this.configError = ''),
+		this.client.request<unknown, { warnings?: string[] } | null>('mms/setConfig', this.config).then(
+			(r) => {
+				this.configError = '';
+				this.configWarnings = r?.warnings ?? [];
+			},
 			(e: unknown) => (this.configError = e instanceof Error ? e.message : String(e))
 		);
 	}
 
-	setConfig(config: { namespace: string; description: string }) {
-		this.config = { ...config };
+	/** Sends the whole mms.json, lint settings and all, as VS Code's server reads it from disk. */
+	setConfig(config: { namespace: string; description: string; rest?: Record<string, unknown> }) {
+		const { rest, ...known } = config;
+		this.config = { ...rest, ...known };
 		if (this.client.connected) this.sendConfig();
 	}
 

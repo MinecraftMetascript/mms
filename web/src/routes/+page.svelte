@@ -395,6 +395,8 @@
 			</span>
 			{#if engine?.configError}
 				<span class="rounded px-1.5 py-0.5 text-sm text-red-600" role="alert" title={engine.configError}>Settings not applied</span>
+			{:else if engine?.configWarnings.length}
+				<span class="rounded px-1.5 py-0.5 text-sm text-amber-600" role="status" title={engine.configWarnings.join('\n')}>Check settings</span>
 			{/if}
 			{#if project.saveError}
 				<span class="rounded px-1.5 py-0.5 text-sm text-red-600" role="alert" title={project.saveError}>Not saved</span>

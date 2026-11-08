@@ -485,6 +485,14 @@ func (s *Server) setConfig(ctx context.Context, cfg project.Config) (any, *respE
 	}
 	w.proj = np
 	s.analyze(ctx, w)
+	// Settings that only analysis can check, such as a lint rule that
+	// neither MMS nor a Blueprint has; the browser has no mms.json to
+	// show them on.
+	if w.res != nil {
+		if ws := w.res.ConfigWarnings(); len(ws) > 0 {
+			return map[string]any{"warnings": ws}, nil
+		}
+	}
 	return nil, nil
 }
 

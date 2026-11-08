@@ -224,7 +224,7 @@ A function with a return type must end with `return` on every path.
 
 A call looks like `add(1, 2)`, or `other_ns:add(1, 2)` for a function in another namespace. Arguments are passed by position. A call can stand on its own, or be used as a value when the function has a return type.
 
-Parameters are `int`, `bool` or `string`. Functions return `int` or `bool`. To hand a string back, assign it to a Global.
+Parameters are `int`, `bool` or `string`. Functions return `int` or `bool`. A `Type` that names one of these, such as `Type Count = int`, can be used instead. To hand a string back, assign it to a Global.
 
 ## Command templates
 

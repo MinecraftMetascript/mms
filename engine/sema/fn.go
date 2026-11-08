@@ -65,6 +65,40 @@ func SigOf(d *syntax.Decl) FuncSig {
 	return s
 }
 
+// valueType is the function value type a type name stands for: int, bool
+// or string itself, or a project Type that is one of them, such as
+// `Type Count = int` or a union of strings. Other names come back as
+// written, for the check to report.
+func (t *Table) valueType(name string) string {
+	switch name {
+	case tInt, tBool, tString:
+		return name
+	}
+	if t == nil {
+		return name
+	}
+	st := t.Types[typePrefix+name]
+	for i := 0; st != nil && st.Kind == "reference" && i < 8; i++ {
+		st = t.Types[st.Path]
+	}
+	if k := storageKind(st); k != "" {
+		return k
+	}
+	return name
+}
+
+// sigIn is d's signature with project Types resolved to value types.
+func sigIn(t *Table, d *syntax.Decl) FuncSig {
+	s := SigOf(d)
+	for i := range s.Params {
+		s.Params[i].Type = t.valueType(s.Params[i].Type)
+	}
+	if s.Ret != "" {
+		s.Ret = t.valueType(s.Ret)
+	}
+	return s
+}
+
 // SymSig is the signature part of a symbol that other declarations
 // depend on; it is "" for most kinds.
 func SymSig(s *Symbol) string {
@@ -90,11 +124,11 @@ func symSig(s *Symbol) string {
 		if s.Decl.Type == nil {
 			return tInt
 		}
-		return syntax.TypeText(s.Decl.Type)
+		return s.table.valueType(syntax.TypeText(s.Decl.Type))
 	}
 	// Callers also depend on what the function calls, which decides
 	// whether a call is recursive.
-	return SigOf(s.Decl).String() + " calls " + strings.Join(callees(s.Decl, s.NS), ",")
+	return sigIn(s.table, s.Decl).String() + " calls " + strings.Join(callees(s.Decl, s.NS), ",")
 }
 
 // callees lists the functions a body calls, by id, sorted: calls in
@@ -270,7 +304,7 @@ func (c *Checker) CompileFunction(d *syntax.Decl, id string, src []rune) *fn.Fun
 		return nil
 	}
 	ns, path, _ := strings.Cut(id, ":")
-	f := &fc{c: c, src: src, ns: ns, path: path, obj: fn.Objective(ns), sig: SigOf(d), names: map[string]int{}, selfID: id}
+	f := &fc{c: c, src: src, ns: ns, path: path, obj: fn.Objective(ns), sig: sigIn(c.Syms, d), names: map[string]int{}, selfID: id}
 	f.push()
 	if d.Params != nil {
 		for i, p := range d.Params.Params {
@@ -320,7 +354,7 @@ func (f *fc) valueType(t string, at syntax.TypeExpr) bool {
 	if at != nil {
 		sp = at.Span()
 	}
-	f.c.errorf("mms/unknown-type", sp, "unknown type '%s'; function values are int, bool or string", t)
+	f.c.errorf("mms/unknown-type", sp, "unknown type '%s'; function values are int, bool or string, or a Type that is one of them", t)
 	return false
 }
 
@@ -418,7 +452,7 @@ func (f *fc) stmt(out *fn.Block, s syntax.Stmt) {
 		}
 		typ := ""
 		if s.Type != nil {
-			typ = syntax.TypeText(s.Type)
+			typ = f.c.Syms.valueType(syntax.TypeText(s.Type))
 			if !f.valueType(typ, s.Type) {
 				typ = tInt
 			}
@@ -1222,7 +1256,7 @@ func (f *fc) call(pre *[]fn.Op, e *syntax.Call, wantValue bool) *val {
 	in := c.info(e.Fn)
 	in.Symbol = sym
 	in.ID = id
-	sig := SigOf(sym.Decl)
+	sig := sigIn(c.Syms, sym.Decl)
 	if len(e.Args) != len(sig.Params) {
 		c.errorf(argCountCode(len(e.Args), len(sig.Params)), e.ArgsSp, "%s takes %d %s, but got %d", id, len(sig.Params), plural(len(sig.Params), "argument"), len(e.Args))
 		return nil
@@ -1294,9 +1328,9 @@ func (c *Checker) Global(d *syntax.Decl) []string {
 	}
 	typ := tInt
 	if d.Type != nil {
-		typ = syntax.TypeText(d.Type)
+		typ = c.Syms.valueType(syntax.TypeText(d.Type))
 		if typ != tInt && typ != tBool && typ != tString {
-			c.errorf("mms/unknown-type", d.Type.Span(), "unknown type '%s'; globals are int, bool or string", typ)
+			c.errorf("mms/unknown-type", d.Type.Span(), "unknown type '%s'; globals are int, bool or string, or a Type that is one of them", typ)
 			return nil
 		}
 	}

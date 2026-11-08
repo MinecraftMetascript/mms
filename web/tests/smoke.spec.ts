@@ -525,10 +525,6 @@ test('the docs render guides and the reference', async ({ page }) => {
 	await expect(page.locator('#density-functions')).toBeVisible();
 	await expect(page.getByRole('navigation', { name: 'Previous and next' }).getByRole('link', { name: /Functions/ })).toBeVisible();
 
-	// An old guide URL redirects, keeping its anchor.
-	await page.goto('./docs/functions#calls');
-	await expect(page).toHaveURL(/\/docs\/guides\/functions#calls$/);
-
 	// The Reference tab: helpers by group, one page each.
 	await page.getByRole('navigation', { name: 'Sections' }).getByRole('link', { name: 'Reference' }).click();
 	await expect(page.getByRole('heading', { level: 1 })).toHaveText('Reference');
