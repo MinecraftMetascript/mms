@@ -188,60 +188,13 @@ export type FromWorld =
 // the extension sends the lists to choose from and the recent blocks, and
 // copies the give command the page builds.
 
-/** How a jigsaw block is set up, as its screen in the game shows it. */
 import type { JigsawConfig } from '@mms/preview/jigsaw/give';
-export type { JigsawConfig };
-
-export interface JigsawPoolRow {
-	id: string;
-	/** The jigsaw names its pieces have, when its pieces are project structure files. */
-	names: string[];
-}
-
-export interface JigsawHoleRow {
-	id: string;
-	doc?: string;
-}
-
-/** A jigsaw block in one of the pack's structure files. */
-export interface JigsawExisting {
-	/** The structure's project file, relative to the mms.json folder. */
-	src: string;
-	/** Its id in the pack, such as dungeon:halls/hall. */
-	id: string;
-	pos: [number, number, number];
-	orientation?: string;
-	config: JigsawConfig;
-}
-
-export interface JigsawRecent {
-	config: JigsawConfig;
-	/** When it was last copied, in ms since the epoch. */
-	at: number;
-}
-
-export interface JigsawState {
-	project?: { name: string; ns?: string };
-	holes: JigsawHoleRow[];
-	pools: JigsawPoolRow[];
-	recent: JigsawRecent[];
-	existing: JigsawExisting[];
-	/** The holes can only be read from a project without errors in their files. */
-	hasErrors: boolean;
-}
+import type { JigsawAction, JigsawExisting, JigsawHoleRow, JigsawPoolRow, JigsawRecent, JigsawState } from '@mms/preview/jigsaw/tool';
+export type { JigsawConfig, JigsawExisting, JigsawHoleRow, JigsawPoolRow, JigsawRecent, JigsawState };
 
 export type ToJigsaw = { type: 'state'; state: JigsawState };
 
-export type FromJigsaw =
-	| { type: 'ready' }
-	/** Copy the command, and remember the block as recent. */
-	| { type: 'copy'; config: JigsawConfig; command: string }
-	| { type: 'forget'; config: JigsawConfig }
-	| { type: 'forgetAll' }
-	/** Add `JigsawHole <name>` to the project, next to its other holes. */
-	| { type: 'declare'; id: string }
-	| { type: 'revealHole'; id: string }
-	| { type: 'revealFile'; src: string };
+export type FromJigsaw = { type: 'ready' } | JigsawAction;
 
 /** One Test's outcome, as the language server's `mms/runTests` returns it. */
 export interface TestOutcome {

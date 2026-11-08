@@ -115,6 +115,14 @@ export const outputKey = (f: OutputFile) => (f.pack === 'resources' ? `resources
 export const itemKey = (it: OutputItem) => `item:${it.id}`;
 
 /** A project file the pack copies, such as a texture: its output path and source. */
+/** A `JigsawHole name` declaration. */
+export interface OutputHole {
+	id: string;
+	doc?: string;
+	uri: string;
+	range: Diagnostic['range'];
+}
+
 export interface OutputAsset {
 	path: string;
 	src: string;
@@ -162,6 +170,8 @@ export class Engine {
 	diagnostics = $state<Record<string, Diagnostic[]>>({});
 	output = $state<OutputFile[]>([]);
 	outputAssets = $state<OutputAsset[]>([]);
+	/** The project's JigsawHole declarations: jigsaw block names, which write no file. */
+	outputHoles = $state<OutputHole[]>([]);
 	outputItems = $state<OutputItem[]>([]);
 	/** The messages tell, title and actionbar show, for the chat preview. */
 	outputTexts = $state<OutputText[]>([]);
@@ -279,9 +289,10 @@ export class Engine {
 		try {
 			await this.client.initializing;
 			this.client.sync();
-			const out = await this.client.request<object, { files: OutputFile[]; assets?: OutputAsset[]; items?: OutputItem[]; texts?: OutputText[]; unusedAssets?: string[]; hasErrors: boolean }>('mms/output', {});
+			const out = await this.client.request<object, { files: OutputFile[]; assets?: OutputAsset[]; jigsawHoles?: OutputHole[]; items?: OutputItem[]; texts?: OutputText[]; unusedAssets?: string[]; hasErrors: boolean }>('mms/output', {});
 			this.output = out.files;
 			this.outputAssets = out.assets ?? [];
+			this.outputHoles = out.jigsawHoles ?? [];
 			this.outputItems = out.items ?? [];
 			this.outputTexts = out.texts ?? [];
 			this.unusedAssets = out.unusedAssets ?? [];

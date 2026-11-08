@@ -1284,3 +1284,48 @@ test('go to definition on a built-in opens the prelude read-only', async ({ page
 	await page.getByRole('button', { name: 'Close' }).click();
 	await expect(page.getByTestId('prelude-view')).toBeHidden();
 });
+
+test('the Jigsaw tab copies a jigsaw block, keeps it in Recent, and declares a new hole', async ({ page }) => {
+	const errors: string[] = [];
+	page.on('pageerror', (e) => errors.push(e.message));
+	page.on('dialog', (d) => d.accept());
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	// A project with no jigsaw has no Jigsaw tab.
+	await expect(page.getByRole('tab', { name: 'Jigsaw' })).toHaveCount(0);
+	await page.getByRole('button', { name: /Examples/ }).click();
+	await page.getByRole('button', { name: /jigsaw/ }).click();
+	await expect(status(page)).toHaveText(/No problems/);
+	await page.getByRole('tab', { name: 'Jigsaw' }).click();
+	const tool = page.getByLabel('Jigsaw', { exact: true });
+
+	// The pools and holes the project declares are offered.
+	await expect(tool.locator('#jigsaw-pools option[value="dungeon:halls"]')).toHaveCount(1);
+	await expect(tool.locator('#jigsaw-names option[value="dungeon:room_exit"]')).toHaveCount(1);
+	// The structures' own jigsaw blocks are listed.
+	await expect(tool.getByRole('heading', { name: 'In structures' })).toBeVisible();
+
+	await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+	await tool.getByLabel('Target pool').fill('dungeon:halls');
+	await tool.getByLabel('Target hole').fill('dungeon:hall_entry');
+	await tool.getByLabel('Name', { exact: true }).fill('dungeon:room_exit');
+	await tool.getByRole('button', { name: 'Copy give command' }).click();
+	expect(await page.evaluate(() => navigator.clipboard.readText())).toMatch(/^\/give @s jigsaw\[block_entity_data=\{id:"jigsaw",name:"dungeon:room_exit",target:"dungeon:hall_entry",pool:"dungeon:halls"/);
+	await expect(tool.getByRole('heading', { name: 'Recent' })).toBeVisible();
+	await expect(tool.getByLabel('Copy the give command for dungeon:room_exit')).toHaveCount(1);
+
+	// Recent survives a reload.
+	await page.reload();
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	await page.getByRole('tab', { name: 'Jigsaw' }).click();
+	await expect(tool.getByLabel('Copy the give command for dungeon:room_exit')).toHaveCount(1);
+
+	// A hole no JigsawHole declares is declared next to the others.
+	await tool.getByLabel('Name', { exact: true }).fill('dungeon:side_door');
+	await expect(tool.getByText('Not a JigsawHole.')).toBeVisible();
+	await tool.getByRole('button', { name: 'Declare it' }).click();
+	await expect(page.locator('.cm-line', { hasText: 'JigsawHole side_door' })).toBeVisible();
+	await expect(status(page)).toHaveText(/No problems/);
+	await expect(tool.getByText('Not a JigsawHole.')).toBeHidden();
+	expect(errors).toEqual([]);
+});
