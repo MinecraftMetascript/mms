@@ -119,6 +119,8 @@ func TestCompletionMatrix(t *testing.T) {
 		{name: "let value", src: "Function f(n: int) {\n  let x = 1\n  let y = |\n}", want: []string{"n", "x", "true"}, not: []string{"y", "As"}},
 		{name: "let value after operator", src: "Global g: int = 0\nFunction f {\n  let y = g + |\n}", want: []string{"g"}, not: []string{"y", "let"}},
 		{name: "if condition", src: "Function f {\n  let x = 1\n  if x > |\n}", want: []string{"x"}, not: []string{"let"}},
+		{name: "if predicate", src: "Predicate sneaking = EntityProperties(entity = this, predicate = { flags = { is_sneaking = true } })\nFunction f {\n  if (|)\n}", want: []string{"sneaking", "exists"}},
+		{name: "if predicate operand", src: "Predicate sneaking = EntityProperties(entity = this, predicate = { flags = { is_sneaking = true } })\nFunction f {\n  if (!sne|)\n}", want: []string{"sneaking"}, replace: "sne"},
 		{name: "return value", src: "Function f(n: int): int {\n  return |\n}", want: []string{"n"}, not: []string{"As"}},
 		{name: "assignment value", src: "Global g: int = 0\nFunction f {\n  g = |\n}", want: []string{"g"}, not: []string{"As"}},
 		{name: "loop variable", src: "Function f {\n  for i in 0..10 {\n    let y = |\n  }\n}", want: []string{"i"}},

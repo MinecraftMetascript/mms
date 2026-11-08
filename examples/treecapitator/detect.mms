@@ -61,7 +61,9 @@ Function chopped(wood: string, nether_tree: bool) {
   for w in woods {
     /scoreboard players reset @s chop_${w.name}
   }
-  /execute if predicate treecap:sneaking run return 0
+  if (sneaking) {
+    return
+  }
   // The axe is still in hand, unless that log used up its last point of
   // durability.
   /execute unless items entity @s weapon.mainhand #minecraft:axes run return 0

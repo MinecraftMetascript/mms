@@ -87,6 +87,23 @@ Function check {
 }
 ```
 
+### Predicates
+
+A `Predicate` is a condition in function code: its name is a `bool` that tests `if predicate <namespace>:<name>` for the entity and place the code runs as.
+
+```mms
+Predicate sneaking = EntityProperties(entity = this, predicate = { flags = { is_sneaking = true } })
+
+Function on_use {
+  if (sneaking && !exists(@e[tag=boss, distance=..8])) {
+    /say quiet now
+  }
+  let crouched: bool = sneaking
+}
+```
+
+It works wherever a condition does, with `!`, `&&` and `||`, and a predicate of another namespace is written with its id, as in `other:sneaking`. A local or parameter of the same name hides it, with a hint, and a `Global` of the same name wins, with a warning. Either way, `<namespace>:sneaking` still names the predicate.
+
 ### Operators
 
 | Operators | Meaning |

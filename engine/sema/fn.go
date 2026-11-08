@@ -318,6 +318,7 @@ func (c *Checker) CompileFunction(d *syntax.Decl, id string, src []rune) *fn.Fun
 			if _, dup := f.scopes[0][p.Name.Text]; dup {
 				c.errorf("mms/duplicate", p.Name.Sp, "parameter '%s' is already declared", p.Name.Text)
 			}
+			f.hidesPredicate(p.Name)
 			f.names[p.Name.Text]++
 			l := local{s: f.score(fn.Holder(path, p.Name.Text)), typ: t,
 				info: &Local{Name: p.Name.Text, Type: t, What: "parameter", Doc: syntax.ParseDoc(d.Doc).Param(p.Name.Text)}}
@@ -399,11 +400,24 @@ func (f *fc) lookup(name string) (local, bool) {
 	return local{}, false
 }
 
+// hidesPredicate hints that a local or parameter named n hides the
+// Predicate of the same name, which code in its scope can then no longer
+// test by name.
+func (f *fc) hidesPredicate(n *syntax.Name) {
+	id := f.ns + ":" + n.Text
+	if f.c.trial || f.c.find("predicate", id) == nil {
+		return
+	}
+	f.c.Diags = append(f.c.Diags, syntax.Diagnostic{Code: "mms/shadowed-predicate", Severity: syntax.SeverityHint,
+		Message: fmt.Sprintf("'%s' hides the Predicate %s here; test the Predicate as %s, or rename this", n.Text, id, id), Sp: n.Sp})
+}
+
 // declare adds a local. A name shadowing an outer one gets its own holder.
 func (f *fc) declare(n *syntax.Name, typ string) local {
 	if _, dup := f.scopes[len(f.scopes)-1][n.Text]; dup {
 		f.c.errorf("mms/duplicate", n.Sp, "'%s' is already declared in this block", n.Text)
 	}
+	f.hidesPredicate(n)
 	holder := n.Text
 	if k := f.names[n.Text]; k > 0 {
 		holder = n.Text + fn.Gen + strconv.Itoa(k)
@@ -776,6 +790,36 @@ func (f *fc) variable(e syntax.Expr) *local {
 	return nil
 }
 
+// predicate reads a name that is neither a variable nor a Global but a
+// Predicate as the condition that it holds: `if (sneaking)` tests
+// `if predicate <ns>:sneaking`. It returns nil for any other name.
+func (f *fc) predicate(e syntax.Expr) *val {
+	var id string
+	switch e := e.(type) {
+	case *syntax.Ident:
+		if _, ok := f.lookup(e.Name); ok {
+			return nil
+		}
+		id = f.ns + ":" + e.Name
+	case *syntax.ResLoc:
+		id = e.Text
+	default:
+		return nil
+	}
+	sym := f.c.find("predicate", id)
+	if sym == nil {
+		return nil
+	}
+	if f.c.findSig("Global", id) != nil {
+		f.c.warnf("mms/shadowed-predicate", e.Span(), "'%s' is both a Global and a Predicate; this reads the Global, so rename one of them to test the Predicate", id)
+		return nil
+	}
+	in := f.c.info(e)
+	in.Symbol = sym
+	in.ID = id
+	return &val{typ: tBool, cond: &fn.Cond{Parts: []string{"if predicate " + id}}}
+}
+
 func (f *fc) global(id string, e syntax.Expr) *local {
 	sym := f.c.findSig("Global", id)
 	if sym == nil {
@@ -953,6 +997,9 @@ func (f *fc) expr(pre *[]fn.Op, e syntax.Expr) *val {
 		}
 		if n, err := strconv.ParseInt(word, 10, 32); err == nil {
 			return &val{typ: tInt, op: fn.Const(int32(n))}
+		}
+		if v := f.predicate(e); v != nil {
+			return v
 		}
 		var l *local
 		if m, ok := e.(*syntax.Member); ok {
@@ -1249,12 +1296,12 @@ func (f *fc) logic(pre *[]fn.Op, e *syntax.Binary) *val {
 // parameter scores, and the result comes back through `execute store`.
 func (f *fc) call(pre *[]fn.Op, e *syntax.Call, wantValue bool) *val {
 	c := f.c
-	var id string
+	var id, name string
 	switch x := e.Fn.(type) {
 	case *syntax.Ident:
-		id = f.ns + ":" + x.Name
+		id, name = f.ns+":"+x.Name, x.Name
 	case *syntax.ResLoc:
-		id = x.Text
+		id, name = x.Text, x.Text
 		if !strings.Contains(id, ":") {
 			id = "minecraft:" + id
 		}
@@ -1273,6 +1320,10 @@ func (f *fc) call(pre *[]fn.Op, e *syntax.Call, wantValue bool) *val {
 	}
 	if x, ok := e.Fn.(*syntax.Ident); ok && sym == nil && (x.Name == "exists" || x.Name == "count") {
 		return f.selectorTest(pre, x.Name, e)
+	}
+	if sym == nil && c.find("predicate", id) != nil {
+		c.errorf("mms/type-mismatch", e.Sp, "'%s' is a Predicate, not a function; test it without parentheses, as in if (%s)", id, name)
+		return nil
 	}
 	if sym == nil || sym.Kind.MMS != "Function" {
 		c.errorf("mms/unknown-name", e.Fn.Span(), "no Function named '%s' is declared", id)

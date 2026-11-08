@@ -28,8 +28,7 @@ OnAdvancement use_barrel = PlayerInteractedWithEntity(
     open()
     /execute at @s run summon item_display ~ ~ ~ {Tags:["barrels.tmp"]}
     /execute store success score $holding mms.barrels if items entity @s weapon.mainhand *
-    /execute store success score $sneaking mms.barrels if predicate barrels:sneaking
-    if (sneaking == 1) {
+    if (sneaking) {
       // An empty barrel takes the kind of the held item first, if any.
       if (holding == 1 && stack == 0) {
         claim()
@@ -168,7 +167,9 @@ Function take_out {
     return
   }
   amount = stack
-  /execute if predicate barrels:sneaking run scoreboard players set $amount mms.barrels 1
+  if (sneaking) {
+    amount = 1
+  }
   if (amount > count) {
     amount = count
   }
