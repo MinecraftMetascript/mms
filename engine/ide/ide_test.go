@@ -317,3 +317,23 @@ func TestSemanticTokensMarkup(t *testing.T) {
 		t.Errorf("tokens:\n%s\nwant:\n%s", g, want)
 	}
 }
+
+// A Predicate named in a condition hovers, jumps and renames like any
+// other reference to it.
+func TestPredicateConditionReference(t *testing.T) {
+	src := "Predicate sneaking = EntityProperties(entity = this, predicate = { flags = { is_sneaking = true } })\nFunction f {\n  if (!snea|king) {\n    /say up\n  }\n}\n"
+	s, off := session(t, src)
+	if h, _ := s.Hover("main.mms", off); !strings.Contains(h, "sneaking") {
+		t.Errorf("hover = %q", h)
+	}
+	if defs := s.Definition("main.mms", off); len(defs) != 1 || defs[0].Span.Start != strings.Index(src, "sneaking") {
+		t.Errorf("definition = %+v", defs)
+	}
+	edits, msg := s.Rename("main.mms", off, "crouching")
+	if msg != "" {
+		t.Fatal(msg)
+	}
+	if len(edits) != 2 {
+		t.Errorf("rename edits = %+v", edits)
+	}
+}

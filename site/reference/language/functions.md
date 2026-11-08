@@ -61,6 +61,7 @@ Function code computes with `int` (32-bit, wrapping like a scoreboard), `bool` a
 | `Storage game: SiegeState`, `game.wave` | a record's field in command storage |
 | `let n = 0` | a local of the function |
 | `@e[tag=x]`, `exists(sel)`, `count(sel)` | a selector, whether it finds any entity, and how many |
+| `Predicate sneaking = ...`, `if (sneaking)` | whether a predicate holds, as `if predicate <ns>:sneaking` |
 
 `Objective name` with no criterion is a `dummy` score, and a comma list declares several: `Objective wins, losses`.
 

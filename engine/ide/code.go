@@ -141,10 +141,22 @@ func enclosingCall(f *syntax.File, open *syntax.Token) (name string, index int, 
 
 // codeValues lists what an expression in function code can name: the
 // parameters and locals in scope at off, then the Globals, the
-// objectives (read as `name[@s]`) and the functions, then true and false.
+// objectives (read as `name[@s]`), the Predicates and the functions, then
+// true and false.
 func (s *Session) codeValues(a *at, off int) []sema.Candidate {
 	out := locals(a.u.File, a.fn, off)
 	out = append(out, s.projectNames(a.decl.NS)...)
+	// A Predicate is a condition: `if (sneaking)`.
+	for _, sym := range s.R.Syms.All() {
+		if sym.Kind.Folder() != "predicate" {
+			continue
+		}
+		name := sym.ID()
+		if sym.NS == a.decl.NS {
+			name = sym.Path
+		}
+		out = append(out, sema.Candidate{Label: name, Kind: sema.CandID, Detail: "Predicate", Doc: sema.DocMarkdown(sym.Decl.Doc), Rank: 65})
+	}
 	// The consts, and the Templates that give a number, a bool or a
 	// string, which is what code computes with.
 	for _, c := range s.evalValueCandidates() {
@@ -157,6 +169,8 @@ func (s *Session) codeValues(a *at, off int) []sema.Candidate {
 		out = append(out, c)
 	}
 	out = append(out,
+		sema.Candidate{Label: "exists", Kind: sema.CandCallable, Detail: "exists(target): bool", Doc: "Whether a selector finds any entity: `exists(@e[tag=boss])`.", Insert: "exists($1)", Rank: 150},
+		sema.Candidate{Label: "count", Kind: sema.CandCallable, Detail: "count(target): int", Doc: "How many entities a selector finds: `count(@e[type=zombie])`.", Insert: "count($1)", Rank: 151},
 		sema.Candidate{Label: "true", Kind: sema.CandKeyword, Rank: 200},
 		sema.Candidate{Label: "false", Kind: sema.CandKeyword, Rank: 201})
 	return out

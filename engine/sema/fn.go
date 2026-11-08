@@ -766,6 +766,36 @@ func (f *fc) variable(e syntax.Expr) *local {
 	return nil
 }
 
+// predicate reads a name that is neither a variable nor a Global but a
+// Predicate as the condition that it holds: `if (sneaking)` tests
+// `if predicate <ns>:sneaking`. It returns nil for any other name.
+func (f *fc) predicate(e syntax.Expr) *val {
+	var id string
+	switch e := e.(type) {
+	case *syntax.Ident:
+		if _, ok := f.lookup(e.Name); ok {
+			return nil
+		}
+		id = f.ns + ":" + e.Name
+	case *syntax.ResLoc:
+		id = e.Text
+	default:
+		return nil
+	}
+	sym := f.c.find("predicate", id)
+	if sym == nil {
+		return nil
+	}
+	if f.c.findSig("Global", id) != nil {
+		f.c.errorf("mms/duplicate", e.Span(), "'%s' is both a Global and a Predicate; rename one of them", id)
+		return &val{typ: tBool, cond: &fn.Cond{Never: true}}
+	}
+	in := f.c.info(e)
+	in.Symbol = sym
+	in.ID = id
+	return &val{typ: tBool, cond: &fn.Cond{Parts: []string{"if predicate " + id}}}
+}
+
 func (f *fc) global(id string, e syntax.Expr) *local {
 	sym := f.c.findSig("Global", id)
 	if sym == nil {
@@ -928,6 +958,9 @@ func (f *fc) expr(pre *[]fn.Op, e syntax.Expr) *val {
 		}
 		if n, err := strconv.ParseInt(word, 10, 32); err == nil {
 			return &val{typ: tInt, op: fn.Const(int32(n))}
+		}
+		if v := f.predicate(e); v != nil {
+			return v
 		}
 		var l *local
 		if m, ok := e.(*syntax.Member); ok {
@@ -1224,12 +1257,12 @@ func (f *fc) logic(pre *[]fn.Op, e *syntax.Binary) *val {
 // parameter scores, and the result comes back through `execute store`.
 func (f *fc) call(pre *[]fn.Op, e *syntax.Call, wantValue bool) *val {
 	c := f.c
-	var id string
+	var id, name string
 	switch x := e.Fn.(type) {
 	case *syntax.Ident:
-		id = f.ns + ":" + x.Name
+		id, name = f.ns+":"+x.Name, x.Name
 	case *syntax.ResLoc:
-		id = x.Text
+		id, name = x.Text, x.Text
 		if !strings.Contains(id, ":") {
 			id = "minecraft:" + id
 		}
@@ -1248,6 +1281,10 @@ func (f *fc) call(pre *[]fn.Op, e *syntax.Call, wantValue bool) *val {
 	}
 	if x, ok := e.Fn.(*syntax.Ident); ok && sym == nil && (x.Name == "exists" || x.Name == "count") {
 		return f.selectorTest(pre, x.Name, e)
+	}
+	if sym == nil && c.find("predicate", id) != nil {
+		c.errorf("mms/type-mismatch", e.Sp, "'%s' is a Predicate, not a function; test it without parentheses, as in if (%s)", id, name)
+		return nil
 	}
 	if sym == nil || sym.Kind.MMS != "Function" {
 		c.errorf("mms/unknown-name", e.Fn.Span(), "no Function named '%s' is declared", id)
