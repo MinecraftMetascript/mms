@@ -10,7 +10,7 @@ Audit of `main` at b469b74 (the overhaul, 16da2fe, plus #213 and #215 to #220), 
 4. **The editor and the CLI checker disagree with the formatter on where declarations start (repro).** The incremental chunker splits at any `word word` line, so `else 2` on its own line passes `mms fmt` and fails in the editor and `mms check`. That breaks the whitespace-agnostic goal. (F09)
 5. **Each keystroke redoes most of the work.** Blueprint instances (every CustomItem, Book and JigsawStructure) are expanded and checked again with no reuse (400 CustomItems cost 158 ms natively for a comment edit). Typed consts and instances are type-checked two or three times. VS Code runs Fix All on every lightbulb request and re-reads the Minecraft world from disk on every pack refresh. (F20 to F27)
 6. **The `mms/*` LSP payloads are `map[string]any` in Go and hand-copied three times in TypeScript, and the copies have drifted.** VS Code drops `texts`, so the chat/title preview from W5 never appears there. (F30, F31)
-7. **Two of the "one way" rules don't hold yet.** `MaterialRule` and `SurfaceRule` both resolve (and the importer and error messages print the undocumented one), `Shaped` and `CraftingShaped` are both valid, list commas are optional, and two mcfunction simulators (Go `mcfn` and TS cmdlib) can disagree about the same pack. (F40 to F44)
+7. **Two of the "one way" rules don't hold yet.** `MaterialRule` and `SurfaceRule` both resolve (and the importer and error messages print the undocumented one), `Shaped` and `CraftingShaped` are both valid, list commas are optional. (F40 to F43)
 8. **Quick fixes and lints can break files.** The "quotes are not needed" fix strips quotes from `setup`, `run`, `check` and other keywords that can't be written bare, and the missing-field fix parses the field names out of an English error message. (F07, F33)
 9. **Web project data loss.** Export then import drops every `.mmsbook` and `.mmstext` file, and IndexedDB save failures (including quota) are swallowed while the UI says "saved". (F11, F12)
 10. **CI runs only `gofmt`, `go vet` and the tests.** No staticcheck, unused or ineffassign, which is how an ignored error in `mms import` (F08), seven unused helpers and the dead `fn` coalesce call (F55) reached `main`.
@@ -39,14 +39,14 @@ Two places where this differs from the docs:
 | `govulncheck` | **not run**: vuln.go.dev is blocked by this environment's network policy |
 | `npm audit` | web: fflate 0.8.2 moderate (GHSA-px8p-9vwx-vf98, used on user zips), 4 low via deepmerge in the Svelte toolchain. VS Code: glob and minimatch moderate via `@vscode/vsce` (dev only). preview: 0 |
 | `svelte-check` / `tsc --noEmit` | preview and VS Code clean. web: 3 errors, all from generated files missing in a fresh checkout (`reference.json`, `third-party-licenses.txt`), not real |
-| `madge --circular` | web: 2 cycles, both type-only (`import type`). preview: cycles only inside vendored cmdlib |
+| `madge --circular` | web: 2 cycles, both type-only (`import type`). preview: cycles only inside vendored cmdlib (since removed with the function-run preview) |
 | `knip`, `depcheck` | not run; unused dependencies were checked by hand (none found apart from F86) |
 
 ## Status after the fix pass
 
 The same pull request then fixed most of these. What is left needs a decision from the maintainer or is a larger piece of work.
 
-**Resolved:** F01 to F19, F23, F31 to F34, F36 to F38, F43, F47, F49, F52 to F59, F67 to F70, F73, F76, F80, F82, F84 to F88 and F90.
+**Resolved:** F01 to F19, F23, F31 to F34, F36 to F38, F43, F47, F49, F52 to F59, F67 to F70, F73, F76, F80, F82, F84 to F88 and F90. F44 too: the function-run preview and its vendored cmdlib simulator were removed, so Go `mcfn` (`mms test`) is the only simulator. That also settles Q1 and Q13.
 
 **Partly resolved:**
 
@@ -56,7 +56,7 @@ The same pull request then fixed most of these. What is left needs a decision fr
 - F81: VS Code is on TypeScript 6.0.3 like the other packages. The pinning policy and a root workspace wait on Q8.
 - F83: lint.md now links to the generated rule reference. Whether Blueprint hints can be configured waits on Q3.
 
-**Waiting on a decision:** F35 (Q3), F40 and F41 (Q9), F42 (Q7), F44 (Q1), F51 (Q2), F60 and F22 (Q4).
+**Waiting on a decision:** F35 (Q3), F40 and F41 (Q9), F42 (Q7), F51 (Q2), F60 and F22 (Q4).
 
 **Deferred as larger work (M or L effort):** the editor hot-path items F20, F21, F22 and F25 to F29; the typed `mms/*` protocol F30; F39, F45, F46, F48, F50, F71, F74, F75 and F89; and the god files F61 to F65.
 
@@ -330,7 +330,7 @@ In `Reparse`, when a new chunk has errors, parse the whole file once; if that pa
 
 ## Open questions for the maintainer
 
-1. **Which simulator is authoritative?** Go `mcfn` (`mms test`) and TS cmdlib (function-run preview) run the same output and can disagree (F44). Should one go, or do they share a golden corpus?
+1. ~~**Which simulator is authoritative?** Go `mcfn` (`mms test`) and TS cmdlib (function-run preview) run the same output and can disagree (F44). Should one go, or do they share a golden corpus?~~ Settled: the cmdlib preview was removed.
 2. **Provenance:** wire `Frames` into related information and Template-body go to definition, or delete it (F51)?
 3. **Are Blueprint `check` and `hint(...)` rule names configurable in mms.json** like the Go rules? This decides F35 and the `custom-item-as-base` docs bug (F83).
 4. **Is "types resolves, sema checks" the final design?** If yes, tasks.md should say so (F60) and the double check (F22) belongs in project; if not, it belongs in types.
@@ -342,4 +342,4 @@ In `Reparse`, when a new chunk has errors, parse the whole file once; if that pa
 10. **Is the jigsaw hole picker, and the World/Structures view, intentionally VS Code only?** `mms/output` returns `jigsawHoles`, and nothing in web reads them.
 11. **Function signatures use string type names** (`tInt`, `tBool`, engine/sema/fn.go:17-21), so `Type N = int` is "unknown type" in a function. Intended?
 12. **Should namespaces `.` and `..` be banned?** Minecraft allows them; F04 recommends banning them.
-13. **Is cmdlib's licence (the author's verbal permission, packages/preview/src/vendor/cmdlib/NOTICE.md:7-10) enough for a release that bundles it?**
+13. ~~**Is cmdlib's licence (the author's verbal permission, packages/preview/src/vendor/cmdlib/NOTICE.md:7-10) enough for a release that bundles it?**~~ Settled: cmdlib was removed.

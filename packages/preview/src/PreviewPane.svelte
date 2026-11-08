@@ -1,7 +1,7 @@
 <script lang="ts">
 	// The preview pane both the web editor and VS Code show: an inspector
 	// for loot tables, recipes and biomes, a connection graph for jigsaw
-	// pools and structures, a simulated run for functions, and a rendered
+	// pools and structures, and a rendered
 	// preview for worldgen, with a note when a pinned declaration has left
 	// the pack.
 	import BookView from './book/BookView.svelte';
@@ -12,8 +12,7 @@
 	import JigsawView from './jigsaw/JigsawView.svelte';
 	import JigsawSim from './jigsaw/JigsawSim.svelte';
 	import { jigsawGraph } from './jigsaw/graph';
-	import { bookAt, itemPath, jigsawable, runnable, shows } from './paths';
-	import FunctionRun from './run/FunctionRun.svelte';
+	import { bookAt, itemPath, jigsawable, shows } from './paths';
 	import Preview from './preview/Preview.svelte';
 	import type { OutputAsset, OutputFile, OutputItem, OutputText } from './types';
 
@@ -97,8 +96,6 @@
 			<p class="p-3 text-xs text-muted">This structure isn't a jigsaw one, so it has no pieces to connect.</p>
 		{:else if file && inspectable(file.path)}
 			<Inspect {file} items={itemInfo} />
-		{:else if file && runnable(file.path)}
-			<FunctionRun {output} path={file.path} />
 		{:else}
 			<Preview {output} target={path} {createWorker} {hint} />
 		{/if}

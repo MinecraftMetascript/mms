@@ -38,14 +38,6 @@ export const credits: Credit[] = [
 		license: 'MIT'
 	},
 	{
-		name: 'cmdlib',
-		url: 'https://github.com/Gameboy612/cmdlib',
-		by: 'Gameboy612',
-		byUrl: 'https://github.com/Gameboy612',
-		what: 'The command simulator that runs functions in the function preview.',
-		license: 'MIT'
-	},
-	{
 		name: 'CodeMirror',
 		url: 'https://codemirror.net',
 		by: 'Marijn Haverbeke and contributors',
