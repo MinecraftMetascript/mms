@@ -100,5 +100,5 @@
 
 <div class="h-full overflow-auto text-sm" aria-label="Jigsaw">
 	<JigsawTool state={toolState} bind:form {send} revealFileLabel="Preview the piece" />
-	{#if note}<p class="px-3 py-2 text-xs text-muted" role="status">{note}</p>{/if}
+	{#if note}<p class="px-3 py-2 text-xs text-muted" aria-live="polite">{note}</p>{/if}
 </div>

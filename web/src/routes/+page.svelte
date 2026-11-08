@@ -10,6 +10,7 @@
 	import JsonView from '#lib/components/JsonView.svelte';
 	import TestsView from '#lib/components/TestsView.svelte';
 	import JigsawPanel from '#lib/components/JigsawPanel.svelte';
+	import WorldPanel from '#lib/components/WorldPanel.svelte';
 	import { Engine, itemKey, outputKey, type Diagnostic, type DocSymbol, type Expansion, type OutputFile } from '#lib/engine/engine.svelte.ts';
 	import { Project, pathOf, uriOf, starter, type ProjectData } from '#lib/project/project.svelte.ts';
 	import { examples } from '#lib/project/examples.ts';
@@ -30,7 +31,7 @@
 	let viewWaiters: ((v: EditorView) => void)[] = [];
 	let loaded = $state(false);
 	let selectedOutput = $state<string | null>(null);
-	let rightTab = $state<'preview' | 'json' | 'expanded' | 'tests' | 'jigsaw'>('preview');
+	let rightTab = $state<'preview' | 'json' | 'expanded' | 'tests' | 'jigsaw' | 'world'>('preview');
 	let cursor = $state<{ uri: string; line: number; character: number } | null>(null);
 	let theme = $state<'system' | 'light' | 'dark'>('system');
 	const themes = { system: 'System', light: 'Light', dark: 'Dark' } as const;
@@ -180,6 +181,13 @@
 	$effect(() => {
 		if (rightTab === 'jigsaw' && !hasJigsaw) rightTab = 'preview';
 	});
+	// Goes to the first error, for a world build that stopped on one.
+	function firstProblem() {
+		for (const [uri, ds] of Object.entries(engine?.diagnostics ?? {})) {
+			const d = ds.find((d) => (d.severity ?? 1) === 1);
+			if (d) return void reveal(uri, d.range);
+		}
+	}
 	// Adds text to a source file through its editor, so it can be undone,
 	// and selects what was added.
 	async function insertAt(uri: string, line: number | undefined, text: string, select: string) {
@@ -509,7 +517,7 @@
 		</section>
 		<section class="flex min-h-0 flex-col bg-panel">
 			<div class="flex border-b border-line text-xs" role="tablist">
-				{#each [['preview', 'Preview'], ['json', 'JSON'], ['expanded', 'Expanded'], ...(engine?.hasTests ? [['tests', testsLabel]] : []), ...(hasJigsaw ? [['jigsaw', 'Jigsaw']] : [])] as [id, label] (id)}
+				{#each [['preview', 'Preview'], ['json', 'JSON'], ['expanded', 'Expanded'], ...(engine?.hasTests ? [['tests', testsLabel]] : []), ...(hasJigsaw ? [['jigsaw', 'Jigsaw']] : []), ['world', 'World']] as [id, label] (id)}
 					<button
 						role="tab"
 						aria-selected={rightTab === id}
@@ -563,6 +571,19 @@
 								rightTab = 'preview';
 							}}
 							oninsert={insertAt}
+						/>
+					{/if}
+					{#if rightTab === 'world'}
+						<WorldPanel
+							{engine}
+							{project}
+							onproblems={firstProblem}
+							onpiece={(path) => {
+								selectedOutput = path;
+								rightTab = 'preview';
+							}}
+							resources={resourcePack}
+							ondownload={exportPack}
 						/>
 					{/if}
 					{#if rightTab === 'tests'}
