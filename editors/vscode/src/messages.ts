@@ -88,101 +88,16 @@ export type ToExtension =
 	/** Go to a declaration's source. */
 	| { type: 'reveal'; uri: string; range: Range };
 
-// The World and Structures views' page (webview/World.svelte). The extension owns the
-// state and sends all of it after each change; the page only draws it and
-// sends back what was clicked.
+// The World and Structures views' page (webview/World.svelte, drawing the
+// shared WorldTool). The extension owns the state and sends all of it after
+// each change; the page only draws it and sends back what was clicked.
 
-/** What the player does in the game after a build, from `mms build --world`. */
-export type NextAction = 'reload' | 'rejoin' | 'none';
-
-export type WorldResult =
-	| {
-			ok: true;
-			files: number;
-			at: string;
-			next?: { action: NextAction; line: string; changed?: string };
-			resources: boolean;
-			/** Dimensions whose saved chunks the build took out, so they generate again. */
-			reset?: string[];
-			/** Dimensions it was asked to reset that had no chunks yet. */
-			unvisited?: string[];
-	  }
-	| { ok: false; message: string; detail: string; at: string; problems: boolean; worldOpen?: boolean };
-
-/** A dimension the project's pack declares. */
-export interface WorldDimensionRow {
-	/** Such as mypack:caves. */
-	id: string;
-	/** The overworld, nether or end, which the build never resets by itself. */
-	vanilla: boolean;
-	/** Whether the build world has saved chunks for it. */
-	generated: boolean;
-}
-
-/** A structure a structure block saved in the world. */
-export interface WorldStructureRow {
-	/** Its .nbt file in the world, which names it in messages. */
-	file: string;
-	/** Its id in the game, such as tower:base. */
-	id: string;
-	status: 'new' | 'imported' | 'changed';
-	/** Where it goes (or is) in the project, relative to the mms.json folder. */
-	rel: string;
-	call: string;
-	saved: string;
-	/** When it was saved, in ms since the epoch, for "saved 5 min ago". */
-	savedMs: number;
-	/** Imported, but no StructureFile(...) call names the project copy (lint/unused-asset). */
-	unused: boolean;
-	/** Its id in the pack, when it was saved under another namespace. */
-	packId?: string;
-}
-
-export interface WorldState {
-	/** No project means no mms.json in the workspace. */
-	project?: { name: string; ns?: string; path: string; canChoose: boolean };
-	/** The world the pack is built into. None means none chosen yet for the project. */
-	world?: { name: string; folder?: string; path: string };
-	/**
-	 * The world structures are imported from: a separate one when chosen
-	 * (separate is true), else the build world.
-	 */
-	structureWorld?: { name: string; folder?: string; path: string; separate: boolean };
-	building: boolean;
-	buildOnSave: boolean;
-	/** Reset the project's dimensions whose worldgen changed on each build (mms build --reset-dimensions). */
-	resetDimensions: boolean;
-	/** The pack's dimensions, shown with the build world. */
-	dimensions: WorldDimensionRow[];
-	result?: WorldResult;
-	structures: WorldStructureRow[];
-	/** Project .nbt files no StructureFile(...) call names that are not saves of the structure world. */
-	unusedFiles: string[];
-	/** The unused check waits for a project without errors. */
-	unusedPaused: boolean;
-}
+import type { NextAction, WorldAction, WorldDimensionRow, WorldResult, WorldState, WorldStructureRow } from '@mms/preview/world/tool';
+export type { NextAction, WorldDimensionRow, WorldResult, WorldState, WorldStructureRow };
 
 export type ToWorld = { type: 'state'; state: WorldState };
 
-export type FromWorld =
-	| { type: 'ready' }
-	| {
-			type: 'run';
-			action: 'build' | 'chooseWorld' | 'chooseProject' | 'revealWorld' | 'forgetWorld' | 'showProblems' | 'showOutput' | 'copyReload' | 'dismiss' | 'importWaiting'
-				| 'chooseStructureWorld' | 'sameStructureWorld' | 'revealStructureWorld';
-	  }
-	| { type: 'buildOnSave'; on: boolean }
-	| { type: 'resetDimensions'; on: boolean }
-	/** Build, and reset this one dimension (a WorldDimensionRow's id) whatever changed. */
-	| { type: 'resetDimension'; id: string }
-	/** file is a WorldStructureRow's file. */
-	| { type: 'import'; file: string }
-	| { type: 'copyCall'; file: string }
-	| { type: 'deleteFromWorld'; file: string }
-	/** files are WorldStructureRow files, imported together (a folder's Import button). */
-	| { type: 'importFiles'; files: string[] }
-	/** rel is relative to the project folder. */
-	| { type: 'revealFile'; rel: string };
+export type FromWorld = { type: 'ready' } | WorldAction;
 
 // The Jigsaw view's page (webview/Jigsaw.svelte). The page owns the form;
 // the extension sends the lists to choose from and the recent blocks, and

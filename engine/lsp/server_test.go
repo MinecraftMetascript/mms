@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -1036,5 +1037,45 @@ func TestBrokenConfig(t *testing.T) {
 	}
 	if !found {
 		t.Errorf("no diagnostic on %s in %v", cfgURI, c.notes)
+	}
+}
+
+// mms/worldInstall gives an editor that writes a world's files itself
+// what `mms build --world` would write there, and the next step.
+func TestWorldInstall(t *testing.T) {
+	c := start(t)
+	c.result("initialize", map[string]any{})
+	c.openFiles(map[string]any{"uri": "mem:///a.mms", "text": "PaintingVariant p { width = 1, height = 1, asset_id = Texture(\"art/p.png\") }\nFunction hi {\n  /say hi\n}\n"})
+	c.notify("mms/setAssets", map[string]any{"files": []any{map[string]any{"path": "art/p.png", "data": []byte("\x89PNG\r\n\x1a\nrest")}}})
+	got := c.result("mms/worldInstall", map[string]any{"before": map[string]any{}, "oldZip": nil}).(map[string]any)
+	paths := []string{}
+	for _, f := range got["data"].([]any) {
+		paths = append(paths, f.(map[string]any)["path"].(string))
+	}
+	if !slices.Contains(paths, "data/mms/function/hi.mcfunction") || slices.Contains(paths, "assets/mms/textures/painting/p.png") {
+		t.Errorf("data = %v", paths)
+	}
+	if got["zip"] == nil || got["resources"] != float64(2) /* the texture and pack.mcmeta */ || got["resourcesChanged"] != true {
+		t.Errorf("resource pack: zip %v, resources %v, changed %v", got["zip"] != nil, got["resources"], got["resourcesChanged"])
+	}
+	if got["next"] != "rejoin" || !strings.HasPrefix(got["message"].(string), "next step: exit and rejoin") {
+		t.Errorf("next = %v, %v", got["next"], got["message"])
+	}
+
+	// Built again over the same files, nothing changes.
+	before := map[string]any{}
+	for _, f := range got["data"].([]any) {
+		m := f.(map[string]any)
+		before[m["path"].(string)] = m["data"]
+	}
+	again := c.result("mms/worldInstall", map[string]any{"before": before, "oldZip": got["zip"]}).(map[string]any)
+	if again["next"] != "none" || again["resourcesChanged"] != false {
+		t.Errorf("rebuilt: next %v, resources changed %v", again["next"], again["resourcesChanged"])
+	}
+
+	// A project with errors writes nothing.
+	c.notify("textDocument/didChange", map[string]any{"textDocument": map[string]any{"uri": "mem:///a.mms", "version": 2}, "contentChanges": []any{map[string]any{"text": "Function hi {\n"}}})
+	if m := c.call("mms/worldInstall", map[string]any{}); m["error"] == nil {
+		t.Errorf("built with errors: %v", m["result"])
 	}
 }

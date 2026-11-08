@@ -7,6 +7,8 @@
 import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
+import type { StructureStatus } from '@mms/preview/world/tool';
+export { importPath, structureCall } from '@mms/preview/world/tool';
 
 export interface WorldStructure {
 	/** The namespace it was saved under in the game. */
@@ -19,7 +21,7 @@ export interface WorldStructure {
 }
 
 /** How a world's structure compares with the project's copy. */
-export type Status = 'new' | 'imported' | 'changed';
+export type Status = StructureStatus;
 
 /** The structures saved in a world, by id. */
 export function findStructures(world: string): WorldStructure[] {
@@ -42,31 +44,6 @@ export function findStructures(world: string): WorldStructure[] {
 		}
 	}
 	return out.sort((a, b) => `${a.ns}:${a.path}`.localeCompare(`${b.ns}:${b.path}`));
-}
-
-/**
- * Where a structure goes in the project, relative to its folder:
- * <folder>/<path>.nbt for the project's namespace, and
- * <folder>-<namespace>/<path>.nbt for another. Each namespace gets its own
- * folder, so a:b/foo and b:foo never share a file.
- */
-export function importPath(s: WorldStructure, projectNs: string | undefined, folder: string): string {
-	const base = folder.replace(/\\/g, '/').replace(/^\.?\/+|\/+$/g, '') || 'structures';
-	return path.posix.normalize(`${s.ns === projectNs ? base : `${base}-${s.ns}`}/${s.path}.nbt`);
-}
-
-/**
- * The call that puts an imported structure in the pack. The id name
- * keeps the folders of the path; without it the id would be the bare
- * file name.
- */
-export function structureCall(rel: string, s: WorldStructure): string {
-	// Piece("tower/base") reads structures/tower/base.nbt as a pool entry,
-	// with the id tower/base.
-	if (rel === `structures/${s.path}.nbt`) return `Piece("${s.path}")`;
-	const base = s.path.split('/').pop()!;
-	const defaultName = base.toLowerCase().replace(/[^a-z0-9_.-]/g, '_');
-	return s.path === defaultName ? `StructureFile("${rel}")` : `StructureFile("${rel}", "${s.path}")`;
 }
 
 /** Whether the project has the structure, and the same bytes as the world. */

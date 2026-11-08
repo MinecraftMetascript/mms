@@ -21,6 +21,12 @@
 			"svelte": "./src/jigsaw/JigsawTool.svelte",
 			"default": "./src/jigsaw/JigsawTool.svelte"
 		},
+		"./world/tool": "./src/world/tool.ts",
+		"./world/WorldTool.svelte": {
+			"types": "./src/world/WorldTool.svelte",
+			"svelte": "./src/world/WorldTool.svelte",
+			"default": "./src/world/WorldTool.svelte"
+		},
 		"./theme.css": "./theme.css"
 	},
 	"scripts": {

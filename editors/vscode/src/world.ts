@@ -30,6 +30,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import * as vscode from 'vscode';
+import { dimensionFolders, nextView, packDimensions, vanillaDimensions } from '@mms/preview/world/tool';
 import type { FromWorld, ToWorld, WorldDimensionRow, WorldResult, WorldState } from './messages';
 import { key, type PackOutput } from './output';
 import { findStructures, importPath, importStructure, status, structureCall, type Status, type WorldStructure } from './structures';
@@ -66,26 +67,9 @@ export function resetLines(stdout: string): { reset: string[]; unvisited: string
 	return { reset, unvisited };
 }
 
-/** The dimensions a pack declares: data/<ns>/dimension/<path>.json. */
-export function packDimensions(paths: string[]): string[] {
-	const ids = new Set<string>();
-	for (const p of paths) {
-		const m = /^data\/([^/]+)\/dimension\/(.+)\.json$/.exec(p);
-		if (m) ids.add(`${m[1]}:${m[2]}`);
-	}
-	return [...ids].sort();
-}
-
-const vanillaDimensions = new Set(['minecraft:overworld', 'minecraft:the_nether', 'minecraft:the_end']);
-
 /** Whether a world has saved chunks for a dimension, in the 26.1+ layout or the older one. */
 function generated(world: string, id: string): boolean {
-	const [ns, name] = id.split(':');
-	const dirs = [path.join(world, 'dimensions', ns, ...name.split('/'))];
-	if (id === 'minecraft:overworld') dirs.push(world);
-	if (id === 'minecraft:the_nether') dirs.push(path.join(world, 'DIM-1'));
-	if (id === 'minecraft:the_end') dirs.push(path.join(world, 'DIM1'));
-	return dirs.some((d) => fs.existsSync(path.join(d, 'region')));
+	return dimensionFolders(id).some((d) => fs.existsSync(path.join(world, ...d, 'region')));
 }
 
 /** The two side bar views this class draws: World (mms.world) and Structures (mms.structures). */
@@ -739,6 +723,6 @@ function describe(world: string): { name: string; folder?: string; path: string 
 function view(r: Result): WorldResult {
 	const at = r.at.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
 	if (!r.ok) return { ok: false, message: r.message, detail: r.detail, problems: r.problems, worldOpen: r.worldOpen, at };
-	const next = r.next && { action: r.next.action, line: r.next.line, changed: /; (.*) changed\b/.exec(r.next.line)?.[1] };
+	const next = r.next && nextView(r.next.action, r.next.line);
 	return { ok: true, files: r.files, at, next, resources: r.resources, reset: r.reset, unvisited: r.unvisited };
 }

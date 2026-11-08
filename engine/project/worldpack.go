@@ -244,26 +244,18 @@ func MergeWorldPack(old []byte, owner string, files []OutFile) (*WorldPackResult
 	return res, err
 }
 
-// WriteWorldPack merges owner's resource pack files into the zip at path,
-// creating it when it does not exist. The new zip replaces the old one in
-// a single rename, so a failed build never leaves half a pack.
-func WriteWorldPack(path, owner string, files []OutFile) (*WorldPackResult, error) {
-	old, err := os.ReadFile(path)
-	if err != nil && !os.IsNotExist(err) {
-		return nil, err
-	}
-	res, err := MergeWorldPack(old, owner, files)
-	if err != nil {
-		return nil, err
-	}
+// WriteFileAtomic writes data to path, making its folder, in a single
+// rename, so a failed build never leaves half a file, such as a world's
+// resources.zip.
+func WriteFileAtomic(path string, data []byte) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return nil, err
+		return err
 	}
-	tmp, err := os.CreateTemp(filepath.Dir(path), ".resources-*.zip")
+	tmp, err := os.CreateTemp(filepath.Dir(path), ".mms-*.tmp")
 	if err != nil {
-		return nil, err
+		return err
 	}
-	_, err = tmp.Write(res.Zip)
+	_, err = tmp.Write(data)
 	if cerr := tmp.Close(); err == nil {
 		err = cerr
 	}
@@ -276,9 +268,8 @@ func WriteWorldPack(path, owner string, files []OutFile) (*WorldPackResult, erro
 	}
 	if err != nil {
 		os.Remove(tmp.Name())
-		return nil, err
 	}
-	return res, nil
+	return err
 }
 
 // ownEarlierBuild says a zip without a manifest, whose entries all carry

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"flag"
 	"fmt"
@@ -198,39 +197,33 @@ func runBuild(args []string, stdout, stderr io.Writer) int {
 		if err != nil {
 			return fail(err)
 		}
-		var resetIDs []string
-		if reset.set {
-			if resetIDs = reset.ids; resetIDs == nil {
-				resetIDs = project.ChangedDimensions(before, data)
-			}
-			// Checked before anything is written, so the next build sees
-			// the same changes and resets the same dimensions.
-			if len(resetIDs) > 0 && worldInUse(*world) {
-				fmt.Fprintf(stderr, "mms: %s is open in Minecraft; leave the world to reset %s, then build again (nothing written)\n", *world, strings.Join(resetIDs, ", "))
-				return 1
-			}
-		}
-		if err := project.WriteDir(target, data); err != nil {
-			return fail(err)
-		}
-		fmt.Fprintf(stdout, "wrote %d files to %s\n", len(data), target)
 		rz, note := worldResourcePack(*world)
 		oldZip, statErr := os.ReadFile(rz)
 		if statErr != nil && !os.IsNotExist(statErr) {
 			return fail(statErr)
 		}
-		resChanged := false
-		// With no resources, a pack already there still loses the files
-		// this project put in it last time.
-		if len(res) > 0 || statErr == nil {
-			m, err := project.WriteWorldPack(rz, p.Config.Namespace, res)
-			if err != nil {
+		in, err := project.PlanWorldInstall(files, p.Config.Namespace, before, oldZip, reset.set, reset.ids)
+		if err != nil {
+			return fail(err)
+		}
+		// Checked before anything is written, so the next build sees
+		// the same changes and resets the same dimensions.
+		if len(in.Reset) > 0 && worldInUse(*world) {
+			fmt.Fprintf(stderr, "mms: %s is open in Minecraft; leave the world to reset %s, then build again (nothing written)\n", *world, strings.Join(in.Reset, ", "))
+			return 1
+		}
+		if err := project.WriteDir(target, in.Data); err != nil {
+			return fail(err)
+		}
+		fmt.Fprintf(stdout, "wrote %d files to %s\n", len(in.Data), target)
+		if m := in.Pack; m != nil {
+			if err := project.WriteFileAtomic(rz, m.Zip); err != nil {
 				return fail(err)
 			}
-			if len(res) == 0 {
+			if in.Resources == 0 {
 				fmt.Fprintf(stdout, "%s has no resources now; removed what it had in %s\n", p.Config.Namespace, rz)
 			} else {
-				fmt.Fprintf(stdout, "wrote resource pack %s (%d files)\n", rz, len(res))
+				fmt.Fprintf(stdout, "wrote resource pack %s (%d files)\n", rz, in.Resources)
 			}
 			if m.Adopted {
 				fmt.Fprintln(stdout, "replaced the resource pack an earlier mms build left there")
@@ -242,10 +235,9 @@ func runBuild(args []string, stdout, stderr io.Writer) int {
 				fmt.Fprintf(stderr, "mms: warning: overwrote %s\n", r)
 			}
 			fmt.Fprintln(stdout, note)
-			resChanged = !bytes.Equal(oldZip, m.Zip)
 		}
 		if reset.set {
-			done, err := project.ResetDimensions(*world, resetIDs)
+			done, err := project.ResetDimensions(*world, in.Reset)
 			for _, d := range done {
 				if len(d.Moved) == 0 {
 					fmt.Fprintf(stdout, "reset %s: nothing to reset, it has not been visited yet\n", d.ID)
@@ -256,11 +248,11 @@ func runBuild(args []string, stdout, stderr io.Writer) int {
 			if err != nil {
 				return fail(err)
 			}
-			if len(resetIDs) == 0 {
+			if len(in.Reset) == 0 {
 				fmt.Fprintln(stdout, "reset: no dimension's worldgen changed")
 			}
 		}
-		fmt.Fprintln(stdout, project.PlanApply(before, data, resChanged).Message())
+		fmt.Fprintln(stdout, in.Plan.Message())
 		return 0
 	}
 	resOut := filepath.Join(dir, p.Config.ResourceOutput())
