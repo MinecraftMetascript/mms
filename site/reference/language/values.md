@@ -12,7 +12,7 @@ Values look like the JSON they become, with less punctuation. Every value is che
 | `diamond`, `minecraft:stone`, `chests/gems` | an id, or an enum word such as `rigid` |
 | `#gems`, `#minecraft:logs` | a tag |
 | `1..3`, `5..`, `..10` | a range: a number provider, or bounds |
-| `[a, b, c]` | a list. Commas between items are optional. |
+| `[a, b, c]` | a list. Items are separated by commas, and a comma after the last one is allowed. |
 | `{ key = value }` | an object. Fields are separated by newlines or commas. |
 | `none` | no value: a field set to `none` is left out |
 

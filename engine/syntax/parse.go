@@ -975,11 +975,36 @@ func (b *builder) primary(c parser.IPrimaryContext, sp Span) Expr {
 		for _, e := range p.AllValue() {
 			l.Elems = append(l.Elems, b.value(e, sp))
 		}
+		b.listCommas(p)
 		return l
 	case *parser.ObjectLitContext:
 		return &Object{Body: b.block(p.Block()), Sp: sp}
 	}
 	return &Bad{Sp: sp}
+}
+
+// listCommas reports list elements with no comma between them. The
+// grammar lets the comma go missing so that recovery keeps the list, but
+// the language has one way to write a list, with commas, and the
+// formatter writes them.
+func (b *builder) listCommas(p *parser.ListLitContext) {
+	var prev antlr.ParserRuleContext
+	for _, ch := range p.GetChildren() {
+		v, ok := ch.(parser.IValueContext)
+		if !ok {
+			prev = nil
+			continue
+		}
+		if prev != nil {
+			end := span(prev).End
+			b.file.Diags = append(b.file.Diags, Diagnostic{
+				Code: "syntax/missing-comma", Severity: SeverityError, Sp: span(v),
+				Message: "missing ',' between list elements",
+				Fixes:   []Fix{{Title: "Insert ','", Edits: []TextEdit{{Sp: Span{end, end}, Text: ","}}, Safe: true}},
+			})
+		}
+		prev = v
+	}
 }
 
 // exprAt converts the i'th expression of a list, or a Bad one when

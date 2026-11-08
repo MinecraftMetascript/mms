@@ -374,6 +374,8 @@ func (c *Checker) callableByName(name string, v tview) *Callable {
 		key := Snake(name)
 		if a, ok := callAliases[disp.Dispatcher][name]; ok {
 			key = a
+		} else if _, ok := Spelled(name); ok {
+			return nil
 		}
 		if c.hasDispatchKey(disp, key) {
 			cfs, _ := c.fields(v, key)
@@ -383,7 +385,7 @@ func (c *Checker) callableByName(name string, v tview) *Callable {
 	}
 	if v.Name != "" {
 		short := spec.ShortPath(v.Name)
-		if name == short || structAliases[name] == short {
+		if (name == short && !isAliased(short)) || structAliases[name] == short {
 			return &Callable{Name: name, Struct: v, Fields: withDocs(short, "", fs), Ov: overlays[short]}
 		}
 	}
@@ -453,6 +455,9 @@ func (c *Checker) callStruct(e syntax.Expr, v tview) jsonv.Value {
 		return nil
 	}
 	cl := c.callableByName(name.Name, v)
+	if cl == nil && c.respelled(name.Name, name.Sp) {
+		return nil
+	}
 	if cl == nil {
 		names := c.callableNames(v)
 		msg := "'" + name.Name + "' does not make a " + describe(v)

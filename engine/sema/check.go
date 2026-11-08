@@ -211,6 +211,19 @@ func (c *Checker) errorf(code string, sp syntax.Span, format string, args ...any
 	c.Diags = append(c.Diags, syntax.Diagnostic{Code: code, Severity: syntax.SeverityError, Message: fmt.Sprintf(format, args...), Sp: sp})
 }
 
+// respelled reports a helper written with a spelling an alias replaces.
+func (c *Checker) respelled(name string, sp syntax.Span) bool {
+	want, ok := Spelled(name)
+	if !ok {
+		return false
+	}
+	c.errs++
+	if !c.trial {
+		c.Diags = append(c.Diags, respell("mms/unknown-helper", sp, name, want))
+	}
+	return true
+}
+
 func (c *Checker) warnf(code string, sp syntax.Span, format string, args ...any) {
 	if c.trial {
 		return
@@ -459,12 +472,15 @@ func (c *Checker) union(e syntax.Expr, v tview) jsonv.Value {
 	switch len(cands) {
 	case 0:
 		if name := callName(e); name != "" {
+			_, id, _, _ := unchain(e)
+			if c.respelled(name, id.Sp) {
+				return nil
+			}
 			names := c.callableNames(v)
 			msg := "'" + name + "' does not make a " + unionText(v)
 			if s := closest(name, names); s != "" {
 				msg += "; did you mean " + s + "(...)?"
 			}
-			_, id, _, _ := unchain(e)
 			c.errorf("mms/unknown-helper", id.Sp, "%s", msg)
 			return nil
 		}

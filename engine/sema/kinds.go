@@ -60,15 +60,20 @@ func (k Kind) Folder() string {
 var kindAliases = map[string]string{
 	"SurfaceRule":      "worldgen/material_rule",
 	"SurfaceCondition": "worldgen/material_condition",
-	"NoiseSettings":    "worldgen/noise_settings",
 	// Resource-pack kinds named after their folder or the component that
 	// uses them, rather than mcdoc's block_definition / item_definition.
 	"BlockState": "block_definition",
 	"ItemModel":  "item_definition",
 }
 
-// renamed are resource kinds that only an alias names.
-var renamed = map[string]bool{"block_definition": true, "item_definition": true}
+// renamed are resource kinds that only an alias names, so each kind has
+// one spelling.
+var renamed = map[string]bool{
+	"block_definition":            true,
+	"item_definition":             true,
+	"worldgen/material_rule":      true,
+	"worldgen/material_condition": true,
+}
 
 // Kinds resolves declaration kinds against one spec pack.
 type Kinds struct {

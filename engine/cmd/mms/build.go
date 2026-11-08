@@ -72,6 +72,9 @@ func report(w io.Writer, r *project.Result, hints bool) int {
 			fmt.Fprintf(w, "    %s\n    %s%s\n", strings.ReplaceAll(text, "\t", " "), strings.Repeat(" ", col-1), strings.Repeat("^", width))
 		}
 	}
+	for _, msg := range r.ConfigWarnings() {
+		fmt.Fprintf(w, "%s: warning: %s\n", project.ConfigFile, msg)
+	}
 	// Files nothing uses have no line to point at.
 	if paths, sev := r.UnusedAssets(); sev != syntax.SeverityHint || hints {
 		name := map[syntax.Severity]string{syntax.SeverityError: "error", syntax.SeverityWarning: "warning"}[sev]

@@ -91,10 +91,9 @@ func (c Config) Validate() error {
 			return fmt.Errorf("mms.json: %s %q must be a folder inside the project, such as \"build\"", o.key, o.dir)
 		}
 	}
+	// Rule names are checked after analysis, against the built-in rules
+	// and those the project's Blueprints name (Result.ConfigWarnings).
 	for id, sev := range c.Lint {
-		if RuleByID(id) == nil {
-			return fmt.Errorf("mms.json: lint: unknown rule %q", id)
-		}
 		if _, ok := ParseSeverity(sev); !ok {
 			return fmt.Errorf("mms.json: lint: %s: severity must be error, warning, info, hint or off, not %q", id, sev)
 		}

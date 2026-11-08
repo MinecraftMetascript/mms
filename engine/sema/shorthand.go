@@ -81,6 +81,48 @@ var structAliases = map[string]string{
 	"Pool": "LootPool",
 }
 
+func isAliased(short string) bool {
+	for _, s := range structAliases {
+		if s == short {
+			return true
+		}
+	}
+	return false
+}
+
+// Spelled maps a kind or helper name that an alias replaces to the one
+// spelling MMS accepts, such as CraftingShaped to Shaped, so the error
+// can say so and fix it.
+func Spelled(name string) (string, bool) {
+	for k, r := range kindAliases {
+		if renamed[r] && Pascal(lastSeg(r)) == name {
+			return k, true
+		}
+	}
+	for _, as := range callAliases {
+		for a, key := range as {
+			if Pascal(key) == name {
+				return a, true
+			}
+		}
+	}
+	for a, s := range structAliases {
+		if s == name {
+			return a, true
+		}
+	}
+	return "", false
+}
+
+// respell is the error for a name that has another spelling.
+func respell(code string, sp syntax.Span, name, want string) syntax.Diagnostic {
+	return syntax.Diagnostic{
+		Code: code, Severity: syntax.SeverityError, Sp: sp,
+		Message: "'" + name + "' is written " + want,
+		Fixes:   []syntax.Fix{{Title: "Write " + want, Edits: []syntax.TextEdit{{Sp: sp, Text: want}}, Safe: true}},
+	}
+}
+
 // shorthandCallables are helper names that shorthand rules accept at a type, for
 // completion.
 var shorthandCallables = map[string][]string{

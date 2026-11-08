@@ -307,6 +307,7 @@ func (r *Result) Diagnostics(path string) []syntax.Diagnostic {
 		}
 		out = append(out, d.Extern[path]...)
 	}
+	out = r.configure(path, out)
 	out = append(out, r.Lints()[path]...)
 	sort.SliceStable(out, func(i, j int) bool { return out[i].Sp.Start < out[j].Sp.Start })
 	return out

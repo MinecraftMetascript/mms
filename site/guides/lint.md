@@ -11,7 +11,7 @@ Every rule, with its default severity and what it reports, is listed in the [lin
 - `book-page-overflow` (warning): a [Book](resources.md#books) page with more text than the book screen shows.
 - The `jigsaw-` rules (warning or info): jigsaw blocks in structure files that can never join, name an unknown pool or hole, or place pieces that stick out or overlap.
 
-Blueprints in the prelude add hints of their own, such as `custom-item-as-base` on a [custom item](resources.md#custom-items) written where a plain item id is expected. They are part of the Blueprint, not lint rules, so `mms.json` does not configure them.
+Blueprints add rules of their own: the prelude's `custom-item-as-base` hint on a [custom item](resources.md#custom-items) written where a plain item id is expected, and any rule a project's Blueprint names in `warn(field, "rule", "message")` or `hint("rule", "message")`. They are configured and ignored like the built-in rules. A setting for a rule that neither MMS nor a Blueprint has is a warning on `mms.json`, with the closest rule name.
 
 ## Configuration
 

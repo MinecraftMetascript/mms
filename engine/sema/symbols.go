@@ -127,6 +127,10 @@ func Collect(units []*Unit, kinds *Kinds, defaultNS string) (*Table, map[string]
 		for _, d := range u.File.Decls {
 			k, ok := kinds.Lookup(d.Kind.Name)
 			if !ok {
+				if want, ok := Spelled(d.Kind.Name); ok {
+					diags[u.Path] = append(diags[u.Path], respell("mms/unknown-kind", d.Kind.Sp, d.Kind.Name, want))
+					continue
+				}
 				report(u, "mms/unknown-kind", d.Kind.Sp, "unknown declaration kind '"+d.Kind.Name+"'")
 				continue
 			}

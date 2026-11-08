@@ -15,4 +15,15 @@ W1 to W4 run in order. W5 to W8 can run side by side after W4, and W8 starts as 
 | W7 | Function side | `Storage` records, selector values, Commands templates with the `inlined` inlay, `run { }`, `Test` declarations, `mms test`, simulator support. | Function examples are rewritten with `Test` declarations, and `mms test` gives the same results in Go and in the web simulator. |
 | W8 | Editors and docs | Every row of the parity table, `mms/expand`, VS Code (lenses, views, `mmstext` language, TextMate grammars, a new extension host test), web editor (tokenizer, previews, reference), importer, `docs/*.md`, refreshed examples. | Every parity table row is checked off by the LSP, Playwright and VS Code tests. |
 
+## How the overhaul landed
+
+All eight workstreams are merged into `main`. Some done conditions above describe a design that changed on the way, and the code is the reference:
+
+- **`types` resolves, `sema` checks.** `engine/types` turns MMS types into mcdoc types, matches unions and checks Blueprint fields, Template arguments and typed consts at the user's spans, but it hands the checking of values against vanilla-mcdoc to `sema`. `sema/check.go` stays as that checker; it was not deleted (W3).
+- **Kinds come from the spec and the prelude.** `sema/kinds.go` builds the kind table from vanilla-mcdoc folders and the prelude's `extern Blueprint`s, with a short alias table, instead of the old hardcoded map. `sugar.go` became `sema/shorthand.go` (W4).
+- **Markup lives in `sema`.** There is no `text` package: markup is parsed and checked in `sema/bookmarkup.go`, `book.go`, `text.go` and `tell.go` (W5).
+- **One simulator.** `mms test`, the LSP and both editors run the Go interpreter in `engine/internal/mcfn`. The web editor's function-run preview, which used a second simulator, was removed (W7).
+
+The double type check of typed consts and instances (one in `types` for diagnostics, another in `project` for hover info) should become one: `types.Env.Check` returning its checker so `project` reuses it.
+
 The earlier rewrite milestones (M0 to M6) are tracked under issue [#22](https://github.com/MinecraftMetascript/mms/issues/22).

@@ -223,9 +223,10 @@ func checkRule(sev syntax.Severity) intrinsic {
 				sp = fsp
 			}
 		}
-		// A rule without a name is reported under the Blueprint's:
-		// mms/custom-item for CustomItem.
-		code := "check"
+		// A named rule is a lint rule, lint/<rule>, which mms.json can
+		// configure. One without a name is reported under the
+		// Blueprint's: mms/custom-item for CustomItem.
+		code := "mms/check"
 		if c.inst != nil {
 			code = "mms/" + kebab(c.inst.Blueprint.D.NameText())
 		}
@@ -235,7 +236,7 @@ func checkRule(sev syntax.Severity) intrinsic {
 				c.errorf("mms/check-args", x.Sp, "a rule name is a string")
 				return &None{pos: p}
 			}
-			code = r.S
+			code = "lint/" + r.S
 		}
 		msg, ok := args[len(args)-1].v.(*Str)
 		if !ok {

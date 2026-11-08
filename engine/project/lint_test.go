@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/minecraftmetascript/mms/engine/spec"
+	"github.com/minecraftmetascript/mms/engine/syntax"
 )
 
 func lintCodes(t *testing.T, cfg Config, src string) []string {
@@ -51,8 +52,45 @@ Function f {
 	if got := strings.Join(lintCodes(t, Config{Namespace: "demo"}, src3), " "); got != "lint/overrides-vanilla@2" {
 		t.Errorf("tag lint = %s, want lint/overrides-vanilla@2", got)
 	}
-	if err := (Config{Namespace: "x", Lint: map[string]string{"nope": "off"}}).Validate(); err == nil {
-		t.Error("unknown rule accepted")
+	if err := (Config{Namespace: "x", Lint: map[string]string{"nope": "loud"}}).Validate(); err == nil {
+		t.Error("bad severity accepted")
+	}
+}
+
+// TestBlueprintRules checks that a Blueprint's named check rules are
+// lint rules: mms.json sets their level, `// mms-ignore` silences them,
+// and a setting for a rule nothing has is a warning on mms.json.
+func TestBlueprintRules(t *testing.T) {
+	src := `Blueprint Wand {
+  cooldown: int = 20
+  check {
+    if (cooldown > 200) {
+      warn(cooldown, "slow-wand", "slow")
+    }
+  }
+}
+Wand a { cooldown = 300 }
+// mms-ignore slow-wand
+Wand b { cooldown = 300 }
+`
+	cfg := Config{Namespace: "demo"}
+	if got := strings.Join(lintCodes(t, cfg, src), " "); got != "lint/slow-wand@9" {
+		t.Errorf("default = %s, want lint/slow-wand@9", got)
+	}
+	cfg.Lint = map[string]string{"slow-wand": "off"}
+	if got := strings.Join(lintCodes(t, cfg, src), " "); got != "" {
+		t.Errorf("off = %s, want nothing", got)
+	}
+	cfg.Lint = map[string]string{"slow-wand": "error", "slow-wnd": "off", "custom-item-as-base": "off"}
+	p := New(spec.MustDefault(), cfg)
+	p.SetFile("a.mms", src)
+	r, _ := p.Analyze(context.Background())
+	ds := r.Diagnostics("a.mms")
+	if len(ds) != 1 || ds[0].Severity != syntax.SeverityError {
+		t.Errorf("error level = %v", ds)
+	}
+	if got := strings.Join(r.ConfigWarnings(), "; "); got != `lint: unknown rule "slow-wnd"; did you mean "slow-wand"?` {
+		t.Errorf("warnings = %s", got)
 	}
 }
 

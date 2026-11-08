@@ -560,14 +560,25 @@ func (s *Server) publishAssets(w *workspace, r *project.Result) {
 			}}})
 		}
 	}
-	if w.configErr != nil && w.dir != "" {
-		uri := pathURI(filepath.Join(w.dir, project.ConfigFile))
-		now[uri] = true
-		s.notify("textDocument/publishDiagnostics", map[string]any{"uri": uri, "diagnostics": []any{map[string]any{
-			"range":    map[string]any{"start": Position{}, "end": Position{}},
-			"severity": int(syntax.SeverityError), "source": "mms", "code": "mms/config",
-			"message": w.configErr.Error() + "; the project uses the default settings until this is fixed",
-		}}})
+	if w.dir != "" {
+		var ds []any
+		at := map[string]any{"start": Position{}, "end": Position{}}
+		if w.configErr != nil {
+			ds = append(ds, map[string]any{
+				"range": at, "severity": int(syntax.SeverityError), "source": "mms", "code": "mms/config",
+				"message": w.configErr.Error() + "; the project uses the default settings until this is fixed",
+			})
+		}
+		for _, msg := range r.ConfigWarnings() {
+			ds = append(ds, map[string]any{
+				"range": at, "severity": int(syntax.SeverityWarning), "source": "mms", "code": "mms/config", "message": msg,
+			})
+		}
+		if len(ds) > 0 {
+			uri := pathURI(filepath.Join(w.dir, project.ConfigFile))
+			now[uri] = true
+			s.notify("textDocument/publishDiagnostics", map[string]any{"uri": uri, "diagnostics": ds})
+		}
 	}
 	for uri := range s.assetDiags[w] {
 		if !now[uri] {
