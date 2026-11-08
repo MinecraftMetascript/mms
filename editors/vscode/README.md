@@ -38,7 +38,7 @@ The extension starts when a folder contains an `mms.json` or when you open a `.m
 
 ## Building
 
-The preview panel uses the same Svelte components as the web editor, from `packages/preview`. `npm run build` bundles the extension (esbuild), the panel (Vite, into `out/webview`) the World and Structures views' page (`webview/World.svelte`, into `out/world`) and the Jigsaw view's page (`webview/Jigsaw.svelte`, into `out/jigsaw`).
+The preview panel uses the same Svelte components as the web editor, from `packages/preview`. All three are one npm workspace: run `npm ci` in the repository root. `npm run build` bundles the extension (esbuild), the panel (Vite, into `out/webview`) the World and Structures views' page (`webview/World.svelte`, into `out/world`) and the Jigsaw view's page (`webview/Jigsaw.svelte`, into `out/jigsaw`).
 
 `npm run package` makes the universal `.vsix`, without `mms`. `npm run package:targets` makes one `.vsix` per VS Code platform with `mms` cross-compiled into `bin/` (it needs Go); pass targets to make only some, such as `npm run package:targets -- linux-x64 darwin-arm64`. `MMS_VERSION` sets the version `mms version` prints.
 

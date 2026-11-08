@@ -10,6 +10,7 @@
 // (such as v1.0.0) is stamped into the binary for `mms version`.
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -37,8 +38,10 @@ for (const t of wanted) {
 	}
 }
 
-// vsce's own entry point, run with this node: no shell, so paths with spaces work on Windows.
-const vsce = path.join(root, 'node_modules', '@vscode', 'vsce', 'vsce');
+// vsce's own entry point, run with this node: no shell, so paths with spaces
+// work on Windows. The workspace may install it in the repository's
+// node_modules, so resolve it the way Node does.
+const vsce = path.join(path.dirname(createRequire(import.meta.url).resolve('@vscode/vsce/package.json')), 'vsce');
 const ldflags = ['-s', '-w'];
 if (process.env.MMS_VERSION) ldflags.push(`-X main.version=${process.env.MMS_VERSION}`);
 
@@ -56,7 +59,7 @@ try {
 		});
 		fs.copyFileSync(path.join(engine, 'THIRD_PARTY_NOTICES.txt'), path.join(bin, 'THIRD_PARTY_NOTICES.txt'));
 		if (goos !== 'windows') fs.chmodSync(path.join(bin, exe), 0o755);
-		execFileSync(process.execPath, [vsce, 'package', '--skip-license', '--target', target], { cwd: root, stdio: 'inherit' });
+		execFileSync(process.execPath, [vsce, 'package', '--skip-license', '--no-dependencies', '--target', target], { cwd: root, stdio: 'inherit' });
 	}
 } finally {
 	// The universal .vsix (`npm run package`) must not pick up a stray binary.

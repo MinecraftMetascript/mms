@@ -46,7 +46,7 @@ Two places where this differs from the docs:
 
 The same pull request then fixed most of these. What is left needs a decision from the maintainer or is a larger piece of work.
 
-**Resolved:** F01 to F19, F23, F31 to F34, F36 to F38, F43, F47, F49, F52 to F59, F67 to F70, F73, F76, F80, F82, F84 to F88 and F90. F44 too: the function-run preview and its vendored cmdlib simulator were removed, so Go `mcfn` (`mms test`) is the only simulator. That also settles Q1 and Q13.
+**Resolved:** F01 to F19, F23, F31 to F34, F36 to F38, F43, F47, F49, F52 to F59, F67 to F70, F73, F76, F80, F82, F84 to F88 and F90, plus F66 (Q6) and F81 (Q8): the old docs redirects are gone, and the three npm packages are one workspace with one lockfile. For F38, Q5 kept the full mms.json in the web, which now also sends all of it to the server. F44 too: the function-run preview and its vendored cmdlib simulator were removed, so Go `mcfn` (`mms test`) is the only simulator. That also settles Q1 and Q13.
 
 **Resolved after the maintainer's answers:**
 
@@ -59,9 +59,7 @@ The same pull request then fixed most of these. What is left needs a decision fr
 **Partly resolved:**
 
 - F24: the World and Structures views no longer redraw while they are hidden, and structure hashes are cached. `level.dat` is still read on each visible redraw.
-- F66: the pre-index project migration and the scaffold `index.ts` are gone. The old docs redirects stay until Q6 is answered.
 - F72: the fuzz test no longer excuses Reparse/Parse differences, and the whitespace test checks Reparse on every layout. Whitespace-removal variants (`total/2`, `a:int`) are still missing.
-- F81: VS Code is on TypeScript 6.0.3 like the other packages. The pinning policy and a root workspace wait on Q8.
 
 **Deferred as larger work (M or L effort):** the editor hot-path items F20, F21, F22 and F25 to F29; the typed `mms/*` protocol F30; F39, F45, F46, F48, F50, F71, F74, F75 and F89; and the god files F61 to F65.
 
@@ -339,12 +337,12 @@ In `Reparse`, when a new chunk has errors, parse the whole file once; if that pa
 2. ~~**Provenance:** wire `Frames` into related information and Template-body go to definition, or delete it (F51)?~~ Settled: wired into related information.
 3. ~~**Are Blueprint `check` and `hint(...)` rule names configurable in mms.json** like the Go rules? This decides F35 and the `custom-item-as-base` docs bug (F83).~~ Settled: yes.
 4. ~~**Is "types resolves, sema checks" the final design?** If yes, tasks.md should say so (F60) and the double check (F22) belongs in project; if not, it belongs in types.~~ Settled: yes, recorded in tasks.md. F22 stays deferred work.
-5. **Should the web editor keep the full mms.json** (lint, icon, sources), or only namespace and description (F38)?
-6. **Do old docs URLs need to keep working?** No users, but the site is public on GitHub Pages, so external links may exist (F66).
+5. ~~**Should the web editor keep the full mms.json** (lint, icon, sources), or only namespace and description (F38)?~~ Settled: yes. The web sends all of it to the server and shows settings warnings.
+6. ~~**Do old docs URLs need to keep working?** No users, but the site is public on GitHub Pages, so external links may exist (F66).~~ Settled: no. The redirects are gone.
 7. ~~**Were optional list commas deliberate** (for a recovery case), or a side effect of the overhaul grammar (F42)?~~ Settled: a side effect; commas are now required.
-8. **A root npm workspace?** It would remove three lockfiles and the version drift (F81), at the cost of changing CI caching.
+8. ~~**A root npm workspace?** It would remove three lockfiles and the version drift (F81), at the cost of changing CI caching.~~ Settled: yes. One root lockfile; shared libraries use the same caret ranges, so they install once.
 9. ~~**Are `SurfaceRule`, `Shaped`, `AboveWater` and friends the official names**, or compatibility aliases that "no aliases" says to remove (F40, F41)?~~ Settled: one spelling each, the short ones.
-10. **Is the jigsaw hole picker, and the World/Structures view, intentionally VS Code only?** `mms/output` returns `jigsawHoles`, and nothing in web reads them.
-11. **Function signatures use string type names** (`tInt`, `tBool`, engine/sema/fn.go:17-21), so `Type N = int` is "unknown type" in a function. Intended?
-12. **Should namespaces `.` and `..` be banned?** Minecraft allows them; F04 recommends banning them.
+10. ~~**Is the jigsaw hole picker, and the World/Structures view, intentionally VS Code only?** `mms/output` returns `jigsawHoles`, and nothing in web reads them.~~ Settled: no, web and VS Code should match wherever possible. Bringing the Jigsaw, World and Structures views to the web is follow-up work.
+11. ~~**Function signatures use string type names** (`tInt`, `tBool`, engine/sema/fn.go:17-21), so `Type N = int` is "unknown type" in a function. Intended?~~ Settled: not intended. A Type that is int, bool or string (or a union of strings) now works in function signatures, let and Global.
+12. ~~**Should namespaces `.` and `..` be banned?** Minecraft allows them; F04 recommends banning them.~~ Settled: yes, and they already are.
 13. ~~**Is cmdlib's licence (the author's verbal permission, packages/preview/src/vendor/cmdlib/NOTICE.md:7-10) enough for a release that bundles it?**~~ Settled: cmdlib was removed.

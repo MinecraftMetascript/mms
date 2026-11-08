@@ -61,7 +61,9 @@ jobs:
         with:
           go-version-file: engine/go.mod
           cache-dependency-path: engine/go.sum
-      - run: npm ci
+      - name: Install the npm workspace
+        working-directory: .
+        run: npm ci
       # The universal mms-<version>.vsix, which runs mms from mms.path or PATH.
       - run: npm run package
       # One mms-<target>-<version>.vsix per platform, with mms bundled.

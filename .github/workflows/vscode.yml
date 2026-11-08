@@ -3,9 +3,9 @@ name: vscode
 on:
   push:
     branches: [main]
-    paths: ["editors/vscode/**", "packages/**", "engine/**", ".github/workflows/vscode.yml"]
+    paths: ["editors/vscode/**", "packages/**", "engine/**", "package.json", "package-lock.json", ".github/workflows/vscode.yml"]
   pull_request:
-    paths: ["editors/vscode/**", "packages/**", "engine/**", ".github/workflows/vscode.yml"]
+    paths: ["editors/vscode/**", "packages/**", "engine/**", "package.json", "package-lock.json", ".github/workflows/vscode.yml"]
 
 defaults:
   run:
@@ -20,12 +20,14 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: editors/vscode/package-lock.json
+          cache-dependency-path: package-lock.json
       - uses: actions/setup-go@v5
         with:
           go-version-file: engine/go.mod
           cache-dependency-path: engine/go.sum
-      - run: npm ci
+      - name: Install the npm workspace
+        working-directory: .
+        run: npm ci
       - run: npm run check
       - run: npm run package
       # One platform-specific build, with mms bundled, to check the packaging;
@@ -46,7 +48,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: editors/vscode/package-lock.json
+          cache-dependency-path: package-lock.json
       - uses: actions/setup-go@v5
         with:
           go-version-file: engine/go.mod
@@ -54,7 +56,9 @@ jobs:
       - name: Build mms
         working-directory: engine
         run: go build -o "$RUNNER_TEMP/mms" ./cmd/mms
-      - run: npm ci
+      - name: Install the npm workspace
+        working-directory: .
+        run: npm ci
       - run: npm run build
       - name: Extension host tests
         run: xvfb-run -a npm test

@@ -31,4 +31,3 @@ Function f {
 		t.Errorf("no f.mcfunction in %v", keys(out))
 	}
 }
-

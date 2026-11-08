@@ -542,10 +542,6 @@ test('the docs render guides and the reference', async ({ page }) => {
 	await expect(page).toHaveURL(/\/docs\/reference\/types#type-util-direction-Axis$/);
 	await expect(page.locator('#type-util-direction-Axis')).toBeInViewport();
 
-	// A link into the old one-page reference lands on the entry's new page.
-	await page.goto('./docs/reference#loot_function-SetCount', { waitUntil: 'commit' });
-	await expect(page).toHaveURL(/\/docs\/reference\/helpers\/loot_function#loot_function-SetCount$/);
-
 	// A lint rule has a page of its own.
 	await page.goto('./docs/reference/lint');
 	await page.getByRole('table').getByRole('link', { name: 'unused', exact: true }).click();

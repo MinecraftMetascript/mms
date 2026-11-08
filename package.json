@@ -1,0 +1,10 @@
+{
+	"name": "mms-workspace",
+	"private": true,
+	"description": "The npm packages of MMS, installed together: the shared previews, the web editor and the VS Code extension.",
+	"workspaces": [
+		"packages/preview",
+		"web",
+		"editors/vscode"
+	]
+}

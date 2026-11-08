@@ -9,8 +9,10 @@ The browser editor for MMS: SvelteKit 3, Tailwind CSS 4 and CodeMirror 6, built 
 
 ## Develop
 
+The web editor, the VS Code extension and the shared previews (`packages/preview`) are one npm workspace with one lockfile, so install from the repository root:
+
 ```sh
-npm ci
+(cd .. && npm ci)
 npm run wasm     # builds static/mms.wasm and copies wasm_exec.js (needs Go)
 npm run dev
 ```
