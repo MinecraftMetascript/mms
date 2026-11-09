@@ -76,6 +76,17 @@ type state struct {
 	ids   []ID // ids along the current path
 	okIDs []ID
 	known func(registry, id string) bool
+	// trail is the nodes matched along the current path; okTrail and
+	// bestTrail keep it for a whole match and for the best problem, for
+	// Usage.
+	trail, okTrail, bestTrail []step
+}
+
+// step is one node of the tree matched by the rune range [start, end).
+type step struct {
+	name       string
+	n          *spec.CommandNode
+	start, end int
 }
 
 // fail records a problem, keeping the one furthest into the line: that is
@@ -86,6 +97,7 @@ func (s *state) fail(start, end int, msg string) bool {
 	}
 	if s.best == nil || start > s.best.Start {
 		s.best = &Problem{Start: start, End: end, Message: msg}
+		s.bestTrail = append(s.bestTrail[:0], s.trail...)
 	}
 	return false
 }
@@ -147,17 +159,25 @@ func (s *state) children(n *spec.CommandNode, pos int, root bool) bool {
 	wild := strings.HasPrefix(w, interp)
 	for _, name := range lits {
 		if name == w || wild {
+			s.trail = append(s.trail, step{name, n.Children[name], pos, end})
 			if s.node(n.Children[name], end) {
 				return true
 			}
+			s.trail = s.trail[:len(s.trail)-1]
 		}
 	}
 	for _, name := range args {
 		ch := n.Children[name]
 		mark := len(s.ids)
 		aend, ok := s.arg(name, ch, pos)
+		if ok {
+			s.trail = append(s.trail, step{name, ch, pos, aend})
+		}
 		if ok && (aend == len(s.src) || s.src[aend] == ' ') && s.node(ch, aend) {
 			return true
+		}
+		if ok {
+			s.trail = s.trail[:len(s.trail)-1]
 		}
 		if ok && aend < len(s.src) && s.src[aend] != ' ' {
 			s.fail(aend, s.word(aend), "expected a space after "+argLabel(name, ch))
@@ -178,6 +198,7 @@ func (s *state) node(n *spec.CommandNode, pos int) bool {
 	if pos >= len(s.src) {
 		if n.Executable {
 			s.okIDs = append([]ID(nil), s.ids...)
+			s.okTrail = append([]step(nil), s.trail...)
 			return true
 		}
 		t := s.targets(n)

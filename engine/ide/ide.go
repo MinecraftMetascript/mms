@@ -1066,6 +1066,11 @@ func (s *Session) Hover(path string, off int) (string, syntax.Span) {
 			md, sp = tmd, tsp
 		}
 	}
+	if md == "" {
+		if cmd, csp, ok := s.commandHover(path, off); ok {
+			md, sp = cmd, csp
+		}
+	}
 	for _, c := range s.commandCalls(path) {
 		if fsp := c.X.Fn.Span(); fsp.Contains(off) {
 			if md != "" {
@@ -1599,6 +1604,33 @@ func (s *Session) Symbols(path string) []Symbol {
 		sort.SliceStable(out, func(i, j int) bool { return out[i].Span.Start < out[j].Span.Start })
 	}
 	return out
+}
+
+// commandHover shows the signature of a raw command at off, from the
+// word under the cursor on, in the game's /help syntax.
+func (s *Session) commandHover(path string, off int) (string, syntax.Span, bool) {
+	a := s.at(path, off)
+	if a == nil || len(a.path) == 0 {
+		return "", syntax.Span{}, false
+	}
+	cmd, ok := a.path[len(a.path)-1].(*syntax.CommandStmt)
+	if !ok {
+		return "", syntax.Span{}, false
+	}
+	base := cmd.Sp.Start + 1 // after the '/'
+	u, ok := command.New(s.P.Pack).Usage(cmd.Text, max(off-base, 0))
+	if !ok {
+		return "", syntax.Span{}, false
+	}
+	md := "```\n/" + strings.Join(u.Lines, "\n/") + "\n```"
+	if u.Arg != "" {
+		md += "\n`" + u.Arg + "`"
+	}
+	sp := syntax.Span{Start: base + u.Start, End: base + u.End}
+	if u.Start == 0 {
+		sp.Start = cmd.Sp.Start // the '/' belongs to the command word
+	}
+	return md, sp, true
 }
 
 // commandCompletion completes inside a raw command: literals from the
