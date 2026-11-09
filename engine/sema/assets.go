@@ -173,8 +173,16 @@ func (c *Checker) assetCall(e syntax.Expr, v tview) jsonv.Value {
 		c.errorf("mms/asset", srcSp, "%s expects %s file, not '%s'", name, map[string]string{".png": "a .png", ".ogg": "an .ogg", ".nbt": "an .nbt"}[h.ext], path.Base(src))
 		return nil
 	}
+	model := name == "Texture" && c.resource == "model"
 	if idName == "" {
 		idName = assetName(src)
+		if model {
+			// Models only find sprites the blocks and items atlases
+			// stitch, and the blocks atlas takes every file under
+			// textures/block/. Its sprites work in block and item models
+			// alike, so a model's own texture goes there.
+			idName = "block/" + idName
+		}
 	} else if idName = c.stripAssetExt(idName, h.registries[0], call.Args[1].Value); !assetNamePattern.MatchString(idName) || strings.Contains(idName, "..") {
 		c.errorf("mms/invalid-name", nameSp, "an id name is lowercase letters, digits, '_', '-', '.' and '/'")
 		return nil
@@ -195,6 +203,7 @@ func (c *Checker) assetCall(e syntax.Expr, v tview) jsonv.Value {
 	ns := c.NS
 	full := ns + ":" + idName
 	in.ID = full
+	in.ModelTexture = model
 	in.Asset = &Asset{Helper: name, Src: src, ID: full, Out: h.out(ns, id.Path, idName), Pack: h.pack}
 	return jsonv.String(full)
 }

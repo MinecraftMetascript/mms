@@ -33,6 +33,10 @@ type Info struct {
 	Folder string
 	// Asset is set on an asset helper call such as Texture("a.png").
 	Asset *Asset
+	// ModelTexture is set on a texture id or Texture(...) call in a
+	// model, whose sprite the game looks up in the blocks and items
+	// atlases.
+	ModelTexture bool
 	// Converted is set where a Blueprint instance's name is checked as
 	// one of its `as` conversions.
 	Converted *Conversion
@@ -121,6 +125,10 @@ type Checker struct {
 	// to be written as its own resource (see hoist.go).
 	Hoisted []Hoisted
 	hoistN  map[string]int
+
+	// resource is the resource kind of the declaration being checked,
+	// such as "model".
+	resource string
 
 	trial bool
 	errs  int
@@ -250,6 +258,8 @@ func (c *Checker) Resource(d *syntax.Decl, k Kind) jsonv.Value {
 	if root.T != nil && root.T.Kind == "reference" {
 		root.Name = root.T.Path
 	}
+	c.resource = k.Resource
+	defer func() { c.resource = "" }()
 	var v jsonv.Value
 	switch {
 	case d.Body != nil:
@@ -1028,6 +1038,9 @@ func (c *Checker) resolveID(text string, id idInfo, e syntax.Expr) string {
 			c.errorf("mms/unknown-id", e.Span(), "%s", msg)
 		}
 		return full
+	}
+	if reg == "texture" && c.resource == "model" {
+		in.ModelTexture = true
 	}
 	if IsAssetRegistry(reg) {
 		// A file, not a declaration: the external-asset lint rule checks
