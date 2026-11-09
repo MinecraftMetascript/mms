@@ -12,11 +12,9 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { sameBlock } from '@mms/preview/jigsaw/give';
-import type { FromJigsaw, JigsawConfig, JigsawExisting, JigsawRecent, JigsawState, ToJigsaw } from './messages';
+import { jigsawToolState, RECENT_MAX } from '@mms/preview/jigsaw/tool';
+import type { FromJigsaw, JigsawConfig, JigsawRecent, JigsawState, ToJigsaw } from './messages';
 import { key, type PackOutput } from './output';
-
-/** How many copied blocks Recent keeps per project. */
-const RECENT_MAX = 20;
 
 export class JigsawView implements vscode.Disposable, vscode.WebviewViewProvider {
 	private view: vscode.WebviewView | undefined;
@@ -104,39 +102,14 @@ export class JigsawView implements vscode.Disposable, vscode.WebviewViewProvider
 
 	private state(): JigsawState {
 		const project = this.project();
-		const ns = project ? namespace(project) : undefined;
-		const state: JigsawState = { holes: [], pools: [], recent: [], existing: [], hasErrors: this.output.hasErrors };
-		if (!project) return state;
-		state.project = { name: path.basename(project), ns };
-		state.holes = this.output.jigsawHoles.map((h) => ({ id: h.id, doc: h.doc }));
-		state.recent = this.recent();
-		// Structure files by id, with their jigsaw blocks.
-		const structures = new Map<string, NonNullable<(typeof this.output.assets)[number]['jigsaws']>>();
-		for (const a of this.output.assets) {
-			const m = /^data\/([^/]+)\/structures?\/(.+)\.nbt$/.exec(a.path);
-			if (!m || !a.jigsaws) continue;
-			const id = `${m[1]}:${m[2]}`;
-			structures.set(id, a.jigsaws);
-			for (const j of a.jigsaws) {
-				const existing: JigsawExisting = {
-					src: a.src,
-					id,
-					pos: j.pos,
-					orientation: j.orientation,
-					config: { label: j.label ?? '', pool: field(j.pool), target: field(j.target), name: field(j.name), finalState: j.final_state ?? 'minecraft:air', joint: j.joint === 'aligned' ? 'aligned' : 'rollable' }
-				};
-				state.existing.push(existing);
-			}
-		}
-		for (const f of this.output.files) {
-			const m = /^data\/([^/]+)\/worldgen\/template_pool\/(.+)\.json$/.exec(f.path);
-			if (!m) continue;
-			const names = new Set<string>();
-			for (const loc of poolLocations(f.text)) for (const j of structures.get(loc) ?? []) if (j.name !== 'minecraft:empty') names.add(j.name);
-			state.pools.push({ id: `${m[1]}:${m[2]}`, names: [...names].sort() });
-		}
-		state.pools.sort((a, b) => a.id.localeCompare(b.id));
-		return state;
+		return jigsawToolState({
+			project: project ? { name: path.basename(project), ns: namespace(project) } : undefined,
+			holes: this.output.jigsawHoles,
+			files: this.output.files,
+			assets: this.output.assets,
+			recent: this.recent(),
+			hasErrors: this.output.hasErrors
+		});
 	}
 
 	private redraw() {
@@ -195,29 +168,6 @@ export class JigsawView implements vscode.Disposable, vscode.WebviewViewProvider
 	dispose() {
 		for (const s of this.subscriptions) s.dispose();
 	}
-}
-
-/** An id as the form holds it: minecraft:empty, the game's default, as an empty field. */
-function field(id: string): string {
-	return id === 'minecraft:empty' ? '' : id;
-}
-
-/** The structure ids a template pool's JSON places, list elements included. */
-function poolLocations(text: string): string[] {
-	const out: string[] = [];
-	const walk = (el: unknown) => {
-		if (!el || typeof el !== 'object') return;
-		const o = el as { location?: unknown; elements?: unknown[] };
-		if (typeof o.location === 'string') out.push(o.location.includes(':') ? o.location : `minecraft:${o.location}`);
-		if (Array.isArray(o.elements)) o.elements.forEach(walk);
-	};
-	try {
-		const pool = JSON.parse(text) as { elements?: { element?: unknown }[] };
-		for (const e of pool.elements ?? []) walk(e.element);
-	} catch {
-		// Not JSON yet; no pieces.
-	}
-	return out;
 }
 
 async function reveal(uri: string, range: { start: { line: number; character: number } }) {

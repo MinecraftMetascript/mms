@@ -9,6 +9,8 @@
 	import Sidebar from '#lib/components/Sidebar.svelte';
 	import JsonView from '#lib/components/JsonView.svelte';
 	import TestsView from '#lib/components/TestsView.svelte';
+	import JigsawPanel from '#lib/components/JigsawPanel.svelte';
+	import WorldPanel from '#lib/components/WorldPanel.svelte';
 	import { Engine, itemKey, outputKey, type Diagnostic, type DocSymbol, type Expansion, type OutputFile } from '#lib/engine/engine.svelte.ts';
 	import { Project, pathOf, uriOf, starter, type ProjectData } from '#lib/project/project.svelte.ts';
 	import { examples } from '#lib/project/examples.ts';
@@ -29,7 +31,7 @@
 	let viewWaiters: ((v: EditorView) => void)[] = [];
 	let loaded = $state(false);
 	let selectedOutput = $state<string | null>(null);
-	let rightTab = $state<'preview' | 'json' | 'expanded' | 'tests'>('preview');
+	let rightTab = $state<'preview' | 'json' | 'expanded' | 'tests' | 'jigsaw' | 'world'>('preview');
 	let cursor = $state<{ uri: string; line: number; character: number } | null>(null);
 	let theme = $state<'system' | 'light' | 'dark'>('system');
 	const themes = { system: 'System', light: 'Light', dark: 'Dark' } as const;
@@ -168,6 +170,39 @@
 	$effect(() => {
 		if (rightTab === 'tests' && !engine?.hasTests) rightTab = 'preview';
 	});
+	// The Jigsaw tab, for a project with jigsaw structures: template pools,
+	// jigsaw holes or structure files with jigsaw blocks.
+	const hasJigsaw = $derived(
+		!!engine &&
+			(engine.outputHoles.length > 0 ||
+				engine.output.some((f) => f.path.includes('/worldgen/template_pool/')) ||
+				engine.outputAssets.some((a) => a.jigsaws?.length))
+	);
+	$effect(() => {
+		if (rightTab === 'jigsaw' && !hasJigsaw) rightTab = 'preview';
+	});
+	// Goes to the first error, for a world build that stopped on one.
+	function firstProblem() {
+		for (const [uri, ds] of Object.entries(engine?.diagnostics ?? {})) {
+			const d = ds.find((d) => (d.severity ?? 1) === 1);
+			if (d) return void reveal(uri, d.range);
+		}
+	}
+	// Adds text to a source file through its editor, so it can be undone,
+	// and selects what was added.
+	async function insertAt(uri: string, line: number | undefined, text: string, select: string) {
+		await reveal(uri, { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } });
+		const v = view;
+		if (!v) return;
+		const doc = v.state.doc;
+		const at = line !== undefined && line < doc.lines ? doc.line(line + 1).from : doc.length;
+		let insert = text;
+		if (at === doc.length && doc.length > 0 && !doc.sliceString(doc.length - 1).endsWith('\n')) insert = '\n' + insert;
+		v.dispatch({ changes: { from: at, insert }, userEvent: 'input' });
+		const from = v.state.doc.sliceString(0).indexOf(select, at);
+		if (from >= 0) v.dispatch({ selection: EditorSelection.range(from, from + select.length), effects: EditorView.scrollIntoView(from, { y: 'center' }) });
+		v.focus();
+	}
 	// The Expanded tab shows what the Template call or Blueprint instance
 	// at the cursor writes, refreshed as the cursor moves and the code changes.
 	let expansion = $state<Expansion | null>(null);
@@ -482,7 +517,7 @@
 		</section>
 		<section class="flex min-h-0 flex-col bg-panel">
 			<div class="flex border-b border-line text-xs" role="tablist">
-				{#each [['preview', 'Preview'], ['json', 'JSON'], ['expanded', 'Expanded'], ...(engine?.hasTests ? [['tests', testsLabel]] : [])] as [id, label] (id)}
+				{#each [['preview', 'Preview'], ['json', 'JSON'], ['expanded', 'Expanded'], ...(engine?.hasTests ? [['tests', testsLabel]] : []), ...(hasJigsaw ? [['jigsaw', 'Jigsaw']] : []), ['world', 'World']] as [id, label] (id)}
 					<button
 						role="tab"
 						aria-selected={rightTab === id}
@@ -523,6 +558,33 @@
 								<p class="p-4 text-sm text-muted">Put the cursor in a Template call or a Blueprint declaration, such as a CustomItem, to see the code it writes.</p>
 							{/if}
 						</div>
+					{/if}
+					{#if rightTab === 'jigsaw'}
+						<JigsawPanel
+							{engine}
+							projectId={project.id}
+							projectName={project.name}
+							ns={project.config.namespace}
+							onreveal={reveal}
+							onpiece={(path) => {
+								selectedOutput = path;
+								rightTab = 'preview';
+							}}
+							oninsert={insertAt}
+						/>
+					{/if}
+					{#if rightTab === 'world'}
+						<WorldPanel
+							{engine}
+							{project}
+							onproblems={firstProblem}
+							onpiece={(path) => {
+								selectedOutput = path;
+								rightTab = 'preview';
+							}}
+							resources={resourcePack}
+							ondownload={exportPack}
+						/>
 					{/if}
 					{#if rightTab === 'tests'}
 						<div class="h-full">

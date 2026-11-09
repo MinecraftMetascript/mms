@@ -1284,3 +1284,129 @@ test('go to definition on a built-in opens the prelude read-only', async ({ page
 	await page.getByRole('button', { name: 'Close' }).click();
 	await expect(page.getByTestId('prelude-view')).toBeHidden();
 });
+
+test('the Jigsaw tab copies a jigsaw block, keeps it in Recent, and declares a new hole', async ({ page }) => {
+	const errors: string[] = [];
+	page.on('pageerror', (e) => errors.push(e.message));
+	page.on('dialog', (d) => d.accept());
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	// A project with no jigsaw has no Jigsaw tab.
+	await expect(page.getByRole('tab', { name: 'Jigsaw' })).toHaveCount(0);
+	await page.getByRole('button', { name: /Examples/ }).click();
+	await page.getByRole('button', { name: /jigsaw/ }).click();
+	await expect(status(page)).toHaveText(/No problems/);
+	await page.getByRole('tab', { name: 'Jigsaw' }).click();
+	const tool = page.getByLabel('Jigsaw', { exact: true });
+
+	// The pools and holes the project declares are offered.
+	await expect(tool.locator('#jigsaw-pools option[value="dungeon:halls"]')).toHaveCount(1);
+	await expect(tool.locator('#jigsaw-names option[value="dungeon:room_exit"]')).toHaveCount(1);
+	// The structures' own jigsaw blocks are listed.
+	await expect(tool.getByRole('heading', { name: 'In structures' })).toBeVisible();
+
+	await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+	await tool.getByLabel('Target pool').fill('dungeon:halls');
+	await tool.getByLabel('Target hole').fill('dungeon:hall_entry');
+	await tool.getByLabel('Name', { exact: true }).fill('dungeon:room_exit');
+	await tool.getByRole('button', { name: 'Copy give command' }).click();
+	expect(await page.evaluate(() => navigator.clipboard.readText())).toMatch(/^\/give @s jigsaw\[block_entity_data=\{id:"jigsaw",name:"dungeon:room_exit",target:"dungeon:hall_entry",pool:"dungeon:halls"/);
+	await expect(tool.getByRole('heading', { name: 'Recent' })).toBeVisible();
+	await expect(tool.getByLabel('Copy the give command for dungeon:room_exit')).toHaveCount(1);
+
+	// Recent survives a reload.
+	await page.reload();
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	await page.getByRole('tab', { name: 'Jigsaw' }).click();
+	await expect(tool.getByLabel('Copy the give command for dungeon:room_exit')).toHaveCount(1);
+
+	// A hole no JigsawHole declares is declared next to the others.
+	await tool.getByLabel('Name', { exact: true }).fill('dungeon:side_door');
+	await expect(tool.getByText('Not a JigsawHole.')).toBeVisible();
+	await tool.getByRole('button', { name: 'Declare it' }).click();
+	await expect(page.locator('.cm-line', { hasText: 'JigsawHole side_door' })).toBeVisible();
+	await expect(status(page)).toHaveText(/No problems/);
+	await expect(tool.getByText('Not a JigsawHole.')).toBeHidden();
+	expect(errors).toEqual([]);
+});
+
+// A world folder for the World tab: the browser's private file system
+// stands in for a folder on disk, which a headless browser cannot pick.
+async function fakeWorld(page: Page) {
+	await page.addInitScript(() => {
+		(window as unknown as { showDirectoryPicker: () => Promise<FileSystemDirectoryHandle> }).showDirectoryPicker = async () =>
+			(await navigator.storage.getDirectory()).getDirectoryHandle('my_world', { create: true });
+	});
+}
+async function writeWorldFile(page: Page, path: string, bytes: number[], gzip = false) {
+	await page.evaluate(
+		async ({ path, bytes, gzip }) => {
+			let d = await (await navigator.storage.getDirectory()).getDirectoryHandle('my_world', { create: true });
+			const parts = path.split('/');
+			for (const p of parts.slice(0, -1)) d = await d.getDirectoryHandle(p, { create: true });
+			let data: Uint8Array | ArrayBuffer = new Uint8Array(bytes);
+			if (gzip) data = await new Response(new Blob([data]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer();
+			const w = await (await d.getFileHandle(parts[parts.length - 1], { create: true })).createWritable();
+			await w.write(data);
+			await w.close();
+		},
+		{ path, bytes, gzip }
+	);
+}
+async function worldFiles(page: Page, path: string): Promise<string[]> {
+	return page.evaluate(async (path) => {
+		let d = await (await navigator.storage.getDirectory()).getDirectoryHandle('my_world');
+		for (const p of path.split('/')) d = await d.getDirectoryHandle(p);
+		const out: string[] = [];
+		for await (const name of (d as unknown as { keys(): AsyncIterable<string> }).keys()) out.push(name);
+		return out.sort();
+	}, path);
+}
+const str = (s: string) => [...new TextEncoder().encode(s)];
+// level.dat: { Data: { LevelName: "Test World" } }
+const levelDat = [10, 0, 0, 10, 0, 4, ...str('Data'), 8, 0, 9, ...str('LevelName'), 0, 10, ...str('Test World'), 0, 0];
+
+test('the World tab builds the pack into a world folder and imports its saved structures', async ({ page }) => {
+	const errors: string[] = [];
+	page.on('pageerror', (e) => errors.push(e.message));
+	page.on('dialog', (d) => d.accept());
+	await fakeWorld(page);
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	await writeWorldFile(page, 'level.dat', levelDat, true);
+	await page.getByRole('tab', { name: 'World' }).click();
+	const tab = page.getByLabel('World', { exact: true });
+	await tab.getByRole('button', { name: 'Choose world…' }).first().click();
+	await expect(tab).toContainText('Test World');
+	await expect(tab).toContainText('my_world');
+
+	await tab.getByRole('button', { name: /Build into world/ }).click();
+	await expect(tab).toContainText(/Built \d+ files/);
+	await expect(tab).toContainText('Next, in the game');
+	expect(await worldFiles(page, 'datapacks/my_pack')).toEqual(['data', 'pack.mcmeta']);
+	// The same pack again changes nothing in the game.
+	await tab.getByRole('button', { name: /Build into world/ }).click();
+	await expect(tab).toContainText('Nothing changed since the last build.');
+
+	// A structure block's save shows up in Structures, to import.
+	await writeWorldFile(page, 'generated/my_pack/structure/tower/base.nbt', [10, 0, 0, 0]);
+	await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+	await expect(tab).toContainText('1 to import');
+	// A row's buttons show on hover, as in VS Code.
+	await tab.getByRole('treeitem').filter({ hasText: 'tower/base' }).hover();
+	await tab.getByRole('button', { name: 'Import my_pack:tower/base' }).click();
+	await expect(tab).toContainText('All imported');
+	await expect(page.getByText('structures/tower/base.nbt', { exact: true })).toBeVisible();
+	// No pool uses it yet.
+	await expect(tab).toContainText('not used');
+
+	// A changed save can be imported again.
+	await writeWorldFile(page, 'generated/my_pack/structure/tower/base.nbt', [10, 0, 0, 1, 0]);
+	await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+	await expect(tab).toContainText('changed');
+
+	// (The folder is kept in IndexedDB for the next visit. Not checked
+	// here: reading a private file system handle back out of IndexedDB
+	// crashes the test browser.)
+	expect(errors).toEqual([]);
+});

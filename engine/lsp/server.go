@@ -224,6 +224,7 @@ func init() {
 		"workspace/didChangeWatchedFiles":  typed((*Server).didChangeWatched),
 		"mms/output":                       typed((*Server).output),
 		"mms/runTests":                     typed((*Server).runTests),
+		"mms/worldInstall":                 typed((*Server).worldInstall),
 		"mms/expand":                       typed((*Server).expand),
 		"textDocument/codeAction":          typed((*Server).codeAction),
 		"mms/setConfig":                    typed((*Server).setConfig),
@@ -1178,6 +1179,73 @@ func (s *Server) output(_ context.Context, p struct {
 		unused = []string{}
 	}
 	return map[string]any{"files": out, "assets": assets, "items": items, "texts": texts, "jigsawHoles": holes, "unusedAssets": unused, "hasErrors": w.res.HasErrors()}, nil
+}
+
+// worldInstall works out what building the project's pack into a world
+// writes, for an editor that writes the world's files itself (the web
+// editor, through the browser's folder access). before is the world's
+// datapacks/<namespace> folder as project.ReadPackDir reads it, and
+// oldZip its resourcepacks/resources.zip, null when there is none. The
+// editor writes data to the datapack folder (replacing its data/,
+// assets/ and pack.png), zip, when there is one, to resources.zip, and
+// takes the chunks of the reset dimensions out, as `mms build --world`
+// does.
+func (s *Server) worldInstall(_ context.Context, p struct {
+	URI      string            `json:"uri"`
+	Before   map[string][]byte `json:"before"`
+	OldZip   []byte            `json:"oldZip"`
+	Reset    bool              `json:"reset"`
+	ResetIDs []string          `json:"resetIds"`
+}) (any, *respError) {
+	w := s.at(canonURI(p.URI))
+	if w == nil {
+		w = s.last
+	}
+	if w == nil || w.res == nil {
+		w = s.projects[""]
+	}
+	if w.res == nil {
+		return nil, &respError{Code: codeRequestFailed, Message: "the project has not been checked yet"}
+	}
+	if w.res.HasErrors() {
+		return nil, &respError{Code: codeRequestFailed, Message: "the project has errors; nothing written"}
+	}
+	files := w.res.Emit()
+	if err := project.ReadAssets(files, w.proj.Files); err != nil {
+		return nil, &respError{Code: codeRequestFailed, Message: err.Error()}
+	}
+	in, err := project.PlanWorldInstall(files, w.proj.Config.Namespace, p.Before, p.OldZip, p.Reset, p.ResetIDs)
+	if err != nil {
+		return nil, &respError{Code: codeRequestFailed, Message: err.Error()}
+	}
+	data := make([]map[string]any, len(in.Data))
+	for i, f := range in.Data {
+		data[i] = map[string]any{"path": f.Path, "data": f.Data}
+	}
+	out := map[string]any{
+		"namespace":  w.proj.Config.Namespace,
+		"data":       data,
+		"resources":  in.Resources,
+		"dimensions": nonNil(project.DimensionIDs(in.Data)),
+		"reset":      nonNil(in.Reset),
+		"next":       map[project.Apply]string{project.ApplyNone: "none", project.ApplyReload: "reload", project.ApplyRejoin: "rejoin"}[in.Plan.Need],
+		"message":    in.Plan.Message(),
+	}
+	if m := in.Pack; m != nil {
+		out["zip"] = m.Zip
+		out["resourcesChanged"] = in.ResourcesChanged
+		out["others"] = nonNil(m.Others)
+		out["replaced"] = nonNil(m.Replaced)
+		out["adopted"] = m.Adopted
+	}
+	return out, nil
+}
+
+func nonNil(s []string) []string {
+	if s == nil {
+		return []string{}
+	}
+	return s
 }
 
 // structureAsset matches a structure file's path in the data pack.

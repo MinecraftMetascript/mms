@@ -80,6 +80,26 @@ export interface Expansion {
 	range: Diagnostic['range'];
 }
 
+/** A world build as `mms/worldInstall` works it out; bytes are base64. */
+export interface WorldInstall {
+	namespace: string;
+	/** The data pack, for datapacks/<namespace>. */
+	data: { path: string; data: string }[];
+	resources: number;
+	dimensions: string[];
+	/** Dimensions whose saved chunks to take out. */
+	reset: string[];
+	next: 'reload' | 'rejoin' | 'none';
+	/** The "next step: ..." line. */
+	message: string;
+	/** The world's new resourcepacks/resources.zip; absent when the build leaves it alone. */
+	zip?: string;
+	resourcesChanged?: boolean;
+	others?: string[];
+	replaced?: string[];
+	adopted?: boolean;
+}
+
 /** One Test's outcome, as `mms/runTests` returns it. */
 export interface TestOutcome {
 	name: string;
@@ -115,6 +135,14 @@ export const outputKey = (f: OutputFile) => (f.pack === 'resources' ? `resources
 export const itemKey = (it: OutputItem) => `item:${it.id}`;
 
 /** A project file the pack copies, such as a texture: its output path and source. */
+/** A `JigsawHole name` declaration. */
+export interface OutputHole {
+	id: string;
+	doc?: string;
+	uri: string;
+	range: Diagnostic['range'];
+}
+
 export interface OutputAsset {
 	path: string;
 	src: string;
@@ -162,6 +190,8 @@ export class Engine {
 	diagnostics = $state<Record<string, Diagnostic[]>>({});
 	output = $state<OutputFile[]>([]);
 	outputAssets = $state<OutputAsset[]>([]);
+	/** The project's JigsawHole declarations: jigsaw block names, which write no file. */
+	outputHoles = $state<OutputHole[]>([]);
 	outputItems = $state<OutputItem[]>([]);
 	/** The messages tell, title and actionbar show, for the chat preview. */
 	outputTexts = $state<OutputText[]>([]);
@@ -279,9 +309,10 @@ export class Engine {
 		try {
 			await this.client.initializing;
 			this.client.sync();
-			const out = await this.client.request<object, { files: OutputFile[]; assets?: OutputAsset[]; items?: OutputItem[]; texts?: OutputText[]; unusedAssets?: string[]; hasErrors: boolean }>('mms/output', {});
+			const out = await this.client.request<object, { files: OutputFile[]; assets?: OutputAsset[]; jigsawHoles?: OutputHole[]; items?: OutputItem[]; texts?: OutputText[]; unusedAssets?: string[]; hasErrors: boolean }>('mms/output', {});
 			this.output = out.files;
 			this.outputAssets = out.assets ?? [];
+			this.outputHoles = out.jigsawHoles ?? [];
 			this.outputItems = out.items ?? [];
 			this.outputTexts = out.texts ?? [];
 			this.unusedAssets = out.unusedAssets ?? [];
@@ -312,11 +343,21 @@ export class Engine {
 		}
 	}
 
-	/** Formats a whole document, returning the new text or null. */
 	/** Converts data pack files into formatted MMS files. */
 	async importPack(files: { path: string; text: string }[]): Promise<PackImport> {
 		await this.client.initializing;
 		return this.client.request<object, PackImport>('mms/importPack', { files });
+	}
+
+	/**
+	 * What building the pack into a world writes there, worked out from the
+	 * world's data pack folder (before, by path, base64) and its
+	 * resources.zip (base64, null when there is none). Rejects when the
+	 * project has errors.
+	 */
+	async worldInstall(p: { before: Record<string, string>; oldZip: string | null; reset: boolean; resetIds?: string[] }): Promise<WorldInstall> {
+		await this.client.initializing;
+		return this.client.request<object, WorldInstall>('mms/worldInstall', p);
 	}
 
 	/** Converts one JSON resource into a declaration for the file uri. */
