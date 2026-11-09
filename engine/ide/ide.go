@@ -1594,6 +1594,9 @@ func (s *Session) commandItems(text string, off int) ([]Item, int) {
 		if reg == "storage" {
 			return s.storageIDs()
 		}
+		if reg == "sound_event" {
+			return s.R.SoundIDs()
+		}
 		if id, ok := strings.CutPrefix(reg, "storage "); ok {
 			return s.storagePaths(id)
 		}

@@ -57,6 +57,7 @@ func (c *Checker) Complete(text string, off int, ids func(registry string) []str
 		}
 	}
 	reach(c.pack.Commands, 0)
+	argReg := c.argRegistries()
 
 	var out []Suggestion
 	dup := map[string]bool{}
@@ -74,6 +75,12 @@ func (c *Checker) Complete(text string, off int, ids func(registry string) []str
 		for _, a := range args {
 			ch := n.Children[a]
 			detail := argLabel(a, ch)
+			if reg := argReg[ch]; reg != "" {
+				for _, v := range c.registryValues(reg, false, ids) {
+					v.Detail = detail
+					add(v)
+				}
+			}
 			for _, v := range c.storageValues(ch, src[:ws], ids) {
 				v.Detail = detail
 				add(v)
@@ -124,28 +131,7 @@ func (c *Checker) values(n *spec.CommandNode, ids func(string) []string) []Sugge
 		}
 		return out
 	}
-	registry := func(reg string, tags bool) []Suggestion {
-		var out []Suggestion
-		if ids != nil {
-			for _, id := range ids(reg) {
-				out = append(out, Suggestion{Label: id, ID: true})
-			}
-			if tags {
-				for _, id := range ids("tag/" + reg) {
-					out = append(out, Suggestion{Label: "#" + id, ID: true})
-				}
-			}
-		}
-		for _, id := range c.pack.RegistryIDs(reg) {
-			out = append(out, Suggestion{Label: id, ID: true})
-		}
-		if tags {
-			for _, id := range c.pack.RegistryIDs("tag/" + reg) {
-				out = append(out, Suggestion{Label: "#" + id, ID: true})
-			}
-		}
-		return out
-	}
+	registry := func(reg string, tags bool) []Suggestion { return c.registryValues(reg, tags, ids) }
 	switch p {
 	case "entity", "game_profile":
 		return words("@a", "@e", "@n", "@p", "@r", "@s")
@@ -179,6 +165,61 @@ func (c *Checker) values(n *spec.CommandNode, ids func(string) []string) []Sugge
 		return words(vals...)
 	}
 	return nil
+}
+
+// registryValues suggests the project's ids for a registry, then the
+// pack's, each followed by its tags when tags is set.
+func (c *Checker) registryValues(reg string, tags bool, ids func(string) []string) []Suggestion {
+	var out []Suggestion
+	if ids != nil {
+		for _, id := range ids(reg) {
+			out = append(out, Suggestion{Label: id, ID: true})
+		}
+		if tags {
+			for _, id := range ids("tag/" + reg) {
+				out = append(out, Suggestion{Label: "#" + id, ID: true})
+			}
+		}
+	}
+	for _, id := range c.pack.RegistryIDs(reg) {
+		out = append(out, Suggestion{Label: id, ID: true})
+	}
+	if tags {
+		for _, id := range c.pack.RegistryIDs("tag/" + reg) {
+			out = append(out, Suggestion{Label: "#" + id, ID: true})
+		}
+	}
+	return out
+}
+
+// namedArgRegistry gives the registry for plain resource_location
+// arguments whose ids the command tree does not type. The game suggests
+// these through a suggestion provider the exported tree leaves out, so
+// the registry is named here by command and argument; the ids still come
+// from the pack.
+var namedArgRegistry = map[string]map[string]string{
+	"playsound": {"sound": "sound_event"},
+	"stopsound": {"sound": "sound_event"},
+}
+
+// argRegistries finds the argument nodes namedArgRegistry types.
+func (c *Checker) argRegistries() map[*spec.CommandNode]string {
+	out := map[*spec.CommandNode]string{}
+	var walk func(n *spec.CommandNode, args map[string]string)
+	walk = func(n *spec.CommandNode, args map[string]string) {
+		for name, ch := range n.Children {
+			if ch.Type == "argument" && args[name] != "" && out[ch] == "" {
+				out[ch] = args[name]
+			}
+			walk(ch, args)
+		}
+	}
+	for cmd, args := range namedArgRegistry {
+		if n := c.pack.Commands.Children[cmd]; n != nil {
+			walk(n, args)
+		}
+	}
+	return out
 }
 
 func sorted(xs []string) []string {
