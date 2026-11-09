@@ -624,6 +624,7 @@ func TestExecuteRuntimeValueErrors(t *testing.T) {
 		"Function f {\n  let x = 1\n  Positioned(nope + 1, 0, 0) {\n    /say hi\n  }\n}":   "mms/unknown-name",
 		"Function f {\n  Positioned(~nope ~ ~) {\n    /say hi\n  }\n}":                     "mms/unknown-name",
 		"Function f {\n  let s = \"x\"\n  Positioned(~s ~ ~) {\n    /say hi\n  }\n}":       "mms/type-mismatch",
+		"Function f(dx: int) {\n  As(@e[x=~dx]) {\n    /say hi\n  }\n}":                    "mms/selector",
 		"Function f {\n  let x = 1\n  In(~x) {\n    /say hi\n  }\n}":                       "mms/unsupported",
 		"const name = \"a\"\nFunction f {\n  Positioned(~name ~ ~) {\n    /say hi\n  }\n}": "mms/type-mismatch",
 	}
