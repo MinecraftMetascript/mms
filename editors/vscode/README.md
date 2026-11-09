@@ -46,7 +46,7 @@ The preview panel uses the same Svelte components as the web editor, from `packa
 
 ## Publishing
 
-CI publishes to the VS Code Marketplace and Open VSX with `scripts/publish.mjs`, which needs the repository secrets `VSCE_PAT` (an Azure DevOps token with the Marketplace Manage scope, for the `minecraftmetascript` publisher) and `OVSX_PAT` (an Open VSX token for the `minecraftmetascript` namespace); a store without its secret is skipped. A `v*` tag publishes that version (`.github/workflows/release.yml`). Each merge to `main` that changes the extension or the engine publishes a pre-release one minor version ahead of the latest tag, with the workflow's run number as the patch: after v0.5.0 they are 0.6.1, 0.6.2 and so on (`.github/workflows/vscode-prerelease.yml`, `scripts/version.mjs`). A pre-release is always newer than the release before it.
+`.github/workflows/release.yml` publishes to the VS Code Marketplace (publisher `minecraftmetascript`) and Open VSX (namespace `minecraftmetascript`) with trusted publishing: both stores trust that workflow file in this repository, so there are no tokens. A `v*` tag publishes that version. Each push to `main` that changes the extension or the engine publishes a pre-release one minor version ahead of the latest tag, with the workflow's run number as the patch: after v0.5.0 they are 0.6.<run> (`scripts/version.mjs`). A pre-release is always newer than the release before it.
 
 ## Credits
 
