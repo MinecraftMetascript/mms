@@ -2,17 +2,40 @@ name: release
 
 # Pushing a tag such as v1.0.0 builds the CLI for every platform and the
 # VS Code extension (a universal .vsix plus one per platform with mms
-# bundled), and publishes them as a GitHub release.
+# bundled), publishes them as a GitHub release, and publishes the extension
+# to the VS Code Marketplace and Open VSX as version 1.0.0.
+#
+# Each push to main that changes the extension or the engine publishes the
+# extension as a pre-release instead, for people who chose "Switch to
+# Pre-Release Version". Its version is one minor ahead of the latest v* tag
+# with this workflow's run number as the patch (v0.5.0 -> 0.6.<run>;
+# editors/vscode/scripts/version.mjs), so it is always newer than the
+# release before it.
+#
+# Both stores trust this workflow file (trusted publishing over GitHub's
+# OIDC token), so there are no publishing secrets. Pre-releases live here
+# rather than in a workflow of their own for that reason.
 on:
   push:
     tags: ["v*"]
+    branches: [main]
+    # Not evaluated for tags.
+    paths: ["editors/vscode/**", "packages/**", "engine/**", "package.json", "package-lock.json", ".github/workflows/release.yml"]
   workflow_dispatch:
 
+# A newer push to main supersedes a pre-release still building; tags never
+# cancel each other.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref_type == 'branch' }}
+
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   binaries:
+    # Pushes to main only publish the extension.
+    if: github.event_name != 'push' || github.ref_type == 'tag'
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -54,6 +77,9 @@ jobs:
         working-directory: editors/vscode
     steps:
       - uses: actions/checkout@v4
+        with:
+          # The tags, for a pre-release's version.
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -64,12 +90,22 @@ jobs:
       - name: Install the npm workspace
         working-directory: .
         run: npm ci
+      # A tag's version is the tag's (v1.0.0 -> 1.0.0); anything else is a
+      # pre-release (scripts/version.mjs).
+      - name: Set the version
+        run: |
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            version="${GITHUB_REF_NAME#v}"
+          else
+            version="$(node scripts/version.mjs --pre-release "$GITHUB_RUN_NUMBER")"
+            echo "VSCE_FLAGS=--pre-release" >> "$GITHUB_ENV"
+          fi
+          npm pkg set version="$version"
+          echo "MMS_VERSION=v$version" >> "$GITHUB_ENV"
       # The universal mms-<version>.vsix, which runs mms from mms.path or PATH.
-      - run: npm run package
+      - run: npm run package -- $VSCE_FLAGS
       # One mms-<target>-<version>.vsix per platform, with mms bundled.
-      - run: node scripts/package-targets.mjs
-        env:
-          MMS_VERSION: ${{ github.ref_name }}
+      - run: node scripts/package-targets.mjs $VSCE_FLAGS
       - uses: actions/upload-artifact@v4
         with:
           name: vscode
@@ -79,6 +115,9 @@ jobs:
     needs: [binaries, vscode]
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
+    permissions:
+      # Creates the release.
+      contents: write
     steps:
       - uses: actions/download-artifact@v4
         with:
@@ -90,3 +129,38 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --title "MMS $GITHUB_REF_NAME" --generate-notes
+
+  # The same .vsix files, to the extension stores, on a tag or a push to
+  # main. The stores check the OIDC token's repository and workflow file.
+  stores:
+    needs: [vscode]
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      VSCE_FLAGS: ${{ github.ref_type == 'branch' && '--pre-release' || '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Install the npm workspace
+        run: npm ci
+      - uses: actions/download-artifact@v4
+        with:
+          name: vscode
+          path: vsix
+      - name: VS Code Marketplace
+        run: npx vsce publish --oidc --skip-duplicate $VSCE_FLAGS --packagePath vsix/*.vsix
+      # Runs even when the Marketplace failed, so one store's outage does not
+      # hold back the other. Each .vsix says whether it is a pre-release.
+      - name: Open VSX
+        if: success() || failure()
+        run: |
+          for f in vsix/*.vsix; do
+            npx --yes ovsx@1.3.0 publish "$f" --skip-duplicate --trusted-publishing
+          done
