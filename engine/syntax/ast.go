@@ -320,9 +320,13 @@ type (
 		Sp   Span
 	}
 	// Coord is a relative or local coordinate group such as `~ ~1 ~`.
+	// A coordinate a variable offsets, `~x` or `^-spot.y`, is written
+	// as is in Text; Names holds each one's name (an Ident, or a Member
+	// for a field), in order.
 	Coord struct {
-		Text string
-		Sp   Span
+		Text  string
+		Names []Expr
+		Sp    Span
 	}
 	Paren struct {
 		X  Expr
@@ -582,4 +586,21 @@ func TypeText(t TypeExpr) string {
 		return "(" + TypeText(t.X) + ")"
 	}
 	return ""
+}
+
+// CoordName reports whether w, one coordinate of a Coord's Text, is
+// offset by a name, as `~x` or `^-y` are: it returns the `~` or `^` and
+// whether the name is negated.
+func CoordName(w string) (prefix string, neg, ok bool) {
+	if len(w) < 2 || (w[0] != '~' && w[0] != '^') {
+		return "", false, false
+	}
+	rest := w[1:]
+	if rest[0] == '-' {
+		neg, rest = true, rest[1:]
+	}
+	if rest == "" || !(rest[0] == '_' || rest[0] >= 'a' && rest[0] <= 'z' || rest[0] >= 'A' && rest[0] <= 'Z') {
+		return "", false, false
+	}
+	return w[:1], neg, true
 }

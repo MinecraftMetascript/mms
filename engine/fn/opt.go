@@ -73,6 +73,11 @@ func countUses(b *Block, uses map[Score]int) {
 			for _, p := range o.Parts {
 				text(p)
 			}
+			for _, a := range o.Args {
+				if a.Score != nil {
+					add(*a.Score)
+				}
+			}
 			countUses(o.Body, uses)
 		case Return:
 			if o.Val != nil {
@@ -306,6 +311,11 @@ func (l *liveness) op(b *Block, i int, live set) set {
 		live = l.op(&Block{Ops: []Op{Loop{Body: o.Body}}}, 0, live)
 		for _, p := range o.Parts {
 			readText(p, live)
+		}
+		for _, a := range o.Args {
+			if a.Score != nil {
+				live[*a.Score] = true
+			}
 		}
 	case Return:
 		live = set{}

@@ -253,8 +253,59 @@ func (c *ctx) reduce(x syntax.Expr) Value {
 	case *syntax.Spread:
 		v := c.reduce(x.X)
 		return &Code{p, &syntax.Spread{X: c.lower(v), Sp: c.span(x.Sp)}}
+	case *syntax.Coord:
+		if len(x.Names) > 0 {
+			return &Code{p, c.coord(x)}
+		}
 	}
 	return &Code{p, c.clone(x)}
+}
+
+// coord fills in the names of `~x` coordinates that are known at compile
+// time, a const or a Template's number argument, and leaves variables for
+// the function compiler.
+func (c *ctx) coord(x *syntax.Coord) syntax.Expr {
+	out := &syntax.Coord{Sp: c.span(x.Sp)}
+	words := strings.Fields(x.Text)
+	i := 0
+	for k, w := range words {
+		prefix, neg, ok := syntax.CoordName(w)
+		if !ok || i >= len(x.Names) {
+			continue
+		}
+		name := x.Names[i]
+		i++
+		v := c.reduce(name)
+		if n, isNum := v.(*Num); isNum {
+			f := n.F
+			if neg {
+				f = -f
+			}
+			words[k] = prefix + strconv.FormatFloat(f, 'f', -1, 64)
+			if f == 0 {
+				words[k] = prefix
+			}
+			continue
+		}
+		if _, isCode := v.(*Code); !isCode {
+			c.errorf("mms/type-mismatch", name.Span(), "a coordinate is offset by a number, but this is "+kindName(v))
+			out.Names = append(out.Names, c.clone(name))
+			continue
+		}
+		lx := c.lower(v)
+		switch lx.(type) {
+		case *syntax.Ident, *syntax.Member:
+			// A Template's argument passed on, written as its name.
+			sign := ""
+			if neg {
+				sign = "-"
+			}
+			words[k] = prefix + sign + format.Expr(lx)
+		}
+		out.Names = append(out.Names, lx)
+	}
+	out.Text = strings.Join(words, " ")
+	return out
 }
 
 // clone copies a node that needs no evaluation into the output.

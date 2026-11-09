@@ -337,3 +337,25 @@ func TestPredicateConditionReference(t *testing.T) {
 		t.Errorf("rename edits = %+v", edits)
 	}
 }
+
+// A variable in an execute helper's coordinates, `x` or `~dx`, is the
+// variable for hover and rename.
+func TestExecuteCoordinateVariables(t *testing.T) {
+	for _, src := range []string{
+		"Function f {\n  let dx = 1\n  Positioned(d|x, 64, 0) {\n    /say hi\n  }\n}",
+		"Function f {\n  let dx = 1\n  Positioned(~d|x ~ ~-dx) {\n    /say hi\n  }\n}",
+	} {
+		s, off := session(t, src)
+		h, _ := s.Hover("main.mms", off)
+		if !strings.Contains(h, "dx") || !strings.Contains(h, "int") {
+			t.Errorf("%q: hover = %q", src, h)
+		}
+		edits, msg := s.Rename("main.mms", off, "step")
+		if msg != "" {
+			t.Errorf("%q: rename: %s", src, msg)
+		}
+		if want := strings.Count(strings.Replace(src, "|", "", 1), "dx"); len(edits) != want {
+			t.Errorf("%q: rename edits %+v, want %d", src, edits, want)
+		}
+	}
+}

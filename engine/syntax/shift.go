@@ -237,7 +237,11 @@ func (s shifter) expr(e Expr) Expr {
 	case *Selector:
 		n = &Selector{Name: x.Name, Sp: s.sp(x.Sp)}
 	case *Coord:
-		n = &Coord{Text: x.Text, Sp: s.sp(x.Sp)}
+		c := &Coord{Text: x.Text, Sp: s.sp(x.Sp)}
+		for _, nm := range x.Names {
+			c.Names = append(c.Names, s.expr(nm))
+		}
+		n = c
 	case *Paren:
 		n = &Paren{X: s.expr(x.X), Sp: s.sp(x.Sp)}
 	case *List:

@@ -2,6 +2,7 @@ package sema
 
 import (
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/minecraftmetascript/mms/engine/fn"
@@ -26,12 +27,19 @@ type ExecHelper struct {
 	// Sub followed by the arguments.
 	render func(args []execArg) string
 	min    int // fewest arguments
+	// Values is set when the arguments can be numbers the function
+	// computes, such as Positioned(x, 64, z).
+	Values bool
 }
 
 type execArg struct {
 	text     string
 	selector bool
 }
+
+// sample stands in for a value only known at run time when the chain is
+// checked against the command tree: any whole number reads the same.
+const sample = "0"
 
 func joinArgs(args []execArg) string {
 	ts := make([]string, len(args))
@@ -58,12 +66,12 @@ var ExecHelpers = []*ExecHelper{
 		Doc: "Runs the block once for each target, as that entity (`execute as`). Position and rotation stay as they were; chain `.At(@s)` to move there too."},
 	{Name: "At", Sub: "at", Params: "targets", min: 1, Insert: "At(${1:@s}) {\n\t$0\n}",
 		Doc: "Runs the block at each target's position, rotation and dimension (`execute at`)."},
-	{Name: "Positioned", Sub: "positioned", Params: "pos | targets", min: 1, render: orAs("positioned"), Insert: "Positioned(${1:~ ~ ~}) {\n\t$0\n}",
-		Doc: "Moves the position (`execute positioned`). Coordinates are written `~ ~1 ~` or `0, 64, 0`; a selector uses `positioned as`."},
-	{Name: "Rotated", Sub: "rotated", Params: "rot | targets", min: 1, render: orAs("rotated"), Insert: "Rotated(${1:~ ~}) {\n\t$0\n}",
-		Doc: "Sets the rotation (`execute rotated`): `~ ~`, `90, 0`, or a selector for `rotated as`."},
-	{Name: "Facing", Sub: "facing", Params: "pos | targets, anchor?", min: 1, Insert: "Facing(${1:@p}) {\n\t$0\n}",
-		Doc: "Turns to face a position or an entity (`execute facing`). With a selector the second argument is the anchor, `eyes` (the default) or `feet`.",
+	{Name: "Positioned", Sub: "positioned", Params: "pos | targets", min: 1, Values: true, render: orAs("positioned"), Insert: "Positioned(${1:~ ~ ~}) {\n\t$0\n}",
+		Doc: "Moves the position (`execute positioned`). Coordinates are written `~ ~1 ~` or `0, 64, 0`, where a whole coordinate can be a variable, a Global, a Storage field or arithmetic, `Positioned(x, 64, z)`, and a relative or local one can be offset by a name, `Positioned(~dx ~ ~-dz)`. A selector uses `positioned as`."},
+	{Name: "Rotated", Sub: "rotated", Params: "rot | targets", min: 1, Values: true, render: orAs("rotated"), Insert: "Rotated(${1:~ ~}) {\n\t$0\n}",
+		Doc: "Sets the rotation (`execute rotated`): `~ ~`, `90, 0` (either angle can be a value the function computes, `yaw, 0`), or a selector for `rotated as`."},
+	{Name: "Facing", Sub: "facing", Params: "pos | targets, anchor?", min: 1, Values: true, Insert: "Facing(${1:@p}) {\n\t$0\n}",
+		Doc: "Turns to face a position or an entity (`execute facing`). A position's coordinates can be values the function computes, as in Positioned. With a selector the second argument is the anchor, `eyes` (the default) or `feet`.",
 		render: func(args []execArg) string {
 			if args[0].selector {
 				anchor := "eyes"
@@ -217,14 +225,17 @@ type piece struct {
 }
 
 // execParts checks an execute chain and returns its subcommands, or ok
-// false after reporting a problem.
-func (f *fc) execParts(e syntax.Expr) (parts []string, ok bool) {
+// false after reporting a problem. An argument only known at run time,
+// such as a variable in Positioned(x, 64, z), is a $(key) placeholder in
+// the parts, filled from margs by running the command as a macro; pre
+// computes those values first.
+func (f *fc) execParts(pre *[]fn.Op, e syntax.Expr) (parts []string, margs []fn.MacroArg, ok bool) {
 	c := f.c
 	steps, isChain := execChain(e)
 	if !isChain {
 		name, sp := execHeadName(e)
 		f.unknownExec(name, sp)
-		return nil, false
+		return nil, nil, false
 	}
 	text := "execute"
 	var pieces []piece
@@ -237,8 +248,9 @@ func (f *fc) execParts(e syntax.Expr) (parts []string, ok bool) {
 			continue
 		}
 		c.info(st.node()).Help = h.help()
-		var args []execArg
+		var args, macro []execArg
 		var argPieces []piece
+		bad := false // an argument was reported already
 		for _, a := range st.call.Args {
 			if a.Name != nil {
 				c.errorf("mms/unsupported", a.Sp, "%s takes its arguments by position", h.Name)
@@ -260,7 +272,43 @@ func (f *fc) execParts(e syntax.Expr) (parts []string, ok bool) {
 			case *syntax.Bad:
 				ok = false
 				continue
+			case *syntax.Coord:
+				if len(v.Names) == 0 {
+					ea.text, verbatim = f.argText(a.Value)
+					break
+				}
+				if !h.Values {
+					c.errorf("mms/unsupported", v.Sp, "%s takes no coordinates; a name after ~ or ^ works in Positioned, Rotated and Facing", h.Name)
+					ok, bad = false, true
+					continue
+				}
+				check, run, good := f.coordValue(pre, v, &margs)
+				if !good {
+					ok, bad = false, true
+					continue
+				}
+				args = append(args, execArg{text: check})
+				macro = append(macro, execArg{text: run})
+				argPieces = append(argPieces, piece{src: v.Sp})
+				continue
 			default:
+				if h.Values && f.runtimeArg(a.Value) {
+					text, key, good := f.execValue(pre, a.Value, &margs)
+					if !good {
+						ok, bad = false, true
+						continue
+					}
+					m := execArg{text: text}
+					ea.text = text
+					if key != "" {
+						m.text = "$(" + key + ")"
+						ea.text = sample
+					}
+					args = append(args, ea)
+					macro = append(macro, m)
+					argPieces = append(argPieces, piece{src: a.Value.Span()})
+					continue
+				}
 				ea.text, verbatim = f.argText(a.Value)
 				switch x := a.Value.(type) {
 				case *syntax.Selector:
@@ -270,20 +318,24 @@ func (f *fc) execParts(e syntax.Expr) (parts []string, ok bool) {
 				}
 			}
 			args = append(args, ea)
+			macro = append(macro, ea)
 			argPieces = append(argPieces, piece{src: a.Value.Span(), verbatim: verbatim})
+		}
+		if bad {
+			continue
 		}
 		if len(args) < h.min {
 			c.errorf("mms/missing-value", st.call.ArgsSp, "%s needs %s", h.Name, h.Params)
 			ok = false
 			continue
 		}
-		var part string
-		if h.render != nil {
-			part = h.render(args)
-		} else {
-			part = h.Sub + " " + joinArgs(args)
+		render := func(args []execArg) string {
+			if h.render != nil {
+				return strings.TrimSpace(h.render(args))
+			}
+			return strings.TrimSpace(h.Sub + " " + joinArgs(args))
 		}
-		part = strings.TrimSpace(part)
+		part := render(args)
 		if part == "" {
 			c.errorf("mms/missing-value", st.call.ArgsSp, "%s needs %s", h.Name, h.Params)
 			ok = false
@@ -306,10 +358,10 @@ func (f *fc) execParts(e syntax.Expr) (parts []string, ok bool) {
 		}
 		pieces = append(pieces, piece{start: base, end: base + len(pr), src: st.call.Sp})
 		text += " " + part
-		parts = append(parts, part)
+		parts = append(parts, render(macro))
 	}
 	if !ok || len(parts) == 0 {
-		return nil, false
+		return nil, nil, false
 	}
 	whole := e.Span()
 	errs := len(c.Diags)
@@ -333,9 +385,102 @@ func (f *fc) execParts(e syntax.Expr) (parts []string, ok bool) {
 		return whole
 	})
 	if hasErrorsSince(c.Diags, errs) {
-		return nil, false
+		return nil, nil, false
 	}
-	return parts, true
+	return parts, margs, true
+}
+
+// runtimeArg reports whether an execute helper's argument is a value the
+// function computes, such as a variable, a Global, a Storage field, a
+// score or arithmetic, rather than text written into the command.
+func (f *fc) runtimeArg(e syntax.Expr) bool {
+	if selectorText(e) != "" {
+		return false
+	}
+	switch x := e.(type) {
+	case *syntax.Ident:
+		if _, ok := f.lookup(x.Name); ok {
+			return true
+		}
+		return f.c.findSig("Global", f.ns+":"+x.Name) != nil
+	case *syntax.Member:
+		base, _ := storageChain(x)
+		switch b := base.(type) {
+		case *syntax.Ident:
+			if _, ok := f.lookup(b.Name); ok {
+				return false
+			}
+			return f.c.findSig("Storage", f.ns+":"+b.Name) != nil
+		case *syntax.ResLoc:
+			return f.c.findSig("Storage", b.Text) != nil
+		}
+	case *syntax.Unary:
+		_, lit := x.X.(*syntax.Number)
+		return !lit
+	case *syntax.Index, *syntax.Call, *syntax.Binary, *syntax.Paren:
+		return true
+	}
+	return false
+}
+
+// coordValue writes a coordinate group whose `~x` words a variable
+// offsets: check is the text to check against the command tree, with a
+// sample number for each value, and run the macro line's text.
+func (f *fc) coordValue(pre *[]fn.Op, co *syntax.Coord, margs *[]fn.MacroArg) (check, run string, ok bool) {
+	words := strings.Fields(co.Text)
+	checks := append([]string(nil), words...)
+	i := 0
+	ok = true
+	for k, w := range words {
+		prefix, neg, isName := syntax.CoordName(w)
+		if !isName || i >= len(co.Names) {
+			continue
+		}
+		x := co.Names[i]
+		i++
+		if neg {
+			x = &syntax.Unary{Op: "-", X: x, Sp: x.Span()}
+		}
+		text, key, good := f.execValue(pre, x, margs)
+		if !good {
+			ok = false
+			continue
+		}
+		if key == "" {
+			words[k], checks[k] = prefix+text, prefix+text
+			continue
+		}
+		words[k], checks[k] = prefix+"$("+key+")", prefix+sample
+	}
+	return strings.Join(checks, " "), strings.Join(words, " "), ok
+}
+
+// execValue computes a run-time argument of an execute helper: the
+// number itself when it turns out constant, otherwise the key of its
+// macro argument in margs, shared with an earlier one that reads the
+// same score.
+func (f *fc) execValue(pre *[]fn.Op, e syntax.Expr, margs *[]fn.MacroArg) (text, key string, ok bool) {
+	v := f.expr(pre, e)
+	if v == nil {
+		return "", "", false
+	}
+	if v.typ != tInt {
+		f.c.errorf("mms/type-mismatch", e.Span(), "an execute helper takes a whole number here, but this is %s", v.typ)
+		return "", "", false
+	}
+	op := f.operand(pre, v)
+	if op.IsConst {
+		return strconv.Itoa(int(op.Const)), "", true
+	}
+	s := op.S
+	for _, a := range *margs {
+		if a.Score != nil && *a.Score == s {
+			return "", a.Key, true
+		}
+	}
+	key = "a" + strconv.Itoa(len(*margs))
+	*margs = append(*margs, fn.MacroArg{Key: key, Score: &s})
+	return "", key, true
 }
 
 func hasErrorsSince(ds []syntax.Diagnostic, from int) bool {
@@ -371,7 +516,8 @@ func (f *fc) unknownExec(name string, sp syntax.Span) {
 
 // execBlock lowers `As(@a).At(@s) { ... }`.
 func (f *fc) execBlock(out *fn.Block, t *syntax.Trailing) {
-	parts, ok := f.execParts(t.X)
+	var pre []fn.Op
+	parts, args, ok := f.execParts(&pre, t.X)
 	body := &fn.Block{}
 	loops := f.loops
 	f.loops = 0
@@ -380,7 +526,8 @@ func (f *fc) execBlock(out *fn.Block, t *syntax.Trailing) {
 	f.exec--
 	f.loops = loops
 	if ok {
-		out.Add(fn.Exec{Parts: parts, Body: body})
+		out.Ops = append(out.Ops, pre...)
+		out.Add(fn.Exec{Parts: parts, Args: args, Body: body})
 	}
 }
 

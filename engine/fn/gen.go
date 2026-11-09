@@ -174,7 +174,11 @@ func (g *gen) op(fr *frame, op Op) []string {
 			return nil
 		}
 		cmd, after := g.run(fr, o.Body, "exec")
-		return append([]string{chain(o.Parts, cmd)}, after...)
+		line := chain(o.Parts, cmd)
+		if len(o.Args) > 0 {
+			return append(g.macro(Macro{Line: line, Args: o.Args}), after...)
+		}
+		return append([]string{line}, after...)
 	}
 	panic(fmt.Sprintf("fn: unknown op %T", op))
 }
