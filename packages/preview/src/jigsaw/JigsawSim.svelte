@@ -6,7 +6,7 @@
 	// A slice cuts the view along x, y or z to see inside. Clicking a piece
 	// shows where it came from and what each of its jigsaw blocks joined.
 	import { onDestroy, onMount } from 'svelte';
-	import { simulate, structureFiles, type Box, type NoneReason, type PlacedPiece, type Simulation } from './simulate';
+	import { MAX_DEPTH, simulate, structureFiles, type Box, type NoneReason, type PlacedPiece, type Simulation } from './simulate';
 	import { placeBlocks } from './blocks';
 	import { blockMesh, boxMesh, clip, edgeLines, fade, hit, ray, VoxelView, type Camera, type Rgb, type Slice } from './voxel';
 	import { blockColor } from '../preview/colors';
@@ -28,7 +28,18 @@
 	let at = $state(0);
 	let selected = $state<number | null>(null);
 
-	const sim: Simulation | null = $derived(simulate(path, output, assets, { seed }));
+	/** A depth set here, in place of the structure's size; null follows the size. */
+	let depth = $state<number | null>(null);
+	$effect(() => {
+		// Another structure starts again from its own size.
+		void path;
+		depth = null;
+	});
+
+	const sim: Simulation | null = $derived(simulate(path, output, assets, { seed, ...(depth !== null ? { depth } : {}) }));
+	const setDepth = (v: number) => {
+		depth = Number.isFinite(v) ? Math.max(0, Math.min(MAX_DEPTH, Math.round(v))) : null;
+	};
 	$effect(() => {
 		// A new layout drops the selection, which may not exist in it.
 		void sim;
@@ -243,7 +254,7 @@
 	const why: Record<NoneReason, string> = {
 		empty: 'an end: its pool is minecraft:empty',
 		'unknown-pool': 'nothing: its pool is not in the pack',
-		depth: 'nothing: at the structure size, and no fallback piece fit',
+		depth: 'nothing: at the last depth, and no fallback piece fit',
 		'no-fit': 'nothing: no piece could join or fit',
 		'empty-piece': 'nothing: the pool drew the empty piece'
 	};
@@ -256,6 +267,16 @@
 			<input class="w-20 rounded border border-line bg-panel px-1 py-0.5 font-mono" type="number" step="1" bind:value={seed} aria-label="Layout seed" />
 		</label>
 		<button type="button" class="rounded border border-line px-1.5 py-0.5 hover:bg-hover" onclick={() => (seed = Math.floor(Math.random() * 2 ** 31))}>Re-roll</button>
+		{#if sim}
+			<label class="flex items-center gap-1" title="How many pieces deep to grow from the start piece, 0 to {MAX_DEPTH} (the game's limit). Starts at the structure's size, {sim.size}; this only changes the preview, not the pack.">
+				<span class="text-muted">Depth</span>
+				<input class="w-12 rounded border border-line bg-panel px-1 py-0.5 font-mono" type="number" min="0" max={MAX_DEPTH} step="1" value={sim.depth} oninput={(e) => setDepth(e.currentTarget.valueAsNumber)} aria-label="Depth" />
+				<input type="range" class="w-24" min="0" max={MAX_DEPTH} step="1" value={sim.depth} oninput={(e) => setDepth(e.currentTarget.valueAsNumber)} aria-label="Depth slider" />
+			</label>
+			{#if depth !== null && depth !== sim.size}
+				<button type="button" class="rounded border border-line px-1.5 py-0.5 hover:bg-hover" title="Go back to the structure's own size" onclick={() => (depth = null)}>Size {sim.size}</button>
+			{/if}
+		{/if}
 		<span class="flex overflow-hidden rounded border border-line" role="group" aria-label="Show">
 			{#each [['boxes', 'Boxes'], ['blocks', 'Blocks']] as [id, label] (id)}
 				<button type="button" class="px-1.5 py-0.5 {mode === id ? 'bg-selected font-medium' : 'hover:bg-hover'}" aria-pressed={mode === id} onclick={() => (mode = id as typeof mode)}>{label}</button>
@@ -279,7 +300,7 @@
 				{#if sim.failed}
 					<span class="text-amber-600 dark:text-amber-400">{sim.failed}</span>
 				{:else}
-					{sim.pieces.length} {sim.pieces.length === 1 ? 'piece' : 'pieces'} · {sim.reached} deep (size {sim.depth}){#if counts.none}
+					{sim.pieces.length} {sim.pieces.length === 1 ? 'piece' : 'pieces'} · {sim.reached} deep (size {sim.size}{sim.depth !== sim.size ? `, grown to ${sim.depth}` : ''}){#if counts.none}
 						· <span class="text-red-600 dark:text-red-400">{counts.none} jigsaw {counts.none === 1 ? 'block' : 'blocks'} found nothing</span>{/if}
 				{/if}
 			</span>
