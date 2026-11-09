@@ -62,6 +62,19 @@ func (r *Result) providedAssets() map[string]bool {
 	return out
 }
 
+// SoundIDs returns the sound event ids the project's Sound("x.ogg") uses
+// give their files, in source order. The build writes them to
+// sounds.json, so commands such as /playsound can name them.
+func (r *Result) SoundIDs() []string {
+	var out []string
+	for _, u := range r.assets {
+		if u.Helper == "Sound" {
+			out = append(out, u.ID)
+		}
+	}
+	return out
+}
+
 // emitAssets lists the copied files and the files generated for them:
 // sounds.json, the resource pack's pack.mcmeta, and pack.png from the
 // icon. Copies carry their source in Asset and no Data until ReadAssets.

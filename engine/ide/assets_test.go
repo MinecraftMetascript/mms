@@ -2,6 +2,7 @@ package ide
 
 import (
 	"context"
+	"slices"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -36,6 +37,21 @@ func assetSession(t *testing.T, src string) (*Session, int) {
 		t.Fatal(err)
 	}
 	return &Session{P: p, R: r}, len([]rune(src[:off]))
+}
+
+// TestCommandSoundCompletion offers the sounds the project's Sound uses
+// give their files after /playsound, before the vanilla ones.
+func TestCommandSoundCompletion(t *testing.T) {
+	src := "JukeboxSong s { sound_event = Sound(\"music/tune.ogg\"), description = \"x\", length_in_seconds = 1, comparator_output = 1 }\nFunction f {\n  /playsound |\n}"
+	s, off := assetSession(t, src)
+	items, _ := s.Completion("main.mms", off)
+	got := labels(items)
+	if len(got) == 0 || got[0] != "test:tune" {
+		t.Fatalf("first items = %v, want test:tune first", got[:min(len(got), 3)])
+	}
+	if !slices.Contains(got, "ambient.cave") {
+		t.Errorf("vanilla sounds missing: %v", got[:min(len(got), 5)])
+	}
 }
 
 func TestAssetPathCompletion(t *testing.T) {
