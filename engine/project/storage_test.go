@@ -338,3 +338,32 @@ Function f {
 		}
 	}
 }
+
+// A string shown with ${...} reads as plain text, not as SNBT: the game
+// quotes and colours a string tag green unless its nbt component
+// interprets it.
+func TestShownStringIsPlain(t *testing.T) {
+	src := `Type S {
+  mode: int
+  name: string = "none"
+}
+Storage st: S
+const modes: [string] = ["Measure", "Replace", "Copy"]
+Function next {
+  st.mode = (st.mode + 1) % len(modes)
+  let current = modes[st.mode]
+  st.name = current
+  actionbar(@s, "Set mode to ${current}")
+  tell(@a, "Stored ${st.name}, ${st.mode}")
+}
+`
+	_, r := bookProject(t, src, nil)
+	if d := diagText(r); d != "" {
+		t.Fatal(d)
+	}
+	vm := load(t, r, "demo")
+	call(t, vm, "demo:next")
+	if got, want := strings.Join(vm.Said, "|"), "Set mode to Replace|Stored Replace, 1"; got != want {
+		t.Errorf("said %q, want %q", got, want)
+	}
+}
