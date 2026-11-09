@@ -578,20 +578,17 @@ test('the docs render guides and the reference', async ({ page }) => {
 	await expect(page).toHaveURL(/\/docs\/reference\/helpers\/loot_function#loot_function-SetCount$/);
 
 	// The reference for AI tools.
-	// At the site's root, where the llms.txt convention puts them, and
-	// under /docs/ too.
-	for (const path of ['./llms.txt', './docs/llms.txt']) {
-		const res = await page.request.get(path);
-		expect(res.status(), path).toBe(200);
-		const llms = await res.text();
-		expect(llms).toMatch(/^# MMS\n\n> /);
-		expect(llms).toContain('/docs/guides/functions');
-	}
-	for (const path of ['./llms-full.txt', './docs/llms-full.txt']) {
-		const res = await page.request.get(path);
-		expect(res.status(), path).toBe(200);
-		expect(await res.text()).toContain('# Reference: helpers');
-	}
+	// At the site's root, where the llms.txt convention puts them.
+	const llmsRes = await page.request.get('./llms.txt');
+	expect(llmsRes.status()).toBe(200);
+	const llms = await llmsRes.text();
+	expect(llms).toMatch(/^# MMS\n\n> /);
+	expect(llms).toContain('/docs/guides/functions');
+	const fullRes = await page.request.get('./llms-full.txt');
+	expect(fullRes.status()).toBe(200);
+	expect(await fullRes.text()).toContain('# Reference: helpers');
+	// The footer links to them there.
+	await expect(page.getByRole('link', { name: 'llms.txt', exact: true })).toHaveAttribute('href', /\/llms\.txt$/);
 	const yaml = await (await page.request.get('./docs/reference.yaml')).text();
 	expect(yaml).toContain('lint_rules:');
 	expect(yaml).toContain('- name: "SetCount"');

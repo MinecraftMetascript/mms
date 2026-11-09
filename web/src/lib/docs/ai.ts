@@ -1,8 +1,7 @@
 // The reference in forms that AI tools and scripts read easily, served
-// at the site's root and next to the docs: /llms.txt (an index in the
-// llms.txt convention), /llms-full.txt (every page and the whole reference
-// as Markdown), the same two under /docs/, and /docs/reference.yaml (the
-// generated reference as data).
+// /llms.txt (an index in the llms.txt convention, at the site's root
+// where tools look), /llms-full.txt (every page and the whole reference
+// as Markdown) and /docs/reference.yaml (the generated reference as data).
 import { docGroups, groupPages, referenceGroups, siteURL } from './site.ts';
 import { ref, resourceKinds, ownKinds, helperCount, blueprints, forms, preludeTemplates, preludeTypes } from './refdata.ts';
 import { groupId, groupTitle, type Param, type PreludeDecl, type PreludeField } from './reference.ts';
@@ -13,7 +12,7 @@ const intro =
 
 const url = (path: string) => `${siteURL}${path}`;
 
-/** /llms.txt and /docs/llms.txt: what MMS is, and a link to every page. */
+/** /llms.txt: what MMS is, and a link to every page. */
 export function llmsIndex(): string {
 	const out = [`# MMS`, '', `> ${intro}`, ''];
 	for (const g of [...docGroups, ...referenceGroups]) {
@@ -48,7 +47,7 @@ const usesLines = (d: PreludeDecl) => (d.uses ?? []).map((u) => `  - where \`${u
 const paramLine = (p: Param) =>
 	`  - \`${p.name}\`: ${p.type}${p.default ? ` (default \`${p.default}\`)` : p.optional ? ' (optional)' : ''}${p.doc ? `. ${p.doc.replace(/\s*\n\s*/g, ' ')}` : ''}`;
 
-/** /llms-full.txt and /docs/llms-full.txt: every hand-written page, then the reference. */
+/** /llms-full.txt: every hand-written page, then the reference. */
 export function llmsFull(): string {
 	const out = [`# MMS`, '', `> ${intro}`, '', `Minecraft version: ${ref.version}.`, ''];
 	for (const g of [...docGroups, ...referenceGroups]) {
