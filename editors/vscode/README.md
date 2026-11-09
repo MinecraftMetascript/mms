@@ -24,7 +24,9 @@ Language support for [Minecraft Metascript](https://github.com/MinecraftMetascri
 
 ## Setup
 
-The extension runs the `mms` language server. The platform-specific builds of the extension (`mms-<platform>-<version>.vsix` on the [releases page](https://github.com/MinecraftMetascript/mms/releases), such as `mms-darwin-arm64-1.0.0.vsix`) include `mms`, so there is nothing else to install. They exist for Windows, macOS and Linux (including Alpine), on x64 and arm64.
+Install **Minecraft Metascript** (`minecraftmetascript.mms`) from the VS Code Marketplace, or from Open VSX in Cursor, VSCodium and other editors. VS Code updates it for you. Every change merged to `main` is published as a pre-release: click **Switch to Pre-Release Version** on the extension's page to get those.
+
+The extension runs the `mms` language server. The stores serve a platform-specific build that includes `mms`, so there is nothing else to install. They exist for Windows, macOS and Linux (including Alpine), on x64 and arm64. The same builds (`mms-<platform>-<version>.vsix`, such as `mms-darwin-arm64-1.0.0.vsix`) are on the [releases page](https://github.com/MinecraftMetascript/mms/releases).
 
 The extension uses the first of:
 
@@ -40,7 +42,11 @@ The extension starts when a folder contains an `mms.json` or when you open a `.m
 
 The preview panel uses the same Svelte components as the web editor, from `packages/preview`. All three are one npm workspace: run `npm ci` in the repository root. `npm run build` bundles the extension (esbuild), the panel (Vite, into `out/webview`) the World and Structures views' page (`webview/World.svelte`, into `out/world`) and the Jigsaw view's page (`webview/Jigsaw.svelte`, into `out/jigsaw`). Those two pages wrap `WorldTool` and `JigsawTool` from `packages/preview`, which the web editor's World and Jigsaw tabs show too.
 
-`npm run package` makes the universal `.vsix`, without `mms`. `npm run package:targets` makes one `.vsix` per VS Code platform with `mms` cross-compiled into `bin/` (it needs Go); pass targets to make only some, such as `npm run package:targets -- linux-x64 darwin-arm64`. `MMS_VERSION` sets the version `mms version` prints.
+`npm run package` makes the universal `.vsix`, without `mms`. `npm run package:targets` makes one `.vsix` per VS Code platform with `mms` cross-compiled into `bin/` (it needs Go); pass targets to make only some, such as `npm run package:targets -- linux-x64 darwin-arm64`. `MMS_VERSION` sets the version `mms version` prints. Flags such as `--pre-release` go on to `vsce package`.
+
+## Publishing
+
+CI publishes to the VS Code Marketplace and Open VSX with `scripts/publish.mjs`, which needs the repository secrets `VSCE_PAT` (an Azure DevOps token with the Marketplace Manage scope, for the `minecraftmetascript` publisher) and `OVSX_PAT` (an Open VSX token for the `minecraftmetascript` namespace); a store without its secret is skipped. A `v*` tag publishes that version (`.github/workflows/release.yml`). Each merge to `main` that changes the extension or the engine publishes a pre-release one minor version ahead of the latest tag, with the workflow's run number as the patch: after v0.5.0 they are 0.6.1, 0.6.2 and so on (`.github/workflows/vscode-prerelease.yml`, `scripts/version.mjs`). A pre-release is always newer than the release before it.
 
 ## Credits
 

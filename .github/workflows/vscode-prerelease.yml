@@ -1,0 +1,55 @@
+name: vscode-prerelease
+
+# Every merge to main that changes the extension or the engine publishes a
+# pre-release of the extension to the VS Code Marketplace and Open VSX, so
+# people who chose "Switch to Pre-Release Version" get it as an update. The
+# version is one minor ahead of the latest v* tag, with this workflow's run
+# number as the patch (v0.5.0 -> 0.6.<run>; scripts/version.mjs). Each store
+# is skipped while its token secret (VSCE_PAT, OVSX_PAT) is not set.
+on:
+  push:
+    branches: [main]
+    paths: ["editors/vscode/**", "packages/**", "engine/**", "package.json", "package-lock.json", ".github/workflows/vscode-prerelease.yml"]
+  workflow_dispatch:
+
+# A newer merge supersedes a build still running.
+concurrency:
+  group: vscode-prerelease
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: editors/vscode
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The tags, for the version.
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: engine/go.mod
+          cache-dependency-path: engine/go.sum
+      - name: Install the npm workspace
+        working-directory: .
+        run: npm ci
+      - name: Set the version
+        run: |
+          version="$(node scripts/version.mjs --pre-release "$GITHUB_RUN_NUMBER")"
+          npm pkg set version="$version"
+          echo "MMS_VERSION=v$version-pre" >> "$GITHUB_ENV"
+      - run: npm run package -- --pre-release
+      - run: node scripts/package-targets.mjs --pre-release
+      - name: Publish
+        run: node scripts/publish.mjs . --pre-release
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}

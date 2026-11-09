@@ -2,7 +2,10 @@ name: release
 
 # Pushing a tag such as v1.0.0 builds the CLI for every platform and the
 # VS Code extension (a universal .vsix plus one per platform with mms
-# bundled), and publishes them as a GitHub release.
+# bundled), and publishes them as a GitHub release. The extension also goes
+# to the VS Code Marketplace and Open VSX, as version 1.0.0, when the
+# VSCE_PAT and OVSX_PAT secrets are set (scripts/publish.mjs). Merges to main
+# publish pre-releases (vscode-prerelease.yml).
 on:
   push:
     tags: ["v*"]
@@ -64,6 +67,10 @@ jobs:
       - name: Install the npm workspace
         working-directory: .
         run: npm ci
+      # The extension's version is the tag's: v1.0.0 -> 1.0.0.
+      - name: Set the version
+        if: startsWith(github.ref, 'refs/tags/')
+        run: npm pkg set version="${GITHUB_REF_NAME#v}"
       # The universal mms-<version>.vsix, which runs mms from mms.path or PATH.
       - run: npm run package
       # One mms-<target>-<version>.vsix per platform, with mms bundled.
@@ -90,3 +97,28 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --title "MMS $GITHUB_REF_NAME" --generate-notes
+
+  # The same .vsix files, to the extension stores. Each store is skipped
+  # while its token secret is not set.
+  stores:
+    needs: [vscode]
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Install the npm workspace
+        run: npm ci
+      - uses: actions/download-artifact@v4
+        with:
+          name: vscode
+          path: vsix
+      - name: Publish
+        run: node editors/vscode/scripts/publish.mjs vsix
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}

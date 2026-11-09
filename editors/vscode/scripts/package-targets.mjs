@@ -4,6 +4,7 @@
 //
 //   node scripts/package-targets.mjs                 every target below
 //   node scripts/package-targets.mjs linux-x64 ...   just these
+//   node scripts/package-targets.mjs --pre-release   flags go to vsce package
 //
 // Run `npm run build` first (`npm run package:targets` does). Needs Go: the
 // binaries are cross-compiled from ../../engine with CGO off. MMS_VERSION
@@ -30,7 +31,9 @@ const targets = {
 	'win32-arm64': ['windows', 'arm64']
 };
 
-const wanted = process.argv.slice(2);
+const args = process.argv.slice(2);
+const wanted = args.filter((a) => !a.startsWith('--'));
+const flags = args.filter((a) => a.startsWith('--'));
 for (const t of wanted) {
 	if (!(t in targets)) {
 		console.error(`unknown target ${t}; known: ${Object.keys(targets).join(', ')}`);
@@ -59,7 +62,7 @@ try {
 		});
 		fs.copyFileSync(path.join(engine, 'THIRD_PARTY_NOTICES.txt'), path.join(bin, 'THIRD_PARTY_NOTICES.txt'));
 		if (goos !== 'windows') fs.chmodSync(path.join(bin, exe), 0o755);
-		execFileSync(process.execPath, [vsce, 'package', '--skip-license', '--no-dependencies', '--target', target], { cwd: root, stdio: 'inherit' });
+		execFileSync(process.execPath, [vsce, 'package', '--skip-license', '--no-dependencies', ...flags, '--target', target], { cwd: root, stdio: 'inherit' });
 	}
 } finally {
 	// The universal .vsix (`npm run package`) must not pick up a stray binary.
