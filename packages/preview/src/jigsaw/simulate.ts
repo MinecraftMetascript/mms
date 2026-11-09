@@ -56,7 +56,7 @@ export type NoneReason =
 	| 'empty'
 	/** No pool of that name is in the pack (a vanilla pool, or undeclared). */
 	| 'unknown-pool'
-	/** The piece is at the structure's size, and the fallback had nothing that fit. */
+	/** The piece is at the last depth, and the fallback had nothing that fit. */
 	| 'depth'
 	/** No piece had a jigsaw block that could join, or none fit the free space. */
 	| 'no-fit'
@@ -86,8 +86,10 @@ export interface Simulation {
 	pieces: PlacedPiece[];
 	/** The box no piece may leave, from max_distance_from_center. */
 	bounds: Box;
-	/** The structure's size: how many pieces deep it grows. */
+	/** How many pieces deep it grows here: the structure's size, unless the options set another. */
 	depth: number;
+	/** The structure's own size, from its JSON (7 when it has none). */
+	size: number;
 	/** The deepest piece placed. */
 	reached: number;
 	/** Why there is no structure at all, when there is none. */
@@ -321,7 +323,15 @@ export interface SimulateOptions {
 	seed?: number;
 	/** At most this many pieces, so a structure that grows without end still returns. */
 	limit?: number;
+	/**
+	 * Grow this many pieces deep instead of the structure's size, clamped
+	 * to 0 to MAX_DEPTH like the game's size field.
+	 */
+	depth?: number;
 }
+
+/** The game's largest jigsaw size (max depth). */
+export const MAX_DEPTH = 20;
 
 /**
  * Simulates a jigsaw structure at an output path, or returns null when the
@@ -333,12 +343,13 @@ export function simulate(path: string, output: readonly OutputFile[], assets: re
 	if (!isObj(json) || String(json.type ?? '').replace(/^minecraft:/, '') !== 'jigsaw' || typeof json.start_pool !== 'string') return null;
 	const seed = opts.seed ?? 0;
 	const limit = opts.limit ?? 4096;
-	const depth = typeof json.size === 'number' ? json.size : 7;
+	const size = typeof json.size === 'number' ? json.size : 7;
+	const depth = Math.max(0, Math.min(MAX_DEPTH, Math.floor(opts.depth ?? size)));
 	const maxDistance = typeof json.max_distance_from_center === 'number' ? json.max_distance_from_center : 80;
 	const startName = typeof json.start_jigsaw_name === 'string' ? fullId(json.start_jigsaw_name) : undefined;
 	const structures = structureFiles(assets);
 	const noted = new Set<string>();
-	const sim: Simulation = { seed, pieces: [], bounds: [[0, 0, 0], [0, 0, 0]], depth, reached: 0, notes: [] };
+	const sim: Simulation = { seed, pieces: [], bounds: [[0, 0, 0], [0, 0, 0]], depth, size, reached: 0, notes: [] };
 	const note = (s: string) => {
 		if (!noted.has(s)) {
 			noted.add(s);

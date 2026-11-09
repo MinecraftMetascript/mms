@@ -1121,6 +1121,15 @@ test('a jigsaw structure simulates a layout in 3D, with a seed, blocks and a sli
 	await sim.getByLabel('Layout seed').fill('0');
 	await expect(summary).toHaveText(first!);
 
+	// Depth grows the preview shallower or deeper than the size, up to 20,
+	// and the size button goes back.
+	await sim.getByLabel('Depth', { exact: true }).fill('2');
+	await expect(summary).toContainText(/\d+ pieces · 3 deep \(size 6, grown to 2\)/);
+	await sim.getByLabel('Depth', { exact: true }).fill('99');
+	await expect(summary).toContainText('grown to 20)');
+	await sim.getByRole('button', { name: 'Size 6' }).click();
+	await expect(summary).toHaveText(first!);
+
 	// Clicking the middle of the view picks a piece and shows what joined it.
 	const canvas = sim.getByLabel('Simulated structure');
 	await page.getByRole('button', { name: 'Fit' }).click();
