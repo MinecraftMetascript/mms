@@ -74,6 +74,56 @@ A field costs a storage read and write each time a function uses it. A `Global` 
 
 ### Selectors
 
+A selector used in many places can be named with a `const`, and one that changes with a value with a `Template` of type `Selector`. Either works wherever a selector does: as a score holder, in `tell`, in an execute helper, and in a raw command as `${boss}`:
+
+```mms
+Objective hp
+
+const boss = @e[tag=siege.boss, limit=1]
+Template near(r: int): Selector = @a[distance=..${r}]
+
+Function hit_boss {
+  /effect give ${boss} glowing 5
+  hp[boss] -= 1
+  tell(near(16), "The boss has ${hp[boss]} hp left")
+  As(near(8)).At(@s) {
+    /particle minecraft:crit ~ ~1 ~
+  }
+}
+```
+
+Square brackets after a named selector add options to it:
+
+```mms
+Objective hp
+Objective kills
+
+const guards = @e[type=zombie, tag=guard, scores={hp=1..}]
+const veterans = guards[tag=veteran, scores={kills=5..}]
+const mobs = @e[type=!player, tag=mob]
+
+Function patrol {
+  tell(guards[limit=1, sort=nearest], "Halt!")
+  As(mobs[type=!item]) {
+    /say on patrol
+  }
+  /effect give ${veterans} strength 10
+}
+```
+
+`veterans` is `@e[type=zombie,tag=guard,scores={hp=1..,kills=5..},tag=veteran]`. Options add up as the game reads them:
+
+| Options | Added |
+|---|---|
+| `tag`, `predicate`, `nbt` | always, and each one narrows the match |
+| `type`, `name`, `gamemode`, `team` | when every one is negated, as in `type=!item` |
+| `scores`, `advancements` | merged into the base's, one entry per objective or advancement |
+| any other, such as `limit` or `distance` | only when the base does not set it |
+
+Anything else is an error that names the option the base already sets.
+
+The value is written into each place it is used, so a named selector costs nothing in the game. Hovering the name shows the selector. Option names are checked where the selector is written, with a fix for a misspelled one, and a value given for a `Selector` must be a selector or a player name in quotes.
+
 `exists(target)` tells whether a selector finds any entity, and `count(target)` how many it finds:
 
 ```mms

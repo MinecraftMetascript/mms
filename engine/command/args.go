@@ -543,3 +543,27 @@ func SelectorOptionNames() []string {
 	sort.Strings(out)
 	return out
 }
+
+// How a selector option may be given more than once, as the game reads
+// it: SelectorRepeats any number of times, SelectorNegatedRepeats again
+// only when every copy is negated (type=!husk), SelectorMap once, but its
+// entries can be merged (scores={...}), and SelectorOnce once.
+const (
+	SelectorOnce = iota
+	SelectorRepeats
+	SelectorNegatedRepeats
+	SelectorMap
+)
+
+// SelectorRepeat tells how the option name may repeat.
+func SelectorRepeat(name string) int {
+	switch name {
+	case "tag", "predicate", "nbt":
+		return SelectorRepeats
+	case "type", "name", "gamemode", "team":
+		return SelectorNegatedRepeats
+	case "scores", "advancements":
+		return SelectorMap
+	}
+	return SelectorOnce
+}

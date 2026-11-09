@@ -211,7 +211,11 @@ func (c *ctx) reduce(x syntax.Expr) Value {
 		if _, sel := x.X.(*syntax.Selector); sel {
 			return &Code{p, &syntax.Index{X: c.lower(base), Args: c.selectorArgs(x.Args), Sp: c.span(x.Sp)}}
 		}
-		return &Code{p, &syntax.Index{X: c.lower(base), Args: c.args(x.Args), Sp: c.span(x.Sp)}}
+		lowered := c.lower(base)
+		if ext := c.extendSelector(lowered, x); ext != nil {
+			return &Code{p, ext}
+		}
+		return &Code{p, &syntax.Index{X: lowered, Args: c.args(x.Args), Sp: c.span(x.Sp)}}
 	case *syntax.Trailing:
 		fn := c.reduce(x.X)
 		return &Code{p, &syntax.Trailing{X: c.lower(fn), Block: c.block(x.Block), Sp: c.span(x.Sp)}}
@@ -641,11 +645,29 @@ func (c *ctx) member(x *syntax.Member) Value {
 // has its name: a selector argument is the game's word. ${...} and
 // strings make words from values.
 func (c *ctx) selectorArgs(as []*syntax.Arg) []*syntax.Arg {
-	out := c.args(as)
-	for i, a := range as {
-		if selectorWord(a.Value) {
-			out[i].Value = c.clone(a.Value)
+	// A bare word is the word, never a const of that name, so
+	// `const boss = @e[tag=boss]` names its own tag.
+	var rest []*syntax.Arg
+	for _, a := range as {
+		if !selectorWord(a.Value) {
+			rest = append(rest, a)
 		}
+	}
+	done := map[*syntax.Arg]*syntax.Arg{}
+	for i, a := range c.args(rest) {
+		done[rest[i]] = a
+	}
+	out := make([]*syntax.Arg, 0, len(as))
+	for _, a := range as {
+		if n, ok := done[a]; ok {
+			out = append(out, n)
+			continue
+		}
+		n := &syntax.Arg{Value: c.clone(a.Value), Sp: c.span(a.Sp)}
+		if a.Name != nil {
+			n.Name = &syntax.Name{Text: a.Name.Text, Sp: c.span(a.Name.Sp)}
+		}
+		out = append(out, n)
 	}
 	return out
 }

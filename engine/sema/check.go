@@ -388,6 +388,9 @@ func describe(v tview) string {
 	}
 	switch v.T.Kind {
 	case "string":
+		if isSelectorType(v.T) {
+			return "a selector, such as @e[tag=boss]"
+		}
 		if id := idOf(v.T); id.Registry != "" {
 			return "a " + id.Registry + " id"
 		}
@@ -920,6 +923,11 @@ func (c *Checker) anyValue(e syntax.Expr) jsonv.Value {
 
 // stringValue checks strings, and ids when the string has an #[id].
 func (c *Checker) stringValue(e syntax.Expr, v tview) jsonv.Value {
+	if isSelectorType(v.T) {
+		if sel := selectorText(e); sel != "" {
+			return jsonv.String(sel)
+		}
+	}
 	id := idOf(v.T)
 	switch x := e.(type) {
 	case *syntax.String:

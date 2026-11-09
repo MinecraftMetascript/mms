@@ -209,6 +209,15 @@ func TestCompletionMatrix(t *testing.T) {
 		{name: "command selector option", src: "Function f {\n  /kill @e[ty|\n}", want: []string{"type=", "tag="}, replace: "ty"},
 		{name: "command selector type", src: "Function f {\n  /kill @e[tag=x,type=zom|\n}", want: []string{"zombie"}, replace: "zom"},
 		{name: "command selector scores", src: "Objective kills\nFunction f {\n  /kill @e[scores={a=1,ki|\n}", want: []string{"kills"}, replace: "ki"},
+		{name: "const selector option", src: "const boss = @e[ty|]", want: []string{"type", "tag", "limit"}, replace: "ty"},
+		{name: "typed const selector", src: "const boss: Selector = |", want: []string{"@a", "@e", "@s"}},
+		{name: "selector const as target", src: "const boss = @e[tag=b]\nFunction f {\n  tell(b|, \"hi\")\n}", want: []string{"boss"}, replace: "b"},
+		{name: "selector const in command", src: "const boss = @e[tag=b]\nFunction f {\n  /kill ${b|}\n}", want: []string{"boss"}, replace: "b"},
+		{name: "extended selector option", src: "const guards = @e[tag=guard]\nconst awake = guards[ta|]", want: []string{"tag", "limit"}, replace: "ta"},
+		{name: "extended template selector", src: "Template near(r: int): Selector = @a[distance=..${r}]\nFunction f {\n  tell(near(3)[li|], \"hi\")\n}", want: []string{"limit"}, replace: "li"},
+		{name: "extended selector in function", src: "const guards = @e[tag=guard]\nFunction f {\n  tell(guards[li|], \"hi\")\n}", want: []string{"limit"}, replace: "li"},
+		{name: "literal selector in tell", src: "Function f {\n  tell(@e[li|], \"hi\")\n}", want: []string{"limit"}, replace: "li"},
+		{name: "objective score not a selector", src: "Objective hp\nFunction f {\n  hp[|] = 1\n}", not: []string{"limit"}},
 		{name: "assignment target", src: "Global count: int = 0\nFunction f {\n  co| = 1\n}", want: []string{"count"}, replace: "co"},
 
 		// No completion.

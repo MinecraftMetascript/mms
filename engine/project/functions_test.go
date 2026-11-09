@@ -502,7 +502,7 @@ Function f {
 
 func TestExecuteErrors(t *testing.T) {
 	cases := map[string]string{
-		"Function f {\n  As(@q) {\n    /say hi\n  }\n}":                            "mms/command",
+		"Function f {\n  As(@q) {\n    /say hi\n  }\n}":                            "mms/selector",
 		"Function f {\n  Ass(@a) {\n    /say hi\n  }\n}":                           "mms/unknown-helper",
 		"Function f {\n  As(@a).Att(@s) {\n    /say hi\n  }\n}":                    "mms/unknown-helper",
 		"Function f {\n  As() {\n    /say hi\n  }\n}":                              "mms/missing-value",
