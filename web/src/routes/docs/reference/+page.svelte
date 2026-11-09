@@ -35,8 +35,8 @@
 	<h2 id="for-ai-tools">For AI tools</h2>
 	<p>The same reference in forms that language models and scripts read easily:</p>
 	<ul>
-		<li><a href="{base}/docs/llms.txt"><code>llms.txt</code></a>: what MMS is, and a link to every page.</li>
-		<li><a href="{base}/docs/llms-full.txt"><code>llms-full.txt</code></a>: every page and the whole reference as one Markdown file.</li>
+		<li><a href="{base}/llms.txt"><code>llms.txt</code></a>: what MMS is, and a link to every page.</li>
+		<li><a href="{base}/llms-full.txt"><code>llms-full.txt</code></a>: every page and the whole reference as one Markdown file.</li>
 		<li><a href="{base}/docs/reference.yaml"><code>reference.yaml</code></a>: kinds, helpers, types and lint rules as data.</li>
 	</ul>
 </article>

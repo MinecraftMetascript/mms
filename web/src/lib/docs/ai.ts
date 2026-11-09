@@ -1,7 +1,8 @@
 // The reference in forms that AI tools and scripts read easily, served
-// next to the docs: /docs/llms.txt (an index in the llms.txt
-// convention), /docs/llms-full.txt (every page and the whole reference
-// as Markdown) and /docs/reference.yaml (the generated reference as data).
+// at the site's root and next to the docs: /llms.txt (an index in the
+// llms.txt convention), /llms-full.txt (every page and the whole reference
+// as Markdown), the same two under /docs/, and /docs/reference.yaml (the
+// generated reference as data).
 import { docGroups, groupPages, referenceGroups, siteURL } from './site.ts';
 import { ref, resourceKinds, ownKinds, helperCount, blueprints, forms, preludeTemplates, preludeTypes } from './refdata.ts';
 import { groupId, groupTitle, type Param, type PreludeDecl, type PreludeField } from './reference.ts';
@@ -12,7 +13,7 @@ const intro =
 
 const url = (path: string) => `${siteURL}${path}`;
 
-/** /docs/llms.txt: what MMS is, and a link to every page. */
+/** /llms.txt and /docs/llms.txt: what MMS is, and a link to every page. */
 export function llmsIndex(): string {
 	const out = [`# MMS`, '', `> ${intro}`, ''];
 	for (const g of [...docGroups, ...referenceGroups]) {
@@ -34,7 +35,7 @@ export function llmsIndex(): string {
 		'',
 		'## Optional',
 		'',
-		`- [Everything in one file](${url('/docs/llms-full.txt')}): every page and the whole reference as Markdown`,
+		`- [Everything in one file](${url('/llms-full.txt')}): every page and the whole reference as Markdown`,
 		`- [Reference as YAML](${url('/docs/reference.yaml')}): kinds, helpers, types and lint rules as data`,
 		''
 	);
@@ -47,7 +48,7 @@ const usesLines = (d: PreludeDecl) => (d.uses ?? []).map((u) => `  - where \`${u
 const paramLine = (p: Param) =>
 	`  - \`${p.name}\`: ${p.type}${p.default ? ` (default \`${p.default}\`)` : p.optional ? ' (optional)' : ''}${p.doc ? `. ${p.doc.replace(/\s*\n\s*/g, ' ')}` : ''}`;
 
-/** /docs/llms-full.txt: every hand-written page, then the reference. */
+/** /llms-full.txt and /docs/llms-full.txt: every hand-written page, then the reference. */
 export function llmsFull(): string {
 	const out = [`# MMS`, '', `> ${intro}`, '', `Minecraft version: ${ref.version}.`, ''];
 	for (const g of [...docGroups, ...referenceGroups]) {

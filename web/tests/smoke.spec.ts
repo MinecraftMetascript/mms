@@ -578,9 +578,20 @@ test('the docs render guides and the reference', async ({ page }) => {
 	await expect(page).toHaveURL(/\/docs\/reference\/helpers\/loot_function#loot_function-SetCount$/);
 
 	// The reference for AI tools.
-	const llms = await (await page.request.get('./docs/llms.txt')).text();
-	expect(llms).toMatch(/^# MMS\n\n> /);
-	expect(llms).toContain('/docs/guides/functions');
+	// At the site's root, where the llms.txt convention puts them, and
+	// under /docs/ too.
+	for (const path of ['./llms.txt', './docs/llms.txt']) {
+		const res = await page.request.get(path);
+		expect(res.status(), path).toBe(200);
+		const llms = await res.text();
+		expect(llms).toMatch(/^# MMS\n\n> /);
+		expect(llms).toContain('/docs/guides/functions');
+	}
+	for (const path of ['./llms-full.txt', './docs/llms-full.txt']) {
+		const res = await page.request.get(path);
+		expect(res.status(), path).toBe(200);
+		expect(await res.text()).toContain('# Reference: helpers');
+	}
 	const yaml = await (await page.request.get('./docs/reference.yaml')).text();
 	expect(yaml).toContain('lint_rules:');
 	expect(yaml).toContain('- name: "SetCount"');
