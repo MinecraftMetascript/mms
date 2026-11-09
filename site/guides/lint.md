@@ -8,6 +8,7 @@ Every rule, with its default severity and what it reports, is listed in the [lin
 - `quoted-name`, `redundant-namespace`, `use-shorthand` and `constant-expression` (hint, safe fixes): a shorter way to write the same thing, such as `stone` for `"minecraft:stone"` or `Noise(noise = ridge)` for `{ type = noise, noise = ridge }`.
 - `deprecated` (warning): a use of a declaration whose [doc comment](../start/getting-started.md#doc-comments) has a `@deprecated` tag.
 - `external-asset` (warning) and `unused-asset` (info): an asset id that no `Texture`, `Sound` or `StructureFile` call provides, and an asset file nothing uses. See [Asset files](resources.md#asset-files).
+- `texture-outside-atlas` (warning): a texture a model names that neither the blocks atlas (`textures/block/`) nor the items atlas (`textures/item/`) stitches, so the game shows the missing texture. See [Resource packs](resources.md#resource-packs).
 - `book-page-overflow` (warning): a [Book](resources.md#books) page with more text than the book screen shows.
 - The `jigsaw-` rules (warning or info): jigsaw blocks in structure files that can never join, name an unknown pool or hole, or place pieces that stick out or overlap.
 

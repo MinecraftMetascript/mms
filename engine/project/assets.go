@@ -1,6 +1,7 @@
 package project
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/fs"
 	"path"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/minecraftmetascript/mms/engine/jsonv"
 	"github.com/minecraftmetascript/mms/engine/sema"
+	"github.com/minecraftmetascript/mms/engine/spec"
 	"github.com/minecraftmetascript/mms/engine/syntax"
 )
 
@@ -201,6 +203,76 @@ func lintExternalAsset(l *lintRun) {
 		sort.Slice(hits, func(i, j int) bool { return hits[i].sp.Start < hits[j].sp.Start })
 		for _, h := range hits {
 			l.out[d.Unit.Path] = append(l.out[d.Unit.Path], syntax.Diagnostic{Code: "lint/" + l.rule.ID, Severity: l.sev, Message: h.msg, Sp: h.sp})
+		}
+	}
+}
+
+// modelAtlases are the atlases the game looks a model's textures up in.
+var modelAtlases = []string{"blocks", "items"}
+
+// lintTextureAtlas reports a texture a model names, in a namespace other
+// than minecraft, that neither the blocks nor the items atlas stitches:
+// the game shows the missing texture. The atlases' sources are vanilla's
+// plus those of the project's own Atlas blocks and Atlas items
+// declarations in the minecraft namespace.
+func lintTextureAtlas(l *lintRun) {
+	var sources []spec.AtlasSource
+	for _, a := range modelAtlases {
+		sources = append(sources, l.r.pack.Atlases[a]...)
+	}
+	for _, d := range l.r.Order {
+		if d.Kind.Resource != "atlas" || d.Value == nil {
+			continue
+		}
+		if id := d.ID(); id != "minecraft:blocks" && id != "minecraft:items" {
+			continue
+		}
+		var a struct {
+			Sources []spec.AtlasSource `json:"sources"`
+		}
+		if json.Unmarshal(jsonv.Marshal(d.Value), &a) == nil {
+			sources = append(sources, a.Sources...)
+		}
+	}
+	covered := func(id string) bool {
+		for _, s := range sources {
+			if s.Covers(id) {
+				return true
+			}
+		}
+		return false
+	}
+	for _, d := range l.r.Order {
+		if hasErrors(d.Diags) {
+			continue
+		}
+		type hit struct {
+			sp    syntax.Span
+			msg   string
+			fixes []syntax.Fix
+		}
+		var hits []hit
+		for n, in := range d.Info {
+			if !in.ModelTexture || in.ID == "" || strings.HasPrefix(in.ID, "minecraft:") || covered(in.ID) {
+				continue
+			}
+			ns, p, _ := strings.Cut(in.ID, ":")
+			msg := fmt.Sprintf("no atlas stitches the texture '%s', so models show the missing texture; models find textures under textures/block/ and textures/item/", in.ID)
+			var fixes []syntax.Fix
+			if in.Asset != nil {
+				msg += fmt.Sprintf(", so name it like %s(\"%s\", \"block/%s\")", in.Asset.Helper, in.Asset.Src, path.Base(p))
+				if call, ok := n.(*syntax.Call); ok && len(call.Args) == 2 {
+					fixes = []syntax.Fix{{Title: "Name it 'block/" + path.Base(p) + "'", Edits: []syntax.TextEdit{{Sp: call.Args[1].Value.Span(), Text: `"block/` + path.Base(p) + `"`}}}}
+				}
+			} else {
+				msg += fmt.Sprintf(", such as '%s:block/%s'", ns, path.Base(p))
+			}
+			msg += ", or add it to an Atlas blocks declaration in the minecraft namespace"
+			hits = append(hits, hit{n.Span(), msg, fixes})
+		}
+		sort.Slice(hits, func(i, j int) bool { return hits[i].sp.Start < hits[j].sp.Start })
+		for _, h := range hits {
+			l.out[d.Unit.Path] = append(l.out[d.Unit.Path], syntax.Diagnostic{Code: "lint/" + l.rule.ID, Severity: l.sev, Message: h.msg, Sp: h.sp, Fixes: h.fixes})
 		}
 	}
 }

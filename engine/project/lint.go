@@ -53,6 +53,8 @@ var Rules = []*Rule{
 		Doc: "An id or enum name in quotes can be written bare: `minecraft:stone` or `stone` rather than \"minecraft:stone\"."},
 	{ID: "redundant-namespace", Severity: syntax.SeverityHint, run: lintNamespace,
 		Doc: "A `minecraft:` prefix that can be dropped: `stone` means `minecraft:stone` unless the project declares its own `stone`."},
+	{ID: "texture-outside-atlas", Severity: syntax.SeverityWarning, all: lintTextureAtlas,
+		Doc: "A texture a model names, outside the minecraft namespace, that neither the blocks atlas nor the items atlas stitches, so the game shows the missing texture. Vanilla's atlases take the files under textures/block/ and textures/item/; a Texture(...) in a Model goes under textures/block/ unless it is given an id name. The project's own `Atlas blocks` and `Atlas items` declarations in the minecraft namespace count too."},
 	{ID: "use-shorthand", Severity: syntax.SeverityHint, run: lintShorthand,
 		Doc: "An object literal that has a shorter MMS form: an item entry as its id, `1..3` for a uniform provider or bounds, `diamond * 4` for a stack, a trigger call for a criterion, and `&&`, `||` and `!` for conditions."},
 	{ID: "unused", Severity: syntax.SeverityHint, all: lintUnused,

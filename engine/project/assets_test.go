@@ -197,6 +197,7 @@ Model item/ruby { parent = "item/generated.json", textures = { layer0 = demo:sun
 mms/asset-extension: texture ids leave out the file extension, which the game adds itself; MMS writes 'sun'
 mms/asset-extension: model ids leave out the file extension, which the game adds itself; MMS writes 'item/generated'
 mms/asset-extension: texture ids leave out the file extension, which the game adds itself; MMS writes 'sun'
+lint/texture-outside-atlas: no atlas stitches the texture 'demo:sun', so models show the missing texture; models find textures under textures/block/ and textures/item/, such as 'demo:block/sun', or add it to an Atlas blocks declaration in the minecraft namespace
 mms/asset-extension: texture ids leave out the file extension, which the game adds itself; MMS writes 'item/diamond'
 `
 	if got := diagText(r); got != want {
@@ -238,5 +239,69 @@ func TestAssetsExtensionDeclName(t *testing.T) {
 	}
 	if e := ds[0].Fixes[0].Edits[0]; e.Sp.End-e.Sp.Start != len(".json") {
 		t.Errorf("fix edit %+v", e)
+	}
+}
+
+// A Texture(...) in a Model goes under textures/block/, which the blocks
+// atlas stitches; without that the game never loads the sprite.
+func TestAssetsModelTextureAtlas(t *testing.T) {
+	files := fstest.MapFS{
+		"art/icon.png":      {Data: pngBytes},
+		"tools/select.png":  {Data: pngBytes},
+		"tools/wand.png":    {Data: pngBytes},
+		"tools/stray.png":   {Data: pngBytes},
+		"tools/own.png":     {Data: pngBytes},
+		"tools/handled.png": {Data: pngBytes},
+	}
+	src := `Model spellbook/selection {
+  parent = block/cube_all
+  textures = { all = Texture("tools/select.png") }
+}
+CustomItem wand {
+  base = stick
+  texture = Texture("tools/wand.png")
+}
+Model stray {
+  parent = item/generated
+  textures = {
+    layer0 = Texture("tools/stray.png", "gui/stray")
+    layer1 = demo:loose
+    layer2 = Texture("tools/own.png", "custom/own")
+    layer3 = Texture("tools/handled.png", "item/handled")
+  }
+}
+Atlas minecraft:blocks { sources = [{ type = "single", resource = "demo:custom/own" }] }
+`
+	_, r := assetProject(t, files, src)
+	var atlas []string
+	for _, d := range r.Diagnostics("main.mms") {
+		if d.Code == "lint/texture-outside-atlas" {
+			atlas = append(atlas, d.Message)
+		} else if d.Severity <= syntax.SeverityWarning && d.Code != "lint/external-asset" {
+			t.Errorf("unexpected: %s: %s", d.Code, d.Message)
+		}
+	}
+	for _, d := range r.Diagnostics("main.mms") {
+		if d.Code == "lint/texture-outside-atlas" && strings.Contains(d.Message, "gui/stray") {
+			if len(d.Fixes) == 0 || d.Fixes[0].Edits[0].Text != `"block/stray"` || d.Fixes[0].Safe {
+				t.Errorf("fix: %+v", d.Fixes)
+			}
+		}
+	}
+	if len(atlas) != 2 || !strings.Contains(atlas[0], "'demo:gui/stray'") || !strings.Contains(atlas[0], `Texture("tools/stray.png", "block/stray")`) || !strings.Contains(atlas[1], "'demo:loose'") {
+		t.Errorf("atlas warnings: %q", atlas)
+	}
+	out := r.Emit()
+	paths := map[string]string{}
+	for _, f := range out {
+		paths[f.Path] = strings.Join(strings.Fields(string(f.Data)), "")
+	}
+	if s := paths["assets/demo/models/spellbook/selection.json"]; !strings.Contains(s, `"all":"demo:block/select"`) {
+		t.Errorf("selection model: %s", s)
+	}
+	for _, p := range []string{"assets/demo/textures/block/select.png", "assets/demo/textures/item/wand.png"} {
+		if _, ok := paths[p]; !ok {
+			t.Errorf("no %s", p)
+		}
 	}
 }

@@ -19,7 +19,8 @@ BlockState minecraft:glowstone {
 }
 
 // A cube with one texture on every face. A file of your own would be
-// Texture("art/glow.png", "block/glow") instead of a vanilla texture id.
+// Texture("art/glow.png"), copied to textures/block/glow.png, instead of
+// a vanilla texture id.
 Model block/glowstone_plain {
   parent = block/cube_all
   textures = { all = block/glowstone }

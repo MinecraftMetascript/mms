@@ -46,8 +46,23 @@ type Pack struct {
 	Blocks map[string]*BlockStates `json:"blocks"`
 	// Commands is the root of the Brigadier command tree.
 	Commands *CommandNode `json:"commands"`
+	// Atlases maps each vanilla texture atlas ("blocks", "items") to the
+	// sources its assets/minecraft/atlases/<name>.json lists.
+	Atlases map[string][]AtlasSource `json:"atlases,omitempty"`
 
 	registrySets map[string]map[string]struct{}
+}
+
+// AtlasSource is one entry of an atlas's sources list. Only the fields
+// that say which texture files it stitches are kept: a "directory"
+// source's Source folder and Prefix, and a "single" source's Resource
+// and Sprite.
+type AtlasSource struct {
+	Type     string `json:"type"`
+	Source   string `json:"source,omitempty"`
+	Prefix   string `json:"prefix,omitempty"`
+	Resource string `json:"resource,omitempty"`
+	Sprite   string `json:"sprite,omitempty"`
 }
 
 type BlockStates struct {
@@ -206,4 +221,26 @@ func (p *Pack) AssetKinds() []string {
 	}
 	sort.Strings(kinds)
 	return kinds
+}
+
+// Covers reports whether the source stitches the texture file
+// assets/<ns>/textures/<path>.png as the sprite id "<ns>:<path>", the id
+// a model names it by.
+func (s AtlasSource) Covers(id string) bool {
+	switch strings.TrimPrefix(s.Type, "minecraft:") {
+	case "directory":
+		rest, ok := strings.CutPrefix(id[strings.IndexByte(id, ':')+1:], strings.TrimSuffix(s.Source, "/")+"/")
+		return ok && s.Prefix+rest == id[strings.IndexByte(id, ':')+1:]
+	case "single":
+		res := qualify(s.Resource)
+		return res == qualify(id) && (s.Sprite == "" || qualify(s.Sprite) == res)
+	}
+	return false
+}
+
+func qualify(id string) string {
+	if strings.Contains(id, ":") {
+		return id
+	}
+	return "minecraft:" + id
 }

@@ -225,8 +225,8 @@ BlockState minecraft:glowstone {
     ]
   }
 }
-Model block/glowstone_1 { parent = block/cube_all, textures = { all = Texture("art/glow1.png", "block/glowstone_1") } }
-Model block/glowstone_2 { parent = block/cube_all, textures = { all = Texture("art/glow2.png", "block/glowstone_2") } }
+Model block/glowstone_1 { parent = block/cube_all, textures = { all = Texture("art/glow1.png") } }
+Model block/glowstone_2 { parent = block/cube_all, textures = { all = Texture("art/glow2.png") } }
 ```
 
 | Kind | Writes | For |
@@ -240,7 +240,9 @@ Model block/glowstone_2 { parent = block/cube_all, textures = { all = Texture("a
 
 A block state is named after the block it replaces, such as `minecraft:glowstone`: the game only reads block states of its own blocks. Variant keys (`"facing=north,lit=true"`, or `""` for every state) and multipart `when` conditions are checked against the block's properties, and the editor completes property names in `when`.
 
-In a model's `textures`, a value is a texture id, `"#name"` for another slot, or `Texture("file.png", "block/name")`, which copies the file to `textures/block/name.png`. A texture id can name a vanilla texture, such as `block/stone`.
+In a model's `textures`, a value is a texture id, `"#name"` for another slot, or `Texture("file.png")`. A texture id can name a vanilla texture, such as `block/stone`.
+
+The game only finds a model's textures in two atlases: the blocks atlas, which stitches every file under `textures/block/`, and the items atlas, which stitches `textures/item/`. So `Texture("art/glow1.png")` in a model copies the file to `textures/block/glow1.png` and stands for `<ns>:block/glow1`, which works in block and item models alike. Give it an id name to put it elsewhere, such as `Texture("art/glow1.png", "item/glow1")`. A texture a model names that neither atlas stitches shows as the missing texture, and the [`texture-outside-atlas`](lint.md) lint rule warns about it; an `Atlas minecraft:blocks` declaration that adds the texture as a source counts. Keep a model's textures in one atlas: the game rejects a model that mixes the two.
 
 `sounds.json` is still generated from `Sound(...)`, and textures cannot have `.png.mcmeta` animation yet. The [`resource-pack`](../../examples/resource-pack/) example shows each kind with vanilla textures; [`embers`](../../examples/embers/) uses files of its own.
 

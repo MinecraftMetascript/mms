@@ -81,6 +81,12 @@ func run(out, cache string) error {
 	if err := fetchJSON(cache, mcmetaRepo, mcmetaRef, "blocks/data.min.json", &blocks); err != nil {
 		return err
 	}
+	var atlases map[string]struct {
+		Sources []spec.AtlasSource `json:"sources"`
+	}
+	if err := fetchJSON(cache, mcmetaRepo, mcmetaRef, "assets/atlas/data.min.json", &atlases); err != nil {
+		return err
+	}
 	var commands spec.CommandNode
 	if err := fetchJSON(cache, mcmetaRepo, mcmetaRef, "commands/data.min.json", &commands); err != nil {
 		return err
@@ -122,6 +128,10 @@ func run(out, cache string) error {
 		Commands:    &commands,
 		Types:       map[string]*spec.Type{},
 		Dispatchers: map[string]map[string]*spec.Type{},
+		Atlases:     map[string][]spec.AtlasSource{},
+	}
+	for name, a := range atlases {
+		pack.Atlases[name] = a.Sources
 	}
 
 	// Data-pack resource kinds: every kind whose type does not point into

@@ -105,6 +105,11 @@
           "markdownDescription": "A `minecraft:` prefix that can be dropped: `stone` means `minecraft:stone` unless the project declares its own `stone`.\n\nDefault: `hint`.",
           "$ref": "#/definitions/severity"
         },
+        "texture-outside-atlas": {
+          "description": "A texture a model names, outside the minecraft namespace, that neither the blocks atlas nor the items atlas stitches, so the game shows the missing texture. Vanilla's atlases take the files under textures/block/ and textures/item/; a Texture(...) in a Model goes under textures/block/ unless it is given an id name. The project's own `Atlas blocks` and `Atlas items` declarations in the minecraft namespace count too.\n\nDefault: `warning`.",
+          "markdownDescription": "A texture a model names, outside the minecraft namespace, that neither the blocks atlas nor the items atlas stitches, so the game shows the missing texture. Vanilla's atlases take the files under textures/block/ and textures/item/; a Texture(...) in a Model goes under textures/block/ unless it is given an id name. The project's own `Atlas blocks` and `Atlas items` declarations in the minecraft namespace count too.\n\nDefault: `warning`.",
+          "$ref": "#/definitions/severity"
+        },
         "unused": {
           "description": "A worldgen piece, predicate or item modifier that nothing in the project references, so the game never uses it, or a const, Template, Type or Blueprint that nothing names. A TemplatePool counts as used when a jigsaw block in one of the project's structure files draws from it.\n\nDefault: `hint`.",
           "markdownDescription": "A worldgen piece, predicate or item modifier that nothing in the project references, so the game never uses it, or a const, Template, Type or Blueprint that nothing names. A TemplatePool counts as used when a jigsaw block in one of the project's structure files draws from it.\n\nDefault: `hint`.",
