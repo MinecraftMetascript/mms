@@ -21,6 +21,16 @@ func (s *Session) mmsComplete(a *at, off int) ([]sema.Candidate, bool) {
 	if sp, ok := wordAt(f, off); ok {
 		start = sp.Start
 	}
+	// The name of a coordinate a variable offsets: `Positioned(~d|)`.
+	if i := f.TokenAt(off); i >= 0 && f.Tokens[i].Kind == parser.MMSLexerREL_NAME && start > f.Tokens[i].Sp.Start && a.code() {
+		var out []sema.Candidate
+		for _, c := range s.codeValues(a, start) {
+			if c.Kind != sema.CandKeyword && c.Kind != sema.CandCallable {
+				out = append(out, c)
+			}
+		}
+		return out, true
+	}
 	prev := prevToken(f, start)
 	if prev == nil {
 		return nil, false
@@ -74,8 +84,20 @@ func (s *Session) mmsComplete(a *at, off int) ([]sema.Candidate, bool) {
 		if !ok {
 			return nil, false
 		}
-		if sema.ExecHelperNamed(name) != nil {
-			return a.c.ExecArgCandidates(name, index), true
+		if h := sema.ExecHelperNamed(name); h != nil {
+			out := a.c.ExecArgCandidates(name, index)
+			if h.Values {
+				// A coordinate or angle can be a value the function
+				// computes: Positioned(x, 64, z).
+				for _, c := range s.codeValues(a, start) {
+					if c.Kind == sema.CandKeyword {
+						continue // true and false
+					}
+					c.Rank += 20
+					out = append(out, c)
+				}
+			}
+			return out, true
 		}
 		return s.codeValues(a, start), true
 	}

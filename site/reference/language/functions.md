@@ -113,7 +113,7 @@ The editor marks each call with an `inlined` inlay, and hover shows the commands
 
 ## Execute blocks
 
-`As`, `At`, `Positioned`, `Rotated`, `Facing`, `In`, `Anchored`, `Align`, `On`, `Summon` and `Execute("...")` chain into an `execute` command whose `run` is the block. The [guide](../../guides/functions.md#execute-blocks) lists each one.
+`As`, `At`, `Positioned`, `Rotated`, `Facing`, `In`, `Anchored`, `Align`, `On`, `Summon` and `Execute("...")` chain into an `execute` command whose `run` is the block. A coordinate or angle of `Positioned`, `Rotated` or `Facing` can be a whole-number value the function computes, `Positioned(x, 64, z)`, or a name right after `~` or `^`, `Positioned(~dx ~ ~-dz)`. A value only known at run time runs the chain as a macro, and a `const` is written straight in. The [guide](../../guides/functions.md#execute-blocks) lists each one.
 
 ## Events
 

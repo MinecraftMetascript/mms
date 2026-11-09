@@ -351,6 +351,23 @@ Function zap {
 
 Arguments are written into the command as they appear: selectors as `@e[tag=x]`, coordinates as `~ ~1 ~` or `0, 64, 0`, ids as `the_nether`. The chain is checked against the command tree like a raw command, and `Execute("...")` covers conditions such as `if block` and anything without a helper.
 
+A whole coordinate or angle of `Positioned`, `Rotated` or `Facing` can also be a value the function computes: a variable, a parameter, a `Global`, a `Storage` field, a score or arithmetic on them. A relative or local coordinate takes a name straight after its `~` or `^`, as `~dx` or `^-step`; the name is a variable, a parameter, a `Global` or a `Storage` field such as `~game.height`, and anything bigger goes in a `let` first. A `const` is written straight into the command.
+
+```mms
+Global spawn_y: int = 64
+
+Function mark(x: int, z: int, dy: int) {
+  Positioned(x, spawn_y + 1, z).Rotated(x * 2, 0) {
+    /summon minecraft:marker ~ ~ ~ {Tags:["mark"]}
+  }
+  Positioned(~ ~dy ~-x) {
+    /summon minecraft:marker ~ ~ ~ {Tags:["offset"]}
+  }
+}
+```
+
+The game only takes numbers written into a command there, so a chain that holds such a value runs as a macro: MMS copies the values into storage and calls a one-line function, here `$execute positioned $(a0) $(a1) $(a2) rotated $(a3) 0 run summon ...` and `$execute positioned ~ ~$(a0) ~$(a1) run summon ...`. The values are whole numbers, worked out once before the block runs. `~dx` is one word: `~ dx` is a coordinate and then a name.
+
 A body with one command is written inline, as `execute as @a at @s run particle ...`. A longer body becomes a sub-function, such as `demo:zap/_exec0`.
 
 The body can use the function's variables. They are not per entity: a body that runs for five entities updates one `n` five times. Keep per-entity values in an objective, such as `hits[@s]`.

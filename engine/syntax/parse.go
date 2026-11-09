@@ -974,7 +974,7 @@ func (b *builder) primary(c parser.IPrimaryContext, sp Span) Expr {
 	case *parser.SelectorContext:
 		return &Selector{Name: strings.TrimPrefix(text, "@"), Sp: sp}
 	case *parser.CoordinateContext:
-		return &Coord{Text: coordText(p), Sp: sp}
+		return &Coord{Text: coordText(p), Names: coordNames(p), Sp: sp}
 	case *parser.ParenExprContext:
 		return &Paren{X: b.value(p.Value(), sp), Sp: sp}
 	case *parser.ListLitContext:
@@ -1069,6 +1069,36 @@ func unquote(s string) string {
 // coordText spells a coordinate group from its tokens, one space between
 // coordinates and none inside one, so `^ ^-1.7` reads the same however it
 // is spaced or broken across lines.
+// coordNames reads the names of a coordinate group's `~x` words.
+func coordNames(p *parser.CoordinateContext) []Expr {
+	var out []Expr
+	for _, c := range p.GetChildren() {
+		t, ok := c.(antlr.TerminalNode)
+		if !ok || t.GetSymbol().GetTokenType() != parser.MMSLexerREL_NAME {
+			continue
+		}
+		text := t.GetText()
+		at := t.GetSymbol().GetStart() // runes; the word is ASCII
+		skip := 1
+		if strings.HasPrefix(text[1:], "-") {
+			skip = 2
+		}
+		var x Expr
+		pos := at + skip
+		for i, part := range strings.Split(text[skip:], ".") {
+			sp := Span{Start: pos, End: pos + len(part)}
+			if i == 0 {
+				x = &Ident{Name: part, Sp: sp}
+			} else {
+				x = &Member{X: x, Name: &Name{Text: part, Sp: sp}, Sp: Span{Start: at + skip, End: sp.End}}
+			}
+			pos = sp.End + 1
+		}
+		out = append(out, x)
+	}
+	return out
+}
+
 func coordText(p *parser.CoordinateContext) string {
 	var b strings.Builder
 	for _, c := range p.GetChildren() {
@@ -1077,7 +1107,7 @@ func coordText(p *parser.CoordinateContext) string {
 			continue
 		}
 		switch tt := t.GetSymbol().GetTokenType(); tt {
-		case parser.MMSLexerTILDE, parser.MMSLexerCARET:
+		case parser.MMSLexerTILDE, parser.MMSLexerCARET, parser.MMSLexerREL_NAME:
 			if b.Len() > 0 {
 				b.WriteByte(' ')
 			}

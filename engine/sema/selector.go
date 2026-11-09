@@ -41,6 +41,11 @@ func CheckSelectors(f *syntax.File) []syntax.Diagnostic {
 				errorf(a.Sp, "expected a selector option such as tag=boss")
 				continue
 			}
+			if co, ok := a.Value.(*syntax.Coord); ok && len(co.Names) > 0 {
+				// The game reads a selector's options as written, so a
+				// value only known when the pack runs has no place here.
+				errorf(co.Sp, "a selector option is written into the command as is; a name after ~ or ^ only works in Positioned, Rotated and Facing")
+			}
 			name := a.Name.Text
 			if slices.Contains(names, name) || strings.Contains(name, "${") {
 				continue

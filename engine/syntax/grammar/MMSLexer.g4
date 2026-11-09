@@ -111,6 +111,9 @@ PERCENT : '%';
 BANG    : '!';
 HASH    : '#';
 AT      : '@';
+// A relative or local coordinate that a variable offsets, `~x`, `^-y`,
+// `~spot.y`: one word, so `~ x` stays a coordinate and then a name.
+REL_NAME : [~^] '-'? IDENT_START IDENT_CHAR* ('.' IDENT_START IDENT_CHAR*)*;
 TILDE   : '~';
 CARET   : '^';
 

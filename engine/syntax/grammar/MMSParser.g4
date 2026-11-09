@@ -189,7 +189,7 @@ primary
     | TNAME                                              # templatedRef
     | HASH (IDENT | RESLOC | TNAME)                      # tagRef
     | AT IDENT                                           # selector
-    | ((TILDE | CARET) (MINUS? NUMBER)?)+                # coordinate
+    | ((TILDE | CARET) (MINUS? NUMBER)? | REL_NAME)+     # coordinate
     | LPAREN value RPAREN                                # parenExpr
     | LBRACK FOR IDENT (COMMA IDENT)? IN expr (IF expr)? COLON value RBRACK # comprehension
     | LBRACK (value (COMMA? value)* COMMA?)? RBRACK            # listLit

@@ -92,9 +92,12 @@ type (
 	}
 	// Exec runs Body under an execute chain ("as @a", "at @s"), which
 	// may run it once per entity or not at all. Body never leaves early:
-	// the checker rejects break, continue and return inside it.
+	// the checker rejects break, continue and return inside it. With
+	// Args, Parts hold $(key) placeholders for values only known at run
+	// time, and the execute command runs as a macro line.
 	Exec struct {
 		Parts []string
+		Args  []MacroArg
 		Body  *Block
 	}
 	// Return leaves the function, with a value when Val is set.

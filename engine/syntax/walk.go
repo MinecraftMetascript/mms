@@ -168,6 +168,10 @@ func Children(n Node) []Node {
 		if n.Hi != nil {
 			add(n.Hi)
 		}
+	case *Coord:
+		for _, x := range n.Names {
+			add(x)
+		}
 	case *Member:
 		add(n.X)
 		if n.Name != nil {

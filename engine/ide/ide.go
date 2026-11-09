@@ -319,6 +319,17 @@ func wordAt(f *syntax.File, off int) (syntax.Span, bool) {
 	case t.Kind == parser.MMSLexerAT:
 		// A selector being typed: `@` alone, or `@a` below.
 		return t.Sp, true
+	case t.Kind == parser.MMSLexerREL_NAME:
+		// The name of `~dx`, after the `~` or `^` and a `-`.
+		sp := t.Sp
+		sp.Start++
+		if strings.HasPrefix(t.Text[1:], "-") {
+			sp.Start++
+		}
+		if off < sp.Start {
+			return syntax.Span{}, false
+		}
+		return sp, true
 	case t.Kind == parser.MMSLexerIDENT || (t.Kind >= parser.MMSLexerCONST && t.Kind <= parser.MMSLexerFALSE):
 		sp := t.Sp
 		if i > 0 && f.Tokens[i-1].Kind == parser.MMSLexerAT && f.Tokens[i-1].Sp.End == sp.Start {

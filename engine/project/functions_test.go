@@ -540,6 +540,110 @@ func TestExecuteErrors(t *testing.T) {
 	}
 }
 
+// TestExecuteRuntimeValues checks that a coordinate or angle of an
+// execute helper can be a value the function computes: the chain then
+// runs as a macro line, and a const is written in directly.
+func TestExecuteRuntimeValues(t *testing.T) {
+	src := `
+const floor = 64
+Global gz = 7
+Objective depth
+Type Spot { y: int = 0 }
+Storage spot: Spot
+
+Function place(x: int) {
+  spot.y = 70
+  Positioned(x, floor, gz) {
+    /summon marker ~ ~ ~ {Tags:["a"]}
+  }
+  Positioned(x * 2, spot.y, -x) {
+    /summon marker ~ ~ ~ {Tags:["b"]}
+  }
+  Positioned(0, depth[@p], 0).Rotated(x, 0) {
+    /say hi
+  }
+  Positioned(x, x, 1) {
+    /say twice
+  }
+  Positioned(100, 0, 0).Positioned(~x ~floor ~-spot.y) {
+    /summon marker ~ ~ ~ {Tags:["c"]}
+  }
+  Positioned(^ ^ ^-x).Rotated(~x ~) {
+    /say local
+  }
+}
+
+Function go {
+  place(5)
+}
+`
+	p := New(spec.MustDefault(), Config{Namespace: "demo"})
+	p.SetFile("main.mms", src)
+	r, _ := p.Analyze(context.Background())
+	for _, d := range r.Diagnostics("main.mms") {
+		if d.Severity == syntax.SeverityError {
+			t.Fatalf("%s: %s", d.Code, d.Message)
+		}
+	}
+	got := dumpFiles(r.Emit())
+	for _, want := range []string{
+		"$execute positioned $(a0) 64 $(a1) run summon marker ~ ~ ~ {Tags:[\"a\"]}\n",
+		"$execute positioned $(a0) $(a1) $(a2) run summon marker ~ ~ ~ {Tags:[\"b\"]}\n",
+		"$execute positioned 0 $(a0) 0 rotated $(a1) 0 run say hi\n",
+		"$execute positioned $(a0) $(a0) 1 run say twice\n",
+		"$execute positioned 100 0 0 positioned ~$(a0) ~64 ~$(a1) run summon marker ~ ~ ~ {Tags:[\"c\"]}\n",
+		"$execute positioned ^ ^ ^$(a0) rotated ~$(a1) ~ run say local\n",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("missing %q in:\n%s", want, got)
+		}
+	}
+
+	// It has no players and no facing, so the blocks that need them go.
+	src = strings.Replace(src, "  Positioned(0, depth[@p], 0).Rotated(x, 0) {\n    /say hi\n  }\n", "", 1)
+	src = strings.Replace(src, "  Positioned(^ ^ ^-x).Rotated(~x ~) {\n    /say local\n  }\n", "", 1)
+	vm := world(t, src)
+	call(t, vm, "demo:go")
+	at := map[string][3]float64{}
+	for _, e := range vm.Entities {
+		for tag := range e.Tags {
+			at[tag] = e.Pos
+		}
+	}
+	if at["a"] != [3]float64{5, 64, 7} || at["b"] != [3]float64{10, 70, -5} || at["c"] != [3]float64{105, 64, -70} {
+		t.Errorf("markers at %v, want a at 5 64 7, b at 10 70 -5 and c at 105 64 -70", at)
+	}
+}
+
+// TestExecuteRuntimeValueErrors checks the problems with a computed
+// argument of an execute helper.
+func TestExecuteRuntimeValueErrors(t *testing.T) {
+	cases := map[string]string{
+		"Function f {\n  let s = \"x\"\n  Positioned(s, 0, 0) {\n    /say hi\n  }\n}":      "mms/type-mismatch",
+		"Function f {\n  let x = 1\n  Positioned(x, 0) {\n    /say hi\n  }\n}":             "mms/command",
+		"Function f {\n  let x = 1\n  Positioned(nope + 1, 0, 0) {\n    /say hi\n  }\n}":   "mms/unknown-name",
+		"Function f {\n  Positioned(~nope ~ ~) {\n    /say hi\n  }\n}":                     "mms/unknown-name",
+		"Function f {\n  let s = \"x\"\n  Positioned(~s ~ ~) {\n    /say hi\n  }\n}":       "mms/type-mismatch",
+		"Function f(dx: int) {\n  As(@e[x=~dx]) {\n    /say hi\n  }\n}":                    "mms/selector",
+		"Function f {\n  let x = 1\n  In(~x) {\n    /say hi\n  }\n}":                       "mms/unsupported",
+		"const name = \"a\"\nFunction f {\n  Positioned(~name ~ ~) {\n    /say hi\n  }\n}": "mms/type-mismatch",
+	}
+	for src, want := range cases {
+		p := New(spec.MustDefault(), Config{Namespace: "demo"})
+		p.SetFile("main.mms", src)
+		r, _ := p.Analyze(context.Background())
+		var codes []string
+		for _, d := range r.Diagnostics("main.mms") {
+			if d.Severity == syntax.SeverityError {
+				codes = append(codes, d.Code)
+			}
+		}
+		if len(codes) == 0 || codes[0] != want {
+			t.Errorf("%q: errors %v, want %s", src, codes, want)
+		}
+	}
+}
+
 // TestEventHooks checks OnAdvancement, OnFirstJoin and OnRespawn output.
 func TestEventHooks(t *testing.T) {
 	p := New(spec.MustDefault(), Config{Namespace: "demo"})
