@@ -93,3 +93,64 @@ func TestSelectorOptionFix(t *testing.T) {
 		t.Fatalf("got %+v, want one fix to tag", ds)
 	}
 }
+
+// Indexing a named selector adds options, as the game reads repeats.
+func TestExtendSelector(t *testing.T) {
+	src := `Objective hp
+Objective kills
+const guards = @e[type=zombie, tag=guard, scores={hp=1..}]
+const awake = guards[tag=awake, scores={kills=5..}]
+const mobs = @e[type=!player, tag=mob]
+const boss = @e[tag=boss]
+Template near(r: int): Selector = @a[distance=..${r}]
+Function f {
+  /kill ${awake}
+  tell(guards[limit=1, sort=nearest], "hi")
+  hp[near(3)[tag=x]] = 1
+  As(mobs[type=!item]) {
+    /say hi
+  }
+  tell(boss, "boss")
+}
+`
+	_, r := bookProject(t, src, nil)
+	if d := diagText(r); d != "" {
+		t.Fatal(d)
+	}
+	got := emitted(t, r, "data/demo/function/f.mcfunction")
+	for _, want := range []string{
+		"kill @e[type=zombie,tag=guard,scores={hp=1..,kills=5..},tag=awake]",
+		"tellraw @e[type=zombie,tag=guard,scores={hp=1..},limit=1,sort=nearest]",
+		"scoreboard players set @a[distance=..3,tag=x] hp 1",
+		"execute as @e[type=!player,tag=mob,type=!item] run say hi",
+		`tellraw @e[tag=boss] "boss"`,
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("output lacks %s:\n%s", want, got)
+		}
+	}
+}
+
+func TestExtendSelectorErrors(t *testing.T) {
+	base := "Objective hp\nconst guards = @e[type=zombie, tag=guard, limit=1, scores={hp=1..}]\n"
+	cases := []struct{ ext, at, msg string }{
+		{"guards[limit=2]", "limit=2", "guards already sets limit"},
+		{"guards[type=skeleton]", "type=skeleton", "only negated"},
+		{"guards[type=!husk]", "type=!husk", "only negated"},
+		{"guards[scores={hp=2..}]", "hp", "already sets scores for hp"},
+		{"guards[tagg=x]", "tagg", "did you mean 'tag'"},
+	}
+	for _, c := range cases {
+		src := base + "Function f {\n  tell(" + c.ext + ", \"hi\")\n}"
+		ds := selectorErrors(src)
+		if len(ds) != 1 {
+			t.Errorf("%s: %d errors %v, want one", c.ext, len(ds), ds)
+			continue
+		}
+		d := ds[0]
+		at := src[d.Sp.Start:d.Sp.End]
+		if d.Code != "mms/selector" || at != c.at || !strings.Contains(d.Message, c.msg) {
+			t.Errorf("%s: %s at %q: %s; want %q at %q", c.ext, d.Code, at, d.Message, c.msg, c.at)
+		}
+	}
+}

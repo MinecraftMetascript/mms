@@ -16,7 +16,7 @@ func (s *Session) selectorCompletion(a *at, off int) ([]sema.Candidate, bool) {
 	at := -1
 	for i := len(a.path) - 1; i >= 0; i-- {
 		if n, ok := a.path[i].(*syntax.Index); ok {
-			if _, sel := n.X.(*syntax.Selector); sel && off > n.X.Span().End {
+			if s.isSelector(n.X) && off > n.X.Span().End {
 				ix, at = n, i
 				break
 			}
@@ -48,6 +48,45 @@ func (s *Session) selectorCompletion(a *at, off int) ([]sema.Candidate, bool) {
 		return selectorOptionCandidates(ix), true
 	}
 	return s.selectorValues(a, arg, at+1), true
+}
+
+// isSelector tells whether e is a selector: @e, or the name of a const or
+// the call of a Template whose value is one, as in guards[tag=awake].
+func (s *Session) isSelector(e syntax.Expr) bool {
+	switch x := e.(type) {
+	case *syntax.Selector:
+		return true
+	case *syntax.Index:
+		// Function code is read expanded: the const is its value.
+		_, ok := x.X.(*syntax.Selector)
+		return ok
+	case *syntax.Ident:
+		if s.R == nil || s.R.Eval == nil {
+			return false
+		}
+		k := s.R.Eval.Consts[x.Name]
+		if k == nil {
+			return false
+		}
+		if k.S.Type != nil {
+			return syntax.TypeText(k.S.Type) == "Selector"
+		}
+		switch v := k.Lowered().(type) {
+		case *syntax.Selector:
+			return true
+		case *syntax.Index:
+			_, ok := v.X.(*syntax.Selector)
+			return ok
+		}
+	case *syntax.Call:
+		id, ok := x.Fn.(*syntax.Ident)
+		if !ok || s.R == nil || s.R.Eval == nil {
+			return false
+		}
+		t := s.R.Eval.Templates[id.Name]
+		return t != nil && t.D.Type != nil && syntax.TypeText(t.D.Type) == "Selector"
+	}
+	return false
 }
 
 // selectorOptionCandidates lists the options a selector does not set yet.
