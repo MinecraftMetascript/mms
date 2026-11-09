@@ -746,6 +746,9 @@ func (p *bookParser) expr(src *bookSrc, start, end int, click *jsonv.Object, hov
 				o := &jsonv.Object{}
 				o.Set("nbt", jsonv.String(path))
 				o.Set("storage", jsonv.String(loc))
+				if l.typ == tString {
+					o.Set("interpret", jsonv.Bool(true))
+				}
 				p.addObj(src, start-2, o, 48, click, hover)
 				return
 			}
@@ -779,6 +782,9 @@ func (p *bookParser) expr(src *bookSrc, start, end int, click *jsonv.Object, hov
 		o = &jsonv.Object{}
 		o.Set("nbt", jsonv.String(path))
 		o.Set("storage", jsonv.String(loc))
+		// Without interpret the game shows a string tag as SNBT: quoted
+		// and coloured green.
+		o.Set("interpret", jsonv.Bool(true))
 		width = 48
 	case v.op.IsConst:
 		p.add(src, -1, strconv.Itoa(int(v.op.Const)), click, hover)

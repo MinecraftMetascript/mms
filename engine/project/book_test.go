@@ -106,7 +106,7 @@ Function go {
 		`{"keybind":"key.jump"}`, `{"atlas":"minecraft:items","object":"atlas","sprite":"minecraft:item/diamond","type":"object"}`,
 		`{"object":"player","player":{"name":"Notch"},"type":"object"}`, `{"translate":"block.minecraft.stone"}`, `*plain*`,
 		`{"score":{"name":"@s","objective":"kills"}}`, `{"score":{"name":"$wave","objective":"mms.demo"}}`,
-		`{"nbt":"g.motto","storage":"demo:mms"}`, `2"`,
+		`{"interpret":true,"nbt":"g.motto","storage":"demo:mms"}`, `2"`,
 	} {
 		if !strings.Contains(string(p1), want) {
 			t.Errorf("page 1 lacks %s:\n%s", want, p1)

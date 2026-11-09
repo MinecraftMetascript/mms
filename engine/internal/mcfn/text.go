@@ -52,7 +52,11 @@ func (vm *VM) render(b *strings.Builder, c any) error {
 			if err != nil {
 				return err
 			}
-			if v != nil {
+			// Like the game, a string tag is shown as SNBT (quoted) unless
+			// the component interprets it.
+			if s, ok := v.(string); ok && c["interpret"] != int32(1) {
+				b.WriteString(SNBT(s))
+			} else if v != nil {
 				b.WriteString(toText(v))
 			}
 		case c["selector"] != nil:
