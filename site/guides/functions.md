@@ -21,7 +21,7 @@ Every command is checked against the 26.3 command tree, the same one the game us
 - unknown vanilla ids, such as `minecraft:diamnd`
 - ids in your own namespaces that nothing declares, such as `function demo:missing`
 
-Completion inside a command offers the next literal and values for the argument being typed. These include selectors, game modes, registry ids, and your project's functions, tags and objectives.
+Completion inside a command offers the next literal and values for the argument being typed. These include selectors, game modes, registry ids, and your project's functions, tags and objectives. Hovering a word of a command shows the forms the command can take from that word on, in the game's `/help` syntax, so hovering `/data` lists `data get (block|entity|storage)` and the rest, and hovering `get` lists the arguments of each `data get` form.
 
 The checker checks syntax, not meaning. Whether an entity exists, or whether an NBT path fits the entity, is left to the game.
 
