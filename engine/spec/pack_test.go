@@ -85,3 +85,23 @@ func TestVersionFilter(t *testing.T) {
 	}
 	t.Error("Clamp has no input field")
 }
+
+func TestAtlasSource(t *testing.T) {
+	dir := AtlasSource{Type: "minecraft:directory", Source: "fancy", Prefix: "custom/"}
+	if sp, ok := dir.SpriteOf("test:fancy/iridium"); !ok || sp != "test:custom/iridium" {
+		t.Errorf("directory SpriteOf: %q %v", sp, ok)
+	}
+	if _, ok := dir.SpriteOf("test:custom/iridium"); ok {
+		t.Error("directory takes a file outside its folder")
+	}
+	if !dir.Makes("test:custom/iridium") || dir.Makes("test:fancy/iridium") {
+		t.Error("directory Makes")
+	}
+	one := AtlasSource{Type: "single", Resource: "test:a/b", Sprite: "test:c"}
+	if sp, ok := one.SpriteOf("test:a/b"); !ok || sp != "test:c" {
+		t.Errorf("single SpriteOf: %q %v", sp, ok)
+	}
+	if !one.Makes("test:c") || one.Makes("test:a/b") {
+		t.Error("single Makes")
+	}
+}

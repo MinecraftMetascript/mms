@@ -223,19 +223,49 @@ func (p *Pack) AssetKinds() []string {
 	return kinds
 }
 
-// Covers reports whether the source stitches the texture file
-// assets/<ns>/textures/<path>.png as the sprite id "<ns>:<path>", the id
-// a model names it by.
-func (s AtlasSource) Covers(id string) bool {
+// SpriteOf returns the sprite the source stitches from the texture file
+// assets/<ns>/textures/<path>.png, named "<ns>:<path>"; ok is false when
+// the source does not take that file.
+func (s AtlasSource) SpriteOf(file string) (sprite string, ok bool) {
+	ns, p := splitNS(file)
 	switch strings.TrimPrefix(s.Type, "minecraft:") {
 	case "directory":
-		rest, ok := strings.CutPrefix(id[strings.IndexByte(id, ':')+1:], strings.TrimSuffix(s.Source, "/")+"/")
-		return ok && s.Prefix+rest == id[strings.IndexByte(id, ':')+1:]
+		if rest, ok := strings.CutPrefix(p, strings.TrimSuffix(s.Source, "/")+"/"); ok {
+			return ns + ":" + s.Prefix + rest, true
+		}
 	case "single":
-		res := qualify(s.Resource)
-		return res == qualify(id) && (s.Sprite == "" || qualify(s.Sprite) == res)
+		if qualify(s.Resource) == ns+":"+p {
+			if s.Sprite != "" {
+				return qualify(s.Sprite), true
+			}
+			return ns + ":" + p, true
+		}
+	}
+	return "", false
+}
+
+// Makes reports whether the source can stitch a sprite named id, from
+// some file: a directory source names each of its files with its prefix.
+func (s AtlasSource) Makes(id string) bool {
+	switch strings.TrimPrefix(s.Type, "minecraft:") {
+	case "directory":
+		_, p := splitNS(id)
+		return strings.HasPrefix(p, s.Prefix)
+	case "single":
+		name := s.Sprite
+		if name == "" {
+			name = s.Resource
+		}
+		return qualify(name) == qualify(id)
 	}
 	return false
+}
+
+func splitNS(id string) (ns, path string) {
+	if ns, path, ok := strings.Cut(id, ":"); ok {
+		return ns, path
+	}
+	return "minecraft", id
 }
 
 func qualify(id string) string {
