@@ -1332,10 +1332,41 @@ func (s *Session) Definition(path string, off int) []Location {
 		return []Location{{Path: cv.Path, Span: cv.Decl.Name.Sp}}
 	}
 	sym := s.target(path, off)
-	if sym == nil || sym.Decl.Name == nil {
+	if sym == nil {
+		if v := s.vanillaAt(path, off); v != "" {
+			return []Location{{Path: v}}
+		}
+		return nil
+	}
+	if sym.Decl.Name == nil {
 		return nil
 	}
 	return []Location{{Path: sym.Unit.Path, Span: sym.Decl.Name.Sp}}
+}
+
+// vanillaAt returns the path of the vanilla file that a minecraft id at off
+// names, such as @vanilla/data/minecraft/worldgen/noise/ridge.json, or "".
+func (s *Session) vanillaAt(path string, off int) string {
+	v := s.P.Pack.Vanilla()
+	a := s.at(path, off)
+	if v == nil || a == nil || len(a.path) < 3 {
+		return ""
+	}
+	in := a.info(a.path[len(a.path)-1])
+	if _, ok := a.path[len(a.path)-1].(*syntax.CommandStmt); ok && a.decl != nil {
+		// An id inside a command has a node of its own.
+		in = nil
+		for n, cin := range a.decl.Info {
+			if cin.ID != "" && cin.Symbol == nil && n.Span().Contains(off) {
+				in = cin
+				break
+			}
+		}
+	}
+	if in == nil || in.ID == "" || in.Symbol != nil {
+		return ""
+	}
+	return v.VanillaPath(in.Folder, in.ID)
 }
 
 // References returns every use of the symbol at off, with its declaration

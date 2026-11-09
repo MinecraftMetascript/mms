@@ -5,7 +5,7 @@ Language support for [Minecraft Metascript](https://github.com/MinecraftMetascri
 - **Diagnostics** for errors, lint findings and every raw command, checked against the Minecraft command tree.
 - **Editing help:**
   - completion, hover and signature help
-  - go to definition, find references and rename; go to definition on a built-in Template, Blueprint or Type opens the prelude, read-only
+  - go to definition, find references and rename; go to definition on a built-in Template, Blueprint or Type opens the prelude, and on a vanilla id (a noise, density function, loot table, tag and so on) opens vanilla's own JSON file, both read-only
 - **Fixes:**
   - quick fixes
   - "Fix all" (`source.fixAll.mms`)

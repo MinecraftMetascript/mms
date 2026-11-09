@@ -74,6 +74,15 @@ test('go to definition on a built-in opens the prelude read-only', async () => {
 	assert.match(prelude.getText(), /Blueprint CustomItem/);
 });
 
+test('go to definition on a vanilla id opens its JSON read-only', async () => {
+	const defs = await vscode.commands.executeCommand<(vscode.Location | vscode.LocationLink)[]>('vscode.executeDefinitionProvider', doc.uri, at('Noise(ridge', 7));
+	assert.equal(defs.length, 1);
+	const uri = 'targetUri' in defs[0] ? defs[0].targetUri : defs[0].uri;
+	assert.equal(uri.toString(), 'mms-vanilla:/data/minecraft/worldgen/noise/ridge.json');
+	const file = await vscode.workspace.openTextDocument(uri);
+	assert.match(file.getText(), /"base_octave"/);
+});
+
 test('rename of a const edits its declaration and every use', async () => {
 	const edit = await vscode.commands.executeCommand<vscode.WorkspaceEdit>('vscode.executeDocumentRenameProvider', doc.uri, at('wave', 1), 'level');
 	const edits = edit.get(doc.uri);

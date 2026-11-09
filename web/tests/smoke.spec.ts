@@ -1293,13 +1293,32 @@ test('go to definition on a built-in opens the prelude read-only', async ({ page
 	await page.locator('.cm-line', { hasText: 'CustomItem ruby' }).click({ position: { x: 20, y: 5 } });
 	await expect(async () => {
 		await page.keyboard.press('F12');
-		await expect(page.getByTestId('prelude-view')).toBeVisible({ timeout: 2_000 });
+		await expect(page.getByTestId('builtin-view')).toBeVisible({ timeout: 2_000 });
 	}).toPass({ timeout: 15_000 });
-	await expect(page.locator('#prelude-title')).toContainText('items.mms');
+	await expect(page.locator('#builtin-title')).toContainText('items.mms');
 	// The definition is selected and scrolled into view.
-	await expect(page.getByTestId('prelude-view').locator('.cm-activeLine')).toContainText('Blueprint CustomItem');
+	await expect(page.getByTestId('builtin-view').locator('.cm-activeLine')).toContainText('Blueprint CustomItem');
 	await page.getByRole('button', { name: 'Close' }).click();
-	await expect(page.getByTestId('prelude-view')).toBeHidden();
+	await expect(page.getByTestId('builtin-view')).toBeHidden();
+});
+
+test('go to definition on a vanilla id opens its JSON read-only', async ({ page }) => {
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	await replaceText(page, 'DensityFunction ridged = Noise(ridge, 1, 1)\n');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 15_000 });
+	// The cursor goes inside ridge, the vanilla noise.
+	await page.locator('.cm-line', { hasText: 'Noise(ridge' }).click();
+	await page.keyboard.press('Home');
+	for (let i = 0; i < 'DensityFunction ridged = Noise(ri'.length; i++) await page.keyboard.press('ArrowRight');
+	await expect(async () => {
+		await page.keyboard.press('F12');
+		await expect(page.getByTestId('builtin-view')).toBeVisible({ timeout: 2_000 });
+	}).toPass({ timeout: 15_000 });
+	await expect(page.locator('#builtin-title')).toContainText('worldgen/noise/ridge.json');
+	await expect(page.getByTestId('builtin-view')).toContainText('"base_octave"');
+	await page.getByRole('button', { name: 'Close' }).click();
+	await expect(page.getByTestId('builtin-view')).toBeHidden();
 });
 
 test('the Jigsaw tab copies a jigsaw block, keeps it in Recent, and declares a new hole', async ({ page }) => {

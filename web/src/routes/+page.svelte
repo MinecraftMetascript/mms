@@ -18,7 +18,7 @@
 	import PasteJson from '#lib/components/PasteJson.svelte';
 	import ProjectsDialog from '#lib/components/ProjectsDialog.svelte';
 	import AboutDialog from '#lib/components/AboutDialog.svelte';
-	import PreludeViewer from '#lib/components/PreludeViewer.svelte';
+	import BuiltinViewer from '#lib/components/BuiltinViewer.svelte';
 	import { requestPersistence } from '#lib/project/store.ts';
 	import Dropdown from '#lib/components/Dropdown.svelte';
 	import { fixAllKeys, formatKeys, mod, quickFixKeys } from '#lib/editor/shortcuts.ts';
@@ -43,7 +43,7 @@
 	let editor = $state<ReturnType<typeof Editor> | null>(null);
 	let projects = $state<ReturnType<typeof ProjectsDialog> | null>(null);
 	let about = $state<ReturnType<typeof AboutDialog> | null>(null);
-	let preludeViewer = $state<ReturnType<typeof PreludeViewer> | null>(null);
+	let builtinViewer = $state<ReturnType<typeof BuiltinViewer> | null>(null);
 
 	onMount(() => {
 		try {
@@ -54,9 +54,9 @@
 		const e = new Engine(asset('mms-worker.js'), {
 			onText: (uri, text) => project.setText(pathOf(uri), text),
 			display: async (uri): Promise<EditorView | null> => {
-				if (uri.startsWith('mms-prelude:')) {
-					const text: string | null = await e.preludeFile(uri);
-					return text === null || !preludeViewer ? null : preludeViewer.show(uri, text);
+				if (uri.startsWith('mms-prelude:') || uri.startsWith('mms-vanilla:')) {
+					const text: string | null = await e.builtinFile(uri);
+					return text === null || !builtinViewer ? null : builtinViewer.show(uri, text);
 				}
 				const path = pathOf(uri);
 				if (!project.files.some((f) => f.path === path)) return null;
@@ -410,7 +410,7 @@
 		</div>
 		<ProjectsDialog bind:this={projects} {project} {onswitch} />
 		<AboutDialog bind:this={about} />
-		<PreludeViewer bind:this={preludeViewer} />
+		<BuiltinViewer bind:this={builtinViewer} />
 		<input type="file" accept=".zip" class="hidden" bind:this={fileInput} onchange={importZip} />
 		{#if engine}
 			<PasteJson bind:this={pasteJson} {engine} uri={uriOf(project.active)} oninsert={insertDecl} />

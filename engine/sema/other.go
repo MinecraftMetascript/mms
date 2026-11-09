@@ -216,6 +216,16 @@ func (c *Checker) commandText(text string, at func(start, end int) syntax.Span) 
 			}
 		}
 		if ns == "" || ns == "minecraft" {
+			// Go to definition shows vanilla's file, if it has one.
+			full := v
+			if ns == "" {
+				full = "minecraft:" + v
+			}
+			if strings.HasPrefix(id.Value, "#") {
+				full = "#" + full
+			}
+			in := c.info(&syntax.ResLoc{Text: id.Value, Sp: sp})
+			in.ID, in.Folder = full, f
 			continue
 		}
 		if _, ok := c.Kinds.ForFolder(strings.TrimPrefix(f, "tags/")); !ok && f != "function" && f != "tags/function" {

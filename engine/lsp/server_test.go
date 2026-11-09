@@ -905,6 +905,29 @@ func TestPreludeDefinition(t *testing.T) {
 	}
 }
 
+// Go to definition on a vanilla id opens vanilla's JSON file read-only: an
+// mms-vanilla: URI whose text mms/vanillaFile gives.
+func TestVanillaDefinition(t *testing.T) {
+	c := start(t)
+	c.result("initialize", map[string]any{})
+	c.notify("initialized", map[string]any{})
+	uri := "file:///a.mms"
+	src := "DensityFunction x = Noise(ridge)\n"
+	c.notify("textDocument/didOpen", map[string]any{"textDocument": map[string]any{"uri": uri, "languageId": "mms", "version": 1, "text": src}})
+	defs, _ := c.result("textDocument/definition", pos(uri, 0, 28)).([]any)
+	if len(defs) != 1 {
+		t.Fatalf("definition = %v", defs)
+	}
+	target := defs[0].(map[string]any)["uri"].(string)
+	if target != VanillaScheme+":/data/minecraft/worldgen/noise/ridge.json" {
+		t.Fatalf("uri = %s", target)
+	}
+	file, _ := c.result("mms/vanillaFile", map[string]any{"uri": target}).(map[string]any)
+	if text, _ := file["text"].(string); !strings.Contains(text, `"amplitudes"`) && !strings.Contains(text, `"base_octave"`) {
+		t.Errorf("text = %q", text)
+	}
+}
+
 // TestWatchedFileOutsideSources checks that a .mms file that mms.json's
 // sources leave out stays out of the project when it changes on disk, as
 // it does for mms build.
