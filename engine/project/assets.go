@@ -230,13 +230,20 @@ func lintTextureAtlas(l *lintRun) {
 		var a struct {
 			Sources []spec.AtlasSource `json:"sources"`
 		}
+		// The declaration checked against the atlas schema, so it decodes.
 		if json.Unmarshal(jsonv.Marshal(d.Value), &a) == nil {
 			sources = append(sources, a.Sources...)
 		}
 	}
-	covered := func(id string) bool {
+	// covered reports whether a sprite named id is stitched: from the
+	// file Texture(...) copies when file is set, from any file otherwise.
+	covered := func(id string, file bool) bool {
 		for _, s := range sources {
-			if s.Covers(id) {
+			if file {
+				if sp, ok := s.SpriteOf(id); ok && sp == id {
+					return true
+				}
+			} else if s.Makes(id) {
 				return true
 			}
 		}
@@ -253,7 +260,7 @@ func lintTextureAtlas(l *lintRun) {
 		}
 		var hits []hit
 		for n, in := range d.Info {
-			if !in.ModelTexture || in.ID == "" || strings.HasPrefix(in.ID, "minecraft:") || covered(in.ID) {
+			if !in.ModelTexture || in.ID == "" || strings.HasPrefix(in.ID, "minecraft:") || covered(in.ID, in.Asset != nil) {
 				continue
 			}
 			ns, p, _ := strings.Cut(in.ID, ":")
