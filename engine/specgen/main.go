@@ -7,6 +7,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -36,6 +37,9 @@ const (
 	mcmetaRef   = "d96c75fec200c4580dd75e033a76341521165461" // tag 26.3-summary
 )
 
+// errNotFound is fetchJSON's error for a file the upstream ref lacks.
+var errNotFound = errors.New("not found")
+
 // assetFolders maps the resource-pack kinds MMS declares to their folder
 // under assets/<ns>/. Left out: sounds (generated from Sound uses),
 // texture_meta (a .png.mcmeta next to its texture), shader, and the
@@ -56,16 +60,17 @@ var assetFolders = map[string]string{
 
 func main() {
 	out := flag.String("out", "spec/data/"+version+".json.gz", "output file")
+	vanillaOut := flag.String("vanilla-out", "spec/data/"+version+".vanilla.json.gz", "output file for vanilla's data pack files")
 	cache := flag.String("cache", "specgen/.cache", "download cache directory")
 	flag.Parse()
 
-	if err := run(*out, *cache); err != nil {
+	if err := run(*out, *vanillaOut, *cache); err != nil {
 		fmt.Fprintln(os.Stderr, "specgen:", err)
 		os.Exit(1)
 	}
 }
 
-func run(out, cache string) error {
+func run(out, vanillaOut, cache string) error {
 	var symbols struct {
 		Types       map[string]*spec.Type            `json:"mcdoc"`
 		Dispatchers map[string]map[string]*spec.Type `json:"mcdoc/dispatcher"`
@@ -191,6 +196,58 @@ func run(out, cache string) error {
 	fmt.Printf("spec pack %s (format %d): %d types, %d dispatchers, %d resource kinds (%d resource pack), %d registries, %d blocks\n",
 		version, packFormat, len(pack.Types), len(pack.Dispatchers), len(pack.Resources), len(pack.Assets), len(pack.Registries), len(pack.Blocks))
 	fmt.Printf("wrote %s: %d KB gzipped, decodes in %s\n", out, buf.Len()/1024, time.Since(start).Round(time.Millisecond))
+	return writeVanilla(pack, vanillaOut, cache)
+}
+
+// writeVanilla writes the vanilla data pack's JSON files, from mcmeta's
+// summary of each data pack folder (data/<folder>/data.min.json) and of
+// each tag registry (data/tag/<registry>/data.min.json). Go to definition
+// on a vanilla id shows them.
+func writeVanilla(pack *spec.Pack, out, cache string) error {
+	v := spec.Vanilla{}
+	var missing []string
+	get := func(src, folder string) error {
+		var files map[string]json.RawMessage
+		err := fetchJSON(cache, mcmetaRepo, mcmetaRef, "data/"+src+"/data.min.json", &files)
+		if errors.Is(err, errNotFound) {
+			missing = append(missing, src)
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		v[folder] = files
+		return nil
+	}
+	for _, kind := range pack.ResourceKinds() {
+		if _, asset := pack.Assets[kind]; asset {
+			continue
+		}
+		if err := get(kind, kind); err != nil {
+			return err
+		}
+	}
+	for reg := range pack.Registries {
+		if tag, ok := strings.CutPrefix(reg, "tag/"); ok {
+			if err := get(reg, "tags/"+tag); err != nil {
+				return err
+			}
+		}
+	}
+	var buf bytes.Buffer
+	if err := v.Encode(&buf); err != nil {
+		return err
+	}
+	if err := os.WriteFile(out, buf.Bytes(), 0o644); err != nil {
+		return err
+	}
+	n := 0
+	for _, files := range v {
+		n += len(files)
+	}
+	sort.Strings(missing)
+	fmt.Printf("wrote %s: %d vanilla files in %d folders, %d KB gzipped\n", out, n, len(v), buf.Len()/1024)
+	fmt.Printf("no vanilla files for: %s\n", strings.Join(missing, ", "))
 	return nil
 }
 
@@ -204,6 +261,9 @@ func fetchJSON(cache, repo, ref, file string, v any) error {
 			return err
 		}
 		defer resp.Body.Close()
+		if resp.StatusCode == http.StatusNotFound {
+			return fmt.Errorf("GET %s: %w", url, errNotFound)
+		}
 		if resp.StatusCode != http.StatusOK {
 			return fmt.Errorf("GET %s: %s", url, resp.Status)
 		}

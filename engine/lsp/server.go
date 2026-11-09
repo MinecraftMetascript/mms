@@ -232,6 +232,7 @@ func init() {
 		"mms/importPack":                   typed((*Server).importPack),
 		"mms/resourceKinds":                typed((*Server).resourceKinds),
 		"mms/preludeFile":                  typed((*Server).preludeFile),
+		"mms/vanillaFile":                  typed((*Server).vanillaFile),
 		"mms/convertJSON":                  typed((*Server).convertJSON),
 		"mms/ping":                         func(*Server, context.Context, json.RawMessage) (any, *respError) { return "pong", nil },
 	}
@@ -777,6 +778,8 @@ func (s *Server) locations(locs []ide.Location) []location {
 		uri := loc.Path
 		if rest, ok := strings.CutPrefix(loc.Path, prelude.Prefix); ok {
 			uri = PreludeScheme + ":/" + rest
+		} else if rest, ok := strings.CutPrefix(loc.Path, spec.VanillaPrefix); ok {
+			uri = VanillaScheme + ":/" + rest
 		}
 		out = append(out, location{URI: uri, Range: l.rng(loc.Span)})
 	}
@@ -798,6 +801,24 @@ func preludeText(path string) (string, bool) {
 		}
 	}
 	return "", false
+}
+
+// VanillaScheme is the URI scheme of the game's own data pack files, where
+// go to definition on a vanilla id leads and which editors open read-only:
+// mms-vanilla:/data/minecraft/worldgen/noise/ridge.json. mms/vanillaFile
+// gives their text.
+const VanillaScheme = "mms-vanilla"
+
+func (s *Server) vanillaFile(_ context.Context, p struct {
+	URI string `json:"uri"`
+}) (any, *respError) {
+	rest := strings.TrimPrefix(strings.TrimPrefix(p.URI, VanillaScheme+":"), "/")
+	rest = strings.TrimPrefix(rest, "//")
+	text, ok := s.pack.Vanilla().File(spec.VanillaPrefix + rest)
+	if !ok {
+		return nil, &respError{Code: codeInvalidParams, Message: "no vanilla file " + p.URI}
+	}
+	return map[string]string{"text": text}, nil
 }
 
 func (s *Server) preludeFile(_ context.Context, p struct {

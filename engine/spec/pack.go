@@ -51,6 +51,9 @@ type Pack struct {
 	Atlases map[string][]AtlasSource `json:"atlases,omitempty"`
 
 	registrySets map[string]map[string]struct{}
+	// vanilla is set on the embedded default pack, whose version has
+	// vanilla files (see Vanilla).
+	vanilla bool
 }
 
 // AtlasSource is one entry of an atlas's sources list. Only the fields
@@ -93,6 +96,9 @@ var (
 func Default() (*Pack, error) {
 	defaultOnce.Do(func() {
 		defaultPack, defaultErr = Decode(bytes.NewReader(embedded263))
+		if defaultPack != nil {
+			defaultPack.vanilla = true
+		}
 	})
 	return defaultPack, defaultErr
 }

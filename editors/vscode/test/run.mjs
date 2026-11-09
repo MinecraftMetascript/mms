@@ -40,6 +40,7 @@ write(
 		'  /say ${wave}',
 		'}',
 		'DensityFunction d = twice(wave)',
+		'DensityFunction ridged = Noise(ridge)',
 		''
 	].join('\n')
 );

@@ -12,6 +12,8 @@ Every JSON resource kind can be written as an object literal that mirrors the JS
 
 The `use-shorthand` lint rule suggests the short forms, and imported packs use them automatically.
 
+**Vanilla ids.** An id the game itself defines, such as the noise `ridge`, the density function `overworld/continents`, the loot table `chests/simple_dungeon` or the tag `#minecraft:logs`, needs no declaration. Go to definition on one opens the game's own JSON file for it, read-only, in VS Code and the web editor. This works in commands too.
+
 ## Loot tables
 
 ```mms

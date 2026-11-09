@@ -12,7 +12,7 @@
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"wasm": "./scripts/build-wasm.sh",
 		"test": "playwright test",
-		"licenses": "node ../scripts/third-party-licenses.mjs . static/third-party-licenses.txt @codemirror/autocomplete @codemirror/commands @codemirror/language @codemirror/lint @codemirror/lsp-client @codemirror/state @codemirror/view @lezer/highlight codemirror deepslate fflate flexsearch idb-keyval marked svelte @sveltejs/kit --notice ../engine/THIRD_PARTY_NOTICES.txt"
+		"licenses": "node ../scripts/third-party-licenses.mjs . static/third-party-licenses.txt @codemirror/autocomplete @codemirror/commands @codemirror/lang-json @codemirror/language @codemirror/lint @codemirror/lsp-client @codemirror/state @codemirror/view @lezer/highlight @lezer/json codemirror deepslate fflate flexsearch idb-keyval marked svelte @sveltejs/kit --notice ../engine/THIRD_PARTY_NOTICES.txt"
 	},
 	"devDependencies": {
 		"@playwright/test": "^1.63.0",
@@ -34,6 +34,7 @@
 	"dependencies": {
 		"@codemirror/autocomplete": "^6.20.4",
 		"@codemirror/commands": "^6.11.1",
+		"@codemirror/lang-json": "^6.0.2",
 		"@codemirror/language": "^6.13.1",
 		"@codemirror/lint": "^6.9.7",
 		"@codemirror/lsp-client": "^6.3.0",

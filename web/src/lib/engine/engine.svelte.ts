@@ -373,11 +373,15 @@ export class Engine {
 		return this.client.request<object, ResourceKind[]>('mms/resourceKinds', {});
 	}
 
-	/** The text of a file of the language's prelude, by its mms-prelude: URI. */
-	async preludeFile(uri: string): Promise<string | null> {
+	/**
+	 * The text of a file that comes with the language: a prelude file by its
+	 * mms-prelude: URI, or a vanilla data pack file by its mms-vanilla: URI.
+	 */
+	async builtinFile(uri: string): Promise<string | null> {
 		await this.client.initializing;
+		const method = uri.startsWith('mms-vanilla:') ? 'mms/vanillaFile' : 'mms/preludeFile';
 		try {
-			return (await this.client.request<object, { text: string }>('mms/preludeFile', { uri })).text;
+			return (await this.client.request<object, { text: string }>(method, { uri })).text;
 		} catch {
 			return null;
 		}
