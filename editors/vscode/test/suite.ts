@@ -75,7 +75,7 @@ test('go to definition on a built-in opens the prelude read-only', async () => {
 });
 
 test('go to definition on a vanilla id opens its JSON read-only', async () => {
-	const defs = await vscode.commands.executeCommand<(vscode.Location | vscode.LocationLink)[]>('vscode.executeDefinitionProvider', doc.uri, at('Noise(ridge)', 7));
+	const defs = await vscode.commands.executeCommand<(vscode.Location | vscode.LocationLink)[]>('vscode.executeDefinitionProvider', doc.uri, at('Noise(ridge', 7));
 	assert.equal(defs.length, 1);
 	const uri = 'targetUri' in defs[0] ? defs[0].targetUri : defs[0].uri;
 	assert.equal(uri.toString(), 'mms-vanilla:/data/minecraft/worldgen/noise/ridge.json');

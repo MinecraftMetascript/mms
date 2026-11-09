@@ -1305,13 +1305,12 @@ test('go to definition on a built-in opens the prelude read-only', async ({ page
 test('go to definition on a vanilla id opens its JSON read-only', async ({ page }) => {
 	await page.goto('./');
 	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
-	await replaceText(page, 'DensityFunction ridged = Noise(ridge)\n');
-	await expect(status(page)).toHaveText(/No problems|problem/, { timeout: 15_000 });
+	await replaceText(page, 'DensityFunction ridged = Noise(ridge, 1, 1)\n');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 15_000 });
 	// The cursor goes inside ridge, the vanilla noise.
-	await page.locator('.cm-line', { hasText: 'Noise(ridge)' }).click();
-	await page.keyboard.press('End');
-	await page.keyboard.press('ArrowLeft');
-	await page.keyboard.press('ArrowLeft');
+	await page.locator('.cm-line', { hasText: 'Noise(ridge' }).click();
+	await page.keyboard.press('Home');
+	for (let i = 0; i < 'DensityFunction ridged = Noise(ri'.length; i++) await page.keyboard.press('ArrowRight');
 	await expect(async () => {
 		await page.keyboard.press('F12');
 		await expect(page.getByTestId('builtin-view')).toBeVisible({ timeout: 2_000 });
