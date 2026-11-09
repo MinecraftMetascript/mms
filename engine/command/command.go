@@ -11,7 +11,9 @@ package command
 
 import (
 	"sort"
+	"strconv"
 	"strings"
+	"unicode"
 
 	"github.com/minecraftmetascript/mms/engine/spec"
 )
@@ -21,6 +23,14 @@ import (
 type Problem struct {
 	Start, End int
 	Message    string
+	Fix        *Fix // a likely correction, if any
+}
+
+// Fix replaces the runes Start..End of the command text with Text.
+type Fix struct {
+	Title      string
+	Start, End int
+	Text       string
 }
 
 // ID is a resource id used by a command, for callers that check ids in
@@ -164,6 +174,9 @@ func (s *state) children(n *spec.CommandNode, pos int, root bool) bool {
 		}
 		s.ids = s.ids[:mark]
 	}
+	if s.pathSpace(n, pos, end, w) {
+		return false
+	}
 	switch {
 	case root:
 		return s.fail(pos, end, "unknown command '"+w+"'")
@@ -171,6 +184,42 @@ func (s *state) children(n *spec.CommandNode, pos int, root bool) bool {
 		return s.fail(pos, end, "unknown option '"+w+"'; expected "+describe(n, lits, args))
 	}
 	return s.fail(pos, end, "expected "+describe(n, lits, args))
+}
+
+// pathSpace explains a word that fails to match after an NBT path when
+// it reads as the rest of that path: the path was split by a space, as in
+// `SelectedItem components.minecraft:custom_data`. The game reads the
+// second half as the next argument (a scale, a type, a value) and rejects
+// it, so the fix joins the two halves.
+func (s *state) pathSpace(n *spec.CommandNode, pos, end int, w string) bool {
+	if n.Parser != "minecraft:nbt_path" || pos == 0 || s.src[pos-1] != ' ' {
+		return false
+	}
+	if s.best != nil && s.best.Start > pos {
+		return false // a later argument matched; the path was fine
+	}
+	if _, err := strconv.ParseFloat(w, 64); err == nil {
+		return false
+	}
+	c := s.src[pos]
+	joiner := ""
+	switch {
+	case c == '.' || c == '[' || c == '{':
+	case c == '"' || c == '_' || unicode.IsLetter(c):
+		if !strings.ContainsAny(w, ".[{") && c != '"' {
+			return false // a single word is more likely a misspelt option
+		}
+		joiner = "."
+	default:
+		return false
+	}
+	s.best = &Problem{
+		Start:   pos,
+		End:     end,
+		Message: "an NBT path cannot contain spaces; the game reads '" + w + "' as the next argument",
+		Fix:     &Fix{Title: "Join the NBT path", Start: pos - 1, End: pos, Text: joiner},
+	}
+	return true
 }
 
 // node continues after a child that matched up to pos.

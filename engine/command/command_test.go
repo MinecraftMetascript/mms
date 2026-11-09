@@ -94,3 +94,42 @@ func TestInvalidCommands(t *testing.T) {
 		}
 	}
 }
+
+// A space inside an NBT path makes the game read the rest as the next
+// argument; the problem says so and the fix joins the path again.
+func TestNBTPathSpace(t *testing.T) {
+	c := checker(t)
+	for _, tc := range []struct{ cmd, want string }{
+		{"data get entity @s SelectedItem components.minecraft:custom_data.current_mode_idx", "data get entity @s SelectedItem.components.minecraft:custom_data.current_mode_idx"},
+		{"data get entity @s SelectedItem .components", "data get entity @s SelectedItem.components"},
+		{"data get entity @s Inventory [0].id", "data get entity @s Inventory[0].id"},
+		{"execute store result entity @s SelectedItem components.minecraft:custom_data.x int 1 run say hi", "execute store result entity @s SelectedItem.components.minecraft:custom_data.x int 1 run say hi"},
+	} {
+		r := c.Check(tc.cmd)
+		if r.Problem == nil || r.Problem.Fix == nil {
+			t.Errorf("%q: got %+v, want a fix", tc.cmd, r.Problem)
+			continue
+		}
+		if !strings.Contains(r.Problem.Message, "cannot contain spaces") {
+			t.Errorf("%q: message %q", tc.cmd, r.Problem.Message)
+		}
+		src := []rune(tc.cmd)
+		f := r.Problem.Fix
+		got := string(src[:f.Start]) + f.Text + string(src[f.End:])
+		if got != tc.want {
+			t.Errorf("%q: fixed to %q, want %q", tc.cmd, got, tc.want)
+		}
+		if fixed := c.Check(got); fixed.Problem != nil {
+			t.Errorf("%q: still invalid: %s", got, fixed.Problem.Message)
+		}
+	}
+	// Words that are not the rest of a path keep their usual messages.
+	for _, cmd := range []string{"data get entity @s SelectedItem components 2", "execute store result entity @s Pos[0] intt 1 run say hi"} {
+		if r := c.Check(cmd); r.Problem == nil || r.Problem.Fix != nil {
+			t.Errorf("%q: got %+v, want a problem without a fix", cmd, r.Problem)
+		}
+	}
+	if r := c.Check("data get entity @s SelectedItem.components.minecraft:custom_data.current_mode_idx"); r.Problem != nil {
+		t.Errorf("dotted path: %s", r.Problem.Message)
+	}
+}

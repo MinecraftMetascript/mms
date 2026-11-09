@@ -170,3 +170,20 @@ func TestInlineFunctionNeedsRun(t *testing.T) {
 	}
 	t.Errorf("no error: %v", r.Diagnostics("main.mms"))
 }
+
+// A space splitting an NBT path in a command is reported with a fix that
+// joins the path again.
+func TestCommandNBTPathSpaceFix(t *testing.T) {
+	p := New(spec.MustDefault(), Config{Namespace: "demo"})
+	src := "Function f {\n  /data get entity @s SelectedItem components.minecraft:custom_data.mode\n}\n"
+	p.SetFile("main.mms", src)
+	r, _ := p.Analyze(context.Background())
+	ds := r.Diagnostics("main.mms")
+	if len(ds) != 1 || len(ds[0].Fixes) != 1 {
+		t.Fatalf("diagnostics: %+v", ds)
+	}
+	e := ds[0].Fixes[0].Edits[0]
+	if got := src[:e.Sp.Start] + e.Text + src[e.Sp.End:]; !strings.Contains(got, "SelectedItem.components.minecraft:custom_data.mode\n") {
+		t.Errorf("fixed: %q", got)
+	}
+}

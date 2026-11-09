@@ -196,6 +196,13 @@ func (c *Checker) commandText(text string, at func(start, end int) syntax.Span) 
 	})
 	if p := r.Problem; p != nil {
 		c.errorf("mms/command", at(p.Start, p.End), "%s", p.Message)
+		if f := p.Fix; f != nil && !c.trial {
+			sp := at(f.Start, f.End)
+			if f.End == f.Start {
+				sp.End = sp.Start
+			}
+			c.Diags[len(c.Diags)-1].Fixes = []syntax.Fix{{Title: f.Title, Edits: []syntax.TextEdit{{Sp: sp, Text: f.Text}}}}
+		}
 		return
 	}
 	for _, id := range r.IDs {
