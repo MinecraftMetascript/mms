@@ -116,6 +116,9 @@ func (c *Checker) valueCandidates(v tview, depth int) []Candidate {
 			out = append(out, Candidate{Label: "TextFile", Kind: CandCallable, Insert: `TextFile("$1")`, Detail: ".mmstext or .mmsbook file", Doc: bookTextDoc, Rank: 0})
 		}
 	case "string":
+		if isSelectorType(v.T) {
+			out = append(out, words(CandKeyword, Selectors...)...)
+		}
 		if id := idOf(v.T); id.Present {
 			out = append(out, c.idCandidates(id)...)
 		}

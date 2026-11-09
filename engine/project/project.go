@@ -182,6 +182,7 @@ type Result struct {
 	emitted  map[*syntax.Decl]bool          // declarations Blueprint instances emitted
 	langErr  map[string][]syntax.Diagnostic // keys two Lang declarations set
 	formErr  map[string][]syntax.Diagnostic // declaration forms the language dropped
+	selErr   map[string][]syntax.Diagnostic // selectors written with unknown options
 	jigsaw   *jigsawModel                   // structure files' jigsaw blocks, for the jigsaw rules
 	files    fs.FS
 	lintMu   sync.Mutex
@@ -362,6 +363,7 @@ func (r *Result) fileDiagnostics(path string) []syntax.Diagnostic {
 	out = append(out, r.orderErr[path]...)
 	out = append(out, r.langErr[path]...)
 	out = append(out, r.formErr[path]...)
+	out = append(out, r.selErr[path]...)
 	typeErr := r.typeErr[path]
 	for _, d := range r.Order {
 		if d.Unit == u {
@@ -383,6 +385,7 @@ func (r *Result) fileDiagnostics(path string) []syntax.Diagnostic {
 		}
 		out = append(out, d.Extern[path]...)
 	}
+	out = dropSelectorEchoes(out, r.selErr[path])
 	out = r.configure(path, out)
 	out = append(out, r.Lints()[path]...)
 	r.relate(path, out)
@@ -448,6 +451,10 @@ func (p *Project) Analyze(ctx context.Context) (*Result, error) {
 	syms.Conversions = tenv.Conversions(ev, p.Config.Namespace)
 	r := &Result{Syms: syms, Units: units, Source: source, Decls: map[*syntax.Decl]*Decl{}, collect: collect, pack: p.Pack, cfg: p.Config, files: p.Files, Eval: ev}
 	r.TypeEnv = tenv
+	r.selErr = map[string][]syntax.Diagnostic{}
+	for path, f := range source {
+		r.selErr[path] = sema.CheckSelectors(f)
+	}
 	r.typeErr = tenv.Check(ev, p.Config.Namespace, func(ns string) *sema.Checker {
 		c := sema.NewChecker(p.Pack, p.Kinds, syms, ns)
 		c.Files, c.Texts = p.Files, p.bookText
@@ -781,6 +788,33 @@ func objective(c *sema.Checker, d *syntax.Decl) []string {
 			Message: "expected an objective criterion such as dummy or deathCount"})
 	}
 	return []string{"scoreboard objectives add " + d.Name.Text + " " + criterion}
+}
+
+// dropSelectorEchoes drops a command's complaint about a selector that
+// the selector check already reported, with its fix, at the option or
+// head that is wrong: an execute helper's chain is checked as a command
+// too.
+func dropSelectorEchoes(ds, sel []syntax.Diagnostic) []syntax.Diagnostic {
+	if len(sel) == 0 {
+		return ds
+	}
+	out := ds[:0]
+	for _, d := range ds {
+		if d.Code == "mms/command" && overlapsAny(d.Sp, sel) {
+			continue
+		}
+		out = append(out, d)
+	}
+	return out
+}
+
+func overlapsAny(sp syntax.Span, ds []syntax.Diagnostic) bool {
+	for _, d := range ds {
+		if d.Sp.Start < sp.End && sp.Start < d.Sp.End {
+			return true
+		}
+	}
+	return false
 }
 
 // coversAny reports whether sp holds the span of one of ds.

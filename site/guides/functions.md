@@ -74,6 +74,26 @@ A field costs a storage read and write each time a function uses it. A `Global` 
 
 ### Selectors
 
+A selector used in many places can be named with a `const`, and one that changes with a value with a `Template` of type `Selector`. Either works wherever a selector does: as a score holder, in `tell`, in an execute helper, and in a raw command as `${boss}`:
+
+```mms
+Objective hp
+
+const boss = @e[tag=siege.boss, limit=1]
+Template near(r: int): Selector = @a[distance=..${r}]
+
+Function hit_boss {
+  /effect give ${boss} glowing 5
+  hp[boss] -= 1
+  tell(near(16), "The boss has ${hp[boss]} hp left")
+  As(near(8)).At(@s) {
+    /particle minecraft:crit ~ ~1 ~
+  }
+}
+```
+
+The value is written into each place it is used, so a named selector costs nothing in the game. Hovering the name shows the selector. Option names are checked where the selector is written, with a fix for a misspelled one, and a value given for a `Selector` must be a selector or a player name in quotes.
+
 `exists(target)` tells whether a selector finds any entity, and `count(target)` how many it finds:
 
 ```mms

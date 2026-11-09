@@ -1635,6 +1635,13 @@ func (f *fc) interpolate(ops *[]fn.Op, cmd *syntax.CommandStmt, prefix string) {
 			i = j
 			continue
 		}
+		if sel := selectorText(e); sel != "" {
+			// A selector, or a const or Template that is one, as a
+			// command's target: /kill ${boss}
+			line.WriteString(sel)
+			i = j
+			continue
+		}
 		if id := f.declID(e); id != "" {
 			// A declaration's name is its id, as a command's resource
 			// argument: /locate structure ${dungeon}
