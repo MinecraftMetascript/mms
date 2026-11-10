@@ -332,7 +332,10 @@ func (s *Session) Completion(path string, off int) ([]Item, syntax.Span) {
 			replace = sp
 		}
 	}
-	cands, ok := s.selectorCompletion(a, off)
+	cands, ok := s.instConstCandidates(a, off)
+	if !ok {
+		cands, ok = s.selectorCompletion(a, off)
+	}
 	if !ok {
 		cands, ok = s.typeCompletion(a, off)
 	}
@@ -1153,7 +1156,9 @@ func (s *Session) Hover(path string, off int) (string, syntax.Span) {
 		}
 		md, sp = lmd, lsp
 	} else if md == "" || strings.HasPrefix(md, "Expected:") {
-		if emd, esp, ok := s.evalHover(path, off); ok {
+		if emd, esp, ok := s.instConstHover(path, off); ok {
+			md, sp = emd, esp
+		} else if emd, esp, ok := s.evalHover(path, off); ok {
 			md, sp = emd, esp
 		}
 	}
@@ -1423,6 +1428,9 @@ func (s *Session) current(sym *sema.Symbol) *sema.Symbol {
 func (s *Session) Definition(path string, off int) []Location {
 	if l, _, ok := s.localAt(path, off); ok {
 		return []Location{{Path: path, Span: l.Name.Sp}}
+	}
+	if l, ok := s.instConstDefinition(path, off); ok {
+		return []Location{l}
 	}
 	if n, ok := s.evalNameAt(path, off); ok {
 		// A prelude name's Path is its prelude file, which editors open

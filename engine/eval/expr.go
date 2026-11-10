@@ -443,14 +443,24 @@ func (c *ctx) interp(s string, sp syntax.Span) (string, bool) {
 }
 
 // refsBound reports whether x names anything this evaluation binds: a
-// const, a Template, a loop variable, a parameter or a field.
+// const, a Template, a loop variable, a parameter, a field or a Blueprint
+// instance's const.
 func (c *ctx) refsBound(x syntax.Expr) bool {
 	hit := false
 	syntax.Walk(x, func(n syntax.Node) bool {
-		if id, ok := n.(*syntax.Ident); ok {
-			_, bound, hidden := c.sc.lookup(id.Name)
-			if bound || !hidden && (c.e.r.Const(c.defPath, id.Name) != nil || c.e.r.Template(c.defPath, id.Name) != nil) {
+		switch n := n.(type) {
+		case *syntax.Ident:
+			_, bound, hidden := c.sc.lookup(n.Name)
+			if bound || !hidden && (c.e.r.Const(c.defPath, n.Name) != nil || c.e.r.Template(c.defPath, n.Name) != nil) {
 				hit = true
+			}
+		case *syntax.Member:
+			// name.const of a Blueprint instance
+			if id, ok := n.X.(*syntax.Ident); ok {
+				_, bound, hidden := c.sc.lookup(id.Name)
+				if !bound && !hidden && c.e.instanceSites(id.Name) != nil {
+					hit = true
+				}
 			}
 		}
 		return !hit
@@ -665,6 +675,9 @@ func arith(p pos, op string, a, b *Num) (Value, bool) {
 
 func (c *ctx) member(x *syntax.Member) Value {
 	p := c.pos(x.Sp)
+	if v, ok := c.instanceConst(x); ok {
+		return v
+	}
 	base := c.reduce(x.X)
 	if x.Name == nil {
 		return &Code{p, &syntax.Member{X: c.lower(base), Sp: c.span(x.Sp)}}
@@ -689,6 +702,67 @@ func (c *ctx) member(x *syntax.Member) Value {
 		return &None{pos: p}
 	}
 	return &Code{p, &syntax.Member{X: c.lower(base), Name: &syntax.Name{Text: x.Name.Text, Sp: c.span(x.Name.Sp)}, Sp: c.span(x.Sp)}}
+}
+
+// instanceConst reads name.const, a const at the top of the emit block of
+// the Blueprint instance written as name. ok is false when x is not one.
+func (c *ctx) instanceConst(x *syntax.Member) (Value, bool) {
+	id, ok := x.X.(*syntax.Ident)
+	if !ok || x.Name == nil {
+		return nil, false
+	}
+	if _, bound, hidden := c.sc.lookup(id.Name); bound || hidden || c.e.r.Const(c.defPath, id.Name) != nil {
+		return nil, false
+	}
+	sites := c.e.instanceSites(id.Name)
+	if len(sites) == 0 {
+		return nil, false
+	}
+	p := c.pos(x.Sp)
+	for _, o := range sites {
+		if o.state == 0 {
+			// Expand it now, on a budget of its own, as if it were met
+			// in its place in the file.
+			steps, over := c.e.steps, c.e.over
+			c.e.steps, c.e.over = 0, false
+			obp := c.e.r.Blueprint(o.path, o.d.Kind.Name)
+			c.e.expandSite(o, obp, &ctx{e: c.e, path: o.path, defPath: o.path, sc: &scope{}, ns: o.ns, compile: true}, false)
+			c.e.steps, c.e.over = steps, over
+		}
+	}
+	// Two instances may share a name when their Blueprints differ: the
+	// one with the const is meant.
+	s := sites[0]
+	for _, o := range sites {
+		if o.state == 1 || o.inst != nil && o.inst.ConstDefs[x.Name.Text] != nil {
+			s = o
+			break
+		}
+	}
+	bp := c.e.r.Blueprint(s.path, s.d.Kind.Name)
+	if s.state == 1 {
+		c.errorf("mms/const-cycle", x.Sp, bp.D.NameText()+" "+id.Name+" reads its own const '"+x.Name.Text+"' while it is being declared")
+		return &Code{p, &syntax.Bad{Sp: c.span(x.Sp)}}, true
+	}
+	if s.inst == nil {
+		// It could not be expanded, which is reported at the instance.
+		return &None{pos: p}, true
+	}
+	st := s.inst.ConstDefs[x.Name.Text]
+	if st == nil {
+		msg := bp.D.NameText() + " " + id.Name + " has no const '" + x.Name.Text + "'"
+		if s.inst.Consts == nil {
+			msg += "; the consts at the top of a Blueprint's emit block are read as " + id.Name + ".<name>, and " + bp.D.NameText() + " has none"
+		} else {
+			msg += "; it has " + strings.Join(s.inst.Consts.Keys, ", ")
+		}
+		c.errorf("mms/unknown-field", x.Name.Sp, msg)
+		return &Code{p, &syntax.Bad{Sp: c.span(x.Sp)}}, true
+	}
+	v, _ := s.inst.Consts.get(x.Name.Text)
+	name := id.Name + "." + x.Name.Text
+	return withPos(v, c.span(x.Sp), append(append([]Frame(nil), c.fr...),
+		Frame{Kind: FrameConst, Name: name, Call: Origin{c.path, c.span(x.Sp)}, Def: Origin{bp.Path, st.Sp}}), bp.Path), true
 }
 
 // selectorArgs evaluates a selector's arguments. A bare word stays as

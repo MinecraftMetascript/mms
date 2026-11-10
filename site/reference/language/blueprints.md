@@ -102,3 +102,69 @@ The first `as` that fits the expected type is used. `hint(...)` after the value 
 `emit { }` holds the declarations the kind writes. It can use `if`, `for` and `let`, and the fields by name. `self.path` is the declaration's name and `self.id` its id with the namespace, and names can be templates, as in a [top-level for](reuse.md#repeating-declarations). Emitting into a kind that merges, such as a tag, `Lang`, `OnLoad` or `OnTick`, merges with the project's own.
 
 One emitted declaration can be marked `primary`. It must have the declaration's own id, and the name then forwards to it: wherever none of the Blueprint's `as` fits, `fire_wand` means what the custom item `fire_wand` means. That is why `fire_wand` above works as a recipe result. A Blueprint has at most one primary.
+
+### Consts of an instance
+
+A `const` at the top of an `emit` block belongs to each instance, and other code reads it as `name.const`. Use one for a value that has no file of its own, such as a biome's entry in a multi-noise biome source:
+
+```mms
+Blueprint CustomBiome {
+  climate: ClimateParameters
+  biome: Biome
+
+  emit {
+    primary Biome ${self.path} = biome
+
+    const noise_entry: BiomeNoiseEntry = {
+      biome = self.id
+      parameters = climate
+    }
+  }
+}
+
+CustomBiome ash_fields {
+  climate = {
+    temperature = [0.5, 1]
+    humidity = [-1, 0]
+    continentalness = 0
+    erosion = 0
+    weirdness = 0
+    depth = 0
+    offset = 0
+  }
+  biome = {
+    has_precipitation = false
+    temperature = 2
+    downfall = 0
+    effects = { water_color = "#3F76E4" }
+    carvers = []
+    features = []
+  }
+}
+
+CustomBiome frost_fields {
+  climate = {
+    temperature = [-1, -0.5]
+    humidity = 0
+    continentalness = 0
+    erosion = 0
+    weirdness = 0
+    depth = 0
+    offset = 0
+  }
+  biome = {
+    has_precipitation = true
+    temperature = -0.5
+    downfall = 0.5
+    effects = { water_color = "#3D57D6" }
+    carvers = []
+    features = []
+  }
+}
+
+const fields_source: BiomeSource = MultiNoise(
+  biomes = [ash_fields.noise_entry, frost_fields.noise_entry]
+)
+```
+
+`ash_fields.noise_entry` is the entry that `CustomBiome ash_fields` worked out. It can be read anywhere a const can, in any file and before the instance is written, and in a command as `${ash_fields.noise_entry}`. Only the consts at the top of an `emit` block are read this way. A `let`, a field, or a const inside an `if` or a `for` stays inside the Blueprint. An instance that reads its own consts while it is being declared is an error.

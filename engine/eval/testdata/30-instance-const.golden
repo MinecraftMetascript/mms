@@ -1,0 +1,22 @@
+=== a.mms (changed: true)
+# at a.mms:3:10
+Function show {
+  /say 6 ${[6, 12]} other:beta
+}
+# at a.mms:7:6, def b.mms:7:5 < Blueprint Pair (at a.mms:7:6, def b.mms:2:1)
+Objective loop: dummy
+--- diagnostics
+6:23 error mms/unknown-field: Pair alpha has no const 'thrice'; it has twice, tag
+7:17 error mms/const-cycle: Pair loop reads its own const 'twice' while it is being declared
+=== b.mms (changed: true)
+# at b.mms:1:1
+Namespace other
+# at b.mms:10:6, def b.mms:7:5 < Blueprint Pair (at b.mms:10:6, def b.mms:2:1)
+Objective alpha: dummy
+# at b.mms:11:6, def b.mms:7:5 < Blueprint Pair (at b.mms:11:6, def b.mms:2:1)
+Objective beta: dummy
+=== provenance of copied nodes
+a.mms:4:3 from a.mms:2 < const both (at a.mms:4:3, def a.mms:2:1): 1 node, [6, 12]
+a.mms:4:3 from b.mms:5 < const both (at a.mms:4:3, def a.mms:2:1): 2 nodes, 12
+a.mms:7:6 from b.mms:5 < Blueprint Pair (at a.mms:7:6, def b.mms:2:1): 1 node, 2
+b.mms:11:17 from b.mms:5 < const alpha.twice (at b.mms:11:17, def b.mms:5:5): 1 node, 6
