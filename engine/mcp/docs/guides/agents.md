@@ -4,7 +4,7 @@
 
 ## Setting it up
 
-The server is part of the `mms` command line and speaks over stdin and stdout. It needs a version of `mms` newer than 0.5.0: run `mms mcp -check`, which tests the server and prints the lines below with the path of your own `mms` filled in. If it says `unknown command "mcp"`, the `mms` it found is too old.
+The server is part of the `mms` command line and speaks over stdin and stdout. It needs a version of `mms` newer than 0.5.0: run `mms mcp -check`, which tests the server and prints the lines below. Its `claude mcp add` line has the path of your own `mms` filled in; the `.mcp.json` entry keeps plain `mms`, which everyone who shares the file needs on their PATH. If it says `unknown command "mcp"`, the `mms` it found is too old.
 
 In Claude Code, for yourself in one project folder:
 
@@ -40,7 +40,7 @@ The server has no settings and does not use the network. Everything it knows is 
 | `Failed to connect`, `ENOENT` | The client did not find `mms`. Give the full path as the command; `mms mcp -check` prints it. |
 | no `mms` line | The client did not read the entry. Check the file's name and place, and that it is valid JSON. |
 
-`mms mcp` on its own waits for a client and prints nothing else, so use `mms mcp -check` to test it by hand.
+`mms mcp` on its own waits for a client. It writes one line to stderr and nothing to stdout, so use `mms mcp -check` to test it by hand.
 
 ## The tools
 

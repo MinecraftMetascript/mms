@@ -46,9 +46,10 @@ func runMCP(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	return 0
 }
 
-// checkMCP runs the server's self-test and prints the entry a client
-// needs, with this binary's own path so that it works whatever PATH the
-// client starts servers with.
+// checkMCP runs the server's self-test and prints how to set a client
+// up. The command for one person has this binary's own path, so that it
+// works whatever PATH the client starts servers with; the shared
+// .mcp.json entry says plain mms, which each person needs on their PATH.
 func checkMCP(s *mcp.Server, stdout, stderr io.Writer) int {
 	what, err := s.SelfTest(context.Background())
 	if err != nil {
