@@ -61,7 +61,7 @@ func (s *Session) SplineAt(path string, off int) (SplineView, bool) {
 	if f == nil {
 		return SplineView{}, false
 	}
-	root, focus := spline.At(syntax.PathAt(f, off), off, f.Src, s.foldNumber)
+	root, focus := spline.At(syntax.PathAt(f, off), off, f.Src, func(e syntax.Expr) (float64, bool) { return s.foldNumber(path, e) })
 	if root == nil {
 		return SplineView{}, false
 	}
@@ -185,12 +185,12 @@ func removeSpan(l *syntax.List, i int, src []rune) syntax.Span {
 }
 
 // foldNumber works out a number expression of literals, arithmetic and
-// consts.
-func (s *Session) foldNumber(e syntax.Expr) (float64, bool) {
-	return s.fold(e, 0)
+// consts, as written in file path.
+func (s *Session) foldNumber(path string, e syntax.Expr) (float64, bool) {
+	return s.fold(path, e, 0)
 }
 
-func (s *Session) fold(e syntax.Expr, depth int) (float64, bool) {
+func (s *Session) fold(path string, e syntax.Expr, depth int) (float64, bool) {
 	if depth > 16 {
 		return 0, false
 	}
@@ -199,9 +199,9 @@ func (s *Session) fold(e syntax.Expr, depth int) (float64, bool) {
 		v, err := strconv.ParseFloat(strings.ReplaceAll(x.Text, "_", ""), 64)
 		return v, err == nil
 	case *syntax.Paren:
-		return s.fold(x.X, depth)
+		return s.fold(path, x.X, depth)
 	case *syntax.Unary:
-		v, ok := s.fold(x.X, depth)
+		v, ok := s.fold(path, x.X, depth)
 		switch x.Op {
 		case "-":
 			return -v, ok
@@ -209,8 +209,8 @@ func (s *Session) fold(e syntax.Expr, depth int) (float64, bool) {
 			return v, ok
 		}
 	case *syntax.Binary:
-		a, ok1 := s.fold(x.L, depth)
-		b, ok2 := s.fold(x.R, depth)
+		a, ok1 := s.fold(path, x.L, depth)
+		b, ok2 := s.fold(path, x.R, depth)
 		if !ok1 || !ok2 {
 			return 0, false
 		}
@@ -228,9 +228,9 @@ func (s *Session) fold(e syntax.Expr, depth int) (float64, bool) {
 		if s.R.Eval == nil {
 			return 0, false
 		}
-		if c := s.R.Eval.Consts[x.Name]; c != nil {
+		if c := s.R.Eval.Const(path, x.Name); c != nil {
 			if v := c.Lowered(); v != nil {
-				return s.fold(v, depth+1)
+				return s.fold(c.Path, v, depth+1)
 			}
 		}
 	}

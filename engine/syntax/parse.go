@@ -213,8 +213,9 @@ func (b *builder) topItem(c parser.ITopItemContext) Stmt {
 	switch it := c.(type) {
 	case *parser.DeclItemContext:
 		d := b.decl(it.Declaration())
-		if d != nil && it.EXTERN() != nil {
-			d.Extern = true
+		if d != nil && (it.EXTERN() != nil || it.PRIVATE() != nil) {
+			d.Extern = it.EXTERN() != nil
+			d.Private = it.PRIVATE() != nil
 			d.Sp = sp
 			d.Doc = b.docBefore(it.GetStart().GetTokenIndex())
 		}
@@ -223,7 +224,13 @@ func (b *builder) topItem(c parser.ITopItemContext) Stmt {
 		}
 		return d
 	case *parser.ConstItemContext:
-		return b.constDecl(it.ConstDecl())
+		st := b.constDecl(it.ConstDecl())
+		if it.PRIVATE() != nil {
+			st.Private = true
+			st.Sp = sp
+			st.Doc = b.docBefore(it.GetStart().GetTokenIndex())
+		}
+		return st
 	case *parser.LetItemContext:
 		return b.letDecl(it.LetDecl())
 	case *parser.ForItemContext:

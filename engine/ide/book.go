@@ -370,7 +370,7 @@ func (s *Session) markupNameHover(body string) string {
 			var found *syntax.FieldDecl
 			for _, n := range strings.Split(field, ".") {
 				found = nil
-				for _, f := range s.recordFields(t) {
+				for _, f := range s.recordFields(sym.Unit.Path, t) {
 					if f.Name.Text == n {
 						found = f
 					}
@@ -387,13 +387,13 @@ func (s *Session) markupNameHover(body string) string {
 }
 
 // recordFields are the fields of a record type as written: in place,
-// `{ x: int }`, or a Type declaration's body.
-func (s *Session) recordFields(t syntax.TypeExpr) []*syntax.FieldDecl {
+// `{ x: int }`, or the body of the Type declaration it names in file path.
+func (s *Session) recordFields(path string, t syntax.TypeExpr) []*syntax.FieldDecl {
 	switch t := t.(type) {
 	case *syntax.TypeRecord:
 		return t.Fields
 	case *syntax.TypeName:
-		if td := s.R.Syms.TypeDecls[t.Name]; td != nil && td.Body != nil {
+		if td := s.R.Syms.TypeDecls[s.R.Eval.TypeKey(path, t.Name)]; td != nil && td.Body != nil {
 			var out []*syntax.FieldDecl
 			for _, it := range td.Body.Items {
 				if f, ok := it.(*syntax.FieldDecl); ok && f.Name != nil {

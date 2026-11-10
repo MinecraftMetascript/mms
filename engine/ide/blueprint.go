@@ -1,7 +1,6 @@
 package ide
 
 import (
-	"sort"
 	"strings"
 
 	"github.com/minecraftmetascript/mms/engine/eval"
@@ -11,21 +10,17 @@ import (
 )
 
 // declKinds lists what can start a declaration: the kinds, then the
-// Blueprints in scope, except those whose doc says @internal.
-func (s *Session) declKinds() []sema.Candidate {
+// Blueprints file path can name, except those whose doc says @internal.
+func (s *Session) declKinds(path string) []sema.Candidate {
 	out := append(s.P.Kinds.DeclKinds(), evalKeywords...)
 	if s.R == nil || s.R.Eval == nil {
 		return out
 	}
-	names := make([]string, 0, len(s.R.Eval.Blueprints))
-	for n, bp := range s.R.Eval.Blueprints {
-		if !internal(bp.D) {
-			names = append(names, n)
+	for _, bp := range s.R.Eval.BlueprintsIn(path) {
+		if internal(bp.D) {
+			continue
 		}
-	}
-	sort.Strings(names)
-	for _, n := range names {
-		bp := s.R.Eval.Blueprints[n]
+		n := bp.D.Name.Text
 		out = append(out, sema.Candidate{
 			Label: n, Kind: sema.CandKind, Detail: "Blueprint",
 			Doc: sema.DocMarkdown(bp.D.Doc), Deprecated: sema.Deprecated(bp.D),
@@ -51,9 +46,9 @@ var emitKeywords = []sema.Candidate{
 // emitCandidates lists what starts a statement in a Blueprint's emit
 // block: the declaration kinds, the project's Blueprints and the emit
 // keywords. Template, Type and Blueprint are file-level only.
-func (s *Session) emitCandidates() []sema.Candidate {
+func (s *Session) emitCandidates(path string) []sema.Candidate {
 	var out []sema.Candidate
-	for _, c := range s.declKinds() {
+	for _, c := range s.declKinds(path) {
 		switch c.Label {
 		case "Template", "Type", "Blueprint", "const", "for":
 			continue
@@ -112,11 +107,12 @@ func internal(d *syntax.Decl) bool {
 }
 
 // blueprint returns the Blueprint a declaration's kind names, or nil.
-func (s *Session) blueprint(d *syntax.Decl) *eval.Blueprint {
+// d is written in file path.
+func (s *Session) blueprint(path string, d *syntax.Decl) *eval.Blueprint {
 	if d == nil || d.Kind == nil || s.R == nil || s.R.Eval == nil {
 		return nil
 	}
-	return s.R.Eval.Blueprints[d.Kind.Name]
+	return s.R.Eval.Blueprint(path, d.Kind.Name)
 }
 
 // instanceHover describes a Blueprint instance at its name.
@@ -175,7 +171,7 @@ func (s *Session) blueprintValues(bp *eval.Blueprint) []sema.Candidate {
 		out = append(out, tc.Candidate)
 	}
 	out = append(out, sema.Candidate{Label: "self", Kind: sema.CandID, Detail: "the instance", Doc: "The instance being expanded: `self.id`, `self.namespace` and `self.path`.", Rank: 1})
-	for _, c := range s.evalValueCandidates() {
+	for _, c := range s.evalValueCandidates(bp.Path) {
 		c.Rank += 10
 		out = append(out, c)
 	}
@@ -204,7 +200,7 @@ func (s *Session) blueprintComplete(a *at, off int) ([]sema.Candidate, bool) {
 	// The kind of the declaration `primary` marks.
 	if prev != nil && prev.Kind == parser.MMSLexerPRIMARY {
 		var out []sema.Candidate
-		for _, c := range s.emitCandidates() {
+		for _, c := range s.emitCandidates(a.u.Path) {
 			if c.Kind != sema.CandKeyword {
 				out = append(out, c)
 			}
@@ -216,7 +212,7 @@ func (s *Session) blueprintComplete(a *at, off int) ([]sema.Candidate, bool) {
 	}
 	// The type of an `as` conversion.
 	if prev != nil && prev.Kind == parser.MMSLexerAS && s.R.TypeEnv != nil {
-		return s.typeNameCandidates(), true
+		return s.typeNameCandidates(a.u.Path), true
 	}
 	// The first word of a line: an item of the body, or a line of a
 	// check block.

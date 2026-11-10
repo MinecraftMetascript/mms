@@ -43,7 +43,7 @@ func (c *ctx) defaultsAt(v Value, t syntax.TypeExpr, depth int) Value {
 	case *syntax.TypeRecord:
 		return c.recordDefaults(v, t.Fields, c.defPath, depth)
 	case *syntax.TypeName:
-		td := c.e.r.Types[t.Name]
+		td := c.e.r.Type(c.defPath, t.Name)
 		if td == nil {
 			return v
 		}

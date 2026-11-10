@@ -191,7 +191,7 @@ func (c *ctx) markPrimary(st *syntax.Decl, out []*Decl, first int) {
 		c.errorf("mms/primary", st.Kind.Sp, "a Blueprint has at most one primary declaration")
 		return
 	}
-	if c.e.r.Blueprints[st.Kind.Name] != nil {
+	if c.e.r.Blueprint(c.defPath, st.Kind.Name) != nil {
 		if first < len(c.e.r.Instances) {
 			c.inst.Forward = c.e.r.Instances[first]
 		}

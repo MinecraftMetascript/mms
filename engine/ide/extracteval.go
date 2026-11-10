@@ -195,17 +195,17 @@ func constName(parent syntax.Node) string {
 func (s *Session) newEvalName(name string) string {
 	taken := map[string]bool{}
 	e := s.R.Eval
-	for n := range e.Consts {
-		taken[n] = true
+	for _, k := range e.Consts {
+		taken[k.Name()] = true
 	}
-	for n := range e.Templates {
-		taken[n] = true
+	for _, t := range e.Templates {
+		taken[t.D.Name.Text] = true
 	}
-	for n := range e.Blueprints {
-		taken[n] = true
+	for _, b := range e.Blueprints {
+		taken[b.D.Name.Text] = true
 	}
-	for n := range e.Types {
-		taken[n] = true
+	for _, t := range e.Types {
+		taken[t.D.Name.Text] = true
 	}
 	return uniqueName(taken, name)
 }

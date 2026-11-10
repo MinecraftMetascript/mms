@@ -286,9 +286,9 @@ func (e *Env) named(path string, t *syntax.TypeName) *spec.Type {
 		}
 		return idType(reg)
 	}
-	if _, ok := e.decls[t.Name]; ok {
-		e.define(t.Name)
-		return &spec.Type{Kind: "reference", Path: Prefix + t.Name}
+	if k := e.key(path, t.Name); e.decls[k] != nil {
+		e.define(k)
+		return &spec.Type{Kind: "reference", Path: Prefix + k}
 	}
 	if k, ok := e.Kinds.Lookup(t.Name); ok && k.Resource != "" && !strings.HasPrefix(k.Resource, "tags/") {
 		// A kind's name: an id of one, or an inline value where the
@@ -298,7 +298,7 @@ func (e *Env) named(path string, t *syntax.TypeName) *spec.Type {
 	if p, ok := schemaNames(e.Pack)[t.Name]; ok {
 		return &spec.Type{Kind: "reference", Path: p}
 	}
-	e.errorf(path, t.Sp, "unknown type '"+t.Name+"'"+e.suggest(t.Name))
+	e.errorf(path, t.Sp, "unknown type '"+t.Name+"'"+e.suggest(path, t.Name))
 	return &spec.Type{Kind: "any"}
 }
 
@@ -307,14 +307,34 @@ func (e *Env) isResourceFolder(reg string) bool {
 	return ok
 }
 
+// key returns the key in decls of the Type that name means in file path:
+// the file's own private Type, or the public one.
+func (e *Env) key(path, name string) string {
+	if e.decls[eval.PrivateKey(path, name)] != nil {
+		return eval.PrivateKey(path, name)
+	}
+	return name
+}
+
+// Path returns the path in Types of the Type declaration that name
+// means in file path, or "" when the project declares none.
+func (e *Env) Path(path, name string) string {
+	if k := e.key(path, name); e.decls[k] != nil {
+		return Prefix + k
+	}
+	return ""
+}
+
 // suggest offers a close type name.
-func (e *Env) suggest(name string) string {
+func (e *Env) suggest(path, name string) string {
 	var cands []string
 	for p := range primitives {
 		cands = append(cands, p)
 	}
-	for n := range e.decls {
-		cands = append(cands, n)
+	for _, td := range e.decls {
+		if eval.Visible(td.D.Private, td.Path, path) {
+			cands = append(cands, td.D.Name.Text)
+		}
 	}
 	best := near.Closest(name, cands)
 	if best == "" {
@@ -349,10 +369,10 @@ type TypeName struct {
 	Args bool
 }
 
-// Names lists the names a type expression can use: the language's own
-// types, the project's Type declarations, resource kinds and then schema
-// types, in that order.
-func (e *Env) Names() []TypeName {
+// Names lists the names a type expression in file path can use: the
+// language's own types, the project's Type declarations it can see,
+// resource kinds and then schema types, in that order.
+func (e *Env) Names(path string) []TypeName {
 	var out []TypeName
 	for _, n := range []string{"int", "float", "double", "long", "short", "byte", "bool", "string", "any"} {
 		out = append(out, TypeName{Name: n, Detail: "value type"})
@@ -375,8 +395,10 @@ func (e *Env) Names() []TypeName {
 		}
 	}
 	var own []string
-	for n := range e.decls {
-		own = append(own, n)
+	for _, td := range e.decls {
+		if eval.Visible(td.D.Private, td.Path, path) {
+			own = append(own, td.D.Name.Text)
+		}
 	}
 	add(own, "Type")
 	var kinds []string

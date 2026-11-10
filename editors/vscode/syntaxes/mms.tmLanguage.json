@@ -50,7 +50,7 @@
       "patterns": [
         { "include": "#comments" },
         { "name": "keyword.control.mms", "match": "\\b(if|else|while|for|in|return|break|continue)\\b" },
-        { "name": "storage.modifier.mms", "match": "\\b(let|const|extern|primary)\\b" },
+        { "name": "storage.modifier.mms", "match": "\\b(let|const|extern|private|primary)\\b" },
         { "name": "keyword.other.mms", "match": "\\b(emit|check|as|setup|run|expect)\\b" },
         { "name": "variable.language.self.mms", "match": "\\bself\\b" },
         { "name": "constant.language.mms", "match": "\\b(true|false)\\b" },

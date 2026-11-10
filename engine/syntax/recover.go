@@ -136,8 +136,8 @@ func hasUnclosed(toks []antlr.Token) bool {
 }
 
 // startsTopItem reports whether a token pair starts a top-level item:
-// `Kind name` with a PascalCase kind, or `const`, `for` or `extern`
-// followed by a word.
+// `Kind name` with a PascalCase kind, `const`, `for` or `extern`
+// followed by a word, or `private` followed by either.
 func startsTopItem(first antlr.Token, second int) bool {
 	switch first.GetTokenType() {
 	case parser.MMSLexerIDENT:
@@ -145,6 +145,8 @@ func startsTopItem(first antlr.Token, second int) bool {
 		return r != "" && r[0] >= 'A' && r[0] <= 'Z' && parser.IsNameToken(second)
 	case parser.MMSLexerCONST, parser.MMSLexerFOR, parser.MMSLexerEXTERN:
 		return second == parser.MMSLexerIDENT
+	case parser.MMSLexerPRIVATE:
+		return second == parser.MMSLexerIDENT || second == parser.MMSLexerCONST || second == parser.MMSLexerTYPE
 	}
 	return false
 }

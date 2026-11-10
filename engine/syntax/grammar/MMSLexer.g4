@@ -17,6 +17,8 @@ CONST    : 'const';
 // `Type` is the one PascalCase keyword: its body is types, not values.
 TYPE     : 'Type';
 EXTERN   : 'extern';
+// `private` scopes a const, Template, Type or Blueprint to its file.
+PRIVATE  : 'private';
 LET      : 'let';
 IF       : 'if';
 ELSE     : 'else';

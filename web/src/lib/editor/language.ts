@@ -34,7 +34,7 @@ export const mmsLanguage = StreamLanguage.define<{ inBlock: boolean }>({
 		}
 		if (stream.match(/^"(?:[^"\\]|\\.)*"?/) || stream.match(/^'(?:[^'\\]|\\.)*'?/)) return 'string';
 		if (stream.match(/^\d+(\.\d+)?([eE][+-]?\d+)?/)) return 'number';
-		if (stream.match(/^(true|false|const|let|extern|primary|if|else|while|for|in|return|break|continue|emit|check|as|setup|run|expect)\b/)) return 'keyword';
+		if (stream.match(/^(true|false|const|let|extern|private|primary|if|else|while|for|in|return|break|continue|emit|check|as|setup|run|expect)\b/)) return 'keyword';
 		if (stream.match(/^[a-z0-9_.-]+:[a-z0-9_./-]+/)) return 'atom';
 		// Identifiers are left to semantic tokens, which know kinds from
 		// helpers from references.

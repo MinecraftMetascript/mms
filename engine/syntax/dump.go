@@ -36,6 +36,9 @@ func (d *dumper) decl(decl *Decl) {
 	if decl.Extern {
 		head = "extern " + head
 	}
+	if decl.Private {
+		head = "private " + head
+	}
 	if decl.Primary {
 		head = "primary " + head
 	}
@@ -150,6 +153,9 @@ func (d *dumper) stmt(s Stmt) {
 		name := "?"
 		if s.Name != nil {
 			name = s.Name.Text
+		}
+		if s.Private {
+			name = "private " + name
 		}
 		d.line("Const %s", name)
 		d.in(func() {

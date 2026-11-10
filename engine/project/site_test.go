@@ -122,7 +122,7 @@ func TestSiteListsLanguageTypes(t *testing.T) {
 		t.Fatal(err)
 	}
 	r, _ := New(spec.MustDefault(), Config{Namespace: "demo"}).Analyze(context.Background())
-	for _, n := range r.TypeEnv.Names() {
+	for _, n := range r.TypeEnv.Names("") {
 		switch n.Detail {
 		case "value type", "language type":
 			if !strings.Contains(string(b), "`"+n.Name+"`") {
