@@ -10,6 +10,7 @@ import (
 
 	"github.com/minecraftmetascript/mms/engine/prelude"
 	"github.com/minecraftmetascript/mms/engine/sema"
+	"github.com/minecraftmetascript/mms/engine/spline"
 	"github.com/minecraftmetascript/mms/engine/syntax"
 )
 
@@ -53,6 +54,8 @@ var Rules = []*Rule{
 		Doc: "An id or enum name in quotes can be written bare: `minecraft:stone` or `stone` rather than \"minecraft:stone\"."},
 	{ID: "redundant-namespace", Severity: syntax.SeverityHint, run: lintNamespace,
 		Doc: "A `minecraft:` prefix that can be dropped: `stone` means `minecraft:stone` unless the project declares its own `stone`."},
+	{ID: "spline-order", Severity: syntax.SeverityWarning, run: lintSplineOrder,
+		Doc: "A spline point whose location is lower than the point before it. The game looks points up by location assuming they go from lowest to highest, so points out of order give a broken curve. The quick fix sorts the points."},
 	{ID: "structure-unknown-loot-table", Severity: syntax.SeverityWarning, all: lintStructureLoot,
 		Doc: "A chest, barrel, chest minecart or other container in a structure file that StructureFile(\"...\") includes whose LootTable tag names a loot table nothing provides: in the minecraft namespace one vanilla does not have, and in a namespace the project declares in one that no LootTable declares. The game leaves the container empty without an error. The quick fix declares the table. Other namespaces may come from another pack and are not checked."},
 	{ID: "texture-outside-atlas", Severity: syntax.SeverityWarning, all: lintTextureAtlas,
@@ -784,3 +787,45 @@ func ruleByID(id string) *Rule {
 	}
 	return nil
 }
+
+func lintSplineOrder(l *lintRun, d *Decl) {
+	src := d.Unit.File.Src
+	for _, s := range spline.All(d.D, src, constValue) {
+		if s.List == nil {
+			continue
+		}
+		for i, p := range s.Points {
+			if !p.Location.Known {
+				continue
+			}
+			if i == 0 || !s.Points[i-1].Location.Known || p.Location.Value >= s.Points[i-1].Location.Value {
+				continue
+			}
+			l.report(d, p.Location.Sp, fmt.Sprintf("this point's location %s is lower than the one before it (%s); spline points must go from the lowest location to the highest",
+				num(p.Location.Value), num(s.Points[i-1].Location.Value)), splineSortFix(s, src)...)
+			break
+		}
+	}
+}
+
+// splineSortFix sorts a spline's points by location, when every location
+// is known and every point is written in this file.
+func splineSortFix(s *spline.Spline, src []rune) []syntax.Fix {
+	sorted := append([]*spline.Point{}, s.Points...)
+	for _, p := range sorted {
+		sp := p.X.Span()
+		if !p.Location.Known || sp.Start < s.List.Sp.Start || sp.End > s.List.Sp.End || sp.End > len(src) {
+			return nil
+		}
+	}
+	sort.SliceStable(sorted, func(i, j int) bool { return sorted[i].Location.Value < sorted[j].Location.Value })
+	var edits []syntax.TextEdit
+	for i, p := range s.Points {
+		if sorted[i] != p {
+			edits = append(edits, syntax.TextEdit{Sp: p.X.Span(), Text: string(src[sorted[i].X.Span().Start:sorted[i].X.Span().End])})
+		}
+	}
+	return []syntax.Fix{{Title: "Sort the points by location", Edits: edits}}
+}
+
+func num(v float64) string { return strconv.FormatFloat(v, 'g', -1, 64) }

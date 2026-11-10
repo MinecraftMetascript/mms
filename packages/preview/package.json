@@ -14,6 +14,7 @@
 		"./worker": "./src/preview/preview.worker.ts",
 		"./paths": "./src/paths.ts",
 		"./tree": "./src/tree.ts",
+		"./spline": "./src/spline/spline.ts",
 		"./jigsaw/give": "./src/jigsaw/give.ts",
 		"./jigsaw/tool": "./src/jigsaw/tool.ts",
 		"./jigsaw/JigsawTool.svelte": {

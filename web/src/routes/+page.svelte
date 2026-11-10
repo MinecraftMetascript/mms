@@ -22,7 +22,8 @@
 	import { requestPersistence } from '#lib/project/store.ts';
 	import Dropdown from '#lib/components/Dropdown.svelte';
 	import { fixAllKeys, formatKeys, mod, quickFixKeys } from '#lib/editor/shortcuts.ts';
-	import { bookPageAt, PinButton, PreviewPane, shows } from '@mms/preview';
+	import { bookPageAt, PinButton, PreviewPane, shows, type SplineAt, type SplineEdit } from '@mms/preview';
+	import { applyEdits } from '#lib/editor/diagnostics.ts';
 	import PreviewWorker from '@mms/preview/worker?worker';
 
 	const project = new Project();
@@ -218,6 +219,28 @@
 			live = false;
 		};
 	});
+	// The density function spline at the cursor opens the spline editor in
+	// the Preview tab; its edits go to the source through the editor, so
+	// they can be undone.
+	let spline = $state<SplineAt | null>(null);
+	$effect(() => {
+		const c = cursor;
+		void engine?.output; // a new analysis
+		if (rightTab !== 'preview' || pinned || !engine || !c) {
+			spline = null;
+			return;
+		}
+		let live = true;
+		void engine.spline(c.uri, { line: c.line, character: c.character }).then((x) => {
+			if (live) spline = x;
+		});
+		return () => {
+			live = false;
+		};
+	});
+	function editSpline(edits: SplineEdit[]) {
+		if (view) applyEdits(view, edits);
+	}
 	const previewPath = $derived(pinned ?? selectedOutput);
 	const pinnable = $derived(shows(previewPath, engine?.outputItems, engine?.outputTexts));
 	function togglePin() {
@@ -544,6 +567,8 @@
 							{pinned}
 							onunpin={() => (pinned = null)}
 							createWorker={() => new PreviewWorker()}
+							{spline}
+							onsplineedit={editSpline}
 						/>
 					</div>
 					<div class="h-full" class:hidden={rightTab !== 'json'}>

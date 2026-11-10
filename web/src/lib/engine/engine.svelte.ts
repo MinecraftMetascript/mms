@@ -5,7 +5,7 @@ import { ProjectWorkspace } from './workspace';
 import { sanitizeHTML } from './sanitize';
 import { showDiagnostics } from '../editor/diagnostics';
 import type { InlayHint } from '../editor/inlay';
-import type { OutputJigsaw } from '@mms/preview';
+import type { OutputJigsaw, SplineAt } from '@mms/preview';
 
 export interface Diagnostic {
 	range: { start: { line: number; character: number }; end: { line: number; character: number } };
@@ -382,6 +382,17 @@ export class Engine {
 		const method = uri.startsWith('mms-vanilla:') ? 'mms/vanillaFile' : 'mms/preludeFile';
 		try {
 			return (await this.client.request<object, { text: string }>(method, { uri })).text;
+		} catch {
+			return null;
+		}
+	}
+
+	/** The density function spline at a position, for the spline editor, or null. */
+	async spline(uri: string, position: { line: number; character: number }): Promise<SplineAt | null> {
+		if (!this.client.connected) return null;
+		this.client.sync();
+		try {
+			return await this.client.request<object, SplineAt | null>('mms/spline', { textDocument: { uri }, position });
 		} catch {
 			return null;
 		}

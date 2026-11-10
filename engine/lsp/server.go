@@ -226,6 +226,7 @@ func init() {
 		"mms/runTests":                     typed((*Server).runTests),
 		"mms/worldInstall":                 typed((*Server).worldInstall),
 		"mms/expand":                       typed((*Server).expand),
+		"mms/spline":                       typed((*Server).spline),
 		"textDocument/codeAction":          typed((*Server).codeAction),
 		"mms/setConfig":                    typed((*Server).setConfig),
 		"mms/setAssets":                    typed((*Server).setAssets),
@@ -1352,6 +1353,58 @@ func (s *Server) runTests(_ context.Context, p struct {
 		tests = append(tests, m)
 	}
 	return map[string]any{"tests": tests}, nil
+}
+
+// spline returns the spline at a position for the spline editor, or
+// null: the outermost spline of the nesting there as a tree, and focus,
+// the point indices from it to the innermost spline at the position.
+// A number has a range only when it is a literal the editor can rewrite.
+func (s *Server) spline(_ context.Context, p posParams) (any, *respError) {
+	sess, l, off, ok := s.locate(p)
+	if !ok {
+		return nil, nil
+	}
+	v, ok := sess.SplineAt(p.TextDocument.URI, off)
+	if !ok {
+		return nil, nil
+	}
+	focus := append([]int{}, v.Focus...)
+	return map[string]any{"root": splineJSON(v.Root, l), "focus": focus}, nil
+}
+
+func splineJSON(sp *ide.SplineInfo, l *lines) map[string]any {
+	num := func(n ide.SplineNum) map[string]any {
+		m := map[string]any{"value": nil}
+		if n.Known {
+			m["value"] = n.Value
+		}
+		if n.Sp.End > n.Sp.Start {
+			m["range"] = l.rng(n.Sp)
+		}
+		return m
+	}
+	points := []any{}
+	for _, p := range sp.Points {
+		m := map[string]any{"range": l.rng(p.Sp), "location": num(p.Location), "derivative": num(p.Derivative)}
+		if p.Spline != nil {
+			m["spline"] = splineJSON(p.Spline, l)
+		} else {
+			m["value"] = num(p.Value)
+		}
+		if sp.Editable {
+			m["remove"] = l.rng(p.Remove)
+		}
+		points = append(points, m)
+	}
+	out := map[string]any{"range": l.rng(sp.Sp), "coordinate": sp.Coordinate, "editable": sp.Editable, "points": points}
+	if sp.Editable {
+		ins := []any{}
+		for _, in := range sp.Inserts {
+			ins = append(ins, map[string]any{"range": l.rng(syntax.Span{Start: in.At, End: in.At}), "before": in.Before, "after": in.After})
+		}
+		out["template"], out["inserts"] = sp.Template, ins
+	}
+	return out
 }
 
 // expand returns what a Template call or Blueprint instance writes: at
