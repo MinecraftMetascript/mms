@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/MinecraftMetascript/nbt-go"
+
 	"github.com/minecraftmetascript/mms/engine/fn"
 	"github.com/minecraftmetascript/mms/engine/syntax"
 )
@@ -1446,7 +1448,7 @@ func (c *Checker) Global(d *syntax.Decl) []string {
 	}
 	if typ == tString {
 		loc := fn.Storage(ns) + " " + fn.GlobalPath(path)
-		return []string{fmt.Sprintf("execute unless data storage %s run data modify storage %s set value %s", loc, loc, fn.QuoteSNBT(str))}
+		return []string{fmt.Sprintf("execute unless data storage %s run data modify storage %s set value %s", loc, loc, nbt.Quote(str))}
 	}
 	return []string{fmt.Sprintf("execute unless score %s = %s run scoreboard players set %s %d", s, s, s, init)}
 }
@@ -1454,7 +1456,7 @@ func (c *Checker) Global(d *syntax.Decl) []string {
 // setString writes a string value to a storage location.
 func (f *fc) setString(dst string, v *val) fn.Op {
 	if v.str != nil {
-		return fn.Cmd{Text: "data modify storage " + dst + " set value " + fn.QuoteSNBT(*v.str)}
+		return fn.Cmd{Text: "data modify storage " + dst + " set value " + nbt.Quote(*v.str)}
 	}
 	return fn.Cmd{Text: "data modify storage " + dst + " set from storage " + v.path}
 }
@@ -1507,7 +1509,7 @@ func (f *fc) concat(pre *[]fn.Op, l, r *val) *val {
 		return &val{typ: tString, str: &s}
 	}
 	esc := func(s string) string {
-		q := fn.QuoteSNBT(s)
+		q := nbt.Quote(s)
 		return q[1 : len(q)-1]
 	}
 	var args []fn.MacroArg
@@ -1539,7 +1541,7 @@ func (f *fc) compareStrings(pre []fn.Op, op string, l, r *val) *val {
 	pre = append(pre, f.setString(tmp, l))
 	src := "from storage " + r.path
 	if r.str != nil {
-		src = "value " + fn.QuoteSNBT(*r.str)
+		src = "value " + nbt.Quote(*r.str)
 	}
 	pre = append(pre, fn.Cmd{Text: fmt.Sprintf("execute store success score %s run data modify storage %s set %s", t, tmp, src)})
 	kw := "if"

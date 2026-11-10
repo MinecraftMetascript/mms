@@ -3,180 +3,91 @@ package mcfn
 import (
 	"fmt"
 	"math"
-	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/MinecraftMetascript/nbt-go"
 )
 
-// Storage values are map[string]any (compounds), []any (lists), string,
-// int32 (and other ints as int32), float64.
+// Storage holds nbt-go tag trees, so values keep their NBT types and
+// paths follow the game's rules.
 
-func (vm *VM) root(id string) map[string]any {
+func (vm *VM) root(id string) nbt.Compound {
 	m, ok := vm.Storage[id]
 	if !ok {
-		m = map[string]any{}
+		m = nbt.Compound{}
 		vm.Storage[id] = m
 	}
 	return m
 }
 
-type step struct {
-	key   string
-	index *int
-}
-
-func parsePath(p string) ([]step, error) {
-	var out []step
-	for p != "" {
-		switch {
-		case p[0] == '.':
-			p = p[1:]
-		case p[0] == '[':
-			j := strings.IndexByte(p, ']')
-			if j < 0 {
-				return nil, fmt.Errorf("unclosed [ in path")
-			}
-			n, err := strconv.Atoi(p[1:j])
-			if err != nil {
-				return nil, fmt.Errorf("unsupported path index %q", p[1:j])
-			}
-			out = append(out, step{index: &n})
-			p = p[j+1:]
-		case p[0] == '"':
-			j := strings.IndexByte(p[1:], '"')
-			if j < 0 {
-				return nil, fmt.Errorf("unclosed quote in path")
-			}
-			out = append(out, step{key: p[1 : j+1]})
-			p = p[j+2:]
-		default:
-			j := strings.IndexAny(p, ".[")
-			if j < 0 {
-				j = len(p)
-			}
-			out = append(out, step{key: p[:j]})
-			p = p[j:]
-		}
+// get reads the one tag at path, or the whole storage for "".
+func (vm *VM) get(id, path string) (nbt.Tag, error) {
+	if path == "" {
+		return vm.root(id), nil
 	}
-	return out, nil
-}
-
-func (vm *VM) get(id, path string) (any, error) {
-	steps, err := parsePath(path)
+	p, err := nbt.ParsePath(path)
 	if err != nil {
 		return nil, err
 	}
-	var cur any = vm.root(id)
-	for _, s := range steps {
-		switch c := cur.(type) {
-		case map[string]any:
-			if s.index != nil {
-				return nil, fmt.Errorf("index on a compound")
-			}
-			v, ok := c[s.key]
-			if !ok {
-				return nil, fmt.Errorf("nothing at %s", path)
-			}
-			cur = v
-		case []any:
-			if s.index == nil {
-				return nil, fmt.Errorf("key on a list")
-			}
-			i := *s.index
-			if i < 0 {
-				i += len(c)
-			}
-			if i < 0 || i >= len(c) {
-				return nil, fmt.Errorf("nothing at %s", path)
-			}
-			cur = c[i]
-		default:
-			return nil, fmt.Errorf("nothing at %s", path)
-		}
+	switch ts := p.Get(vm.root(id)); len(ts) {
+	case 0:
+		return nil, fmt.Errorf("nothing at %s", path)
+	case 1:
+		return ts[0], nil
+	default:
+		return nil, fmt.Errorf("%d tags at %s, not one", len(ts), path)
 	}
-	return cur, nil
 }
 
-// put sets the value at path, creating compounds on the way. With remove
-// set, it deletes it instead.
-func (vm *VM) put(id, path string, v any, remove bool) error {
-	steps, err := parsePath(path)
+// setData stores v at path, creating compounds on the way, and reports
+// whether anything changed.
+func (vm *VM) setData(id, path string, v nbt.Tag) (bool, error) {
+	if path == "" {
+		m, ok := v.(nbt.Compound)
+		if !ok {
+			return false, fmt.Errorf("storage root must be a compound")
+		}
+		changed := !nbt.Equal(vm.root(id), m)
+		vm.Storage[id] = m
+		return changed, nil
+	}
+	p, err := nbt.ParsePath(path)
+	if err != nil {
+		return false, err
+	}
+	root := vm.root(id)
+	n, err := p.Set(root, v)
+	if err != nil {
+		return false, err
+	}
+	if n == 0 && p.Count(root) == 0 {
+		return false, fmt.Errorf("nothing at %s", path)
+	}
+	return n > 0, nil
+}
+
+// modify calls f with the tag at path, created with create if it is
+// missing, and stores what f returns.
+func (vm *VM) modify(id, path string, create func() nbt.Tag, f func(nbt.Tag) (nbt.Tag, error)) error {
+	p, err := nbt.ParsePath(path)
 	if err != nil {
 		return err
 	}
-	if len(steps) == 0 {
-		m, ok := v.(map[string]any)
-		if !ok {
-			return fmt.Errorf("storage root must be a compound")
-		}
-		vm.Storage[id] = m
-		return nil
+	n, err := p.Modify(vm.root(id), create, f)
+	if err == nil && n == 0 {
+		err = fmt.Errorf("nothing at %s", path)
 	}
-	var cur any = vm.root(id)
-	for i, s := range steps {
-		last := i == len(steps)-1
-		switch c := cur.(type) {
-		case map[string]any:
-			if last {
-				if remove {
-					delete(c, s.key)
-				} else {
-					c[s.key] = v
-				}
-				return nil
-			}
-			next, ok := c[s.key]
-			if !ok {
-				if remove {
-					return nil
-				}
-				next = map[string]any{}
-				c[s.key] = next
-			}
-			cur = next
-		case []any:
-			if s.index == nil {
-				return fmt.Errorf("key on a list")
-			}
-			j := *s.index
-			if j < 0 {
-				j += len(c)
-			}
-			if j < 0 || j >= len(c) {
-				return fmt.Errorf("index out of range in %s", path)
-			}
-			if last {
-				if remove {
-					return vm.setList(id, steps[:i], append(append([]any(nil), c[:j]...), c[j+1:]...))
-				}
-				c[j] = v
-				return nil
-			}
-			cur = c[j]
-		default:
-			return fmt.Errorf("cannot go into a %T at %s", cur, path)
-		}
+	return err
+}
+
+func (vm *VM) remove(id, path string) error {
+	p, err := nbt.ParsePath(path)
+	if err != nil {
+		return err
 	}
+	p.Remove(vm.root(id))
 	return nil
-}
-
-func (vm *VM) setList(id string, steps []step, l []any) error {
-	return vm.put(id, joinPath(steps), l, false)
-}
-
-func joinPath(steps []step) string {
-	var sb strings.Builder
-	for i, s := range steps {
-		if s.index != nil {
-			fmt.Fprintf(&sb, "[%d]", *s.index)
-			continue
-		}
-		if i > 0 {
-			sb.WriteByte('.')
-		}
-		sb.WriteString(s.key)
-	}
-	return sb.String()
 }
 
 func (vm *VM) storeTo(spec []string, v int32) error {
@@ -186,14 +97,44 @@ func (vm *VM) storeTo(spec []string, v int32) error {
 		return err
 	}
 	x := float64(v) * scale
-	var val any
+	var val nbt.Tag
 	switch spec[2] {
-	case "int", "short", "byte", "long":
-		val = int32(math.Floor(x))
+	case "int":
+		val = nbt.Int(math.Floor(x))
+	case "short":
+		val = nbt.Short(math.Floor(x))
+	case "byte":
+		val = nbt.Byte(math.Floor(x))
+	case "long":
+		val = nbt.Long(math.Floor(x))
+	case "float":
+		val = nbt.Float(x)
+	case "double":
+		val = nbt.Double(x)
 	default:
-		val = x
+		return fmt.Errorf("unknown store type %q", spec[2])
 	}
-	return vm.put(spec[0], spec[1], val, false)
+	_, err = vm.setData(spec[0], spec[1], val)
+	return err
+}
+
+// number reads a numeric tag.
+func number(t nbt.Tag) (float64, bool) {
+	switch x := t.(type) {
+	case nbt.Byte:
+		return float64(x), true
+	case nbt.Short:
+		return float64(x), true
+	case nbt.Int:
+		return float64(x), true
+	case nbt.Long:
+		return float64(x), true
+	case nbt.Float:
+		return float64(x), true
+	case nbt.Double:
+		return float64(x), true
+	}
+	return 0, false
 }
 
 // data runs `data get|modify|remove storage ...`.
@@ -218,32 +159,37 @@ func (vm *VM) data(w []string) (result, error) {
 				return result{}, err
 			}
 		}
+		if n, ok := number(v); ok {
+			return result{value: int32(math.Floor(n * scale)), ok: true}, nil
+		}
 		switch x := v.(type) {
-		case int32:
-			return result{value: int32(math.Floor(float64(x) * scale)), ok: true}, nil
-		case float64:
-			return result{value: int32(math.Floor(x * scale)), ok: true}, nil
-		case string:
+		case nbt.String:
 			return result{value: int32(len(x)), ok: true}, nil
-		case []any:
+		case nbt.List:
 			return result{value: int32(len(x)), ok: true}, nil
-		case map[string]any:
+		case nbt.Compound:
+			return result{value: int32(len(x)), ok: true}, nil
+		case nbt.ByteArray:
+			return result{value: int32(len(x)), ok: true}, nil
+		case nbt.IntArray:
+			return result{value: int32(len(x)), ok: true}, nil
+		case nbt.LongArray:
 			return result{value: int32(len(x)), ok: true}, nil
 		}
-		return result{}, fmt.Errorf("cannot get %T", v)
+		return result{}, fmt.Errorf("cannot get %v", v.Type())
 	case "remove":
-		return result{value: 1, ok: true}, vm.put(id, w[3], nil, true)
+		return result{value: 1, ok: true}, vm.remove(id, w[3])
 	case "modify":
 		// data modify storage <id> <path> <set|append|prepend|merge> (value <snbt> | from storage <id> <path> | string storage <id> <path>)
 		if len(w) < 6 {
 			return result{}, fmt.Errorf("incomplete data modify")
 		}
 		path, mode := w[3], w[4]
-		var v any
+		var v nbt.Tag
 		switch w[5] {
 		case "value":
 			var err error
-			if v, err = ParseSNBT(strings.Join(w[6:], " ")); err != nil {
+			if v, err = nbt.ParseSNBT(strings.Join(w[6:], " ")); err != nil {
 				return result{}, err
 			}
 		case "from":
@@ -251,282 +197,77 @@ func (vm *VM) data(w []string) (result, error) {
 			if err != nil {
 				return result{failed: true}, nil // nothing to copy: the command fails
 			}
-			v = clone(src)
+			v = nbt.Clone(src)
 		case "string":
 			src, err := vm.get(w[7], w[8])
 			if err != nil {
 				return result{}, err
 			}
-			v = toText(src)
+			v = nbt.String(toText(src))
 		default:
 			return result{}, fmt.Errorf("unsupported data source %q", w[5])
 		}
 		switch mode {
 		case "set":
-			if old, err := vm.get(id, path); err == nil && SNBT(old) == SNBT(v) {
+			changed, err := vm.setData(id, path, v)
+			if err == nil && !changed {
 				return result{failed: true}, nil // nothing changed: the command fails
 			}
-			return result{value: 1, ok: true}, vm.put(id, path, v, false)
+			return result{value: 1, ok: true}, err
 		case "append", "prepend":
-			cur, err := vm.get(id, path)
-			if err != nil {
-				cur = []any{}
-			}
-			l, ok := cur.([]any)
-			if !ok {
-				return result{}, fmt.Errorf("%s is not a list", path)
-			}
-			if mode == "append" {
-				l = append(l, v)
-			} else {
-				l = append([]any{v}, l...)
-			}
-			return result{value: int32(len(l)), ok: true}, vm.put(id, path, l, false)
+			n := 0
+			err := vm.modify(id, path, func() nbt.Tag { return nbt.List{} }, func(cur nbt.Tag) (nbt.Tag, error) {
+				l, ok := cur.(nbt.List)
+				if !ok {
+					return nil, fmt.Errorf("%s is not a list", path)
+				}
+				if mode == "append" {
+					l = append(l, v)
+				} else {
+					l = append(nbt.List{v}, l...)
+				}
+				n = len(l)
+				return l, nil
+			})
+			return result{value: int32(n), ok: true}, err
 		case "merge":
-			cur, err := vm.get(id, path)
-			m, ok := cur.(map[string]any)
-			if err != nil || !ok {
-				m = map[string]any{}
-			}
-			add, ok := v.(map[string]any)
+			add, ok := v.(nbt.Compound)
 			if !ok {
 				return result{}, fmt.Errorf("merge needs a compound")
 			}
-			for k, x := range add {
-				m[k] = x
-			}
-			return result{value: 1, ok: true}, vm.put(id, path, m, false)
+			err := vm.modify(id, path, func() nbt.Tag { return nbt.Compound{} }, func(cur nbt.Tag) (nbt.Tag, error) {
+				m, ok := cur.(nbt.Compound)
+				if !ok {
+					m = nbt.Compound{}
+				}
+				for k, x := range add {
+					m[k] = x
+				}
+				return m, nil
+			})
+			return result{value: 1, ok: true}, err
 		}
 		return result{}, fmt.Errorf("unsupported data modify %q", mode)
 	}
 	return result{}, fmt.Errorf("unsupported data %q", w[0])
 }
 
-func clone(v any) any {
+// toText reads a tag as text, as data modify ... string and macro
+// arguments do: a string as itself, a number as written without its
+// suffix, anything else as SNBT.
+func toText(v nbt.Tag) string {
 	switch x := v.(type) {
-	case map[string]any:
-		m := make(map[string]any, len(x))
-		for k, y := range x {
-			m[k] = clone(y)
-		}
-		return m
-	case []any:
-		l := make([]any, len(x))
-		for i, y := range x {
-			l[i] = clone(y)
-		}
-		return l
+	case nbt.String:
+		return string(x)
+	case nbt.Float, nbt.Double:
+		n, _ := number(x)
+		return strconv.FormatFloat(n, 'f', -1, 64)
+	case nbt.Byte, nbt.Short, nbt.Int, nbt.Long:
+		n, _ := number(x)
+		return strconv.FormatInt(int64(n), 10)
 	}
-	return v
-}
-
-func toText(v any) string {
-	switch x := v.(type) {
-	case string:
-		return x
-	case int32:
-		return strconv.Itoa(int(x))
-	case float64:
-		return strconv.FormatFloat(x, 'f', -1, 64)
-	}
-	return SNBT(v)
-}
-
-// SNBT writes a value as SNBT, with sorted keys.
-func SNBT(v any) string {
-	switch x := v.(type) {
-	case map[string]any:
-		keys := make([]string, 0, len(x))
-		for k := range x {
-			keys = append(keys, k)
-		}
-		sort.Strings(keys)
-		parts := make([]string, len(keys))
-		for i, k := range keys {
-			parts[i] = k + ":" + SNBT(x[k])
-		}
-		return "{" + strings.Join(parts, ",") + "}"
-	case []any:
-		parts := make([]string, len(x))
-		for i, y := range x {
-			parts[i] = SNBT(y)
-		}
-		return "[" + strings.Join(parts, ",") + "]"
-	case string:
-		return strconv.Quote(x)
-	case int32:
-		return strconv.Itoa(int(x))
-	case float64:
-		return strconv.FormatFloat(x, 'f', -1, 64) + "d"
-	}
-	return fmt.Sprint(v)
-}
-
-// snbtMacro is how a macro argument is substituted: strings bare,
-// numbers as written.
-func snbtMacro(v any) string {
-	if s, ok := v.(string); ok {
-		return s
-	}
-	if f, ok := v.(float64); ok {
-		return strconv.FormatFloat(f, 'f', -1, 64)
-	}
-	return SNBT(v)
-}
-
-// ParseSNBT reads the SNBT subset the backend writes.
-func ParseSNBT(s string) (any, error) {
-	p := &snbt{s: strings.TrimSpace(s)}
-	v, err := p.value()
-	if err != nil {
-		return nil, err
-	}
-	p.ws()
-	if p.i != len(p.s) {
-		return nil, fmt.Errorf("unexpected %q in SNBT", p.s[p.i:])
-	}
-	return v, nil
-}
-
-type snbt struct {
-	s string
-	i int
-}
-
-func (p *snbt) ws() {
-	for p.i < len(p.s) && p.s[p.i] == ' ' {
-		p.i++
-	}
-}
-
-func (p *snbt) value() (any, error) {
-	p.ws()
-	if p.i >= len(p.s) {
-		return nil, fmt.Errorf("unexpected end of SNBT")
-	}
-	switch c := p.s[p.i]; {
-	case c == '{':
-		p.i++
-		m := map[string]any{}
-		for {
-			p.ws()
-			if p.i < len(p.s) && p.s[p.i] == '}' {
-				p.i++
-				return m, nil
-			}
-			k, err := p.word()
-			if err != nil {
-				return nil, err
-			}
-			p.ws()
-			if p.i >= len(p.s) || p.s[p.i] != ':' {
-				return nil, fmt.Errorf("expected ':' in SNBT")
-			}
-			p.i++
-			v, err := p.value()
-			if err != nil {
-				return nil, err
-			}
-			m[k] = v
-			p.ws()
-			if p.i < len(p.s) && p.s[p.i] == ',' {
-				p.i++
-			}
-		}
-	case c == '[':
-		p.i++
-		var l []any
-		for {
-			p.ws()
-			if p.i < len(p.s) && p.s[p.i] == ']' {
-				p.i++
-				if l == nil {
-					l = []any{}
-				}
-				return l, nil
-			}
-			v, err := p.value()
-			if err != nil {
-				return nil, err
-			}
-			l = append(l, v)
-			p.ws()
-			if p.i < len(p.s) && p.s[p.i] == ',' {
-				p.i++
-			}
-		}
-	case c == '"' || c == '\'':
-		return p.word()
-	}
-	w, err := p.word()
-	if err != nil {
-		return nil, err
-	}
-	switch w {
-	case "true":
-		return int32(1), nil
-	case "false":
-		return int32(0), nil
-	}
-	num := strings.TrimRight(w, "bslBSL")
-	if n, err := strconv.ParseInt(num, 10, 64); err == nil {
-		return int32(n), nil
-	}
-	if f, err := strconv.ParseFloat(strings.TrimRight(w, "fdFD"), 64); err == nil {
-		return f, nil
-	}
-	return w, nil
-}
-
-func (p *snbt) word() (string, error) {
-	if p.i < len(p.s) && (p.s[p.i] == '"' || p.s[p.i] == '\'') {
-		q := p.s[p.i]
-		var sb strings.Builder
-		for j := p.i + 1; j < len(p.s); j++ {
-			switch p.s[j] {
-			case '\\':
-				j++
-				if j < len(p.s) {
-					j = unescape(&sb, p.s, j)
-				}
-			case q:
-				p.i = j + 1
-				return sb.String(), nil
-			default:
-				sb.WriteByte(p.s[j])
-			}
-		}
-		return "", fmt.Errorf("unclosed string in SNBT")
-	}
-	start := p.i
-	for p.i < len(p.s) && strings.IndexByte(" ,:]}", p.s[p.i]) < 0 {
-		p.i++
-	}
-	if p.i == start {
-		return "", fmt.Errorf("expected a value in SNBT")
-	}
-	return p.s[start:p.i], nil
+	return v.String()
 }
 
 // Get reads a storage value at a path, such as "game.wave".
-func (vm *VM) Get(id, path string) (any, error) { return vm.get(id, path) }
-
-// unescape writes the character an SNBT escape stands for, the one at
-// s[j] after a backslash, and returns the index of its last byte. The
-// game reads \n, \t, \r, \b, \f, \s and \xHH, \uHHHH, \UHHHHHHHH; any
-// other character stands for itself.
-func unescape(sb *strings.Builder, s string, j int) int {
-	simple := map[byte]rune{'n': '\n', 't': '\t', 'r': '\r', 'b': '\b', 'f': '\f', 's': ' '}
-	if r, ok := simple[s[j]]; ok {
-		sb.WriteRune(r)
-		return j
-	}
-	if n := map[byte]int{'x': 2, 'u': 4, 'U': 8}[s[j]]; n > 0 && j+n < len(s) {
-		if v, err := strconv.ParseUint(s[j+1:j+1+n], 16, 32); err == nil {
-			sb.WriteRune(rune(v))
-			return j + n
-		}
-	}
-	sb.WriteByte(s[j])
-	return j
-}
+func (vm *VM) Get(id, path string) (nbt.Tag, error) { return vm.get(id, path) }

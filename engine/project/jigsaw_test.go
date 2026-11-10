@@ -1,15 +1,42 @@
 package project
 
 import (
+	"bytes"
 	"fmt"
 	"sort"
 	"strings"
 	"testing"
 	"testing/fstest"
 
-	"github.com/minecraftmetascript/mms/engine/nbt"
+	"github.com/MinecraftMetascript/nbt-go"
+	"github.com/MinecraftMetascript/nbt-go/structure"
+
 	"github.com/minecraftmetascript/mms/engine/syntax"
 )
+
+// encodeStructure writes a structure file's root compound, gzipped as
+// the game writes them.
+func encodeStructure(root map[string]any) ([]byte, error) {
+	var b bytes.Buffer
+	enc := nbt.NewEncoder(&b)
+	enc.SetCompression(nbt.Gzip)
+	err := enc.Encode(root)
+	return b.Bytes(), err
+}
+
+// structureOf reads a structure file's root compound as a Structure.
+func structureOf(t *testing.T, root map[string]any) *structure.Structure {
+	t.Helper()
+	data, err := nbt.Marshal(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	st, err := structure.Read(bytes.NewReader(data))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return st
+}
 
 // piece builds a structure file with a stone block and the given jigsaw
 // blocks, each as pool|name|target.
@@ -27,7 +54,7 @@ func piece(t *testing.T, jigsaws ...string) []byte {
 			"nbt": map[string]any{"id": "minecraft:jigsaw", "pool": f[0], "name": f[1], "target": f[2], "final_state": "minecraft:air", "joint": "rollable"},
 		})
 	}
-	data, err := nbt.Encode(map[string]any{"DataVersion": int32(4440), "size": []any{int32(3), int32(1), int32(1)}, "palette": palette, "blocks": blocks, "entities": []any{}})
+	data, err := encodeStructure(map[string]any{"DataVersion": int32(4440), "size": []any{int32(3), int32(1), int32(1)}, "palette": palette, "blocks": blocks, "entities": []any{}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -119,7 +146,7 @@ func TestJigsawOrientationAndJoint(t *testing.T) {
 		}
 		return map[string]any{"pos": []any{x, int32(0), int32(0)}, "state": state, "nbt": data}
 	}
-	got := Jigsaws(map[string]any{"palette": palette, "blocks": []any{jig(0, 0, ""), jig(1, 1, ""), jig(2, 1, "aligned")}})
+	got := Jigsaws(structureOf(t, map[string]any{"palette": palette, "blocks": []any{jig(0, 0, ""), jig(1, 1, ""), jig(2, 1, "aligned")}}))
 	want := []string{"west_up aligned", "up_north rollable", "up_north aligned"}
 	if len(got) != len(want) {
 		t.Fatalf("got %v", got)
@@ -142,11 +169,11 @@ func TestJigsawPriorities(t *testing.T) {
 		}
 		return map[string]any{"pos": []any{x, int32(0), int32(0)}, "state": int32(0), "nbt": data}
 	}
-	got := Jigsaws(map[string]any{"palette": palette, "blocks": []any{
+	got := Jigsaws(structureOf(t, map[string]any{"palette": palette, "blocks": []any{
 		jig(0, nil),
 		jig(1, map[string]any{"selection_priority": int32(3), "placement_priority": int32(-2)}),
 		jig(2, map[string]any{"selection_priority": int8(1)}),
-	}})
+	}}))
 	want := [][2]int{{0, 0}, {3, -2}, {1, 0}}
 	if len(got) != len(want) {
 		t.Fatalf("got %v", got)
@@ -171,7 +198,7 @@ func orientedPiece(t *testing.T, size [3]int32, jigsaws ...string) []byte {
 		blocks = append(blocks, map[string]any{"pos": []any{x, y, z}, "state": int32(i),
 			"nbt": map[string]any{"id": "minecraft:jigsaw", "pool": f[2], "name": f[3], "target": f[4]}})
 	}
-	data, err := nbt.Encode(map[string]any{"size": []any{size[0], size[1], size[2]}, "palette": palette, "blocks": blocks})
+	data, err := encodeStructure(map[string]any{"size": []any{size[0], size[1], size[2]}, "palette": palette, "blocks": blocks})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -258,7 +285,7 @@ func TestJigsawOrientation26Palette(t *testing.T) {
 		"blocks": []any{map[string]any{"pos": []any{int32(2), int32(0), int32(13)}, "state": int32(0),
 			"nbt": map[string]any{"id": "minecraft:jigsaw", "pool": "demo:a", "name": "demo:b", "target": "demo:c", "joint": "rollable"}}},
 	}
-	got := Jigsaws(root)
+	got := Jigsaws(structureOf(t, root))
 	if len(got) != 1 || got[0].Orientation != "up_north" || got[0].Joint != "rollable" {
 		t.Fatalf("got %+v", got)
 	}
@@ -399,7 +426,7 @@ func TestJigsawLabel(t *testing.T) {
 		block(3, nil),
 	}}
 	var got []string
-	for _, j := range Jigsaws(root) {
+	for _, j := range Jigsaws(structureOf(t, root)) {
 		got = append(got, j.Label)
 	}
 	if want := []string{"Hall exit", "Road end", "Arch", ""}; fmt.Sprint(got) != fmt.Sprint(want) {

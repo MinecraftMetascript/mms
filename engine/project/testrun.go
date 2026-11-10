@@ -122,7 +122,7 @@ func seen(vm *mcfn.VM, ns string, e sema.TestExpect) string {
 		if err != nil {
 			return text + " has no score"
 		}
-		return text + " is " + mcfn.SNBT(v)
+		return text + " is " + v.String()
 	}
 	lit := func(text string) bool { _, err := strconv.Atoi(text); return err == nil }
 	switch {

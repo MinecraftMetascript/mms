@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/MinecraftMetascript/nbt-go"
 )
 
 // Entity is a summoned entity: its type, tags and position. The VM has
@@ -13,7 +15,7 @@ type Entity struct {
 	Type string // with its namespace: "minecraft:zombie"
 	Tags map[string]bool
 	Pos  [3]float64
-	NBT  map[string]any // the rest of the summon data, as given
+	NBT  nbt.Compound // the rest of the summon data, as given
 	// key is the entity's score holder in VM.Scores: a name no fake
 	// player can have.
 	key string
@@ -66,7 +68,7 @@ func (vm *VM) summon(w []string) (result, error) {
 		return result{}, fmt.Errorf("summon needs an entity type")
 	}
 	vm.summoned++
-	e := &Entity{Type: fullID(w[0]), Tags: map[string]bool{}, NBT: map[string]any{}, key: "\x00entity" + strconv.Itoa(vm.summoned)}
+	e := &Entity{Type: fullID(w[0]), Tags: map[string]bool{}, NBT: nbt.Compound{}, key: "\x00entity" + strconv.Itoa(vm.summoned)}
 	rest := w[1:]
 	if len(rest) >= 3 {
 		pos, err := vm.position(rest[:3])
@@ -80,11 +82,11 @@ func (vm *VM) summon(w []string) (result, error) {
 		e.Pos = vm.pos
 	}
 	if len(rest) > 0 {
-		v, err := ParseSNBT(strings.Join(rest, " "))
+		v, err := nbt.ParseSNBT(strings.Join(rest, " "))
 		if err != nil {
 			return result{}, err
 		}
-		m, ok := v.(map[string]any)
+		m, ok := v.(nbt.Compound)
 		if !ok {
 			return result{}, fmt.Errorf("summon data must be a compound")
 		}
@@ -93,16 +95,16 @@ func (vm *VM) summon(w []string) (result, error) {
 				e.NBT[k] = v
 				continue
 			}
-			l, ok := v.([]any)
+			l, ok := v.(nbt.List)
 			if !ok {
 				return result{}, fmt.Errorf("the Tags tag must be a list of strings")
 			}
 			for _, t := range l {
-				s, ok := t.(string)
+				s, ok := t.(nbt.String)
 				if !ok {
 					return result{}, fmt.Errorf("the Tags tag must be a list of strings")
 				}
-				e.Tags[s] = true
+				e.Tags[string(s)] = true
 			}
 		}
 	}
