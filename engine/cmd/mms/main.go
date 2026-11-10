@@ -37,6 +37,7 @@ commands:
   import  turn a data pack folder or zip into an MMS project
   init    create mms.json and a starter file
   lsp     run the language server over stdio
+  mcp     run the MCP server over stdio, for AI agents that write MMS
   reference print every kind and helper as JSON
   test    run the project's Test declarations
   version print the version
@@ -65,6 +66,8 @@ func main() {
 		code = runTest(os.Args[2:], os.Stdout, os.Stderr)
 	case "lsp":
 		code = runLSP(os.Args[2:], os.Stdin, os.Stdout, os.Stderr)
+	case "mcp":
+		code = runMCP(os.Args[2:], os.Stdin, os.Stdout, os.Stderr)
 	case "reference":
 		code = runReference(os.Args[2:], os.Stdout, os.Stderr)
 	case "version", "-v", "--version":

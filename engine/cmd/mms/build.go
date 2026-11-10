@@ -11,40 +11,11 @@ import (
 
 	"github.com/minecraftmetascript/mms/engine/prelude"
 	"github.com/minecraftmetascript/mms/engine/project"
-	"github.com/minecraftmetascript/mms/engine/spec"
 	"github.com/minecraftmetascript/mms/engine/syntax"
 )
 
 // load reads the project in dir: mms.json and every source file.
-func load(dir string) (*project.Project, error) {
-	cfg, err := project.LoadConfig(dir)
-	if err != nil {
-		return nil, err
-	}
-	pack, err := spec.Default()
-	if err != nil {
-		return nil, err
-	}
-	p := project.New(pack, cfg)
-	p.Files = os.DirFS(dir)
-	if cfg.Icon != "" {
-		if st, err := os.Stat(filepath.Join(dir, filepath.FromSlash(cfg.Icon))); err != nil || st.IsDir() {
-			return nil, fmt.Errorf("mms.json: icon: no file %q in the project", cfg.Icon)
-		}
-	}
-	paths, err := cfg.SourceFiles(dir)
-	if err != nil {
-		return nil, err
-	}
-	for _, rel := range paths {
-		b, err := os.ReadFile(filepath.Join(dir, rel))
-		if err != nil {
-			return nil, err
-		}
-		p.SetFile(rel, string(b))
-	}
-	return p, nil
-}
+func load(dir string) (*project.Project, error) { return project.Load(dir) }
 
 // report prints diagnostics like a compiler: path:line:col, the message,
 // and the source line with a caret. Hints are editor suggestions and are

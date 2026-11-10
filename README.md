@@ -57,6 +57,7 @@ mms fix gems                    # apply every safe lint fix
 mms fmt gems                    # format every .mms file in gems
 mms import pack.zip proj        # turn an existing data pack (folder or zip) into MMS
 mms lsp                         # language server over stdio, for other editors
+mms mcp                         # MCP server over stdio, for AI agents that write MMS
 mms reference                   # every kind, helper and prelude declaration, as JSON
 ```
 
@@ -67,7 +68,7 @@ Everything is on the [docs site](https://minecraftmetascript.github.io/mms/docs)
 - [Getting started](https://minecraftmetascript.github.io/mms/docs/start/getting-started), then the [custom dimension tutorial](https://minecraftmetascript.github.io/mms/docs/start/tutorial-dimension).
 - Guides to [resources](https://minecraftmetascript.github.io/mms/docs/guides/resources), [functions](https://minecraftmetascript.github.io/mms/docs/guides/functions) and [lint rules](https://minecraftmetascript.github.io/mms/docs/guides/lint).
 - The [reference](https://minecraftmetascript.github.io/mms/docs/reference): the language itself, then every kind, helper, Blueprint and lint rule.
-- For AI assistants: [llms.txt](https://minecraftmetascript.github.io/mms/llms.txt) and [llms-full.txt](https://minecraftmetascript.github.io/mms/llms-full.txt).
+- For AI agents: the [`mms mcp` server](https://minecraftmetascript.github.io/mms/docs/guides/agents), and [llms.txt](https://minecraftmetascript.github.io/mms/llms.txt) and [llms-full.txt](https://minecraftmetascript.github.io/mms/llms-full.txt).
 
 The [examples](examples/) are whole projects (worldgen, custom items, books, jigsaw structures, minigames). The web editor lists them, and the tests build every one.
 
