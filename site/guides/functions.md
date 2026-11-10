@@ -220,6 +220,28 @@ Function next_mode {
 }
 ```
 
+`index_of(list, value)` goes the other way: the position of the first item equal to `value`, counting from 0. A value known when compiling, such as `index_of(modes, "Replace")`, becomes its number, and it must be in the list. A value known only as the function runs is tested against each item, and gives `-1` when none matches:
+
+```mms
+const modes: [string] = ["Measure", "Replace"]
+
+Type ToolState {
+  mode: int
+  picked: string = "Measure"
+}
+
+Storage tool: ToolState
+
+Function pick_mode {
+  let i = index_of(modes, tool.picked)
+  if (i == -1) {
+    actionbar(@s, "No mode named ${tool.picked}")
+    return
+  }
+  tool.mode = i
+}
+```
+
 ## Interpolation
 
 `${expr}` puts a value into a command:
