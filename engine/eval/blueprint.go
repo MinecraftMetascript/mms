@@ -7,8 +7,49 @@ import (
 )
 
 // instance expands one declaration of a Blueprint's kind: it binds the
-// fields, runs the check rules and returns what the emit blocks write.
+// fields, runs the check rules and returns what the emit blocks write. An
+// instance written at the top of a file is expanded once: reading one of
+// its consts may have expanded it already.
 func (c *ctx) instance(d *syntax.Decl, n *syntax.Name, bp *Blueprint, from *syntax.Decl) []*Decl {
+	s := c.e.siteOf[n]
+	if s == nil || s.d != d || c.site != nil || c.inst != nil {
+		return c.expandInstance(d, n, bp, from)
+	}
+	switch s.state {
+	case 1:
+		return nil // reported where its const was read
+	case 2:
+		if !s.placed {
+			s.placed = true
+			c.e.r.Instances = append(c.e.r.Instances, s.insts...)
+		}
+		return s.out
+	}
+	c.e.expandSite(s, bp, c, true)
+	return s.out
+}
+
+// expandSite expands an instance written at the top of a file, with c
+// for its context. placed is set when it is expanded in its place in the
+// file; otherwise the instances it makes are held back until then.
+func (e *evaluator) expandSite(s *site, bp *Blueprint, c *ctx, placed bool) {
+	s.state = 1
+	first := len(e.r.Instances)
+	s.out = c.expandInstance(s.d, s.n, bp, s.d)
+	s.insts = append([]*Instance(nil), e.r.Instances[first:]...)
+	for _, in := range s.insts {
+		if in.D == s.d && in.Name != nil && in.Name.Sp == s.n.Sp {
+			s.inst = in
+			break
+		}
+	}
+	if s.placed = placed; !placed {
+		e.r.Instances = e.r.Instances[:first]
+	}
+	s.state = 2
+}
+
+func (c *ctx) expandInstance(d *syntax.Decl, n *syntax.Name, bp *Blueprint, from *syntax.Decl) []*Decl {
 	name := c.declName(n)
 	if name == nil {
 		return nil
@@ -149,6 +190,21 @@ func (c *ctx) instance(d *syntax.Decl, n *syntax.Name, bp *Blueprint, from *synt
 		ec.stmts(blk.Items, &discard)
 		if len(discard) > 0 {
 			bc.errorf("mms/emit-body", blk.Sp, "an emit block holds declarations, let, if and for")
+		}
+		// A const at the top of an emit block is the instance's: other
+		// code reads it as name.const.
+		for _, it := range blk.Items {
+			st, ok := it.(*syntax.ConstStmt)
+			if !ok || st.Name == nil {
+				continue
+			}
+			if v, ok, _ := ec.sc.lookup(st.Name.Text); ok {
+				if inst.Consts == nil {
+					inst.Consts, inst.ConstDefs = &Record{pos: sp}, map[string]*syntax.ConstStmt{}
+				}
+				inst.Consts.set(st.Name.Text, ec.withDefaults(v, st.Type))
+				inst.ConstDefs[st.Name.Text] = st
+			}
 		}
 	}
 	var pid string

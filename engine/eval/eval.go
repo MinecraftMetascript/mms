@@ -290,7 +290,12 @@ type Instance struct {
 	// Forward is set instead when the primary declaration is itself a
 	// Blueprint instance: the name means what that instance's name means.
 	Forward *Instance
-	fieldSp map[string]syntax.Span
+	// Consts are the consts at the top of the Blueprint's emit blocks,
+	// which other code reads as name.const, and ConstDefs where each is
+	// written in the Blueprint.
+	Consts    *Record
+	ConstDefs map[string]*syntax.ConstStmt
+	fieldSp   map[string]syntax.Span
 }
 
 // Conversion is one `as T = expr hint(...)` of a Blueprint instance.
@@ -333,6 +338,30 @@ type evaluator struct {
 	// values are the names of Globals and Storages, which function code
 	// passes to a Template as the values they hold when the code runs.
 	values map[string]bool
+	// sites are the declarations written at the top of a file, by name,
+	// and siteOf by the name as written: the ones of a Blueprint's kind
+	// are instances whose emitted consts are read as name.const.
+	sites  map[string][]*site
+	siteOf map[*syntax.Name]*site
+}
+
+// site is one name of a declaration written at the top of a file. When
+// it is a Blueprint instance it is expanded once, when it is first
+// needed: in its place in the file, or earlier, when something reads one
+// of its consts.
+type site struct {
+	path  string
+	ns    string
+	d     *syntax.Decl
+	n     *syntax.Name
+	state int // 0 not expanded, 1 expanding, 2 done
+	out   []*Decl
+	// inst is the instance, and insts the instances its expansion made,
+	// held back when it was expanded early so that Result.Instances
+	// keeps the order they are written in.
+	inst   *Instance
+	insts  []*Instance
+	placed bool
 }
 
 // Run expands units, which must be in a stable order.
@@ -346,7 +375,7 @@ func Run(units []Unit, opt Options) *Result {
 		e.r.Files[u.Path] = &FileOut{}
 	}
 	for _, u := range units {
-		e.collect(u)
+		e.collect(u, opt.Namespace)
 	}
 	e.shadows()
 	if e.cache = opt.Cache; e.cache != nil {
@@ -362,6 +391,11 @@ func Run(units []Unit, opt Options) *Result {
 		}
 		for n := range e.values {
 			names = append(names, "v"+n)
+		}
+		for n := range e.sites {
+			if e.instanceSites(n) != nil {
+				names = append(names, "i"+n)
+			}
 		}
 		sort.Strings(names)
 		e.key = strings.Join(names, "\x00")
@@ -426,7 +460,7 @@ func sameRelated(a, b []syntax.Related) bool {
 
 // collect records the file's const, Template, Type and Blueprint
 // declarations, which every file can use.
-func (e *evaluator) collect(u Unit) {
+func (e *evaluator) collect(u Unit, ns string) {
 	errorf := func(sp syntax.Span, msg string) {
 		e.report(u.Path, syntax.Diagnostic{Code: "mms/duplicate", Severity: syntax.SeverityError, Message: msg, Sp: sp})
 	}
@@ -471,6 +505,12 @@ func (e *evaluator) collect(u Unit) {
 				continue
 			}
 			name := it.Name.Text
+			if it.Kind.Name == "Namespace" {
+				ns = name
+			}
+			if !definitionKind(it.Kind.Name) {
+				e.addSites(u.Path, ns, it)
+			}
 			if it.Private && !definitionKind(it.Kind.Name) {
 				e.report(u.Path, syntax.Diagnostic{Code: "mms/private", Severity: syntax.SeverityError, Sp: it.Kind.Sp,
 					Message: "only a const, Template, Type or Blueprint can be private; a " + it.Kind.Name + " is part of the data pack, which every file shares"})
@@ -515,6 +555,34 @@ func (e *evaluator) collect(u Unit) {
 			}
 		}
 	}
+}
+
+// addSites records the plainly named declarations written at the top of
+// a file, which may be Blueprint instances.
+func (e *evaluator) addSites(path, ns string, d *syntax.Decl) {
+	for _, n := range d.Names() {
+		if n == nil || n.Templated() || n.Text == "" {
+			continue
+		}
+		if e.sites == nil {
+			e.sites, e.siteOf = map[string][]*site{}, map[*syntax.Name]*site{}
+		}
+		s := &site{path: path, ns: ns, d: d, n: n}
+		e.sites[n.Text] = append(e.sites[n.Text], s)
+		e.siteOf[n] = s
+	}
+}
+
+// instanceSites are the Blueprint instances written at the top of a file
+// with this name.
+func (e *evaluator) instanceSites(name string) []*site {
+	var out []*site
+	for _, s := range e.sites[name] {
+		if e.r.Blueprint(s.path, s.d.Kind.Name) != nil {
+			out = append(out, s)
+		}
+	}
+	return out
 }
 
 // shadows reports, as hints, the private declarations that hide a public
@@ -782,6 +850,10 @@ func (e *evaluator) walkTouches(path string, d *syntax.Decl) bool {
 			if e.r.Const(path, n.Name) != nil || e.r.Template(path, n.Name) != nil {
 				found = true
 			}
+		case *syntax.Member:
+			if id, ok := n.X.(*syntax.Ident); ok && e.instanceSites(id.Name) != nil {
+				found = true
+			}
 		case *syntax.ConstStmt, *syntax.Comprehension, *syntax.Spread, *syntax.IfExpr, *syntax.TemplatedName:
 			found = true
 		case *syntax.Binary:
@@ -820,6 +892,11 @@ func (e *evaluator) interpTouches(path, s string) bool {
 		syntax.Walk(x, func(n syntax.Node) bool {
 			if id, ok := n.(*syntax.Ident); ok && (e.r.Const(path, id.Name) != nil || e.r.Template(path, id.Name) != nil) {
 				hit = true
+			}
+			if m, ok := n.(*syntax.Member); ok {
+				if id, ok := m.X.(*syntax.Ident); ok && e.instanceSites(id.Name) != nil {
+					hit = true
+				}
 			}
 			return !hit
 		})

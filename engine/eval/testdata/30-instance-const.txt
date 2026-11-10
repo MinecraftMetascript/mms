@@ -1,0 +1,20 @@
+-- a.mms --
+// Read before the instances are written, and from another file.
+const both = [alpha.twice, beta.twice]
+Function show {
+  /say ${alpha.twice} ${both} ${beta.tag}
+}
+const missing = alpha.thrice
+Pair loop { v = loop.twice }
+-- b.mms --
+Namespace other
+Blueprint Pair {
+  v: int
+  emit {
+    const twice: int = v * 2
+    const tag = "${self.id}"
+    Objective ${self.path}: dummy
+  }
+}
+Pair alpha { v = 3 }
+Pair beta { v = alpha.twice }
