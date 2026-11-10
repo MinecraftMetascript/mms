@@ -3,7 +3,7 @@
 	import { onMount, tick } from 'svelte';
 	import { asset, resolve } from '$app/paths';
 	import { LSPPlugin } from '@codemirror/lsp-client';
-	import { EditorSelection } from '@codemirror/state';
+	import { ChangeSet, EditorSelection, type Text } from '@codemirror/state';
 	import { EditorView } from '@codemirror/view';
 	import Editor from '#lib/editor/Editor.svelte';
 	import Sidebar from '#lib/components/Sidebar.svelte';
@@ -23,7 +23,6 @@
 	import Dropdown from '#lib/components/Dropdown.svelte';
 	import { fixAllKeys, formatKeys, mod, quickFixKeys } from '#lib/editor/shortcuts.ts';
 	import { bookPageAt, PinButton, PreviewPane, shows, type SplineAt, type SplineEdit } from '@mms/preview';
-	import { applyEdits } from '#lib/editor/diagnostics.ts';
 	import PreviewWorker from '@mms/preview/worker?worker';
 
 	const project = new Project();
@@ -125,6 +124,10 @@
 		cursor = { uri: uriOf(project.active), line: l.number - 1, character: head - l.from };
 	}
 	const cursorExt = EditorView.updateListener.of((u) => {
+		if (u.docChanged && splineSince && u.startState.doc === splineNow) {
+			splineSince = splineSince.compose(u.changes);
+			splineNow = u.state.doc;
+		}
 		if (u.selectionSet || u.docChanged) trackCursor(u.view);
 	});
 
@@ -223,6 +226,12 @@
 	// the Preview tab; its edits go to the source through the editor, so
 	// they can be undone.
 	let spline = $state<SplineAt | null>(null);
+	// The text the shown spline's ranges are in, and the edits made to it
+	// since (splineNow is the text after them), so an edit made before the
+	// spline is read again still lands on the right numbers.
+	let splineDoc: Text | null = null;
+	let splineSince: ChangeSet | null = null;
+	let splineNow: Text | null = null;
 	$effect(() => {
 		const c = cursor;
 		void engine?.output; // a new analysis
@@ -231,15 +240,29 @@
 			return;
 		}
 		let live = true;
+		// The ranges are in the text as it is now; an answer to an older
+		// text is dropped, since the edit asks again.
+		const doc = view?.state.doc;
 		void engine.spline(c.uri, { line: c.line, character: c.character }).then((x) => {
-			if (live) spline = x;
+			if (!live || !doc || view?.state.doc !== doc) return;
+			spline = x;
+			splineDoc = splineNow = doc;
+			splineSince = ChangeSet.empty(doc.length);
 		});
 		return () => {
 			live = false;
 		};
 	});
 	function editSpline(edits: SplineEdit[]) {
-		if (view) applyEdits(view, edits);
+		const v = view;
+		const doc = splineDoc;
+		const since = splineSince;
+		if (!v || !doc || !since || v.state.doc !== splineNow) return;
+		const pos = (p: SplineEdit['range']['start']) => {
+			const line = doc.line(Math.min(p.line + 1, doc.lines));
+			return since.mapPos(Math.min(line.from + p.character, line.to));
+		};
+		v.dispatch({ changes: edits.map((e) => ({ from: pos(e.range.start), to: pos(e.range.end), insert: e.newText })), userEvent: 'input' });
 	}
 	const previewPath = $derived(pinned ?? selectedOutput);
 	const pinnable = $derived(shows(previewPath, engine?.outputItems, engine?.outputTexts));

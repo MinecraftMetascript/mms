@@ -34,6 +34,8 @@ export class Previews implements vscode.Disposable, vscode.CodeLensProvider {
 	 */
 	private editor: vscode.TextEditor | undefined;
 	private spline: SplineAt | null = null;
+	/** The document version the spline's ranges are in. */
+	private splineVersion = -1;
 	private splineTimer: ReturnType<typeof setTimeout> | undefined;
 
 	constructor(
@@ -104,6 +106,7 @@ export class Previews implements vscode.Disposable, vscode.CodeLensProvider {
 		const ed = this.editor;
 		const c = this.client();
 		let spline: SplineAt | null = null;
+		const version = ed?.document.version ?? -1;
 		if (ed && !ed.document.isClosed && c?.isRunning()) {
 			const pos = ed.selection.active;
 			try {
@@ -116,7 +119,11 @@ export class Previews implements vscode.Disposable, vscode.CodeLensProvider {
 			}
 		}
 		if (ed !== this.editor) return; // a newer request is on its way
+		// The document changed while the server answered: its ranges are
+		// out of date, and the change schedules a new request.
+		if (ed && ed.document.version !== version) return void this.scheduleSpline();
 		this.spline = spline;
+		this.splineVersion = version;
 		this.post({ type: 'spline', uri: ed?.document.uri.toString() ?? null, spline });
 	}
 
@@ -231,10 +238,12 @@ export class Previews implements vscode.Disposable, vscode.CodeLensProvider {
 		// A spline opens the spline editor.
 		if (document.languageId === 'mms') {
 			const text = document.getText();
+			// Its own set: a Preview lens on the same line is another command.
+			const splineLines = new Set<number>();
 			for (const m of text.matchAll(/\bSpline\s*\(/g)) {
 				const pos = document.positionAt(m.index! + m[0].length);
-				if (lines.has(pos.line)) continue;
-				lines.add(pos.line);
+				if (splineLines.has(pos.line)) continue;
+				splineLines.add(pos.line);
 				lenses.push(
 					new vscode.CodeLens(new vscode.Range(pos.line, 0, pos.line, 0), {
 						title: '$(graph-line) Edit spline',
@@ -307,6 +316,10 @@ export class Previews implements vscode.Disposable, vscode.CodeLensProvider {
 			await this.output.refresh();
 		} else if (m.type === 'splineEdit') {
 			const uri = vscode.Uri.parse(m.uri);
+			// Ranges from an older version of the document would land on
+			// the wrong text; drop the edit and show the spline as it is now.
+			const doc = vscode.workspace.textDocuments.find((d) => d.uri.toString() === uri.toString());
+			if (!doc || doc.version !== this.splineVersion) return void this.scheduleSpline();
 			const edit = new vscode.WorkspaceEdit();
 			for (const e of m.edits) {
 				edit.replace(uri, new vscode.Range(e.range.start.line, e.range.start.character, e.range.end.line, e.range.end.character), e.newText);
