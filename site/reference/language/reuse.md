@@ -79,7 +79,7 @@ The list must be known at compile time, so the editor always knows every id the 
 Every file in a project sees every other file's constants, templates, Types and Blueprints. Write `private` before one to keep it to its own file:
 
 ```mms
-private const gap = 4
+private const gap: int = 4
 private Template spaced(n: int): int = n * gap
 
 LootTable chests/spaced { pools = [Pool(spaced(2), stone)] }
