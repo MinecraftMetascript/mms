@@ -12,6 +12,10 @@ import (
 // with none set expects no items at all.
 // markupDecls are the names the ${...} rows complete, after the shape of
 // a spellbook: a const list, a Storage record, a Global and an objective.
+// bpHead is the start of a Blueprint the Blueprint rows complete in:
+// two fields and a let.
+const bpHead = "const tier_starts = [128, -128]\nBlueprint Tier {\n  tier: int = 1\n  label: string\n  let doubled = tier * 2\n"
+
 const markupDecls = "Type S {\n  mode: int\n}\nconst modes: [string] = [\"a\", \"b\"]\nStorage st: S\nGlobal g: int = 0\nObjective kills: dummy\n"
 
 func TestCompletionMatrix(t *testing.T) {
@@ -223,6 +227,47 @@ func TestCompletionMatrix(t *testing.T) {
 		{name: "literal selector in tell", src: "Function f {\n  tell(@e[li|], \"hi\")\n}", want: []string{"limit"}, replace: "li"},
 		{name: "objective score not a selector", src: "Objective hp\nFunction f {\n  hp[|] = 1\n}", not: []string{"limit"}},
 		{name: "assignment target", src: "Global count: int = 0\nFunction f {\n  co| = 1\n}", want: []string{"count"}, replace: "co"},
+
+		// A Blueprint's own body: its keywords, the lines of its check
+		// block, and the values its lets, checks and emit block use.
+		{name: "blueprint item", src: bpHead + "  |\n}", want: []string{"let", "check", "emit", "as"}, not: []string{"tier"}},
+		{name: "blueprint item prefix", src: bpHead + "  ch|\n}", want: []string{"check"}, replace: "ch"},
+		{name: "blueprint item after section", src: bpHead + "  check {\n  }\n  em|\n}", want: []string{"emit"}, replace: "em"},
+		{name: "blueprint field name", src: "Blueprint B {\n  ti|\n}", want: []string{"let", "check"}, replace: "ti"},
+		{name: "blueprint as type", src: bpHead + "  as |\n}", want: []string{"ItemStack", "int"}},
+		{name: "blueprint let value", src: bpHead + "  let x = |\n}", want: []string{"tier", "label", "doubled", "self", "tier_starts", "len"}, not: []string{"x", "As"}},
+		{name: "blueprint let value prefix", src: bpHead + "  let x = ti|\n}", want: []string{"tier", "tier_starts"}, replace: "ti"},
+		{name: "blueprint let index", src: bpHead + "  let x = tier_starts[|]\n}", want: []string{"tier", "doubled"}},
+		{name: "blueprint let operand", src: bpHead + "  let x = tier - |\n}", want: []string{"tier", "doubled"}},
+		{name: "blueprint later let", src: bpHead + "  let x = |\n  let y = 1\n}", want: []string{"doubled"}, not: []string{"x", "y"}},
+		{name: "blueprint self", src: bpHead + "  let x = self.|\n}", want: []string{"id", "namespace", "path"}, not: []string{"tier"}},
+		{name: "blueprint typed let", src: bpHead + "  let g: DensityFunction = {\n    |\n  }\n}", want: []string{"type"}},
+		{name: "blueprint typed let field", src: bpHead + "  let g: DensityFunction = {\n    type = gradient\n    from_coordinate = tier_starts[|]\n  }\n}", want: []string{"tier"}},
+		{name: "blueprint string interpolation", src: bpHead + "  let key = \"item.${|}\"\n}", want: []string{"tier", "label", "self"}, not: []string{"key"}},
+		{name: "blueprint string self", src: bpHead + "  let key = \"item.${self.na|}\"\n}", want: []string{"namespace"}, replace: "na"},
+		{name: "check line", src: bpHead + "  check {\n    |\n  }\n}", want: []string{"error", "warn", "if", "tier", "label"}},
+		{name: "check line in if", src: bpHead + "  check {\n    if (tier < 1) {\n      |\n    }\n  }\n}", want: []string{"error", "warn", "tier"}},
+		{name: "check condition", src: bpHead + "  check {\n    if (|) {\n    }\n  }\n}", want: []string{"tier", "label", "self", "contains"}, not: []string{"error"}},
+		{name: "check condition operand", src: bpHead + "  check {\n    if (tier < |) {\n    }\n  }\n}", want: []string{"doubled"}},
+		{name: "check error arg", src: bpHead + "  check {\n    if (tier < 1) {\n      error(|)\n    }\n  }\n}", want: []string{"tier", "label"}},
+		{name: "check error message", src: bpHead + "  check {\n    error(tier, \"tier ${|} is too low\")\n  }\n}", want: []string{"tier", "doubled"}},
+		{name: "check for", src: bpHead + "  check {\n    for t in |\n  }\n}", want: []string{"tier_starts", "tier"}},
+		{name: "emit statement", src: bpHead + "  emit {\n    |\n  }\n}", want: []string{"Objective", "Function", "primary", "if", "for", "Tier"}, not: []string{"Template", "error"}},
+		{name: "emit primary kind", src: bpHead + "  emit {\n    primary |\n  }\n}", want: []string{"DensityFunction", "CustomItem"}, not: []string{"primary", "if"}},
+		{name: "emit primary kind prefix", src: bpHead + "  emit {\n    primary Dens|\n  }\n}", want: []string{"DensityFunction"}, replace: "Dens"},
+		{name: "emit name interpolation", src: bpHead + "  emit {\n    Objective ${|}: dummy\n  }\n}", want: []string{"self", "label", "tier"}},
+		{name: "emit name self", src: bpHead + "  emit {\n    primary Objective ${self.|}: dummy\n  }\n}", want: []string{"path", "id"}, not: []string{"tier"}},
+		{name: "emit name self after text", src: bpHead + "  emit {\n    Objective ${label}_${self.pa|}: dummy\n  }\n}", want: []string{"path"}, replace: "pa"},
+		{name: "emit if condition", src: bpHead + "  emit {\n    if (|) {\n    }\n  }\n}", want: []string{"tier", "label"}},
+		{name: "emit for values", src: bpHead + "  emit {\n    for t in |\n  }\n}", want: []string{"tier_starts"}},
+		{name: "emit const value", src: bpHead + "  emit {\n    const id = |\n  }\n}", want: []string{"self", "label"}},
+		{name: "emit body field", src: bpHead + "  emit {\n    primary DensityFunction ${self.path} = {\n      |\n    }\n  }\n}", want: []string{"type"}},
+		{name: "emit body value", src: bpHead + "  emit {\n    primary Objective ${self.path}: dummy\n    CustomItem ${self.path}_item {\n      base = stick\n      name = |\n    }\n  }\n}", want: []string{"label"}},
+		{name: "emit body string", src: bpHead + "  emit {\n    CustomItem ${self.path} {\n      base = stick\n      name = \"${|}\"\n    }\n  }\n}", want: []string{"label", "self"}},
+		{name: "emit function code", src: bpHead + "  emit {\n    Function ${self.path} {\n      let y = |\n    }\n  }\n}", want: []string{"tier", "label", "self", "true"}},
+		{name: "emit function command", src: bpHead + "  emit {\n    Function ${self.path} {\n      /say ${|}\n    }\n  }\n}", want: []string{"label", "self"}},
+		{name: "emit function command self", src: bpHead + "  emit {\n    Function ${self.path} {\n      /say ${self.|}\n    }\n  }\n}", want: []string{"path"}},
+		{name: "blueprint instance field", src: bpHead + "}\nTier t {\n  |\n}", want: []string{"tier", "label"}, not: []string{"doubled"}},
 
 		// No completion.
 		{name: "comment", src: "// Feature |\nFeature f {}", none: true},
