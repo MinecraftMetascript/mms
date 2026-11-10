@@ -138,6 +138,16 @@ function put(out: Uint8ClampedArray, i: number, c: Rgb, shade = 1) {
 /** Yields to the message loop, so a newer request can supersede this one. */
 const breathe = () => new Promise((r) => setTimeout(r, 0));
 class Superseded extends Error {}
+/**
+ * Stops a request a newer one has replaced. Renders share state (the 3D
+ * view's chunks and jobs, the side view's strips), so one that resumes
+ * after an await must stop before touching it: a stale 3D render that
+ * went on would switch the chunk key and cancel the newer render's jobs,
+ * and neither would ever answer.
+ */
+function current(req: RenderRequest) {
+	if (req.seq !== latest) throw new Superseded();
+}
 
 // ---- Dimensions -------------------------------------------------------
 
@@ -1144,7 +1154,9 @@ async function warm(req: RenderRequest, t: Terrain, key: string): Promise<Terrai
 	const chunk = Math.floor(Math.floor(plane.along(req.width / 2)) / 16);
 	const k = stripKey(plane.alongX, plane.depth, chunk);
 	if (!terrainStrips.has(k)) {
-		await withVanilla(() => terrainStrips.set(k, buildStrip(t, plane.alongX, plane.depth, chunk)));
+		const strip = await withVanilla(() => buildStrip(t, plane.alongX, plane.depth, chunk));
+		current(req);
+		terrainStrips.set(k, strip);
 	}
 	return t;
 }
@@ -1324,11 +1336,14 @@ async function render(req: RenderRequest): Promise<PreviewResponse> {
 			// Built from whole chunks, the same ones the 3D view uses.
 			const asIso = { ...req, mode: 'iso' as const };
 			const { terrain, key } = await terrainOf(asIso);
+			current(req);
 			return renderTop(asIso, terrain, key);
 		}
 		const { terrain, key } = await terrainOf(req);
+		current(req);
 		if (req.mode === 'iso') return renderIso(req, terrain, key);
 		await warm(req, terrain, key);
+		current(req);
 		return renderTerrain(req, terrain, key);
 	}
 
