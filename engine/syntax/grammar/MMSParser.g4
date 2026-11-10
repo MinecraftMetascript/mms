@@ -75,6 +75,7 @@ typeArm  : typeAtom QUESTION?;
 typeAtom
     : typeName (LT typeExpr (COMMA typeExpr)* GT)?               # namedType
     | STRING                                                      # literalType
+    | MINUS? NUMBER                                               # numberType
     | LBRACK typeExpr RBRACK                                      # listType
     | LBRACE typeField ((COMMA | SEP)? typeField)* (COMMA | SEP)? RBRACE # recordType
     | LBRACE mapKey COLON typeExpr RBRACE                         # mapType

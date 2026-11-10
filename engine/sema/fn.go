@@ -89,6 +89,50 @@ func (t *Table) valueType(name string) string {
 	return name
 }
 
+// letType is the value type of a let's type, with the strings or
+// numbers it can hold when it is a union of them: `let m: Mode`, where
+// `Type Mode = "a" | "b"`, or `let tier: 1 | 2 | 3`.
+func (t *Table) letType(at syntax.TypeExpr) (typ string, strs []string, ints []int32) {
+	if u, ok := at.(*syntax.TypeUnion); ok {
+		for _, a := range u.Arms {
+			switch a := a.(type) {
+			case *syntax.TypeString:
+				strs = append(strs, a.Value)
+			case *syntax.TypeNumber:
+				n, err := strconv.ParseInt(a.Text, 10, 32)
+				if err != nil {
+					return syntax.TypeText(at), nil, nil
+				}
+				ints = append(ints, int32(n))
+			default:
+				return syntax.TypeText(at), nil, nil
+			}
+		}
+		switch {
+		case len(ints) == 0:
+			return tString, strs, nil
+		case len(strs) == 0:
+			return tInt, nil, ints
+		}
+		return syntax.TypeText(at), nil, nil
+	}
+	typ = t.valueType(syntax.TypeText(at))
+	if t == nil {
+		return typ, nil, nil
+	}
+	st := t.Types[typePrefix+syntax.TypeText(at)]
+	for i := 0; st != nil && st.Kind == "reference" && i < 8; i++ {
+		st = t.Types[st.Path]
+	}
+	switch typ {
+	case tString:
+		return typ, storageChoices(st), nil
+	case tInt:
+		return typ, nil, intChoices(st)
+	}
+	return typ, nil, nil
+}
+
 // sigIn is d's signature with project Types resolved to value types.
 func sigIn(t *Table, d *syntax.Decl) FuncSig {
 	s := SigOf(d)
@@ -261,9 +305,12 @@ type local struct {
 	nbt  string
 	typ  string
 	info *Local
-	// choices are the strings a Storage field of a union of string
-	// literals can hold; nil for any string.
+	// choices are the strings a Storage field or let of a union of
+	// string literals can hold; nil for any string.
 	choices []string
+	// ints are the numbers one of a union of whole numbers, such as
+	// `0 | 1 | 2`, can hold; nil for any int.
+	ints []int32
 }
 
 // Local describes a function parameter, local variable or loop variable,
@@ -477,8 +524,10 @@ func (f *fc) stmt(out *fn.Block, s syntax.Stmt) {
 			return
 		}
 		typ := ""
+		var strs []string
+		var ints []int32
 		if s.Type != nil {
-			typ = f.c.Syms.valueType(syntax.TypeText(s.Type))
+			typ, strs, ints = f.c.Syms.letType(s.Type)
 			if !f.valueType(typ, s.Type) {
 				typ = tInt
 			}
@@ -495,13 +544,26 @@ func (f *fc) stmt(out *fn.Block, s syntax.Stmt) {
 		}
 		l := f.declare(s.Name, typ)
 		l.info.Doc = s.Doc
+		if typ == tString && strs != nil || typ == tInt && ints != nil {
+			l.choices, l.ints = strs, ints
+			f.scopes[len(f.scopes)-1][s.Name.Text] = l
+		}
 		if v == nil {
+			// Without a value, a let starts at its type's first choice,
+			// or at "" or 0.
 			if typ == tString {
 				empty := ""
+				if len(strs) > 0 {
+					empty = strs[0]
+				}
 				out.Add(f.setString(l.path, &val{typ: tString, str: &empty}))
 				return
 			}
-			out.Add(fn.Set{Dst: l.s, Src: fn.Const(0)})
+			zero := int32(0)
+			if len(ints) > 0 {
+				zero = ints[0]
+			}
+			out.Add(fn.Set{Dst: l.s, Src: fn.Const(zero)})
 			return
 		}
 		f.store(&out.Ops, l, v, s.Value)
@@ -734,6 +796,10 @@ func (f *fc) store(pre *[]fn.Op, l local, v *val, e syntax.Expr) {
 		*pre = append(*pre, f.setString(l.path, v))
 		return
 	}
+	if l.ints != nil && v.cond == nil && v.op.IsConst && !slices.Contains(l.ints, v.op.Const) {
+		f.c.errorf("mms/type-mismatch", e.Span(), "expected one of %s, but this is %d", intList(l.ints), v.op.Const)
+		return
+	}
 	if l.nbt != "" {
 		f.save(pre, l, f.operand(pre, v))
 		return
@@ -750,6 +816,18 @@ func quoteChoices(cs []string) string {
 	q := make([]string, len(cs))
 	for i, c := range cs {
 		q[i] = strconv.Quote(c)
+	}
+	if len(q) == 1 {
+		return q[0]
+	}
+	return strings.Join(q[:len(q)-1], ", ") + " or " + q[len(q)-1]
+}
+
+// intList lists numbers as 0, 1 or 2.
+func intList(ns []int32) string {
+	q := make([]string, len(ns))
+	for i, n := range ns {
+		q[i] = strconv.Itoa(int(n))
 	}
 	if len(q) == 1 {
 		return q[0]

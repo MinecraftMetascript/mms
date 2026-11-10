@@ -92,6 +92,7 @@ Types come from three places: the game's own schema (`ItemStack`, `LootPool`, `H
 | `Id<item>` | an id in a registry, vanilla or the project's |
 | `Ids<worldgen/biome>` | an id, a tag, or a list of ids |
 | `"rigid" \| "terrain_matching"` | one of these words |
+| `1 \| 2 \| 3` | one of these whole numbers |
 | `LootTable`, any kind's name | an id of one, or a value of one written in place |
 
 A `Type` declaration names a record or an alias:
@@ -106,6 +107,9 @@ Type Wave {
 
 /** Text in English, or one text per language. */
 Type Label = string | {string: string}
+
+/** How strong a spell is. */
+Type Tier = 1 | 2 | 3
 
 const waves: [Wave] = [{ mob = zombie, count = 3 }, { mob = skeleton }]
 ```

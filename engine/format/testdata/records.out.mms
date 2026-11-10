@@ -5,6 +5,7 @@ Type Pos {
 
 Type S {
   mode: "x" | "y"
+  tier: 1 | 2 | -3
   blah: {
     x: int
     y: int = 2
