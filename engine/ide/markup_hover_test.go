@@ -15,6 +15,7 @@ func TestMarkupExprHover(t *testing.T) {
 			"Type S {\n  /** Which spell is ready. */\n  mode: \"x\" | \"y\"\n}\nStorage s: S\nFunction f {\n  tell(@a, \"Mode ${s.mo^de}\")\n}",
 			"s.mode: \"x\" | \"y\"\n```\nWhich spell is ready.\n\nA value the function computes, filled in when this line runs", "book",
 		},
+		{"Type S {\n  tier: 1 | 2 | 3\n}\nStorage s: S\nFunction f {\n  tell(@a, \"Tier ${s.ti^er}\")\n}", "s.tier: 1 | 2 | 3", "book"},
 		{"Global g: int = 0\nFunction f {\n  tell(@a, \"Wave ${^g}\")\n}", "Global test:g: int", "book"},
 		// The name under the cursor in a longer expression.
 		{markupDecls + "Function f {\n  actionbar(@s, \"Mode ${mo^des[st.mode]}\")\n}", "const modes: [string]", "book"},

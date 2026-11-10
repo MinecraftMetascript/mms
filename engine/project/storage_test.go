@@ -86,6 +86,13 @@ func TestStorageErrors(t *testing.T) {
 		{"Type S { a: int = 0 }\nStorage s: S\nFunction f {\n  s.a = true\n}", "expected int"},
 		{"Type S { mode: \"x\" | \"y\" }\nStorage s: S\nFunction f {\n  s.mode = \"z\"\n}", `expected one of "x" or "y", but this is "z"`},
 		{"Type S { mode: \"x\" | \"y\" }\nStorage s: S\nFunction f {\n  s.mode += \"x\"\n}", "set it with ="},
+		{"Type S { tier: 1 | 2 | 3 }\nStorage s: S\nFunction f {\n  s.tier = 4\n}", "expected one of 1, 2 or 3, but this is 4"},
+		{"Type S { tier: 1 | 2 | 3 }\nStorage s: S\nFunction f {\n  s.tier = \"x\"\n}", "expected int, but this is string"},
+		{"Type Tier = 1 | 2\nFunction f {\n  let t: Tier = 3\n}", "expected one of 1 or 2, but this is 3"},
+		{"Function f {\n  let t: 0 | 1 = 1\n  t = -1\n}", "expected one of 0 or 1, but this is -1"},
+		{"Function f {\n  let m: \"a\" | \"b\" = \"c\"\n}", `expected one of "a" or "b", but this is "c"`},
+		{"Type S { speed: 1 | 2.5 }", "a number in a type must be a whole number"},
+		{"Type S { big: 3000000000 | 1 }", "3000000000 does not fit an int"},
 		{"Type S {\n  blah: { x: int, y: int }\n}\nStorage s: S\nFunction f {\n  s.blah.z = 1\n}", "s.blah has no field 'z'"},
 		{"Type S {\n  a: int\n}\nStorage s: S\nFunction f {\n  s.a.b = 1\n}", "s.a is an integer, not a record"},
 		{"Type S {\n  blah: { x: int, y }\n}", "a record's field needs a type: y: Type"},
@@ -132,6 +139,48 @@ Function f(): int {
 	ld := emitted(t, r, "data/demo/function/mms_gen/load.mcfunction")
 	if want := `execute unless data storage demo:mms s.mode run data modify storage demo:mms s.mode set value "x"`; !strings.Contains(ld, want) {
 		t.Errorf("load lacks %s:\n%s", want, ld)
+	}
+	vm := load(t, r, "demo")
+	if got := call(t, vm, "demo:f"); got != 1 {
+		t.Errorf("f = %d, want 1", got)
+	}
+	if got := call(t, vm, "demo:f"); got != 0 {
+		t.Errorf("f again = %d, want 0", got)
+	}
+}
+
+// A field of a union of whole numbers is an int functions read and
+// write, and it starts at the first of them. A let can have such a type
+// too, written in place or named.
+func TestStorageIntChoices(t *testing.T) {
+	src := `Type Tier = 1 | 2 | 3
+Type S {
+  tier: Tier
+  step: -1 | 0 | 1 = 0
+}
+Storage s: S
+Function f(): int {
+  let next: 1 | 2 | 3
+  if (s.tier == 1) {
+    next = 2
+  }
+  s.tier = next
+  s.step = -1
+  return s.tier + s.step
+}
+`
+	_, r := bookProject(t, src, nil)
+	if d := diagText(r); d != "" {
+		t.Fatal(d)
+	}
+	ld := emitted(t, r, "data/demo/function/mms_gen/load.mcfunction")
+	for _, want := range []string{
+		`execute unless data storage demo:mms s.tier run data modify storage demo:mms s.tier set value 1`,
+		`execute unless data storage demo:mms s.step run data modify storage demo:mms s.step set value 0`,
+	} {
+		if !strings.Contains(ld, want) {
+			t.Errorf("load lacks %s:\n%s", want, ld)
+		}
 	}
 	vm := load(t, r, "demo")
 	if got := call(t, vm, "demo:f"); got != 1 {

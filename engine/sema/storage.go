@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/MinecraftMetascript/nbt-go"
@@ -148,7 +149,7 @@ func (c *Checker) storageDefaults(ns, loc string, t *spec.Type, decls []*syntax.
 			lines = append(lines, c.storageDefaults(ns, at, c.record(f.Type), inner, depth+1)...)
 			continue
 		default:
-			v = zeroOf(f.Type)
+			v = zeroOf(c.deref(f.Type))
 		}
 		if v == nil {
 			continue
@@ -165,6 +166,9 @@ func (c *Checker) storageDefaults(ns, loc string, t *spec.Type, decls []*syntax.
 func zeroOf(t *spec.Type) jsonv.Value {
 	switch storageKind(t) {
 	case tInt:
+		if cs := intChoices(t); len(cs) > 0 {
+			return jsonv.Number(strconv.Itoa(int(cs[0])))
+		}
 		return jsonv.Number("0")
 	case tBool:
 		return jsonv.Bool(false)
@@ -180,7 +184,7 @@ func zeroOf(t *spec.Type) jsonv.Value {
 // storageKind is the function type of a field: int, bool or string, or
 // "" for a field functions cannot read.
 // A union of string literals, `mode: "x" | "y"`, is a string that holds
-// one of them.
+// one of them, and a union of whole numbers, `tier: 1 | 2 | 3`, an int.
 func storageKind(t *spec.Type) string {
 	if t == nil {
 		return ""
@@ -196,16 +200,70 @@ func storageKind(t *spec.Type) string {
 		if t.Literal != nil && t.Literal.Kind == "string" {
 			return tString
 		}
+		if t.Literal != nil && isIntKind(t.Literal.Kind) {
+			return tInt
+		}
 	case "enum":
 		if t.EnumKind == "string" {
 			return tString
+		}
+		if isIntKind(t.EnumKind) {
+			return tInt
 		}
 	case "union":
 		if storageChoices(t) != nil {
 			return tString
 		}
+		if intChoices(t) != nil {
+			return tInt
+		}
 	}
 	return ""
+}
+
+func isIntKind(k string) bool {
+	return k == "int" || k == "byte" || k == "short" || k == "long"
+}
+
+// intChoices are the numbers a field of a union of whole numbers, or an
+// int enum, can hold, in order, or nil for any other field.
+func intChoices(t *spec.Type) []int32 {
+	if t == nil {
+		return nil
+	}
+	var out []int32
+	add := func(raw []byte) bool {
+		n, err := strconv.ParseInt(string(raw), 10, 32)
+		if err != nil {
+			return false
+		}
+		out = append(out, int32(n))
+		return true
+	}
+	switch t.Kind {
+	case "literal":
+		if t.Literal == nil || !isIntKind(t.Literal.Kind) || !add(t.Literal.Value) {
+			return nil
+		}
+	case "enum":
+		if !isIntKind(t.EnumKind) {
+			return nil
+		}
+		for _, v := range t.Values {
+			if !add(v.Value) {
+				return nil
+			}
+		}
+	case "union":
+		for _, m := range t.Members {
+			cs := intChoices(m)
+			if cs == nil {
+				return nil
+			}
+			out = append(out, cs...)
+		}
+	}
+	return out
 }
 
 // storageChoices are the strings a field of a union of string literals,
@@ -267,9 +325,12 @@ func fieldSig(rt *spec.Type, t *Table, depth int) string {
 		for i := 0; ft != nil && ft.Kind == "reference" && i < 8; i++ {
 			ft = t.Types[ft.Path]
 		}
-		sig := f.Key + ":" + storageKind(f.Type)
+		sig := f.Key + ":" + storageKind(ft)
 		if cs := storageChoices(ft); cs != nil {
 			sig += "(" + strings.Join(cs, "|") + ")"
+		}
+		if ns := intChoices(ft); ns != nil {
+			sig += "(" + intList(ns) + ")"
 		}
 		if ft != nil && ft.Kind == "struct" && depth < 16 {
 			sig += fieldSig(ft, t, depth+1)
@@ -340,15 +401,16 @@ func (f *fc) storageField(e *syntax.Member) (*local, bool) {
 			}
 			continue
 		}
-		k := storageKind(fl.Type)
+		ft := f.c.deref(fl.Type)
+		k := storageKind(ft)
 		if k == "" {
 			f.c.errorf("mms/unsupported", n.Sp, "a function reads int, bool and string fields; %s is another type", path)
 			return nil, true
 		}
 		if k == tString {
-			return &local{typ: tString, path: loc, choices: storageChoices(fl.Type)}, true
+			return &local{typ: tString, path: loc, choices: storageChoices(ft)}, true
 		}
-		return &local{typ: k, nbt: loc}, true
+		return &local{typ: k, nbt: loc, ints: intChoices(ft)}, true
 	}
 	return nil, true
 }
@@ -369,12 +431,7 @@ func storageChain(e syntax.Expr) (base syntax.Expr, names []*syntax.Name) {
 // record is t as a record with fields, following a project Type's name,
 // or nil when t is not one.
 func (c *Checker) record(t *spec.Type) *spec.Type {
-	for i := 0; t != nil && t.Kind == "reference" && i < 8; i++ {
-		if c.Syms == nil {
-			return nil
-		}
-		t = c.Syms.Types[t.Path]
-	}
+	t = c.deref(t)
 	if t == nil || t.Kind != "struct" {
 		return nil
 	}
@@ -382,6 +439,18 @@ func (c *Checker) record(t *spec.Type) *spec.Type {
 		if f.Key == "" {
 			return nil // a map
 		}
+	}
+	return t
+}
+
+// deref follows a project Type's name to the type it stands for, so a
+// field `tier: Tier`, where `Type Tier = 1 | 2 | 3`, is a union of ints.
+func (c *Checker) deref(t *spec.Type) *spec.Type {
+	for i := 0; t != nil && t.Kind == "reference" && i < 8; i++ {
+		if c.Syms == nil {
+			return nil
+		}
+		t = c.Syms.Types[t.Path]
 	}
 	return t
 }
@@ -471,7 +540,7 @@ func (c *Checker) StorageFieldCandidates(x syntax.Expr) []Candidate {
 	var out []Candidate
 	for i, f := range t.Fields {
 		detail := describe(tview{T: f.Type})
-		if storageKind(f.Type) == "" && c.record(f.Type) == nil {
+		if storageKind(c.deref(f.Type)) == "" && c.record(f.Type) == nil {
 			detail += " (not readable in functions)"
 		}
 		out = append(out, Candidate{Label: f.Key, Kind: CandField, Detail: detail, Doc: DocMarkdown(f.Desc), Rank: i})

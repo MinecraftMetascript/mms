@@ -440,6 +440,12 @@ func (b *builder) typeAtom(c parser.ITypeAtomContext) TypeExpr {
 	case *parser.LiteralTypeContext:
 		raw := t.STRING().GetText()
 		return &TypeString{Value: unquote(raw), Raw: raw, Sp: sp}
+	case *parser.NumberTypeContext:
+		text := t.NUMBER().GetText()
+		if t.MINUS() != nil {
+			text = "-" + text
+		}
+		return &TypeNumber{Text: text, Sp: sp}
 	case *parser.ListTypeContext:
 		return &TypeList{Elem: b.typeOrEmpty(t.TypeExpr(), sp), Sp: sp}
 	case *parser.RecordTypeContext:

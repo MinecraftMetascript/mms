@@ -124,6 +124,8 @@ func (s shifter) typ(t TypeExpr) TypeExpr {
 		n = u
 	case *TypeString:
 		n = &TypeString{Value: x.Value, Raw: x.Raw, Sp: s.sp(x.Sp)}
+	case *TypeNumber:
+		n = &TypeNumber{Text: x.Text, Sp: s.sp(x.Sp)}
 	case *TypeParen:
 		n = &TypeParen{X: s.typ(x.X), Sp: s.sp(x.Sp)}
 	default:
