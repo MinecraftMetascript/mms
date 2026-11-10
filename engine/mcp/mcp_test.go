@@ -398,3 +398,16 @@ func TestDocsInSync(t *testing.T) {
 		}
 	}
 }
+
+func TestSelfTest(t *testing.T) {
+	got, err := server(t).SelfTest(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "9 tools answer, protocol "+protocolVersions[0] {
+		t.Errorf("SelfTest = %q", got)
+	}
+	if got := ConfigJSON("mms"); got != `{"mcpServers":{"mms":{"command":"mms","args":["mcp"]}}}` {
+		t.Errorf("ConfigJSON = %s", got)
+	}
+}

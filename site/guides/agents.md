@@ -4,13 +4,15 @@
 
 ## Setting it up
 
-The server is part of the `mms` command line and speaks over stdin and stdout. Any MCP client can start it. In Claude Code:
+The server is part of the `mms` command line and speaks over stdin and stdout. It needs a version of `mms` newer than 0.5.0: run `mms mcp -check`, which tests the server and prints the lines below with the path of your own `mms` filled in. If it says `unknown command "mcp"`, the `mms` it found is too old.
+
+In Claude Code, for yourself in one project folder:
 
 ```
 claude mcp add mms -- mms mcp
 ```
 
-For a client that reads a JSON file of servers, such as Claude Desktop or Cursor:
+To share it with everyone who works on a project, put a `.mcp.json` file at the project's root instead:
 
 ```
 {
@@ -20,7 +22,25 @@ For a client that reads a JSON file of servers, such as Claude Desktop or Cursor
 }
 ```
 
+Claude Code does not start a server from `.mcp.json` until you approve it. It asks the next time you start `claude` in that folder, and until you answer the server is not loaded.
+
+Claude Desktop, Cursor and other clients take the same `mcpServers` entry in their own settings file.
+
 The server has no settings and does not use the network. Everything it knows is inside the `mms` binary, including these docs and the vanilla data of the Minecraft version MMS targets.
+
+## Checking that it is connected
+
+`claude mcp list` starts each server and says how it went. Inside Claude Code, `/mcp` shows the same and lists the tools.
+
+| `claude mcp list` says | What it means |
+| --- | --- |
+| `Connected` | It works. The agent has the tools below. |
+| `Pending approval` | The entry is in `.mcp.json` and nobody has approved it yet. Start `claude` in the folder and accept the server. |
+| `Failed to connect`, `Connection closed` | `mms` started and quit, which is what a version without `mcp` does. Run `mms mcp -check`. |
+| `Failed to connect`, `ENOENT` | The client did not find `mms`. Give the full path as the command; `mms mcp -check` prints it. |
+| no `mms` line | The client did not read the entry. Check the file's name and place, and that it is valid JSON. |
+
+`mms mcp` on its own waits for a client and prints nothing else, so use `mms mcp -check` to test it by hand.
 
 ## The tools
 

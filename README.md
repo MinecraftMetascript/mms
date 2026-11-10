@@ -57,7 +57,7 @@ mms fix gems                    # apply every safe lint fix
 mms fmt gems                    # format every .mms file in gems
 mms import pack.zip proj        # turn an existing data pack (folder or zip) into MMS
 mms lsp                         # language server over stdio, for other editors
-mms mcp                         # MCP server over stdio, for AI agents that write MMS
+mms mcp                         # MCP server over stdio, for AI agents that write MMS (-check tests it)
 mms reference                   # every kind, helper and prelude declaration, as JSON
 ```
 
