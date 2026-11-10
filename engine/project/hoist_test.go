@@ -170,3 +170,30 @@ func TestInlineFunctionNeedsRun(t *testing.T) {
 	}
 	t.Errorf("no error: %v", r.Diagnostics("main.mms"))
 }
+
+// A schema type that has no file of its own, such as BiomeSource, used
+// as a declaration kind says to name it with a const, with a fix.
+func TestValueTypeDeclIsConst(t *testing.T) {
+	p := New(spec.MustDefault(), Config{Namespace: "demo"})
+	src := "BiomeSource src { type = fixed, biome = plains }\n"
+	p.SetFile("main.mms", src)
+	r, _ := p.Analyze(context.Background())
+	for _, d := range r.Diagnostics("main.mms") {
+		if d.Code != "mms/unknown-kind" {
+			continue
+		}
+		if !strings.Contains(d.Message, "const <name>: BiomeSource") {
+			t.Errorf("message: %s", d.Message)
+		}
+		if len(d.Fixes) != 1 {
+			t.Fatalf("fixes: %+v", d.Fixes)
+		}
+		e := d.Fixes[0].Edits[0]
+		got := src[:e.Sp.Start] + e.Text + src[e.Sp.End:]
+		if got != "const src: BiomeSource = { type = fixed, biome = plains }\n" {
+			t.Errorf("fixed = %q", got)
+		}
+		return
+	}
+	t.Errorf("no error: %v", r.Diagnostics("main.mms"))
+}
