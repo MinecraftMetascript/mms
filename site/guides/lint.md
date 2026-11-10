@@ -43,3 +43,25 @@ DensityFunction d = Clamp(1, min = 0, max = 0)
 ```
 
 In an object that spans lines, each field goes on its own line before the closing brace. A placeholder is `0` (or the nearest number the field's range allows), `false`, the first enum value, `[]`, `""` or `{}`. For a value that can take several forms, the simplest form is used, so a loot pool's `rolls` becomes `0`. An inserted `{}` reports its own missing fields, with its own fix. Placeholders are guesses, so these fixes are not safe and "Fix all" leaves them alone.
+
+A list of ids can't hold a tag, but a field that takes either one tag or a list, such as a structure's `biomes`, can take a tag declaration holding the whole list, and a tag may list other tags. So a tag in such a list ("a tag is not allowed here") offers **Move the list into a BiomeTag** (or `BlockTag`, `ItemTag` and so on, for the field's registry). It writes the list as a new tag above the declaration, named after the declaration and the field, and puts the tag in its place:
+
+```mms error
+JigsawStructure village {
+  biomes = [#minecraft:is_forest, desert, savanna]   // a tag is not allowed here
+  // ...
+}
+```
+
+becomes
+
+```
+BiomeTag village_biomes = [#minecraft:is_forest, desert, savanna]
+
+JigsawStructure village {
+  biomes = #village_biomes
+  // ...
+}
+```
+
+The fix adds a resource to the pack, so it is not safe and "Fix all" leaves it alone.

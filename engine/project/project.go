@@ -195,6 +195,7 @@ type Result struct {
 	lints    map[string][]syntax.Diagnostic
 	symKey   uint64
 	pack     *spec.Pack
+	kinds    *sema.Kinds
 	cfg      Config
 }
 
@@ -386,6 +387,7 @@ func (r *Result) fileDiagnostics(path string) []syntax.Diagnostic {
 		out = append(out, d.Extern[path]...)
 	}
 	out = dropSelectorEchoes(out, r.selErr[path])
+	out = r.completeTagListFixes(u, out)
 	out = r.configure(path, out)
 	out = append(out, r.Lints()[path]...)
 	r.relate(path, out)
@@ -449,7 +451,7 @@ func (p *Project) Analyze(ctx context.Context) (*Result, error) {
 	}
 	syms.Hidden = preludeEmitted(ev)
 	syms.Conversions = tenv.Conversions(ev, p.Config.Namespace)
-	r := &Result{Syms: syms, Units: units, Source: source, Decls: map[*syntax.Decl]*Decl{}, collect: collect, pack: p.Pack, cfg: p.Config, files: p.Files, Eval: ev}
+	r := &Result{Syms: syms, Units: units, Source: source, Decls: map[*syntax.Decl]*Decl{}, collect: collect, pack: p.Pack, kinds: p.Kinds, cfg: p.Config, files: p.Files, Eval: ev}
 	r.TypeEnv = tenv
 	r.selErr = map[string][]syntax.Diagnostic{}
 	for path, f := range source {

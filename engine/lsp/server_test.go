@@ -1113,3 +1113,34 @@ func gzipNBT(root map[string]any) ([]byte, error) {
 	err := enc.Encode(root)
 	return b.Bytes(), err
 }
+
+// TestTagListAction checks that a list of biomes holding a tag offers
+// the quick fix that moves the list into a BiomeTag, as VS Code and the
+// web editor both show it.
+func TestTagListAction(t *testing.T) {
+	c := start(t)
+	c.result("initialize", map[string]any{})
+	c.notify("initialized", map[string]any{})
+	uri := "file:///a.mms"
+	src := "Structure s { type = jigsaw, biomes = [#minecraft:is_ocean, plains] }\n"
+	c.notify("textDocument/didOpen", map[string]any{"textDocument": map[string]any{"uri": uri, "languageId": "mms", "version": 1, "text": src}})
+	at := map[string]any{"line": 0, "character": 42}
+	acts := c.result("textDocument/codeAction", map[string]any{"textDocument": map[string]any{"uri": uri}, "range": map[string]any{"start": at, "end": at},
+		"context": map[string]any{"diagnostics": []any{}, "only": []string{"quickfix"}}}).([]any)
+	for _, a := range acts {
+		a := a.(map[string]any)
+		if a["title"] != "Move the list into BiomeTag s_biomes" {
+			continue
+		}
+		edits := a["edit"].(map[string]any)["changes"].(map[string]any)[uri].([]any)
+		var texts []string
+		for _, e := range edits {
+			texts = append(texts, e.(map[string]any)["newText"].(string))
+		}
+		if got, want := strings.Join(texts, "|"), "BiomeTag s_biomes = [#minecraft:is_ocean, plains]\n\n|#s_biomes"; got != want {
+			t.Errorf("edits = %q, want %q", got, want)
+		}
+		return
+	}
+	t.Errorf("no BiomeTag fix in %v", acts)
+}
