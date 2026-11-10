@@ -232,6 +232,10 @@ func (s *Session) Completion(path string, off int) ([]Item, syntax.Span) {
 	if items, replace, ok := s.assetPathCompletion(f, off); ok {
 		return items, replace
 	}
+	// A `${...}` a Blueprint fills in, in its strings and names.
+	if items, replace, ok := s.blueprintInterpolation(a, off); ok {
+		return items, replace
+	}
 	// No completion inside comments or strings (old issue #17).
 	if i := f.TokenAt(off); i >= 0 {
 		t := f.Tokens[i]
@@ -274,6 +278,11 @@ func (s *Session) Completion(path string, off int) ([]Item, syntax.Span) {
 	}
 	if !ok {
 		cands = s.complete(a, off)
+	}
+	// What no type describes in a Blueprint's own body: its keywords,
+	// the kind after `primary`, and the names its values can use.
+	if len(cands) == 0 {
+		cands, _ = s.blueprintComplete(a, off)
 	}
 	items := make([]Item, 0, len(cands))
 	for i, c := range cands {
@@ -360,7 +369,15 @@ func (a *at) command(t syntax.Token, off int) (syntax.Span, bool) {
 // '"' and '/' complete asset file paths, and '/' also starts a command.
 // Elsewhere, such as after the '/' of a division, they open nothing.
 func (s *Session) TriggerApplies(path string, off int, ch string) bool {
-	// '{' and '$' only complete book markup.
+	// A `${` a Blueprint fills in, in its strings and names.
+	if ch == "{" && !sema.IsBookFile(path) {
+		if a := s.at(path, off); a != nil {
+			if _, _, ok := s.blueprintInterpolation(a, off); ok {
+				return true
+			}
+		}
+	}
+	// '{' and '$' otherwise only complete book markup.
 	if sema.IsBookFile(path) || ch == "{" || ch == "$" {
 		return s.bookTrigger(path, off)
 	}

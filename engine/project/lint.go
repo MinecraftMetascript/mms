@@ -587,13 +587,29 @@ func lintUnused(l *lintRun) {
 	}
 	sort.Slice(unused, func(i, j int) bool { return unused[i].Decl.Sp.Start < unused[j].Decl.Sp.Start })
 	unusedEvalNames(l)
+	// A Blueprint instance's primary declaration is named by the
+	// instance's kind, as the user wrote it: `TierDensityFunction upper`.
+	kindOf := map[*syntax.Decl]string{}
+	if r.Eval != nil {
+		for _, f := range r.Eval.Files {
+			for _, od := range f.Decls {
+				if in := od.Instance; in != nil && in.Primary == od.D && in.D != nil && in.D.Kind != nil {
+					kindOf[od.D] = in.D.Kind.Name
+				}
+			}
+		}
+	}
 	for _, s := range unused {
 		if d := r.Decls[s.Decl]; d == nil || hasErrors(d.Diags) {
 			continue
 		}
+		kind := s.Kind.Name
+		if k, ok := kindOf[s.Decl]; ok {
+			kind = k
+		}
 		l.out[s.Unit.Path] = append(l.out[s.Unit.Path], syntax.Diagnostic{
 			Code: "lint/unused", Severity: l.sev, Sp: s.Decl.Name.Sp, Unnecessary: true,
-			Message: fmt.Sprintf("%s '%s' is never used", s.Kind.Name, s.ID()),
+			Message: fmt.Sprintf("%s '%s' is never used", kind, s.ID()),
 		})
 	}
 }

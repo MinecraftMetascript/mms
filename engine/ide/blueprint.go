@@ -2,6 +2,7 @@ package ide
 
 import (
 	"sort"
+	"strings"
 
 	"github.com/minecraftmetascript/mms/engine/eval"
 	"github.com/minecraftmetascript/mms/engine/sema"
@@ -143,4 +144,216 @@ func (s *Session) convertedAt(path string, off int) *sema.Conversion {
 		}
 	}
 	return nil
+}
+
+// blueprintKeywords start the items of a Blueprint's body other than a
+// field, which is a name the author makes up.
+var blueprintKeywords = []sema.Candidate{
+	{Label: "let", Kind: sema.CandKeyword, Detail: "a value worked out from the fields", Insert: "let ${1:name} = $0",
+		Doc: "A value the check and emit blocks can name, worked out once per instance: `let lang_key = \"item.${self.namespace}.${self.path}\"`."},
+	{Label: "check", Kind: sema.CandKeyword, Detail: "problems with an instance", Insert: "check {\n\t$0\n}", Rank: 1,
+		Doc: "Reports problems with an instance's fields where the instance is written: `if (cooldown < 1) { error(cooldown, \"...\") }`."},
+	{Label: "emit", Kind: sema.CandKeyword, Detail: "the declarations an instance writes", Insert: "emit {\n\t$0\n}", Rank: 2,
+		Doc: "The declarations each instance writes, with `primary` on the one its name stands for."},
+	{Label: "as", Kind: sema.CandKeyword, Detail: "what the name means where a type is expected", Insert: "as ${1:Type} = $0", Rank: 3,
+		Doc: "What an instance's name stands for where a value of the type goes: `as ItemStack = { id = base }`."},
+}
+
+// selfCandidates are the parts of `self`, the instance being expanded.
+var selfCandidates = []sema.Candidate{
+	{Label: "id", Kind: sema.CandField, Detail: "self: string", Doc: "The instance's id, `<namespace>:<path>`."},
+	{Label: "namespace", Kind: sema.CandField, Detail: "self: string", Doc: "The namespace the instance is in.", Rank: 1},
+	{Label: "path", Kind: sema.CandField, Detail: "self: string", Doc: "The instance's name, the path of its id.", Rank: 2},
+}
+
+// blueprintValues lists what an expression in a Blueprint can name,
+// worked out when the pack is built: its fields and lets, self, then the
+// consts and Templates.
+func (s *Session) blueprintValues(bp *eval.Blueprint) []sema.Candidate {
+	var out []sema.Candidate
+	for _, tc := range s.blueprintFields(bp) {
+		out = append(out, tc.Candidate)
+	}
+	out = append(out, sema.Candidate{Label: "self", Kind: sema.CandID, Detail: "the instance", Doc: "The instance being expanded: `self.id`, `self.namespace` and `self.path`.", Rank: 1})
+	for _, c := range s.evalValueCandidates() {
+		c.Rank += 10
+		out = append(out, c)
+	}
+	for i, kw := range []string{"true", "false", "none"} {
+		out = append(out, sema.Candidate{Label: kw, Kind: sema.CandKeyword, Rank: 200 + i})
+	}
+	return out
+}
+
+// blueprintComplete completes the parts of a Blueprint's own body that
+// no declaration's type describes: the keywords starting its items and
+// its check block's lines, the kind after `primary`, and the values its
+// lets, defaults, checks and emit statements compute with. ok is false
+// elsewhere, such as in the body of a declaration it emits.
+func (s *Session) blueprintComplete(a *at, off int) ([]sema.Candidate, bool) {
+	if a.decl == nil || a.decl.Emitter == nil || a.code() || len(a.path) < 3 {
+		return nil, false
+	}
+	bp := a.decl.Emitter
+	f := a.u.File
+	start := off
+	if sp, ok := wordAt(f, off); ok {
+		start = sp.Start
+	}
+	prev := prevToken(f, start)
+	// The kind of the declaration `primary` marks.
+	if prev != nil && prev.Kind == parser.MMSLexerPRIMARY {
+		var out []sema.Candidate
+		for _, c := range s.emitCandidates() {
+			if c.Kind != sema.CandKeyword {
+				out = append(out, c)
+			}
+		}
+		return out, true
+	}
+	if a.decl.D != bp.D {
+		return nil, false // inside an emitted declaration
+	}
+	// The type of an `as` conversion.
+	if prev != nil && prev.Kind == parser.MMSLexerAS && s.R.TypeEnv != nil {
+		return s.typeNameCandidates(), true
+	}
+	// The first word of a line: an item of the body, or a line of a
+	// check block.
+	if lineStart(f.Src, start) {
+		b := innermostBlock(a.path)
+		if b >= 2 && startsAt(a.path[b+1:], start) {
+			if b == 2 && a.path[b] == bp.D.Body {
+				return blueprintKeywords, true
+			}
+			if inCheck(a.path[:b+1]) {
+				return s.checkCandidates(a), true
+			}
+		}
+	}
+	// `self.|`.
+	if prev != nil && prev.Kind == parser.MMSLexerDOT {
+		if recv := prevToken(f, prev.Sp.Start); recv != nil && string(f.Src[recv.Sp.Start:recv.Sp.End]) == "self" {
+			return selfCandidates, true
+		}
+		return nil, false
+	}
+	if prev != nil && (exprStart(prev.Kind) || prev.Kind == parser.MMSLexerLPAREN || prev.Kind == parser.MMSLexerCOMMA || prev.Kind == parser.MMSLexerLBRACK) {
+		return s.blueprintValuesAt(a, bp, off), true
+	}
+	return nil, false
+}
+
+// blueprintValuesAt is blueprintValues without the lets a value at off
+// cannot use yet: in `let x = |`, x itself and the lets after it.
+func (s *Session) blueprintValuesAt(a *at, bp *eval.Blueprint, off int) []sema.Candidate {
+	var inLet *syntax.LetStmt
+	for _, n := range a.path {
+		if l, ok := n.(*syntax.LetStmt); ok {
+			inLet = l
+		}
+	}
+	if inLet == nil {
+		for _, l := range bp.Lets {
+			// A let without its value yet ends at its `=`.
+			if l.Sp.Start <= off && (off <= l.Sp.End || lineOf(a.u.File, l.Sp.Start) == lineOf(a.u.File, off)) {
+				inLet = l
+			}
+		}
+	}
+	all := s.blueprintValues(bp)
+	if inLet == nil {
+		return all
+	}
+	later := map[string]bool{}
+	for _, l := range bp.Lets {
+		if l.Name != nil && l.Sp.Start >= inLet.Sp.Start {
+			later[l.Name.Text] = true
+		}
+	}
+	out := all[:0:0]
+	for _, c := range all {
+		if !(later[c.Label] && c.Detail != "" && strings.HasPrefix(c.Detail, "let")) {
+			out = append(out, c)
+		}
+	}
+	return out
+}
+
+// blueprintInterpolation completes a `${...}` in a Blueprint's strings
+// and templated names, `Objective ${self.|}_cd`, which the Blueprint
+// fills in when the pack is built: its fields, lets and self, and after
+// `self.` its parts. ok is false when off is not in an open `${` there.
+func (s *Session) blueprintInterpolation(a *at, off int) ([]Item, syntax.Span, bool) {
+	if a.decl == nil || a.decl.Emitter == nil {
+		return nil, syntax.Span{}, false
+	}
+	f := a.u.File
+	i := f.TokenAt(off)
+	if i < 0 {
+		return nil, syntax.Span{}, false
+	}
+	t := f.Tokens[i]
+	switch {
+	case t.Kind == parser.MMSLexerTNAME && t.Sp.Start < off && off <= t.Sp.End:
+	case t.Kind == parser.MMSLexerSTRING && t.Sp.Start < off && off < t.Sp.End && !a.code():
+	default:
+		return nil, syntax.Span{}, false
+	}
+	src := f.Src
+	open, depth := -1, 0
+	for j := t.Sp.Start; j < off; j++ {
+		switch {
+		case open < 0 && src[j] == '$' && j+1 < off && src[j+1] == '{':
+			open, depth = j+2, 1
+			j++
+		case open >= 0 && src[j] == '{':
+			depth++
+		case open >= 0 && src[j] == '}':
+			if depth--; depth == 0 {
+				open = -1
+			}
+		}
+	}
+	if open < 0 {
+		return nil, syntax.Span{}, false
+	}
+	start := off
+	for start > open && identRune(src[start-1]) {
+		start--
+	}
+	var cands []sema.Candidate
+	if start > open && src[start-1] == '.' {
+		if strings.TrimSpace(string(src[receiverStart(src, open, start-1):start-1])) == "self" {
+			cands = selfCandidates
+		}
+	} else {
+		cands = s.blueprintValuesAt(a, a.decl.Emitter, off)
+	}
+	end := wordEnd(src, off)
+	if end > t.Sp.End {
+		end = t.Sp.End
+	}
+	return candidateItems(cands), syntax.Span{Start: start, End: end}, true
+}
+
+// innermostBlock is the index of the last Block on path, or -1.
+func innermostBlock(path []syntax.Node) int {
+	for i := len(path) - 1; i >= 0; i-- {
+		if _, ok := path[i].(*syntax.Block); ok {
+			return i
+		}
+	}
+	return -1
+}
+
+// startsAt reports whether every node starts at off: the word being
+// typed is the first thing in each, as in a statement of one word.
+func startsAt(nodes []syntax.Node, off int) bool {
+	for _, n := range nodes {
+		if n.Span().Start != off {
+			return false
+		}
+	}
+	return true
 }
