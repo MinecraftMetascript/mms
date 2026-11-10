@@ -20,8 +20,36 @@ export interface Group {
 
 // The Docs tab teaches; the Reference tab is for looking things up.
 export const docGroups: Group[] = [
-	{ dir: 'start', title: 'Start', order: ['getting-started', 'tutorial-dimension'] },
-	{ dir: 'guides', title: 'Guides', order: ['resources', 'functions', 'lint', 'agents', 'jigsaw-pieces'] },
+	{
+		dir: 'start',
+		title: 'Start',
+		order: [
+			'getting-started',
+			'tutorial-custom-item',
+			'tutorial-minigame',
+			'tutorial-book',
+			'tutorial-dimension',
+			'tutorial-structure'
+		]
+	},
+	{
+		dir: 'guides',
+		title: 'Guides',
+		order: [
+			'resources',
+			'functions',
+			'state',
+			'repetition',
+			'blueprints',
+			'testing',
+			'terrain',
+			'jigsaw-pieces',
+			'building',
+			'editors',
+			'lint',
+			'agents'
+		]
+	},
 	{ dir: 'concepts', title: 'Concepts', order: ['how-functions-compile'] }
 ];
 export const referenceGroups: Group[] = [

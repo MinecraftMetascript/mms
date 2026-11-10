@@ -5,8 +5,8 @@ Wherever the game takes a text component, a string is markup: a small Markdown-l
 ```mms
 CustomItem ember_shard {
   base = amethyst_shard
-  name = "{#ff8800}Ember Shard"
-  components = { lore = ["{gray}*Still warm.*"] }
+  name = "Ember Shard"
+  components = { lore = ["{#ff8800}A shard that glows like a coal.", "{gray}*Still warm.*"] }
 }
 ```
 
