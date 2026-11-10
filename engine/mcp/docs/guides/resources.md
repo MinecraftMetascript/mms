@@ -126,6 +126,26 @@ Each entry of `pools` is a `TemplatePool` of that name, so a jigsaw block draws 
 
 The structure set's `salt` is made from the structure's id unless you set it, so two structures never share one by accident. `heightmap = WORLD_SURFACE_WG` measures `height` from the ground, as villages do. `terrain_adaptation` and `max_distance` (80 by default) are the `Structure`'s fields of those names. The name stands for the structure's id in a command, as in `/locate structure ${dungeon}`. The [`jigsaw`](../../examples/jigsaw/) and [`treasure`](../../examples/treasure/) examples use it.
 
+The other fields of a jigsaw `Structure` are there too, by their own names. `spawn_overrides` replaces the biome's mobs inside the structure, by mob category: this village keeps hostile mobs out of its pieces.
+
+```mms in=examples/jigsaw
+JigsawStructure village {
+  biomes = #minecraft:has_structure/village_plains
+  step = surface_structures
+  spacing = 34
+  separation = 8
+  height = Constant(Absolute(0))
+  heightmap = WORLD_SURFACE_WG
+  start = start
+  pools = { start = [Piece("start")] }
+  spawn_overrides = {
+    monster = { bounding_box = piece, spawns = [] }
+  }
+}
+```
+
+`bounding_box = piece` covers only the pieces, and `full` the whole box around them. `start_jigsaw_name` names the jigsaw block in the start piece that sits at the structure's center. `liquid_settings = ignore_waterlogging` keeps pieces placed in water from being waterlogged. `pool_aliases` binds stand-in pool names to real pools when the structure starts, as trial chambers do, and `dimension_padding` keeps pieces that many blocks from the bottom and top of the world (a number, or `{ bottom = 10, top = 0 }`).
+
 `biomes` has the type `Ids<worldgen/biome>`: a list of ids, or one id or tag. A Blueprint field can use `Ids<...>` the same way.
 
 ### Simulating a jigsaw structure
