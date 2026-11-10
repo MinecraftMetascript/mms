@@ -75,6 +75,21 @@
 	let seed = $state('0');
 	let error = $state('');
 	let busy = $state(false);
+	/** A render has been running long enough to say so, even over a density view. */
+	let slow = $state(false);
+	let slowTimer: ReturnType<typeof setTimeout> | undefined;
+	function setBusy(on: boolean) {
+		if (on && !busy) {
+			// Every worker has until the next stall check from now on.
+			const now = performance.now();
+			for (const w of alive.keys()) alive.set(w, now);
+			slowTimer = setTimeout(() => (slow = busy), 500);
+		} else if (!on) {
+			clearTimeout(slowTimer);
+			slow = false;
+		}
+		busy = on;
+	}
 	let last: Extract<PreviewResponse, { type: 'rendered' }> | null = $state(null);
 	let hover = $state<{ px: number; py: number } | null>(null);
 	type Point = { x: number; y: number; z: number };
@@ -245,15 +260,39 @@
 	});
 	const terrainChoices = $derived(['minecraft:overworld', ...parsed.filter((f) => f.kind === 'noise_settings').map((f) => f.id)]);
 
-	onMount(() => {
-		worker = createWorker();
-		worker.onmessage = (e: MessageEvent<PreviewResponse>) => {
+	/**
+	 * Workers can get stuck: a density function that repeats work can take
+	 * hours to sample, and a worker busy sampling can't take the next
+	 * request, so the preview would show the old picture forever. While a
+	 * render runs, every worker is pinged each second; one that hasn't
+	 * answered for stallMs is stuck, so all of them are replaced. A newer
+	 * request the stuck worker never got to is sent again; otherwise the
+	 * next change renders again. A crashed worker is replaced the same way.
+	 */
+	const stallMs = 6000;
+	/** Each worker and when it last answered. */
+	const alive = new Map<Worker, number>();
+	let files: PreviewFile[] = [];
+	/** The newest render the main worker has started. */
+	let started = 0;
+
+	function startWorker() {
+		const w = createWorker();
+		worker = w;
+		alive.set(w, performance.now());
+		w.onmessage = (e: MessageEvent<PreviewResponse>) => {
+			alive.set(w, performance.now());
 			const r = e.data;
+			if (r.type === 'pong') return;
+			if (r.type === 'started') {
+				started = r.seq;
+				return;
+			}
 			if (r.seq !== seq) {
 				if (r.type === 'rendered') r.bitmap?.close();
 				return;
 			}
-			busy = r.type === 'rendered' && !!r.partial;
+			setBusy(r.type === 'rendered' && !!r.partial);
 			if (r.type === 'error') {
 				error = r.message;
 				return;
@@ -264,18 +303,68 @@
 			if (r.scale && (!isoView.scale || r.scale > isoView.scale)) isoView.scale = r.scale;
 			draw();
 		};
+		w.onerror = (e) => {
+			e.preventDefault();
+			restart(`the preview's worker crashed${e.message ? ` (${e.message})` : ''}`);
+		};
+		w.postMessage({ type: 'setup', files } satisfies PreviewRequest);
+	}
+
+	function stopWorkers() {
+		worker?.terminate();
+		worker = null;
+		for (const h of helpers) h.terminate();
+		helpers = [];
+		alive.clear();
+	}
+
+	/**
+	 * Replaces every worker. The render that broke them isn't asked for
+	 * again (it would only break them again), and the preview says why; but
+	 * if a newer one is waiting behind it, that one is.
+	 */
+	function restart(why: string) {
+		const waiting = seq > started;
+		stopWorkers();
+		startWorker();
+		started = seq;
+		if (waiting) {
+			request();
+			return;
+		}
+		seq++; // drops anything still on its way from the old workers
+		setBusy(false);
+		error = `${why[0].toUpperCase()}${why.slice(1)}. It starts again when you change the code or the view.`;
+	}
+
+	function watch() {
+		if (!busy) return;
+		const now = performance.now();
+		for (const [w, t] of alive) {
+			if (now - t > stallMs) {
+				restart(`it stopped responding after ${Math.round(stallMs / 1000)} seconds, so this view may take too long to compute`);
+				return;
+			}
+			w.postMessage({ type: 'ping' } satisfies PreviewRequest);
+		}
+	}
+
+	onMount(() => {
+		startWorker();
+		const watcher = setInterval(watch, 1000);
 		const ro = new ResizeObserver(() => request());
 		ro.observe(box);
 		return () => {
 			ro.disconnect();
-			worker?.terminate();
-			for (const h of helpers) h.terminate();
+			clearInterval(watcher);
+			clearTimeout(slowTimer);
+			stopWorkers();
 		};
 	});
 
 	// Re-register files whenever the pack changes, then re-render.
 	$effect(() => {
-		const files = parsed.map(({ kind, id, json }) => ({ kind, id, json }));
+		files = parsed.map(({ kind, id, json }) => ({ kind, id, json }));
 		worker?.postMessage({ type: 'setup', files } satisfies PreviewRequest);
 		request();
 	});
@@ -334,6 +423,12 @@
 		const ports: MessagePort[] = [];
 		for (let i = 0; i < count; i++) {
 			const helper = createWorker();
+			alive.set(helper, performance.now());
+			helper.onmessage = () => alive.set(helper, performance.now());
+			helper.onerror = (e) => {
+				e.preventDefault();
+				restart(`a worker building chunks crashed${e.message ? ` (${e.message})` : ''}`);
+			};
 			const channel = new MessageChannel();
 			helper.postMessage({ type: 'serve', port: channel.port2 } satisfies PreviewRequest, [channel.port2]);
 			ports.push(channel.port1);
@@ -351,7 +446,7 @@
 			if (!worker || !info || !box) return;
 			const width = Math.max(16, Math.floor(box.clientWidth / resolution));
 			const height = Math.max(16, Math.floor(box.clientHeight / resolution));
-			busy = true;
+			setBusy(true);
 			if (mode === 'iso' || topBlocks) startHelpers();
 			worker.postMessage({
 				type: 'render',
@@ -818,7 +913,7 @@
 			<div class="pointer-events-none absolute bottom-2 left-2 flex flex-col gap-0.5 rounded bg-black/60 px-2 py-1 font-mono text-[11px] text-white">
 				{#if readout}<span>{readout}</span>{/if}
 				{#if lockValue}<span class="text-red-300">● {lockValue}</span>{/if}
-				{#if busy && (!last || mode !== 'density')}<span>Rendering…</span>{/if}
+				{#if busy && (!last || mode !== 'density' || slow)}<span>Rendering…</span>{/if}
 			</div>
 		{/if}
 		{#if info && last && mode !== 'iso'}
