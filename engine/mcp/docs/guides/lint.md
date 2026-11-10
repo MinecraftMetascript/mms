@@ -11,6 +11,7 @@ Every rule, with its default severity and what it reports, is listed in the [lin
 - `texture-outside-atlas` (warning): a texture a model names that neither the blocks atlas (`textures/block/`) nor the items atlas (`textures/item/`) stitches, so the game shows the missing texture. See [Resource packs](resources.md#resource-packs).
 - `book-page-overflow` (warning): a [Book](resources.md#books) page with more text than the book screen shows.
 - The `jigsaw-` rules (warning or info): jigsaw blocks in structure files that can never join, name an unknown pool or hole, or place pieces that stick out or overlap.
+- `structure-unknown-loot-table` (warning): a chest, barrel, chest minecart or other container in a structure file whose `LootTable` tag names a table that is not vanilla and that no `LootTable` declares, so the game leaves it empty. The quick fix declares the table.
 
 Blueprints add rules of their own: the prelude's `custom-item-as-base` hint on a [custom item](resources.md#custom-items) written where a plain item id is expected, and any rule a project's Blueprint names in `warn(field, "rule", "message")` or `hint("rule", "message")`. They are configured and ignored like the built-in rules. A setting for a rule that neither MMS nor a Blueprint has is a warning on `mms.json`, with the closest rule name.
 

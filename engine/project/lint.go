@@ -53,6 +53,8 @@ var Rules = []*Rule{
 		Doc: "An id or enum name in quotes can be written bare: `minecraft:stone` or `stone` rather than \"minecraft:stone\"."},
 	{ID: "redundant-namespace", Severity: syntax.SeverityHint, run: lintNamespace,
 		Doc: "A `minecraft:` prefix that can be dropped: `stone` means `minecraft:stone` unless the project declares its own `stone`."},
+	{ID: "structure-unknown-loot-table", Severity: syntax.SeverityWarning, all: lintStructureLoot,
+		Doc: "A chest, barrel, chest minecart or other container in a structure file that StructureFile(\"...\") includes whose LootTable tag names a loot table nothing provides: in the minecraft namespace one vanilla does not have, and in a namespace the project declares in one that no LootTable declares. The game leaves the container empty without an error. The quick fix declares the table. Other namespaces may come from another pack and are not checked."},
 	{ID: "texture-outside-atlas", Severity: syntax.SeverityWarning, all: lintTextureAtlas,
 		Doc: "A texture a model names, outside the minecraft namespace, that neither the blocks atlas nor the items atlas stitches, so the game shows the missing texture. Vanilla's atlases take the files under textures/block/ and textures/item/; a Texture(...) in a Model goes under textures/block/ unless it is given an id name. The project's own `Atlas blocks` and `Atlas items` declarations in the minecraft namespace count too."},
 	{ID: "use-shorthand", Severity: syntax.SeverityHint, run: lintShorthand,

@@ -63,7 +63,8 @@ var structureCache = struct {
 type structureFile struct {
 	jigsaws []Jigsaw
 	size    [3]int // x, y, z; zero when the file has no size
-	ok      bool   // false when the file could not be read as a structure
+	loot    []LootRef
+	ok      bool // false when the file could not be read as a structure
 }
 
 // StructureJigsaws returns the jigsaw blocks of a structure file in the
@@ -102,7 +103,7 @@ func readStructure(fsys fs.FS, src string) structureFile {
 	}
 	if f2, err := fsys.Open(src); err == nil {
 		if st, err := structure.Read(f2); err == nil {
-			f = structureFile{jigsaws: Jigsaws(st), ok: true}
+			f = structureFile{jigsaws: Jigsaws(st), loot: LootTables(st), ok: true}
 			for i, n := range st.Size {
 				f.size[i] = int(n)
 			}
@@ -234,6 +235,7 @@ func nbtID(v nbt.Tag) string {
 type structureUse struct {
 	assetUse
 	jigsaws []Jigsaw
+	loot    []LootRef
 	size    [3]int // zero when the file has no size
 }
 
@@ -275,7 +277,7 @@ func (r *Result) jigsawModel() *jigsawModel {
 		if !f.ok {
 			continue
 		}
-		s := &structureUse{assetUse: u, jigsaws: f.jigsaws, size: f.size}
+		s := &structureUse{assetUse: u, jigsaws: f.jigsaws, loot: f.loot, size: f.size}
 		m.uses = append(m.uses, s)
 		m.byID[u.ID] = s
 	}
@@ -951,16 +953,8 @@ func nearHole(id string, holes map[string]bool) string {
 // namespace, else the full id.
 func (r *Result) newHoleFix(s *structureUse, id string) (syntax.Fix, bool) {
 	ns, name, _ := strings.Cut(id, ":")
-	// The namespace in force at the end of the file: the last Namespace
-	// declaration's, or the project's.
-	end := r.cfg.Namespace
-	for _, d := range s.decl.Unit.File.Decls {
-		if d.Kind != nil && d.Kind.Name == "Namespace" && d.Name != nil {
-			end = d.Name.Text
-		}
-	}
 	decl := name
-	if end != ns {
+	if endNamespace(r, s.decl.Unit.File) != ns {
 		decl = id
 	}
 	src := s.decl.Unit.File.Src
