@@ -38,7 +38,10 @@ type Point struct {
 
 // Spline is a multipoint cubic spline.
 type Spline struct {
-	X *syntax.Object
+	// X is the spline's object; it is nil for an empty `Spline()`, whose
+	// call is Empty.
+	X     *syntax.Object
+	Empty *syntax.Call
 	// Coordinate is the coordinate's source text, such as `continents`.
 	Coordinate string
 	CoordSp    syntax.Span
@@ -92,6 +95,10 @@ func Read(e syntax.Expr, src []rune, fold Fold) *Spline {
 func Of(c *syntax.Call, src []rune, fold Fold) *Spline {
 	if id, ok := c.Fn.(*syntax.Ident); !ok || id.Name != "Spline" {
 		return nil
+	}
+	// `Spline()` is a spline still to be written.
+	if len(c.Args) == 0 {
+		return &Spline{Empty: c}
 	}
 	for i, a := range c.Args {
 		if a.Name == nil && i == 0 || a.Name != nil && a.Name.Text == "spline" {
@@ -233,7 +240,7 @@ func At(path []syntax.Node, off int, src []rune, fold Fold) (*Spline, []int) {
 	}
 	// Climb while the spline is a point's value of the spline above.
 	root, focus := inner, []int(nil)
-	for i := at - 1; i >= 0; i-- {
+	for i := at - 1; i >= 0 && root.X != nil; i-- {
 		e, ok := path[i].(syntax.Expr)
 		if !ok {
 			continue

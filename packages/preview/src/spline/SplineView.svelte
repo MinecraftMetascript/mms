@@ -341,7 +341,9 @@
 			{/each}
 		</svg>
 		{#if spline.points.length === 0}
-			<p class="absolute inset-x-0 top-1/2 text-center text-muted">This spline has no points. Double-click to add one.</p>
+			<p class="pointer-events-none absolute inset-x-0 top-1/2 px-4 text-center text-muted">
+				This spline has no points. Double-click to add one{spline.coordinate ? '' : '; its coordinate starts as 0, to replace in the source'}.
+			</p>
 		{/if}
 	</div>
 	<div class="flex flex-col gap-1.5 border-t border-line px-3 py-2">

@@ -21,6 +21,8 @@
 	let page = $state(vscode.getState()?.page ?? 0);
 	let ready = $state(false);
 	// The spline at the cursor in the last .mms editor, for the spline editor.
+	// What goes back to the extension is a $state.snapshot: postMessage
+	// cannot clone the proxies $state wraps values in, and throws.
 	let spline = $state<SplineAt | null>(null);
 	let splineUri: string | null = null;
 	// The document version the spline's ranges are in, sent back with each edit.
@@ -66,7 +68,7 @@
 			<button
 				class="min-w-0 truncate px-3 py-1 text-muted hover:text-ink"
 				title="Go to the declaration"
-				onclick={() => vscode.postMessage({ type: 'reveal', uri: source.uri!, range: source.range! } satisfies ToExtension)}
+				onclick={() => vscode.postMessage({ type: 'reveal', uri: source.uri!, range: $state.snapshot(source.range!) } satisfies ToExtension)}
 				>{source.label}</button
 			>
 		</div>
@@ -87,7 +89,7 @@
 				onunpin={() => vscode.postMessage({ type: 'clear' } satisfies ToExtension)}
 				createWorker={() => new PreviewWorker()}
 				{spline}
-				onsplineedit={(edits) => splineUri && vscode.postMessage({ type: 'splineEdit', uri: splineUri, version: splineVersion, edits } satisfies ToExtension)}
+				onsplineedit={(edits) => splineUri && vscode.postMessage({ type: 'splineEdit', uri: splineUri, version: splineVersion, edits: $state.snapshot(edits) } satisfies ToExtension)}
 				hint="Click Preview above a noise, density function, noise settings, surface rule, dimension, loot table, recipe, biome, template pool, jigsaw structure or book to show it here, or Edit spline above a spline to graph it."
 			/>
 		{:else}
