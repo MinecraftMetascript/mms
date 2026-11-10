@@ -500,7 +500,7 @@ func (c *Checker) union(e syntax.Expr, v tview) jsonv.Value {
 		c.errorf("mms/type-mismatch", e.Span(), "expected %s, got %s%s", unionText(v), exprKind(e), colorHint(v))
 		return nil
 	case 1:
-		return c.check(e, cands[0])
+		return c.checkMember(e, v, cands[0])
 	}
 	best, bestErrs := 0, math.MaxInt
 	for i, m := range cands {
@@ -512,7 +512,24 @@ func (c *Checker) union(e syntax.Expr, v tview) jsonv.Value {
 			break
 		}
 	}
-	return c.check(e, cands[best])
+	return c.checkMember(e, v, cands[best])
+}
+
+// checkMember checks e as m, the member of union v it was narrowed to.
+// A list of ids where the union also takes a tag gets, on the tags in
+// it, the fix that moves the list into a tag declaration.
+func (c *Checker) checkMember(e syntax.Expr, v, m tview) jsonv.Value {
+	kind := ""
+	if !c.trial {
+		kind = c.tagListKind(e, v, m)
+	}
+	if kind == "" {
+		return c.check(e, m)
+	}
+	from := len(c.Diags)
+	r := c.check(e, m)
+	c.tagListFix(e.(*syntax.List), kind, from)
+	return r
 }
 
 // preferKnownKeys keeps, of the struct members an object might be, those
