@@ -103,6 +103,10 @@ type Checker struct {
 	Files fs.FS
 	// Src is the checked file's text; quick fixes need it for layout.
 	Src []rune
+	// FixIn, when set, is the only part of Src quick fixes may edit:
+	// the text the checked value was written as. A value evaluated from
+	// elsewhere, such as another const, keeps its own spans.
+	FixIn *syntax.Span
 	// Texts returns the text of a project file the host has as a
 	// source, such as a .mmsbook file, by its path in the project, and
 	// the unit path it has; nil when there are none.

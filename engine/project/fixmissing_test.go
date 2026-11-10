@@ -45,6 +45,16 @@ func TestMissingFieldFix(t *testing.T) {
 		// Colors start as opaque white, in the "#hex" form.
 		{"Biome b { temperature = 0, downfall = 0, has_precipitation = false, carvers = [], features = [], effects = {} }\n", "Biome b { temperature = 0, downfall = 0, has_precipitation = false, carvers = [], features = [], effects = { water_color = \"#FFFFFF\" } }\n"},
 		{"Biome b {\n  temperature = 1\n}\n", "Biome b {\n  temperature = 1\n  downfall = 0\n  has_precipitation = false\n  effects = {}\n  carvers = []\n  features = []\n}\n"},
+		// Typed consts, Template arguments and Blueprint fields get the
+		// fix too, where their values are written.
+		{"const src: BiomeSource = { type = checkerboard }\n", "const src: BiomeSource = { type = checkerboard, biomes = [] }\n"},
+		{"const src: BiomeSource = Checkerboard()\n", "const src: BiomeSource = Checkerboard(biomes = [])\n"},
+		{"const n: Noise = {\n}\n", "const n: Noise = {\n  base_octave = 0\n}\n"},
+		{"Type P {\n  x: int\n  y: string\n}\nconst p: P = {\n  x = 1\n}\n", "Type P {\n  x: int\n  y: string\n}\nconst p: P = {\n  x = 1\n  y = \"\"\n}\n"},
+		{"Type P {\n  x: int\n  q: { a: int, b: int }\n}\nconst p: P = { x = 1, q = { a = 1 } }\n", "Type P {\n  x: int\n  q: { a: int, b: int }\n}\nconst p: P = { x = 1, q = { a = 1, b = 0 } }\n"},
+		{"Type P {\n  x: int\n  y: string\n}\nconst ps: [P] = [{ x = 1 }]\n", "Type P {\n  x: int\n  y: string\n}\nconst ps: [P] = [{ x = 1, y = \"\" }]\n"},
+		{"Type P {\n  x: int\n  y: string\n}\nTemplate f(p: P): int = 1\nconst z = f({ x = 1 })\n", "Type P {\n  x: int\n  y: string\n}\nTemplate f(p: P): int = 1\nconst z = f({ x = 1, y = \"\" })\n"},
+		{"Type P {\n  x: int\n  y: string\n}\nBlueprint B {\n  p: P\n}\nB b {\n  p = { x = 1 }\n}\n", "Type P {\n  x: int\n  y: string\n}\nBlueprint B {\n  p: P\n}\nB b {\n  p = { x = 1, y = \"\" }\n}\n"},
 	}
 	for _, c := range cases {
 		got, f := missingFix(t, c.src)
@@ -79,5 +89,32 @@ func TestMissingFieldFix(t *testing.T) {
 	files, _, err := p.FixAll(context.Background(), "a.mms")
 	if err != nil || strings.Contains(files["a.mms"], "base_octave") {
 		t.Errorf("fix all = %q, %v", files["a.mms"], err)
+	}
+}
+
+// A value evaluated from elsewhere keeps the spans of where it is
+// written, so a typed const naming another const gets no fix that would
+// edit the other one's text.
+func TestMissingFieldFixStaysInValue(t *testing.T) {
+	for _, src := range []string{
+		"Type P {\n  x: int\n  y: string\n}\nconst a = { x = 1 }\nconst p: P = a\n",
+		"Type P {\n  x: int\n  y: string\n}\nconst a = { x = 1 }\nconst p: P = { ...a }\n",
+	} {
+		p := New(spec.MustDefault(), Config{Namespace: "demo"})
+		p.SetFile("a.mms", src)
+		r, _ := p.Analyze(context.Background())
+		found := false
+		for _, d := range r.Diagnostics("a.mms") {
+			if d.Code != "mms/missing-field" {
+				continue
+			}
+			found = true
+			if len(d.Fixes) > 0 {
+				t.Errorf("%q: fix %q edits another value", src, d.Fixes[0].Title)
+			}
+		}
+		if !found {
+			t.Errorf("%q: no missing-field error", src)
+		}
 	}
 }

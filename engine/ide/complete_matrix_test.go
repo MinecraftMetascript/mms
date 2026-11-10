@@ -269,6 +269,29 @@ func TestCompletionMatrix(t *testing.T) {
 		{name: "emit function command self", src: bpHead + "  emit {\n    Function ${self.path} {\n      /say ${self.|}\n    }\n  }\n}", want: []string{"path"}},
 		{name: "blueprint instance field", src: bpHead + "}\nTier t {\n  |\n}", want: []string{"tier", "label"}, not: []string{"doubled"}},
 
+		// Typed consts complete like a declaration of their type, and a
+		// value never offers the name it defines.
+		{name: "typed const helpers", src: "const src: BiomeSource = |", want: []string{"Checkerboard", "MultiNoise"}, not: []string{"src"}},
+		{name: "typed const object fields", src: "const src: BiomeSource = {\n  |\n}", want: []string{"type"}},
+		{name: "typed const dispatched fields", src: "const src: BiomeSource = {\n  type = multi_noise\n  |\n}", want: []string{"biomes", "preset"}, not: []string{"type"}},
+		{name: "typed const field value", src: "const src: BiomeSource = {\n  type = |\n}", want: []string{"checkerboard", "multi_noise"}},
+		{name: "typed const field prefix", src: "const e: Biome = {\n  te|\n}", want: []string{"temperature"}, replace: "te"},
+		{name: "typed const helper args", src: "const src: BiomeSource = MultiNoise(|)", want: []string{"biomes", "preset"}},
+		{name: "typed const nested object", src: "const src: BiomeSource = MultiNoise(biomes = [{\n  |\n}])", want: []string{"biome", "parameters"}},
+		{name: "typed const nested value", src: "const src: BiomeSource = MultiNoise(biomes = [{ biome = |}])", want: []string{"plains"}},
+		{name: "typed const record fields", src: "Type P {\n  x: int\n  y: Id<item>\n}\nconst p: P = {\n  x = 1\n  |\n}", want: []string{"y"}, not: []string{"x"}},
+		{name: "typed const record value", src: "Type P {\n  x: int\n  y: Id<item>\n}\nconst p: P = {\n  y = |\n}", want: []string{"diamond"}},
+		{name: "typed const list of records", src: "Type P {\n  f: Feature\n}\nconst ps: [P] = [{ f = |}]", want: []string{"Ore"}},
+		{name: "private typed const", src: "private const src: BiomeSource = {\n  |\n}", want: []string{"type"}},
+		{name: "typed const after other const", src: "const src: BiomeSource = Fixed(plains)\nconst b: BiomeSource = |", want: []string{"Fixed", "src"}, not: []string{"b"}},
+		{name: "typed const in emit", src: bpHead + "  emit {\n    const s: BiomeSource = {\n      |\n    }\n  }\n}", want: []string{"type"}},
+		{name: "typed const in emit helpers", src: bpHead + "  emit {\n    const s: BiomeSource = |\n  }\n}", want: []string{"Checkerboard"}, not: []string{"s"}},
+		{name: "typed let not itself", src: bpHead + "  let s: BiomeSource = |\n}", want: []string{"Checkerboard"}, not: []string{"s"}},
+		{name: "template value not itself", src: "Template t(): BiomeSource = |", want: []string{"Checkerboard"}, not: []string{"t"}},
+		{name: "untyped const template arg object", src: "Template f(it: ItemStack): int = 1\nconst z = f({ |})", want: []string{"id", "count"}},
+		{name: "untyped const template named arg object", src: "Template f(it: ItemStack): int = 1\nconst z = f(it = { |})", want: []string{"id", "count"}},
+		{name: "untyped const template arg not itself", src: "Template f(it: ItemStack): int = 1\nconst z = f(|)", want: []string{"it"}, not: []string{"z"}},
+
 		// No completion.
 		{name: "comment", src: "// Feature |\nFeature f {}", none: true},
 		{name: "string", src: "Function f {\n  let s = \"a|b\"\n}", none: true},

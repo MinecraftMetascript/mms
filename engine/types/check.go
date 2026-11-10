@@ -17,14 +17,23 @@ type Checkers func(ns string) *sema.Checker
 // Check checks what the evaluator was given against the types written
 // for it: each Blueprint field the user set, each Template argument in
 // user code, and each const with a type. It returns diagnostics by file,
-// on the user's spans.
-func (e *Env) Check(r *eval.Result, ns string, newChecker Checkers) map[string][]syntax.Diagnostic {
+// on the user's spans. src gives a file's text, so a missing-field error
+// gets the quick fix that adds the fields where the value is written.
+func (e *Env) Check(r *eval.Result, ns string, newChecker Checkers, src func(path string) []rune) map[string][]syntax.Diagnostic {
 	out := map[string][]syntax.Diagnostic{}
 	for p, ds := range e.Diags {
 		out[p] = append(out[p], ds...)
 	}
 	add := func(path string, c *sema.Checker) {
 		out[path] = append(out[path], c.Diags...)
+	}
+	// fixes lets c's quick fixes edit the text of written, in path.
+	fixes := func(c *sema.Checker, path string, written syntax.Span) {
+		if src == nil {
+			return
+		}
+		c.Src = src(path)
+		c.FixIn = &written
 	}
 	for _, inst := range r.Instances {
 		if len(inst.Written) == 0 {
@@ -44,6 +53,7 @@ func (e *Env) Check(r *eval.Result, ns string, newChecker Checkers) map[string][
 				continue
 			}
 			t, _ := e.Resolve(inst.Blueprint.Path, f.Type)
+			fixes(c, inst.Path, x.Span())
 			check(c, x, t, syntax.TypeText(f.Type))
 		}
 		add(inst.Path, c)
@@ -63,6 +73,7 @@ func (e *Env) Check(r *eval.Result, ns string, newChecker Checkers) map[string][
 				continue
 			}
 			t, _ := e.Resolve(call.Template.Path, p.Type)
+			fixes(c, call.Path, call.X.Sp)
 			check(c, x, t, syntax.TypeText(p.Type))
 		}
 		add(call.Path, c)
@@ -83,6 +94,7 @@ func (e *Env) Check(r *eval.Result, ns string, newChecker Checkers) map[string][
 		}
 		t, _ := e.Resolve(k.Path, k.S.Type)
 		c := newChecker(ns)
+		fixes(c, k.Path, k.S.Value.Span())
 		check(c, x, t, syntax.TypeText(k.S.Type))
 		add(k.Path, c)
 	}

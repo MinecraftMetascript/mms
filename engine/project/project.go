@@ -485,6 +485,11 @@ func (p *Project) Analyze(ctx context.Context) (*Result, error) {
 		c := sema.NewChecker(p.Pack, p.Kinds, syms, ns)
 		c.Files, c.Texts = p.Files, p.bookText
 		return c
+	}, func(path string) []rune {
+		if f := source[path]; f != nil {
+			return f.Src
+		}
+		return nil
 	})
 	r.symKey = symbolKey(syms)
 	sameSyms := prev != nil && prev.symKey == r.symKey
@@ -577,6 +582,14 @@ func (p *Project) Analyze(ctx context.Context) (*Result, error) {
 		r.Decls[bp.D] = &Decl{Unit: u, D: bp.D, NS: p.Config.Namespace, Info: c.Info, Emitter: bp}
 		for _, b := range bp.Emits {
 			syntax.Walk(b, func(n syntax.Node) bool {
+				// A typed const the emit block computes with completes
+				// like its type, as a typed let does.
+				if k, ok := n.(*syntax.ConstStmt); ok && k.Type != nil && k.Value != nil {
+					if want := tenv.Lookup(bp.Path, k.Type); want != nil && want.Kind != "any" {
+						c.CheckType(k.Value, want, syntax.TypeText(k.Type))
+					}
+					return false
+				}
 				d, ok := n.(*syntax.Decl)
 				if !ok {
 					return true
