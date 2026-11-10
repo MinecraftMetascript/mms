@@ -1323,6 +1323,9 @@ func (f *fc) call(pre *[]fn.Op, e *syntax.Call, wantValue bool) *val {
 	if x, ok := e.Fn.(*syntax.Ident); ok && sym == nil && (x.Name == "exists" || x.Name == "count") {
 		return f.selectorTest(pre, x.Name, e)
 	}
+	if x, ok := e.Fn.(*syntax.Ident); ok && sym == nil && x.Name == "index_of" {
+		return f.indexOf(pre, e)
+	}
 	if sym == nil && c.find("predicate", id) != nil {
 		c.errorf("mms/type-mismatch", e.Sp, "'%s' is a Predicate, not a function; test it without parentheses, as in if (%s)", id, name)
 		return nil
@@ -1781,22 +1784,9 @@ func (f *fc) listIndex(pre *[]fn.Op, l *syntax.List, e *syntax.Index) *val {
 		return f.expr(pre, l.Elems[i])
 	}
 	// Each item is a constant, so reading it adds no commands.
-	vals := make([]*val, len(l.Elems))
-	for i, x := range l.Elems {
-		var none []fn.Op
-		v := f.expr(&none, x)
-		if v == nil {
-			return nil
-		}
-		if len(none) > 0 || !(v.str != nil || v.typ == tInt && v.op.IsConst) {
-			f.c.errorf("mms/unsupported", x.Span(), "a list read at an index known only when the function runs holds int or string constants")
-			return nil
-		}
-		if v.typ != firstTyp(vals, v) {
-			f.c.errorf("mms/type-mismatch", x.Span(), "the list's items are %s and %s; a list read at a run-time index holds one type", vals[0].typ, v.typ)
-			return nil
-		}
-		vals[i] = v
+	vals, ok := f.constItems(l)
+	if !ok {
+		return nil
 	}
 	src := idx.S
 	branch := func(i int, op fn.Op) fn.Op {
@@ -1816,6 +1806,97 @@ func (f *fc) listIndex(pre *[]fn.Op, l *syntax.List, e *syntax.Index) *val {
 		*pre = append(*pre, branch(i, fn.Set{Dst: t, Src: v.op}))
 	}
 	return &val{typ: tInt, op: fn.Of(t)}
+}
+
+// indexOf finds a value only known as the function runs in a list
+// written in the code: `index_of(modes, tool.name)`. Each item is tested
+// from the last to the first, so the first match is the one that stays,
+// and a value matching no item gives -1. Values known when compiling are
+// found by eval before the checker sees the call.
+func (f *fc) indexOf(pre *[]fn.Op, e *syntax.Call) *val {
+	if len(e.Args) != 2 || e.Args[0].Name != nil || e.Args[1].Name != nil {
+		f.c.errorf("mms/syntax", e.Sp, "index_of takes a list and a value: index_of(list, value)")
+		return nil
+	}
+	l, ok := e.Args[0].Value.(*syntax.List)
+	if !ok {
+		f.c.errorf("mms/unsupported", e.Args[0].Value.Span(), "index_of in a function takes a const list")
+		return nil
+	}
+	items, ok := f.constItems(l)
+	if !ok {
+		return nil
+	}
+	v := f.expr(pre, e.Args[1].Value)
+	if v == nil {
+		return nil
+	}
+	if len(items) > 0 && v.typ != items[0].typ {
+		f.c.errorf("mms/type-mismatch", e.Args[1].Value.Span(), "the list's items are %s, but this is %s", items[0].typ, v.typ)
+		return nil
+	}
+	t := f.temp()
+	*pre = append(*pre, fn.Set{Dst: t, Src: fn.Const(-1)})
+	if len(items) == 0 {
+		return &val{typ: tInt, op: fn.Of(t)}
+	}
+	set := func(i int) *fn.Block {
+		return &fn.Block{Ops: []fn.Op{fn.Set{Dst: t, Src: fn.Const(int32(i))}}}
+	}
+	if v.typ == tString {
+		// Setting a copy of the value to an item succeeds unless they are
+		// equal. One copy and one score serve every item.
+		tmp, changed := f.tempPath(), f.temp()
+		for i := len(items) - 1; i >= 0; i-- {
+			item := *items[i].str
+			if v.str != nil {
+				if *v.str == item {
+					*pre = append(*pre, set(i).Ops...)
+				}
+				continue
+			}
+			*pre = append(*pre,
+				f.setString(tmp, v),
+				fn.Cmd{Text: fmt.Sprintf("execute store success score %s run data modify storage %s set value %s", changed, tmp, nbt.Quote(item))},
+				fn.If{Cond: fn.Cond{Parts: []string{fmt.Sprintf("if score %s matches 0", changed)}}, Then: set(i)})
+		}
+		return &val{typ: tInt, op: fn.Of(t)}
+	}
+	op := f.operand(pre, v)
+	for i := len(items) - 1; i >= 0; i-- {
+		want := items[i].op.Const
+		if op.IsConst {
+			if op.Const == want {
+				*pre = append(*pre, set(i).Ops...)
+			}
+			continue
+		}
+		*pre = append(*pre, fn.If{Cond: fn.Cond{Parts: []string{fmt.Sprintf("if score %s matches %d", op.S, want)}}, Then: set(i)})
+	}
+	return &val{typ: tInt, op: fn.Of(t)}
+}
+
+// constItems lowers the items of a list written in the code, which must
+// all be int constants or all string constants.
+func (f *fc) constItems(l *syntax.List) ([]*val, bool) {
+	vals := make([]*val, len(l.Elems))
+	for i, x := range l.Elems {
+		var none []fn.Op
+		v := f.expr(&none, x)
+		if v == nil {
+			return nil, false
+		}
+		if len(none) > 0 || !(v.str != nil || v.typ == tInt && v.op.IsConst) {
+			f.c.errorf("mms/unsupported", x.Span(), "a list used when the function runs holds int or string constants")
+			return nil, false
+		}
+		if v.typ != firstTyp(vals, v) {
+			f.c.errorf("mms/type-mismatch", x.Span(), "the list's items are %s and %s; a list used when the function runs holds one type", vals[0].typ, v.typ)
+			return nil, false
+		}
+		vals[i] = v
+	}
+	return vals, true
 }
 
 // firstTyp is the type of the first value in vals, or v's when there is none yet.

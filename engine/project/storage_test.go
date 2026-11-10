@@ -252,6 +252,80 @@ Function last(): int {
 	}
 }
 
+// index_of finds a value in a const list: when compiling for a known
+// value, and with one test per item for a value known only as the
+// function runs, where the first match wins and no match gives -1.
+func TestConstListIndexOf(t *testing.T) {
+	src := `Type S {
+  name: string = "Copy"
+  n: int = 5
+}
+Storage st: S
+const modes: [string] = ["Measure", "Replace", "Copy", "Replace"]
+const costs: [int] = [1, 5, 9, 5]
+const copy = index_of(modes, "Copy")
+Function stored(): int {
+  return index_of(modes, st.name)
+}
+Function first(): int {
+  st.name = "Replace"
+  return index_of(modes, st.name)
+}
+Function missing(): int {
+  st.name = "Nope"
+  return index_of(modes, st.name)
+}
+Function ints(): int {
+  return index_of(costs, st.n)
+}
+Function known(): int {
+  return index_of(modes, "Copy") * 100 + index_of(costs, 9) * 10 + copy
+}
+Function local(): int {
+  let x = "Measure"
+  let n = 9
+  return index_of(modes, x) * 10 + index_of(costs, n)
+}
+`
+	_, r := bookProject(t, src, nil)
+	if d := diagText(r); d != "" {
+		t.Fatal(d)
+	}
+	vm := load(t, r, "demo")
+	for _, tc := range []struct {
+		fn   string
+		want int32
+	}{{"stored", 2}, {"first", 1}, {"missing", -1}, {"ints", 1}, {"known", 222}, {"local", 2}} {
+		if got := call(t, vm, "demo:"+tc.fn); got != tc.want {
+			t.Errorf("%s = %d, want %d", tc.fn, got, tc.want)
+		}
+	}
+}
+
+func TestConstListIndexOfErrors(t *testing.T) {
+	decls := "Type S {\n  name: string = \"x\"\n}\nStorage st: S\nconst modes: [string] = [\"a\", \"b\"]\nconst costs: [int] = [1, 2]\n"
+	for _, tc := range []struct{ src, want string }{
+		{"Function f(): int {\n  return index_of(modes, \"z\")\n}", `"z" is not in the list`},
+		{"const i = index_of(modes, \"z\")", `"z" is not in the list`},
+		{"Function f(): int {\n  return index_of(costs, st.name)\n}", "the list's items are int, but this is string"},
+		{"Function f(): int {\n  return index_of(\"ab\", \"a\")\n}", "index_of takes a list"},
+		{"Function f(): int {\n  return index_of(modes)\n}", "index_of takes two arguments"},
+	} {
+		p := New(spec.MustDefault(), Config{Namespace: "demo"})
+		p.SetFile("main.mms", decls+tc.src)
+		r, _ := p.Analyze(context.Background())
+		var msgs []string
+		for _, d := range r.Diagnostics("main.mms") {
+			if d.Severity == syntax.SeverityError {
+				msgs = append(msgs, d.Message)
+			}
+		}
+		if !strings.Contains(strings.Join(msgs, "\n"), tc.want) {
+			t.Errorf("%q: errors %q, want %q", tc.src, msgs, tc.want)
+		}
+	}
+}
+
 // Changing a field's type rechecks the functions that use it.
 func TestStorageDeps(t *testing.T) {
 	p := New(spec.MustDefault(), Config{Namespace: "demo"})
