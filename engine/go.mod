@@ -3,7 +3,7 @@ module github.com/minecraftmetascript/mms/engine
 go 1.24
 
 require (
-	github.com/MinecraftMetascript/nbt-go v0.0.0-20261110022744-93d43921e6bf
+	github.com/MinecraftMetascript/nbt-go v0.0.0-20261110025557-40711687f208
 	github.com/antlr4-go/antlr/v4 v4.13.1
 )
 
