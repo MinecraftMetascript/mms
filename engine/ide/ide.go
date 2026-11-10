@@ -101,8 +101,60 @@ func (s *Session) at(path string, off int) *at {
 	if a.decl != nil && a.decl.Emitter != nil {
 		a.c.Typed = append(s.blueprintFields(a.decl.Emitter), a.c.Typed...)
 	}
+	a.c.Typed = withoutName(a.c.Typed, a.defining(off))
 	s.templateArgInfo(a)
 	return a
+}
+
+// defining is the name whose own value off is in: a const, a Template
+// or a let. Its value cannot name it, so completion leaves it out.
+func (a *at) defining(off int) string {
+	name := ""
+	for _, n := range a.path {
+		var id *syntax.Name
+		var val syntax.Expr
+		switch n := n.(type) {
+		case *syntax.ConstStmt:
+			id, val = n.Name, n.Value
+		case *syntax.LetStmt:
+			id, val = n.Name, n.Value
+		case *syntax.Decl:
+			if n.Kind != nil && n.Kind.Name == "Template" {
+				id, val = n.Name, n.Value
+			}
+		}
+		if id != nil && (val == nil || off >= val.Span().Start) {
+			name = id.Text
+		}
+	}
+	// A Blueprint's let with no value yet, `let x = |`, ends at its `=`,
+	// so the path misses it.
+	if name == "" && a.decl != nil && a.decl.Emitter != nil {
+		f := a.u.File
+		for _, l := range a.decl.Emitter.Lets {
+			if l.Name == nil || l.Sp.Start > off || (l.Value != nil && off < l.Value.Span().Start) {
+				continue
+			}
+			if off <= l.Sp.End || lineOf(f, l.Sp.Start) == lineOf(f, off) {
+				name = l.Name.Text
+			}
+		}
+	}
+	return name
+}
+
+// withoutName is tcs without the value called name.
+func withoutName(tcs []sema.TypedCandidate, name string) []sema.TypedCandidate {
+	if name == "" {
+		return tcs
+	}
+	out := make([]sema.TypedCandidate, 0, len(tcs))
+	for _, tc := range tcs {
+		if tc.Label != name {
+			out = append(out, tc)
+		}
+	}
+	return out
 }
 
 // templateArgInfo checks the argument of a Template call that the cursor
@@ -111,8 +163,19 @@ func (s *Session) at(path string, off int) *at {
 // there. The checker sees a Template call as a value of its result type
 // and does not look inside its arguments.
 func (s *Session) templateArgInfo(a *at) {
-	if a.decl == nil || s.R.Eval == nil || s.R.TypeEnv == nil {
+	if s.R.Eval == nil || s.R.TypeEnv == nil || len(a.path) < 2 {
 		return
+	}
+	base := a.decl
+	if base == nil {
+		// An untyped const, `const z = f({ |})`, has nothing checked of
+		// its own, but a Template call in it still types its arguments.
+		k, ok := a.path[1].(*syntax.ConstStmt)
+		if !ok {
+			return
+		}
+		base = &project.Decl{Unit: a.u, NS: s.P.Config.Namespace, Info: map[syntax.Node]*sema.Info{},
+			D: &syntax.Decl{Name: k.Name, Value: k.Value, Doc: k.Doc, Sp: k.Sp}}
 	}
 	for i := len(a.path) - 2; i >= 1; i-- {
 		arg, ok := a.path[i+1].(*syntax.Arg)
@@ -139,11 +202,11 @@ func (s *Session) templateArgInfo(a *at) {
 		if want == nil || want.Kind == "any" {
 			return
 		}
-		c := sema.NewChecker(s.P.Pack, s.P.Kinds, s.R.Syms, a.decl.NS)
+		c := sema.NewChecker(s.P.Pack, s.P.Kinds, s.R.Syms, base.NS)
 		c.CheckType(arg.Value, want, syntax.TypeText(p.Type))
-		d := *a.decl
-		d.Info = make(map[syntax.Node]*sema.Info, len(a.decl.Info)+len(c.Info))
-		for n, in := range a.decl.Info {
+		d := *base
+		d.Info = make(map[syntax.Node]*sema.Info, len(base.Info)+len(c.Info))
+		for n, in := range base.Info {
 			d.Info[n] = in
 		}
 		for n, in := range c.Info {
@@ -275,6 +338,16 @@ func (s *Session) Completion(path string, off int) ([]Item, syntax.Span) {
 	}
 	if !ok {
 		cands, ok = s.templateArgCandidates(path, off, a.c)
+		if name := a.defining(off); ok && name != "" {
+			// `const z = f(|)`: z cannot be its own argument.
+			kept := cands[:0:0]
+			for _, c := range cands {
+				if c.Label != name || (c.Kind != sema.CandID && c.Kind != sema.CandCallable) {
+					kept = append(kept, c)
+				}
+			}
+			cands = kept
+		}
 	}
 	if !ok {
 		cands = s.complete(a, off)

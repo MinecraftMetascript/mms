@@ -33,6 +33,18 @@ func (c *Checker) missingFix(site fixSite, fs []field, missing []string) []synta
 	}
 	var e syntax.TextEdit
 	var ok bool
+	if c.FixIn != nil {
+		var sp syntax.Span
+		switch {
+		case site.block != nil:
+			sp = site.block.Sp
+		case site.call != nil:
+			sp = site.call.Sp
+		}
+		if !within(sp, *c.FixIn) {
+			return nil
+		}
+	}
 	switch {
 	case site.block != nil:
 		e, ok = c.blockInsert(site.block, entries)
@@ -56,6 +68,13 @@ func (c *Checker) blockInsert(b *syntax.Block, entries []string) (syntax.TextEdi
 	open, close := b.Sp.Start, b.Sp.End-1
 	if !b.Closed || open < 0 || close >= len(src) || close <= open || src[open] != '{' || src[close] != '}' {
 		return syntax.TextEdit{}, false
+	}
+	for _, it := range b.Items {
+		// An item from elsewhere, such as a spread of another const,
+		// says nothing about this block's layout.
+		if sp := it.Span(); sp.Start <= open || sp.End > close {
+			return syntax.TextEdit{}, false
+		}
 	}
 	inner := string(src[open+1 : close])
 	if !strings.Contains(inner, "\n") {
@@ -96,6 +115,9 @@ func (c *Checker) callInsert(call *syntax.Call, entries []string) (syntax.TextEd
 	text := strings.Join(entries, ", ")
 	if n := len(call.Args); n > 0 {
 		end := call.Args[n-1].Span().End
+		if end <= call.Sp.Start || end > close {
+			return syntax.TextEdit{}, false
+		}
 		// Keep a trailing comma where it is: `f(a,)` becomes `f(a, b,)`.
 		return syntax.TextEdit{Sp: syntax.Span{Start: end, End: end}, Text: ", " + text}, true
 	}
@@ -259,3 +281,6 @@ func (c *Checker) MissingFieldsFix(body *syntax.Block, t *spec.Type, missing []s
 	fs, _ := c.fields(tview{T: t}, "")
 	return c.missingFix(fixSite{block: body}, fs, missing)
 }
+
+// within reports whether span a lies inside span b.
+func within(a, b syntax.Span) bool { return a.Start >= b.Start && a.End <= b.End }
