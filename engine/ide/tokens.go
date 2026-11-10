@@ -126,7 +126,7 @@ func (s *Session) SemanticTokens(path string) []SemToken {
 					return true
 				}
 			}
-			s.classify(n, set, byStart, info)
+			s.classify(path, n, set, byStart, info)
 			if str, ok := n.(*syntax.String); ok && dr != nil && dr.Info[n] != nil && dr.Info[n].Markup {
 				markupTokens(f.Src, str.Sp, dr.Info[n].Accidental, set)
 			}
@@ -143,7 +143,7 @@ func (s *Session) SemanticTokens(path string) []SemToken {
 			}
 		}
 		for _, it := range src.Items {
-			s.sourceTokens(it, fill, byStart)
+			s.sourceTokens(path, it, fill, byStart)
 		}
 	}
 	out := make([]SemToken, 0, len(byStart))
@@ -165,7 +165,7 @@ func (s *Session) SemanticTokens(path string) []SemToken {
 
 // classify sets the token for one node of a checked declaration. info
 // reports whether a name resolved to a symbol.
-func (s *Session) classify(n syntax.Node, set func(syntax.Span, TokenType, int), byStart map[int]SemToken, info func(syntax.Node) bool) {
+func (s *Session) classify(path string, n syntax.Node, set func(syntax.Span, TokenType, int), byStart map[int]SemToken, info func(syntax.Node) bool) {
 	switch n := n.(type) {
 	case *syntax.Decl:
 		if n.Kind != nil {
@@ -180,7 +180,7 @@ func (s *Session) classify(n syntax.Node, set func(syntax.Span, TokenType, int),
 		}
 	case *syntax.Call:
 		if id, ok := n.Fn.(*syntax.Ident); ok {
-			set(id.Sp, TokFunction, s.libraryMod(id.Name))
+			set(id.Sp, TokFunction, s.libraryMod(path, id.Name))
 		}
 	case *syntax.Member:
 		if n.Name != nil {
@@ -222,9 +222,9 @@ func (s *Session) nameToken(n syntax.Node, set func(syntax.Span, TokenType, int)
 
 // libraryMod marks a call of a built-in helper or prelude Template as
 // part of the default library, and a call of the user's own Template not.
-func (s *Session) libraryMod(name string) int {
+func (s *Session) libraryMod(path, name string) int {
 	if s.R.Eval != nil {
-		if t := s.R.Eval.Templates[name]; t != nil && !strings.HasPrefix(t.Path, prelude.Prefix) {
+		if t := s.R.Eval.Template(path, name); t != nil && !strings.HasPrefix(t.Path, prelude.Prefix) {
 			return 0
 		}
 	}
@@ -243,7 +243,7 @@ func typeName(n *syntax.TypeName, set func(syntax.Span, TokenType, int)) {
 // sourceTokens classifies one top-level item as written. Names bound in
 // it (parameters, fields, loop and let variables, self) are variables or
 // parameters; consts and Templates are found in the evaluation.
-func (s *Session) sourceTokens(it syntax.Stmt, set func(syntax.Span, TokenType, int), byStart map[int]SemToken) {
+func (s *Session) sourceTokens(path string, it syntax.Stmt, set func(syntax.Span, TokenType, int), byStart map[int]SemToken) {
 	params := map[string]bool{}
 	locals := map[string]bool{"self": true}
 	syntax.Walk(it, func(n syntax.Node) bool {
@@ -282,7 +282,7 @@ func (s *Session) sourceTokens(it syntax.Stmt, set func(syntax.Span, TokenType, 
 		case locals[name]:
 			return TokVariable, true
 		}
-		if s.R.Eval != nil && s.R.Eval.Consts[name] != nil {
+		if s.R.Eval != nil && s.R.Eval.Const(path, name) != nil {
 			return TokVariable, true
 		}
 		return 0, false
@@ -341,7 +341,7 @@ func (s *Session) sourceTokens(it syntax.Stmt, set func(syntax.Span, TokenType, 
 			}
 		case *syntax.Call:
 			if id, ok := n.Fn.(*syntax.Ident); ok {
-				set(id.Sp, TokFunction, s.libraryMod(id.Name))
+				set(id.Sp, TokFunction, s.libraryMod(path, id.Name))
 			}
 		case *syntax.Member:
 			if n.Name != nil {

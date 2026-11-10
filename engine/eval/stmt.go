@@ -44,7 +44,7 @@ func (c *ctx) stmt(it syntax.Stmt, out *[]syntax.Stmt) {
 			if st.Primary {
 				c.markPrimary(st, res, first)
 			}
-			plain := st.Kind != nil && c.e.r.Blueprints[st.Kind.Name] == nil
+			plain := st.Kind != nil && c.e.r.Blueprint(c.defPath, st.Kind.Name) == nil
 			for _, d := range res {
 				// Emitting the same declaration twice writes it once:
 				// every custom item with a click hook needs the click
@@ -333,7 +333,7 @@ func (c *ctx) decl(d *syntax.Decl, from *syntax.Decl) []*Decl {
 		c.errorf("mms/nested-definition", d.Kind.Sp, "a "+d.Kind.Name+" is declared at the top of a file")
 		return nil
 	}
-	if bp := c.e.r.Blueprints[d.Kind.Name]; bp != nil {
+	if bp := c.e.r.Blueprint(c.defPath, d.Kind.Name); bp != nil {
 		var out []*Decl
 		for _, n := range d.Names() {
 			out = append(out, c.instance(d, n, bp, from)...)
@@ -416,7 +416,7 @@ func (c *ctx) call(x *syntax.Call) Value {
 	if id, ok := x.Fn.(*syntax.Ident); ok {
 		_, bound, hidden := c.sc.lookup(id.Name)
 		if !bound && !hidden {
-			if t := c.e.r.Templates[id.Name]; t != nil {
+			if t := c.e.r.Template(c.defPath, id.Name); t != nil {
 				if t.D.Extern {
 					if fn := intrinsics[id.Name]; fn != nil {
 						return fn(c, x, c.argValues(x.Args))
@@ -654,7 +654,7 @@ func argIndex(d *syntax.Decl, x *syntax.Call) map[string]int {
 func (c *ctx) namesValue(x syntax.Expr) bool {
 	switch x := x.(type) {
 	case *syntax.Ident:
-		if _, ok, _ := c.sc.lookup(x.Name); ok || c.e.r.Consts[x.Name] != nil {
+		if _, ok, _ := c.sc.lookup(x.Name); ok || c.e.r.Const(c.defPath, x.Name) != nil {
 			return false
 		}
 		return c.e.values[x.Name]

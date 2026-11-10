@@ -16,7 +16,7 @@ func (s *Session) selectorCompletion(a *at, off int) ([]sema.Candidate, bool) {
 	at := -1
 	for i := len(a.path) - 1; i >= 0; i-- {
 		if n, ok := a.path[i].(*syntax.Index); ok {
-			if s.isSelector(n.X) && off > n.X.Span().End {
+			if s.isSelector(a.u.Path, n.X) && off > n.X.Span().End {
 				ix, at = n, i
 				break
 			}
@@ -52,7 +52,8 @@ func (s *Session) selectorCompletion(a *at, off int) ([]sema.Candidate, bool) {
 
 // isSelector tells whether e is a selector: @e, or the name of a const or
 // the call of a Template whose value is one, as in guards[tag=awake].
-func (s *Session) isSelector(e syntax.Expr) bool {
+// isSelector reports whether e, written in file path, is a selector.
+func (s *Session) isSelector(path string, e syntax.Expr) bool {
 	switch x := e.(type) {
 	case *syntax.Selector:
 		return true
@@ -64,7 +65,7 @@ func (s *Session) isSelector(e syntax.Expr) bool {
 		if s.R == nil || s.R.Eval == nil {
 			return false
 		}
-		k := s.R.Eval.Consts[x.Name]
+		k := s.R.Eval.Const(path, x.Name)
 		if k == nil {
 			return false
 		}
@@ -83,7 +84,7 @@ func (s *Session) isSelector(e syntax.Expr) bool {
 		if !ok || s.R == nil || s.R.Eval == nil {
 			return false
 		}
-		t := s.R.Eval.Templates[id.Name]
+		t := s.R.Eval.Template(path, id.Name)
 		return t != nil && t.D.Type != nil && syntax.TypeText(t.D.Type) == "Selector"
 	}
 	return false

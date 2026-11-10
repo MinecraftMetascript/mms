@@ -84,6 +84,11 @@ func (k *Cache) keep(live map[*syntax.Decl]bool) {
 }
 
 // Result is the expansion of a set of files.
+//
+// Consts, Templates, Blueprints and Types hold a public declaration by its
+// name and a private one (`private const x`) by PrivateKey(file, name).
+// Look a name up with Const, Template, Blueprint and Type, which know
+// that a file's own private declaration hides a public one.
 type Result struct {
 	Files      map[string]*FileOut
 	Consts     map[string]*Const
@@ -105,6 +110,100 @@ type Result struct {
 	// is the line in the body.
 	Lines map[syntax.Node]Prov
 }
+
+// PrivateKey is the key a private const, Template, Blueprint or Type
+// declared in file path has in a Result's maps.
+func PrivateKey(path, name string) string { return name + "@" + path }
+
+// Const returns the const that name means in file path, or nil.
+func (r *Result) Const(path, name string) *Const {
+	if k := r.Consts[PrivateKey(path, name)]; k != nil {
+		return k
+	}
+	return r.Consts[name]
+}
+
+// Template returns the Template that name means in file path, or nil.
+func (r *Result) Template(path, name string) *Template {
+	if t := r.Templates[PrivateKey(path, name)]; t != nil {
+		return t
+	}
+	return r.Templates[name]
+}
+
+// Blueprint returns the Blueprint that name means in file path, or nil.
+func (r *Result) Blueprint(path, name string) *Blueprint {
+	if b := r.Blueprints[PrivateKey(path, name)]; b != nil {
+		return b
+	}
+	return r.Blueprints[name]
+}
+
+// Type returns the Type that name means in file path, or nil.
+func (r *Result) Type(path, name string) *TypeDef {
+	if t := r.Types[PrivateKey(path, name)]; t != nil {
+		return t
+	}
+	return r.Types[name]
+}
+
+// TypeKey returns the key in Types of the Type that name means in file
+// path: its private key when the file declares it privately, else name.
+func (r *Result) TypeKey(path, name string) string {
+	if r != nil && r.Types[PrivateKey(path, name)] != nil {
+		return PrivateKey(path, name)
+	}
+	return name
+}
+
+// ConstsIn lists the consts file path can name, by name: its own
+// private ones and the public ones they do not hide.
+func (r *Result) ConstsIn(path string) []*Const {
+	return visibleIn(r.Consts, path, func(k *Const) (bool, string, string) { return k.S.Private, k.Path, k.Name() })
+}
+
+// TemplatesIn lists the Templates file path can name, by name.
+func (r *Result) TemplatesIn(path string) []*Template {
+	return visibleIn(r.Templates, path, func(t *Template) (bool, string, string) { return t.D.Private, t.Path, t.D.Name.Text })
+}
+
+// BlueprintsIn lists the Blueprints file path can name, by name.
+func (r *Result) BlueprintsIn(path string) []*Blueprint {
+	return visibleIn(r.Blueprints, path, func(b *Blueprint) (bool, string, string) { return b.D.Private, b.Path, b.D.Name.Text })
+}
+
+// TypesIn lists the Types file path can name, by name.
+func (r *Result) TypesIn(path string) []*TypeDef {
+	return visibleIn(r.Types, path, func(t *TypeDef) (bool, string, string) { return t.D.Private, t.Path, t.D.Name.Text })
+}
+
+func visibleIn[T any](m map[string]T, path string, info func(T) (private bool, def, name string)) []T {
+	names := map[string]T{}
+	for _, v := range m {
+		private, def, name := info(v)
+		if !Visible(private, def, path) {
+			continue
+		}
+		if _, taken := names[name]; taken && !private {
+			continue // the file's private one hides it
+		}
+		names[name] = v
+	}
+	keys := make([]string, 0, len(names))
+	for n := range names {
+		keys = append(keys, n)
+	}
+	sort.Strings(keys)
+	out := make([]T, len(keys))
+	for i, n := range keys {
+		out[i] = names[n]
+	}
+	return out
+}
+
+// Visible reports whether a declaration made in file def can be named
+// from file path.
+func Visible(private bool, def, path string) bool { return !private || def == path }
 
 // FileOut is one file's expansion.
 type FileOut struct {
@@ -249,6 +348,7 @@ func Run(units []Unit, opt Options) *Result {
 	for _, u := range units {
 		e.collect(u)
 	}
+	e.shadows()
 	if e.cache = opt.Cache; e.cache != nil {
 		var names []string
 		for n := range e.r.Consts {
@@ -330,10 +430,30 @@ func (e *evaluator) collect(u Unit) {
 	errorf := func(sp syntax.Span, msg string) {
 		e.report(u.Path, syntax.Diagnostic{Code: "mms/duplicate", Severity: syntax.SeverityError, Message: msg, Sp: sp})
 	}
-	taken := func(name string) bool {
-		_, c := e.r.Consts[name]
-		_, t := e.r.Templates[name]
-		return c || t
+	// keyOf is the key a declaration takes in its map. dup reports whether
+	// that map already has it in this scope: a public name anywhere, or a
+	// private name in this file, or the same name the other way in this
+	// file.
+	keyOf := func(private bool, name string) string { return key(private, u.Path, name) }
+	dup := func(has func(string) (string, bool), private bool, name string) bool {
+		if _, ok := has(keyOf(private, name)); ok {
+			return true
+		}
+		if private {
+			path, ok := has(name)
+			return ok && path == u.Path
+		}
+		_, ok := has(PrivateKey(u.Path, name))
+		return ok
+	}
+	constOrTemplate := func(k string) (string, bool) {
+		if c := e.r.Consts[k]; c != nil {
+			return c.Path, true
+		}
+		if t := e.r.Templates[k]; t != nil {
+			return t.Path, true
+		}
+		return "", false
 	}
 	for _, it := range u.File.Items {
 		switch it := it.(type) {
@@ -341,41 +461,97 @@ func (e *evaluator) collect(u Unit) {
 			if it.Name == nil {
 				continue
 			}
-			if taken(it.Name.Text) {
+			if dup(constOrTemplate, it.Private, it.Name.Text) {
 				errorf(it.Name.Sp, "'"+it.Name.Text+"' is already declared")
 				continue
 			}
-			e.r.Consts[it.Name.Text] = &Const{Path: u.Path, S: it}
+			e.r.Consts[keyOf(it.Private, it.Name.Text)] = &Const{Path: u.Path, S: it}
 		case *syntax.Decl:
 			if it.Kind == nil || it.Name == nil {
 				continue
 			}
 			name := it.Name.Text
+			if it.Private && !definitionKind(it.Kind.Name) {
+				e.report(u.Path, syntax.Diagnostic{Code: "mms/private", Severity: syntax.SeverityError, Sp: it.Kind.Sp,
+					Message: "only a const, Template, Type or Blueprint can be private; a " + it.Kind.Name + " is part of the data pack, which every file shares"})
+			}
+			k := keyOf(it.Private, name)
 			switch it.Kind.Name {
 			case "Template":
-				if taken(name) {
+				if dup(constOrTemplate, it.Private, name) {
 					errorf(it.Name.Sp, "'"+name+"' is already declared")
 					continue
 				}
-				e.r.Templates[name] = &Template{Path: u.Path, D: it}
+				e.r.Templates[k] = &Template{Path: u.Path, D: it}
 			case "Global", "Storage":
 				e.values[name] = true
 			case "Type":
-				if _, dup := e.r.Types[name]; dup {
+				if dup(func(k string) (string, bool) {
+					t := e.r.Types[k]
+					if t == nil {
+						return "", false
+					}
+					return t.Path, true
+				}, it.Private, name) {
 					errorf(it.Name.Sp, "Type '"+name+"' is already declared")
 					continue
 				}
-				e.r.Types[name] = &TypeDef{Path: u.Path, D: it}
+				e.r.Types[k] = &TypeDef{Path: u.Path, D: it}
 			case "Blueprint":
 				if it.Extern {
 					continue // a kind the compiler builds in Go
 				}
-				if _, dup := e.r.Blueprints[name]; dup {
+				if dup(func(k string) (string, bool) {
+					b := e.r.Blueprints[k]
+					if b == nil {
+						return "", false
+					}
+					return b.Path, true
+				}, it.Private, name) {
 					errorf(it.Name.Sp, "Blueprint '"+name+"' is already declared")
 					continue
 				}
-				e.r.Blueprints[name] = e.blueprint(u.Path, u.File.Src, it)
+				e.r.Blueprints[k] = e.blueprint(u.Path, u.File.Src, it)
 			}
+		}
+	}
+}
+
+// shadows reports, as hints, the private declarations that hide a public
+// one of the same name declared in another file.
+func (e *evaluator) shadows() {
+	// No related location: the project echoes a problem at each one, and
+	// the public declaration has nothing wrong with it.
+	hint := func(path string, sp syntax.Span, what, name, other string) {
+		e.report(path, syntax.Diagnostic{Code: "mms/shadowed-private", Severity: syntax.SeverityHint, Sp: sp,
+			Message: "this private " + what + " hides the " + what + " '" + name + "' declared in " + other + "; in this file '" + name + "' means this one"})
+	}
+	for _, k := range e.r.Consts {
+		if k.S.Private {
+			if o := e.r.Consts[k.Name()]; o != nil {
+				hint(k.Path, k.S.Name.Sp, "const", k.Name(), o.Path)
+			} else if o := e.r.Templates[k.Name()]; o != nil {
+				hint(k.Path, k.S.Name.Sp, "const", k.Name(), o.Path)
+			}
+		}
+	}
+	for _, t := range e.r.Templates {
+		if t.D.Private {
+			if o := e.r.Templates[t.D.Name.Text]; o != nil {
+				hint(t.Path, t.D.Name.Sp, "Template", t.D.Name.Text, o.Path)
+			} else if o := e.r.Consts[t.D.Name.Text]; o != nil {
+				hint(t.Path, t.D.Name.Sp, "Template", t.D.Name.Text, o.Path)
+			}
+		}
+	}
+	for _, t := range e.r.Types {
+		if o := e.r.Types[t.D.Name.Text]; t.D.Private && o != nil {
+			hint(t.Path, t.D.Name.Sp, "Type", t.D.Name.Text, o.Path)
+		}
+	}
+	for _, b := range e.r.Blueprints {
+		if o := e.r.Blueprints[b.D.Name.Text]; b.D.Private && o != nil {
+			hint(b.Path, b.D.Name.Sp, "Blueprint", b.D.Name.Text, o.Path)
 		}
 	}
 }
@@ -523,7 +699,7 @@ func (e *evaluator) expand(u Unit, ns string) {
 				}
 				continue
 			}
-			if !e.touches(it) {
+			if !e.touches(u.Path, it) {
 				out.Decls = append(out.Decls, &Decl{D: it, From: it, Prov: Prov{At: Origin{u.Path, it.Sp}}})
 				continue
 			}
@@ -534,7 +710,7 @@ func (e *evaluator) expand(u Unit, ns string) {
 			if it.Name == nil {
 				continue
 			}
-			if k := e.r.Consts[it.Name.Text]; k != nil && k.S == it {
+			if k := e.r.Const(u.Path, it.Name.Text); k != nil && k.S == it {
 				c.constValue(k, it.Sp)
 			}
 		case *syntax.LetStmt:
@@ -553,25 +729,44 @@ func (e *evaluator) expand(u Unit, ns string) {
 // Name is the const's name.
 func (s *Const) Name() string { return s.S.Name.Text }
 
+// Key is the const's key in Result.Consts.
+func (s *Const) Key() string { return key(s.S.Private, s.Path, s.S.Name.Text) }
+
+// Key is the Template's key in Result.Templates.
+func (t *Template) Key() string { return key(t.D.Private, t.Path, t.D.Name.Text) }
+
+// Key is the Blueprint's key in Result.Blueprints.
+func (b *Blueprint) Key() string { return key(b.D.Private, b.Path, b.D.Name.Text) }
+
+// Key is the Type's key in Result.Types.
+func (t *TypeDef) Key() string { return key(t.D.Private, t.Path, t.D.Name.Text) }
+
+func key(private bool, path, name string) string {
+	if private {
+		return PrivateKey(path, name)
+	}
+	return name
+}
+
 // touches reports whether a declaration uses anything this package
 // expands. A declaration that does not is passed through as it is, so the
 // checker can keep its earlier results.
-func (e *evaluator) touches(d *syntax.Decl) bool {
-	if e.r.Blueprints[d.Kind.Name] != nil {
+func (e *evaluator) touches(path string, d *syntax.Decl) bool {
+	if e.r.Blueprint(path, d.Kind.Name) != nil {
 		return true
 	}
 	if e.cache == nil {
-		return e.walkTouches(d)
+		return e.walkTouches(path, d)
 	}
 	if pass, ok := e.cache.lookup(e.key, d); ok {
 		return !pass
 	}
-	t := e.walkTouches(d)
+	t := e.walkTouches(path, d)
 	e.cache.store(e.key, d, !t)
 	return t
 }
 
-func (e *evaluator) walkTouches(d *syntax.Decl) bool {
+func (e *evaluator) walkTouches(path string, d *syntax.Decl) bool {
 	for _, n := range d.Names() {
 		if n.Templated() {
 			return true
@@ -584,7 +779,7 @@ func (e *evaluator) walkTouches(d *syntax.Decl) bool {
 		}
 		switch n := n.(type) {
 		case *syntax.Ident:
-			if e.r.Consts[n.Name] != nil || e.r.Templates[n.Name] != nil {
+			if e.r.Const(path, n.Name) != nil || e.r.Template(path, n.Name) != nil {
 				found = true
 			}
 		case *syntax.ConstStmt, *syntax.Comprehension, *syntax.Spread, *syntax.IfExpr, *syntax.TemplatedName:
@@ -598,9 +793,9 @@ func (e *evaluator) walkTouches(d *syntax.Decl) bool {
 				found = true
 			}
 		case *syntax.String:
-			found = e.interpTouches(n.Value)
+			found = e.interpTouches(path, n.Value)
 		case *syntax.CommandStmt:
-			found = e.interpTouches(n.Text)
+			found = e.interpTouches(path, n.Text)
 		}
 		return !found
 	}
@@ -609,7 +804,7 @@ func (e *evaluator) walkTouches(d *syntax.Decl) bool {
 }
 
 // interpTouches reports whether a `${...}` in s names a const or Template.
-func (e *evaluator) interpTouches(s string) bool {
+func (e *evaluator) interpTouches(path, s string) bool {
 	if !strings.Contains(s, "${") {
 		return false
 	}
@@ -623,7 +818,7 @@ func (e *evaluator) interpTouches(s string) bool {
 		}
 		hit := false
 		syntax.Walk(x, func(n syntax.Node) bool {
-			if id, ok := n.(*syntax.Ident); ok && (e.r.Consts[id.Name] != nil || e.r.Templates[id.Name] != nil) {
+			if id, ok := n.(*syntax.Ident); ok && (e.r.Const(path, id.Name) != nil || e.r.Template(path, id.Name) != nil) {
 				hit = true
 			}
 			return !hit

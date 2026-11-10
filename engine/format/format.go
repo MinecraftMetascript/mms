@@ -335,6 +335,8 @@ func (p *printer) decl(d *syntax.Decl) doc {
 	switch {
 	case d.Extern:
 		head = "extern " + head
+	case d.Private:
+		head = "private " + head
 	case d.Primary:
 		head = "primary " + head
 	}
@@ -530,6 +532,9 @@ func (p *printer) stmt(s syntax.Stmt) doc {
 	case *syntax.LetStmt:
 		return p.typed("let ", s.Name, s.Type, s.Value)
 	case *syntax.ConstStmt:
+		if s.Private {
+			return p.typed("private const ", s.Name, s.Type, s.Value)
+		}
 		return p.typed("const ", s.Name, s.Type, s.Value)
 	case *syntax.FieldDecl:
 		return p.typed("", s.Name, s.Type, s.Default)

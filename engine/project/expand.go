@@ -198,7 +198,7 @@ func (r *Result) missingFieldFixes(tenv *types.Env, kinds *sema.Kinds, source ma
 				if d.Kind == nil || d.Body == nil || !d.Sp.Contains(dg.Sp.Start) {
 					continue
 				}
-				bp := r.Eval.Blueprints[d.Kind.Name]
+				bp := r.Eval.Blueprint(path, d.Kind.Name)
 				if bp == nil {
 					continue
 				}

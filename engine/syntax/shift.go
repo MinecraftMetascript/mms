@@ -47,7 +47,7 @@ func (s shifter) rec(old, new Node) {
 
 func (s shifter) decl(d *Decl) *Decl {
 	n := &Decl{Kind: s.ident(d.Kind), Name: s.name(d.Name), Type: s.typ(d.Type), Value: s.expr(d.Value),
-		TypeValue: s.typ(d.TypeValue), Body: s.block(d.Body), Extern: d.Extern, Primary: d.Primary, Doc: d.Doc, Sp: s.sp(d.Sp)}
+		TypeValue: s.typ(d.TypeValue), Body: s.block(d.Body), Extern: d.Extern, Private: d.Private, Primary: d.Primary, Doc: d.Doc, Sp: s.sp(d.Sp)}
 	for _, m := range d.More {
 		n.More = append(n.More, s.name(m))
 	}
@@ -170,7 +170,7 @@ func (s shifter) stmt(st Stmt) Stmt {
 	case *LetStmt:
 		n = &LetStmt{Name: s.name(x.Name), Type: s.typ(x.Type), Value: s.expr(x.Value), Doc: x.Doc, Sp: s.sp(x.Sp)}
 	case *ConstStmt:
-		n = &ConstStmt{Name: s.name(x.Name), Type: s.typ(x.Type), Value: s.expr(x.Value), Doc: x.Doc, Sp: s.sp(x.Sp)}
+		n = &ConstStmt{Name: s.name(x.Name), Type: s.typ(x.Type), Value: s.expr(x.Value), Doc: x.Doc, Private: x.Private, Sp: s.sp(x.Sp)}
 	case *FieldDecl:
 		n = &FieldDecl{Name: s.name(x.Name), Type: s.typ(x.Type), Default: s.expr(x.Default), Doc: x.Doc, Sp: s.sp(x.Sp)}
 	case *SectionStmt:

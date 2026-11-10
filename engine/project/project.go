@@ -449,6 +449,7 @@ func (p *Project) Analyze(ctx context.Context) (*Result, error) {
 	for name, td := range ev.Types {
 		syms.TypeDecls[name] = td.D
 	}
+	syms.TypeKey = ev.TypeKey
 	syms.Hidden = preludeEmitted(ev)
 	syms.Conversions = tenv.Conversions(ev, p.Config.Namespace)
 	r := &Result{Syms: syms, Units: units, Source: source, Decls: map[*syntax.Decl]*Decl{}, collect: collect, pack: p.Pack, kinds: p.Kinds, cfg: p.Config, files: p.Files, Eval: ev}
@@ -543,7 +544,7 @@ func (p *Project) Analyze(ctx context.Context) (*Result, error) {
 					return false
 				}
 				// Another Blueprint's instance, such as a CustomItem.
-				if inner := ev.Blueprints[d.Kind.Name]; inner != nil && d.Body != nil {
+				if inner := ev.Blueprint(bp.Path, d.Kind.Name); inner != nil && d.Body != nil {
 					c := sema.NewChecker(p.Pack, p.Kinds, syms, p.Config.Namespace)
 					c.Files, c.Texts, c.Src = p.Files, p.bookText, u.File.Src
 					c.CheckType(&syntax.Object{Body: d.Body, Sp: d.Body.Sp}, tenv.InstanceType(inner), d.Kind.Name)

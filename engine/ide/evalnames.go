@@ -35,6 +35,8 @@ type evalName struct {
 	Name string
 	Path string      // the file that declares it
 	Def  syntax.Span // its name there
+	// Private marks a private declaration, which only Path can name.
+	Private bool
 }
 
 // evalNameAt finds the evaluator name at off, at its declaration or at a
@@ -59,24 +61,24 @@ func (s *Session) evalNameAt(path string, off int) (evalName, bool) {
 			case *syntax.Decl:
 				if n.Name != nil && within(n.Name.Sp, off) {
 					if k := declNameKind(n); k != 0 {
-						found, ok = s.lookupName(k, n.Name.Text)
+						found, ok = s.lookupName(path, k, n.Name.Text)
 					}
 				}
 			case *syntax.ConstStmt:
 				if n.Name != nil && within(n.Name.Sp, off) {
-					found, ok = s.lookupName(nameConst, n.Name.Text)
+					found, ok = s.lookupName(path, nameConst, n.Name.Text)
 				}
 			case *syntax.Ident:
 				if within(n.Sp, off) {
-					found, ok = s.identName(n.Name, bound)
+					found, ok = s.identName(path, n.Name, bound)
 				}
 			case *syntax.TypeName:
 				if within(typeNameSpan(n), off) {
-					found, ok = s.typeRef(n.Name)
+					found, ok = s.typeRef(path, n.Name)
 				}
 			case *syntax.String, *syntax.CommandStmt:
 				if name, ok2 := pieceAt(src.Src, n.Span(), off); ok2 {
-					found, ok = s.identName(name, bound)
+					found, ok = s.identName(path, name, bound)
 				}
 			}
 			return true
@@ -104,60 +106,72 @@ func declNameKind(d *syntax.Decl) nameKind {
 	return 0
 }
 
-// lookupName finds a declared evaluator name.
-func (s *Session) lookupName(k nameKind, name string) (evalName, bool) {
+// lookupName finds the evaluator name that name means in file from: the
+// file's own private declaration, or the public one.
+func (s *Session) lookupName(from string, k nameKind, name string) (evalName, bool) {
 	e := s.R.Eval
 	var path string
 	var sp syntax.Span
+	var private bool
 	switch k {
 	case nameConst:
-		c := e.Consts[name]
+		c := e.Const(from, name)
 		if c == nil || c.S.Name == nil {
 			return evalName{}, false
 		}
-		path, sp = c.Path, c.S.Name.Sp
+		path, sp, private = c.Path, c.S.Name.Sp, c.S.Private
 	case nameTemplate:
-		t := e.Templates[name]
+		t := e.Template(from, name)
 		if t == nil || t.D.Name == nil {
 			return evalName{}, false
 		}
-		path, sp = t.Path, t.D.Name.Sp
+		path, sp, private = t.Path, t.D.Name.Sp, t.D.Private
 	case nameBlueprint:
-		b := e.Blueprints[name]
+		b := e.Blueprint(from, name)
 		if b == nil || b.D.Name == nil {
 			return evalName{}, false
 		}
-		path, sp = b.Path, b.D.Name.Sp
+		path, sp, private = b.Path, b.D.Name.Sp, b.D.Private
 	case nameType:
-		t := e.Types[name]
+		t := e.Type(from, name)
 		if t == nil || t.D.Name == nil {
 			return evalName{}, false
 		}
-		path, sp = t.Path, t.D.Name.Sp
+		path, sp, private = t.Path, t.D.Name.Sp, t.D.Private
 	}
-	return evalName{Kind: k, Name: name, Path: path, Def: sp}, true
+	return evalName{Kind: k, Name: name, Path: path, Def: sp, Private: private}, true
 }
 
-// identName resolves a name used as a value: a const or a Template, or a
-// Blueprint used as a kind, unless the item binds it itself.
-func (s *Session) identName(name string, bound map[string]bool) (evalName, bool) {
+// key is the name's key in the evaluator's maps.
+func (n evalName) key() string {
+	if n.Private {
+		return eval.PrivateKey(n.Path, n.Name)
+	}
+	return n.Name
+}
+
+// identName resolves a name used as a value in file from: a const or a
+// Template, or a Blueprint used as a kind, unless the item binds it
+// itself.
+func (s *Session) identName(from, name string, bound map[string]bool) (evalName, bool) {
 	if bound[name] {
 		return evalName{}, false
 	}
 	for _, k := range []nameKind{nameConst, nameTemplate, nameBlueprint} {
-		if n, ok := s.lookupName(k, name); ok {
+		if n, ok := s.lookupName(from, k, name); ok {
 			return n, true
 		}
 	}
 	return evalName{}, false
 }
 
-// typeRef resolves a type name: a Type or a Blueprint.
-func (s *Session) typeRef(name string) (evalName, bool) {
-	if n, ok := s.lookupName(nameType, name); ok {
+// typeRef resolves a type name written in file from: a Type or a
+// Blueprint.
+func (s *Session) typeRef(from, name string) (evalName, bool) {
+	if n, ok := s.lookupName(from, nameType, name); ok {
 		return n, true
 	}
-	return s.lookupName(nameBlueprint, name)
+	return s.lookupName(from, nameBlueprint, name)
 }
 
 // typeNameSpan is the span of a type's name, without its arguments.
@@ -255,6 +269,12 @@ func (s *Session) evalUses(n evalName) []Location {
 	}
 	sort.Strings(paths)
 	for _, path := range paths {
+		// A file names n only where n is what the name means there: not
+		// in another file when n is private, nor in a file whose own
+		// private declaration hides it.
+		if m, ok := s.lookupName(path, n.Kind, n.Name); !ok || m.Path != n.Path || m.Def != n.Def {
+			continue
+		}
 		src := s.R.Source[path]
 		for _, it := range src.Items {
 			bound := boundNames(it)
@@ -310,15 +330,32 @@ func (s *Session) renameEval(n evalName, to string) ([]Edit, string) {
 	if !identRe.MatchString(to) {
 		return nil, "a name is letters, digits and underscores, not starting with a digit"
 	}
+	uses := s.evalUses(n)
 	if to != n.Name {
-		for _, k := range []nameKind{nameConst, nameTemplate, nameBlueprint, nameType} {
-			if _, taken := s.lookupName(k, to); taken {
-				return nil, "'" + to + "' is already declared"
+		// The new name must not mean something else already in a file
+		// that names n.
+		files := map[string]bool{n.Path: true}
+		for _, l := range uses {
+			files[l.Path] = true
+		}
+		for f := range files {
+			for _, k := range []nameKind{nameConst, nameTemplate, nameBlueprint, nameType} {
+				if _, taken := s.lookupName(f, k, to); taken {
+					return nil, "'" + to + "' is already declared"
+				}
+			}
+		}
+		// A public name must not clash with another public one.
+		if !n.Private {
+			for _, k := range []nameKind{nameConst, nameTemplate, nameBlueprint, nameType} {
+				if _, taken := s.lookupName("", k, to); taken {
+					return nil, "'" + to + "' is already declared"
+				}
 			}
 		}
 	}
 	var edits []Edit
-	for _, l := range s.evalUses(n) {
+	for _, l := range uses {
 		edits = append(edits, Edit{Path: l.Path, Span: l.Span, Text: to})
 	}
 	return edits, ""
@@ -389,7 +426,7 @@ func (s *Session) sourceTemplateCall(path string, off int) (*syntax.File, *synta
 	if !ok || bound[id.Name] {
 		return nil, nil, nil
 	}
-	t := s.R.Eval.Templates[id.Name]
+	t := s.R.Eval.Template(path, id.Name)
 	if t == nil {
 		return nil, nil, nil
 	}
@@ -449,7 +486,7 @@ func (s *Session) templateArgCandidates(path string, off int, c *sema.Checker) (
 	}
 	if i == 0 {
 		// A path the Template turns into an asset file: Piece("|").
-		if helper, prefix, suffix, ok := s.templateAssetPath(t.D.Name.Text); ok {
+		if helper, prefix, suffix, ok := s.templateAssetPath(t.Path, t.D.Name.Text); ok {
 			ext, what, _ := sema.AssetFileType(helper)
 			for _, f := range s.P.Config.AssetFiles(s.P.Files, ext) {
 				if strings.HasPrefix(f, prefix) && strings.HasSuffix(f, suffix) && len(f) >= len(prefix)+len(suffix) {
@@ -464,15 +501,15 @@ func (s *Session) templateArgCandidates(path string, off int, c *sema.Checker) (
 			// The values of its type, the consts and Templates that give
 			// one, and the consts whose type is not written.
 			out = append(out, c.TypeCandidates(want)...)
-			for _, k := range s.evalValueCandidates() {
-				if k.Kind == sema.CandID && s.R.Eval.Consts[k.Label] != nil && s.R.Eval.Consts[k.Label].S.Type == nil {
+			for _, k := range s.evalValueCandidates(path) {
+				if c := s.R.Eval.Const(path, k.Label); k.Kind == sema.CandID && c != nil && c.S.Type == nil {
 					out = append(out, k)
 				}
 			}
 			return out, true
 		}
 	}
-	return append(out, s.evalValueCandidates()...), true
+	return append(out, s.evalValueCandidates(path)...), true
 }
 
 // argAt is the argument of call that off is in, or nil.
@@ -542,27 +579,31 @@ func templateNamedArgs(t *eval.Template, call *syntax.Call, i int) []sema.Candid
 	return out
 }
 
-// typedEval lists the consts and value Templates that have a written
-// type, to be offered wherever that type fits.
-func (s *Session) typedEval() []sema.TypedCandidate {
-	if s.typed != nil || s.R.Eval == nil || s.R.TypeEnv == nil {
-		return s.typed
+// typedEval lists the consts and value Templates file path can name that
+// have a written type, to be offered wherever that type fits.
+func (s *Session) typedEval(path string) []sema.TypedCandidate {
+	if s.typed[path] != nil || s.R.Eval == nil || s.R.TypeEnv == nil {
+		return s.typed[path]
 	}
-	s.typed = []sema.TypedCandidate{}
-	for _, c := range s.evalValueCandidates() {
+	if s.typed == nil {
+		s.typed = map[string][]sema.TypedCandidate{}
+	}
+	out := []sema.TypedCandidate{}
+	for _, c := range s.evalValueCandidates(path) {
 		var t *spec.Type
-		if k := s.R.Eval.Consts[c.Label]; k != nil && c.Kind == sema.CandID {
+		if k := s.R.Eval.Const(path, c.Label); k != nil && c.Kind == sema.CandID {
 			if k.S.Type != nil {
 				t = s.R.TypeEnv.Lookup(k.Path, k.S.Type)
 			}
-		} else if tm := s.R.Eval.Templates[c.Label]; tm != nil && tm.D.Type != nil {
+		} else if tm := s.R.Eval.Template(path, c.Label); tm != nil && tm.D.Type != nil {
 			t = s.R.TypeEnv.Lookup(tm.Path, tm.D.Type)
 		}
 		if t != nil {
-			s.typed = append(s.typed, sema.TypedCandidate{Candidate: c, Type: t})
+			out = append(out, sema.TypedCandidate{Candidate: c, Type: t})
 		}
 	}
-	return s.typed
+	s.typed[path] = out
+	return out
 }
 
 // templateParams are the parameters of t, which its body can name, each
@@ -618,18 +659,13 @@ func (s *Session) blueprintFields(bp *eval.Blueprint) []sema.TypedCandidate {
 	return out
 }
 
-// evalValueCandidates are the consts and value Templates a value can
-// name, after what its type offers.
-func (s *Session) evalValueCandidates() []sema.Candidate {
+// evalValueCandidates are the consts and value Templates a value in file
+// path can name, after what its type offers.
+func (s *Session) evalValueCandidates(path string) []sema.Candidate {
 	e := s.R.Eval
 	var out []sema.Candidate
-	names := make([]string, 0, len(e.Consts))
-	for n := range e.Consts {
-		names = append(names, n)
-	}
-	sort.Strings(names)
-	for _, n := range names {
-		c := e.Consts[n]
+	for _, c := range e.ConstsIn(path) {
+		n := c.Name()
 		detail := "const"
 		if c.S.Type != nil {
 			detail += ": " + syntax.TypeText(c.S.Type)
@@ -639,16 +675,11 @@ func (s *Session) evalValueCandidates() []sema.Candidate {
 		doc, _ := docText(c.S.Doc)
 		out = append(out, sema.Candidate{Label: n, Kind: sema.CandID, Detail: detail, Doc: doc, Rank: 5})
 	}
-	names = names[:0]
-	for n, t := range e.Templates {
+	for _, t := range e.TemplatesIn(path) {
 		if t.D.Type != nil && syntax.TypeText(t.D.Type) == "Commands" || internal(t.D) {
 			continue
 		}
-		names = append(names, n)
-	}
-	sort.Strings(names)
-	for _, n := range names {
-		t := e.Templates[n]
+		n := t.D.Name.Text
 		label, _ := templateHead(t.D)
 		doc, _ := docText(t.D.Doc)
 		out = append(out, sema.Candidate{Label: n, Kind: sema.CandCallable, Detail: "Template", Doc: "```mms\nTemplate " + label + "\n```\n\n" + doc, Insert: n + "($1)", Rank: 6})
@@ -666,6 +697,8 @@ var evalKeywords = []sema.Candidate{
 		Doc: "A record type with fields, or an alias such as `Type Mode = \"rigid\" | \"terrain_matching\"`."},
 	{Label: "Blueprint", Kind: sema.CandKeyword, Detail: "a declaration kind", Insert: "Blueprint ${1:Name} {\n\t$0\n\temit {\n\t}\n}",
 		Doc: "A new declaration kind: its fields, `check` blocks, an `as` conversion and the declarations it `emit`s."},
+	{Label: "private", Kind: sema.CandKeyword, Detail: "only this file can name it", Insert: "private ",
+		Doc: "Keeps a const, Template, Type or Blueprint to this file: `private const gap = 4`. Other files cannot name it, and may keep a private one of the same name."},
 	{Label: "for", Kind: sema.CandKeyword, Detail: "declarations for each value", Insert: "for ${1:x} in ${2:[]} {\n\t$0\n}",
 		Doc: "Repeats the declarations in its body for each value, with `${x}` in their names."},
 }
@@ -690,8 +723,11 @@ func (s *Session) evalHover(path string, off int) (string, syntax.Span, bool) {
 	var head, doc string
 	switch n.Kind {
 	case nameConst:
-		c := e.Consts[n.Name]
+		c := e.Consts[n.key()]
 		head = "const " + n.Name
+		if n.Private {
+			head = "private " + head
+		}
 		if c.S.Type != nil {
 			head += ": " + syntax.TypeText(c.S.Type)
 		} else if t := eval.TypeOf(c.Value()); t != "" {
@@ -706,17 +742,26 @@ func (s *Session) evalHover(path string, off int) (string, syntax.Span, bool) {
 		}
 		doc, _ = docText(c.S.Doc)
 	case nameTemplate:
-		t := e.Templates[n.Name]
+		t := e.Templates[n.key()]
 		label, _ := templateHead(t.D)
 		head = "Template " + label
+		if n.Private {
+			head = "private " + head
+		}
 		doc, _ = docText(t.D.Doc)
 	case nameBlueprint:
-		b := e.Blueprints[n.Name]
+		b := e.Blueprints[n.key()]
 		head = "Blueprint " + n.Name
+		if n.Private {
+			head = "private " + head
+		}
 		doc, _ = docText(b.D.Doc)
 	case nameType:
-		t := e.Types[n.Name]
+		t := e.Types[n.key()]
 		head = "Type " + n.Name
+		if n.Private {
+			head = "private " + head
+		}
 		if t.D.TypeValue != nil {
 			head += " = " + syntax.TypeText(t.D.TypeValue)
 		}

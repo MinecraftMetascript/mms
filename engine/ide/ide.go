@@ -28,8 +28,8 @@ type Session struct {
 	P *project.Project
 	R *project.Result
 
-	typed  []sema.TypedCandidate // typedEval's result, once worked out
-	repair bool                  // this session completes in a repaired copy
+	typed  map[string][]sema.TypedCandidate // typedEval's result by file, once worked out
+	repair bool                             // this session completes in a repaired copy
 }
 
 // Location is a span in a file.
@@ -94,7 +94,7 @@ func (s *Session) at(path string, off int) *at {
 	} else {
 		a.c = sema.NewChecker(s.P.Pack, s.P.Kinds, s.R.Syms, s.P.Config.Namespace)
 	}
-	a.c.Typed = s.typedEval()
+	a.c.Typed = s.typedEval(path)
 	if a.decl != nil && a.decl.Template != nil {
 		a.c.Typed = append(s.templateParams(a.decl.Template), a.c.Typed...)
 	}
@@ -127,7 +127,7 @@ func (s *Session) templateArgInfo(a *at) {
 		if !ok {
 			continue
 		}
-		t := s.R.Eval.Templates[id.Name]
+		t := s.R.Eval.Template(a.u.Path, id.Name)
 		if t == nil || t.D.Params == nil {
 			continue
 		}
@@ -229,7 +229,7 @@ func (s *Session) Completion(path string, off int) ([]Item, syntax.Span) {
 	f := a.u.File
 	// The path of Texture("..."), Sound("...") or StructureFile("...") lists
 	// the project's files of that type.
-	if items, replace, ok := s.assetPathCompletion(f, off); ok {
+	if items, replace, ok := s.assetPathCompletion(path, f, off); ok {
 		return items, replace
 	}
 	// No completion inside comments or strings (old issue #17).
@@ -377,7 +377,7 @@ func (s *Session) TriggerApplies(path string, off int, ch string) bool {
 		if _, _, ok := sema.AssetFileType(h); ok || h == "TextFile" {
 			return true
 		}
-		if _, _, _, ok := s.templateAssetPath(h); ok {
+		if _, _, _, ok := s.templateAssetPath(path, h); ok {
 			return true
 		}
 	}
@@ -410,23 +410,23 @@ func (s *Session) complete(a *at, off int) []sema.Candidate {
 		if prev := prevToken(f, start); prev != nil && prev.Kind == parser.MMSLexerIDENT && lineOf(f, prev.Sp.End) == lineOf(f, off) {
 			return nil
 		}
-		return s.declKinds()
+		return s.declKinds(a.u.Path)
 	}
 	d, _ := a.path[1].(*syntax.Decl)
 	if d != nil && d.Kind.Sp.Contains(off) {
-		return s.declKinds()
+		return s.declKinds(a.u.Path)
 	}
 	if d != nil && d.Name != nil && d.Name.Sp.Contains(off) {
 		// A name on a later line than its kind is a new declaration's
 		// kind: in `X x = foo` + newline + `Fe|`, the value `foo` reads
 		// as the kind of a declaration named `Fe`.
 		if l1, _ := f.LineCol(d.Kind.Sp.End); l1 != lineOf(f, off) {
-			return s.declKinds()
+			return s.declKinds(a.u.Path)
 		}
 		return nil
 	}
 	if emitStatementStart(f, a.path, off) {
-		return s.emitCandidates()
+		return s.emitCandidates(a.u.Path)
 	}
 	if a.decl == nil {
 		return nil
@@ -632,13 +632,8 @@ func (s *Session) statementCandidates(a *at, off int) []sema.Candidate {
 	}
 	// Templates that give commands, called as a statement.
 	if e := s.R.Eval; e != nil {
-		names := make([]string, 0, len(e.Templates))
-		for name := range e.Templates {
-			names = append(names, name)
-		}
-		sort.Strings(names)
-		for _, name := range names {
-			t := e.Templates[name]
+		for _, t := range e.TemplatesIn(a.u.Path) {
+			name := t.D.Name.Text
 			if t.D.Type == nil || syntax.TypeText(t.D.Type) != "Commands" || internal(t.D) {
 				continue
 			}
@@ -1113,7 +1108,7 @@ func (s *Session) hover(path string, off int) (string, syntax.Span) {
 		return s.declHover(a.decl), d.Name.Sp
 	}
 	if d.Kind.Sp.Contains(off) {
-		if bp := s.blueprint(d); bp != nil {
+		if bp := s.blueprint(path, d); bp != nil {
 			return "```mms\nBlueprint " + d.Kind.Name + "\n```\n" + sema.DocMarkdown(bp.D.Doc), d.Kind.Sp
 		}
 		k := a.decl
@@ -1602,8 +1597,8 @@ func (s *Session) Symbols(path string) []Symbol {
 					continue
 				}
 				kind := map[string]string{"Template": "template", "Type": "type", "Blueprint": "blueprint"}[it.Kind.Name]
-				if kind == "" && s.R.Eval.Blueprints[it.Kind.Name] != nil && !it.Name.Templated() {
-					if bp := s.R.Eval.Blueprints[it.Kind.Name]; !bp.D.Extern {
+				if kind == "" && s.R.Eval.Blueprint(path, it.Kind.Name) != nil && !it.Name.Templated() {
+					if bp := s.R.Eval.Blueprint(path, it.Kind.Name); !bp.D.Extern {
 						kind = "resource" // a Blueprint instance, such as a CustomItem
 					}
 				}
@@ -1759,7 +1754,7 @@ func (s *Session) storagePaths(id string) []string {
 		if !ok {
 			continue
 		}
-		out = s.recordPaths(out, name, s.R.Syms.Types["::mms::"+tn.Name], 0)
+		out = s.recordPaths(out, name, s.R.Syms.Types["::mms::"+s.R.Eval.TypeKey(sym.Unit.Path, tn.Name)], 0)
 	}
 	return out
 }
@@ -1838,7 +1833,7 @@ func (s *Session) typeHints(u *sema.Unit) []InlayHint {
 	}
 	for _, it := range u.File.Items {
 		if k, ok := it.(*syntax.ConstStmt); ok && k.Name != nil && k.Type == nil && s.R.Eval != nil {
-			if c := s.R.Eval.Consts[k.Name.Text]; c != nil && c.S == k {
+			if c := s.R.Eval.Const(u.Path, k.Name.Text); c != nil && c.S == k {
 				hint(k.Name, eval.TypeOf(c.Value()))
 			}
 		}

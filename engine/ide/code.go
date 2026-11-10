@@ -52,7 +52,7 @@ func (s *Session) mmsComplete(a *at, off int) ([]sema.Candidate, bool) {
 	// A Storage's record type: `Storage siege: |`.
 	if a.decl.Kind.MMS == "Storage" && prev.Kind == parser.MMSLexerCOLON && s.R.TypeEnv != nil &&
 		(a.decl.D.Value == nil || !a.decl.D.Value.Span().Contains(off)) {
-		return s.typeNameCandidates(), true
+		return s.typeNameCandidates(a.u.Path), true
 	}
 	// A type annotation: `Global g: |`, `Function f(n: |)`, `let x: |`.
 	if prev.Kind == parser.MMSLexerCOLON {
@@ -181,8 +181,8 @@ func (s *Session) codeValues(a *at, off int) []sema.Candidate {
 	}
 	// The consts, and the Templates that give a number, a bool or a
 	// string, which is what code computes with.
-	for _, c := range s.evalValueCandidates() {
-		if t := s.R.Eval.Templates[c.Label]; t != nil && c.Kind == sema.CandCallable {
+	for _, c := range s.evalValueCandidates(a.u.Path) {
+		if t := s.R.Eval.Template(a.u.Path, c.Label); t != nil && c.Kind == sema.CandCallable {
 			if t.D.Extern || t.D.Type == nil || !codeTypes[syntax.TypeText(t.D.Type)] {
 				continue
 			}
@@ -370,7 +370,7 @@ func (s *Session) exprCompletion(a *at, src []rune, open, off int) (cands []sema
 			cands = append(cands, c)
 		}
 	}
-	for _, c := range s.evalValueCandidates() {
+	for _, c := range s.evalValueCandidates(a.u.Path) {
 		if c.Kind != sema.CandCallable {
 			c.Rank += 70
 			cands = append(cands, c)

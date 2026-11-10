@@ -59,6 +59,9 @@ type Decl struct {
 	// Extern marks `extern Kind name ...`: a declaration whose meaning is
 	// supplied by the engine.
 	Extern bool
+	// Private marks `private Kind name ...`: a Template, Type or
+	// Blueprint only its own file can name.
+	Private bool
 	// Primary marks `primary Kind name ...` in an emit block.
 	Primary bool
 	Doc     string // text of the /** */ comment right above, if any
@@ -154,7 +157,9 @@ type (
 		Type  TypeExpr
 		Value Expr
 		Doc   string
-		Sp    Span
+		// Private marks `private const`: only its own file can name it.
+		Private bool
+		Sp      Span
 	}
 	IfStmt struct {
 		Cond Expr

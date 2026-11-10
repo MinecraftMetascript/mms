@@ -71,7 +71,7 @@ func SigOf(d *syntax.Decl) FuncSig {
 // or string itself, or a project Type that is one of them, such as
 // `Type Count = int` or a union of strings. Other names come back as
 // written, for the check to report.
-func (t *Table) valueType(name string) string {
+func (t *Table) valueType(d *syntax.Decl, name string) string {
 	switch name {
 	case tInt, tBool, tString:
 		return name
@@ -79,7 +79,7 @@ func (t *Table) valueType(name string) string {
 	if t == nil {
 		return name
 	}
-	st := t.Types[typePrefix+name]
+	st := t.Types[typePrefix+t.typeKey(d, name)]
 	for i := 0; st != nil && st.Kind == "reference" && i < 8; i++ {
 		st = t.Types[st.Path]
 	}
@@ -93,10 +93,10 @@ func (t *Table) valueType(name string) string {
 func sigIn(t *Table, d *syntax.Decl) FuncSig {
 	s := SigOf(d)
 	for i := range s.Params {
-		s.Params[i].Type = t.valueType(s.Params[i].Type)
+		s.Params[i].Type = t.valueType(d, s.Params[i].Type)
 	}
 	if s.Ret != "" {
-		s.Ret = t.valueType(s.Ret)
+		s.Ret = t.valueType(d, s.Ret)
 	}
 	return s
 }
@@ -126,7 +126,7 @@ func symSig(s *Symbol) string {
 		if s.Decl.Type == nil {
 			return tInt
 		}
-		return s.table.valueType(syntax.TypeText(s.Decl.Type))
+		return s.table.valueType(s.Decl, syntax.TypeText(s.Decl.Type))
 	}
 	// Callers also depend on what the function calls, which decides
 	// whether a call is recursive.
@@ -277,6 +277,7 @@ type Local struct {
 // fc compiles one function body.
 type fc struct {
 	c      *Checker
+	decl   *syntax.Decl // the function, test or hook being compiled
 	src    []rune
 	ns     string
 	path   string
@@ -306,7 +307,7 @@ func (c *Checker) CompileFunction(d *syntax.Decl, id string, src []rune) *fn.Fun
 		return nil
 	}
 	ns, path, _ := strings.Cut(id, ":")
-	f := &fc{c: c, src: src, ns: ns, path: path, obj: fn.Objective(ns), sig: sigIn(c.Syms, d), names: map[string]int{}, selfID: id}
+	f := &fc{c: c, decl: d, src: src, ns: ns, path: path, obj: fn.Objective(ns), sig: sigIn(c.Syms, d), names: map[string]int{}, selfID: id}
 	f.push()
 	if d.Params != nil {
 		for i, p := range d.Params.Params {
@@ -478,7 +479,7 @@ func (f *fc) stmt(out *fn.Block, s syntax.Stmt) {
 		}
 		typ := ""
 		if s.Type != nil {
-			typ = f.c.Syms.valueType(syntax.TypeText(s.Type))
+			typ = f.c.Syms.valueType(f.decl, syntax.TypeText(s.Type))
 			if !f.valueType(typ, s.Type) {
 				typ = tInt
 			}
@@ -1406,7 +1407,7 @@ func (c *Checker) Global(d *syntax.Decl) []string {
 	}
 	typ := tInt
 	if d.Type != nil {
-		typ = c.Syms.valueType(syntax.TypeText(d.Type))
+		typ = c.Syms.valueType(d, syntax.TypeText(d.Type))
 		if typ != tInt && typ != tBool && typ != tString {
 			c.errorf("mms/unknown-type", d.Type.Span(), "unknown type '%s'; globals are int, bool or string, or a Type that is one of them", typ)
 			return nil

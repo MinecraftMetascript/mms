@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/minecraftmetascript/mms/engine/eval"
 	"github.com/minecraftmetascript/mms/engine/prelude"
 	"github.com/minecraftmetascript/mms/engine/sema"
 	"github.com/minecraftmetascript/mms/engine/syntax"
@@ -607,20 +608,23 @@ func unusedEvalNames(l *lintRun) {
 	if r.Eval == nil {
 		return
 	}
-	named := map[string]bool{}
-	for _, f := range r.Source {
+	// named holds the names each file writes.
+	named := map[string]map[string]bool{}
+	for path, f := range r.Source {
+		in := map[string]bool{}
+		named[path] = in
 		syntax.Walk(f, func(n syntax.Node) bool {
 			switch n := n.(type) {
 			case *syntax.Ident:
-				named[n.Name] = true
+				in[n.Name] = true
 			case *syntax.TypeName:
-				named[n.Name] = true
+				in[n.Name] = true
 			case *syntax.String, *syntax.CommandStmt:
 				sp := n.Span()
 				if sp.End <= len(f.Src) {
 					for _, piece := range evalPieceRe.FindAllString(string(f.Src[sp.Start:sp.End]), -1) {
 						for _, w := range evalWordRe.FindAllString(piece, -1) {
-							named[w] = true
+							in[w] = true
 						}
 					}
 				}
@@ -631,22 +635,38 @@ func unusedEvalNames(l *lintRun) {
 	type decl struct {
 		kind, path string
 		name       *syntax.Name
+		private    bool
+		// hidden reports whether a file has a private declaration of
+		// the name, which its uses there mean instead.
+		hidden func(path string) bool
 	}
 	var ds []decl
-	for _, c := range r.Eval.Consts {
-		ds = append(ds, decl{"const", c.Path, c.S.Name})
+	ev := r.Eval
+	for _, c := range ev.Consts {
+		ds = append(ds, decl{"const", c.Path, c.S.Name, c.S.Private, func(p string) bool { return ev.Consts[eval.PrivateKey(p, c.Name())] != nil }})
 	}
-	for _, t := range r.Eval.Templates {
-		ds = append(ds, decl{"Template", t.Path, t.D.Name})
+	for _, t := range ev.Templates {
+		ds = append(ds, decl{"Template", t.Path, t.D.Name, t.D.Private, func(p string) bool { return ev.Templates[eval.PrivateKey(p, t.D.Name.Text)] != nil }})
 	}
-	for _, t := range r.Eval.Types {
-		ds = append(ds, decl{"Type", t.Path, t.D.Name})
+	for _, t := range ev.Types {
+		ds = append(ds, decl{"Type", t.Path, t.D.Name, t.D.Private, func(p string) bool { return ev.Types[eval.PrivateKey(p, t.D.Name.Text)] != nil }})
 	}
-	for _, b := range r.Eval.Blueprints {
-		ds = append(ds, decl{"Blueprint", b.Path, b.D.Name})
+	for _, b := range ev.Blueprints {
+		ds = append(ds, decl{"Blueprint", b.Path, b.D.Name, b.D.Private, func(p string) bool { return ev.Blueprints[eval.PrivateKey(p, b.D.Name.Text)] != nil }})
+	}
+	used := func(d decl) bool {
+		if d.private {
+			return named[d.path][d.name.Text]
+		}
+		for path, in := range named {
+			if in[d.name.Text] && !d.hidden(path) {
+				return true
+			}
+		}
+		return false
 	}
 	for _, d := range ds {
-		if d.name == nil || prelude.Is(d.path) || r.Source[d.path] == nil || named[d.name.Text] {
+		if d.name == nil || prelude.Is(d.path) || r.Source[d.path] == nil || used(d) {
 			continue
 		}
 		l.out[d.path] = append(l.out[d.path], syntax.Diagnostic{

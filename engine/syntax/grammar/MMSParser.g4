@@ -17,9 +17,10 @@ exprOnly : expr EOF;
 // const spacing: int = 32
 // for w in woods { Recipe ${w}_crate = ... }
 // extern Template font_width(text: string): int
+// private const gap = 4
 topItem
-    : EXTERN? declaration                                         # declItem
-    | constDecl                                                   # constItem
+    : (PRIVATE | EXTERN)? declaration                             # declItem
+    | PRIVATE? constDecl                                          # constItem
     | letDecl                                                     # letItem
     | FOR IDENT (COMMA IDENT)? IN expr block                      # forItem
     ;
@@ -52,7 +53,7 @@ innerBody : ASSIGN value | block;
 declName : word | RESLOC | TNAME;
 
 // An identifier, or a body keyword used as a plain name.
-word : IDENT | TYPE | PRIMARY | AS | CHECK | EMIT | SETUP | EXPECT | RUN;
+word : IDENT | TYPE | PRIMARY | AS | CHECK | EMIT | SETUP | EXPECT | RUN | PRIVATE;
 
 // When the value after '=' is left out and the next line starts a new
 // declaration, recovery inserts a MISSING token as the value (see

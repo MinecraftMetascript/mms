@@ -37,11 +37,12 @@ func (c *Checker) storageType(d *syntax.Decl) (*spec.Type, *syntax.Decl) {
 	if !ok || c.Syms == nil {
 		return nil, nil
 	}
-	t := c.Syms.Types[typePrefix+tn.Name]
+	k := c.Syms.typeKey(d, tn.Name)
+	t := c.Syms.Types[typePrefix+k]
 	if t == nil || t.Kind != "struct" {
 		return nil, nil
 	}
-	return t, c.Syms.TypeDecls[tn.Name]
+	return t, c.Syms.TypeDecls[k]
 }
 
 // Storage checks `Storage name: Record` and returns the load-function
@@ -83,7 +84,11 @@ func (c *Checker) Storage(d *syntax.Decl) []string {
 	if td != nil && td.Body != nil {
 		decls = fieldDecls(td.Body.Items)
 	}
-	return c.storageDefaults(ns, loc, t, decls, 0)
+	file := c.Syms.DeclPath[d]
+	if td != nil {
+		file = c.Syms.DeclPath[td]
+	}
+	return c.storageDefaults(file, ns, loc, t, decls, 0)
 }
 
 // fieldDecls are the field declarations among a Type body's items.
@@ -101,7 +106,10 @@ func fieldDecls(items []syntax.Stmt) []*syntax.FieldDecl {
 // of record t, kept at loc, to its default. A field holding a record
 // without a default of its own gets its fields' defaults, so a field
 // added to it later starts at its default too.
-func (c *Checker) storageDefaults(ns, loc string, t *spec.Type, decls []*syntax.FieldDecl, depth int) []string {
+//
+// file is the file the Type declaring decls is written in, where the
+// names of nested record Types are looked up.
+func (c *Checker) storageDefaults(file, ns, loc string, t *spec.Type, decls []*syntax.FieldDecl, depth int) []string {
 	byName := map[string]*syntax.FieldDecl{}
 	for _, d := range decls {
 		byName[d.Name.Text] = d
@@ -123,6 +131,7 @@ func (c *Checker) storageDefaults(ns, loc string, t *spec.Type, decls []*syntax.
 			v = sub.check(d.Default, tview{T: f.Type})
 		case c.record(f.Type) != nil && depth < 16:
 			var inner []*syntax.FieldDecl
+			innerFile := file
 			if d != nil {
 				dt := d.Type
 				for {
@@ -139,13 +148,16 @@ func (c *Checker) storageDefaults(ns, loc string, t *spec.Type, decls []*syntax.
 					inner = dt.Fields
 				case *syntax.TypeName:
 					if c.Syms != nil {
-						if nd := c.Syms.TypeDecls[dt.Name]; nd != nil && nd.Body != nil {
+						if nd := c.Syms.TypeDecls[c.Syms.typeKeyIn(file, dt.Name)]; nd != nil && nd.Body != nil {
 							inner = fieldDecls(nd.Body.Items)
+							if p, ok := c.Syms.DeclPath[nd]; ok {
+								innerFile = p
+							}
 						}
 					}
 				}
 			}
-			lines = append(lines, c.storageDefaults(ns, at, c.record(f.Type), inner, depth+1)...)
+			lines = append(lines, c.storageDefaults(innerFile, ns, at, c.record(f.Type), inner, depth+1)...)
 			continue
 		default:
 			v = zeroOf(f.Type)
@@ -251,7 +263,7 @@ func storageSig(s *Symbol, t *Table) string {
 	if !ok {
 		return syntax.TypeText(s.Decl.Type)
 	}
-	rt := t.Types[typePrefix+tn.Name]
+	rt := t.Types[typePrefix+t.typeKey(s.Decl, tn.Name)]
 	if rt == nil {
 		return tn.Name
 	}

@@ -11,7 +11,7 @@ import (
 // asset helper, Texture("|"), Sound("|") or StructureFile("|"), listing the
 // files with the extension the helper takes. It also works before the
 // closing quote is typed. ok is false when off is not in such a string.
-func (s *Session) assetPathCompletion(f *syntax.File, off int) (items []Item, replace syntax.Span, ok bool) {
+func (s *Session) assetPathCompletion(path string, f *syntax.File, off int) (items []Item, replace syntax.Span, ok bool) {
 	start, end, ok := assetPathString(f, off)
 	if !ok {
 		return nil, replace, false
@@ -46,7 +46,7 @@ func (s *Session) assetPathCompletion(f *syntax.File, off int) (items []Item, re
 		// A Template that passes its first parameter on as part of an
 		// asset path, as Piece("halls/hall") does with
 		// StructureFile("structures/${path}.nbt").
-		helper, prefix, suffix, ok = s.templateAssetPath(helper)
+		helper, prefix, suffix, ok = s.templateAssetPath(path, helper)
 		if !ok {
 			return nil, replace, false
 		}
@@ -65,12 +65,12 @@ func (s *Session) assetPathCompletion(f *syntax.File, off int) (items []Item, re
 // templateAssetPath finds, in the Template name, a call of an asset
 // helper whose path is the Template's first parameter with text around
 // it: StructureFile("structures/${path}.nbt") gives StructureFile,
-// "structures/" and ".nbt".
-func (s *Session) templateAssetPath(name string) (helper, prefix, suffix string, ok bool) {
+// "structures/" and ".nbt". name is written in file path.
+func (s *Session) templateAssetPath(path, name string) (helper, prefix, suffix string, ok bool) {
 	if s.R.Eval == nil {
 		return "", "", "", false
 	}
-	t := s.R.Eval.Templates[name]
+	t := s.R.Eval.Template(path, name)
 	if t == nil || t.D.Params == nil || len(t.D.Params.Params) == 0 || t.D.Params.Params[0].Name == nil || t.D.Value == nil {
 		return "", "", "", false
 	}

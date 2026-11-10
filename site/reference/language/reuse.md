@@ -1,6 +1,6 @@
 # Constants, templates and loops
 
-Four tools cut repetition: `const` names a value, `Template` names a value with parameters, comprehensions build lists, and a top-level `for` repeats declarations. They all run at compile time and write nothing of their own: only the declarations that use them reach the pack.
+Four tools cut repetition: `const` names a value, `Template` names a value with parameters, comprehensions build lists, and a top-level `for` repeats declarations. They all run at compile time and write nothing of their own: only the declarations that use them reach the pack. `private` keeps a name to the file it is written in.
 
 ## Constants
 
@@ -73,3 +73,20 @@ for w in woods {
 That declares `oak_crate`, `spruce_crate` and so on. Go to definition on `oak_crate` lands on the loop, with `w = oak` shown inline, and find references and rename work as on any other name. Nothing is addressed by index, as `crate["oak"]` would be.
 
 The list must be known at compile time, so the editor always knows every id the loop makes. `for k, v in map` walks a map's names and values. Loops can be nested.
+
+## Private names
+
+Every file in a project sees every other file's constants, templates, Types and Blueprints. Write `private` before one to keep it to its own file:
+
+```mms
+private const gap = 4
+private Template spaced(n: int): int = n * gap
+
+LootTable chests/spaced { pools = [Pool(spaced(2), stone)] }
+```
+
+Another file can't name `gap` or `spaced`, and it may keep a private `gap` of its own: the two never clash. A template or Blueprint still sees its own file's private names when another file uses it, so a public `Template` can be built from private helpers.
+
+A private name that hides a public one declared in another file is fine. The file means its own, and a hint (`mms/shadowed-private`) points it out. The same name declared both public and private in one file is a duplicate.
+
+Only names the compiler expands away can be private: `const`, `Template`, `Type` and `Blueprint`. A declaration that writes a file into the pack, such as a `LootTable` or a `Function`, lands in the namespace every file shares, so `private` on one is an error.

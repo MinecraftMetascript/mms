@@ -29,7 +29,7 @@ func (s *Session) typeCompletion(a *at, off int) ([]sema.Candidate, bool) {
 	// typed: `{st|: string}` is on its way to `{string: string}`.
 	if _, ok := inner.(*syntax.Name); ok && len(path) >= 3 {
 		if r, ok := path[len(path)-3].(*syntax.TypeRecord); ok && len(r.Fields) == 1 && inTypes(path) {
-			return s.typeNameCandidates(), true
+			return s.typeNameCandidates(a.u.Path), true
 		}
 	}
 	if _, ok := inner.(*syntax.TypeName); !ok {
@@ -74,13 +74,14 @@ func (s *Session) typeCompletion(a *at, off int) ([]sema.Candidate, bool) {
 	if !inTypes(path) {
 		return nil, false
 	}
-	return s.typeNameCandidates(), true
+	return s.typeNameCandidates(a.u.Path), true
 }
 
-// typeNameCandidates lists the names a type expression can use.
-func (s *Session) typeNameCandidates() []sema.Candidate {
+// typeNameCandidates lists the names a type expression in file path can
+// use.
+func (s *Session) typeNameCandidates(path string) []sema.Candidate {
 	var out []sema.Candidate
-	for i, t := range s.R.TypeEnv.Names() {
+	for i, t := range s.R.TypeEnv.Names(path) {
 		c := sema.Candidate{Label: t.Name, Kind: sema.CandKind, Detail: t.Detail, Rank: i}
 		if t.Args {
 			c.Insert = t.Name + "<$1>"
@@ -210,7 +211,7 @@ func (s *Session) typeHover(path string, off int) (string, syntax.Span, bool) {
 	if !ok || !within(typeNameSpan(tn), off) || !inTypes(p) {
 		return "", syntax.Span{}, false
 	}
-	for _, t := range s.R.TypeEnv.Names() {
+	for _, t := range s.R.TypeEnv.Names(path) {
 		if t.Name != tn.Name {
 			continue
 		}

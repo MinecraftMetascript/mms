@@ -21,7 +21,7 @@ var keywords = func() map[string]bool {
 
 // keyWords are the keywords the parser's `word` rule still takes as field
 // keys, argument names, member names and declaration names.
-var keyWords = map[string]bool{"Type": true, "primary": true, "as": true, "check": true, "emit": true, "setup": true, "expect": true, "run": true}
+var keyWords = map[string]bool{"Type": true, "primary": true, "as": true, "check": true, "emit": true, "setup": true, "expect": true, "run": true, "private": true}
 
 func isWord(w string) bool {
 	for _, r := range w {

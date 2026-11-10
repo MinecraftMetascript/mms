@@ -40,15 +40,37 @@ type Table struct {
 	// Types are the types the project declares with `Type`, by the
 	// path the type checker gives them ("::mms::Name").
 	Types map[string]*spec.Type
-	// TypeDecls are the project's Type declarations by name, for the
-	// defaults of a record's fields.
+	// TypeDecls are the project's Type declarations by key (the name, or
+	// a private Type's key), for the defaults of a record's fields.
 	TypeDecls map[string]*syntax.Decl
+	// TypeKey gives the key in TypeDecls, and after "::mms::" in Types,
+	// of the Type that name means in a file: a private Type declared
+	// there has its own. Nil means every key is the name.
+	TypeKey func(path, name string) string
+	// DeclPath maps each declaration to the file it is written in.
+	DeclPath map[*syntax.Decl]string
 	// Conversions are the `as` conversions of Blueprint instances, by
 	// the instance's id.
 	Conversions map[string][]*Conversion
 }
 
 func key(folder, id string) string { return folder + "|" + id }
+
+// typeKey is the key of the Type that name means in the file of d.
+func (t *Table) typeKey(d *syntax.Decl, name string) string {
+	if t == nil {
+		return name
+	}
+	return t.typeKeyIn(t.DeclPath[d], name)
+}
+
+// typeKeyIn is the key of the Type that name means in file path.
+func (t *Table) typeKeyIn(path, name string) string {
+	if t == nil || t.TypeKey == nil {
+		return name
+	}
+	return t.TypeKey(path, name)
+}
 
 // ownKey reports whether a kind's names live apart from every resource
 // folder: an objective, a global and a jigsaw hole may share a name with
@@ -117,7 +139,7 @@ func pathEscapes(path string) bool {
 // `Namespace x` declaration. It returns the table and its diagnostics,
 // keyed by unit path.
 func Collect(units []*Unit, kinds *Kinds, defaultNS string) (*Table, map[string][]syntax.Diagnostic) {
-	t := &Table{byKey: map[string]*Symbol{}, DeclNS: map[*syntax.Decl]string{}, DeclKind: map[*syntax.Decl]Kind{}}
+	t := &Table{byKey: map[string]*Symbol{}, DeclNS: map[*syntax.Decl]string{}, DeclPath: map[*syntax.Decl]string{}, DeclKind: map[*syntax.Decl]Kind{}}
 	diags := map[string][]syntax.Diagnostic{}
 	report := func(u *Unit, code string, sp syntax.Span, msg string) {
 		diags[u.Path] = append(diags[u.Path], syntax.Diagnostic{Code: code, Severity: syntax.SeverityError, Message: msg, Sp: sp})
@@ -151,6 +173,7 @@ func Collect(units []*Unit, kinds *Kinds, defaultNS string) (*Table, map[string]
 				continue
 			}
 			t.DeclNS[d] = ns
+			t.DeclPath[d] = u.Path
 			if d.Name == nil {
 				continue // OnLoad { } and friends
 			}

@@ -326,7 +326,7 @@ func (c *ctx) ident(x *syntax.Ident) Value {
 		return v
 	}
 	if !hidden {
-		if k := c.e.r.Consts[x.Name]; k != nil {
+		if k := c.e.r.Const(c.defPath, x.Name); k != nil {
 			v := c.constValue(k, x.Sp)
 			if v == nil {
 				return &Code{p, c.clone(x)}
@@ -449,7 +449,7 @@ func (c *ctx) refsBound(x syntax.Expr) bool {
 	syntax.Walk(x, func(n syntax.Node) bool {
 		if id, ok := n.(*syntax.Ident); ok {
 			_, bound, hidden := c.sc.lookup(id.Name)
-			if bound || !hidden && (c.e.r.Consts[id.Name] != nil || c.e.r.Templates[id.Name] != nil) {
+			if bound || !hidden && (c.e.r.Const(c.defPath, id.Name) != nil || c.e.r.Template(c.defPath, id.Name) != nil) {
 				hit = true
 			}
 		}

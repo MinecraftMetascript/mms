@@ -174,8 +174,8 @@ func splitChunks(src []rune) []int {
 }
 
 // startsDecl reports whether the line at i starts a top-level item: a
-// PascalCase kind followed by a name, or const, let, for or extern
-// followed by a word. It is the same rule as startsTopItem in recover.go,
+// PascalCase kind followed by a name, or const, let, for, extern or
+// private followed by a word. It is the same rule as startsTopItem in recover.go,
 // read from the text: a line such as `else 2` continues the item above.
 func startsDecl(src []rune, i int) bool {
 	isStart := func(r rune) bool { return r == '_' || r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' }
@@ -198,7 +198,7 @@ func startsDecl(src []rune, i int) bool {
 		return false
 	}
 	switch first {
-	case "const", "let", "for", "extern":
+	case "const", "let", "for", "extern", "private":
 		return isStart(src[i])
 	}
 	return first[0] >= 'A' && first[0] <= 'Z' && (isChar(src[i]) || src[i] == '.' || src[i] == '-' || src[i] == '$')
