@@ -131,6 +131,10 @@ func Collect(units []*Unit, kinds *Kinds, defaultNS string) (*Table, map[string]
 					diags[u.Path] = append(diags[u.Path], respell("mms/unknown-kind", d.Kind.Sp, d.Kind.Name, want))
 					continue
 				}
+				if kinds.IsValueType(d.Kind.Name) {
+					diags[u.Path] = append(diags[u.Path], valueTypeDecl(d))
+					continue
+				}
 				report(u, "mms/unknown-kind", d.Kind.Sp, "unknown declaration kind '"+d.Kind.Name+"'")
 				continue
 			}
@@ -193,4 +197,26 @@ func Collect(units []*Unit, kinds *Kinds, defaultNS string) (*Table, map[string]
 		}
 	}
 	return t, diags
+}
+
+// valueTypeDecl reports `BiomeSource src { ... }`: the name is a schema
+// type that only appears inside other files (a dimension's biome
+// source, a feature's placement), so it has no file of its own. A named
+// one is a typed const, and a declaration with a plain body can be
+// rewritten to one.
+func valueTypeDecl(d *syntax.Decl) syntax.Diagnostic {
+	t := d.Kind.Name
+	diag := syntax.Diagnostic{
+		Code: "mms/unknown-kind", Severity: syntax.SeverityError, Sp: d.Kind.Sp,
+		Message: "'" + t + "' is a value inside other files, not a file of its own; name one with `const <name>: " + t + " = ...`",
+	}
+	if d.Name != nil && len(d.Name.Parts) == 0 && len(d.More) == 0 && d.Params == nil && d.Type == nil && d.Value == nil && d.Body != nil && !d.Extern && !d.Primary {
+		sp := syntax.Span{Start: d.Kind.Sp.Start, End: d.Name.Sp.End}
+		diag.Fixes = []syntax.Fix{{
+			Title: "Write as a const",
+			Edits: []syntax.TextEdit{{Sp: sp, Text: "const " + d.Name.Text + ": " + t + " ="}},
+			Safe:  true,
+		}}
+	}
+	return diag
 }

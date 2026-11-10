@@ -198,3 +198,22 @@ func (ks *Kinds) ForFolder(folder string) (Kind, bool) {
 // name or target is chosen, and the jigsaw-unknown-name lint checks the names
 // structure files use against them.
 const JigsawHoleKind = "JigsawHole"
+
+// IsValueType reports whether name is a schema type with no resource
+// kind of its own, such as BiomeSource or ChunkGenerator: a value that a
+// const can name but that is never declared as a file.
+func (ks *Kinds) IsValueType(name string) bool {
+	if name == "" || name[0] < 'A' || name[0] > 'Z' {
+		return false
+	}
+	if _, ok := ks.byName[name]; ok {
+		return false
+	}
+	suffix := "::" + name
+	for path := range ks.pack.Types {
+		if strings.HasSuffix(path, suffix) {
+			return true
+		}
+	}
+	return false
+}
