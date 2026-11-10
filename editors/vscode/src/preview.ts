@@ -11,7 +11,8 @@ import { bookPageAt, itemPath, shows } from '@mms/preview/paths';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
-import type { OutputItem, OutputText, ToExtension, ToPanel } from './messages';
+import type { LanguageClient } from 'vscode-languageclient/node';
+import type { OutputItem, OutputText, SplineAt, ToExtension, ToPanel } from './messages';
 import { isSource, key, type PackOutput } from './output';
 import { configDir } from './world';
 
@@ -26,12 +27,35 @@ export class Previews implements vscode.Disposable, vscode.CodeLensProvider {
 	private readonly lenses = new vscode.EventEmitter<void>();
 	readonly onDidChangeCodeLenses = this.lenses.event;
 	private readonly subscriptions: vscode.Disposable[] = [];
+	/**
+	 * The last .mms editor and the spline at its cursor, for the spline
+	 * editor. The editor is kept while the panel has focus, so a drag there
+	 * still edits it.
+	 */
+	private editor: vscode.TextEditor | undefined;
+	private spline: SplineAt | null = null;
+	private splineTimer: ReturnType<typeof setTimeout> | undefined;
 
 	constructor(
 		private readonly context: vscode.ExtensionContext,
-		private readonly output: PackOutput
+		private readonly output: PackOutput,
+		private readonly client: () => LanguageClient | undefined = () => undefined
 	) {
+		this.editor = isMms(vscode.window.activeTextEditor) ? vscode.window.activeTextEditor : undefined;
 		this.subscriptions.push(
+			vscode.window.onDidChangeTextEditorSelection((e) => {
+				if (!isMms(e.textEditor)) return;
+				this.editor = e.textEditor;
+				this.scheduleSpline();
+			}),
+			vscode.window.onDidChangeActiveTextEditor((e) => {
+				if (e && isSource(e.document)) {
+					this.editor = isMms(e) ? e : undefined;
+					this.scheduleSpline();
+				}
+			}),
+			output.onDidChange(() => this.scheduleSpline()),
+			vscode.commands.registerCommand('mms.editSpline', (uri?: string, at?: { line: number; character: number }) => this.editSpline(uri, at)),
 			this.lenses,
 			vscode.languages.registerCodeLensProvider([{ language: 'mms' }, { language: 'mmsbook' }, { language: 'mmstext' }], this),
 			output.onDidChange(() => {
@@ -67,6 +91,49 @@ export class Previews implements vscode.Disposable, vscode.CodeLensProvider {
 		}
 		const panel = vscode.window.createWebviewPanel(viewType, 'MMS Preview', { viewColumn: vscode.ViewColumn.Beside, preserveFocus: true }, {});
 		this.adopt(panel);
+	}
+
+	private scheduleSpline() {
+		if (!this.panel) return;
+		clearTimeout(this.splineTimer);
+		this.splineTimer = setTimeout(() => void this.refreshSpline(), 60);
+	}
+
+	/** Asks the language server for the spline at the cursor and sends it to the panel. */
+	private async refreshSpline() {
+		const ed = this.editor;
+		const c = this.client();
+		let spline: SplineAt | null = null;
+		const version = ed?.document.version ?? -1;
+		if (ed && !ed.document.isClosed && c?.isRunning()) {
+			const pos = ed.selection.active;
+			try {
+				spline = await c.sendRequest<SplineAt | null>('mms/spline', {
+					textDocument: { uri: ed.document.uri.toString() },
+					position: { line: pos.line, character: pos.character }
+				});
+			} catch {
+				spline = null;
+			}
+		}
+		if (ed !== this.editor) return; // a newer request is on its way
+		// The document changed while the server answered: its ranges are
+		// out of date, and the change schedules a new request.
+		if (ed && ed.document.version !== version) return void this.scheduleSpline();
+		this.spline = spline;
+		this.post({ type: 'spline', uri: ed?.document.uri.toString() ?? null, version, spline });
+	}
+
+	/** Opens the panel's spline editor on the spline at a position, or at the cursor. */
+	private async editSpline(uri?: string, at?: { line: number; character: number }) {
+		if (uri && at) {
+			const doc = await vscode.workspace.openTextDocument(vscode.Uri.parse(uri));
+			const column = vscode.window.visibleTextEditors.find((e) => e.document === doc)?.viewColumn ?? vscode.ViewColumn.One;
+			const p = new vscode.Position(at.line, at.character);
+			this.editor = await vscode.window.showTextDocument(doc, { viewColumn: column, selection: new vscode.Range(p, p) });
+		}
+		this.show(this.target ?? undefined);
+		this.scheduleSpline();
 	}
 
 	private get files() {
@@ -165,6 +232,25 @@ export class Previews implements vscode.Disposable, vscode.CodeLensProvider {
 				);
 			});
 		}
+		// A spline opens the spline editor.
+		if (document.languageId === 'mms') {
+			const text = document.getText();
+			// Its own set: a Preview lens on the same line is another command.
+			const splineLines = new Set<number>();
+			for (const m of text.matchAll(/\bSpline\s*\(/g)) {
+				const pos = document.positionAt(m.index! + m[0].length);
+				if (splineLines.has(pos.line)) continue;
+				splineLines.add(pos.line);
+				lenses.push(
+					new vscode.CodeLens(new vscode.Range(pos.line, 0, pos.line, 0), {
+						title: '$(graph-line) Edit spline',
+						tooltip: 'Show this spline as a graph in the MMS preview, with points to drag',
+						command: 'mms.editSpline',
+						arguments: [document.uri.toString(), { line: pos.line, character: pos.character }]
+					})
+				);
+			}
+		}
 		for (const t of this.output.texts) {
 			if (key(vscode.Uri.parse(t.uri)) !== here || lines.has(t.range.start.line)) continue;
 			lines.add(t.range.start.line);
@@ -223,7 +309,20 @@ export class Previews implements vscode.Disposable, vscode.CodeLensProvider {
 		if (m.type === 'ready') {
 			this.post({ type: 'output', files: this.files, items: this.items, texts: this.output.texts, assets: this.output.assets, textures: this.textures(), structures: this.structures() });
 			this.setTarget(this.target, this.page);
+			this.scheduleSpline();
 			await this.output.refresh();
+		} else if (m.type === 'splineEdit') {
+			const uri = vscode.Uri.parse(m.uri);
+			// The edit's ranges are in the version of the spline the page
+			// showed; against any other version they would land on the
+			// wrong text, so drop it and show the spline as it is now.
+			const doc = vscode.workspace.textDocuments.find((d) => d.uri.toString() === uri.toString());
+			if (!doc || doc.version !== m.version) return void this.scheduleSpline();
+			const edit = new vscode.WorkspaceEdit();
+			for (const e of m.edits) {
+				edit.replace(uri, new vscode.Range(e.range.start.line, e.range.start.character, e.range.end.line, e.range.end.character), e.newText);
+			}
+			await vscode.workspace.applyEdit(edit);
 		} else if (m.type === 'clear') {
 			this.setTarget(null);
 		} else if (m.type === 'reveal') {
@@ -273,9 +372,14 @@ export class Previews implements vscode.Disposable, vscode.CodeLensProvider {
 	}
 
 	dispose() {
+		clearTimeout(this.splineTimer);
 		this.panel?.dispose();
 		for (const s of this.subscriptions) s.dispose();
 	}
+}
+
+function isMms(e: vscode.TextEditor | undefined): e is vscode.TextEditor {
+	return !!e && e.document.languageId === 'mms' && e.document.uri.scheme === 'file';
 }
 
 /** The panel's tab title: the declaration it shows. */

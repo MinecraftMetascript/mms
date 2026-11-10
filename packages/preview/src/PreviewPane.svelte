@@ -14,6 +14,8 @@
 	import { jigsawGraph } from './jigsaw/graph';
 	import { bookAt, itemPath, jigsawable, shows } from './paths';
 	import Preview from './preview/Preview.svelte';
+	import SplineView from './spline/SplineView.svelte';
+	import type { SplineAt, TextEdit } from './spline/spline';
 	import type { OutputAsset, OutputFile, OutputItem, OutputText } from './types';
 
 	interface Props {
@@ -43,8 +45,31 @@
 		textures?: Record<string, string>;
 		/** The pack's copied structure files as data: URLs, by their path in the pack, for the jigsaw simulation's blocks. */
 		structures?: Record<string, string>;
+		/** The density function spline at the cursor, which opens the spline editor. */
+		spline?: SplineAt | null;
+		/** Applies the spline editor's edits to the source. */
+		onsplineedit?: (edits: TextEdit[]) => void;
 	}
-	let { output, path, pinned, onunpin, createWorker, hint, unpinLabel = 'unpin it', items = [], texts = [], page = 0, assets = [], textures = {}, structures = {} }: Props = $props();
+	let {
+		output,
+		path,
+		pinned,
+		onunpin,
+		createWorker,
+		hint,
+		unpinLabel = 'unpin it',
+		items = [],
+		texts = [],
+		page = 0,
+		assets = [],
+		textures = {},
+		structures = {},
+		spline = null,
+		onsplineedit
+	}: Props = $props();
+	// With the cursor in a spline, the spline editor shows over the
+	// declaration's own preview, unless that tab is picked.
+	let splineTab = $state<'spline' | 'preview'>('spline');
 	// A jigsaw structure shows its connections or a simulated layout.
 	let jigsawTab = $state<'connections' | 'simulation'>('connections');
 	const itemInfo = $derived(itemContext(output, items, textures));
@@ -64,8 +89,23 @@
 			<button class="text-accent hover:underline" onclick={onunpin}>{unpinLabel}</button>.
 		</p>
 	{/if}
+	{#if spline}
+		<div class="flex gap-1 border-b border-line px-2 pt-1 text-xs" role="tablist" aria-label="Spline">
+			{#each [['spline', 'Spline'], ['preview', 'Declaration']] as [id, label] (id)}
+				<button
+					type="button"
+					role="tab"
+					aria-selected={splineTab === id}
+					class="-mb-px border-b-2 px-2 py-1 {splineTab === id ? 'border-accent font-medium' : 'border-transparent text-muted hover:text-ink'}"
+					onclick={() => (splineTab = id as typeof splineTab)}>{label}</button
+				>
+			{/each}
+		</div>
+	{/if}
 	<div class="min-h-0 flex-1">
-		{#if book}
+		{#if spline && splineTab === 'spline'}
+			<SplineView data={spline} onedit={onsplineedit} />
+		{:else if book}
 			<BookView stack={book.text} {output} {page} />
 		{:else if text}
 			<ChatView {text} {output} />

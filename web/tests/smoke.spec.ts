@@ -1465,3 +1465,48 @@ test('the World tab builds the pack into a world folder and imports its saved st
 	// crashes the test browser.)
 	expect(errors).toEqual([]);
 });
+
+test('the spline editor graphs the spline at the cursor and writes drags back to the source', async ({ page }) => {
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	await replaceText(
+		page,
+		'DensityFunction offset = Spline({\n  coordinate = overworld/continents\n  points = [\n    SplinePoint(-1, 0, 0),\n    SplinePoint(0, 0.5, {\n      coordinate = overworld/erosion\n      points = [SplinePoint(-1, 0, 0.5), SplinePoint(1, 0, -0.5)]\n    }),\n    SplinePoint(1, 0, 1),\n  ]\n})\n'
+	);
+	await expect(status(page)).toHaveText(/No problems|problem/, { timeout: 15_000 });
+	await clickLine(page, 'SplinePoint(1, 0, 1)');
+	const view = page.getByTestId('spline-view');
+	await expect(view).toBeVisible({ timeout: 15_000 });
+	await expect(view.getByTestId('spline-point')).toHaveCount(3);
+	// The nested spline's coordinate gets a slider.
+	await expect(view.getByText('overworld/erosion', { exact: true })).toBeVisible();
+
+	// Dragging the last point up rewrites its value; its location stays.
+	const last = view.getByTestId('spline-point').nth(2);
+	const box = (await last.boundingBox())!;
+	await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+	await page.mouse.down();
+	await page.mouse.move(box.x + box.width / 2 + 1, box.y + box.height / 2 - 40, { steps: 5 });
+	await page.mouse.up();
+	await expect(page.locator('.cm-line', { hasText: /SplinePoint\(1(\.\d+)?, 0, 1\.\d+\)/ })).toBeVisible({ timeout: 10_000 });
+
+	// The selected point's numbers can be typed, and it can be deleted.
+	await expect(view.getByTestId('spline-selected')).toContainText('Point 3');
+	await view.getByTestId('spline-selected').locator('input').nth(2).fill('0.25');
+	await view.getByTestId('spline-selected').locator('input').nth(2).press('Enter');
+	await expect(page.locator('.cm-line', { hasText: /SplinePoint\(1(\.\d+)?, 0\.25, / })).toBeVisible({ timeout: 10_000 });
+
+	// Double-clicking the graph adds a point in location order.
+	const svg = view.locator('svg');
+	const sb = (await svg.boundingBox())!;
+	await page.mouse.dblclick(sb.x + sb.width * 0.3, sb.y + sb.height / 2);
+	await expect(view.getByTestId('spline-point')).toHaveCount(4, { timeout: 10_000 });
+	await expect(page.locator('.cm-line', { hasText: 'SplinePoint(-0.' })).toHaveCount(1);
+
+	// The hollow point opens its nested spline.
+	await view.getByTestId('spline-point').nth(2).click();
+	await expect(view).toContainText('overworld/erosion (point 3)');
+	await expect(view.getByTestId('spline-point')).toHaveCount(2);
+	await view.getByRole('button', { name: 'overworld/continents' }).click();
+	await expect(view.getByTestId('spline-point')).toHaveCount(4);
+});

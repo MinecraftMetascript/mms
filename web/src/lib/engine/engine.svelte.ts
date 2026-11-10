@@ -5,7 +5,7 @@ import { ProjectWorkspace } from './workspace';
 import { sanitizeHTML } from './sanitize';
 import { showDiagnostics } from '../editor/diagnostics';
 import type { InlayHint } from '../editor/inlay';
-import type { OutputJigsaw } from '@mms/preview';
+import type { OutputJigsaw, SplineAt } from '@mms/preview';
 
 export interface Diagnostic {
 	range: { start: { line: number; character: number }; end: { line: number; character: number } };
@@ -382,6 +382,21 @@ export class Engine {
 		const method = uri.startsWith('mms-vanilla:') ? 'mms/vanillaFile' : 'mms/preludeFile';
 		try {
 			return (await this.client.request<object, { text: string }>(method, { uri })).text;
+		} catch {
+			return null;
+		}
+	}
+
+	/**
+	 * The density function spline at a position in the text the server
+	 * last saw, for the spline editor, or null. It does not sync first:
+	 * the cursor moves on every keystroke, and syncing that often cuts
+	 * into the editor's own syncing (a hover opened just then closes).
+	 */
+	async spline(uri: string, position: { line: number; character: number }): Promise<SplineAt | null> {
+		if (!this.client.connected) return null;
+		try {
+			return await this.client.request<object, SplineAt | null>('mms/spline', { textDocument: { uri }, position });
 		} catch {
 			return null;
 		}

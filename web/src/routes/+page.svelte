@@ -3,7 +3,7 @@
 	import { onMount, tick } from 'svelte';
 	import { asset, resolve } from '$app/paths';
 	import { LSPPlugin } from '@codemirror/lsp-client';
-	import { EditorSelection } from '@codemirror/state';
+	import { ChangeSet, EditorSelection, type Text } from '@codemirror/state';
 	import { EditorView } from '@codemirror/view';
 	import Editor from '#lib/editor/Editor.svelte';
 	import Sidebar from '#lib/components/Sidebar.svelte';
@@ -22,7 +22,7 @@
 	import { requestPersistence } from '#lib/project/store.ts';
 	import Dropdown from '#lib/components/Dropdown.svelte';
 	import { fixAllKeys, formatKeys, mod, quickFixKeys } from '#lib/editor/shortcuts.ts';
-	import { bookPageAt, PinButton, PreviewPane, shows } from '@mms/preview';
+	import { bookPageAt, PinButton, PreviewPane, shows, type SplineAt, type SplineEdit } from '@mms/preview';
 	import PreviewWorker from '@mms/preview/worker?worker';
 
 	const project = new Project();
@@ -124,6 +124,10 @@
 		cursor = { uri: uriOf(project.active), line: l.number - 1, character: head - l.from };
 	}
 	const cursorExt = EditorView.updateListener.of((u) => {
+		if (u.docChanged && splineSince && u.startState.doc === splineNow) {
+			splineSince = splineSince.compose(u.changes);
+			splineNow = u.state.doc;
+		}
 		if (u.selectionSet || u.docChanged) trackCursor(u.view);
 	});
 
@@ -218,6 +222,57 @@
 			live = false;
 		};
 	});
+	// The density function spline at the cursor opens the spline editor in
+	// the Preview tab; its edits go to the source through the editor, so
+	// they can be undone.
+	let spline = $state<SplineAt | null>(null);
+	// The text the shown spline's ranges are in, and the edits made to it
+	// since (splineNow is the text after them), so an edit made before the
+	// spline is read again still lands on the right numbers.
+	let splineDoc: Text | null = null;
+	let splineSince: ChangeSet | null = null;
+	let splineNow: Text | null = null;
+	$effect(() => {
+		const c = cursor;
+		void engine?.output; // a new analysis
+		if (rightTab !== 'preview' || pinned || !engine || !c) {
+			spline = null;
+			return;
+		}
+		let live = true;
+		// The server answers about the text it last saw, which the editor
+		// may have moved past; its changes since are kept to map the ranges.
+		const v = view;
+		const plugin = v && LSPPlugin.get(v);
+		if (!v || !plugin) return;
+		const doc = v.state.doc;
+		const synced = plugin.syncedDoc;
+		const since = plugin.unsyncedChanges;
+		// The cursor is in the editor's text; the server needs it in its own.
+		const head = since.invertedDesc.mapPos(v.state.selection.main.head);
+		const line = synced.lineAt(Math.min(head, synced.length));
+		void engine.spline(c.uri, { line: line.number - 1, character: head - line.from }).then((x) => {
+			if (!live || v.state.doc !== doc) return;
+			spline = x;
+			splineDoc = synced;
+			splineSince = since;
+			splineNow = doc;
+		});
+		return () => {
+			live = false;
+		};
+	});
+	function editSpline(edits: SplineEdit[]) {
+		const v = view;
+		const doc = splineDoc;
+		const since = splineSince;
+		if (!v || !doc || !since || v.state.doc !== splineNow) return;
+		const pos = (p: SplineEdit['range']['start']) => {
+			const line = doc.line(Math.min(p.line + 1, doc.lines));
+			return since.mapPos(Math.min(line.from + p.character, line.to));
+		};
+		v.dispatch({ changes: edits.map((e) => ({ from: pos(e.range.start), to: pos(e.range.end), insert: e.newText })), userEvent: 'input' });
+	}
 	const previewPath = $derived(pinned ?? selectedOutput);
 	const pinnable = $derived(shows(previewPath, engine?.outputItems, engine?.outputTexts));
 	function togglePin() {
@@ -544,6 +599,8 @@
 							{pinned}
 							onunpin={() => (pinned = null)}
 							createWorker={() => new PreviewWorker()}
+							{spline}
+							onsplineedit={editSpline}
 						/>
 					</div>
 					<div class="h-full" class:hidden={rightTab !== 'json'}>

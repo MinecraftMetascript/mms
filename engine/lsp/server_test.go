@@ -880,6 +880,37 @@ func TestExpand(t *testing.T) {
 	}
 }
 
+// TestSpline checks mms/spline: the spline at a position, with ranges on
+// the literal numbers and the edits that add and remove points.
+func TestSpline(t *testing.T) {
+	c := start(t)
+	c.result("initialize", map[string]any{})
+	c.notify("initialized", map[string]any{})
+	uri := "file:///a.mms"
+	src := "DensityFunction d = Spline({ coordinate = overworld/erosion, points = [SplinePoint(-1, 0, 0.5), SplinePoint(1, 0.25, 2)] })\n"
+	c.notify("textDocument/didOpen", map[string]any{"textDocument": map[string]any{"uri": uri, "languageId": "mms", "version": 1, "text": src}})
+	got, _ := c.result("mms/spline", pos(uri, 0, 80)).(map[string]any)
+	root, _ := got["root"].(map[string]any)
+	if root == nil || root["coordinate"] != "overworld/erosion" || root["editable"] != true {
+		t.Fatalf("spline = %v", got)
+	}
+	points, _ := root["points"].([]any)
+	if len(points) != 2 {
+		t.Fatalf("points = %v", points)
+	}
+	loc := points[0].(map[string]any)["location"].(map[string]any)
+	r := loc["range"].(map[string]any)
+	if loc["value"] != -1.0 || r["start"].(map[string]any)["character"] != 83.0 {
+		t.Errorf("location = %v", loc)
+	}
+	if ins, _ := root["inserts"].([]any); len(ins) != 3 {
+		t.Errorf("inserts = %v", root["inserts"])
+	}
+	if none := c.result("mms/spline", pos(uri, 0, 3)); none != nil {
+		t.Errorf("spline at the kind = %v", none)
+	}
+}
+
 // Go to definition on a prelude name opens the prelude file read-only:
 // an mms-prelude: URI whose text mms/preludeFile gives.
 func TestPreludeDefinition(t *testing.T) {
