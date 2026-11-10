@@ -44,17 +44,17 @@ Beyond declarations, the language has `const` values and `for` loops that run at
 ## Get it
 
 - **Web editor:** [minecraftmetascript.github.io/mms](https://minecraftmetascript.github.io/mms/) runs in the browser with nothing to install, and downloads the pack as a zip or builds it into a world folder.
-- **VS Code:** install **Minecraft Metascript** (`minecraftmetascript.mms`) from the VS Code Marketplace, or from Open VSX for Cursor, VSCodium and other editors. It includes `mms`, so there is nothing else to install. See [its README](editors/vscode/README.md) for what it does.
+- **VS Code:** install **Minecraft Metascript** (`minecraftmetascript.mms`) from the VS Code Marketplace, or from Open VSX for Cursor, VSCodium and other editors. It includes `mms` for its own use, so the editor needs nothing else; to run the commands below in a terminal, install the command line too. See [its README](editors/vscode/README.md) for what it does.
 - **Command line:** download `mms` for Linux, macOS or Windows from the [releases page](https://github.com/MinecraftMetascript/mms/releases), or run `go install github.com/minecraftmetascript/mms/engine/cmd/mms@latest`.
 
 ```sh
 mms init -namespace gems gems   # mms.json and a starter file
 mms build gems                  # check, then write the data pack to gems/build
 mms build -world ~/.minecraft/saves/MyWorld gems   # or install it into a world
-mms check                       # report problems without writing anything
-mms test                        # run the project's Test declarations
-mms fix                         # apply every safe lint fix
-mms fmt                         # format every .mms file
+mms check gems                  # report problems without writing anything
+mms test gems                   # run the project's Test declarations
+mms fix gems                    # apply every safe lint fix
+mms fmt gems                    # format every .mms file in gems
 mms import pack.zip proj        # turn an existing data pack (folder or zip) into MMS
 mms lsp                         # language server over stdio, for other editors
 mms reference                   # every kind, helper and prelude declaration, as JSON
