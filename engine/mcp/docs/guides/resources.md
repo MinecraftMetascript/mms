@@ -145,6 +145,8 @@ JigsawHole hall_exit
 
 This declares `<namespace>:hall_exit`. The editors list the declared holes where a jigsaw block's name or target is chosen: the **Jigsaw** view in VS Code, and the **Jigsaw** tab in the web editor, which copy a `/give` command for a set-up jigsaw block, keep the ones you copied under **Recent**, list the jigsaw blocks already in the project's structure files, and offer **Declare it** for a name no `JigsawHole` declares. Once a namespace declares a hole, the `jigsaw-unknown-name` lint reports a jigsaw block in a structure file whose name or target in that namespace is not declared, with the closest declared hole and a fix that declares it. The [`jigsaw`](../../examples/jigsaw/) example declares its holes. The jigsaw preview's piece details also copy a `/give` for each jigsaw block of a piece, for another block set up the same way.
 
+To have several people or AI agents build pieces at once, write down the names, sizes and materials first: [Building jigsaw pieces](jigsaw-pieces.md) is a template for that spec.
+
 A template's chests can get a loot table from a `Rule` processor with `block_entity_modifier = AppendLoot(chests/buried)`. That works on vanilla templates too, so a structure can reuse one without its own `.nbt` file. The [`treasure`](../../examples/treasure/) example does this in `worldgen.mms`.
 
 ## Density functions

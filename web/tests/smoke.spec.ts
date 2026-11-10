@@ -583,10 +583,29 @@ test('the docs render guides and the reference', async ({ page }) => {
 	expect(llmsRes.status()).toBe(200);
 	const llms = await llmsRes.text();
 	expect(llms).toMatch(/^# MMS\n\n> /);
-	expect(llms).toContain('/docs/guides/functions');
+	expect(llms).toContain('/docs/guides/functions.md)');
 	const fullRes = await page.request.get('./llms-full.txt');
 	expect(fullRes.status()).toBe(200);
-	expect(await fullRes.text()).toContain('# Reference: helpers');
+	const full = await fullRes.text();
+	expect(full).toContain('# Helpers');
+	expect(full).toContain('## SetCount');
+	// Every page llms.txt links to is Markdown at that URL.
+	const site = 'https://minecraftmetascript.github.io/mms/';
+	const links = [...llms.matchAll(/\]\((https:[^)]+)\)/g)].map((m) => m[1]).filter((u) => u.endsWith('.md'));
+	expect(links.length).toBeGreaterThan(15);
+	for (const link of links) {
+		const res = await page.request.get('./' + link.slice(site.length));
+		expect(res.status(), link).toBe(200);
+		expect(await res.text(), link).toMatch(/^# /);
+	}
+	const jigsaw = await (await page.request.get('./docs/reference/kinds/JigsawStructure.md')).text();
+	expect(jigsaw).toContain('## Fields');
+	expect(jigsaw).not.toContain('<html');
+	// Links between pages point at the other pages' Markdown.
+	const guide = await (await page.request.get('./docs/guides/functions.md')).text();
+	expect(guide).toContain(`](${site}docs/guides/resources.md#text-markup)`);
+	// Each page links to its Markdown version.
+	await expect(page.locator('link[rel="alternate"][type="text/markdown"]')).toHaveAttribute('href', /\/docs\/reference\/helpers\/loot_function\.md$/);
 	// The footer links to them there.
 	await expect(page.getByRole('link', { name: 'llms.txt', exact: true })).toHaveAttribute('href', /\/llms\.txt$/);
 	const yaml = await (await page.request.get('./docs/reference.yaml')).text();
