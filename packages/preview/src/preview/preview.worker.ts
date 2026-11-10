@@ -149,6 +149,21 @@ function current(req: RenderRequest) {
 	if (req.seq !== latest) throw new Superseded();
 }
 
+/**
+ * Lets a long sampling loop give way: every 40 ms or so it yields, so a
+ * newer request (an edit, a pan) supersedes it instead of waiting for it
+ * to finish, and the viewer's pings are answered. Call it once per sample.
+ */
+function pacer(req: RenderRequest) {
+	let started = performance.now();
+	return async () => {
+		if (performance.now() - started < 40) return;
+		await breathe();
+		current(req);
+		started = performance.now();
+	};
+}
+
 // ---- Dimensions -------------------------------------------------------
 
 interface Dimension {
@@ -624,21 +639,30 @@ function finish(helper: (typeof helpers)[number], reply: HelperReply) {
 	helper.job = null;
 	if (job && job.id === reply.job) {
 		if (jobs.get(`${job.cx},${job.cz}`) === job) jobs.delete(`${job.cx},${job.cz}`);
-		if ('error' in reply) {
-			job.reject(new Error(reply.error));
-		} else if (job.key !== isoKey) {
-			job.reject(new Superseded());
-		} else {
-			// The helper's palette differs from this one's.
-			const map = Uint16Array.from(reply.ids, indexOf);
-			const data = reply.data;
-			for (let i = 0; i < data.length; i++) data[i] = map[data[i]];
-			const c = keep(`${job.cx},${job.cz}`, isoChunkOf(data, data.length / 256));
-			job.resolve(c);
-			if (job.prefetch) refreshSoon();
+		try {
+			settle(job, reply);
+		} catch (err) {
+			// A job left unsettled would leave its render waiting forever.
+			job.reject(err);
 		}
 	}
 	dispatch();
+}
+
+function settle(job: Job, reply: HelperReply) {
+	if ('error' in reply) {
+		job.reject(new Error(reply.error));
+	} else if (job.key !== isoKey) {
+		job.reject(new Superseded());
+	} else {
+		// The helper's palette differs from this one's.
+		const map = Uint16Array.from(reply.ids, indexOf);
+		const data = reply.data;
+		for (let i = 0; i < data.length; i++) data[i] = map[data[i]];
+		const c = keep(`${job.cx},${job.cz}`, isoChunkOf(data, data.length / 256));
+		job.resolve(c);
+		if (job.prefetch) refreshSoon();
+	}
 }
 
 function keep(at: string, c: IsoChunk): IsoChunk {
@@ -1307,7 +1331,7 @@ async function terrainOf(req: RenderRequest): Promise<{ terrain: Terrain; key: s
 	return { terrain, key };
 }
 
-async function render(req: RenderRequest): Promise<PreviewResponse> {
+async function render(req: RenderRequest): Promise<Rendered> {
 	const { width, height, view } = req;
 	const seed = seedOf(req.seed);
 	const id = Identifier.parse(req.id);
@@ -1353,8 +1377,10 @@ async function render(req: RenderRequest): Promise<PreviewResponse> {
 			const rs = new RandomState(NoiseGeneratorSettings.create({}), seed);
 			return rs.getOrCreateNoise(id);
 		});
+		const pace = pacer(req);
 		for (let py = 0; py < height; py++) {
 			for (let px = 0; px < width; px++) {
+				await pace();
 				const v = noise.get3D(plane.x(px, py), view.y, plane.z(px, py));
 				values[py * width + px] = v;
 				track(v);
@@ -1372,9 +1398,11 @@ async function render(req: RenderRequest): Promise<PreviewResponse> {
 			const df = new DensityFunction.HolderHolder(Holder.reference(WorldgenRegistries.DENSITY_FUNCTION, id));
 			return df.mapAll(rs.createVisitor(false));
 		});
+		const pace = pacer(req);
 		for (let py = 0; py < height; py++) {
 			const y = view.down ? view.y : plane.y(py);
 			for (let px = 0; px < width; px++) {
+				await pace();
 				const [x, z] = view.down ? [plane.x(px, py), plane.z(px, py)] : plane.at(plane.along(px));
 				const v = fn.compute(DensityFunction.context(x, y, z));
 				values[py * width + px] = v;
@@ -1395,12 +1423,14 @@ async function render(req: RenderRequest): Promise<PreviewResponse> {
 	const sea = settings.seaLevel;
 	// A side view, or top-down at the camera's y.
 	const yAt = (py: number) => (view.down ? view.y : plane.y(py));
+	const pace = pacer(req);
 	for (let py = 0; py < height; py++) {
 		const y = yAt(py);
 		for (let px = 0; px < width; px++) {
 			const i = py * width + px;
 			let v = NaN;
 			if (y >= minY && y < maxY) {
+				await pace();
 				const [x, z] = view.down ? [plane.x(px, py), plane.z(px, py)] : plane.at(plane.along(px));
 				v = router.finalDensity.compute(DensityFunction.context(x, y, z));
 				track(v);
@@ -1457,6 +1487,10 @@ function setup(files: PreviewFile[]) {
 let latest = 0;
 self.onmessage = async (e: MessageEvent<PreviewRequest>) => {
 	const req = e.data;
+	if (req.type === 'ping') {
+		(self as unknown as Worker).postMessage({ type: 'pong' } satisfies PreviewResponse);
+		return;
+	}
 	if (req.type === 'setup') {
 		setup(req.files);
 		return;
@@ -1471,10 +1505,13 @@ self.onmessage = async (e: MessageEvent<PreviewRequest>) => {
 		return;
 	}
 	latest = req.seq;
+	// Said before any work, so a viewer that finds this worker stuck knows
+	// which render it got to: newer ones never started.
+	(self as unknown as Worker).postMessage({ type: 'started', seq: req.seq } satisfies PreviewResponse);
 	try {
 		const res = await render(req);
 		if (res.seq !== latest) return; // superseded while fetching
-		if (res.type === 'rendered') post(res);
+		post(res);
 	} catch (err) {
 		if (err instanceof Superseded || req.seq !== latest) return;
 		(self as unknown as Worker).postMessage({ type: 'error', seq: req.seq, message: String(err instanceof Error ? err.message : err) } satisfies PreviewResponse);
