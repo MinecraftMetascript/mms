@@ -231,3 +231,17 @@ func TestSpreadReducedOnce(t *testing.T) {
 		t.Errorf("recorded %d calls of base, want 2 (one per use)", len(r.Calls))
 	}
 }
+
+// An instance whose const is read before it is written still takes its
+// place in Instances.
+func TestInstanceConstOrder(t *testing.T) {
+	units, _ := readCase(t, "testdata/30-instance-const.txt")
+	r := Run(units, Options{Namespace: "demo"})
+	var names []string
+	for _, in := range r.Instances {
+		names = append(names, in.Name.Text)
+	}
+	if got := strings.Join(names, " "); got != "loop alpha beta" {
+		t.Errorf("instances = %s, want loop alpha beta", got)
+	}
+}
