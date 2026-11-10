@@ -21,11 +21,11 @@ line	Binary>Member>Ident	16	16
 line	Binary>Member>Name	11	13
 line	Block>AsStmt>TypeName	1	1
 line	Block>AssignStmt>Ident	17	17
-line	Block>Decl>Ident	1	2
+line	Block>Decl>Ident	2	3
 line	Block>ExprStmt>Ident	2	2
-line	Block>FieldDecl>TypeName	24	24
+line	Block>FieldDecl>TypeName	25	25
 line	Block>FieldStmt>Ident	83	84
-line	Block>FieldStmt>Name	362	374
+line	Block>FieldStmt>Name	374	386
 line	Block>FieldStmt>ResLoc	7	7
 line	Block>FieldStmt>Tag	4	4
 line	Block>IfStmt>Block	0	1
@@ -60,7 +60,7 @@ line	FieldStmt>List>Ident	4	4
 line	FieldStmt>List>Tag	1	5
 line	FieldStmt>Unary>Ident	3	3
 line	File	0	1
-line	File>ConstStmt>TypeName	2	2
+line	File>ConstStmt>TypeName	3	3
 line	File>Decl>Block	2	4
 line	File>Decl>Ident	171	173
 line	File>Decl>List	0	2
@@ -77,6 +77,8 @@ line	LetStmt>Index>Ident	6	6
 line	List>Call>Arg	1	1
 line	List>Call>Ident	59	59
 line	List>List>Ident	14	14
+line	List>Member>Ident	0	1
+line	List>Member>Name	1	1
 line	Member>Call>Ident	12	12
 line	Member>Member>Name	1	1
 line	ParamList>Param>TypeName	25	25
@@ -92,7 +94,7 @@ line	TypeList>TypeName>TypeName	1	1
 line	TypeRecord>FieldDecl>TypeName	1	1
 line	TypeUnion>TypeMap>TypeName	1	1
 line	Unary>Call>Ident	6	6
-line	all	1537	1655
+line	all	1553	1672
 word	Arg>Binary>Ident	5	5
 word	Arg>Call>Ident	38	38
 word	Arg>List>Ident	16	18
@@ -115,11 +117,11 @@ word	Binary>Member>Ident	16	16
 word	Binary>Member>Name	13	13
 word	Block>AsStmt>TypeName	1	1
 word	Block>AssignStmt>Ident	17	17
-word	Block>Decl>Ident	1	2
+word	Block>Decl>Ident	2	3
 word	Block>ExprStmt>Ident	2	2
-word	Block>FieldDecl>TypeName	24	24
+word	Block>FieldDecl>TypeName	25	25
 word	Block>FieldStmt>Ident	83	84
-word	Block>FieldStmt>Name	365	374
+word	Block>FieldStmt>Name	377	386
 word	Block>FieldStmt>ResLoc	7	7
 word	Block>FieldStmt>Tag	4	4
 word	Block>IfStmt>Block	0	1
@@ -154,7 +156,7 @@ word	FieldStmt>List>Ident	4	4
 word	FieldStmt>List>Tag	5	5
 word	FieldStmt>Unary>Ident	3	3
 word	File	0	1
-word	File>ConstStmt>TypeName	2	2
+word	File>ConstStmt>TypeName	3	3
 word	File>Decl>Block	2	4
 word	File>Decl>Ident	171	173
 word	File>Decl>List	0	2
@@ -171,6 +173,8 @@ word	LetStmt>Index>Ident	6	6
 word	List>Call>Arg	1	1
 word	List>Call>Ident	59	59
 word	List>List>Ident	14	14
+word	List>Member>Ident	0	1
+word	List>Member>Name	1	1
 word	Member>Call>Ident	12	12
 word	Member>Member>Name	1	1
 word	ParamList>Param>TypeName	25	25
@@ -186,4 +190,4 @@ word	TypeList>TypeName>TypeName	1	1
 word	TypeRecord>FieldDecl>TypeName	1	1
 word	TypeUnion>TypeMap>TypeName	1	1
 word	Unary>Call>Ident	6	6
-word	all	1555	1655
+word	all	1571	1672
