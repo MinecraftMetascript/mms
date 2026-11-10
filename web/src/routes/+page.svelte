@@ -240,14 +240,23 @@
 			return;
 		}
 		let live = true;
-		// The ranges are in the text as it is now; an answer to an older
-		// text is dropped, since the edit asks again.
-		const doc = view?.state.doc;
-		void engine.spline(c.uri, { line: c.line, character: c.character }).then((x) => {
-			if (!live || !doc || view?.state.doc !== doc) return;
+		// The server answers about the text it last saw, which the editor
+		// may have moved past; its changes since are kept to map the ranges.
+		const v = view;
+		const plugin = v && LSPPlugin.get(v);
+		if (!v || !plugin) return;
+		const doc = v.state.doc;
+		const synced = plugin.syncedDoc;
+		const since = plugin.unsyncedChanges;
+		// The cursor is in the editor's text; the server needs it in its own.
+		const head = since.invertedDesc.mapPos(v.state.selection.main.head);
+		const line = synced.lineAt(Math.min(head, synced.length));
+		void engine.spline(c.uri, { line: line.number - 1, character: head - line.from }).then((x) => {
+			if (!live || v.state.doc !== doc) return;
 			spline = x;
-			splineDoc = splineNow = doc;
-			splineSince = ChangeSet.empty(doc.length);
+			splineDoc = synced;
+			splineSince = since;
+			splineNow = doc;
 		});
 		return () => {
 			live = false;

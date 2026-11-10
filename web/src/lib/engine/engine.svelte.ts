@@ -387,10 +387,14 @@ export class Engine {
 		}
 	}
 
-	/** The density function spline at a position, for the spline editor, or null. */
+	/**
+	 * The density function spline at a position in the text the server
+	 * last saw, for the spline editor, or null. It does not sync first:
+	 * the cursor moves on every keystroke, and syncing that often cuts
+	 * into the editor's own syncing (a hover opened just then closes).
+	 */
 	async spline(uri: string, position: { line: number; character: number }): Promise<SplineAt | null> {
 		if (!this.client.connected) return null;
-		this.client.sync();
 		try {
 			return await this.client.request<object, SplineAt | null>('mms/spline', { textDocument: { uri }, position });
 		} catch {
