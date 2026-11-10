@@ -148,3 +148,35 @@ func TestRelatedLineAfterEdit(t *testing.T) {
 		t.Errorf("echoes = %d: %+v", echoes, r.Diagnostics("b.mms"))
 	}
 }
+
+// TestUnusedInstanceNotEchoed checks that an unused Blueprint instance
+// is reported at the instance, by the kind the user wrote, and not
+// echoed over the whole Blueprint, whose body no single line of wrote it.
+func TestUnusedInstanceNotEchoed(t *testing.T) {
+	src := `Tier upper {
+  tier = 1
+}
+Blueprint Tier {
+  tier: int
+  emit {
+    primary DensityFunction ${self.path} = Constant(tier)
+  }
+}
+`
+	p := New(spec.MustDefault(), Config{Namespace: "demo"})
+	p.SetFile("a.mms", src)
+	r, _ := p.Analyze(context.Background())
+	var unused []syntax.Diagnostic
+	for _, d := range r.Diagnostics("a.mms") {
+		if d.Code == "lint/unused" {
+			unused = append(unused, d)
+		}
+	}
+	if len(unused) != 1 {
+		t.Fatalf("unused = %+v", unused)
+	}
+	d := unused[0]
+	if d.Echo || string([]rune(src)[d.Sp.Start:d.Sp.End]) != "upper" || d.Message != "Tier 'demo:upper' is never used" {
+		t.Errorf("unused = %+v", d)
+	}
+}

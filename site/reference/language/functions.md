@@ -83,7 +83,7 @@ Function report {
 }
 ```
 
-Parameters are `int`, `bool` or `string`, and a function returns `int` or `bool`. A `Type` that is one of these, such as `Type Count = int` or a union of strings like `Type Mode = "easy" | "hard"`, works in their place, and in `let` and `Global` too. A function with a return type must return on every path.
+Parameters are `int`, `bool` or `string`, and a function returns `int` or `bool`. A `Type` that is one of these, such as `Type Count = int` a union of strings like `Type Mode = "easy" | "hard"`, or a union of whole numbers like `Type Tier = 1 | 2 | 3`, works in their place, and in `let` and `Global` too. A `let` can also write the union in place, as in `let tier: 1 | 2 | 3`; setting it to a literal outside the union is an error, and without a value it starts at the first one. A function with a return type must return on every path.
 
 ## Interpolation
 

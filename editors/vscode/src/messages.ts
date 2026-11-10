@@ -61,6 +61,9 @@ export interface OutputText {
 	range: Range;
 }
 
+import type { SplineAt, TextEdit as SplineEdit } from '@mms/preview/spline';
+export type { SplineAt, SplineEdit };
+
 export type ToPanel =
 	/** The generated pack and custom items, refreshed after each analysis. */
 	| {
@@ -78,7 +81,9 @@ export type ToPanel =
 	 * The output path to show, chosen with a Preview CodeLens or the
 	 * open-preview command; for a book, item:<id> and the page to open.
 	 */
-	| { type: 'target'; path: string | null; page?: number };
+	| { type: 'target'; path: string | null; page?: number }
+	/** The density function spline at the cursor (`mms/spline`), or null, for the spline editor. */
+	| { type: 'spline'; uri: string | null; version: number; spline: SplineAt | null };
 
 export type ToExtension =
 	/** The page has loaded and wants the current state. */
@@ -86,7 +91,9 @@ export type ToExtension =
 	/** Show nothing (the shown declaration left the pack and the user cleared it). */
 	| { type: 'clear' }
 	/** Go to a declaration's source. */
-	| { type: 'reveal'; uri: string; range: Range };
+	| { type: 'reveal'; uri: string; range: Range }
+	/** Apply the spline editor's edits to a source file, at the version of the spline they were made on. */
+	| { type: 'splineEdit'; uri: string; version: number; edits: SplineEdit[] };
 
 // The World and Structures views' page (webview/World.svelte, drawing the
 // shared WorldTool). The extension owns the state and sends all of it after

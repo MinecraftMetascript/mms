@@ -68,7 +68,7 @@ Function next_wave {
 }
 ```
 
-A field that holds a record, written in place or as another `Type`, is reached by its path, such as `game.spawn.x`. A field can also hold one of a few strings, such as `mode: "siege" | "raid"`. Functions read it as a string, and setting it to any other string literal is an error. The load function sets each missing field to its default. A field without one starts at `0`, `false`, `""`, or the first of its strings. A `/reload` keeps the values, and a field added later starts at its default. The record is at `<namespace>:mms <name>`, so `/data get storage siege:mms game` shows it in the game. Fields of other types, such as `queue`, are stored and given their defaults, but functions do not read them yet. Completion after `game.` lists the fields, and hovering one shows its type and doc comment.
+A field that holds a record, written in place or as another `Type`, is reached by its path, such as `game.spawn.x`. A field can also hold one of a few strings, such as `mode: "siege" | "raid"`, or one of a few whole numbers, such as `tier: 1 | 2 | 3`. Functions read it as a string or an int, and setting it to any other literal is an error. The load function sets each missing field to its default. A field without one starts at `0`, `false`, `""`, or the first of its strings or numbers. A `/reload` keeps the values, and a field added later starts at its default. The record is at `<namespace>:mms <name>`, so `/data get storage siege:mms game` shows it in the game. Fields of other types, such as `queue`, are stored and given their defaults, but functions do not read them yet. Completion after `game.` lists the fields, and hovering one shows its type and doc comment.
 
 A field costs a storage read and write each time a function uses it. A `Global` is a score, so it is cheaper in a tight loop.
 
@@ -217,6 +217,28 @@ Storage tool: ToolState
 Function next_mode {
   tool.mode = (tool.mode + 1) % len(modes)
   actionbar(@s, "Mode: ${modes[tool.mode]}")
+}
+```
+
+`index_of(list, value)` goes the other way: the position of the first item equal to `value`, counting from 0. A value known when compiling, such as `index_of(modes, "Replace")`, becomes its number, and it must be in the list. A value known only as the function runs is tested against each item, and gives `-1` when none matches:
+
+```mms
+const modes: [string] = ["Measure", "Replace"]
+
+Type ToolState {
+  mode: int
+  picked: string = "Measure"
+}
+
+Storage tool: ToolState
+
+Function pick_mode {
+  let i = index_of(modes, tool.picked)
+  if (i == -1) {
+    actionbar(@s, "No mode named ${tool.picked}")
+    return
+  }
+  tool.mode = i
 }
 ```
 

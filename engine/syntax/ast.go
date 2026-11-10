@@ -526,6 +526,12 @@ type (
 		Raw   string
 		Sp    Span
 	}
+	// TypeNumber is a whole number in a type, as in `0 | 1 | 2`. Text
+	// is the number as written, with its sign.
+	TypeNumber struct {
+		Text string
+		Sp   Span
+	}
 	TypeParen struct {
 		X  TypeExpr
 		Sp Span
@@ -540,6 +546,7 @@ func (t *TypeUnion) Span() Span    { return t.Sp }
 func (t *TypeRecord) Span() Span   { return t.Sp }
 func (t *TypeString) Span() Span   { return t.Sp }
 func (t *TypeParen) Span() Span    { return t.Sp }
+func (t *TypeNumber) Span() Span   { return t.Sp }
 func (*TypeName) typeExpr()        {}
 func (*TypeOptional) typeExpr()    {}
 func (*TypeList) typeExpr()        {}
@@ -548,6 +555,7 @@ func (*TypeUnion) typeExpr()       {}
 func (*TypeRecord) typeExpr()      {}
 func (*TypeString) typeExpr()      {}
 func (*TypeParen) typeExpr()       {}
+func (*TypeNumber) typeExpr()      {}
 
 // TypeText renders a type in canonical form, or "" for nil.
 func TypeText(t TypeExpr) string {
@@ -587,6 +595,8 @@ func TypeText(t TypeExpr) string {
 		return strings.Join(arms, " | ")
 	case *TypeString:
 		return t.Raw
+	case *TypeNumber:
+		return t.Text
 	case *TypeParen:
 		return "(" + TypeText(t.X) + ")"
 	}

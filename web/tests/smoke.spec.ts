@@ -278,6 +278,62 @@ test('dimensions, noise settings and surface rules preview as terrain', async ({
 	expect(errors).toEqual([]);
 });
 
+// A density function that adds the one before it to itself, n deep: each
+// sample computes the gradient at the bottom 2^n times, so a deep chain is
+// slow to preview, and a very deep one never finishes.
+function doubling(n: number): string {
+	const lines = ['DensityFunction a0 = Gradient(axis = y, from_coordinate = 0, to_coordinate = 128, from_value = 1, to_value = -1)'];
+	for (let i = 1; i <= n; i++) lines.push(`DensityFunction a${i} = a${i - 1} + a${i - 1}`);
+	return lines.reverse().join('\n') + '\n';
+}
+
+test('a slow preview gives way to the next edit', async ({ page }) => {
+	const errors: string[] = [];
+	page.on('pageerror', (e) => errors.push(e.message));
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	const failed = page.getByText(/Preview failed/);
+
+	// Minutes of sampling: it says it is rendering, and keeps answering.
+	await replaceText(page, doubling(16));
+	await page.locator('.cm-line').first().click();
+	await expect(page.getByText('my_pack:a16', { exact: true })).toBeVisible();
+	await expect(page.getByText('Rendering…')).toBeVisible({ timeout: 10_000 });
+	await page.waitForTimeout(8000);
+	await expect(failed).toBeHidden();
+
+	// An edit doesn't wait for it to finish.
+	await replaceText(page, doubling(4));
+	await page.locator('.cm-line').first().click();
+	await expect(page.getByText('my_pack:a4', { exact: true })).toBeVisible();
+	await expect(page.getByText('in view -16.000 … 16.000')).toBeVisible({ timeout: 20_000 });
+	await expect(failed).toBeHidden();
+	expect(errors).toEqual([]);
+});
+
+test('a preview that never finishes is stopped, and the next edit renders', async ({ page }) => {
+	const errors: string[] = [];
+	page.on('pageerror', (e) => errors.push(e.message));
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	await replaceText(page, doubling(3));
+	await page.locator('.cm-line').first().click();
+	await expect(page.getByText('in view -8.000 … 8.000')).toBeVisible({ timeout: 20_000 });
+
+	// A single sample takes hours, so the worker can't even yield: it is replaced, and the preview says why.
+	await replaceText(page, doubling(40));
+	await page.locator('.cm-line').first().click();
+	await expect(page.getByText('my_pack:a40', { exact: true })).toBeVisible();
+	await expect(page.getByText(/Preview failed: It stopped responding/)).toBeVisible({ timeout: 30_000 });
+
+	// Fixing it renders again.
+	await replaceText(page, doubling(4));
+	await page.locator('.cm-line').first().click();
+	await expect(page.getByText('in view -16.000 … 16.000')).toBeVisible({ timeout: 20_000 });
+	await expect(page.getByText(/Preview failed/)).toBeHidden();
+	expect(errors).toEqual([]);
+});
+
 test('an inline noise where an id is needed previews', async ({ page }) => {
 	const errors: string[] = [];
 	page.on('pageerror', (e) => errors.push(e.message));
@@ -1464,4 +1520,49 @@ test('the World tab builds the pack into a world folder and imports its saved st
 	// here: reading a private file system handle back out of IndexedDB
 	// crashes the test browser.)
 	expect(errors).toEqual([]);
+});
+
+test('the spline editor graphs the spline at the cursor and writes drags back to the source', async ({ page }) => {
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	await replaceText(
+		page,
+		'DensityFunction offset = Spline({\n  coordinate = overworld/continents\n  points = [\n    SplinePoint(-1, 0, 0),\n    SplinePoint(0, 0.5, {\n      coordinate = overworld/erosion\n      points = [SplinePoint(-1, 0, 0.5), SplinePoint(1, 0, -0.5)]\n    }),\n    SplinePoint(1, 0, 1),\n  ]\n})\n'
+	);
+	await expect(status(page)).toHaveText(/No problems|problem/, { timeout: 15_000 });
+	await clickLine(page, 'SplinePoint(1, 0, 1)');
+	const view = page.getByTestId('spline-view');
+	await expect(view).toBeVisible({ timeout: 15_000 });
+	await expect(view.getByTestId('spline-point')).toHaveCount(3);
+	// The nested spline's coordinate gets a slider.
+	await expect(view.getByText('overworld/erosion', { exact: true })).toBeVisible();
+
+	// Dragging the last point up rewrites its value; its location stays.
+	const last = view.getByTestId('spline-point').nth(2);
+	const box = (await last.boundingBox())!;
+	await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+	await page.mouse.down();
+	await page.mouse.move(box.x + box.width / 2 + 1, box.y + box.height / 2 - 40, { steps: 5 });
+	await page.mouse.up();
+	await expect(page.locator('.cm-line', { hasText: /SplinePoint\(1(\.\d+)?, 0, 1\.\d+\)/ })).toBeVisible({ timeout: 10_000 });
+
+	// The selected point's numbers can be typed, and it can be deleted.
+	await expect(view.getByTestId('spline-selected')).toContainText('Point 3');
+	await view.getByTestId('spline-selected').locator('input').nth(2).fill('0.25');
+	await view.getByTestId('spline-selected').locator('input').nth(2).press('Enter');
+	await expect(page.locator('.cm-line', { hasText: /SplinePoint\(1(\.\d+)?, 0\.25, / })).toBeVisible({ timeout: 10_000 });
+
+	// Double-clicking the graph adds a point in location order.
+	const svg = view.locator('svg');
+	const sb = (await svg.boundingBox())!;
+	await page.mouse.dblclick(sb.x + sb.width * 0.3, sb.y + sb.height / 2);
+	await expect(view.getByTestId('spline-point')).toHaveCount(4, { timeout: 10_000 });
+	await expect(page.locator('.cm-line', { hasText: 'SplinePoint(-0.' })).toHaveCount(1);
+
+	// The hollow point opens its nested spline.
+	await view.getByTestId('spline-point').nth(2).click();
+	await expect(view).toContainText('overworld/erosion (point 3)');
+	await expect(view.getByTestId('spline-point')).toHaveCount(2);
+	await view.getByRole('button', { name: 'overworld/continents' }).click();
+	await expect(view.getByTestId('spline-point')).toHaveCount(4);
 });

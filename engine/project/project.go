@@ -301,6 +301,7 @@ func (r *Result) diagnose() {
 		msg  string
 	}
 	at := map[key]int{}
+	whole := r.wholeDefs()
 	for _, u := range r.Units {
 		ds := r.fileDiagnostics(u.Path)
 		r.own[u.Path] = ds
@@ -311,6 +312,13 @@ func (r *Result) diagnose() {
 			for _, rel := range d.Related {
 				if r.Unit(rel.Path) == nil || (rel.Path == u.Path && rel.Sp == d.Sp) {
 					continue // the prelude, say, which nobody edits
+				}
+				if whole[eval.Origin{Path: rel.Path, Sp: rel.Sp}] {
+					// No line of the body wrote it, only the Blueprint
+					// or Template as a whole, such as an unused
+					// instance: shown over the whole body, it reads as
+					// the Blueprint's own problem.
+					continue
 				}
 				back := syntax.Related{Path: u.Path, Sp: d.Sp, Message: usedAt(u, d.Sp)}
 				k := key{rel.Path, rel.Sp, d.Code, d.Message}
@@ -329,6 +337,22 @@ func (r *Result) diagnose() {
 			}
 		}
 	}
+}
+
+// wholeDefs are the spans of the Blueprints and Templates, which a
+// problem points at when no single line of the body wrote it.
+func (r *Result) wholeDefs() map[eval.Origin]bool {
+	out := map[eval.Origin]bool{}
+	if r.Eval == nil {
+		return out
+	}
+	for _, b := range r.Eval.Blueprints {
+		out[eval.Origin{Path: b.Path, Sp: b.D.Sp}] = true
+	}
+	for _, t := range r.Eval.Templates {
+		out[eval.Origin{Path: t.Path, Sp: t.D.Sp}] = true
+	}
+	return out
 }
 
 // maxEchoUses is how many uses an echoed problem points back at.
@@ -462,6 +486,11 @@ func (p *Project) Analyze(ctx context.Context) (*Result, error) {
 		c := sema.NewChecker(p.Pack, p.Kinds, syms, ns)
 		c.Files, c.Texts = p.Files, p.bookText
 		return c
+	}, func(path string) []rune {
+		if f := source[path]; f != nil {
+			return f.Src
+		}
+		return nil
 	})
 	r.symKey = symbolKey(syms)
 	sameSyms := prev != nil && prev.symKey == r.symKey
@@ -533,9 +562,35 @@ func (p *Project) Analyze(ctx context.Context) (*Result, error) {
 				c.CheckType(as.Value, want, syntax.TypeText(as.Type))
 			}
 		}
+		// Typed lets and field defaults too, so their values complete
+		// like the type's: `let g: DensityFunction = { ty| }`.
+		for _, l := range bp.Lets {
+			if l.Type == nil || l.Value == nil {
+				continue
+			}
+			if want := tenv.Lookup(bp.Path, l.Type); want != nil && want.Kind != "any" {
+				c.CheckType(l.Value, want, syntax.TypeText(l.Type))
+			}
+		}
+		for _, f := range bp.Fields {
+			if f.Type == nil || f.Default == nil {
+				continue
+			}
+			if want := tenv.Lookup(bp.Path, f.Type); want != nil && want.Kind != "any" {
+				c.CheckType(f.Default, want, syntax.TypeText(f.Type))
+			}
+		}
 		r.Decls[bp.D] = &Decl{Unit: u, D: bp.D, NS: p.Config.Namespace, Info: c.Info, Emitter: bp}
 		for _, b := range bp.Emits {
 			syntax.Walk(b, func(n syntax.Node) bool {
+				// A typed const the emit block computes with completes
+				// like its type, as a typed let does.
+				if k, ok := n.(*syntax.ConstStmt); ok && k.Type != nil && k.Value != nil {
+					if want := tenv.Lookup(bp.Path, k.Type); want != nil && want.Kind != "any" {
+						c.CheckType(k.Value, want, syntax.TypeText(k.Type))
+					}
+					return false
+				}
 				d, ok := n.(*syntax.Decl)
 				if !ok {
 					return true

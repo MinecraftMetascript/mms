@@ -173,6 +173,28 @@ A template's chests can get a loot table from a `Rule` processor with `block_ent
 
 `+`, `-`, `*` and `/` build `add`, `sub`, `mul` and `div`. Arithmetic on constants is folded. A unary `-x` is `x * -1`.
 
+### Splines
+
+A `Spline` maps its coordinate through a curve. Each point has a `location` on the coordinate, the `value` there and the curve's slope there (`derivative`). A point's value can be another spline, which is how vanilla mixes continentalness, erosion and weirdness into terrain height. `SplinePoint(...)` takes location, derivative and value, in that order:
+
+```mms
+DensityFunction offset = Spline({
+  coordinate = overworld/continents
+  points = [
+    SplinePoint(-1.1, 0, 0.044),
+    SplinePoint(-0.2, 0, {
+      coordinate = overworld/erosion
+      points = [SplinePoint(-0.8, 0, 0.3), SplinePoint(0.5, 0, -0.1)]
+    }),
+    SplinePoint(0.6, 0.4, 0.8),
+  ]
+})
+```
+
+With the cursor in a spline, the Preview tab of the web editor shows its curve, worked out the way the game does. Drag a point to change its location and value, or select it and drag its handle to change its slope; hold Shift to snap. Each drag rewrites the numbers in the source, so undo works as usual. Double-click the graph to add a point, and press Delete to remove the selected one. A number written as a const or an expression shows but cannot be dragged. A hollow point's value is a spline of its own: click it to open that spline, and use the sliders under the graph to pick the values of the nested splines' coordinates. In VS Code, the **Edit spline** lens above a `Spline(` opens it in the preview panel, which then follows the spline at the cursor.
+
+Points must go from the lowest location to the highest, because the game looks them up in that order. The `spline-order` lint reports a point out of order, with a fix that sorts them.
+
 ## Inline values where an id is needed
 
 Some fields need an id, and the game will not load an inline value there. Examples are a surface rule's `NoiseThreshold` noise, a biome source's biome, and a template pool's fallback. A density function's noise is in the same group. The schema allows it inline, but the game seeds each noise from its id, so an inline noise fails when the world loads.

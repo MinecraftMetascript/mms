@@ -161,6 +161,23 @@ func TestEvalCompletion(t *testing.T) {
 	}
 }
 
+// A value of a union of whole numbers completes from its numbers, as a
+// Template argument and as a field of a typed const.
+func TestIntUnionCompletion(t *testing.T) {
+	for _, tc := range []struct{ src, want string }{
+		{"Template pick(tier: 1 | 2 | 3): int = tier\nDensityFunction d = pick(^)\n", "1 2 3"},
+		{"Type Level {\n  bonus: 0 | 5 | 10\n}\nconst c: Level = { bonus = ^ }\n", "0 5 10"},
+		{"Type Tier = -1 | 0 | 1\nType Level {\n  tier: Tier\n}\nconst c: Level = { tier = ^ }\n", "-1 0 1"},
+	} {
+		got := " " + strings.Join(labelsAt(t, tc.src), " ") + " "
+		for _, want := range strings.Fields(tc.want) {
+			if !strings.Contains(got, " "+want+" ") {
+				t.Errorf("%q lacks %s: %s", tc.src, want, got)
+			}
+		}
+	}
+}
+
 // The outline lists consts, Templates, Types and Blueprints too, and a
 // Blueprint instance as written rather than what it emits.
 func TestEvalSymbols(t *testing.T) {

@@ -105,6 +105,11 @@
           "markdownDescription": "A `minecraft:` prefix that can be dropped: `stone` means `minecraft:stone` unless the project declares its own `stone`.\n\nDefault: `hint`.",
           "$ref": "#/definitions/severity"
         },
+        "spline-order": {
+          "description": "A spline point whose location is lower than the point before it. The game looks points up by location assuming they go from lowest to highest, so points out of order give a broken curve. The quick fix sorts the points.\n\nDefault: `warning`.",
+          "markdownDescription": "A spline point whose location is lower than the point before it. The game looks points up by location assuming they go from lowest to highest, so points out of order give a broken curve. The quick fix sorts the points.\n\nDefault: `warning`.",
+          "$ref": "#/definitions/severity"
+        },
         "structure-unknown-loot-table": {
           "description": "A chest, barrel, chest minecart or other container in a structure file that StructureFile(\"...\") includes whose LootTable tag names a loot table nothing provides: in the minecraft namespace one vanilla does not have, and in a namespace the project declares in one that no LootTable declares. The game leaves the container empty without an error. The quick fix declares the table. Other namespaces may come from another pack and are not checked.\n\nDefault: `warning`.",
           "markdownDescription": "A chest, barrel, chest minecart or other container in a structure file that StructureFile(\"...\") includes whose LootTable tag names a loot table nothing provides: in the minecraft namespace one vanilla does not have, and in a namespace the project declares in one that no LootTable declares. The game leaves the container empty without an error. The quick fix declares the table. Other namespaces may come from another pack and are not checked.\n\nDefault: `warning`.",

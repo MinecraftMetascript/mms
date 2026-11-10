@@ -224,7 +224,7 @@ export function activate(context: vscode.ExtensionContext) {
 	bundled = path.join(context.extensionPath, 'bin', exe);
 	output = vscode.window.createOutputChannel('MMS Language Server');
 	pack = new PackOutput(() => client);
-	const previews = new Previews(context, pack);
+	const previews = new Previews(context, pack, () => client);
 	const world = new WorldView(context, pack, resolveServer, (line) => log(line));
 	context.subscriptions.push(
 		output,

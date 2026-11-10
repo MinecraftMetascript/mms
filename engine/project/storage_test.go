@@ -86,6 +86,13 @@ func TestStorageErrors(t *testing.T) {
 		{"Type S { a: int = 0 }\nStorage s: S\nFunction f {\n  s.a = true\n}", "expected int"},
 		{"Type S { mode: \"x\" | \"y\" }\nStorage s: S\nFunction f {\n  s.mode = \"z\"\n}", `expected one of "x" or "y", but this is "z"`},
 		{"Type S { mode: \"x\" | \"y\" }\nStorage s: S\nFunction f {\n  s.mode += \"x\"\n}", "set it with ="},
+		{"Type S { tier: 1 | 2 | 3 }\nStorage s: S\nFunction f {\n  s.tier = 4\n}", "expected one of 1, 2 or 3, but this is 4"},
+		{"Type S { tier: 1 | 2 | 3 }\nStorage s: S\nFunction f {\n  s.tier = \"x\"\n}", "expected int, but this is string"},
+		{"Type Tier = 1 | 2\nFunction f {\n  let t: Tier = 3\n}", "expected one of 1 or 2, but this is 3"},
+		{"Function f {\n  let t: 0 | 1 = 1\n  t = -1\n}", "expected one of 0 or 1, but this is -1"},
+		{"Function f {\n  let m: \"a\" | \"b\" = \"c\"\n}", `expected one of "a" or "b", but this is "c"`},
+		{"Type S { speed: 1 | 2.5 }", "a number in a type must be a whole number"},
+		{"Type S { big: 3000000000 | 1 }", "3000000000 does not fit an int"},
 		{"Type S {\n  blah: { x: int, y: int }\n}\nStorage s: S\nFunction f {\n  s.blah.z = 1\n}", "s.blah has no field 'z'"},
 		{"Type S {\n  a: int\n}\nStorage s: S\nFunction f {\n  s.a.b = 1\n}", "s.a is an integer, not a record"},
 		{"Type S {\n  blah: { x: int, y }\n}", "a record's field needs a type: y: Type"},
@@ -132,6 +139,48 @@ Function f(): int {
 	ld := emitted(t, r, "data/demo/function/mms_gen/load.mcfunction")
 	if want := `execute unless data storage demo:mms s.mode run data modify storage demo:mms s.mode set value "x"`; !strings.Contains(ld, want) {
 		t.Errorf("load lacks %s:\n%s", want, ld)
+	}
+	vm := load(t, r, "demo")
+	if got := call(t, vm, "demo:f"); got != 1 {
+		t.Errorf("f = %d, want 1", got)
+	}
+	if got := call(t, vm, "demo:f"); got != 0 {
+		t.Errorf("f again = %d, want 0", got)
+	}
+}
+
+// A field of a union of whole numbers is an int functions read and
+// write, and it starts at the first of them. A let can have such a type
+// too, written in place or named.
+func TestStorageIntChoices(t *testing.T) {
+	src := `Type Tier = 1 | 2 | 3
+Type S {
+  tier: Tier
+  step: -1 | 0 | 1 = 0
+}
+Storage s: S
+Function f(): int {
+  let next: 1 | 2 | 3
+  if (s.tier == 1) {
+    next = 2
+  }
+  s.tier = next
+  s.step = -1
+  return s.tier + s.step
+}
+`
+	_, r := bookProject(t, src, nil)
+	if d := diagText(r); d != "" {
+		t.Fatal(d)
+	}
+	ld := emitted(t, r, "data/demo/function/mms_gen/load.mcfunction")
+	for _, want := range []string{
+		`execute unless data storage demo:mms s.tier run data modify storage demo:mms s.tier set value 1`,
+		`execute unless data storage demo:mms s.step run data modify storage demo:mms s.step set value 0`,
+	} {
+		if !strings.Contains(ld, want) {
+			t.Errorf("load lacks %s:\n%s", want, ld)
+		}
 	}
 	vm := load(t, r, "demo")
 	if got := call(t, vm, "demo:f"); got != 1 {
@@ -249,6 +298,80 @@ Function last(): int {
 	}
 	if want := "index 3 is outside the list, which has 3 items (0 to 2)"; !strings.Contains(strings.Join(msgs, "\n"), want) {
 		t.Errorf("diagnostics %q lack %q", msgs, want)
+	}
+}
+
+// index_of finds a value in a const list: when compiling for a known
+// value, and with one test per item for a value known only as the
+// function runs, where the first match wins and no match gives -1.
+func TestConstListIndexOf(t *testing.T) {
+	src := `Type S {
+  name: string = "Copy"
+  n: int = 5
+}
+Storage st: S
+const modes: [string] = ["Measure", "Replace", "Copy", "Replace"]
+const costs: [int] = [1, 5, 9, 5]
+const copy = index_of(modes, "Copy")
+Function stored(): int {
+  return index_of(modes, st.name)
+}
+Function first(): int {
+  st.name = "Replace"
+  return index_of(modes, st.name)
+}
+Function missing(): int {
+  st.name = "Nope"
+  return index_of(modes, st.name)
+}
+Function ints(): int {
+  return index_of(costs, st.n)
+}
+Function known(): int {
+  return index_of(modes, "Copy") * 100 + index_of(costs, 9) * 10 + copy
+}
+Function local(): int {
+  let x = "Measure"
+  let n = 9
+  return index_of(modes, x) * 10 + index_of(costs, n)
+}
+`
+	_, r := bookProject(t, src, nil)
+	if d := diagText(r); d != "" {
+		t.Fatal(d)
+	}
+	vm := load(t, r, "demo")
+	for _, tc := range []struct {
+		fn   string
+		want int32
+	}{{"stored", 2}, {"first", 1}, {"missing", -1}, {"ints", 1}, {"known", 222}, {"local", 2}} {
+		if got := call(t, vm, "demo:"+tc.fn); got != tc.want {
+			t.Errorf("%s = %d, want %d", tc.fn, got, tc.want)
+		}
+	}
+}
+
+func TestConstListIndexOfErrors(t *testing.T) {
+	decls := "Type S {\n  name: string = \"x\"\n}\nStorage st: S\nconst modes: [string] = [\"a\", \"b\"]\nconst costs: [int] = [1, 2]\n"
+	for _, tc := range []struct{ src, want string }{
+		{"Function f(): int {\n  return index_of(modes, \"z\")\n}", `"z" is not in the list`},
+		{"const i = index_of(modes, \"z\")", `"z" is not in the list`},
+		{"Function f(): int {\n  return index_of(costs, st.name)\n}", "the list's items are int, but this is string"},
+		{"Function f(): int {\n  return index_of(\"ab\", \"a\")\n}", "index_of takes a list"},
+		{"Function f(): int {\n  return index_of(modes)\n}", "index_of takes two arguments"},
+	} {
+		p := New(spec.MustDefault(), Config{Namespace: "demo"})
+		p.SetFile("main.mms", decls+tc.src)
+		r, _ := p.Analyze(context.Background())
+		var msgs []string
+		for _, d := range r.Diagnostics("main.mms") {
+			if d.Severity == syntax.SeverityError {
+				msgs = append(msgs, d.Message)
+			}
+		}
+		if !strings.Contains(strings.Join(msgs, "\n"), tc.want) {
+			t.Errorf("%q: errors %q, want %q", tc.src, msgs, tc.want)
+		}
 	}
 }
 

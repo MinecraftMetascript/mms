@@ -101,6 +101,11 @@ export type PreviewRequest =
 	| { type: 'helpers'; ports: MessagePort[] }
 	/** Makes this worker a helper, taking chunk jobs on the port. */
 	| { type: 'serve'; port: MessagePort }
+	/**
+	 * Asks for a pong, which comes back only between steps of work: a
+	 * worker that doesn't answer is stuck, and the viewer restarts it.
+	 */
+	| { type: 'ping' }
 	| {
 			type: 'render';
 			seq: number;
@@ -146,7 +151,10 @@ export type PreviewResponse =
 			minY?: number;
 			maxY?: number;
 	  }
-	| { type: 'error'; seq: number; message: string };
+	| { type: 'error'; seq: number; message: string }
+	/** A render is under way (sent as it starts, before any work). */
+	| { type: 'started'; seq: number }
+	| { type: 'pong' };
 
 /**
  * Vanilla worldgen that MMS output references comes from mcmeta's summary

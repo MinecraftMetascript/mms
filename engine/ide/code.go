@@ -190,6 +190,16 @@ func (s *Session) codeValues(a *at, off int) []sema.Candidate {
 		c.Rank += 70
 		out = append(out, c)
 	}
+	// In a Blueprint's emit block, its fields, lets and self, filled in
+	// when the pack is built: `${label}`, `${self.path}`.
+	if a.decl != nil && a.decl.Emitter != nil {
+		for _, tc := range s.blueprintFields(a.decl.Emitter) {
+			c := tc.Candidate
+			c.Rank = 40
+			out = append(out, c)
+		}
+		out = append(out, sema.Candidate{Label: "self", Kind: sema.CandID, Detail: "the instance", Doc: "The instance being expanded: `self.id`, `self.namespace` and `self.path`.", Rank: 41})
+	}
 	out = append(out,
 		sema.Candidate{Label: "exists", Kind: sema.CandCallable, Detail: "exists(target): bool", Doc: "Whether a selector finds any entity: `exists(@e[tag=boss])`.", Insert: "exists($1)", Rank: 150},
 		sema.Candidate{Label: "count", Kind: sema.CandCallable, Detail: "count(target): int", Doc: "How many entities a selector finds: `count(@e[type=zombie])`.", Insert: "count($1)", Rank: 151},
@@ -353,6 +363,9 @@ func (s *Session) exprCompletion(a *at, src []rune, open, off int) (cands []sema
 	}
 	if start > open && src[start-1] == '.' {
 		recv := strings.TrimSpace(string(src[receiverStart(src, open, start-1) : start-1]))
+		if recv == "self" && a.decl != nil && a.decl.Emitter != nil {
+			return selfCandidates, start, true
+		}
 		if x, diags := syntax.ParseExpr(recv, 0); x != nil && len(diags) == 0 {
 			cands = a.c.StorageFieldCandidates(x)
 		}
@@ -369,6 +382,12 @@ func (s *Session) exprCompletion(a *at, src []rune, open, off int) (cands []sema
 		if c.Kind != sema.CandCallable { // no function runs to fill it in
 			cands = append(cands, c)
 		}
+	}
+	if a.decl != nil && a.decl.Emitter != nil {
+		for _, tc := range s.blueprintFields(a.decl.Emitter) {
+			cands = append(cands, tc.Candidate)
+		}
+		cands = append(cands, sema.Candidate{Label: "self", Kind: sema.CandID, Detail: "the instance", Rank: 1})
 	}
 	for _, c := range s.evalValueCandidates(a.u.Path) {
 		if c.Kind != sema.CandCallable {

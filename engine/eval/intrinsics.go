@@ -1,6 +1,7 @@
 package eval
 
 import (
+	"fmt"
 	"hash/fnv"
 	"math"
 	"regexp"
@@ -22,6 +23,7 @@ var intrinsics = map[string]intrinsic{
 	"by_language": byLanguage,
 	"english":     english,
 	"contains":    contains,
+	"index_of":    indexOf,
 	"matches":     matches,
 	"replace":     replace,
 	"named":       named,
@@ -176,6 +178,41 @@ func contains(c *ctx, x *syntax.Call, args []argValue) Value {
 		}
 	}
 	return &Bool{p, false}
+}
+
+// indexOf is the position of the first item of a list equal to a value.
+// A value known only when a function runs keeps the call, for the
+// checker to compile into one test per item.
+func indexOf(c *ctx, x *syntax.Call, args []argValue) Value {
+	p := c.pos(x.Sp)
+	if len(args) != 2 {
+		c.errorf("mms/intrinsic-args", x.Sp, "index_of takes two arguments")
+		return &Num{p, -1, true}
+	}
+	l, isList := args[0].v.(*List)
+	if !isList {
+		c.errorf("mms/intrinsic-args", args[0].x.Value.Span(), "index_of takes a list, not "+kindName(args[0].v))
+		return &Num{p, -1, true}
+	}
+	if _, runtime := args[1].v.(*Code); runtime {
+		kept := make([]*syntax.Arg, len(args))
+		for i, a := range args {
+			kept[i] = &syntax.Arg{Value: c.lower(a.v), Sp: c.span(a.x.Sp)}
+		}
+		return &Code{p, &syntax.Call{Fn: c.clone(x.Fn), Args: kept, ArgsSp: c.span(x.ArgsSp), Sp: c.span(x.Sp)}}
+	}
+	if !known(args[1].v) {
+		c.errorf("mms/intrinsic-args", args[1].x.Value.Span(), "index_of looks for a number, string or name, not "+kindName(args[1].v))
+		return &Num{p, -1, true}
+	}
+	for i, e := range l.Elems {
+		if known(e) && equal(e, args[1].v) {
+			return &Num{p, float64(i), true}
+		}
+	}
+	shown, _ := text(args[1].v)
+	c.errorf("mms/intrinsic-args", args[1].x.Value.Span(), fmt.Sprintf("%q is not in the list", shown))
+	return &Num{p, -1, true}
 }
 
 var patterns = map[string]*regexp.Regexp{}

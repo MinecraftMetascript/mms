@@ -110,6 +110,9 @@ func TestTriggerApplies(t *testing.T) {
 		{"Function f {\n  let b = a == /|\n}", "/", false},
 		{"Global g = 4 /| 2", "/", false},
 		{"Global g = 4 .| 2", ".", true},
+		{"Blueprint B {\n  emit {\n    Objective ${|}: dummy\n  }\n}", "{", true},
+		{"Blueprint B {\n  let k = \"a${|}\"\n}", "{", true},
+		{"Blueprint B {\n  let k = {|}\n}", "{", false},
 	}
 	for _, tc := range cases {
 		s, off := assetSession(t, tc.src)

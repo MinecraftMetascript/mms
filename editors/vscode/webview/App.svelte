@@ -5,7 +5,7 @@
 	// on that declaration while you edit elsewhere.
 	import { itemPath, PreviewPane, type OutputFile, type OutputItem } from '@mms/preview';
 	import PreviewWorker from '@mms/preview/worker?worker&inline';
-	import type { OutputAsset, OutputText, ToPanel, ToExtension } from '../src/messages';
+	import type { OutputAsset, OutputText, SplineAt, ToPanel, ToExtension } from '../src/messages';
 
 	// The state is what VS Code hands back when it restores the panel.
 	const vscode = acquireVsCodeApi<{ path: string | null; page?: number }>();
@@ -20,6 +20,11 @@
 	// The book page to open, from 0.
 	let page = $state(vscode.getState()?.page ?? 0);
 	let ready = $state(false);
+	// The spline at the cursor in the last .mms editor, for the spline editor.
+	let spline = $state<SplineAt | null>(null);
+	let splineUri: string | null = null;
+	// The document version the spline's ranges are in, sent back with each edit.
+	let splineVersion = -1;
 
 	$effect(() => vscode.setState({ path, page }));
 
@@ -36,6 +41,10 @@
 		} else if (m.type === 'target') {
 			path = m.path;
 			page = m.page ?? 0;
+		} else if (m.type === 'spline') {
+			spline = m.spline;
+			splineUri = m.uri;
+			splineVersion = m.version;
 		}
 	});
 	vscode.postMessage({ type: 'ready' } satisfies ToExtension);
@@ -77,7 +86,9 @@
 				unpinLabel="clear it"
 				onunpin={() => vscode.postMessage({ type: 'clear' } satisfies ToExtension)}
 				createWorker={() => new PreviewWorker()}
-				hint="Click Preview above a noise, density function, noise settings, surface rule, dimension, loot table, recipe, biome, template pool, jigsaw structure or book to show it here."
+				{spline}
+				onsplineedit={(edits) => splineUri && vscode.postMessage({ type: 'splineEdit', uri: splineUri, version: splineVersion, edits } satisfies ToExtension)}
+				hint="Click Preview above a noise, density function, noise settings, surface rule, dimension, loot table, recipe, biome, template pool, jigsaw structure or book to show it here, or Edit spline above a spline to graph it."
 			/>
 		{:else}
 			<p class="p-3 text-xs text-muted">Waiting for the MMS language server…</p>

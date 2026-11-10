@@ -41,6 +41,8 @@ extern Template by_language(text: LangText?): {string: string}
 extern Template english(text: LangText): string
 /** Whether a list holds a value. */
 extern Template contains(list: [any], value: any): bool
+/** The position of the first item of a list equal to `value`, counting from 0: `index_of(modes, "Replace")`. A value known when compiling must be in the list. In a function, a value known only as it runs is tested against each item, giving -1 when none matches. */
+extern Template index_of(list: [any], value: any): int
 /** Whether a string matches a regular expression, as a whole. */
 extern Template matches(text: string, pattern: string): bool
 /** A string with every `old` replaced by `new`. */

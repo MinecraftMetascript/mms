@@ -239,6 +239,10 @@
         "title": "MMS: Expand at Cursor"
       },
       {
+        "command": "mms.editSpline",
+        "title": "MMS: Edit Spline at Cursor"
+      },
+      {
         "command": "mms.showExpansion",
         "title": "MMS: Show Expansion"
       },

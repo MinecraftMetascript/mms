@@ -10,6 +10,7 @@ package types
 import (
 	"encoding/json"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -161,11 +162,15 @@ func (e *Env) Resolve(path string, t syntax.TypeExpr) (rt *spec.Type, optional b
 		v, _ := e.Resolve(path, t.Value)
 		return &spec.Type{Kind: "struct", Fields: []*spec.Field{{Kind: "pair", KeyType: k, Type: v, Optional: true}}}, false
 	case *syntax.TypeUnion:
-		// A union of words is an enum: `"rigid" | "terrain_matching"`.
-		words := true
+		// A union of words is an enum: `"rigid" | "terrain_matching"`,
+		// and so is a union of whole numbers: `0 | 1 | 2`.
+		words, ints := true, true
 		for _, a := range t.Arms {
 			if _, ok := a.(*syntax.TypeString); !ok {
 				words = false
+			}
+			if n, ok := a.(*syntax.TypeNumber); !ok || !isInt(n.Text) {
+				ints = false
 			}
 		}
 		if words {
@@ -173,6 +178,18 @@ func (e *Env) Resolve(path string, t syntax.TypeExpr) (rt *spec.Type, optional b
 			for _, a := range t.Arms {
 				raw, _ := json.Marshal(a.(*syntax.TypeString).Value)
 				en.Values = append(en.Values, &spec.EnumValue{Identifier: a.(*syntax.TypeString).Value, Value: raw})
+			}
+			return en, false
+		}
+		if ints {
+			en := &spec.Type{Kind: "enum", EnumKind: "int"}
+			seen := map[string]bool{}
+			for _, a := range t.Arms {
+				n := a.(*syntax.TypeNumber).Text
+				if !seen[n] {
+					seen[n] = true
+					en.Values = append(en.Values, &spec.EnumValue{Identifier: n, Value: json.RawMessage(n)})
+				}
 			}
 			return en, false
 		}
@@ -186,10 +203,36 @@ func (e *Env) Resolve(path string, t syntax.TypeExpr) (rt *spec.Type, optional b
 	case *syntax.TypeString:
 		raw, _ := json.Marshal(t.Value)
 		return &spec.Type{Kind: "literal", Literal: &spec.Literal{Kind: "string", Value: raw}}, false
+	case *syntax.TypeNumber:
+		if !e.wholeNumber(path, t) {
+			return &spec.Type{Kind: "int"}, false
+		}
+		return &spec.Type{Kind: "literal", Literal: &spec.Literal{Kind: "int", Value: json.RawMessage(t.Text)}}, false
 	case *syntax.TypeName:
 		return e.named(path, t), false
 	}
 	return &spec.Type{Kind: "any"}, false
+}
+
+// wholeNumber reports whether a number in a type is a whole number that
+// fits an int, as in `0 | 1 | 2`, and reports one that is not. Only
+// whole numbers make literal types: storage and scores hold ints.
+func (e *Env) wholeNumber(path string, n *syntax.TypeNumber) bool {
+	if isInt(n.Text) {
+		return true
+	}
+	msg := "a number in a type must be a whole number, such as 0 | 1 | 2"
+	if _, err := strconv.ParseInt(n.Text, 10, 64); err == nil {
+		msg = n.Text + " does not fit an int"
+	}
+	e.Diags[path] = append(e.Diags[path], syntax.Diagnostic{Code: "mms/type-body", Severity: syntax.SeverityError, Message: msg, Sp: n.Sp})
+	return false
+}
+
+// isInt reports whether text is a whole number that fits an int.
+func isInt(text string) bool {
+	_, err := strconv.ParseInt(text, 10, 32)
+	return err == nil
 }
 
 // Lookup resolves a type expression for an editor, after checking: it
