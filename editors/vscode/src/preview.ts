@@ -34,8 +34,6 @@ export class Previews implements vscode.Disposable, vscode.CodeLensProvider {
 	 */
 	private editor: vscode.TextEditor | undefined;
 	private spline: SplineAt | null = null;
-	/** The document version the spline's ranges are in. */
-	private splineVersion = -1;
 	private splineTimer: ReturnType<typeof setTimeout> | undefined;
 
 	constructor(
@@ -123,8 +121,7 @@ export class Previews implements vscode.Disposable, vscode.CodeLensProvider {
 		// out of date, and the change schedules a new request.
 		if (ed && ed.document.version !== version) return void this.scheduleSpline();
 		this.spline = spline;
-		this.splineVersion = version;
-		this.post({ type: 'spline', uri: ed?.document.uri.toString() ?? null, spline });
+		this.post({ type: 'spline', uri: ed?.document.uri.toString() ?? null, version, spline });
 	}
 
 	/** Opens the panel's spline editor on the spline at a position, or at the cursor. */
@@ -316,10 +313,11 @@ export class Previews implements vscode.Disposable, vscode.CodeLensProvider {
 			await this.output.refresh();
 		} else if (m.type === 'splineEdit') {
 			const uri = vscode.Uri.parse(m.uri);
-			// Ranges from an older version of the document would land on
-			// the wrong text; drop the edit and show the spline as it is now.
+			// The edit's ranges are in the version of the spline the page
+			// showed; against any other version they would land on the
+			// wrong text, so drop it and show the spline as it is now.
 			const doc = vscode.workspace.textDocuments.find((d) => d.uri.toString() === uri.toString());
-			if (!doc || doc.version !== this.splineVersion) return void this.scheduleSpline();
+			if (!doc || doc.version !== m.version) return void this.scheduleSpline();
 			const edit = new vscode.WorkspaceEdit();
 			for (const e of m.edits) {
 				edit.replace(uri, new vscode.Range(e.range.start.line, e.range.start.character, e.range.end.line, e.range.end.character), e.newText);

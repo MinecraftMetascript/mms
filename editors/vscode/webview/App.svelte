@@ -23,6 +23,8 @@
 	// The spline at the cursor in the last .mms editor, for the spline editor.
 	let spline = $state<SplineAt | null>(null);
 	let splineUri: string | null = null;
+	// The document version the spline's ranges are in, sent back with each edit.
+	let splineVersion = -1;
 
 	$effect(() => vscode.setState({ path, page }));
 
@@ -42,6 +44,7 @@
 		} else if (m.type === 'spline') {
 			spline = m.spline;
 			splineUri = m.uri;
+			splineVersion = m.version;
 		}
 	});
 	vscode.postMessage({ type: 'ready' } satisfies ToExtension);
@@ -84,7 +87,7 @@
 				onunpin={() => vscode.postMessage({ type: 'clear' } satisfies ToExtension)}
 				createWorker={() => new PreviewWorker()}
 				{spline}
-				onsplineedit={(edits) => splineUri && vscode.postMessage({ type: 'splineEdit', uri: splineUri, edits } satisfies ToExtension)}
+				onsplineedit={(edits) => splineUri && vscode.postMessage({ type: 'splineEdit', uri: splineUri, version: splineVersion, edits } satisfies ToExtension)}
 				hint="Click Preview above a noise, density function, noise settings, surface rule, dimension, loot table, recipe, biome, template pool, jigsaw structure or book to show it here, or Edit spline above a spline to graph it."
 			/>
 		{:else}

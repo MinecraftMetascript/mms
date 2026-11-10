@@ -83,7 +83,7 @@ export type ToPanel =
 	 */
 	| { type: 'target'; path: string | null; page?: number }
 	/** The density function spline at the cursor (`mms/spline`), or null, for the spline editor. */
-	| { type: 'spline'; uri: string | null; spline: SplineAt | null };
+	| { type: 'spline'; uri: string | null; version: number; spline: SplineAt | null };
 
 export type ToExtension =
 	/** The page has loaded and wants the current state. */
@@ -92,8 +92,8 @@ export type ToExtension =
 	| { type: 'clear' }
 	/** Go to a declaration's source. */
 	| { type: 'reveal'; uri: string; range: Range }
-	/** Apply the spline editor's edits to a source file. */
-	| { type: 'splineEdit'; uri: string; edits: SplineEdit[] };
+	/** Apply the spline editor's edits to a source file, at the version of the spline they were made on. */
+	| { type: 'splineEdit'; uri: string; version: number; edits: SplineEdit[] };
 
 // The World and Structures views' page (webview/World.svelte, drawing the
 // shared WorldTool). The extension owns the state and sends all of it after
