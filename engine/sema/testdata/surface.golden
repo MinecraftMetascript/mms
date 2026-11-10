@@ -160,8 +160,8 @@
     "then_run": {
       "type": "minecraft:block",
       "result_state": {
-        "Name": "minecraft:oak_log",
-        "Properties": {
+        "id": "minecraft:oak_log",
+        "properties": {
           "axis": "y"
         }
       }
@@ -172,7 +172,7 @@
 {
   "type": "minecraft:block",
   "result_state": {
-    "Name": "minecraft:oak_log"
+    "id": "minecraft:oak_log"
   }
 }
 == worldgen/material_rule mms_demo:bad_cond

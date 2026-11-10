@@ -40,15 +40,21 @@ func (c *Checker) validate(val jsonv.Value, v tview, path string, errs *[]string
 		if len(v.T.Members) == 0 {
 			return
 		}
-		best := []string(nil)
+		// Report the member the value was most likely written as: errors
+		// inside the value beat errors about the value itself, and those
+		// beat a plain shape mismatch ("expected a string" for an
+		// object), which would otherwise hide the real problem.
+		var best []string
+		bestRank := -1
 		for _, m := range v.T.Members {
 			var e []string
 			c.validate(val, tview{T: m, Env: v.Env}, path, &e, depth+1)
 			if len(e) == 0 {
 				return
 			}
-			if best == nil || len(e) < len(best) {
-				best = e
+			r := unionRank(e, path)
+			if r > bestRank || r == bestRank && len(e) < len(best) {
+				best, bestRank = e, r
 			}
 		}
 		*errs = append(*errs, best...)
@@ -196,4 +202,21 @@ func (c *Checker) validate(val jsonv.Value, v tview, path string, errs *[]string
 		}
 		fail("%s is not one of the allowed values", jsonv.Compact(val))
 	}
+}
+
+// unionRank scores a union member's errors for the value at path: 2 when
+// some error is inside the value, 1 when the value has the right shape
+// but wrong contents, 0 when it has the wrong shape.
+func unionRank(errs []string, path string) int {
+	rank := 0
+	for _, e := range errs {
+		msg, ok := strings.CutPrefix(e, path+": ")
+		if !ok {
+			return 2
+		}
+		if !strings.HasPrefix(msg, "expected ") {
+			rank = 1
+		}
+	}
+	return rank
 }
