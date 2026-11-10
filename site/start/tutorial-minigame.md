@@ -136,7 +136,7 @@ execute if score #spawn.-t0 mms.arena matches 1 run function arena:spawn/_if0
 ...
 ```
 
-The same `for` written inside a `Function` would be a loop the game runs, and a `Wave` cannot be looked up as the game runs. The editor says so if you try. Hover a template call to see the commands it writes.
+The same loop over `1..len(waves)` written inside a `Function` would be a loop the game runs, and a `Wave` cannot be looked up as the game runs. The editor says so if you try. Hover a template call to see the commands it writes.
 
 ## 6. Run it every tick
 
@@ -209,7 +209,7 @@ Each test starts in a fresh world. `setup` puts the world in the state the test 
 mms build --world ~/.minecraft/saves/MyWorld
 ```
 
-In the world, run `/reload`, stand where mobs should appear and run `/function arena:mark_spawn` a few times, then `/function arena:start`.
+In the world, run `/reload` and make sure the difficulty is not Peaceful, where hostile mobs vanish as they spawn. Stand where mobs should appear and run `/function arena:mark_spawn` a few times, then `/function arena:start`.
 
 ## The whole file
 

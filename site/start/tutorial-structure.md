@@ -52,7 +52,7 @@ Build in a flat creative world. Choose it in the editor first: the **World** tab
 For each piece:
 
 1. **Build it.** Keep to a grid, so that any two pieces meet doorway to doorway. The example uses rooms of 7×7 and halls 5 wide. [Building jigsaw pieces](../guides/jigsaw-pieces.md) is a checklist of the things worth agreeing on first: sizes, doorways, materials and lighting.
-2. **Place the jigsaw blocks.** Each goes in the outer layer of the piece, in a doorway, facing out. The editor's **Jigsaw** tab (the **Jigsaw** view in VS Code) sets one up: pick the pool, the target and the name from the lists, and it copies a `/give` command for a jigsaw block that already has them. Paste it in the game and place the block.
+2. **Place the jigsaw blocks.** Each goes in the outer layer of the piece, in a doorway, facing out. The editor's **Jigsaw** tab (the **Jigsaw** view in VS Code) sets one up: pick the pool, the target and the name, and it copies a `/give` command for a jigsaw block that already has them. The names come from the `JigsawHole` declarations. The pools `halls` and `rooms` are not declared until step 4, so type them for now. Paste it in the game and place the block.
 3. **Save it.** Run `/give @s structure_block`, place it at a corner of the piece, switch it to **Save** mode, set the size to cover the piece and name it after its file: `dungeon:halls/hall`. Press **SAVE**.
 
 The pieces of this dungeon:
@@ -75,7 +75,7 @@ After changing a piece in the game, save it again with its structure block and i
 
 ## 4. Wire it up
 
-One declaration turns the files into a structure:
+One declaration turns the files into a structure. Add it next to the holes from step 1:
 
 ```mms in=examples/jigsaw
 JigsawStructure dungeon {
@@ -94,8 +94,6 @@ JigsawStructure dungeon {
     caps = [Piece("caps/hall_cap"), Piece("caps/room_cap")]
   }
 }
-
-JigsawHole room_exit, hall_entry, hall_exit, room_entry
 ```
 
 - **Where it generates.** `biomes` is the biomes it may start in, `step` the stage of world generation it belongs to, and `height` where the start piece goes. `spacing` and `separation` are in chunks: one try per 32×32 chunks, at least 12 apart.
@@ -112,7 +110,7 @@ Put the cursor in the `JigsawStructure` and open the **Preview** tab (in VS Code
 - **Connections** draws the pools and which pieces can join which. A jigsaw block with nothing to join shows red.
 - **Simulation** grows one layout the way the game does, in 3D. Each jigsaw block is green (joined), red (found nothing) or grey (an end on purpose). **Re-roll** grows another, and **Slice** cuts the view open.
 
-`mms check` reads the piece files too. The `jigsaw-` lint rules report a block whose name or pool is unknown, a target no piece in the pool has, and pieces that cannot fit. Fixing those here is much faster than hunting for a dungeon in a world and finding half of it missing.
+`mms check` reads the piece files too. The `jigsaw-` lint rules report a block whose name or pool is unknown, and a target no piece in the pool has. They do not prove that every piece finds room, which is what the simulation is for. Fixing those here is much faster than hunting for a dungeon in a world and finding half of it missing.
 
 The simulation leaves the terrain out, and a layout seed is not a world seed. It shows what kind of dungeon the pieces make, not the dungeon at one place in one world.
 
@@ -122,7 +120,7 @@ The simulation leaves the terrain out, and a layout seed is not a world seed. It
 mms build --world ~/.minecraft/saves/MyWorld
 ```
 
-Structures are read when a world opens, so leave the world and open it again. Then:
+From the web editor, use **Build into world** in the World tab instead, since the imported pieces are in the browser's project. Structures are read when a world opens, so leave the world and open it again. Then:
 
 - `/place structure dungeon:dungeon` builds one where you stand, which is the quickest way to see it.
 - `/locate structure dungeon:dungeon` finds one that generated. Only chunks made after the pack was added have them, so travel somewhere new.

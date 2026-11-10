@@ -1,6 +1,6 @@
 # Tutorial: a guide book
 
-This tutorial writes the book a map hands to new players: a few pages with headings, colours, links that turn pages and run commands, and a live death count. Then it puts longer books in files of their own and hides them in a chest.
+This tutorial writes the book a map hands to new players: a few pages with headings, colours, links that turn pages and run commands, and the reader's death count. Then it puts longer books in files of their own and hides them in a chest.
 
 In the game's own format, each page of a written book is a tree of text components. In MMS a page is a few lines of markup, and the editor shows the open book as you type. The finished project is close to the [`library`](../../examples/library/) example.
 
@@ -12,6 +12,8 @@ mms init -namespace library
 ```
 
 ## 2. A first book
+
+Each step below shows the declarations it is about. Where a step shows `Book guide` again, it is the same book with something new: change the one you have instead of adding a second, since two books cannot share a name.
 
 ```mms
 Book guide {
@@ -115,7 +117,7 @@ Book diary_12 {
 }
 ```
 
-A `.mmsbook` file is the same markup without the quotes. The editor highlights and completes it, previews each page, and checks it in place.
+Step 6 reads `books/day_13.mmsbook` and `books/day_14.mmsbook` too, so make those the same way, with any text. A `.mmsbook` file is the same markup without the quotes. The editor highlights and completes it, previews each page, and checks it in place.
 
 A book page shows 14 lines of about 19 characters, and the game cuts off the rest without a word. MMS measures each page with the vanilla font and warns where one runs over ([`book-page-overflow`](../guides/lint.md)). Add a `---` there.
 

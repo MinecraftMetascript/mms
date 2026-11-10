@@ -152,11 +152,11 @@ DensityFunction floor_fade = Gradient(
 DensityFunction closed = Lerp(floor_fade, 1, terrain)
 ```
 
-The same trick at the top, blending towards `-1`, keeps terrain from being cut off flat at the height limit.
+The fade starts at the bottom of the world, which is -64 here. Use your own dimension's `min_y`: in a world that starts at y = 0, this fade would be 1 everywhere and do nothing. The same trick at the top, blending towards `-1`, keeps terrain from being cut off flat at the height limit.
 
 ## Use it in a world
 
-The terrain is the `final_density` of a `NoiseSettings`, which a `Dimension` names as its generator:
+The terrain is the `final_density` of a `NoiseSettings`, which a `Dimension` names as its generator with `Noise(settings = hills, ...)`. The sample below uses the flat slope, to stay short. Put the name of your own formula in its place, and keep `noise` in step with the dimension type's `min_y` and `height`:
 
 ```mms
 DensityFunction terrain = Gradient(axis = y, from_coordinate = -64, to_coordinate = 192, from_value = 1, to_value = -1)

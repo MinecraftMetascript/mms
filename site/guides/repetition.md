@@ -134,11 +134,11 @@ for k in kits {
 }
 ```
 
-A third kit is one more line in `kits`. The `Type` means that line is completed and checked: a missing `name` or a misspelled item is an error on the line itself. `/function demo:kit/archer` takes ten coins and runs two `give` commands. Nothing of the list or the loops is left in the pack.
+A third kit is one more line in `kits`. The `Type` means that line is completed and checked: a missing `name` or a misspelled item is an error on the line itself. For a player with ten coins, `/function demo:kit/archer` takes them and runs two `give` commands. Nothing of the list or the loops is left in the pack.
 
 ## Repeat commands
 
-Inside a `Function`, a `for` is a loop the game runs. To write commands out at compile time instead, put them in a `Template` that returns `Commands`:
+Inside a `Function`, a `for` over a list the compiler knows is written out, as `for item in k.items` was above. A `for` over a range, such as `for i in 1..10`, is a loop the game runs. To write a range out at compile time too, or to reuse a run of commands, put them in a `Template` that returns `Commands`:
 
 ```mms
 /** A circle of particles around whoever runs it. */

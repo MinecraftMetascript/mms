@@ -11,7 +11,7 @@ mkdir wands && cd wands
 mms init -namespace wands
 ```
 
-Put everything below in the starter `main.mms`. In the web editor, start a new project instead and set its namespace to `wands`.
+Everything below goes in the starter `main.mms`. Each step shows the declarations it changes: where a step shows `CustomItem blink_wand` or `Function blink` again, change the one you have instead of adding a second, and keep the fields from earlier steps. [The whole file](#the-whole-file) at the end is where the steps arrive. In the web editor, start a new project instead and set its namespace to `wands`.
 
 ## 2. Declare the item
 
@@ -139,15 +139,20 @@ LootTable chests/wizard {
     Pool(1, [Item(name = blink_wand, weight = 1), Item(name = ender_pearl, weight = 4)]),
   ]
 }
+
+/** Places a wizard's chest where you stand. */
+Function chest {
+  /setblock ~ ~ ~ chest{LootTable:"wands:chests/wizard"}
+}
 ```
 
-A `Recipe` and a `CustomItem` can share a name, because different kinds never clash.
+A loot table does nothing until something uses it. `/function wands:chest` places a chest that rolls this one when it is opened. A `Recipe` and a `CustomItem` can share a name, because different kinds never clash.
 
 One thing to know: the game matches recipe ingredients and item tags by item id only. A custom item written there means its base item, so a recipe that takes `blink_wand` as an ingredient accepts any stick. The editor marks each such use with a hint.
 
 ## 7. Give it a look
 
-Without a texture the wand looks like a stick. To draw your own, add a 16×16 `.png` anywhere in the project and name it:
+Without a texture the wand looks like a stick. To draw your own, save a 16×16 `.png` in the project, here as `art/blink_wand.png`, and name it by its path:
 
 ```
 CustomItem blink_wand {
@@ -158,7 +163,7 @@ CustomItem blink_wand {
 }
 ```
 
-`parent = item/handheld` holds the item like a tool. MMS writes the model, the item model definition and the texture into a resource pack next to the data pack, and `mms build --world` installs both. In the web editor, **+ Add texture or sound** adds the file. See [Custom items](../guides/resources.md#custom-items) for the other ways to pick a model.
+`parent = item/handheld` holds the item like a tool. MMS writes the model, the item model definition and the texture into a resource pack next to the data pack, and `mms build --world` installs both. In the web editor, **+ Add texture or sound** adds the file under its own name, so the path there is `Texture("blink_wand.png")`. See [Custom items](../guides/resources.md#custom-items) for the other ways to pick a model.
 
 ## The whole file
 
@@ -203,6 +208,11 @@ LootTable chests/wizard {
   pools = [
     Pool(1, [Item(name = blink_wand, weight = 1), Item(name = ender_pearl, weight = 4)]),
   ]
+}
+
+/** Places a wizard's chest where you stand. */
+Function chest {
+  /setblock ~ ~ ~ chest{LootTable:"wands:chests/wizard"}
 }
 
 /** /function wands:give hands one over. */

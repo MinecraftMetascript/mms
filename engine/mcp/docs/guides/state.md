@@ -29,7 +29,7 @@ Function next_round {
 
 The value after `=` is where it starts. It is set once, when the pack first loads, and a `/reload` keeps whatever it has become. An `int` or `bool` Global is a score, the cheapest thing to read and change, so it is the right home for a counter or a timer that runs every tick. A `string` Global is kept in storage.
 
-To look at one in the game, run `/scoreboard players get $round mms.<namespace>`.
+To look at an `int` or `bool` Global in the game, run `/scoreboard players get $round mms.<namespace>`. A `string` one is in `/data get storage <namespace>:mms g`.
 
 ## A number for each player
 
@@ -68,7 +68,7 @@ Function bank_kills {
 - **The holder** is a selector, such as `@s`, or a name in quotes. A name that starts with `#`, such as `"#total"`, is a made-up holder that never shows on the sidebar, which makes it a handy pack-wide slot on an objective.
 - **A criterion** after the colon makes the game keep the score: `deathCount`, `playerKillCount`, `minecraft.used:minecraft.carrot_on_a_stick` and the rest. Without one the objective is `dummy`, changed only by your code.
 - **Mobs have scores too.** `hp[@e[tag=boss, limit=1]]` works like a player's, and the score goes away with the entity.
-- **A score nobody has set is not 0.** It counts as 0 in arithmetic, but every comparison with it is false and no selector matches it: `mana[@s] < 5` is false for a player whose mana was never set, and `@a[scores={mana=..19}]` skips them. Give each player a starting value in `OnFirstJoin`, as above, and prefer asking whether a player has enough (`>=`) over whether they have too little.
+- **A score nobody has set is not 0.** It counts as 0 in arithmetic, but `<`, `<=`, `>`, `>=` and `==` are all false for it and no selector matches it: `mana[@s] < 5` is false for a player whose mana was never set, and `@a[scores={mana=..19}]` skips them. Give each player a starting value in `OnFirstJoin`, as above, and prefer asking whether a player has enough (`>=`) over whether they have too little.
 
 Raw commands and score variables mix freely. One selector that changes many players at once, as in the `OnTick` above, is cheaper than a loop.
 
@@ -137,9 +137,7 @@ Function freeze {
 }
 
 OnTick {
-  As(frozen).At(@s) {
-    /tp @s ~ ~ ~
-  }
+  /effect give ${frozen} slowness 1 255 true
 }
 ```
 

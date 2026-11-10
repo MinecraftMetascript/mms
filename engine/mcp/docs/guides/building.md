@@ -19,10 +19,10 @@ Most mistakes never need the game. The checker knows the game's schema and comma
 mms check          # errors and warnings
 mms check -hints   # style suggestions too
 mms fix            # apply every safe fix
-mms fmt            # format every file
+mms fmt .          # format every file
 ```
 
-`mms check` exits with 1 when there is an error, and `mms build` refuses to write a pack with errors in it, so a broken pack never reaches a world. `mms fix` applies only fixes that leave the built pack unchanged. `mms fmt -check` lists unformatted files without changing them, for CI. [Lint rules](lint.md) covers the rules and how to set their severity.
+`mms check` exits with 1 when there is an error, and `mms build` refuses to write a pack with errors in it, so a broken pack never reaches a world. `mms fix` applies only fixes that leave the built pack unchanged. `mms fmt -check .` lists unformatted files without changing them, for CI. `mms fmt` needs the folder or the files to format: without one it formats what it reads from standard input. [Lint rules](lint.md) covers the rules and how to set their severity.
 
 ## Build into a world
 
@@ -104,12 +104,12 @@ A pack with custom item textures needs both. Without the resource pack the items
 `mms` is one binary with no dependencies, so checking a pack on every push takes three lines:
 
 ```sh
-mms fmt -check
+mms fmt -check .
 mms check
 mms test
 ```
 
-Each exits with 1 on failure. `mms build --zip` after them gives a release file.
+Each exits with 1 on failure. `mms build --zip pack.zip` after them gives a release file.
 
 ## Start from an existing pack
 

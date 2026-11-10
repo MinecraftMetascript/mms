@@ -7,7 +7,7 @@ MMS has two editors: the [web editor](https://minecraftmetascript.github.io/mms/
 - **The web editor** is the quickest start. Projects are kept in your browser, examples are one click away, and **Download pack** gives you a zip. Use it to try the language, to share a small pack, or on a computer where you cannot install anything.
 - **VS Code** suits a project you keep: the files are on your disk, so they work with git, with other tools and with `mms` in a terminal. Install **Minecraft Metascript** from the Extensions view. It also works in Cursor, VSCodium and other editors that use Open VSX.
 
-A project moves between them as a zip (**Import zip…** in the web editor) or as a folder.
+A project moves between them as a zip: **Export project zip** and **Import zip…** in the web editor's project menu.
 
 ## While you type
 
@@ -61,7 +61,7 @@ After each build the editor says whether the game needs `/reload` or a rejoin. S
 
 ## The web editor's own corners
 
-- **Projects.** Click the project's name to switch projects or start a new one. They are saved in the browser, so download a zip of anything you would be sad to lose.
+- **Projects.** Click the project's name to switch projects or start a new one. They are saved in the browser, so keep a copy of anything you would be sad to lose: **Export project zip**, in the project menu, saves the sources. **Download pack** is the built pack, which cannot be turned back into a project.
 - **Examples** opens any of the example projects as a new project.
 - **Paste JSON…** turns a JSON file from a data pack into the MMS declaration that writes it.
 - **+ Add texture or sound** adds `.png`, `.ogg` and `.nbt` files to the project.

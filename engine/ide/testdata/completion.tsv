@@ -39,7 +39,7 @@ line	Call>Arg>Name	97	98
 line	Call>Arg>Number	1	1
 line	Call>Arg>String	3	3
 line	Call>Arg>Tag	9	9
-line	Call>Member>Name	7	14
+line	Call>Member>Name	6	13
 line	ConstStmt>List>Ident	0	16
 line	ConstStmt>TypeList>TypeName	1	1
 line	Decl>Binary>Ident	2	4
@@ -62,7 +62,7 @@ line	FieldStmt>Unary>Ident	3	3
 line	File	0	1
 line	File>ConstStmt>TypeName	3	3
 line	File>Decl>Block	2	4
-line	File>Decl>Ident	171	173
+line	File>Decl>Ident	173	175
 line	File>Decl>List	0	2
 line	File>Decl>TypeName	69	69
 line	ForStmt>Range>Ident	2	2
@@ -94,7 +94,7 @@ line	TypeList>TypeName>TypeName	1	1
 line	TypeRecord>FieldDecl>TypeName	1	1
 line	TypeUnion>TypeMap>TypeName	1	1
 line	Unary>Call>Ident	6	6
-line	all	1553	1672
+line	all	1554	1673
 word	Arg>Binary>Ident	5	5
 word	Arg>Call>Ident	38	38
 word	Arg>List>Ident	16	18
@@ -135,7 +135,7 @@ word	Call>Arg>Name	96	98
 word	Call>Arg>Number	1	1
 word	Call>Arg>String	3	3
 word	Call>Arg>Tag	9	9
-word	Call>Member>Name	14	14
+word	Call>Member>Name	13	13
 word	ConstStmt>List>Ident	0	16
 word	ConstStmt>TypeList>TypeName	1	1
 word	Decl>Binary>Ident	3	4
@@ -158,7 +158,7 @@ word	FieldStmt>Unary>Ident	3	3
 word	File	0	1
 word	File>ConstStmt>TypeName	3	3
 word	File>Decl>Block	2	4
-word	File>Decl>Ident	171	173
+word	File>Decl>Ident	173	175
 word	File>Decl>List	0	2
 word	File>Decl>TypeName	69	69
 word	ForStmt>Range>Ident	2	2
@@ -190,4 +190,4 @@ word	TypeList>TypeName>TypeName	1	1
 word	TypeRecord>FieldDecl>TypeName	1	1
 word	TypeUnion>TypeMap>TypeName	1	1
 word	Unary>Call>Ident	6	6
-word	all	1571	1672
+word	all	1572	1673

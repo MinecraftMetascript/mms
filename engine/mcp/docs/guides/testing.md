@@ -89,7 +89,7 @@ Test rings_on_the_second_tick {
 
 ## Standing in for a player
 
-There are no players in a test, so `@a` and `@p` find no one. Most function code only needs *something* to run as, and a summoned entity will do. Give it a tag, name the selector, and run the function as it:
+There are no players in a test, so `@a` finds no one, and `@p` and `@r` are not supported. Most function code only needs *something* to run as, and a summoned entity will do. Give it a tag, name the selector, and run the function as it:
 
 ```mms
 /** Mana each player has. */
