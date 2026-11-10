@@ -53,6 +53,24 @@ Blueprint JigsawStructure {
    * `<namespace>:<name>`.
    */
   pools: {string: [WeightedElement] | TemplatePool}
+  /** The jigsaw block in the start piece that sits at the structure's center, by its name, such as `minecraft:city_anchor`. The start piece's own center is used unless set. */
+  start_jigsaw_name: string?
+  /**
+   * The mobs that spawn in it instead of the biome's, by mob category:
+   * `monster = { bounding_box = piece, spawns = [] }` stops hostile mobs
+   * spawning inside its pieces. `full` covers its whole bounding box.
+   */
+  spawn_overrides: {MobCategory: SpawnOverride} = {}
+  /** Whether pieces placed in water are waterlogged: `apply_waterlogging` (the game's default) or `ignore_waterlogging`. */
+  liquid_settings: LiquidSettings?
+  /**
+   * Stand-in pool names that jigsaw blocks can draw from, each bound to a
+   * real pool when the structure starts, as trial chambers do:
+   * `[{ type = random, alias = my:spawner, targets = [{ data = zombies, weight = 1 }] }]`.
+   */
+  pool_aliases: [PoolAlias]?
+  /** How many blocks from the bottom and top of the world its pieces keep: a number for both, or `{ bottom = 10, top = 0 }`. */
+  dimension_padding: (int | DimensionPaddingConfig)?
 
   check {
     if (separation >= spacing) {
@@ -76,13 +94,17 @@ Blueprint JigsawStructure {
       biomes = biomes
       step = step
       terrain_adaptation = terrain_adaptation
-      spawn_overrides = {}
+      spawn_overrides = spawn_overrides
       start_pool = start
+      start_jigsaw_name = start_jigsaw_name
       size = depth
       start_height = height
       project_start_to_heightmap = heightmap
       max_distance_from_center = max_distance
       use_expansion_hack = false
+      pool_aliases = pool_aliases
+      dimension_padding = dimension_padding
+      liquid_settings = liquid_settings
     }
     for name, pool in pools {
       TemplatePool ${name} = if (kind_of(pool) == "list") { fallback = minecraft:empty, elements = pool } else pool

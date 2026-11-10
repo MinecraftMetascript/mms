@@ -555,6 +555,65 @@ func TestPieceProcessors(t *testing.T) {
 	}
 }
 
+// JigsawStructure passes the structure's other jigsaw fields through, and
+// leaves the optional ones out unless set.
+func TestJigsawStructureFields(t *testing.T) {
+	files := fstest.MapFS{"structures/start.nbt": {Data: piece(t)}}
+	src := `JigsawStructure village {
+  biomes = #minecraft:is_overworld
+  step = surface_structures
+  spacing = 32
+  separation = 12
+  height = Constant(Absolute(0))
+  heightmap = WORLD_SURFACE_WG
+  start = start
+  pools = { start = [Piece("start")], guard = [Piece("start")] }
+  start_jigsaw_name = minecraft:center
+  spawn_overrides = {
+    monster = { bounding_box = piece, spawns = [] }
+    creature = { bounding_box = full, spawns = [{ type = minecraft:cat, weight = 1, count = 1 }] }
+  }
+  liquid_settings = ignore_waterlogging
+  pool_aliases = [
+    { type = direct, alias = demo:sentry, target = guard },
+    { type = random, alias = demo:spawner, targets = [{ data = guard, weight = 1 }] },
+  ]
+  dimension_padding = { bottom = 10 }
+}
+`
+	_, r := assetProject(t, files, src)
+	for _, d := range r.Diagnostics("main.mms") {
+		if d.Severity == syntax.SeverityError {
+			t.Errorf("%s: %s", d.Code, d.Message)
+		}
+	}
+	st := emitted(t, r, "data/demo/worldgen/structure/village.json")
+	for _, want := range []string{
+		`"start_jigsaw_name": "minecraft:center"`,
+		`"monster": {`, `"bounding_box": "piece"`, `"type": "minecraft:cat"`,
+		`"liquid_settings": "ignore_waterlogging"`,
+		`"type": "minecraft:direct"`, `"alias": "demo:sentry"`, `"target": "demo:guard"`,
+		`"bottom": 10`, `"type": "minecraft:random"`, `"data": "demo:guard"`,
+	} {
+		if !strings.Contains(st, want) {
+			t.Errorf("structure lacks %s:\n%s", want, st)
+		}
+	}
+
+	// Unset, spawn_overrides is still written, empty, as the game needs it.
+	src = strings.Join(strings.Split(src, "\n")[:9], "\n") + "\n}\n"
+	_, r = assetProject(t, files, src)
+	st = emitted(t, r, "data/demo/worldgen/structure/village.json")
+	if !strings.Contains(st, `"spawn_overrides": {}`) {
+		t.Errorf("want an empty spawn_overrides:\n%s", st)
+	}
+	for _, unset := range []string{"start_jigsaw_name", "liquid_settings", "pool_aliases", "dimension_padding"} {
+		if strings.Contains(st, unset) {
+			t.Errorf("unset %s written:\n%s", unset, st)
+		}
+	}
+}
+
 func TestJigsawStructureChecks(t *testing.T) {
 	for _, tc := range []struct{ fields, want string }{
 		{"spacing = 8\n  separation = 8", "separation must be less than spacing"},
