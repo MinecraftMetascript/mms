@@ -11,7 +11,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/minecraftmetascript/mms/engine/nbt"
+	"github.com/MinecraftMetascript/nbt-go"
+
 	"github.com/minecraftmetascript/mms/engine/spec"
 )
 
@@ -708,7 +709,7 @@ func TestExtractAction(t *testing.T) {
 func TestOutputStructureJigsaws(t *testing.T) {
 	c := start(t)
 	c.result("initialize", map[string]any{})
-	data, err := nbt.Encode(map[string]any{
+	data, err := gzipNBT(map[string]any{
 		"size":    []any{int32(5), int32(4), int32(7)},
 		"palette": []any{map[string]any{"Name": "minecraft:jigsaw", "Properties": map[string]any{"orientation": "east_up"}}},
 		"blocks": []any{map[string]any{"pos": []any{int32(1), int32(2), int32(3)}, "state": int32(0),
@@ -1101,4 +1102,14 @@ func TestWorldInstall(t *testing.T) {
 	if m := c.call("mms/worldInstall", map[string]any{}); m["error"] == nil {
 		t.Errorf("built with errors: %v", m["result"])
 	}
+}
+
+// gzipNBT writes a root compound gzipped, as the game writes structure
+// files.
+func gzipNBT(root map[string]any) ([]byte, error) {
+	var b bytes.Buffer
+	enc := nbt.NewEncoder(&b)
+	enc.SetCompression(nbt.Gzip)
+	err := enc.Encode(root)
+	return b.Bytes(), err
 }

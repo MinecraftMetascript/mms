@@ -65,7 +65,7 @@ scoreboard players set #greet.-f1 mms.adv 0
 execute if score #greet.-t2 mms.adv matches 0 run scoreboard players set #greet.-f1 mms.adv 1
 execute if score #greet.-f1 mms.adv matches 1 run function adv:greet/_if2
 execute unless score #greet.-f1 mms.adv matches 1 run function adv:greet/_else4
-tellraw @a {nbt:"l.\"greet\".greeting",storage:"adv:mms",interpret:true}
+tellraw @a {nbt:'l."greet".greeting',storage:"adv:mms",interpret:true}
 === data/adv/function/greet/_else4.mcfunction
 data modify storage adv:mms m.a0 set from storage adv:mms l."greet".greeting
 function adv:greet/_macro5 with storage adv:mms m

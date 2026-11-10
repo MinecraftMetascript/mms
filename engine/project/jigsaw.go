@@ -11,9 +11,11 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/MinecraftMetascript/nbt-go"
+	"github.com/MinecraftMetascript/nbt-go/structure"
+
 	"github.com/minecraftmetascript/mms/engine/internal/near"
 	"github.com/minecraftmetascript/mms/engine/jsonv"
-	"github.com/minecraftmetascript/mms/engine/nbt"
 	"github.com/minecraftmetascript/mms/engine/sema"
 	"github.com/minecraftmetascript/mms/engine/syntax"
 )
@@ -98,17 +100,14 @@ func readStructure(fsys fs.FS, src string) structureFile {
 	if hit {
 		return f
 	}
-	if data, err := fs.ReadFile(fsys, src); err == nil {
-		if root, err := nbt.Decode(data); err == nil {
-			f = structureFile{jigsaws: Jigsaws(root), ok: true}
-			if size, ok := root["size"].([]any); ok && len(size) == 3 {
-				for i, v := range size {
-					if n, ok := v.(int32); ok {
-						f.size[i] = int(n)
-					}
-				}
+	if f2, err := fsys.Open(src); err == nil {
+		if st, err := structure.Read(f2); err == nil {
+			f = structureFile{jigsaws: Jigsaws(st), ok: true}
+			for i, n := range st.Size {
+				f.size[i] = int(n)
 			}
 		}
+		f2.Close()
 	}
 	structureCache.Lock()
 	if len(structureCache.m) > 1024 {
@@ -119,46 +118,34 @@ func readStructure(fsys fs.FS, src string) structureFile {
 	return f
 }
 
-// Jigsaws lists the jigsaw blocks of a decoded structure file, in the
-// order the file lists its blocks.
-func Jigsaws(root map[string]any) []Jigsaw {
-	var palette []any
-	if p, ok := root["palette"].([]any); ok {
-		palette = p
-	} else if ps, ok := root["palettes"].([]any); ok && len(ps) > 0 {
-		palette, _ = ps[0].([]any)
+// Jigsaws lists the jigsaw blocks of a structure file, in the order the
+// file lists its blocks.
+func Jigsaws(st *structure.Structure) []Jigsaw {
+	palette := st.Palette
+	if len(palette) == 0 && len(st.Palettes) > 0 {
+		palette = st.Palettes[0]
 	}
-	blocks, _ := root["blocks"].([]any)
 	var out []Jigsaw
-	for _, b := range blocks {
-		block, _ := b.(map[string]any)
-		data, _ := block["nbt"].(map[string]any)
+	for _, block := range st.Blocks {
+		data := block.NBT
 		if data == nil {
 			continue
 		}
-		isJigsaw := data["id"] == "minecraft:jigsaw"
+		isJigsaw := nbtString(data["id"]) == "minecraft:jigsaw"
 		orientation := ""
-		if s, ok := block["state"].(int32); ok && int(s) < len(palette) && s >= 0 {
-			// Palette entries are {Name, Properties} up to 1.21 and
-			// {id, properties} in 26.x structure files.
-			if st, ok := palette[s].(map[string]any); ok && (st["Name"] == "minecraft:jigsaw" || st["id"] == "minecraft:jigsaw") {
-				isJigsaw = true
-				props, ok := st["Properties"].(map[string]any)
-				if !ok {
-					props, _ = st["properties"].(map[string]any)
-				}
-				orientation, _ = props["orientation"].(string)
-			}
+		if s := block.State; int(s) < len(palette) && s >= 0 && palette[s].Name == "minecraft:jigsaw" {
+			isJigsaw = true
+			orientation = palette[s].Properties["orientation"]
 		}
 		if !isJigsaw {
 			continue
 		}
 		j := Jigsaw{Pool: nbtID(data["pool"]), Name: nbtID(data["name"]), Target: nbtID(data["target"]), Orientation: orientation}
-		j.Joint, _ = data["joint"].(string)
-		j.FinalState, _ = data["final_state"].(string)
+		j.Joint = nbtString(data["joint"])
+		j.FinalState = nbtString(data["final_state"])
 		j.SelectionPriority = nbtInt(data["selection_priority"])
 		j.PlacementPriority = nbtInt(data["placement_priority"])
-		if comps, ok := data["components"].(map[string]any); ok {
+		if comps, ok := data["components"].(nbt.Compound); ok {
 			for _, k := range []string{"minecraft:custom_name", "minecraft:item_name"} {
 				if j.Label = textOf(comps[k]); j.Label != "" {
 					break
@@ -172,12 +159,8 @@ func Jigsaws(root map[string]any) []Jigsaw {
 				j.Joint = "aligned"
 			}
 		}
-		if pos, ok := block["pos"].([]any); ok && len(pos) == 3 {
-			for i, v := range pos {
-				if n, ok := v.(int32); ok {
-					j.Pos[i] = int(n)
-				}
-			}
+		for i, n := range block.Pos {
+			j.Pos[i] = int(n)
 		}
 		out = append(out, j)
 	}
@@ -187,23 +170,20 @@ func Jigsaws(root map[string]any) []Jigsaw {
 // textOf reads the plain text of a text component in NBT: a string, a
 // compound with text (and extra), or a list of those; older files hold
 // it as JSON in a string.
-func textOf(v any) string {
+func textOf(v nbt.Tag) string {
 	switch t := v.(type) {
-	case string:
-		if strings.HasPrefix(t, "{") || strings.HasPrefix(t, "[") || strings.HasPrefix(t, "\"") {
+	case nbt.String:
+		s := string(t)
+		if strings.HasPrefix(s, "{") || strings.HasPrefix(s, "[") || strings.HasPrefix(s, "\"") {
 			var j any
-			if json.Unmarshal([]byte(t), &j) == nil {
-				return textOf(j)
+			if json.Unmarshal([]byte(s), &j) == nil {
+				return jsonTextOf(j)
 			}
 		}
-		return t
-	case map[string]any:
-		out := textOf(t["text"])
-		if extra, ok := t["extra"].([]any); ok {
-			out += textOf(extra)
-		}
-		return out
-	case []any:
+		return s
+	case nbt.Compound:
+		return textOf(t["text"]) + textOf(t["extra"])
+	case nbt.List:
 		var sb strings.Builder
 		for _, e := range t {
 			sb.WriteString(textOf(e))
@@ -213,10 +193,33 @@ func textOf(v any) string {
 	return ""
 }
 
+// jsonTextOf is textOf for a text component held as JSON.
+func jsonTextOf(v any) string {
+	switch t := v.(type) {
+	case string:
+		return t
+	case map[string]any:
+		return jsonTextOf(t["text"]) + jsonTextOf(t["extra"])
+	case []any:
+		var sb strings.Builder
+		for _, e := range t {
+			sb.WriteString(jsonTextOf(e))
+		}
+		return sb.String()
+	}
+	return ""
+}
+
+// nbtString reads a string tag, or "".
+func nbtString(v nbt.Tag) string {
+	s, _ := v.(nbt.String)
+	return string(s)
+}
+
 // nbtID reads an id string, adding the minecraft namespace; absent or
 // empty is minecraft:empty, the game's default.
-func nbtID(v any) string {
-	s, _ := v.(string)
+func nbtID(v nbt.Tag) string {
+	s := nbtString(v)
 	if s == "" {
 		return "minecraft:empty"
 	}
@@ -970,15 +973,15 @@ func (r *Result) newHoleFix(s *structureUse, id string) (syntax.Fix, bool) {
 }
 
 // nbtInt reads a whole number of any NBT integer type, or 0.
-func nbtInt(v any) int {
+func nbtInt(v nbt.Tag) int {
 	switch n := v.(type) {
-	case int8:
+	case nbt.Byte:
 		return int(n)
-	case int16:
+	case nbt.Short:
 		return int(n)
-	case int32:
+	case nbt.Int:
 		return int(n)
-	case int64:
+	case nbt.Long:
 		return int(n)
 	}
 	return 0

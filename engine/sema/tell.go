@@ -4,6 +4,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/MinecraftMetascript/nbt-go"
+
 	"github.com/minecraftmetascript/mms/engine/fn"
 	"github.com/minecraftmetascript/mms/engine/format"
 	"github.com/minecraftmetascript/mms/engine/jsonv"
@@ -218,11 +220,7 @@ func componentSNBT(v jsonv.Value) string {
 				if i > 0 {
 					b.WriteByte(',')
 				}
-				if plainKey(m.Key) {
-					b.WriteString(m.Key)
-				} else {
-					b.WriteString(fn.QuoteSNBT(m.Key))
-				}
+				b.WriteString(nbt.QuoteKey(m.Key))
 				b.WriteByte(':')
 				write(m.Value)
 			}
@@ -237,7 +235,7 @@ func componentSNBT(v jsonv.Value) string {
 			}
 			b.WriteByte(']')
 		case jsonv.String:
-			b.WriteString(fn.QuoteSNBT(string(v)))
+			b.WriteString(nbt.Quote(string(v)))
 		case jsonv.Number:
 			b.WriteString(string(v))
 		case jsonv.Bool:
@@ -250,18 +248,6 @@ func componentSNBT(v jsonv.Value) string {
 	}
 	write(v)
 	return b.String()
-}
-
-func plainKey(k string) bool {
-	if k == "" {
-		return false
-	}
-	for _, r := range k {
-		if !(r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || r == '_') {
-			return false
-		}
-	}
-	return true
 }
 
 // TextCommandSignature is signature help for a text command: its label,

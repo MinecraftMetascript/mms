@@ -5,6 +5,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/MinecraftMetascript/nbt-go"
 )
 
 // Output is what generating functions produces.
@@ -445,7 +447,7 @@ func (g *gen) macro(o Macro) []string {
 		case a.Score != nil:
 			lines = append(lines, fmt.Sprintf("execute store result storage %s %s int 1 run scoreboard players get %s", st, path, *a.Score))
 		case a.Text != nil:
-			lines = append(lines, fmt.Sprintf("data modify storage %s %s set value %s", st, path, QuoteSNBT(*a.Text)))
+			lines = append(lines, fmt.Sprintf("data modify storage %s %s set value %s", st, path, nbt.Quote(*a.Text)))
 		default:
 			lines = append(lines, fmt.Sprintf("data modify storage %s %s set from storage %s", st, path, a.Path))
 		}
@@ -453,31 +455,6 @@ func (g *gen) macro(o Macro) []string {
 	id := g.next("macro")
 	g.out.Files[id] = []string{"$" + o.Line}
 	return append(lines, fmt.Sprintf("function %s with storage %s m", id, st))
-}
-
-// QuoteSNBT quotes a string for SNBT, escaping control characters so a
-// newline in the string cannot split the command line.
-func QuoteSNBT(s string) string {
-	var b strings.Builder
-	b.WriteByte('"')
-	for _, r := range s {
-		switch {
-		case r == '\\':
-			b.WriteString(`\\`)
-		case r == '"':
-			b.WriteString(`\"`)
-		case r == '\n':
-			b.WriteString(`\n`)
-		case r == '\t':
-			b.WriteString(`\t`)
-		case r < 0x20 || (r >= 0x7f && r <= 0x9f):
-			fmt.Fprintf(&b, `\u%04x`, r)
-		default:
-			b.WriteRune(r)
-		}
-	}
-	b.WriteByte('"')
-	return b.String()
 }
 
 func (g *gen) call(fr *frame, o Call) []string {

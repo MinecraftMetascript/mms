@@ -43,7 +43,8 @@ Function f {
 		`bold:true`,
 		`{score:{name:"#f.n",objective:"mms.demo"}}`,
 		`{score:{name:"#f.-t0",objective:"mms.demo"}}`,
-		`{nbt:"l.\"f\".name",storage:"demo:mms",interpret:true}`,
+		// Quoted as the game quotes it: the other quote from the one inside.
+		`{nbt:'l."f".name',storage:"demo:mms",interpret:true}`,
 	} {
 		if !strings.Contains(got, want) {
 			t.Errorf("output lacks %s:\n%s", want, got)

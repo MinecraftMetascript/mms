@@ -11,15 +11,17 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/MinecraftMetascript/nbt-go"
 )
 
 // VM holds a world's scores, storage and functions.
 type VM struct {
 	Functions map[string][]string // id -> lines
 	Scores    map[string]map[string]int32
-	Storage   map[string]map[string]any // storage id -> top-level compound
-	Said      []string                  // `say` output, and `tellraw` as plain text
-	Steps     int                       // commands run
+	Storage   map[string]nbt.Compound // storage id -> top-level compound
+	Said      []string                // `say` output, and `tellraw` as plain text
+	Steps     int                     // commands run
 	MaxSteps  int
 	Entities  []*Entity // summoned entities, oldest first
 	summoned  int       // entities summoned so far, for their score holders
@@ -29,7 +31,7 @@ type VM struct {
 }
 
 func New(files map[string][]string) *VM {
-	return &VM{Functions: files, Scores: map[string]map[string]int32{}, Storage: map[string]map[string]any{}, MaxSteps: 1_000_000}
+	return &VM{Functions: files, Scores: map[string]map[string]int32{}, Storage: map[string]nbt.Compound{}, MaxSteps: 1_000_000}
 }
 
 // Score returns a score and whether it is set.
@@ -61,7 +63,7 @@ func (vm *VM) Run(id string) (int32, bool, error) {
 	return r.value, r.ok, err
 }
 
-func (vm *VM) call(id string, macro map[string]any) (result, error) {
+func (vm *VM) call(id string, macro nbt.Compound) (result, error) {
 	lines, ok := vm.Functions[id]
 	if !ok {
 		return result{}, fmt.Errorf("unknown function %s", id)
@@ -93,7 +95,7 @@ func (vm *VM) call(id string, macro map[string]any) (result, error) {
 	return result{}, nil
 }
 
-func substitute(line string, macro map[string]any) (string, error) {
+func substitute(line string, macro nbt.Compound) (string, error) {
 	var sb strings.Builder
 	for {
 		i := strings.Index(line, "$(")
@@ -111,7 +113,7 @@ func substitute(line string, macro map[string]any) (string, error) {
 			return "", fmt.Errorf("missing macro argument %q", key)
 		}
 		sb.WriteString(line[:i])
-		sb.WriteString(snbtMacro(v))
+		sb.WriteString(toText(v))
 		line = line[i+j+1:]
 	}
 }
@@ -274,13 +276,13 @@ func (vm *VM) function(w []string) (result, error) {
 	if len(w) == 0 {
 		return result{}, fmt.Errorf("function needs an id")
 	}
-	var macro map[string]any
+	var macro nbt.Compound
 	if len(w) >= 4 && w[1] == "with" && w[2] == "storage" {
 		v, err := vm.get(w[3], strings.Join(w[4:], " "))
 		if err != nil {
 			return result{}, err
 		}
-		m, ok := v.(map[string]any)
+		m, ok := v.(nbt.Compound)
 		if !ok {
 			return result{}, fmt.Errorf("macro arguments must be a compound")
 		}

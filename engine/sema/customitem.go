@@ -1,10 +1,10 @@
 package sema
 
 import (
-	"regexp"
 	"strings"
 
-	"github.com/minecraftmetascript/mms/engine/fn"
+	"github.com/MinecraftMetascript/nbt-go"
+
 	"github.com/minecraftmetascript/mms/engine/jsonv"
 )
 
@@ -43,8 +43,6 @@ func StackSNBT(st *jsonv.Object) string {
 	return sb.String()
 }
 
-var bareSNBTKey = regexp.MustCompile(`^[A-Za-z0-9_\-.+]+$`)
-
 func writeSNBT(sb *strings.Builder, v jsonv.Value) {
 	switch x := v.(type) {
 	case *jsonv.Object:
@@ -53,11 +51,7 @@ func writeSNBT(sb *strings.Builder, v jsonv.Value) {
 			if i > 0 {
 				sb.WriteByte(',')
 			}
-			if bareSNBTKey.MatchString(m.Key) {
-				sb.WriteString(m.Key)
-			} else {
-				sb.WriteString(fn.QuoteSNBT(m.Key))
-			}
+			sb.WriteString(nbt.QuoteKey(m.Key))
 			sb.WriteByte(':')
 			writeSNBT(sb, m.Value)
 		}
@@ -72,7 +66,7 @@ func writeSNBT(sb *strings.Builder, v jsonv.Value) {
 		}
 		sb.WriteByte(']')
 	case jsonv.String:
-		sb.WriteString(fn.QuoteSNBT(string(x)))
+		sb.WriteString(nbt.Quote(string(x)))
 	case jsonv.Number:
 		sb.WriteString(string(x))
 	case jsonv.Bool:

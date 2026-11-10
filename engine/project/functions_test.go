@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/MinecraftMetascript/nbt-go"
+
 	"github.com/minecraftmetascript/mms/engine/internal/mcfn"
 	"github.com/minecraftmetascript/mms/engine/spec"
 	"github.com/minecraftmetascript/mms/engine/syntax"
@@ -351,13 +353,13 @@ Function shout(word: string, n: int) {
 			t.Errorf("is_even(%d) = %d, want %d", n, v, want)
 		}
 	}
-	vm.Storage["demo:mms"] = map[string]any{"l": map[string]any{"shout": map[string]any{"word": "hey"}}}
+	vm.Storage["demo:mms"] = nbt.Compound{"l": nbt.Compound{"shout": nbt.Compound{"word": nbt.String("hey")}}}
 	vm.Scores["mms.demo"]["#shout.n"] = 3
 	call(t, vm, "demo:shout")
 	if got := strings.Join(vm.Said, " "); got != "hey!! hey! hey" {
 		t.Errorf("shout said %q", got)
 	}
-	if st, _ := vm.Storage["demo:mms"]["stack"].([]any); len(st) != 0 {
+	if st, _ := vm.Storage["demo:mms"]["stack"].(nbt.List); len(st) != 0 {
 		t.Errorf("stack left with %d frames", len(st))
 	}
 }

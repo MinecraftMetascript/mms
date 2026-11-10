@@ -1,18 +1,20 @@
 package ide
 
 import (
+	"bytes"
 	"context"
 	"strings"
 	"testing"
 	"testing/fstest"
 
-	"github.com/minecraftmetascript/mms/engine/nbt"
+	"github.com/MinecraftMetascript/nbt-go"
+
 	"github.com/minecraftmetascript/mms/engine/project"
 	"github.com/minecraftmetascript/mms/engine/spec"
 )
 
 func TestStructureHoverListsJigsaws(t *testing.T) {
-	data, err := nbt.Encode(map[string]any{
+	data, err := gzipNBT(map[string]any{
 		"size":    []any{int32(5), int32(3), int32(5)},
 		"palette": []any{map[string]any{"Name": "minecraft:jigsaw", "Properties": map[string]any{"orientation": "south_up"}}},
 		"blocks": []any{map[string]any{"pos": []any{int32(2), int32(0), int32(4)}, "state": int32(0),
@@ -34,4 +36,14 @@ func TestStructureHoverListsJigsaws(t *testing.T) {
 	if !strings.Contains(md, "size 5×3×5") || !strings.Contains(md, "| 2 0 4 | south up | `test:bottom` | `test:tops` | `test:top` |") {
 		t.Fatalf("hover:\n%s", md)
 	}
+}
+
+// gzipNBT writes a root compound gzipped, as the game writes structure
+// files.
+func gzipNBT(root map[string]any) ([]byte, error) {
+	var b bytes.Buffer
+	enc := nbt.NewEncoder(&b)
+	enc.SetCompression(nbt.Gzip)
+	err := enc.Encode(root)
+	return b.Bytes(), err
 }

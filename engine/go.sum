@@ -1,3 +1,5 @@
+github.com/MinecraftMetascript/nbt-go v0.0.0-20261110022744-93d43921e6bf h1:dLp6ELUZtYj8mGaEN+mLPEkWLQAaqAcYJBHnlIabr+0=
+github.com/MinecraftMetascript/nbt-go v0.0.0-20261110022744-93d43921e6bf/go.mod h1:ljqdqeOpqh2V4TOpqvZBA5EvWcvKGRKZ8h1gkjA8qhQ=
 github.com/antlr4-go/antlr/v4 v4.13.1 h1:SqQKkuVZ+zWkMMNkjy5FZe5mr5WURWnlpmOuzYWrPrQ=
 github.com/antlr4-go/antlr/v4 v4.13.1/go.mod h1:GKmUxMtwp6ZgGwZSva4eWPC5mS6vUAmOABFgjdkM7Nw=
 golang.org/x/exp v0.0.0-20240506185415-9bf2ced13842 h1:vr/HnozRka3pE4EsMEg1lgkXJkTFJCVUX+S/ZT6wYzM=

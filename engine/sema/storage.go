@@ -6,6 +6,8 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/MinecraftMetascript/nbt-go"
+
 	"github.com/minecraftmetascript/mms/engine/fn"
 	"github.com/minecraftmetascript/mms/engine/internal/near"
 	"github.com/minecraftmetascript/mms/engine/jsonv"
@@ -109,7 +111,7 @@ func (c *Checker) storageDefaults(ns, loc string, t *spec.Type, decls []*syntax.
 		if f.Key == "" {
 			continue
 		}
-		at := loc + "." + snbtKey(f.Key)
+		at := loc + "." + nbt.QuoteKey(f.Key)
 		d := byName[f.Key]
 		var v jsonv.Value
 		switch {
@@ -239,13 +241,6 @@ func storageChoices(t *spec.Type) []string {
 	return out
 }
 
-func snbtKey(k string) string {
-	if bareSNBTKey.MatchString(k) {
-		return k
-	}
-	return fn.QuoteSNBT(k)
-}
-
 // storageSig fingerprints a Storage declaration's fields, which functions
 // that use it depend on.
 func storageSig(s *Symbol, t *Table) string {
@@ -336,7 +331,7 @@ func (f *fc) storageField(e *syntax.Member) (*local, bool) {
 			return nil, true
 		}
 		path += "." + fl.Key
-		loc += "." + snbtKey(fl.Key)
+		loc += "." + nbt.QuoteKey(fl.Key)
 		f.c.info(n).Help = "```mms\n" + path + ": " + describe(tview{T: fl.Type}) + "\n```\n" + DocMarkdown(fl.Desc)
 		if i < len(names)-1 {
 			if t = f.c.record(fl.Type); t == nil {
