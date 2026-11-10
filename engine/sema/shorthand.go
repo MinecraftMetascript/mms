@@ -402,8 +402,9 @@ func condLogic(c *Checker, e syntax.Expr, v tview) jsonv.Value {
 	return nil
 }
 
-// blockWithState lowers `oak_log[axis=y]` to { Name, Properties } and
-// checks the properties against the block's states.
+// blockWithState lowers `oak_log[axis=y]` to { id, properties }, the
+// block state form 26.x data packs use, and checks the properties against
+// the block's states.
 func blockWithState(c *Checker, e syntax.Expr, v tview) jsonv.Value {
 	ix := e.(*syntax.Index)
 	o := &jsonv.Object{}
@@ -418,7 +419,7 @@ func blockWithState(c *Checker, e syntax.Expr, v tview) jsonv.Value {
 		return nil
 	}
 	id := c.resolveID(name, idInfo{Registry: "block", Present: true}, ix.X)
-	o.Set("Name", jsonv.String(id))
+	o.Set("id", jsonv.String(id))
 	_, path := splitID(id)
 	states := c.Pack.Blocks[path]
 	props := &jsonv.Object{}
@@ -455,7 +456,7 @@ func blockWithState(c *Checker, e syntax.Expr, v tview) jsonv.Value {
 		props.Set(a.Name.Text, jsonv.String(val))
 	}
 	if len(props.Members) > 0 {
-		o.Set("Properties", props)
+		o.Set("properties", props)
 	}
 	return o
 }
