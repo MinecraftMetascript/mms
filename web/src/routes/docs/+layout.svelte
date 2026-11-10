@@ -21,6 +21,10 @@
 	let main: HTMLElement | undefined = $state();
 </script>
 
+<svelte:head>
+	{#if data.markdown}<link rel="alternate" type="text/markdown" href="{base}/docs/{data.markdown}.md" />{/if}
+</svelte:head>
+
 <div class="min-h-dvh bg-bg">
 	<header class="sticky top-0 z-20 flex items-center gap-1 border-b border-line bg-panel px-4 py-2 sm:gap-3">
 		<a class="mr-2 flex items-center gap-2 font-semibold tracking-tight" href={resolve('/docs')}><Logo class="h-6 w-auto" /></a>
@@ -70,7 +74,7 @@
 			{#each credits as c, i (c.name)}<a class="text-accent hover:underline" href={c.url} target="_blank" rel="noopener">{c.name}</a> by <a class="hover:underline" href={c.byUrl} target="_blank" rel="noopener">{c.by}</a>{i < credits.length - 2 ? ', ' : i === credits.length - 2 ? ' and ' : '. '}{/each}
 			Previews are rendered with Deepslate.
 			<a class="text-accent hover:underline" href={asset('third-party-licenses.txt')} target="_blank">Third-party licenses</a>.
-			For AI tools: <a class="text-accent hover:underline" href="{base}/llms.txt">llms.txt</a>, <a class="text-accent hover:underline" href="{base}/llms-full.txt">llms-full.txt</a>, <a class="text-accent hover:underline" href="{base}/docs/reference.yaml">reference.yaml</a>.
+			For AI tools: {#if data.markdown}<a class="text-accent hover:underline" href="{base}/docs/{data.markdown}.md">this page as Markdown</a>, {/if}<a class="text-accent hover:underline" href="{base}/llms.txt">llms.txt</a>, <a class="text-accent hover:underline" href="{base}/llms-full.txt">llms-full.txt</a>, <a class="text-accent hover:underline" href="{base}/docs/reference.yaml">reference.yaml</a>.
 		</p>
 	</footer>
 </div>
