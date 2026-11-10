@@ -130,10 +130,27 @@ Every value is checked against the 26.3 schema as you type. Completion offers th
 
 ## Next
 
+Tutorials build one thing from start to finish:
+
+- [A magic wand](tutorial-custom-item.md): a custom item with a right-click spell, a cooldown and a recipe.
+- [A wave arena](tutorial-minigame.md): a small game with typed data, state, functions and tests.
+- [A guide book](tutorial-book.md): written books, text markup and messages in chat.
+- [A custom dimension](tutorial-dimension.md): a complete worldgen project.
+- [A jigsaw dungeon](tutorial-structure.md): a structure grown from pieces you build in the game.
+
+Guides go deeper into one subject:
+
 - [Writing resources](../guides/resources.md): the shorthand for loot tables, recipes, density functions and more.
 - [Functions](../guides/functions.md): variables, control flow, calls and strings in function code.
-- [Tutorial: a custom dimension](tutorial-dimension.md): a complete worldgen project.
-- [Language reference](../reference/language/declarations.md): declarations, values, constants and templates, Blueprints, functions, text and tests, each with examples.
+- [Keeping state](../guides/state.md): choosing between scores, Globals, Storage and tags.
+- [Cutting repetition](../guides/repetition.md): constants, templates and loops.
+- [Making your own kinds](../guides/blueprints.md): Blueprints, step by step.
+- [Testing functions](../guides/testing.md): tests that run without the game.
+- [Shaping terrain](../guides/terrain.md): density functions, noise and splines.
+- [Building and playing](../guides/building.md): the loop from an edit to the game, and sharing a pack.
+- [A tour of the editors](../guides/editors.md): what the web editor and VS Code can do.
+
+The [language reference](../reference/language/declarations.md) covers declarations, values, constants and templates, Blueprints, functions, text and tests, each with examples.
 
 ## Importing
 

@@ -7,7 +7,7 @@ Objective wand_cooldown
 
 /** A wand: a stick that casts a spell, with a cooldown. */
 Blueprint Wand {
-  /** The wand's name, in markup. */
+  /** The wand's name. */
   name: string
   /** The function that casts the spell. */
   cast: Function
@@ -47,7 +47,7 @@ Function shoot_fireball {
 }
 
 Wand fire_wand {
-  name = "{gold}Fire Wand"
+  name = "Fire Wand"
   cast = shoot_fireball
 }
 
