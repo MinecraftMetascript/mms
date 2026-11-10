@@ -379,6 +379,7 @@ func (c *Checker) callableByName(name string, v tview) *Callable {
 		}
 		if c.hasDispatchKey(disp, key) {
 			cfs, _ := c.fields(v, key)
+			cfs = c.withNoneFields(v, disp, key, cfs)
 			return &Callable{Name: name, Case: key, Struct: v, Fields: withDocs(disp.Dispatcher+"/"+key, disp.Dispatcher, cfs), Disp: disp, Ov: overlays[disp.Dispatcher+"/"+key]}
 		}
 		return nil
@@ -802,4 +803,34 @@ func (c *Checker) octaveCount(fs []field, byKey map[string]*assign, o *jsonv.Obj
 		sp = a.expr.Span()
 	}
 	c.errorf("mms/octave-count", sp, "octave_count is %s, but amplitude_modifiers has %s entries; they must match (or leave octave_count out)", num, n)
+}
+
+// withNoneFields adds the fields another dispatcher of v brings when its
+// key is left out, such as a multi-noise source's biomes when it has no
+// preset. They are optional here: the check asks for them only when the
+// key is missing.
+func (c *Checker) withNoneFields(v tview, disp *dispInfo, key string, fs []field) []field {
+	var secondary []string
+	nfs, _ := c.fieldsWith(v, func(k string) string {
+		if k == disp.KeyField {
+			return key
+		}
+		secondary = append(secondary, k)
+		return noneKey
+	})
+	for _, f := range nfs {
+		if hasField(fs, f.Key) {
+			continue
+		}
+		f.Optional = true
+		if len(secondary) == 1 {
+			note := "Only when `" + secondary[0] + "` is left out."
+			if f.Desc != "" {
+				note = f.Desc + "\n\n" + note
+			}
+			f.Desc = note
+		}
+		fs = append(fs, f)
+	}
+	return fs
 }

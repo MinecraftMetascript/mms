@@ -1,7 +1,7 @@
 package ide
 
 import (
-	"strings"
+	"sort"
 
 	"github.com/minecraftmetascript/mms/engine/sema"
 	"github.com/minecraftmetascript/mms/engine/syntax"
@@ -81,13 +81,23 @@ func (s *Session) typeCompletion(a *at, off int) ([]sema.Candidate, bool) {
 // use.
 func (s *Session) typeNameCandidates(path string) []sema.Candidate {
 	var out []sema.Candidate
+	briefs := sema.TypeBriefs(s.P.Pack, s.P.Kinds)
 	for i, t := range s.R.TypeEnv.Names(path) {
 		c := sema.Candidate{Label: t.Name, Kind: sema.CandKind, Detail: t.Detail, Rank: i}
+		if b, ok := briefs[t.Name]; ok && t.Detail == "schema type" {
+			// Its shape, and the types pack files use before those only
+			// the game's own data does.
+			c.Detail, c.Doc = b.Summary, b.Doc
+			if !b.Used {
+				c.Rank += 100000
+			}
+		}
 		if t.Args {
 			c.Insert = t.Name + "<$1>"
 		}
 		out = append(out, c)
 	}
+	sort.SliceStable(out, func(i, j int) bool { return out[i].Rank < out[j].Rank })
 	return out
 }
 
@@ -224,7 +234,7 @@ func (s *Session) typeHover(path string, off int) (string, syntax.Span, bool) {
 			md += "\n\n" + doc
 		}
 		if t.Detail == "schema type" {
-			md += schemaFields(s.R.TypeEnv, path, tn)
+			md = "```mms\n" + head + "\n```\n" + s.schemaTypeDoc(t.Name)
 		}
 		return md, typeNameSpan(tn), true
 	}
@@ -250,34 +260,17 @@ func typeDetailDoc(t types.TypeName) string {
 	return t.Detail
 }
 
-// schemaFields lists a schema struct's fixed fields, for its hover.
-func schemaFields(e *types.Env, path string, tn *syntax.TypeName) string {
-	rt := e.Lookup(path, tn)
-	for i := 0; rt != nil && rt.Kind == "reference" && i < 8; i++ {
-		rt = e.Pack.Types[rt.Path]
+// schemaTypeDoc describes the schema type MMS code names name: its
+// shape, examples, values or fields, and a link to the reference.
+func (s *Session) schemaTypeDoc(name string) string {
+	c := sema.NewChecker(s.P.Pack, s.P.Kinds, s.R.Syms, s.P.Config.Namespace)
+	path := c.SchemaTypePath(name)
+	e := c.DescribeType(path)
+	if e == nil {
+		return "A type from the game's data schema."
 	}
-	if rt == nil || rt.Kind != "struct" {
-		return ""
+	if !c.HasTypeEntry(path) {
+		path = ""
 	}
-	var sb strings.Builder
-	n := 0
-	for _, f := range rt.Fields {
-		if f.Kind != "pair" || f.Key == "" {
-			continue
-		}
-		if n == 20 {
-			sb.WriteString("- …\n")
-			break
-		}
-		if n == 0 {
-			sb.WriteString("\n\n**Fields**\n\n")
-		}
-		n++
-		opt := ""
-		if f.Optional {
-			opt = " *(optional)*"
-		}
-		sb.WriteString("- `" + f.Key + "`" + opt + "\n")
-	}
-	return strings.TrimRight(sb.String(), "\n")
+	return sema.TypeMarkdown(e, path)
 }

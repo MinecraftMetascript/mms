@@ -73,7 +73,7 @@ The `use-shorthand` lint hint points at an object that has a shorter form, with 
 
 ## Types
 
-Types come from three places: the game's own schema (`ItemStack`, `LootPool`, `HeightProvider`), the language, and `Type` declarations. The language's types are:
+Types come from three places: the game's own schema (`ItemStack`, `LootPool`, `HeightProvider`, `ClimateParameter`), the language, and `Type` declarations. Every schema type has an entry in the [Types reference](https://minecraftmetascript.github.io/mms/docs/reference/types), which says what it is, gives values that fit and lists where it is used; hovering a type's name in the editor shows the same, and completion where a value goes offers each way of writing one, such as `0` or `[-2, 2]` for a `ClimateParameter`. The language's types are:
 
 - Numbers and words: `int`, `float`, `double`, `long`, `short`, `byte`, `bool`, `string`, and `any` for a value of any type.
 - `Text`: a text component, written as [text markup](text.md).
