@@ -7,53 +7,91 @@
 
 # Minecraft Metascript (MMS)
 
-MMS is a small language that compiles to Minecraft data packs. One MMS file can stand in for the many JSON files a feature needs (noise, density functions, surface rules, loot tables, recipes, functions and more). It also gives functions helpers for globals, variables and scoreboards.
-
-This branch is a full rewrite. The plan is in [docs/plan.md](docs/plan.md), progress is in [docs/tasks.md](docs/tasks.md). Judgement calls are explained in pull request descriptions and commit messages. The older [decision log](docs/decisions.md) (D1 to D94) is frozen and kept for reference.
-
-| Folder | Contents |
-| --- | --- |
-| `engine/` | Go module: spec pack, parser, analysis engine, compiler, language server, CLI and WASM entry |
-| `web/` | Browser editor (SvelteKit, CodeMirror 6, Deepslate previews), deployed to GitHub Pages |
-| `docs/` | Guides, plan, task list, frozen decision log |
-| `editors/vscode/` | VS Code extension (a client for `mms lsp`) |
-| `branding/` | Logo, mark and favicon (SVG sources and the script that builds them) |
-| `examples/` | Example projects, built by the tests and listed in the web editor |
+MMS is a language that compiles to Minecraft Java Edition data packs (and the resource pack they need). One `.mms` file stands in for the many JSON and `.mcfunction` files a feature takes: worldgen, loot tables, recipes, advancements, tags, custom items, books, jigsaw structures and functions. Every value is checked against the game's own schemas and command tree as you type, and the editors preview what you are building.
 
 Target: Minecraft Java Edition 26.3 (data pack format 121).
 
-## Command line
+```mms
+/** Gems that drop from the gem chest. */
+ItemTag gems = [diamond, emerald, amethyst_shard]
 
-```sh
-cd engine && go install ./cmd/mms
-mms init my_pack          # mms.json and a starter file
-mms build my_pack         # check and write the data pack to my_pack/build
-mms fmt my_pack           # format every .mms file
-mms import pack.zip proj  # turn an existing data pack (folder or zip) into MMS
-mms lsp                   # language server over stdio, for editors
-mms reference             # every kind and helper, as JSON
-mms version               # the version and the Minecraft version it targets
+LootTable chests/gems {
+  pools = [Pool(1..3, #gems)]
+}
+
+Recipe gem_block = Shaped(["GG", "GG"], { G = #gems }, emerald_block)
+
+Objective found
+
+Function find {
+  found[@s] += 1
+  /loot give @s loot gems:chests/gems
+  tell(@s, "You have found ${found[@s]} gem chests")
+}
+
+/** Counts a find when right-clicked. */
+CustomItem gem_finder {
+  base = compass
+  name = "Gem Finder"
+  on_right_click = find
+}
 ```
 
-Release builds of `mms` for Linux, macOS and Windows, and the VS Code extension (`editors/vscode`), are attached to each [GitHub release](https://github.com/MinecraftMetascript/mms/releases). Each platform's build of the extension includes `mms`, so editor users install only the extension.
+`mms build` turns that into a loot table, a recipe, an item tag, the function, the advancement and hook functions behind the right click, and the load and tick functions that set up the scoreboard.
+
+Beyond declarations, the language has `const` values and `for` loops that run at build time, Templates and Blueprints for reuse (`CustomItem`, `Book` and `JigsawStructure` are Blueprints written in MMS itself), typed `Storage` records and `let` variables in functions, named selectors, chat and book text with inline markup (`.mmstext` and `.mmsbook` files), and `Test` declarations that run functions without starting the game.
+
+## Get it
+
+- **Web editor:** [minecraftmetascript.github.io/mms](https://minecraftmetascript.github.io/mms/) runs in the browser with nothing to install, and downloads the pack as a zip or builds it into a world folder.
+- **VS Code:** install **Minecraft Metascript** (`minecraftmetascript.mms`) from the VS Code Marketplace, or from Open VSX for Cursor, VSCodium and other editors. It includes `mms` for its own use, so the editor needs nothing else; to run the commands below in a terminal, install the command line too. See [its README](editors/vscode/README.md) for what it does.
+- **Command line:** download `mms` for Linux, macOS or Windows from the [releases page](https://github.com/MinecraftMetascript/mms/releases), or run `go install github.com/minecraftmetascript/mms/engine/cmd/mms@latest`.
+
+```sh
+mms init -namespace gems gems   # mms.json and a starter file
+mms build gems                  # check, then write the data pack to gems/build
+mms build -world ~/.minecraft/saves/MyWorld gems   # or install it into a world
+mms check gems                  # report problems without writing anything
+mms test gems                   # run the project's Test declarations
+mms fix gems                    # apply every safe lint fix
+mms fmt gems                    # format every .mms file in gems
+mms import pack.zip proj        # turn an existing data pack (folder or zip) into MMS
+mms lsp                         # language server over stdio, for other editors
+mms reference                   # every kind, helper and prelude declaration, as JSON
+```
 
 ## Documentation
 
-The guides are in `site/` and on the [docs site](https://minecraftmetascript.github.io/mms/docs), which also has the generated reference:
+Everything is on the [docs site](https://minecraftmetascript.github.io/mms/docs):
 
-- [Getting started](site/start/getting-started.md)
-- [Writing resources](site/guides/resources.md)
-- [Functions](site/guides/functions.md)
-- [Lint rules](site/guides/lint.md)
-- [Tutorial: a custom dimension](site/start/tutorial-dimension.md)
-- [How functions compile](site/concepts/how-functions-compile.md)
+- [Getting started](https://minecraftmetascript.github.io/mms/docs/start/getting-started), then the [custom dimension tutorial](https://minecraftmetascript.github.io/mms/docs/start/tutorial-dimension).
+- Guides to [resources](https://minecraftmetascript.github.io/mms/docs/guides/resources), [functions](https://minecraftmetascript.github.io/mms/docs/guides/functions) and [lint rules](https://minecraftmetascript.github.io/mms/docs/guides/lint).
+- The [reference](https://minecraftmetascript.github.io/mms/docs/reference): the language itself, then every kind, helper, Blueprint and lint rule.
+- For AI assistants: [llms.txt](https://minecraftmetascript.github.io/mms/llms.txt) and [llms-full.txt](https://minecraftmetascript.github.io/mms/llms-full.txt).
+
+The [examples](examples/) are whole projects (worldgen, custom items, books, jigsaw structures, minigames). The web editor lists them, and the tests build every one.
+
+## Repository
+
+| Folder | Contents |
+| --- | --- |
+| `engine/` | Go module: spec pack, parser, evaluator, type checker, compiler, prelude, test interpreter, language server, CLI and WASM build |
+| `web/` | Web editor and docs site (SvelteKit, CodeMirror 6), deployed to GitHub Pages |
+| `editors/vscode/` | VS Code extension, a client for `mms lsp` |
+| `packages/preview/` | Svelte previews shared by the web editor and the VS Code extension |
+| `site/` | The docs site's pages, as Markdown that mirrors the `/docs` URLs |
+| `examples/` | Example projects |
+| `docs/` | The plan and task list behind the language |
+| `branding/` | Logo, mark and favicon |
+
+To work on it, run `go test ./...` in `engine/`, and `npm ci` in the repository root for the npm workspace (`packages/preview`, `web` and `editors/vscode`). The [Taskfile](Taskfile.yml) has shortcuts for the builds CI runs.
 
 ## Credits
 
 MMS stands on other people's work:
 
 - [Deepslate](https://github.com/misode/deepslate) by [Misode](https://github.com/misode) (MIT) renders every worldgen preview in the web editor and the VS Code panel.
-- [mcmeta](https://github.com/misode/mcmeta) by Misode provides the vanilla worldgen, assets and command tree that previews and checks read.
+- [mcmeta](https://github.com/misode/mcmeta) by Misode provides the vanilla data, assets, registries and command tree that previews and checks read.
 - [vanilla-mcdoc](https://github.com/SpyglassMC/vanilla-mcdoc) by [SpyglassMC](https://github.com/SpyglassMC) (MIT) is the source of the data pack schemas the engine checks against.
 
 License notices for what each build bundles: `engine/THIRD_PARTY_NOTICES.txt` (copied into every CLI release), `third-party-licenses.txt` on the web editor (generated by `npm run build`), and `out/third-party-licenses.txt` in the VS Code extension.
