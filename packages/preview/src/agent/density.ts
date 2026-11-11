@@ -91,10 +91,10 @@ async function area(what: string, kind: Kind, id: string, seed: string, x: numbe
 	const step = (2 * radius) / n;
 	// The coordinates the worker samples at, which fall between blocks when the step is odd.
 	const xs = Array.from({ length: n }, (_, i) => x + (i + 0.5 - n / 2) * step);
-	const rows = [['z \\ x', ...xs.map((v) => fmt(v, 1))]];
+	const rows = [['z \\ x', ...xs.map((v) => fmt(v))]];
 	for (let py = 0; py < n; py++) {
 		const zz = z + (py + 0.5 - n / 2) * step;
-		rows.push([fmt(zz, 1), ...xs.map((_, px) => fmt(grid.values[py * n + px], 2))]);
+		rows.push([fmt(zz), ...xs.map((_, px) => fmt(grid.values[py * n + px], 2))]);
 	}
 	out.push(table(rows));
 	return out.join('\n');
