@@ -71,3 +71,30 @@ func TestSplineAt(t *testing.T) {
 		t.Error("a spline outside any spline")
 	}
 }
+
+// An empty Spline() is a spline to start: the first point writes it.
+func TestSplineAtEmpty(t *testing.T) {
+	src := "DensityFunction d = Spline()\n"
+	at := strings.Index(src, "()") + 1
+	s, _ := session(t, src[:at]+"|"+src[at:])
+	v, ok := s.SplineAt("main.mms", at)
+	if !ok || !v.Root.Editable || len(v.Root.Points) != 0 || len(v.Root.Inserts) != 1 {
+		t.Fatalf("empty spline: %v %+v", ok, v.Root)
+	}
+	in := v.Root.Inserts[0]
+	point := strings.NewReplacer("$location", "0.5", "$derivative", "0", "$value", "1").Replace(v.Root.Template)
+	got := src[:in.At] + in.Before + point + in.After + src[in.At:]
+	if want := "DensityFunction d = Spline({ coordinate = 0, points = [SplinePoint(0.5, 0, 1)] })\n"; got != want {
+		t.Fatalf("first point:\n%s", got)
+	}
+	// What it writes is a spline the editor reads.
+	s2, _ := session(t, got[:at+3]+"|"+got[at+3:])
+	if v, ok := s2.SplineAt("main.mms", at+3); !ok || len(v.Root.Points) != 1 || v.Root.Coordinate != "0" {
+		t.Fatalf("after the first point: %v %+v", ok, v.Root)
+	}
+	for _, d := range s2.R.Diagnostics("main.mms") {
+		if d.Code != "lint/unused" {
+			t.Errorf("diagnostic: %+v", d)
+		}
+	}
+}

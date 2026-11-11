@@ -68,7 +68,19 @@ func (s *Session) SplineAt(path string, off int) (SplineView, bool) {
 	return SplineView{Root: splineInfo(root, f.Src), Focus: focus}, true
 }
 
+// emptySpline is what a new spline in an empty `Spline()` starts as,
+// around its first point. The coordinate is a constant to replace.
+const emptySpline = "{ coordinate = 0, points = ["
+
 func splineInfo(sp *spline.Spline, src []rune) *SplineInfo {
+	if c := sp.Empty; c != nil {
+		// The first point writes the whole spline between the parentheses.
+		return &SplineInfo{
+			Sp: c.Sp, Editable: true,
+			Template: spline.SplinePoint + "($location, $derivative, $value)",
+			Inserts:  []SplineInsert{{At: c.ArgsSp.Start + 1, Before: emptySpline, After: "] }"}},
+		}
+	}
 	out := &SplineInfo{Sp: sp.X.Sp, Coordinate: sp.Coordinate, Editable: sp.List != nil}
 	for i, p := range sp.Points {
 		pi := &SplinePointInfo{Sp: p.X.Span(), Location: splineNum(p.Location), Derivative: splineNum(p.Derivative)}

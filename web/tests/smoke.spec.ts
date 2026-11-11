@@ -1566,3 +1566,17 @@ test('the spline editor graphs the spline at the cursor and writes drags back to
 	await view.getByRole('button', { name: 'overworld/continents' }).click();
 	await expect(view.getByTestId('spline-point')).toHaveCount(4);
 });
+
+test('an empty Spline() starts a spline from the first double-click', async ({ page }) => {
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	await replaceText(page, 'DensityFunction d = Spline()\n');
+	await clickLine(page, 'Spline()');
+	const view = page.getByTestId('spline-view');
+	await expect(view).toBeVisible({ timeout: 15_000 });
+	await expect(view).toContainText('This spline has no points');
+	const sb = (await view.locator('svg').boundingBox())!;
+	await page.mouse.dblclick(sb.x + sb.width * 0.6, sb.y + sb.height / 2);
+	await expect(page.locator('.cm-line', { hasText: /Spline\(\{ coordinate = 0, points = \[SplinePoint\([-\d.]+, 0, [-\d.]+\)\] \}\)/ })).toBeVisible({ timeout: 10_000 });
+	await expect(view.getByTestId('spline-point')).toHaveCount(1, { timeout: 10_000 });
+});
