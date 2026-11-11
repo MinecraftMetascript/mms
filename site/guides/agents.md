@@ -28,6 +28,8 @@ Claude Desktop, Cursor and other clients take the same `mcpServers` entry in the
 
 The server has no settings and does not use the network. Everything it knows is inside the `mms` binary, including these docs and the vanilla data of the Minecraft version MMS targets.
 
+The three [preview tools](#preview-tools) also need a JavaScript runtime: Node.js 20 or later, Bun or Deno, found on `PATH` (or set `MMS_JS` to its path). `mms mcp -check` says which one it found. The other tools work without one.
+
 ## Checking that it is connected
 
 `claude mcp list` starts each server and says how it went. Inside Claude Code, `/mcp` shows the same and lists the tools.
@@ -57,8 +59,21 @@ The tools that read a project take either `dir`, the project folder on disk, or 
 | `lookup` | Searches the reference: kinds, helpers, the prelude's Templates, Blueprints and Types, and lint rules. An exact name gives the whole entry. |
 | `vanilla` | Lists the game's registries and ids, a block's states, and the files of the vanilla data pack. |
 | `docs` | Lists these pages, returns one, or searches them. |
+| `biomes`, `density`, `jigsaw` | Answer what the editors' previews show, as text. See [Preview tools](#preview-tools). |
 
 `fix` and `fmt` with `dir` are the only calls that write files, and they write only the project's own source files.
+
+### Preview tools
+
+An agent can't see the editors' preview pane, so these tools describe it in words and numbers. They run the same code the editors' previews do, so their numbers match the previews.
+
+| Tool | What it does |
+| --- | --- |
+| `biomes` | The text form of the [biome map](editors.md#why-a-biome-doesnt-appear). Samples a Dimension's biome source over a square (`x`, `z`, `radius`, at height `y`) and lists the biomes in it by share. It gives the climate at the centre and the nearest multi-noise entries, with the parameters each one misses. With `biome`, it says where that biome wins. If it wins nowhere, it says where it comes closest, what beats it there, and which climate parameters never reach its ranges. |
+| `density` | Samples a noise, a density function, the final density of noise settings, or a terrain. `mode` `area` gives the values over a square at one height. `column` gives the values down one column and where they cross 0 (for a final density, the ground and cave edges). `surface` gives the top block of each column, with surface rules and aquifers applied. Vanilla ids such as `minecraft:overworld` work too. |
+| `jigsaw` | Grows a JigsawStructure with the [simulator](resources.md#simulating-a-jigsaw-structure) the editors use. One run lists every piece and each jigsaw block that placed nothing, with the reason. With `runs` it covers many seeds and says how often each piece appears, and which pieces the pools list but no run placed. |
+
+All three take a `seed`. The rendered images are not part of these tools; an agent gets the numbers behind them.
 
 The pages are also MCP resources, as `mms://docs/<page>`, and so is the prelude's source, as `mms://prelude/<file>`.
 

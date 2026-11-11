@@ -13,7 +13,7 @@ func TestMCP(t *testing.T) {
 	if code := runMCP([]string{"-check"}, strings.NewReader(""), &out, &errOut); code != 0 {
 		t.Fatalf("-check exit %d: %s", code, errOut.String())
 	}
-	for _, want := range []string{"ok: mms ", "9 tools answer", "claude mcp add mms -- ", `{"mcpServers":{"mms":{"command":"mms","args":["mcp"]}}}`, "Pending approval"} {
+	for _, want := range []string{"ok: mms ", "12 tools answer", "claude mcp add mms -- ", `{"mcpServers":{"mms":{"command":"mms","args":["mcp"]}}}`, "Pending approval"} {
 		if !strings.Contains(out.String(), want) {
 			t.Errorf("-check output lacks %q:\n%s", want, out.String())
 		}

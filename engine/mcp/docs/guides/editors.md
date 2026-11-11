@@ -87,4 +87,4 @@ After each build the editor says whether the game needs `/reload` or a rejoin. S
 
 ## For AI agents
 
-An agent that writes MMS can use the same checks through [`mms mcp`](agents.md), and read these pages as Markdown: every page has a `.md` twin, and [llms.txt](https://minecraftmetascript.github.io/mms/llms.txt) links them all.
+An agent that writes MMS can use the same checks through [`mms mcp`](agents.md), along with text versions of the biome map, the terrain previews and the jigsaw simulation ([Preview tools](agents.md#preview-tools)). It can also read these pages as Markdown: every page has a `.md` twin, and [llms.txt](https://minecraftmetascript.github.io/mms/llms.txt) links them all.

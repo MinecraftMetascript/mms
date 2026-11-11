@@ -10,7 +10,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"regexp"
 	"sort"
 	"strings"
 	"testing/fstest"
@@ -1039,38 +1038,12 @@ func (s *Server) output(_ context.Context, p struct {
 			a := map[string]any{"path": f.Path, "src": f.Asset}
 			if f.Pack == sema.ResourcePack {
 				a["pack"] = "resources"
-			} else if structureAsset.MatchString(f.Path) {
+			} else if info, ok := project.StructureAsset(w.proj.Files, f.Path, f.Asset); ok {
 				// A structure file's jigsaw blocks, for the jigsaw
 				// connection preview: the editor gets the pack as JSON
 				// and cannot read the .nbt itself.
-				if js, ok := project.StructureJigsaws(w.proj.Files, f.Asset); ok {
-					list := make([]map[string]any, 0, len(js))
-					for _, j := range js {
-						m := map[string]any{"pos": j.Pos, "pool": j.Pool, "name": j.Name, "target": j.Target}
-						if j.Orientation != "" {
-							m["orientation"] = j.Orientation
-						}
-						if j.Joint != "" {
-							m["joint"] = j.Joint
-						}
-						if j.FinalState != "" {
-							m["final_state"] = j.FinalState
-						}
-						if j.Label != "" {
-							m["label"] = j.Label
-						}
-						if j.SelectionPriority != 0 {
-							m["selection_priority"] = j.SelectionPriority
-						}
-						if j.PlacementPriority != 0 {
-							m["placement_priority"] = j.PlacementPriority
-						}
-						list = append(list, m)
-					}
-					a["jigsaws"] = list
-				}
-				if size, ok := project.StructureSize(w.proj.Files, f.Asset); ok {
-					a["size"] = size
+				for k, v := range info {
+					a[k] = v
 				}
 			}
 			assets = append(assets, a)
@@ -1270,9 +1243,6 @@ func nonNil(s []string) []string {
 	}
 	return s
 }
-
-// structureAsset matches a structure file's path in the data pack.
-var structureAsset = regexp.MustCompile(`^data/[^/]+/structures?/.+\.nbt$`)
 
 // ---- URIs
 

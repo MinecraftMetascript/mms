@@ -71,6 +71,51 @@ type structureFile struct {
 // project; ok is false when it cannot be read as one.
 func StructureJigsaws(fsys fs.FS, src string) ([]Jigsaw, bool) { return readJigsaws(fsys, src) }
 
+// structureAsset matches a structure file's path in the data pack.
+var structureAsset = regexp.MustCompile(`^data/[^/]+/structures?/.+\.nbt$`)
+
+// StructureAsset describes a structure file the pack copies the way the
+// editors' jigsaw previews read it (mms/output's assets, and mms mcp's
+// jigsaw tool): its jigsaw blocks under "jigsaws" and its size under
+// "size". path is the file's path in the pack and src its path in the
+// project. ok is false when path is not a structure file.
+func StructureAsset(fsys fs.FS, path, src string) (map[string]any, bool) {
+	if !structureAsset.MatchString(path) {
+		return nil, false
+	}
+	a := map[string]any{}
+	if js, ok := StructureJigsaws(fsys, src); ok {
+		list := make([]map[string]any, 0, len(js))
+		for _, j := range js {
+			m := map[string]any{"pos": j.Pos, "pool": j.Pool, "name": j.Name, "target": j.Target}
+			if j.Orientation != "" {
+				m["orientation"] = j.Orientation
+			}
+			if j.Joint != "" {
+				m["joint"] = j.Joint
+			}
+			if j.FinalState != "" {
+				m["final_state"] = j.FinalState
+			}
+			if j.Label != "" {
+				m["label"] = j.Label
+			}
+			if j.SelectionPriority != 0 {
+				m["selection_priority"] = j.SelectionPriority
+			}
+			if j.PlacementPriority != 0 {
+				m["placement_priority"] = j.PlacementPriority
+			}
+			list = append(list, m)
+		}
+		a["jigsaws"] = list
+	}
+	if size, ok := StructureSize(fsys, src); ok {
+		a["size"] = size
+	}
+	return a, true
+}
+
 // StructureSize returns a structure file's size in blocks (x, y, z); ok
 // is false when it cannot be read as one or has no size.
 func StructureSize(fsys fs.FS, src string) ([3]int, bool) {
