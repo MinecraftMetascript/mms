@@ -71,16 +71,54 @@ export interface Param {
 
 export interface TypePart {
 	text: string;
-	link?: { group?: string; helper?: string; type?: string };
+	/** A helper group or helper, or a type entry and the page it is on. */
+	link?: { group?: string; helper?: string; type?: string; area?: string };
 }
 
-/** A named type that no helper group explains, such as an enum. */
+/** A named type from the game's schema, such as ClimateParameter or an enum. */
 export interface TypeEntry {
 	id: string;
 	name: string;
+	/** The types page it is on, such as "worldgen". */
+	area: string;
 	def?: TypePart[];
 	values?: { value: string; doc?: string }[];
 	fields?: Param[];
+	/** Values that fit, in MMS, one per way of writing one. */
+	examples?: string[];
+	/** Named records whose fields it also has. */
+	includes?: TypePart[];
+	/** The helper parameters and type fields that take it. */
+	usedBy?: TypePart[];
+}
+
+/** The types pages, in sidebar order, each named for the part of the game's schema it covers. */
+export const typeAreaTitles: Record<string, string> = {
+	worldgen: 'World generation',
+	loot: 'Loot and predicates',
+	advancement: 'Advancements',
+	enchantment: 'Enchantments',
+	recipe: 'Recipes',
+	component: 'Item components',
+	item: 'Items',
+	entity: 'Entity data',
+	block: 'Block entity data',
+	dialog: 'Dialogs',
+	variants: 'Mob variants',
+	assets: 'Resource pack',
+	util: 'Shared',
+	data: 'Other data'
+};
+
+export const typeAreaTitle = (area: string) => typeAreaTitles[area] ?? area;
+
+/** The types pages that have entries, in sidebar order, with how many each has. */
+export function typeAreas(types: TypeEntry[]): { area: string; title: string; count: number }[] {
+	const counts = new Map<string, number>();
+	for (const t of types) counts.set(t.area, (counts.get(t.area) ?? 0) + 1);
+	const order = Object.keys(typeAreaTitles);
+	const rank = (a: string) => (order.includes(a) ? order.indexOf(a) : order.length);
+	return [...counts.keys()].sort((a, b) => rank(a) - rank(b) || a.localeCompare(b)).map((area) => ({ area, title: typeAreaTitle(area), count: counts.get(area) ?? 0 }));
 }
 
 /** A group's heading: what its helpers build. */
@@ -102,7 +140,8 @@ export const typeId = (id: string) => `type-${id.replace(/\W/g, '-')}`;
 export const refURL = {
 	group: (base: string, dispatcher: string) => `${base}/docs/reference/helpers/${groupId(dispatcher)}`,
 	helper: (base: string, dispatcher: string, name: string) => `${refURL.group(base, dispatcher)}#${helperId(dispatcher, name)}`,
-	type: (base: string, id: string) => `${base}/docs/reference/types#${typeId(id)}`,
+	types: (base: string, area: string) => `${base}/docs/reference/types/${area}`,
+	type: (base: string, id: string, area: string) => `${refURL.types(base, area)}#${typeId(id)}`,
 	rule: (base: string, id: string) => `${base}/docs/reference/lint/${id}`,
 	kind: (base: string, name: string) => `${base}/docs/reference/kinds/${name}`,
 	prelude: (base: string, name: string) => `${base}/docs/reference/prelude#prelude-${name}`
@@ -111,7 +150,7 @@ export const refURL = {
 /** The URL a type part links to, or "" for plain text. */
 export function linkHref(base: string, link: TypePart['link']): string {
 	if (!link) return '';
-	if (link.type) return refURL.type(base, link.type);
+	if (link.type) return refURL.type(base, link.type, link.area ?? 'data');
 	if (link.group === undefined) return '';
 	return link.helper ? refURL.helper(base, link.group, link.helper) : refURL.group(base, link.group);
 }

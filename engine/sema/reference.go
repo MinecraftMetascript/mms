@@ -96,6 +96,23 @@ func BuildReference(p *spec.Pack, ks *Kinds) Reference {
 	}
 
 	var walk func(v tview, depth int)
+	// walkNone walks the case another dispatcher than disp picks when its
+	// key is left out, such as a multi-noise source's biomes, which only
+	// come with no preset. It is walked for its fields only, so it does
+	// not become a helper of its own.
+	walkNone := func(v tview, disp *dispInfo, depth int) {
+		for _, reg := range c.spreadDispatchers(v) {
+			if disp != nil && reg == disp.Dispatcher {
+				continue
+			}
+			if ct, ok := p.Dispatch(reg, noneKey); ok {
+				if ct.Kind == "reference" {
+					ct = c.typeAt(ct.Path)
+				}
+				walk(tview{T: ct, Env: v.Env}, depth+1)
+			}
+		}
+	}
 	walkFields := func(fs []field, depth int) {
 		for _, f := range fs {
 			walk(f.Type, depth+1)
@@ -139,6 +156,14 @@ func BuildReference(p *spec.Pack, ks *Kinds) Reference {
 					walkFields(cfs, depth)
 				}
 			}
+			walkNone(v, disp, depth)
+			if disp != nil {
+				for _, key := range c.dispatchKeys(disp) {
+					if ct, ok := p.Dispatch(disp.Dispatcher, key); ok {
+						walkNone(tview{T: ct, Env: v.Env}, disp, depth)
+					}
+				}
+			}
 		}
 	}
 	for _, r := range append(p.ResourceKinds(), p.AssetKinds()...) {
@@ -166,7 +191,13 @@ func BuildReference(p *spec.Pack, ks *Kinds) Reference {
 		sort.Slice(rg.Helpers, func(i, j int) bool { return rg.Helpers[i].Name < rg.Helpers[j].Name })
 		ref.Groups = append(ref.Groups, rg)
 	}
+	// Every type MMS code can name has an entry, not only those a
+	// signature links to: a Type field or typed const can name any.
+	for _, path := range nameableTypes(p, ks) {
+		rt.entry(path)
+	}
 	rt.define()
+	rt.usedBy(ref.Groups)
 	for _, t := range rt.types {
 		ref.Types = append(ref.Types, t)
 	}

@@ -2,6 +2,7 @@ package sema
 
 import (
 	"encoding/json"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -21,18 +22,28 @@ type RefLink struct {
 	// Group is a dispatcher, with Helper "" for the whole group.
 	Group  *string `json:"group,omitempty"`
 	Helper string  `json:"helper,omitempty"`
-	// Type is the ID of a RefType.
+	// Type is the ID of a RefType, and Area the page it is on.
 	Type string `json:"type,omitempty"`
+	Area string `json:"area,omitempty"`
 }
 
 // RefType is a named type that helpers alone do not explain, such as
 // DensityFunctionRef (an id or a density function) or an enum.
 type RefType struct {
-	ID     string     `json:"id"`
-	Name   string     `json:"name"`
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	// Area is the reference page the entry is on, such as "worldgen".
+	Area   string     `json:"area"`
 	Def    []TypePart `json:"def,omitempty"`
 	Values []RefValue `json:"values,omitempty"`
 	Fields []RefParam `json:"fields,omitempty"`
+	// Examples are values that fit, in MMS, one per way of writing one.
+	Examples []string `json:"examples,omitempty"`
+	// Includes are the named records whose fields it also has, which
+	// their own entries list.
+	Includes []TypePart `json:"includes,omitempty"`
+	// UsedBy are the helper parameters and type fields that take it.
+	UsedBy []TypePart `json:"usedBy,omitempty"`
 }
 
 type RefValue struct {
@@ -286,10 +297,28 @@ func (rt *refTypes) named(path string, e *env) TypePart {
 	}
 	id := typeID(path)
 	if _, ok := rt.types[id]; !ok {
-		rt.types[id] = &RefType{ID: id, Name: name}
+		rt.types[id] = &RefType{ID: id, Name: name, Area: spec.TypeArea(path)}
 		rt.queue = append(rt.queue, path)
 	}
-	return TypePart{Text: name, Link: &RefLink{Type: id}}
+	return TypePart{Text: name, Link: typeLink(path)}
+}
+
+func (rt *refTypes) dispatched(v tview) bool {
+	_, disp := rt.c.fields(v, "")
+	return disp != nil
+}
+
+// entry makes sure path has an entry of its own, even when helpers
+// explain it, and returns it.
+func (rt *refTypes) entry(path string) *RefType {
+	id := typeID(path)
+	if e, ok := rt.types[id]; ok {
+		return e
+	}
+	e := &RefType{ID: id, Name: spec.ShortPath(path), Area: spec.TypeArea(path)}
+	rt.types[id] = e
+	rt.queue = append(rt.queue, path)
+	return e
 }
 
 // define fills the type entries queued by named, and those their
@@ -298,11 +327,21 @@ func (rt *refTypes) define() {
 	for len(rt.queue) > 0 {
 		path := rt.queue[0]
 		rt.queue = rt.queue[1:]
+		rt.defineOne(path)
+	}
+}
+
+// defineOne fills the type entry of path.
+func (rt *refTypes) defineOne(path string) {
+	{
 		entry := rt.types[typeID(path)]
+		if entry.Def != nil {
+			return
+		}
 		t := rt.c.typeAt(path)
 		if t == nil {
 			entry.Def = []TypePart{text("any")}
-			continue
+			return
 		}
 		v := tview{T: t}
 		n := rt.c.norm(v)
@@ -320,9 +359,37 @@ func (rt *refTypes) define() {
 			if len(entry.Values) == 0 {
 				entry.Def = []TypePart{text("string")}
 			}
+		case n.T != nil && n.T.Kind == "struct" && rt.dispatched(n):
+			// Helpers build it, one for each of its types.
+			entry.Def = rt.format(n, 0)
 		case n.T != nil && n.T.Kind == "struct":
 			fs, _ := rt.c.fields(n, "")
+			// Fields a named record brings in, such as an entity's
+			// EntityBase, are listed once, on that record's entry.
+			inherited := map[string]bool{}
+			for _, f := range n.T.Fields {
+				if f.Kind != "spread" || f.Type == nil || f.Type.Kind != "reference" || !rt.c.HasTypeEntry(f.Type.Path) {
+					continue
+				}
+				sfs, _ := rt.c.fields(tview{T: f.Type, Env: n.Env}, "")
+				for _, sf := range sfs {
+					inherited[sf.Key] = true
+				}
+				entry.Includes = append(entry.Includes, TypePart{Text: spec.ShortPath(f.Type.Path), Link: typeLink(f.Type.Path)})
+			}
+			kept := fs[:0:0]
+			for _, f := range fs {
+				if f.KeyType != nil || !inherited[f.Key] {
+					kept = append(kept, f)
+				}
+				inherited[f.Key] = true // the schema can repeat a field
+			}
+			fs = kept
 			entry.Def = []TypePart{text("object")}
+			if rt.helper("", entry.Name) {
+				g := ""
+				entry.Def = append(entry.Def, text(", or "), TypePart{Text: entry.Name + "(…)", Link: &RefLink{Group: &g, Helper: entry.Name}})
+			}
 			for _, f := range fs {
 				if f.KeyType != nil {
 					key := plainParts(rt.format(*f.KeyType, 1))
@@ -337,6 +404,7 @@ func (rt *refTypes) define() {
 		for i := range entry.Fields {
 			entry.Fields[i].Type = plainParts(entry.Fields[i].TypeParts)
 		}
+		entry.Examples = rt.c.examples(v)
 	}
 }
 
@@ -371,4 +439,48 @@ func (rt *refTypes) inlineStruct(v tview, depth int) []TypePart {
 		out = append(out, rt.format(f.Type, depth+1)...)
 	}
 	return append(out, text(" }"))
+}
+
+// usedBy fills each entry's UsedBy: the helper parameters, and the fields
+// and definitions of other entries, that link to it.
+func (rt *refTypes) usedBy(groups []RefGroup) {
+	add := func(parts []TypePart, use TypePart) {
+		for _, p := range parts {
+			if p.Link == nil || p.Link.Type == "" {
+				continue
+			}
+			e := rt.types[p.Link.Type]
+			if e == nil || len(e.UsedBy) >= 8 {
+				continue
+			}
+			dup := false
+			for _, u := range e.UsedBy {
+				dup = dup || u.Text == use.Text
+			}
+			if !dup && (use.Link == nil || use.Link.Type != e.ID) {
+				e.UsedBy = append(e.UsedBy, use)
+			}
+		}
+	}
+	for _, g := range groups {
+		for _, h := range g.Helpers {
+			group := g.Dispatcher
+			for _, prm := range h.Params {
+				add(prm.TypeParts, TypePart{Text: h.Name + "(" + prm.Name + ")", Link: &RefLink{Group: &group, Helper: h.Name}})
+			}
+		}
+	}
+	ids := make([]string, 0, len(rt.types))
+	for id := range rt.types {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	for _, id := range ids {
+		e := rt.types[id]
+		link := &RefLink{Type: e.ID, Area: e.Area}
+		add(e.Def, TypePart{Text: e.Name, Link: link})
+		for _, f := range e.Fields {
+			add(f.TypeParts, TypePart{Text: e.Name + "." + f.Name, Link: link})
+		}
+	}
 }

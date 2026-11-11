@@ -4,8 +4,8 @@
 // look), /llms-full.txt (every page in one file) and /docs/reference.yaml
 // (the generated reference as data).
 import { docGroups, groupPages, page, pages, referenceGroups, rewriteHref, siteURL } from './site.ts';
-import { ref, resourceKinds, ownKinds, helperCount, blueprints, forms, preludeTemplates, preludeTypes, counts } from './refdata.ts';
-import { groupId, groupTitle, type Group, type Param, type PreludeDecl, type PreludeField } from './reference.ts';
+import { ref, resourceKinds, ownKinds, helperCount, blueprints, forms, preludeTemplates, preludeTypes, counts, typeAreas } from './refdata.ts';
+import { groupId, groupTitle, typeAreaTitle, type Group, type Param, type PreludeDecl, type PreludeField } from './reference.ts';
 
 const intro =
 	'MMS (Minecraft Metascript) is a language for Minecraft Java Edition data packs and resource packs. ' +
@@ -33,7 +33,7 @@ export function llmsIndex(): string {
 		...blueprints.map((b) => `- [${b.name}](${mdURL(`reference/kinds/${b.name}`)}): its fields, and what its name stands for`),
 		`- [Templates and forms](${mdURL('reference/prelude')}): the prelude's templates and types, and what each operator means by type`,
 		`- [Helpers](${mdURL('reference/helpers')}): ${helperCount} helpers in ${ref.groups.length} groups, each building one typed object; each group has a page`,
-		`- [Types](${mdURL('reference/types')}): named types that parameters refer to`,
+		`- [Types](${mdURL('reference/types')}): every named type from the game's schema, with values that fit`,
 		`- [Lint rules](${mdURL('reference/lint')}): the ${ref.rules.length} lint rules and their default severities; each rule has a page`,
 		'',
 		'## Optional',
@@ -68,6 +68,7 @@ export function markdownPaths(): string[] {
 		'reference/helpers',
 		...ref.groups.map((g) => `reference/helpers/${groupId(g.dispatcher)}`),
 		'reference/types',
+		...typeAreas.map((a) => `reference/types/${a.area}`),
 		'reference/lint',
 		...ref.rules.map((r) => `reference/lint/${r.id}`)
 	];
@@ -84,9 +85,12 @@ export function markdownFor(path: string): string | undefined {
 	if (path === 'reference/kinds') return kindsPage();
 	if (path === 'reference/prelude') return preludePage();
 	if (path === 'reference/helpers') return helpersIndex();
-	if (path === 'reference/types') return typesPage();
+	if (path === 'reference/types') return typesIndex();
 	if (path === 'reference/lint') return lintIndex();
-	const [, kind, name] = /^reference\/(kinds|helpers|lint)\/([^/]+)$/.exec(path) ?? [];
+	const [, kind, name] = /^reference\/(kinds|helpers|lint|types)\/([^/]+)$/.exec(path) ?? [];
+	if (kind === 'types') {
+		return typeAreas.some((a) => a.area === name) ? typesPage(name) : undefined;
+	}
 	if (kind === 'kinds') {
 		const b = blueprints.find((b) => b.name === name);
 		return b && blueprintPage(b);
@@ -148,7 +152,7 @@ function referenceIndex(): string {
 		`- [Declaration kinds](${mdURL('reference/kinds')}): ${counts.kinds} kinds, and the folder each one writes to.`,
 		`- [Helpers](${mdURL('reference/helpers')}): ${counts.helpers} helpers in ${counts.groups} groups, each building one typed object.`,
 		`- [Templates and forms](${mdURL('reference/prelude')}): the prelude's templates and types, and what each operator means by type.`,
-		`- [Types](${mdURL('reference/types')}): ${counts.types} named types that parameters refer to.`,
+		`- [Types](${mdURL('reference/types')}): ${counts.types} named types from the game's schema, with values that fit.`,
 		`- [Lint rules](${mdURL('reference/lint')}): ${counts.rules} rules, their default severity and what they catch.`,
 		'',
 		'## For AI tools',
@@ -259,14 +263,28 @@ function helperGroupPage(g: Group): string {
 	return out.join('\n');
 }
 
-function typesPage(): string {
-	const out = ['# Types', '', 'Named types that helper parameters refer to: enums, aliases and records.', ''];
+function typesIndex(): string {
+	return [
+		'# Types',
+		'',
+		"Every type from the game's schema that MMS code can name, such as `ClimateParameter` in `const c: ClimateParameter = [-1, 1]`, one page per part of the schema.",
+		'',
+		...typeAreas.map((a) => `- [${a.title}](${mdURL(`reference/types/${a.area}`)}): ${a.count} types`),
+		''
+	].join('\n');
+}
+
+function typesPage(area: string): string {
+	const out = [`# ${typeAreaTitle(area)} types`, '', "Named types from this part of the game's schema: enums, aliases and records, with values that fit.", ''];
 	for (const t of ref.types) {
+		if (t.area !== area) continue;
 		if (t.values?.length) {
 			if (t.values.some((v) => v.doc)) out.push(`- \`${t.name}\`: one of`, ...t.values.map((v) => `  - \`"${v.value}"\`${v.doc ? `: ${flat(v.doc)}` : ''}`));
 			else out.push(`- \`${t.name}\`: one of ${t.values.map((v) => `\`"${v.value}"\``).join(', ')}`);
-		} else if (t.def?.length) out.push(`- \`${t.name}\`: ${t.def.map((p) => p.text).join('')}`);
-		else if (t.fields?.length) out.push(`- \`${t.name}\`: a record with fields`, ...t.fields.map((f) => '  ' + paramLine(f)));
+		} else if (t.fields?.length) out.push(`- \`${t.name}\`: a record with fields`, ...t.fields.map((f) => '  ' + paramLine(f)));
+		else if (t.def?.length) out.push(`- \`${t.name}\`: ${t.def.map((p) => p.text).join('')}`);
+		if (t.includes?.length) out.push(`  - Also has the fields of ${t.includes.map((p) => `\`${p.text}\``).join(', ')}`);
+		if (t.examples?.length) out.push(`  - For example ${t.examples.map((x) => `\`${x}\``).join(', ')}`);
 	}
 	out.push('');
 	return out.join('\n');
@@ -340,9 +358,12 @@ export function referenceYaml(): string {
 		types: ref.types.map((t) => ({
 			name: t.name,
 			id: t.id,
+			area: t.area,
 			is: t.def?.map((p) => p.text).join(''),
 			values: t.values?.map((v) => (v.doc ? { value: v.value, doc: v.doc } : v.value)),
-			fields: params(t.fields)
+			fields: params(t.fields),
+			includes: t.includes?.map((p) => p.text),
+			examples: t.examples
 		})),
 		lint_rules: ref.rules.map((r) => ({ id: r.id, severity: r.severity, doc: r.doc }))
 	};

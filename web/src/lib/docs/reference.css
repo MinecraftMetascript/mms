@@ -96,6 +96,14 @@
 	flex-wrap: wrap;
 	gap: 0.3rem;
 }
+.reference .examples,
+.reference .used-by {
+	margin: 0.5rem 0 0;
+}
+.reference .used-by {
+	font-size: 0.875rem;
+	color: var(--color-muted, inherit);
+}
 /* A grid of links to reference pages, with a count or note on each. */
 .reference .cards {
 	display: grid;

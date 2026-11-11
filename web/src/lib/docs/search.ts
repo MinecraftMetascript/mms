@@ -3,7 +3,7 @@
 
 import { docGroups, groupPages, referenceGroups, sections, type Group } from './site.ts';
 import { blueprints, forms, preludeTemplates, preludeTypes, ref } from './refdata.ts';
-import { groupId, groupTitle, helperId, typeId } from './reference.ts';
+import { groupId, groupTitle, helperId, typeAreaTitle, typeId } from './reference.ts';
 import type { Entry } from './find.ts';
 
 const pagesOf = (groups: Group[]) =>
@@ -16,6 +16,7 @@ const pagesOf = (groups: Group[]) =>
 
 /** Everything the site search finds, built at build time. */
 export function searchIndex(): Entry[] {
+	const helperNames = new Set(ref.groups.flatMap((g) => g.helpers.map((h) => h.name)));
 	return [
 		...pagesOf(docGroups),
 		...pagesOf(referenceGroups),
@@ -41,7 +42,8 @@ export function searchIndex(): Entry[] {
 				text: (h.doc ?? h.signature).slice(0, 300)
 			}))
 		]),
-		...ref.types.map((t) => ({ title: t.name, where: 'Types', path: `/docs/reference/types#${typeId(t.id)}`, text: '' })),
+		// A type a helper of the same name builds is found as that helper.
+		...ref.types.filter((t) => !helperNames.has(t.name)).map((t) => ({ title: t.name, where: `Types · ${typeAreaTitle(t.area)}`, path: `/docs/reference/types/${t.area}#${typeId(t.id)}`, text: t.examples?.length ? `For example ${t.examples.join(', ')}` : '' })),
 		...ref.rules.map((r) => ({ title: r.id, where: 'Lint rules', path: `/docs/reference/lint/${r.id}`, text: r.doc ?? '' }))
 	];
 }

@@ -1,5 +1,5 @@
 import raw from './reference.json';
-import type { Reference } from './reference.ts';
+import { typeAreas as areasOf, type Reference } from './reference.ts';
 
 // The output of `mms reference`, generated into reference.json by
 // scripts/build-wasm.sh.
@@ -15,6 +15,8 @@ export const preludeTemplates = ref.prelude.filter((d) => d.kind === 'Template')
 export const preludeTypes = ref.prelude.filter((d) => d.kind === 'Type' && !d.builtin);
 /** The forms of expression, such as `a..b` and `!a`, and what each means by type. */
 export const forms = ref.prelude.filter((d) => d.kind === 'Type' && d.builtin);
+/** The types pages, one per part of the game's schema. */
+export const typeAreas = areasOf(ref.types);
 export const helperCount = ref.groups.reduce((n, g) => n + g.helpers.length, 0);
 
 /** The reference's size, for pages that describe it. */

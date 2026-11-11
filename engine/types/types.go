@@ -12,7 +12,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 
 	"github.com/minecraftmetascript/mms/engine/eval"
 	"github.com/minecraftmetascript/mms/engine/internal/near"
@@ -37,39 +36,9 @@ type Env struct {
 	busy  map[string]bool
 }
 
-// short indexes schema types by the last part of their path, built once
-// per pack.
-var (
-	shortMu    sync.Mutex
-	shortIndex = map[*spec.Pack]map[string]string{}
-)
-
-func schemaNames(p *spec.Pack) map[string]string {
-	shortMu.Lock()
-	defer shortMu.Unlock()
-	if m, ok := shortIndex[p]; ok {
-		return m
-	}
-	byName := map[string][]string{}
-	for path := range p.Types {
-		i := strings.LastIndex(path, "::")
-		byName[path[i+2:]] = append(byName[path[i+2:]], path)
-	}
-	m := map[string]string{}
-	for name, paths := range byName {
-		// The shortest path wins, then the first in order: Text is
-		// ::java::util::text::Text, not a nested one.
-		sort.Slice(paths, func(i, j int) bool {
-			if len(paths[i]) != len(paths[j]) {
-				return len(paths[i]) < len(paths[j])
-			}
-			return paths[i] < paths[j]
-		})
-		m[name] = paths[0]
-	}
-	shortIndex[p] = m
-	return m
-}
+// schemaNames maps the names a type expression can use for schema types
+// to their paths.
+func schemaNames(p *spec.Pack) map[string]string { return p.ShortNames() }
 
 // New resolves the project's Type declarations.
 func New(p *spec.Pack, kinds *sema.Kinds, r *eval.Result) *Env {

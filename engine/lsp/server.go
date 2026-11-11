@@ -679,6 +679,7 @@ func (s *Server) lines(uri string) *lines {
 var completionKinds = map[sema.CandidateKind]int{
 	sema.CandField: 10, sema.CandCallable: 3, sema.CandMethod: 2, sema.CandID: 18,
 	sema.CandEnum: 20, sema.CandKeyword: 14, sema.CandKind: 7, sema.CandFile: 17,
+	sema.CandValue: 12,
 }
 
 type completionParams struct {

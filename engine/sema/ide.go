@@ -25,6 +25,9 @@ const (
 	CandKeyword
 	CandKind
 	CandFile // a project file path, inside a string
+	// CandValue is a way to write a value of the expected type, such as
+	// a number, `[min, max]` or a record, inserted as a snippet.
+	CandValue
 )
 
 // Candidate is one completion item.
@@ -49,7 +52,7 @@ func (c *Checker) ValueCandidates(in *Info) []Candidate {
 	if in == nil || !in.typed {
 		return nil
 	}
-	return dedupe(append(c.valueCandidates(in.Type, 0), c.typedCandidates(in.Type)...))
+	return dedupe(append(append(c.valueCandidates(in.Type, 0), c.typedCandidates(in.Type)...), c.armCandidates(in.Type)...))
 }
 
 // TypedCandidate is a value offered where its type fits.
@@ -75,7 +78,24 @@ func (c *Checker) TypeCandidates(t *spec.Type) []Candidate {
 	if t == nil {
 		return nil
 	}
-	return dedupe(append(c.valueCandidates(tview{T: t}, 0), c.typedCandidates(c.norm(tview{T: t}))...))
+	v := tview{T: t}
+	return dedupe(append(append(c.valueCandidates(v, 0), c.typedCandidates(c.norm(v))...), c.armCandidates(v)...))
+}
+
+// armCandidates are the plain ways to write a value of v that no helper,
+// id or enum value covers, such as `0` and `[-2, 2]` for a climate
+// parameter. Each item's documentation describes the expected type.
+func (c *Checker) armCandidates(v tview) []Candidate {
+	arms := c.valueArms(v, 0)
+	if len(arms) == 0 {
+		return nil
+	}
+	doc := c.typeNote(v)
+	var out []Candidate
+	for _, a := range arms {
+		out = append(out, Candidate{Label: a.Label, Kind: CandValue, Detail: a.Detail, Doc: doc, Insert: a.Snippet, Rank: 4})
+	}
+	return out
 }
 
 func (c *Checker) valueCandidates(v tview, depth int) []Candidate {
@@ -437,6 +457,9 @@ func (c *Checker) Hover(in *Info) string {
 		if in.Field.Desc != "" {
 			parts = append(parts, in.Field.Desc)
 		}
+		if note := c.typeNote(in.Field.Type); note != "" {
+			parts = append(parts, note)
+		}
 		if ct, ok := colorOf(in.Field.Type); ok {
 			parts = append(parts, ct.help())
 		}
@@ -468,6 +491,8 @@ func (c *Checker) Hover(in *Info) string {
 		parts = append(parts, "Expected: "+describe(in.Type))
 		if ct, ok := colorOf(in.Type); ok {
 			parts = append(parts, ct.help())
+		} else if note := c.typeNote(in.Type); note != "" {
+			parts = append(parts, note)
 		}
 	}
 	return strings.Join(parts, "\n\n")

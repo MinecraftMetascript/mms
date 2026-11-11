@@ -595,8 +595,19 @@ test('the docs render guides and the reference', async ({ page }) => {
 
 	// A type in a signature links to its entry on the Types page.
 	await page.locator('#density_function-Gradient').getByRole('link', { name: 'Axis', exact: true }).click();
-	await expect(page).toHaveURL(/\/docs\/reference\/types#type-util-direction-Axis$/);
+	await expect(page).toHaveURL(/\/docs\/reference\/types\/util#type-util-direction-Axis$/);
 	await expect(page.locator('#type-util-direction-Axis')).toBeInViewport();
+
+	// Every schema type has an entry, found by name from the Types index:
+	// ClimateParameter says what fits, with examples and where it is used.
+	await page.goto('./docs/reference/types');
+	await page.getByRole('searchbox', { name: 'Find a type' }).fill('ClimateParameter');
+	await page.getByRole('link', { name: 'ClimateParameter', exact: true }).click();
+	await expect(page).toHaveURL(/\/docs\/reference\/types\/worldgen#type-data-worldgen-dimension-biome_source-ClimateParameter$/);
+	const climate = page.locator('#type-data-worldgen-dimension-biome_source-ClimateParameter');
+	await expect(climate).toContainText('number -2..2 | list of number -2..2 (exactly 2)');
+	await expect(climate).toContainText('For example 0 or [-2, 2].');
+	await expect(climate).toContainText('ClimateParameters.temperature');
 
 	// A lint rule has a page of its own.
 	await page.goto('./docs/reference/lint');

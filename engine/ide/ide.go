@@ -1193,9 +1193,12 @@ func (s *Session) hover(path string, off int) (string, syntax.Span) {
 	}
 	d, ok := a.path[1].(*syntax.Decl)
 	if !ok || d.Kind == nil {
-		return "", syntax.Span{} // a const or a top-level for
+		// A typed const's value was checked like a declaration's.
+		if _, isConst := a.path[1].(*syntax.ConstStmt); isConst {
+			return s.infoHover(a)
+		}
+		return "", syntax.Span{} // a top-level for
 	}
-	inner := a.path[len(a.path)-1]
 	if a.decl != nil && a.decl.Blueprint != nil && d.Name != nil && d.Name.Sp.Contains(off) {
 		return instanceHover(d), d.Name.Sp
 	}
@@ -1227,6 +1230,13 @@ func (s *Session) hover(path string, off int) (string, syntax.Span) {
 		}
 		return "", syntax.Span{}
 	}
+	return s.infoHover(a)
+}
+
+// infoHover is the hover of what the checker recorded at the innermost
+// node, or of the word's enclosing value.
+func (s *Session) infoHover(a *at) (string, syntax.Span) {
+	inner := a.path[len(a.path)-1]
 	for i := len(a.path) - 1; i >= 2; i-- {
 		n := a.path[i]
 		if in := a.info(n); in != nil {

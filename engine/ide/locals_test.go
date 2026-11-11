@@ -76,7 +76,7 @@ Function greet(who: string) {
 	if edits, msg := s.Rename("main.mms", letUse, "hello"); msg != "" || len(edits) != 2 {
 		t.Errorf("rename of a let = %v %q, want two edits", edits, msg)
 	}
-	if h := hover(at("LootPool", 1, 1)); !strings.Contains(h, "`rolls`") {
+	if h := hover(at("LootPool", 1, 1)); !strings.Contains(h, "`rolls: IntNumberProviderRef`") || !strings.Contains(h, "/reference/types/loot#type-data-loot-LootPool") {
 		t.Errorf("hover on a schema type = %q", h)
 	}
 	if h := hover(at("Id<", 1, 1)); !strings.Contains(h, "Id<registry>") {
