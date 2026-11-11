@@ -87,7 +87,9 @@ func (c *Checker) caseKeyOf(e syntax.Expr, disp *dispInfo) string {
 	key := strings.TrimPrefix(text, "minecraft:")
 	if !c.hasDispatchKey(disp, key) {
 		msg := "unknown type '" + text + "'"
-		if s := closest(key, c.dispatchKeys(disp)); s != "" {
+		if r := c.renamedKey(disp, key); r != "" {
+			msg += "; this version calls it '" + r + "'"
+		} else if s := closest(key, c.dispatchKeys(disp)); s != "" {
 			msg += "; did you mean '" + s + "'?"
 		}
 		c.errorf("mms/unknown-id", e.Span(), "%s", msg)
@@ -449,6 +451,19 @@ func (c *Checker) callableNames(v tview) []string {
 	return out
 }
 
+// renamedHelper names the current helper for one made from a stale
+// dispatcher case, such as MultifaceGrowth for GlowLichen.
+func (c *Checker) renamedHelper(name string, v tview) string {
+	_, disp := c.fields(v, "")
+	if disp == nil {
+		return ""
+	}
+	if r := c.renamedKey(disp, Snake(name)); r != "" {
+		return Pascal(r)
+	}
+	return ""
+}
+
 func (c *Checker) callStruct(e syntax.Expr, v tview) jsonv.Value {
 	base, name, trailing, steps := unchain(e)
 	if base == nil {
@@ -462,7 +477,9 @@ func (c *Checker) callStruct(e syntax.Expr, v tview) jsonv.Value {
 	if cl == nil {
 		names := c.callableNames(v)
 		msg := "'" + name.Name + "' does not make a " + describe(v)
-		if s := closest(name.Name, names); s != "" {
+		if r := c.renamedHelper(name.Name, v); r != "" {
+			msg += "; this version calls it " + r + "(...)"
+		} else if s := closest(name.Name, names); s != "" {
 			msg += "; did you mean " + s + "(...)?"
 		} else if len(names) > 0 {
 			msg += "; expected one of " + strings.Join(limit(names, 10), ", ")

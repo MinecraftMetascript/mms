@@ -385,10 +385,16 @@ func (c *Checker) registryName(r string) string {
 
 // dispatchKeys lists the case keys of a dispatched struct: dispatcher cases
 // plus key-registry ids, which covers field-less types the mcdoc omits.
+// When the key field names a registry the pack has, that registry is the
+// game's list, so a dispatcher case outside it is a stale mcdoc entry (such
+// as feature type glow_lichen, renamed multiface_growth) and is left out.
 func (c *Checker) dispatchKeys(d *dispInfo) []string {
 	set := map[string]bool{}
+	gated := c.keyRegistryKnown(d)
 	for _, k := range c.Pack.DispatchKeys(d.Dispatcher) {
-		set[k] = true
+		if !gated || c.Pack.HasID(d.KeyRegistry, k) {
+			set[k] = true
+		}
 	}
 	for _, id := range c.Pack.Registries[d.KeyRegistry] {
 		set[id] = true
@@ -405,13 +411,44 @@ func (c *Checker) dispatchKeys(d *dispInfo) []string {
 }
 
 func (c *Checker) hasDispatchKey(d *dispInfo, key string) bool {
+	if c.keyRegistryKnown(d) {
+		return c.Pack.HasID(d.KeyRegistry, key)
+	}
 	if _, ok := c.Pack.Dispatch(d.Dispatcher, key); ok {
 		return true
 	}
-	if d.KeyRegistry != "" && c.Pack.HasID(d.KeyRegistry, key) {
-		return true
-	}
 	return contains(d.KeyEnum, strings.TrimPrefix(key, "minecraft:"))
+}
+
+// renamedKey finds the current key for a stale dispatcher case: the one
+// live key whose case is the same mcdoc type, as multiface_growth is for
+// glow_lichen. It returns "" when there is none or more than one.
+func (c *Checker) renamedKey(d *dispInfo, key string) string {
+	if !c.keyRegistryKnown(d) || c.Pack.HasID(d.KeyRegistry, key) {
+		return ""
+	}
+	stale, ok := c.Pack.Dispatch(d.Dispatcher, key)
+	if !ok || stale.Kind != "reference" || stale.Path == "" {
+		return ""
+	}
+	found := ""
+	for _, k := range c.Pack.DispatchKeys(d.Dispatcher) {
+		t, _ := c.Pack.Dispatch(d.Dispatcher, k)
+		if k == key || t.Kind != "reference" || t.Path != stale.Path || !c.Pack.HasID(d.KeyRegistry, k) {
+			continue
+		}
+		if found != "" {
+			return ""
+		}
+		found = k
+	}
+	return found
+}
+
+// keyRegistryKnown reports whether a dispatched struct's key field takes ids
+// from a registry the pack lists, which then decides the valid keys.
+func (c *Checker) keyRegistryKnown(d *dispInfo) bool {
+	return d.KeyRegistry != "" && len(c.Pack.Registries[d.KeyRegistry]) > 0
 }
 
 // stringEnum returns the values of a string enum type, or nil.
