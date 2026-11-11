@@ -28,12 +28,23 @@ Put the cursor on a declaration and open the **Preview** tab in the web editor. 
 | Declaration | The preview shows |
 | --- | --- |
 | `Noise`, `DensityFunction`, `NoiseSettings`, `Dimension` | the terrain: density, blocks or 3D. See [Shaping terrain](terrain.md) |
+| `Dimension` | also a map of its biomes and the climate behind them. See [Why a biome doesn't appear](#why-a-biome-doesnt-appear) |
 | `SurfaceRule` | the blocks it places on the terrain |
 | a `Spline` | its curve, which you can drag. See [Splines](resources.md#splines) |
 | `LootTable`, `Recipe`, `Biome` | an inspector: a table's pools and entries, a recipe's grid, a biome's settings |
 | `Book`, a `.mmsbook` file | the open book, page by page. See [Previewing a book](resources.md#previewing-a-book) |
 | `tell`, `title`, `actionbar`, a `Text` | the message in chat, as a title or above the hotbar |
 | `JigsawStructure`, `TemplatePool` | which pieces join which, and a 3D simulation of one layout. See [Simulating a jigsaw structure](resources.md#simulating-a-jigsaw-structure) |
+
+### Why a biome doesn't appear
+
+A `MultiNoise` biome source picks, at each spot, the entry whose `parameters` are nearest the climate sampled there. The dimension's **Biomes** map helps when a biome never wins:
+
+- Hover the map to see the six climate values at that spot (at the camera's Y, which is what `depth` depends on) and the nearest entries, best first. For each entry that lost, it lists the parameters the climate is outside of, such as `humidity -0.300 ∉ 0.250…1.000`, and its distance.
+- **Show** switches the map to one climate parameter, coloured over its range in view, with the biome outlines kept on top.
+- **Explain** picks a biome to follow. Biomes the source lists that win nowhere in view are marked *not in view*, and also listed under the legend. Under the pointer, the chosen biome's nearest entry and what keeps it out are shown in amber. **Show: Distance to win** maps how far that biome is from winning: 0 where it wins, and the darker the closer.
+
+Distances are the game's: the square root of the sum of squares of how far each value is outside its range, with the entry's `offset` added as one more term.
 
 Previews redraw as you type. The pin button in the web editor keeps the Preview tab on one declaration while you edit another, which is how you watch terrain change while editing the noise behind it.
 

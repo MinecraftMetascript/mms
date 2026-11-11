@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, untrack } from 'svelte';
 	import type { OutputFile } from '../types';
 	import {
 		canLookDown,
@@ -18,6 +18,7 @@
 		type PreviewView
 	} from './protocol';
 	import { VOID } from './colors';
+	import { climateParams, gapLayer, missing, nearest, nearestOf, type BiomeLayer, type NearEntry } from './climate';
 	import { colorize, cssGradient, formatValue, paletteOf, palettes, position, rangeFor, solidPalette, type PaletteId, type Range } from './colormaps';
 
 	interface Props {
@@ -90,7 +91,8 @@
 		}
 		busy = on;
 	}
-	let last: Extract<PreviewResponse, { type: 'rendered' }> | null = $state(null);
+	// Raw: renders are replaced whole, and a biome map's entries are large.
+	let last = $state.raw<Extract<PreviewResponse, { type: 'rendered' }> | null>(null);
 	let hover = $state<{ px: number; py: number } | null>(null);
 	type Point = { x: number; y: number; z: number };
 	let lock = $state<Point | null>(null);
@@ -111,8 +113,15 @@
 
 	// Density colouring: a palette per kind, remembered in this browser, and
 	// the range it spans (the values in view, -1 to 1, or the user's own).
-	type DensityKind = 'noise' | 'density_function' | 'noise_settings';
-	const paletteDefaults: Record<DensityKind, PaletteId> = { noise: 'grayscale', density_function: 'viridis', noise_settings: 'solid' };
+	// A biome map's climate layers and its distance-to-win layer have their own.
+	type DensityKind = 'noise' | 'density_function' | 'noise_settings' | 'climate' | 'gap';
+	const paletteDefaults: Record<DensityKind, PaletteId> = {
+		noise: 'grayscale',
+		density_function: 'viridis',
+		noise_settings: 'solid',
+		climate: 'diverging',
+		gap: 'magma'
+	};
 	const paletteKey = (k: DensityKind) => `mms.preview.palette.${k}`;
 	function storedPalette(k: DensityKind): PaletteId {
 		try {
@@ -126,9 +135,75 @@
 	let paletteIds = $state<Record<DensityKind, PaletteId>>({
 		noise: storedPalette('noise'),
 		density_function: storedPalette('density_function'),
-		noise_settings: storedPalette('noise_settings')
+		noise_settings: storedPalette('noise_settings'),
+		climate: storedPalette('climate'),
+		gap: storedPalette('gap')
 	});
-	const densityKind = $derived(info && mode === 'density' && info.kind !== 'material_rule' && info.kind !== 'dimension' ? (info.kind as DensityKind) : null);
+
+	// What a biome map shows: the biomes, one climate parameter, or how far
+	// a chosen biome is from winning (multi-noise sources only).
+	let layer = $state<BiomeLayer>('biomes');
+	/** The biome the map explains: its nearest entry under the pointer, and the distance layer. */
+	let focus = $state('');
+	const layerNames: Record<BiomeLayer, string> = {
+		biomes: 'Biomes',
+		temperature: 'Temperature',
+		humidity: 'Humidity',
+		continentalness: 'Continentalness',
+		erosion: 'Erosion',
+		depth: 'Depth',
+		weirdness: 'Weirdness',
+		gap: 'Distance to win'
+	};
+	const biomeMap = $derived(mode === 'biomes' && info?.kind === 'dimension');
+	const entries = $derived(biomeMap ? last?.entries : undefined);
+	const sourceBiomes = $derived(entries ? [...new Set(entries.biomes)].sort() : []);
+	const layers = $derived<BiomeLayer[]>(['biomes', ...climateParams, ...(entries ? (['gap'] as const) : [])]);
+	/** The layer shown: a layer the render can't draw (no entries for the distance) falls back to the biomes. */
+	const shownLayer = $derived<BiomeLayer>(!biomeMap || !last?.climate || !layers.includes(layer) ? 'biomes' : layer);
+	$effect(() => {
+		// Keep the focus on a biome the source has: the first one not in view, else the first.
+		if (entries && !sourceBiomes.includes(focus)) focus = notInView[0] ?? sourceBiomes[0] ?? '';
+	});
+	/** The values a climate or distance layer colours, and their range in view. */
+	const layerValues = $derived.by(() => {
+		if (shownLayer === 'biomes' || !last?.climate) return null;
+		const n = last.width * last.height;
+		const values =
+			shownLayer === 'gap'
+				? entries && last.fit
+					? gapLayer(entries, focus, last.climate, last.fit)
+					: null
+				: last.climate.subarray(climateParams.indexOf(shownLayer) * n, (climateParams.indexOf(shownLayer) + 1) * n);
+		if (!values) return null;
+		let min = Infinity;
+		let max = -Infinity;
+		for (const v of values) {
+			if (v < min) min = v;
+			if (v > max) max = v;
+		}
+		return { values, min, max };
+	});
+	/** Biomes the source lists that win nowhere in view. */
+	const notInView = $derived(entries && last?.legend ? missing(entries, last.legend.map((b) => b.id)) : []);
+	function setLayer(l: BiomeLayer) {
+		layer = l;
+	}
+	// A new layer, biome to explain or range redraws what is there.
+	$effect(() => {
+		void [layerValues, palette, valueRange];
+		untrack(draw);
+	});
+
+	const densityKind = $derived<DensityKind | null>(
+		layerValues
+			? shownLayer === 'gap'
+				? 'gap'
+				: 'climate'
+			: info && mode === 'density' && info.kind !== 'material_rule' && info.kind !== 'dimension'
+				? (info.kind as DensityKind)
+				: null
+	);
 	const palette = $derived(densityKind ? paletteOf(paletteIds[densityKind]) : null);
 	const paletteChoices = $derived(densityKind === 'noise_settings' ? [solidPalette, ...palettes] : palettes);
 	function setPalette(id: PaletteId) {
@@ -146,12 +221,13 @@
 	let customRange = $state<Range>({ lo: -1, hi: 1 });
 	/** The range the palette spans for the current render. */
 	const valueRange = $derived.by((): Range | null => {
-		if (!palette || !last || last.labels) return null;
+		if (!palette || !last || (last.labels && !layerValues)) return null;
 		const fixed = rangeMode === 'unit' ? { lo: -1, hi: 1 } : rangeMode === 'custom' ? customRange : undefined;
-		return rangeFor(palette, last.min, last.max, fixed);
+		const { min, max } = layerValues ?? last;
+		return rangeFor(palette, min, max, fixed);
 	});
 	function setRangeMode(m: RangeMode) {
-		if (m === 'custom' && rangeMode !== 'custom' && last && Number.isFinite(last.min)) {
+		if (m === 'custom' && rangeMode !== 'custom' && last && Number.isFinite((layerValues ?? last).min)) {
 			// Start from what is shown, so switching doesn't jump.
 			const r = valueRange ?? { lo: -1, hi: 1 };
 			customRange = { lo: +r.lo.toPrecision(3), hi: +r.hi.toPrecision(3) };
@@ -476,6 +552,19 @@
 			shown = last.bitmap;
 		} else if (palette && palette.id !== 'solid' && valueRange && mode === 'density') {
 			ctx.putImageData(new ImageData(colorize(last.values, palette, valueRange, VOID), last.width, last.height), 0, 0);
+		} else if (palette && valueRange && layerValues) {
+			const px = colorize(layerValues.values, palette, valueRange, VOID);
+			// Biome edges stay drawn, so the climate lines up with the map.
+			const { width: w, height: h, values: b } = last;
+			for (let i = 0; i < w * h; i++) {
+				const x = i % w;
+				if ((x + 1 < w && b[i + 1] !== b[i]) || (i + w < w * h && b[i + w] !== b[i])) {
+					px[i * 4] *= 0.6;
+					px[i * 4 + 1] *= 0.6;
+					px[i * 4 + 2] *= 0.6;
+				}
+			}
+			ctx.putImageData(new ImageData(px, w, h), 0, 0);
 		} else {
 			ctx.putImageData(new ImageData(last.pixels, last.width, last.height), 0, 0);
 		}
@@ -732,12 +821,42 @@
 	/** The value under the pointer, for the scale's marker. */
 	const hoverValue = $derived.by(() => {
 		const at = hover;
-		if (!at || !last || mode !== 'density') return NaN;
+		if (!at || !last || (mode !== 'density' && !layerValues)) return NaN;
 		const ix = Math.floor(at.px);
 		const iy = Math.floor(at.py);
 		if (ix < 0 || iy < 0 || ix >= last.width || iy >= last.height) return NaN;
-		return last.values[iy * last.width + ix];
+		return (layerValues?.values ?? last.values)[iy * last.width + ix];
 	});
+	/**
+	 * A biome map's climate under the pointer (or at the pinned point), and
+	 * which entries came closest there: why that biome won and the others didn't.
+	 */
+	const climateAt = $derived.by(() => {
+		if (!biomeMap || !last?.climate) return null;
+		let ix: number;
+		let iy: number;
+		if (hover) [ix, iy] = [Math.floor(hover.px), Math.floor(hover.py)];
+		else if (lock) [ix, iy] = toPixel(lock).map(Math.floor);
+		else return null;
+		if (ix < 0 || iy < 0 || ix >= last.width || iy >= last.height) return null;
+		const n = last.width * last.height;
+		const i = iy * last.width + ix;
+		const at = climateParams.map((_, c) => last!.climate![c * n + i]);
+		const near = entries ? nearest(entries, at, 4) : [];
+		const focused = entries && focus && !near.some((e) => e.biome === focus) ? nearestOf(entries, focus, at) : null;
+		return { at, near, focused };
+	});
+	const short = (id: string) => id.replace(/^minecraft:/, '');
+	const num = (v: number) => (Math.abs(v) < 5e-4 ? '0' : v.toFixed(3));
+	/** What keeps an entry from fitting: the parameters it is outside of, worst first. */
+	function misses(e: NearEntry): string {
+		const out = e.params
+			.filter((p) => p.off > 0)
+			.sort((a, b) => b.off - a.off)
+			.map((p) => `${p.param} ${num(p.value)} ∉ ${p.min === p.max ? num(p.min) : `${num(p.min)}…${num(p.max)}`}`);
+		if (e.offset) out.push(`offset ${num(e.offset)}`);
+		return out.length ? out.join(', ') : 'fits';
+	}
 	const lockValue = $derived.by(() => {
 		if (!lock || !last) return '';
 		const [px, py] = toPixel(lock);
@@ -780,6 +899,22 @@
 						{#each biomeChoices.all as b (b)}<option value={b}>{b.replace(/^minecraft:/, '')}</option>{/each}
 					</select>
 				</label>
+			{/if}
+			{#if biomeMap && last?.climate}
+				<label class="flex items-center gap-1" title="Show the biomes, or the climate parameter the biome source samples">
+					Show
+					<select aria-label="Layer" class="rounded border border-line bg-panel px-1 py-0.5 text-ink" value={shownLayer} onchange={(e) => setLayer(e.currentTarget.value as BiomeLayer)}>
+						{#each layers as l (l)}<option value={l}>{layerNames[l]}</option>{/each}
+					</select>
+				</label>
+				{#if entries}
+					<label class="flex items-center gap-1" title="The biome to explain: how far it is from winning, and what keeps it from winning under the pointer">
+						Explain
+						<select aria-label="Explain biome" class="rounded border border-line bg-panel px-1 py-0.5 text-ink" bind:value={focus}>
+							{#each sourceBiomes as b (b)}<option value={b}>{short(b)}{notInView.includes(b) ? ' (not in view)' : ''}</option>{/each}
+						</select>
+					</label>
+				{/if}
 			{/if}
 			{#if palette}
 				<label class="flex items-center gap-1">
@@ -910,9 +1045,33 @@
 			</div>
 		{/if}
 		{#if info && (readout || lockValue || busy)}
-			<div class="pointer-events-none absolute bottom-2 left-2 flex flex-col gap-0.5 rounded bg-black/60 px-2 py-1 font-mono text-[11px] text-white">
+			<!-- Clear of the value scale at the bottom right, when there is one. -->
+			<div
+				class="pointer-events-none absolute bottom-2 left-2 flex flex-col gap-0.5 rounded bg-black/60 px-2 py-1 font-mono text-[11px] text-white"
+				class:max-w-[calc(100%-15.5rem)]={!!(palette && valueRange && palette.id !== 'solid')}
+			>
 				{#if readout}<span>{readout}</span>{/if}
 				{#if lockValue}<span class="text-red-300">● {lockValue}</span>{/if}
+				{#if climateAt}
+					<div class="mt-0.5 grid grid-cols-[auto_auto] gap-x-2 border-t border-white/20 pt-0.5" aria-label="Climate at the pointer">
+						{#each climateParams as p, c (p)}
+							<span class="text-white/70">{p}</span><span class="text-right">{num(climateAt.at[c])}</span>
+						{/each}
+					</div>
+					{#if climateAt.near.length}
+						<div class="mt-0.5 flex max-w-[28rem] flex-col border-t border-white/20 pt-0.5" aria-label="Nearest entries">
+							<span class="text-white/70">Nearest entries (distance):</span>
+							{#each climateAt.near as e, k (e.index)}
+								<span class="whitespace-normal"
+									>{k === 0 ? '✓' : `${k + 1}.`} {short(e.biome)} {num(e.distance)}{#if k > 0}<span class="text-white/70">{` · ${misses(e)}`}</span>{/if}</span
+								>
+							{/each}
+							{#if climateAt.focused}
+								<span class="whitespace-normal text-amber-300">{`→ ${short(climateAt.focused.biome)} ${num(climateAt.focused.distance)} · ${misses(climateAt.focused)}`}</span>
+							{/if}
+						</div>
+					{/if}
+				{/if}
 				{#if busy && (!last || mode !== 'density' || slow)}<span>Rendering…</span>{/if}
 			</div>
 		{/if}
@@ -931,13 +1090,19 @@
 					<span class="flex items-center gap-1.5"><span class="inline-block h-2.5 w-2.5 rounded-sm" style:background={b.color}></span>{b.id.replace(/^minecraft:/, '')}</span>
 				{/each}
 				{#if last.legend.length > 12}<span class="text-white/70">+{last.legend.length - 12} more</span>{/if}
+				{#if notInView.length}
+					<span class="mt-0.5 max-w-48 border-t border-white/20 pt-0.5 text-white/70" aria-label="Biomes not in view">
+						Not in view: {notInView.slice(0, 8).map(short).join(', ')}{notInView.length > 8 ? ` +${notInView.length - 8} more` : ''}
+					</span>
+				{/if}
 			</div>
 		{/if}
 		{#if info && last}
 			<div class="pointer-events-none absolute right-2 bottom-2 flex flex-col items-end gap-1">
 				{#if palette && valueRange && palette.id !== 'solid'}
 					{@const r = valueRange}
-					{@const flatField = last.min === last.max}
+					{@const stat = layerValues ?? last}
+					{@const flatField = stat.min === stat.max}
 					<div class="flex w-56 flex-col gap-1 rounded bg-black/60 px-2 py-1.5 font-mono text-[11px] text-white" aria-label="Value scale">
 						<div class="relative h-3 rounded-sm" style:background={cssGradient(palette)}>
 							{#if r.lo < 0 && r.hi > 0}
@@ -955,12 +1120,12 @@
 							<span>{formatValue(r.hi, r)}</span>
 						</div>
 						<div class="text-white/70">
-							{#if last.min === Infinity}
+							{#if stat.min === Infinity}
 								no values in view
 							{:else if flatField}
-								flat: {last.min.toFixed(3)} everywhere in view
+								flat: {stat.min.toFixed(3)} everywhere in view
 							{:else}
-								in view {last.min.toFixed(3)} … {last.max.toFixed(3)}
+								in view {stat.min.toFixed(3)} … {stat.max.toFixed(3)}
 							{/if}
 						</div>
 					</div>

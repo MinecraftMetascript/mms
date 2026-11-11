@@ -2,6 +2,7 @@
 import {
 	BiomeSource,
 	BlockPos,
+	Climate,
 	Chunk,
 	ChunkPos,
 	DensityFunction,
@@ -21,6 +22,7 @@ import {
 	type MaterialRule
 } from 'deepslate';
 import { biomeColor, blockColor, CAVE, SKY, VOID, type Rgb } from './colors';
+import { entryStride, fitness, type ClimateEntries } from './climate';
 import { speedUp } from './fastDensity';
 import { screenAxes, vanillaSummary, type PreviewFile, type PreviewRequest, type PreviewResponse, type PreviewView } from './protocol';
 
@@ -169,6 +171,31 @@ function pacer(req: RenderRequest) {
 interface Dimension {
 	settings: NoiseGeneratorSettings;
 	biomes: BiomeSource;
+	/** A multi-noise source's entries, to explain which one wins where. */
+	entries?: ClimateEntries;
+	/** The same entries as Deepslate looks them up, finding an entry's index. */
+	lookup?: Climate.Parameters<number>;
+}
+
+/** Reads a multi-noise source's inline entries. */
+function readEntries(list: unknown[]): { entries: ClimateEntries; lookup: Climate.Parameters<number> } {
+	const biomes: string[] = [];
+	const params = new Float32Array(list.length * entryStride);
+	const things: [Climate.ParamPoint, () => number][] = [];
+	list.forEach((raw, i) => {
+		const e = (raw ?? {}) as { biome?: unknown; parameters?: unknown };
+		const point = Climate.ParamPoint.fromJson(e.parameters);
+		biomes.push(Identifier.parse(typeof e.biome === 'string' ? e.biome : 'plains').toString());
+		point.space().forEach((p, c) => {
+			if (c < 6) {
+				params[i * entryStride + c * 2] = p.min;
+				params[i * entryStride + c * 2 + 1] = p.max;
+			}
+		});
+		params[i * entryStride + 12] = point.offset;
+		things.push([point, () => i]);
+	});
+	return { entries: { biomes, params }, lookup: new Climate.Parameters(things) };
 }
 
 function readDimension(id: string): Dimension {
@@ -186,7 +213,9 @@ function readDimension(id: string): Dimension {
 	if (sourceType === 'multi_noise' && (source.preset !== undefined || typeof source.biomes === 'string')) {
 		throw new Error('Multi-noise presets have no preview: their parameters are built into the game. List the biomes inline to map them.');
 	}
-	return { settings, biomes: BiomeSource.fromJson(source) };
+	const biomes = BiomeSource.fromJson(source);
+	if (sourceType === 'multi_noise' && Array.isArray(source.biomes) && source.biomes.length > 0) return { settings, biomes, ...readEntries(source.biomes) };
+	return { settings, biomes };
 }
 
 // ---- Terrain ----------------------------------------------------------
@@ -1247,13 +1276,18 @@ async function renderTerrain(req: RenderRequest, t: Terrain, key: string): Promi
 
 async function renderBiomes(req: RenderRequest, dim: Dimension, rs: RandomState): Promise<Rendered> {
 	const { width, height, view } = req;
-	const values = new Float32Array(width * height);
-	const pixels = new Uint8ClampedArray(width * height * 4);
+	const n = width * height;
+	const values = new Float32Array(n);
+	const pixels = new Uint8ClampedArray(n * 4);
+	// The climate at each pixel, one plane per parameter, and the winning entry's fitness.
+	const climate = new Float32Array(n * 6);
+	const fit = new Float32Array(n).fill(NaN);
 	const plane = planeOf(width, height, view);
 	const qy = Math.floor(view.y) >> 2;
 	const counts = new Map<number, number>();
 	// Biomes are stored per 4×4×4 cell, so neighbouring pixels in one cell share a lookup.
-	const cache = new Map<string, number>();
+	const cache = new Map<string, { b: number; t: Climate.TargetPoint; f: number }>();
+	const { entries, lookup } = dim;
 	let started = performance.now();
 	for (let py = 0; py < height; py++) {
 		if (performance.now() - started > 40) {
@@ -1265,13 +1299,28 @@ async function renderBiomes(req: RenderRequest, dim: Dimension, rs: RandomState)
 			const qx = Math.floor(plane.x(px, py)) >> 2;
 			const qz = Math.floor(plane.z(px, py)) >> 2;
 			const k = `${qx},${qz}`;
-			let b = cache.get(k);
-			if (b === undefined) {
-				b = indexOf(dim.biomes.getBiome(qx, qy, qz, rs.sampler).toString());
-				cache.set(k, b);
+			let cell = cache.get(k);
+			if (cell === undefined) {
+				const t = rs.sampler.sample(qx, qy, qz);
+				if (entries && lookup) {
+					// The same search the game makes, keeping which entry won.
+					const e = lookup.find(t);
+					cell = { b: indexOf(entries.biomes[e]), t, f: fitness(entries, e, t.toArray()) };
+				} else {
+					cell = { b: indexOf(dim.biomes.getBiome(qx, qy, qz, rs.sampler).toString()), t, f: NaN };
+				}
+				cache.set(k, cell);
 			}
 			const i = py * width + px;
+			const b = cell.b;
 			values[i] = b;
+			climate[i] = cell.t.temperature;
+			climate[n + i] = cell.t.humidity;
+			climate[2 * n + i] = cell.t.continentalness;
+			climate[3 * n + i] = cell.t.erosion;
+			climate[4 * n + i] = cell.t.depth;
+			climate[5 * n + i] = cell.t.weirdness;
+			fit[i] = cell.f;
 			counts.set(b, (counts.get(b) ?? 0) + 1);
 			put(pixels, i * 4, biomeColor(palette[b]));
 		}
@@ -1290,8 +1339,23 @@ async function renderBiomes(req: RenderRequest, dim: Dimension, rs: RandomState)
 	const legend = [...counts.entries()]
 		.sort((a, b) => b[1] - a[1])
 		.map(([b]) => ({ id: palette[b], color: `rgb(${biomeColor(palette[b]).join(' ')})` }));
-	return { type: 'rendered', seq: req.seq, width, height, pixels, values, min: Infinity, max: -Infinity, labels: palette.slice(), legend };
+	return {
+		type: 'rendered',
+		seq: req.seq,
+		width,
+		height,
+		pixels,
+		values,
+		min: Infinity,
+		max: -Infinity,
+		labels: palette.slice(),
+		legend,
+		climate,
+		fit: entries ? fit : undefined,
+		entries
+	};
 }
+
 
 // ---- Render -----------------------------------------------------------
 
@@ -1468,6 +1532,8 @@ function post(res: Rendered) {
 	const transfer: Transferable[] = [res.pixels.buffer, res.values.buffer];
 	if (res.bitmap) transfer.push(res.bitmap);
 	if (res.heights) transfer.push(res.heights.buffer);
+	if (res.climate) transfer.push(res.climate.buffer);
+	if (res.fit) transfer.push(res.fit.buffer);
 	(self as unknown as Worker).postMessage(res, transfer);
 }
 

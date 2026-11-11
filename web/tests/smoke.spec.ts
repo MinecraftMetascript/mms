@@ -287,6 +287,43 @@ function doubling(n: number): string {
 	return lines.reverse().join('\n') + '\n';
 }
 
+test('a biome map shows the climate and explains which biome wins', async ({ page }) => {
+	const errors: string[] = [];
+	page.on('pageerror', (e) => errors.push(e.message));
+	page.on('dialog', (d) => d.accept());
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	await page.getByRole('button', { name: /Examples/ }).click();
+	await page.getByRole('button', { name: /cave-siege/ }).click();
+	await page.getByRole('button', { name: 'worldgen/dimension.mms' }).click();
+	await clickLine(page, 'Dimension caves {');
+	await expect(page.getByLabel('Biomes in view')).toBeVisible({ timeout: 30_000 });
+	await expect(page.getByText(/Preview failed/)).toBeHidden();
+
+	// Hovering gives the six parameters and the nearest entries, the winner first.
+	const canvas = page.locator('canvas');
+	const box = (await canvas.boundingBox())!;
+	await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+	const climate = page.getByLabel('Climate at the pointer');
+	for (const p of ['temperature', 'humidity', 'continentalness', 'erosion', 'depth', 'weirdness']) await expect(climate).toContainText(p);
+	await expect(page.getByLabel('Nearest entries')).toContainText(/✓ [\w:]+ \d/);
+
+	// A climate layer is coloured over its range in view, on the biomes' outlines.
+	await page.getByLabel('Layer').selectOption('temperature');
+	await expect(page.getByLabel('Value scale')).toContainText(/in view -?\d\.\d{3} … -?\d\.\d{3}/);
+	await expect(page.getByLabel('Palette')).toHaveValue('diverging');
+
+	// The distance layer shows how far the biome to explain is from winning:
+	// 0 where it wins, as one in view does somewhere.
+	const shown = (await page.getByLabel('Biomes in view').locator('span.flex').first().innerText()).trim();
+	await page.getByLabel('Explain biome').selectOption({ label: shown });
+	await page.getByLabel('Layer').selectOption('gap');
+	await expect(page.getByLabel('Value scale')).toContainText(/in view 0\.000/);
+	await page.getByLabel('Layer').selectOption('biomes');
+	await expect(page.getByLabel('Value scale')).toBeHidden();
+	expect(errors).toEqual([]);
+});
+
 test('a slow preview gives way to the next edit', async ({ page }) => {
 	const errors: string[] = [];
 	page.on('pageerror', (e) => errors.push(e.message));
