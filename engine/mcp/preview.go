@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/minecraftmetascript/mms/engine/project"
 	"github.com/minecraftmetascript/mms/engine/sema"
@@ -56,11 +57,18 @@ var vanillaWorldgen = []string{"worldgen/noise", "worldgen/density_function", "w
 // errNoRuntime explains how to get the preview tools working.
 var errNoRuntime = errors.New("the preview tools run the editors' preview code, which needs a JavaScript runtime: install Node.js 20 or later (or Bun or Deno) and make sure `node` is on PATH, or set MMS_JS to the runtime's path")
 
+// previewTimeout bounds one preview tool call.
+const previewTimeout = 2 * time.Minute
+
 // jsRuntime finds the command that runs a JavaScript file: MMS_JS, then
 // node, bun and deno on PATH.
 func jsRuntime() (string, []string, error) {
 	if p := os.Getenv("MMS_JS"); p != "" {
-		return p, argsFor(p), nil
+		bin, err := exec.LookPath(p)
+		if err != nil {
+			return "", nil, fmt.Errorf("MMS_JS is %s, which is not a program that can run: %w", p, err)
+		}
+		return bin, argsFor(bin), nil
 	}
 	for _, name := range []string{"node", "bun", "deno"} {
 		if p, err := exec.LookPath(name); err == nil {
@@ -195,12 +203,18 @@ func runAgent(ctx context.Context, req previewRequest) (previewResponse, error) 
 	if err != nil {
 		return previewResponse{}, err
 	}
+	// A preview that never finishes would hold up every later tool call.
+	ctx, cancel := context.WithTimeout(ctx, previewTimeout)
+	defer cancel()
 	cmd := exec.CommandContext(ctx, bin, append(pre, script)...)
 	cmd.Stdin = bytes.NewReader(in)
 	var out, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &stderr
 	cmd.Env = append(os.Environ(), "NODE_NO_WARNINGS=1")
 	runErr := cmd.Run()
+	if ctx.Err() == context.DeadlineExceeded {
+		return previewResponse{}, fmt.Errorf("the preview took longer than %s and was stopped; try a smaller radius, size or runs", previewTimeout)
+	}
 	var res previewResponse
 	if err := json.Unmarshal(out.Bytes(), &res); err != nil {
 		msg := strings.TrimSpace(stderr.String())

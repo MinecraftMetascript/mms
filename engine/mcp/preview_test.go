@@ -1,6 +1,8 @@
 package mcp
 
 import (
+	"bytes"
+	"os"
 	"os/exec"
 	"testing"
 )
@@ -89,8 +91,11 @@ func TestAgentInSync(t *testing.T) {
 	if b, err := exec.Command(node, "../../packages/preview/scripts/build-agent.mjs", out).CombinedOutput(); err != nil {
 		t.Fatalf("build: %v\n%s", err, b)
 	}
-	b, err := exec.Command("cmp", out, "preview/agent.mjs").CombinedOutput()
+	built, err := os.ReadFile(out)
 	if err != nil {
-		t.Fatalf("engine/mcp/preview/agent.mjs is stale: run `npm run build:agent -w packages/preview`\n%s", b)
+		t.Fatal(err)
+	}
+	if !bytes.Equal(built, agentJS) {
+		t.Fatal("engine/mcp/preview/agent.mjs is stale: run `npm run build:agent -w packages/preview`")
 	}
 }

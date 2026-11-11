@@ -75,8 +75,19 @@ export async function biomes(args: Record<string, unknown>, files: PreviewFile[]
 		nearest(entries, at, 5).forEach((e, k) => out.push(`${k + 1}. ${entryLine(e, k === 0)}`));
 	}
 
-	if (wanted) out.push('', ...explain(qualified(wanted), map, entries, counts, total, x, z, scale));
+	if (wanted) out.push('', ...explain(biomeId(wanted, [...counts.keys(), ...(entries?.biomes ?? [])]), map, entries, counts, total, x, z, scale));
 	return out.join('\n');
+}
+
+/**
+ * The biome a name means: a bare name matches the biomes the source and the
+ * map know in any namespace (the pack's own included), else minecraft:'s.
+ */
+function biomeId(name: string, known: string[]): string {
+	if (name.includes(':')) return name;
+	const hits = [...new Set(known)].filter((b) => b.slice(b.indexOf(':') + 1) === name);
+	if (hits.length > 1) throw new ArgError(`${name} could be ${hits.join(' or ')}; give the namespace.`);
+	return hits[0] ?? qualified(name);
 }
 
 /** Why one biome does or doesn't win in the area. */

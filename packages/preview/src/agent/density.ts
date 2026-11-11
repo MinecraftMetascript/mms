@@ -89,11 +89,12 @@ async function area(what: string, kind: Kind, id: string, seed: string, x: numbe
 	out.push(spread(stats));
 	out.push('', `Values on a ${n}×${n} grid, ${fmt((2 * radius) / n)} blocks apart (rows run north to south, columns west to east):`);
 	const step = (2 * radius) / n;
-	const xs = Array.from({ length: n }, (_, i) => Math.floor(x + (i + 0.5 - n / 2) * step));
-	const rows = [['z \\ x', ...xs.map(String)]];
+	// The coordinates the worker samples at, which fall between blocks when the step is odd.
+	const xs = Array.from({ length: n }, (_, i) => x + (i + 0.5 - n / 2) * step);
+	const rows = [['z \\ x', ...xs.map((v) => fmt(v, 1))]];
 	for (let py = 0; py < n; py++) {
-		const zz = Math.floor(z + (py + 0.5 - n / 2) * step);
-		rows.push([String(zz), ...xs.map((_, px) => fmt(grid.values[py * n + px], 2))]);
+		const zz = z + (py + 0.5 - n / 2) * step;
+		rows.push([fmt(zz, 1), ...xs.map((_, px) => fmt(grid.values[py * n + px], 2))]);
 	}
 	out.push(table(rows));
 	return out.join('\n');
@@ -119,8 +120,9 @@ async function column(what: string, kind: Kind, id: string, seed: string, x: num
 	const from = Math.floor(num(args, 'from', -64, -2048, 2048));
 	const to = Math.floor(num(args, 'to', 320, -2048, 2048));
 	if (to <= from) throw new ArgError('to must be above from.');
-	const step = Math.floor(num(args, 'step', 8, 1, 512));
-	const n = Math.min(512, Math.floor((to - from) / step) + 1);
+	// At most 512 samples: a longer range takes a larger step rather than stopping short.
+	const step = Math.max(Math.floor(num(args, 'step', 8, 1, 512)), Math.ceil((to - from) / 511));
+	const n = Math.floor((to - from) / step) + 1;
 	// A side view one pixel wide: row r is y = from + (n - 1 - r) * step.
 	const r = await render({ kind, mode: 'density', id, width: 1, height: n, view: { x, y: from + (n / 2 - 0.5) * step, z, facing: 'north', scale: step }, seed, options });
 	const ys = Array.from({ length: n }, (_, i) => from + (n - 1 - i) * step);

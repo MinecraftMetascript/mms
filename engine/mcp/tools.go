@@ -202,7 +202,7 @@ func (s *Server) toolList() []*tool {
 			name: "biomes", title: "Explain a dimension's biomes",
 			doc: "Sample a Dimension's biome source the way the editors' biome map does, and explain it: the biomes in an area and their share, the climate at its centre with the nearest multi-noise entries and the parameters each one misses, " +
 				"and with biome, where that biome wins or, if it wins nowhere, where it comes closest, what beats it there, and which climate parameters never reach its ranges. " +
-				"Needs a noise generator; multi-noise presets have no entries to explain. Runs the editors' preview code, so it needs Node.js (or Bun or Deno).",
+				"Needs a noise generator with its biomes listed inline: a multi-noise preset (`preset = overworld`) cannot be sampled. Runs the editors' preview code, so it needs Node.js (or Bun or Deno).",
 			props: with(map[string]any{
 				"dimension": str("The Dimension's id or name. Optional when the project has one."),
 				"biome":     str("A biome to explain, such as `minecraft:cherry_grove` or one of the project's."),

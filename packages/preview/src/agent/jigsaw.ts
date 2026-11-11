@@ -27,7 +27,7 @@ export function jigsaw(args: Record<string, unknown>, files: OutputFile[], asset
 	const id = given ? pick('jigsaw structure', given, ids) : ids[0];
 	const [ns, name] = id.split(':', 2);
 	const path = `data/${ns}/worldgen/structure/${name}.json`;
-	const seed = Math.floor(num(args, 'seed', 0));
+	const seed = Math.floor(num(args, 'seed', 0, -Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER - 200));
 	const runs = Math.floor(num(args, 'runs', 1, 1, 200));
 	const depth = args.depth === undefined ? undefined : Math.floor(num(args, 'depth', 0, 0, MAX_DEPTH));
 
@@ -47,8 +47,11 @@ function poolPieces(files: OutputFile[], pools: Iterable<string>): Map<string, s
 			const j = JSON.parse(f.text) as { elements?: { element?: { location?: string; elements?: { location?: string }[] } }[] };
 			const ids = new Set<string>();
 			for (const e of j.elements ?? []) {
-				const loc = e.element?.location;
-				if (typeof loc === 'string') ids.add(loc.includes(':') ? loc : `minecraft:${loc}`);
+				// A list element places several structures together.
+				for (const el of [e.element, ...(e.element?.elements ?? [])]) {
+					const loc = el?.location;
+					if (typeof loc === 'string') ids.add(loc.includes(':') ? loc : `minecraft:${loc}`);
+				}
 			}
 			out.set(pool, [...ids]);
 		} catch {
@@ -103,10 +106,11 @@ function many(id: string, sims: Simulation[], files: OutputFile[]): string {
 	}
 	const ok = sims.filter((s) => !s.failed);
 	if (ok.length) {
-		const sizes = ok.map((s) => s.pieces.length);
+		// Counted over every run: one that placed nothing has no pieces.
+		const sizes = sims.map((s) => s.pieces.length);
 		const deep = ok.map((s) => s.reached);
 		out.push(
-			`Pieces per run: ${Math.min(...sizes)}..${Math.max(...sizes)}, mean ${fmt(sizes.reduce((a, b) => a + b, 0) / ok.length, 1)}. ` +
+			`Pieces per run: ${Math.min(...sizes)}..${Math.max(...sizes)}, mean ${fmt(sizes.reduce((a, b) => a + b, 0) / sims.length, 1)}. ` +
 				`Depth reached: ${Math.min(...deep)}..${Math.max(...deep)}.`
 		);
 		// How many runs place each piece, and how many of it a run places.
@@ -122,7 +126,7 @@ function many(id: string, sims: Simulation[], files: OutputFile[]): string {
 		}
 		out.push('', 'Pieces (runs that place it, mean count per run):');
 		const rows = [['piece', 'runs', 'mean']];
-		for (const [p, c] of [...runsWith].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))) rows.push([p, `${c}/${ok.length}`, fmt(total.get(p)! / ok.length, 2)]);
+		for (const [p, c] of [...runsWith].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))) rows.push([p, `${c}/${sims.length}`, fmt(total.get(p)! / sims.length, 2)]);
 		out.push(table(rows));
 		const empties = new Map<string, number>();
 		for (const s of ok)
