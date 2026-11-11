@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 )
@@ -29,11 +30,7 @@ func writeMCPJSON(dir string) (created bool, note string, err error) {
 	path := filepath.Join(dir, ".mcp.json")
 	doc := map[string]json.RawMessage{}
 	servers := map[string]json.RawMessage{}
-	mode := os.FileMode(0o644)
-	if fi, err := os.Stat(path); err == nil {
-		mode = fi.Mode().Perm() // .mcp.json can hold secrets in env
-	}
-	old, rerr := os.ReadFile(path)
+	mode, old, rerr := readWithMode(path)
 	switch err := rerr; {
 	case err == nil:
 		if err := json.Unmarshal(old, &doc); err != nil || doc == nil {
@@ -105,4 +102,21 @@ func joinAnd(s []string) string {
 		out += ", " + x
 	}
 	return out + " and " + s[len(s)-1]
+}
+
+// readWithMode reads path and its permission bits from one open file, so
+// a merge keeps a private (0600) .mcp.json private: it can hold secrets in
+// env. A missing file reads as 0644 and a not-exist error.
+func readWithMode(path string) (os.FileMode, []byte, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return 0o644, nil, err
+	}
+	defer f.Close()
+	fi, err := f.Stat()
+	if err != nil {
+		return 0, nil, err
+	}
+	data, err := io.ReadAll(f)
+	return fi.Mode().Perm(), data, err
 }
