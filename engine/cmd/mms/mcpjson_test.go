@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -51,9 +52,15 @@ func TestInitMergesMCPJSON(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, ".mcp.json")
 	write(t, path, `{"mcpServers": {"mms": {"command": "/opt/mms", "args": ["mcp"]}, "other": {"command": "x"}}, "extra": 1}`)
+	if err := os.Chmod(path, 0o600); err != nil {
+		t.Fatal(err)
+	}
 	var out, errOut bytes.Buffer
 	if code := runInit([]string{dir}, &out, &errOut); code != 0 {
 		t.Fatalf("init exit %d: %s", code, errOut.String())
+	}
+	if fi, err := os.Stat(path); err != nil || (runtime.GOOS != "windows" && fi.Mode().Perm() != 0o600) {
+		t.Errorf("mode after merge: %v %v", fi.Mode(), err)
 	}
 	if !strings.Contains(out.String(), "added nbt to .mcp.json") || strings.Contains(out.String(), "and .mcp.json") {
 		t.Errorf("init output %q", out.String())

@@ -29,6 +29,10 @@ func writeMCPJSON(dir string) (created bool, note string, err error) {
 	path := filepath.Join(dir, ".mcp.json")
 	doc := map[string]json.RawMessage{}
 	servers := map[string]json.RawMessage{}
+	mode := os.FileMode(0o644)
+	if fi, err := os.Stat(path); err == nil {
+		mode = fi.Mode().Perm() // .mcp.json can hold secrets in env
+	}
 	old, rerr := os.ReadFile(path)
 	switch err := rerr; {
 	case err == nil:
@@ -75,7 +79,7 @@ func writeMCPJSON(dir string) (created bool, note string, err error) {
 	}
 	_, werr := tmp.Write(out.Bytes())
 	cerr := tmp.Close()
-	if err := errors.Join(werr, cerr, os.Chmod(tmp.Name(), 0o644)); err != nil {
+	if err := errors.Join(werr, cerr, os.Chmod(tmp.Name(), mode)); err != nil {
 		os.Remove(tmp.Name())
 		return false, "", err
 	}
