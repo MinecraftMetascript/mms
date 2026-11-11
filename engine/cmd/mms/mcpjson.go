@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -31,11 +32,11 @@ func writeMCPJSON(dir string) (created bool, note string, err error) {
 	old, rerr := os.ReadFile(path)
 	switch err := rerr; {
 	case err == nil:
-		if err := json.Unmarshal(old, &doc); err != nil {
-			return false, fmt.Sprintf("left .mcp.json alone: it is not a JSON object (%v)", err), nil
+		if err := json.Unmarshal(old, &doc); err != nil || doc == nil {
+			return false, "left .mcp.json alone: it is not a JSON object", nil
 		}
 		if raw, ok := doc["mcpServers"]; ok {
-			if err := json.Unmarshal(raw, &servers); err != nil {
+			if err := json.Unmarshal(raw, &servers); err != nil || servers == nil {
 				return false, "left .mcp.json alone: its mcpServers is not an object", nil
 			}
 		}
@@ -66,7 +67,20 @@ func writeMCPJSON(dir string) (created bool, note string, err error) {
 		return false, "", err
 	}
 	out.WriteByte('\n')
-	if err := os.WriteFile(path, out.Bytes(), 0o644); err != nil {
+	// Write beside it and rename, so a failed write never truncates the
+	// user's file.
+	tmp, err := os.CreateTemp(dir, ".mcp.json.*")
+	if err != nil {
+		return false, "", err
+	}
+	_, werr := tmp.Write(out.Bytes())
+	cerr := tmp.Close()
+	if err := errors.Join(werr, cerr, os.Chmod(tmp.Name(), 0o644)); err != nil {
+		os.Remove(tmp.Name())
+		return false, "", err
+	}
+	if err := os.Rename(tmp.Name(), path); err != nil {
+		os.Remove(tmp.Name())
 		return false, "", err
 	}
 	if old != nil {

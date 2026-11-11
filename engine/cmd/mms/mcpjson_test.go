@@ -80,16 +80,18 @@ func TestInitMergesMCPJSON(t *testing.T) {
 		t.Errorf("rewrote .mcp.json:\n%s", again)
 	}
 
-	bad := t.TempDir()
-	write(t, filepath.Join(bad, ".mcp.json"), "{ not json")
-	out.Reset()
-	if code := runInit([]string{bad}, &out, &errOut); code != 0 {
-		t.Fatalf("init exit %d: %s", code, errOut.String())
-	}
-	if !strings.Contains(out.String(), "left .mcp.json alone") {
-		t.Errorf("init output %q", out.String())
-	}
-	if got, _ := os.ReadFile(filepath.Join(bad, ".mcp.json")); string(got) != "{ not json" {
-		t.Errorf("bad .mcp.json was changed: %s", got)
+	for _, text := range []string{"{ not json", "null", `{"mcpServers": null}`, `{"mcpServers": [1]}`} {
+		bad := t.TempDir()
+		write(t, filepath.Join(bad, ".mcp.json"), text)
+		out.Reset()
+		if code := runInit([]string{bad}, &out, &errOut); code != 0 {
+			t.Fatalf("%s: init exit %d: %s", text, code, errOut.String())
+		}
+		if !strings.Contains(out.String(), "left .mcp.json alone") {
+			t.Errorf("%s: init output %q", text, out.String())
+		}
+		if got, _ := os.ReadFile(filepath.Join(bad, ".mcp.json")); string(got) != text {
+			t.Errorf("%s: .mcp.json was changed: %s", text, got)
+		}
 	}
 }
