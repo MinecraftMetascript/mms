@@ -199,6 +199,64 @@ func (s *Server) toolList() []*tool {
 			run: s.vanilla,
 		},
 		{
+			name: "biomes", title: "Explain a dimension's biomes",
+			doc: "Sample a Dimension's biome source the way the editors' biome map does, and explain it: the biomes in an area and their share, the climate at its centre with the nearest multi-noise entries and the parameters each one misses, " +
+				"and with biome, where that biome wins or, if it wins nowhere, where it comes closest, what beats it there, and which climate parameters never reach its ranges. " +
+				"Needs a noise generator with its biomes listed inline: a multi-noise preset (`preset = overworld`) cannot be sampled. Runs the editors' preview code, so it needs Node.js (or Bun or Deno).",
+			props: with(map[string]any{
+				"dimension": str("The Dimension's id or name. Optional when the project has one."),
+				"biome":     str("A biome to explain, such as `minecraft:cherry_grove` or one of the project's."),
+				"seed":      str("The world seed: a number, or text hashed the way the game does. Default 0."),
+				"x":         num("The centre's x. Default 0."),
+				"z":         num("The centre's z. Default 0."),
+				"y":         num("The height biomes are sampled at. Default 64."),
+				"radius":    num("Half the side of the square sampled, in blocks: 128×128 samples cover it. Default 2048."),
+			}),
+			run: func(ctx context.Context, args json.RawMessage) (string, error) {
+				return s.preview(ctx, "biomes", args, true)
+			},
+		},
+		{
+			name: "density", title: "Sample worldgen density",
+			doc: "Sample a noise, density function, noise settings' final density, or a terrain's top blocks, through the editors' preview code. " +
+				"mode area: values over a top-down square at y (range, mean, share above 0, and a table). mode column: values down one column, with the heights where the value crosses 0 (for a final density: the ground and cave edges). " +
+				"mode surface (noise settings or a Dimension): the top block of each column, with surface rules and aquifers applied: heights and which blocks show. " +
+				"Ids may be the project's or vanilla's (`minecraft:overworld`). Needs Node.js (or Bun or Deno).",
+			props: with(map[string]any{
+				"id":     str("The noise, density function, noise settings or Dimension, by id or name."),
+				"kind":   map[string]any{"type": "string", "enum": []string{"noise", "density_function", "noise_settings", "dimension"}, "description": "Which kind id is, when several have that name."},
+				"mode":   map[string]any{"type": "string", "enum": []string{"area", "column", "surface"}, "description": "What to sample. Default area, or surface for a Dimension."},
+				"seed":   str("The world seed. Default 0."),
+				"x":      num("The centre's (or column's) x. Default 0."),
+				"z":      num("The centre's (or column's) z. Default 0."),
+				"y":      num("area: the height sampled (default 64). surface: show the top block at or below this height (default: the world's top)."),
+				"radius": num("area and surface: half the side of the square, in blocks. Default 256 for area, 32 for surface (at most 64: surface builds every chunk)."),
+				"size":   num("area and surface: the table's rows and columns, 2 to 32. Default 8."),
+				"from":   num("column: the lowest y. Default -64."),
+				"to":     num("column: the highest y. Default 320."),
+				"step":   num("column: blocks between samples. Default 8."),
+			}),
+			required: []string{"id"},
+			run: func(ctx context.Context, args json.RawMessage) (string, error) {
+				return s.preview(ctx, "density", args, true)
+			},
+		},
+		{
+			name: "jigsaw", title: "Simulate a jigsaw structure",
+			doc: "Grow a JigsawStructure with the simulator the editors' Simulation tab uses (best effort: no terrain matching). " +
+				"With one run: every piece placed (depth, pool, rotation, origin, parent), each jigsaw block that placed nothing and why, and the pieces its pools list that never appeared. " +
+				"With runs: how many seeds place each piece, pieces per run, and the jigsaw blocks that most often stay empty. Needs Node.js (or Bun or Deno).",
+			props: with(map[string]any{
+				"structure": str("The JigsawStructure's id or name. Optional when the project has one."),
+				"seed":      num("The first seed. Default 0."),
+				"runs":      num("How many seeds to run, from seed up, 1 to 200. Default 1."),
+				"depth":     num("Grow this many pieces deep instead of the structure's size, 0 to 20."),
+			}),
+			run: func(ctx context.Context, args json.RawMessage) (string, error) {
+				return s.preview(ctx, "jigsaw", args, false)
+			},
+		},
+		{
 			name: "docs", title: "Read the MMS docs",
 			doc: "Read the MMS documentation. With no arguments, list the pages. With page, return that page as Markdown. With search, list the lines of every page that contain the text, under their headings.",
 			props: map[string]any{

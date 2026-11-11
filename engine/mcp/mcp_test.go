@@ -110,7 +110,7 @@ func TestProtocol(t *testing.T) {
 			t.Errorf("%s: inputSchema is not an object", m["name"])
 		}
 	}
-	for _, n := range []string{"check", "explain", "test", "fix", "fmt", "convert_json", "lookup", "vanilla", "docs"} {
+	for _, n := range []string{"check", "explain", "test", "fix", "fmt", "convert_json", "lookup", "vanilla", "biomes", "density", "jigsaw", "docs"} {
 		if !names[n] {
 			t.Errorf("tools/list lacks %s", n)
 		}
@@ -404,7 +404,7 @@ func TestSelfTest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got != "9 tools answer, protocol "+protocolVersions[0] {
+	if got != "12 tools answer, protocol "+protocolVersions[0] {
 		t.Errorf("SelfTest = %q", got)
 	}
 	if got := ConfigJSON("mms"); got != `{"mcpServers":{"mms":{"command":"mms","args":["mcp"]}}}` {

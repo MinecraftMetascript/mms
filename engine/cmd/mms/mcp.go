@@ -60,7 +60,14 @@ func checkMCP(s *mcp.Server, stdout, stderr io.Writer) int {
 	if err != nil {
 		self = "mms"
 	}
+	preview := "the preview tools (biomes, density, jigsaw) run with "
+	if js, err := mcp.PreviewRuntime(); err == nil {
+		preview += js
+	} else {
+		preview = "the preview tools (biomes, density, jigsaw) will not work: " + err.Error()
+	}
 	fmt.Fprintf(stdout, `ok: %s; %s
+%s
 
 The server works. To connect a client:
 
@@ -77,7 +84,7 @@ The server works. To connect a client:
 
 Then `+"`claude mcp list`"+` should show "mms ... Connected", and /mcp inside
 Claude Code lists its tools.
-`, versionString(), what, quoteArg(self), mcp.ConfigJSON("mms"), self)
+`, versionString(), what, preview, quoteArg(self), mcp.ConfigJSON("mms"), self)
 	return 0
 }
 

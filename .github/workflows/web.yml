@@ -35,6 +35,13 @@ jobs:
       - name: Check the shared previews (packages/preview)
         working-directory: packages/preview
         run: npm run check
+      # mms mcp embeds the preview code its biomes, density and jigsaw
+      # tools run; the committed build must match the source.
+      - name: Check the MCP preview script is up to date
+        working-directory: .
+        run: |
+          npm run build:agent -w packages/preview
+          git diff --exit-code -- engine/mcp/preview || { echo "Run: npm run build:agent -w packages/preview"; exit 1; }
       - run: npm run wasm
       - run: npm run check
       - run: npm run build

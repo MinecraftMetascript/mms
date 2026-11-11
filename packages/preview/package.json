@@ -31,7 +31,8 @@
 		"./theme.css": "./theme.css"
 	},
 	"scripts": {
-		"check": "svelte-check --tsconfig ./tsconfig.json"
+		"check": "svelte-check --tsconfig ./tsconfig.json",
+		"build:agent": "node scripts/build-agent.mjs"
 	},
 	"//": "Hosts install deepslate and svelte and dedupe them in their Vite config, so the components and the host share one copy; the dev copies here are for `npm run check`.",
 	"peerDependencies": {
@@ -40,6 +41,7 @@
 	},
 	"devDependencies": {
 		"deepslate": "^0.27.2",
+		"esbuild": "0.27.7",
 		"svelte": "^5.57.1",
 		"svelte-check": "^4.6.0",
 		"typescript": "^6.0.3"
