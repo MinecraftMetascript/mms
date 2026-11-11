@@ -157,7 +157,7 @@ The interpreter knows the commands that function code compiles to, and enough of
 | Works | |
 | --- | --- |
 | scores, Globals, Storage, strings | `scoreboard`, `data` on storage |
-| control flow and calls | `execute if`/`unless`/`as`/`at`/`positioned`/`store`, `function`, `return` |
+| control flow and calls | `execute if`/`unless`/`as`/`at`/`positioned`/`store`, `function`, `function #tag`, `return` |
 | entities | `summon`, `kill`, `tag`, and `@e` and `@s` with `type`, `tag`, `scores`, `limit` |
 | messages | `say`, `tellraw`, `title`, which `-v` prints |
 | `give` | listed by `-v` |
