@@ -1,0 +1,20 @@
+== worldgen/feature test:lichen
+== worldgen/feature test:patch
+== worldgen/structure test:village
+== worldgen/feature test:raw
+{
+  "type": "minecraft:glow_lichen"
+}
+== worldgen/feature test:growth
+{
+  "type": "minecraft:multiface_growth",
+  "block": "minecraft:glow_lichen",
+  "can_be_placed_on": [
+    "minecraft:stone"
+  ]
+}
+! 4: mms/unknown-helper 'GlowLichen' does not make a ConfiguredFeature; this version calls it MultifaceGrowth(...)
+! 5: mms/unknown-helper 'RandomPatch' does not make a ConfiguredFeature; expected one of Bamboo, BlockBlob, BlockColumn, BlockPile, BlueIce, BonusChest, ChorusPlant, CoralClaw, CoralTree, DeltaFeature, ...
+! 6: mms/unknown-helper 'Village' does not make a Structure; this version calls it Jigsaw(...)
+! 7: mms/unknown-id unknown type 'glow_lichen'; this version calls it 'multiface_growth'
+! 7: mms/unknown-id unknown worldgen/feature_type 'minecraft:glow_lichen'
