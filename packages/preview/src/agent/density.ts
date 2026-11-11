@@ -87,7 +87,7 @@ async function area(what: string, kind: Kind, id: string, seed: string, x: numbe
 	const grid = await render({ kind, mode: 'density', id, width: n, height: n, view: { x, y, z, facing: 'north', scale: (2 * radius) / n, down: true }, seed, options });
 	const out = [`${what}, at y ${fmt(y)}, x ${x - radius}..${x + radius}, z ${z - radius}..${z + radius}.`];
 	out.push(spread(stats));
-	out.push('', `Values on a ${n}×${n} grid, ${fmt((2 * radius) / n)} blocks apart (rows run north to south, columns west to east):`);
+	out.push('', `Values on a ${n}×${n} grid, ${fmt((2 * radius) / n)} blocks apart (rows run north to south, columns west to east; coordinates rounded to 3 decimals):`);
 	const step = (2 * radius) / n;
 	// The coordinates the worker samples at, which fall between blocks when the step is odd.
 	const xs = Array.from({ length: n }, (_, i) => x + (i + 0.5 - n / 2) * step);
