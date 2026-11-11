@@ -828,15 +828,16 @@
 		return (layerValues?.values ?? last.values)[iy * last.width + ix];
 	});
 	/**
-	 * A biome map's climate under the pointer (or at the pinned point), and
-	 * which entries came closest there: why that biome won and the others didn't.
+	 * A biome map's climate at the pinned point (or, with none, under the
+	 * pointer), and which entries came closest there: why that biome won and
+	 * the others didn't.
 	 */
 	const climateAt = $derived.by(() => {
 		if (!biomeMap || !last?.climate) return null;
 		let ix: number;
 		let iy: number;
-		if (hover) [ix, iy] = [Math.floor(hover.px), Math.floor(hover.py)];
-		else if (lock) [ix, iy] = toPixel(lock).map(Math.floor);
+		if (lock) [ix, iy] = toPixel(lock).map(Math.floor);
+		else if (hover) [ix, iy] = [Math.floor(hover.px), Math.floor(hover.py)];
 		else return null;
 		if (ix < 0 || iy < 0 || ix >= last.width || iy >= last.height) return null;
 		const n = last.width * last.height;
@@ -846,17 +847,30 @@
 		const focused = entries && focus && !near.some((e) => e.biome === focus) ? nearestOf(entries, focus, at) : null;
 		return { at, near, focused };
 	});
+	/**
+	 * A pinned point on a biome map holds the panel on it: hovering the map
+	 * doesn't change it, and the pointer can go over the panel to read it.
+	 */
+	const pinned = $derived(biomeMap && !!lock);
 	const short = (id: string) => id.replace(/^minecraft:/, '');
 	const num = (v: number) => (Math.abs(v) < 5e-4 ? '0' : v.toFixed(3));
-	/** What keeps an entry from fitting: the parameters it is outside of, worst first. */
-	function misses(e: NearEntry): string {
-		const out = e.params
-			.filter((p) => p.off > 0)
-			.sort((a, b) => b.off - a.off)
-			.map((p) => `${p.param} ${num(p.value)} ∉ ${p.min === p.max ? num(p.min) : `${num(p.min)}…${num(p.max)}`}`);
-		if (e.offset) out.push(`offset ${num(e.offset)}`);
-		return out.length ? out.join(', ') : 'fits';
-	}
+	/** A range, short: 2 decimals, trailing zeros dropped. */
+	const tight = (v: number) => (Math.abs(v) < 5e-3 ? '0' : String(+v.toFixed(2)));
+	const range = (min: number, max: number) => (min === max ? tight(min) : `${tight(min)}…${tight(max)}`);
+	/** The table's entry rows: the nearest ones, then the biome being explained if it isn't among them. */
+	const nearRows = $derived.by((): { e: NearEntry; focused: boolean }[] =>
+		climateAt ? [...climateAt.near.map((e) => ({ e, focused: false })), ...(climateAt.focused ? [{ e: climateAt.focused, focused: true }] : [])] : []
+	);
+	/** Short column heads, so the table fits beside the map (the full name is the title). */
+	const paramHeads: Record<(typeof climateParams)[number], string> = {
+		temperature: 'temp',
+		humidity: 'humid',
+		continentalness: 'contin',
+		erosion: 'erosion',
+		depth: 'depth',
+		weirdness: 'weird'
+	};
+	const showOffset = $derived(nearRows.some((r) => r.e.offset !== 0));
 	const lockValue = $derived.by(() => {
 		if (!lock || !last) return '';
 		const [px, py] = toPixel(lock);
@@ -1045,33 +1059,9 @@
 			</div>
 		{/if}
 		{#if info && (readout || lockValue || busy)}
-			<!-- Clear of the value scale at the bottom right, when there is one. -->
-			<div
-				class="pointer-events-none absolute bottom-2 left-2 flex flex-col gap-0.5 rounded bg-black/60 px-2 py-1 font-mono text-[11px] text-white"
-				class:max-w-[calc(100%-15.5rem)]={!!(palette && valueRange && palette.id !== 'solid')}
-			>
-				{#if readout}<span>{readout}</span>{/if}
+			<div class="pointer-events-none absolute bottom-2 left-2 flex flex-col gap-0.5 rounded bg-black/60 px-2 py-1 font-mono text-[11px] text-white">
+				{#if readout && !pinned}<span>{readout}</span>{/if}
 				{#if lockValue}<span class="text-red-300">● {lockValue}</span>{/if}
-				{#if climateAt}
-					<div class="mt-0.5 grid grid-cols-[auto_auto] gap-x-2 border-t border-white/20 pt-0.5" aria-label="Climate at the pointer">
-						{#each climateParams as p, c (p)}
-							<span class="text-white/70">{p}</span><span class="text-right">{num(climateAt.at[c])}</span>
-						{/each}
-					</div>
-					{#if climateAt.near.length}
-						<div class="mt-0.5 flex max-w-[28rem] flex-col border-t border-white/20 pt-0.5" aria-label="Nearest entries">
-							<span class="text-white/70">Nearest entries (distance):</span>
-							{#each climateAt.near as e, k (e.index)}
-								<span class="whitespace-normal"
-									>{k === 0 ? '✓' : `${k + 1}.`} {short(e.biome)} {num(e.distance)}{#if k > 0}<span class="text-white/70">{` · ${misses(e)}`}</span>{/if}</span
-								>
-							{/each}
-							{#if climateAt.focused}
-								<span class="whitespace-normal text-amber-300">{`→ ${short(climateAt.focused.biome)} ${num(climateAt.focused.distance)} · ${misses(climateAt.focused)}`}</span>
-							{/if}
-						</div>
-					{/if}
-				{/if}
 				{#if busy && (!last || mode !== 'density' || slow)}<span>Rendering…</span>{/if}
 			</div>
 		{/if}
@@ -1142,4 +1132,71 @@
 			</div>
 		{/if}
 	</div>
+	{#if info && biomeMap}
+		<!--
+			The climate where the pointer is (or at the pinned point), and the
+			entries nearest it. Below the map, at a fixed height, so it never
+			covers the map or resizes it; with a point pinned it holds still,
+			so the pointer can go over it.
+		-->
+		<div class="h-40 shrink-0 overflow-auto border-t border-line bg-panel px-3 py-1.5 font-mono text-[11px] text-ink" aria-label="Climate details">
+			{#if climateAt}
+				<div class="mb-1 flex items-center gap-2 font-sans text-xs text-muted">
+					<span>
+						{#if pinned && lockValue}Pinned: {lockValue}{:else}{readout}{/if}
+						· sampled at y {Math.floor(view.y)}
+					</span>
+					{#if pinned}
+						<button
+							class="rounded border border-line px-1.5 py-0.5 hover:bg-hover"
+							title="Unpin, to follow the pointer again"
+							onclick={() => {
+								lock = null;
+								draw();
+							}}>Unpin</button
+						>
+					{:else}
+						<span class="text-muted/80">Click the map to pin a point.</span>
+					{/if}
+				</div>
+				<table class="[&_td]:px-1 [&_td]:py-px [&_th]:px-1 [&_th]:py-px [&_th]:font-normal" aria-label="Nearest entries">
+					<thead>
+						<tr class="text-muted">
+							<th class="text-left">{climateAt.near.length ? 'Entry' : ''}</th>
+							{#if climateAt.near.length}<th class="text-right" title="The game's distance from the entry to the climate here: lowest wins">distance</th>{/if}
+							{#each climateParams as p (p)}<th class="text-right" title={p}>{paramHeads[p]}</th>{/each}
+							{#if showOffset}<th class="text-right" title="The entry's offset, added to its distance">offset</th>{/if}
+						</tr>
+					</thead>
+					<tbody>
+						<tr class="border-t border-line font-semibold" aria-label="Climate at the pointer">
+							<td>{pinned ? 'pinned' : 'here'}</td>
+							{#if climateAt.near.length}<td></td>{/if}
+							{#each climateParams as p, c (p)}<td class="text-right">{num(climateAt.at[c])}</td>{/each}
+							{#if showOffset}<td></td>{/if}
+						</tr>
+						{#each nearRows as { e, focused }, k (`${e.index}|${focused}`)}
+							<tr class="border-t border-line {focused ? 'text-amber-700 dark:text-amber-300' : ''}" title={focused ? 'The biome being explained' : undefined}>
+								<td class="max-w-44 truncate" title={e.biome}>{focused ? '→' : k === 0 ? '✓' : `${k + 1}.`} {short(e.biome)}</td>
+								<td class="text-right">{num(e.distance)}</td>
+								{#each e.params as p (p.param)}
+									<td
+										class="text-right whitespace-nowrap {p.off > 0 ? 'font-semibold text-red-600 dark:text-red-400' : 'text-muted'}"
+										title="{p.param}: {range(p.min, p.max)}{p.off > 0 ? `; ${num(p.value)} here is ${num(p.off)} outside` : ''}"
+										>{range(p.min, p.max)}</td
+									>
+								{/each}
+								{#if showOffset}<td class="text-right {e.offset ? 'font-semibold text-red-600 dark:text-red-400' : 'text-muted'}">{tight(e.offset)}</td>{/if}
+							</tr>
+						{/each}
+					</tbody>
+				</table>
+				{#if climateAt.near.length}
+					<p class="mt-1 font-sans text-[11px] text-muted">Ranges in red are the ones the climate here is outside of; hover a cell for how far.</p>
+				{/if}
+			{:else}
+				<p class="font-sans text-xs text-muted">Hover the map to see the climate there and the biome entries nearest it, or click to pin a point.</p>
+			{/if}
+		</div>
+	{/if}
 </div>
