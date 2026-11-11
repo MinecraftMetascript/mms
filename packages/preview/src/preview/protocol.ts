@@ -1,4 +1,5 @@
 import type { PreviewKind, PreviewFileKind } from '../paths';
+import type { ClimateEntries } from './climate';
 export type { PreviewKind } from '../paths';
 
 /**
@@ -134,6 +135,15 @@ export type PreviewResponse =
 			labels?: string[];
 			/** For biome maps: the biomes in view with their colours, most common first. */
 			legend?: { id: string; color: string }[];
+			/**
+			 * For biome maps: the climate sampled at each pixel, one plane per
+			 * parameter in climateParams order (parameter c of pixel i at c·w·h + i).
+			 */
+			climate?: Float32Array<ArrayBuffer>;
+			/** For multi-noise biome maps: the winning entry's fitness at each pixel. */
+			fit?: Float32Array<ArrayBuffer>;
+			/** For multi-noise biome maps: the source's entries. */
+			entries?: ClimateEntries;
 			/** For the isometric view: the block size in pixels it was drawn at. */
 			scale?: number;
 			/** For the isometric view: the smallest block size it allows (it fills the canvas with chunks). */
