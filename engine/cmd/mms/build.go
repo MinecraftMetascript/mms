@@ -290,15 +290,27 @@ func runInit(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "mms:", err)
 		return 1
 	}
-	made := project.ConfigFile + " and main.mms"
+	made := []string{project.ConfigFile, "main.mms"}
+	kept := ""
 	main := filepath.Join(dir, "main.mms")
 	if _, err := os.Stat(main); err == nil {
-		made = project.ConfigFile + " (kept the existing main.mms)"
+		made, kept = made[:1], " (kept the existing main.mms)"
 	} else if err := os.WriteFile(main, []byte(src), 0o644); err != nil {
 		fmt.Fprintln(stderr, "mms:", err)
 		return 1
 	}
-	fmt.Fprintf(stdout, "created %s; run `mms build %s`\n", made, dir)
+	created, note, err := writeMCPJSON(dir)
+	if err != nil {
+		fmt.Fprintln(stderr, "mms:", err)
+		return 1
+	}
+	if created {
+		made = append(made, ".mcp.json")
+	}
+	fmt.Fprintf(stdout, "created %s%s; run `mms build %s`\n", joinAnd(made), kept, dir)
+	if note != "" {
+		fmt.Fprintln(stdout, note)
+	}
 	return 0
 }
 
