@@ -40,9 +40,9 @@ Put the cursor on a declaration and open the **Preview** tab in the web editor. 
 
 A `MultiNoise` biome source picks, at each spot, the entry whose `parameters` are nearest the climate sampled there. The dimension's **Biomes** map helps when a biome never wins:
 
-- Hover the map to see the six climate values at that spot (at the camera's Y, which is what `depth` depends on) and the nearest entries, best first. For each entry that lost, it lists the parameters the climate is outside of, such as `humidity -0.300 ∉ 0.250…1.000`, and its distance.
+- Hover the map to fill the table below it: the six climate values at that spot (at the camera's Y, which is what `depth` depends on), then the nearest entries, best first, with each one's distance and parameter ranges. The ranges the climate is outside of are in red. Click the map to pin a point: the table then stays on it while you move the pointer, until you click **Unpin**.
 - **Show** switches the map to one climate parameter, coloured over its range in view, with the biome outlines kept on top.
-- **Explain** picks a biome to follow. Biomes the source lists that win nowhere in view are marked *not in view*, and also listed under the legend. Under the pointer, the chosen biome's nearest entry and what keeps it out are shown in amber. **Show: Distance to win** maps how far that biome is from winning: 0 where it wins, and the darker the closer.
+- **Explain** picks a biome to follow. Biomes the source lists that win nowhere in view are marked *not in view*, and also listed under the legend. If the chosen biome isn't among the nearest entries, its nearest entry is added to the table in amber. **Show: Distance to win** maps how far that biome is from winning: 0 where it wins, and the darker the closer.
 
 Distances are the game's: the square root of the sum of squares of how far each value is outside its range, with the entry's `offset` added as one more term.
 

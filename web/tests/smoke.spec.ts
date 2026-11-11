@@ -300,13 +300,29 @@ test('a biome map shows the climate and explains which biome wins', async ({ pag
 	await expect(page.getByLabel('Biomes in view')).toBeVisible({ timeout: 30_000 });
 	await expect(page.getByText(/Preview failed/)).toBeHidden();
 
-	// Hovering gives the six parameters and the nearest entries, the winner first.
+	// Hovering gives the six parameters and the nearest entries, the winner first, as a table.
 	const canvas = page.locator('canvas');
 	const box = (await canvas.boundingBox())!;
 	await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-	const climate = page.getByLabel('Climate at the pointer');
-	for (const p of ['temperature', 'humidity', 'continentalness', 'erosion', 'depth', 'weirdness']) await expect(climate).toContainText(p);
-	await expect(page.getByLabel('Nearest entries')).toContainText(/✓ [\w:]+ \d/);
+	const table = page.getByLabel('Nearest entries');
+	for (const p of ['temperature', 'humidity', 'continentalness', 'erosion', 'depth', 'weirdness']) await expect(table.locator(`th[title="${p}"]`)).toBeVisible();
+	const here = page.getByLabel('Climate at the pointer').locator('td');
+	await expect(here.first()).toHaveText('here');
+	for (let c = 2; c < 8; c++) await expect(here.nth(c)).toHaveText(/^-?\d(\.\d+)?$/);
+	await expect(table.locator('tbody tr').nth(1).locator('td').first()).toHaveText(/^✓ [\w:]+$/);
+
+	// A pinned point holds the panel: the pointer can go over it, and the map no longer drives it.
+	await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+	const details = page.getByLabel('Climate details');
+	const unpin = details.getByRole('button', { name: 'Unpin' });
+	await expect(unpin).toBeVisible();
+	const pinnedClimate = (await page.getByLabel('Climate at the pointer').textContent())!;
+	await page.mouse.move(box.x + box.width * 0.9, box.y + box.height * 0.1);
+	await expect(page.getByLabel('Climate at the pointer')).toHaveText(pinnedClimate);
+	await expect(page.getByLabel('Climate at the pointer').locator('td').first()).toHaveText('pinned');
+	await unpin.click();
+	await expect(unpin).toBeHidden();
+	await expect(details).toContainText('Hover the map');
 
 	// A climate layer is coloured over its range in view, on the biomes' outlines.
 	await page.getByLabel('Layer').selectOption('temperature');
