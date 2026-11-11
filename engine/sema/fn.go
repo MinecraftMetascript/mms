@@ -189,7 +189,11 @@ func callees(d *syntax.Decl, ns string) []string {
 			case *syntax.Ident:
 				seen[ns+":"+fx.Name] = true
 			case *syntax.ResLoc:
-				seen[fx.Text] = true
+				if strings.Contains(fx.Text, ":") {
+					seen[fx.Text] = true
+				} else {
+					seen[ns+":"+fx.Text] = true
+				}
 			}
 		case *syntax.CommandStmt:
 			for _, e := range interpolations(x.Text) {
@@ -806,10 +810,43 @@ func (f *fc) store(pre *[]fn.Op, l local, v *val, e syntax.Expr) {
 		return
 	}
 	if v.cond != nil && !v.cond.Never && !v.cond.Always() {
-		*pre = append(*pre, fn.Set{Dst: l.s, Src: fn.Const(0)}, fn.If{Cond: *v.cond, Then: &fn.Block{Ops: []fn.Op{fn.Set{Dst: l.s, Src: fn.Const(1)}}}})
+		// The condition's own commands run first, and when its execute
+		// chain reads the target (`x = x && y`, `x = !x`) it is tested
+		// into a temporary, so that clearing the target does not change
+		// what it tests.
+		cond := *v.cond
+		*pre = append(*pre, cond.Pre...)
+		cond.Pre = nil
+		dst := l.s
+		if condReads(cond, l.s) {
+			dst = f.temp()
+		}
+		*pre = append(*pre, fn.Set{Dst: dst, Src: fn.Const(0)}, fn.If{Cond: cond, Then: &fn.Block{Ops: []fn.Op{fn.Set{Dst: dst, Src: fn.Const(1)}}}})
+		if dst != l.s {
+			*pre = append(*pre, fn.Set{Dst: l.s, Src: fn.Of(dst)})
+		}
 		return
 	}
 	*pre = append(*pre, fn.Set{Dst: l.s, Src: f.operand(pre, v)})
+}
+
+// condReads reports whether a condition's execute chain reads score s.
+func condReads(c fn.Cond, s fn.Score) bool {
+	name := s.String()
+	for _, p := range c.Parts {
+		for i := strings.Index(p, name); i >= 0; {
+			end := i + len(name)
+			if (i == 0 || p[i-1] == ' ') && (end == len(p) || p[end] == ' ') {
+				return true
+			}
+			j := strings.Index(p[i+1:], name)
+			if j < 0 {
+				break
+			}
+			i += 1 + j
+		}
+	}
+	return false
 }
 
 // quoteChoices lists strings as "x", "y" or "z".
@@ -1382,9 +1419,11 @@ func (f *fc) call(pre *[]fn.Op, e *syntax.Call, wantValue bool) *val {
 	case *syntax.Ident:
 		id, name = f.ns+":"+x.Name, x.Name
 	case *syntax.ResLoc:
+		// A path with no namespace, as in players/update_tier(), is in
+		// the pack's namespace, as a plain name is.
 		id, name = x.Text, x.Text
 		if !strings.Contains(id, ":") {
-			id = "minecraft:" + id
+			id = f.ns + ":" + id
 		}
 	default:
 		c.errorf("mms/unsupported", e.Fn.Span(), "only functions can be called here")
@@ -1662,11 +1701,64 @@ func (f *fc) commandValue(pre *[]fn.Op, cmd *syntax.CommandStmt, want string) *v
 	if rest, ok := strings.CutPrefix(cmd.Text, "execute "); ok && !strings.HasPrefix(rest, "run ") {
 		inner.Text = rest
 		inner.Sp.Start += len("execute ")
+		// The game stores nothing when a condition before the last one
+		// fails (or an `as` finds no entity), so the value starts at 0.
+		if !singleCondition(rest) {
+			*pre = append(*pre, fn.Set{Dst: t, Src: fn.Const(0)})
+		}
 	} else {
 		prefix += "run "
 	}
 	f.command(pre, &inner, prefix)
 	return &val{typ: typ, op: fn.Of(t)}
+}
+
+// subcommands are the words that start an execute subcommand.
+var subcommands = map[string]bool{
+	"if": true, "unless": true, "as": true, "at": true, "positioned": true, "rotated": true,
+	"facing": true, "align": true, "anchored": true, "in": true, "on": true, "summon": true,
+	"store": true, "run": true,
+}
+
+// singleCondition reports whether an execute command's subcommands (rest,
+// after "execute ") are one if or unless, which always gives a result.
+// It errs towards false: a word such as "as" inside an argument only
+// costs a line that sets the value to 0 first.
+func singleCondition(rest string) bool {
+	n := 0
+	depth := 0
+	var quote byte
+	start := 0
+	for i := 0; i <= len(rest); i++ {
+		if i < len(rest) {
+			ch := rest[i]
+			switch {
+			case quote != 0:
+				if ch == '\\' {
+					i++
+				} else if ch == quote {
+					quote = 0
+				}
+				continue
+			case ch == '"' || ch == '\'':
+				quote = ch
+				continue
+			case ch == '[' || ch == '{' || ch == '(':
+				depth++
+				continue
+			case ch == ']' || ch == '}' || ch == ')':
+				depth--
+				continue
+			case ch != ' ' || depth > 0:
+				continue
+			}
+		}
+		if subcommands[rest[start:i]] {
+			n++
+		}
+		start = i + 1
+	}
+	return n == 1 && (strings.HasPrefix(rest, "if ") || strings.HasPrefix(rest, "unless "))
 }
 
 // command lowers a raw command, written after prefix.

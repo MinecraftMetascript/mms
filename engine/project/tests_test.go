@@ -136,3 +136,77 @@ Test sums {
 		t.Errorf("%v %+v", err, res)
 	}
 }
+
+// TestFunctionPitfalls runs code that used to need workarounds: a
+// foldered function called without its namespace, a bool command value
+// whose execute chain stops early, an assignment that reads its own
+// target, and a test that runs a function tag.
+func TestFunctionPitfalls(t *testing.T) {
+	src := `Global x: bool = true
+Global y: bool = true
+Global ok: bool = true
+Global calls: int = 0
+Function players/update_tier {
+  calls += 1
+}
+Function tiers {
+  players/update_tier()
+  demo:players/update_tier()
+}
+Function both {
+  ok = /execute if entity @e[tag=none] if entity @e
+}
+Function and_self {
+  x = x && y
+}
+Function flip {
+  x = !x
+}
+FunctionTag hook = [players/update_tier, #inner]
+FunctionTag inner = [players/update_tier, tiers]
+Function fire {
+  /function #demo:hook
+}
+Test foldered_call {
+  run tiers()
+  expect calls == 2
+}
+Test chain_stops_early {
+  run both()
+  expect !ok
+}
+Test and_keeps_true {
+  run and_self()
+  expect x
+}
+Test and_gives_false {
+  setup { y = false }
+  run and_self()
+  expect !x
+}
+Test not_self {
+  run flip()
+  expect !x
+}
+Test function_tag {
+  run fire()
+  expect calls == 3
+}
+`
+	_, r := bookProject(t, src, nil)
+	if d := diagText(r); d != "" {
+		t.Fatal(d)
+	}
+	res, err := r.RunTests(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res) != 6 {
+		t.Fatalf("ran %d tests, want 6", len(res))
+	}
+	for _, tr := range res {
+		if !tr.Pass {
+			t.Errorf("%s: %s", tr.Name, tr.Message)
+		}
+	}
+}

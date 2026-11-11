@@ -83,7 +83,11 @@ func (r *Result) RunTests(keep func(name string) bool) ([]TestResult, error) {
 		id := sema.TestID(d.NS, name)
 		res := TestResult{Name: name, ID: id, Unit: d.Unit.Path, Span: d.D.Name.Sp}
 		vm := mcfn.New(files)
-		err := runTag(vm, tags, "minecraft:load", map[string]bool{})
+		vm.Tags = tags
+		var err error
+		if _, ok := tags["minecraft:load"]; ok {
+			_, _, err = vm.RunTag("minecraft:load")
+		}
 		if err != nil {
 			res.Message = "while the pack loaded: " + err.Error()
 			res.Said = vm.Said
@@ -134,23 +138,4 @@ func seen(vm *mcfn.VM, ns string, e sema.TestExpect) string {
 		return side(e.Right, "right")
 	}
 	return side(e.Left, "left") + " and " + side(e.Right, "right")
-}
-
-func runTag(vm *mcfn.VM, tags map[string][]string, tag string, seen map[string]bool) error {
-	if seen[tag] {
-		return nil
-	}
-	seen[tag] = true
-	for _, id := range tags[tag] {
-		if t, ok := strings.CutPrefix(id, "#"); ok {
-			if err := runTag(vm, tags, t, seen); err != nil {
-				return err
-			}
-			continue
-		}
-		if _, _, err := vm.Run(id); err != nil {
-			return err
-		}
-	}
-	return nil
 }

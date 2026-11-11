@@ -18,6 +18,7 @@ import (
 // VM holds a world's scores, storage and functions.
 type VM struct {
 	Functions map[string][]string // id -> lines
+	Tags      map[string][]string // function tag id (no #) -> function ids, and #tag ids
 	Scores    map[string]map[string]int32
 	Storage   map[string]nbt.Compound // storage id -> top-level compound
 	Said      []string                // `say` output, and `tellraw` as plain text
@@ -290,9 +291,56 @@ func (vm *VM) function(w []string) (result, error) {
 	} else if len(w) > 1 {
 		return result{}, fmt.Errorf("unsupported function arguments %v", w[1:])
 	}
+	if tag, ok := strings.CutPrefix(w[0], "#"); ok {
+		return vm.runTag(tag, macro)
+	}
 	r, err := vm.call(w[0], macro)
 	r.returned = false // a return inside the callee only leaves the callee
 	return r, err
+}
+
+// RunTag runs every function in a function tag, as `function #<tag>`
+// does: nested tags are expanded and each function runs once, in order.
+// The result is the sum of the values the functions return.
+func (vm *VM) RunTag(tag string) (int32, bool, error) {
+	r, err := vm.runTag(tag, nil)
+	return r.value, r.ok, err
+}
+
+func (vm *VM) runTag(tag string, macro nbt.Compound) (result, error) {
+	if _, ok := vm.Tags[tag]; !ok {
+		return result{}, fmt.Errorf("unknown function tag #%s", tag)
+	}
+	var ids []string
+	seen := map[string]bool{}
+	var expand func(tag string)
+	expand = func(tag string) {
+		if seen["#"+tag] {
+			return
+		}
+		seen["#"+tag] = true
+		for _, id := range vm.Tags[tag] {
+			if t, ok := strings.CutPrefix(id, "#"); ok {
+				expand(t)
+			} else if !seen[id] {
+				seen[id] = true
+				ids = append(ids, id)
+			}
+		}
+	}
+	expand(tag)
+	var out result
+	for _, id := range ids {
+		r, err := vm.call(id, macro)
+		if err != nil {
+			return result{}, err
+		}
+		if r.ok {
+			out.value += r.value
+			out.ok = true
+		}
+	}
+	return out, nil
 }
 
 func (vm *VM) scoreboard(w []string) (result, error) {

@@ -166,7 +166,7 @@ Constant parts are folded at compile time.
 
 ### Command results
 
-A command after `=` is a value: what the command returns, as `execute store result` would store it. Assigned to a `bool`, it is whether the command succeeded, as `execute store success` would store it.
+A command after `=` is a value: what the command returns, as `execute store result` would store it. Assigned to a `bool`, it is whether the command succeeded, as `execute store success` would store it. An `execute` chain that stops before its end, as `/execute if A if B` does when `A` fails, counts as a failure, `0` or `false`, although the game itself would store nothing.
 
 ```mms
 Objective checks
@@ -311,7 +311,7 @@ A function with a return type must end with `return` on every path.
 
 ## Calls
 
-A call looks like `add(1, 2)`, or `other_ns:add(1, 2)` for a function in another namespace. Arguments are passed by position. A call can stand on its own, or be used as a value when the function has a return type.
+A call looks like `add(1, 2)`, or `other_ns:add(1, 2)` for a function in another namespace. A function in a folder is called by its path, `players/update_tier()`, in the pack's namespace like a plain name. Arguments are passed by position. A call can stand on its own, or be used as a value when the function has a return type.
 
 Parameters are `int`, `bool` or `string`. Functions return `int` or `bool`. A `Type` that names one of these, such as `Type Count = int`, can be used instead. To hand a string back, assign it to a Global.
 
