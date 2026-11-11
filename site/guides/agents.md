@@ -12,15 +12,18 @@ In Claude Code, for yourself in one project folder:
 claude mcp add mms -- mms mcp
 ```
 
-To share it with everyone who works on a project, put a `.mcp.json` file at the project's root instead:
+To share it with everyone who works on a project, put a `.mcp.json` file at the project's root instead. `mms init` writes this one:
 
 ```
 {
   "mcpServers": {
-    "mms": { "command": "mms", "args": ["mcp"] }
+    "mms": { "command": "mms", "args": ["mcp"] },
+    "nbt": { "command": "nbt-mcp", "args": ["-dir", "structures"] }
   }
 }
 ```
+
+The `nbt` entry is [nbt-mcp](https://github.com/MinecraftMetascript/nbt-go/tree/main/cmd/nbt-mcp), a separate server for building structure files. With `-dir structures` it saves `halls/hall.nbt` where `Piece("halls/hall")` looks for it. Install it with `go install github.com/MinecraftMetascript/nbt-go/cmd/nbt-mcp@latest`, or from the nbt-go releases page; remove the entry if you don't build structures. If the folder already has a `.mcp.json`, `mms init` adds whichever of the two servers it does not name and leaves the rest as it was.
 
 Claude Code does not start a server from `.mcp.json` until you approve it. It asks the next time you start `claude` in that folder, and until you answer the server is not loaded.
 
