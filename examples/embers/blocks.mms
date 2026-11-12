@@ -3,13 +3,11 @@
 // textures/block/ember_glow.png.mcmeta beside it, so the game plays them
 // in turn, three ticks each, blending between frames.
 
-/** A full cube showing the ember strip on every face. */
-Model block/ember_glow {
-  parent = block/cube_all
+/**
+ * Glowstone shows the ember strip on every face. Retexture writes a model
+ * with vanilla's glowstone model as its parent, and glowstone's block
+ * state and item model, which show it.
+ */
+Retexture minecraft:glowstone {
   textures = { all = Texture("art/ember_glow.png", animation = { frametime = 3, interpolate = true }) }
-}
-
-/** Every glowstone block shows the ember model. */
-BlockState minecraft:glowstone {
-  variants = { "" = { model = block/ember_glow } }
 }

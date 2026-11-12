@@ -17,18 +17,21 @@ type intrinsic func(c *ctx, x *syntax.Call, args []argValue) Value
 // intrinsics back `extern Template` declarations, which give them their
 // signatures and docs. An extern with no entry here is an error.
 var intrinsics = map[string]intrinsic{
-	"cos":         trig(math.Cos),
-	"sin":         trig(math.Sin),
-	"len":         length,
-	"by_language": byLanguage,
-	"english":     english,
-	"contains":    contains,
-	"index_of":    indexOf,
-	"matches":     matches,
-	"replace":     replace,
-	"named":       named,
-	"kind_of":     kindOf,
-	"hash":        hash,
+	"cos":           trig(math.Cos),
+	"sin":           trig(math.Sin),
+	"len":           length,
+	"by_language":   byLanguage,
+	"english":       english,
+	"contains":      contains,
+	"index_of":      indexOf,
+	"matches":       matches,
+	"replace":       replace,
+	"named":         named,
+	"kind_of":       kindOf,
+	"hash":          hash,
+	"join":          join,
+	"vanilla_block": vanillaBlock,
+	"rebase":        rebase,
 }
 
 // kept are externs whose calls stay as written, with their arguments

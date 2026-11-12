@@ -473,7 +473,7 @@ func (p *Project) Analyze(ctx context.Context) (*Result, error) {
 	for _, u := range units {
 		source[u.Path] = u.File
 	}
-	units, ev := expand(units, p.Config.Namespace, &p.evalCache)
+	units, ev := expand(units, p.Config.Namespace, &p.evalCache, p.Pack)
 	syms, collect := sema.Collect(units, p.Kinds, p.Config.Namespace)
 	tenv := types.New(p.Pack, p.Kinds, ev)
 	syms.Types = tenv.Types

@@ -37,6 +37,7 @@ export const docGroups: Group[] = [
 		title: 'Guides',
 		order: [
 			'resources',
+			'blocks',
 			'functions',
 			'state',
 			'repetition',

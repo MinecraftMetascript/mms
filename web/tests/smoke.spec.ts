@@ -632,7 +632,7 @@ test('the docs render guides and the reference', async ({ page }) => {
 	await page.getByRole('article').getByRole('link', { name: 'Writing resources' }).click();
 	await expect(page).toHaveURL(/\/docs\/guides\/resources#density-functions$/);
 	await expect(page.locator('#density-functions')).toBeVisible();
-	await expect(page.getByRole('navigation', { name: 'Previous and next' }).getByRole('link', { name: /Functions/ })).toBeVisible();
+	await expect(page.getByRole('navigation', { name: 'Previous and next' }).getByRole('link', { name: /Retexturing and remodeling blocks/ })).toBeVisible();
 
 	// The Reference tab: helpers by group, one page each.
 	await page.getByRole('navigation', { name: 'Sections' }).getByRole('link', { name: 'Reference' }).click();

@@ -232,7 +232,7 @@ func (e *Env) named(path string, t *syntax.TypeName) *spec.Type {
 		return &spec.Type{Kind: k}
 	}
 	if opaque[t.Name] {
-		return &spec.Type{Kind: "any"}
+		return &spec.Type{Kind: "any", Attributes: []spec.Attribute{{Name: sema.OpaqueAttr}}}
 	}
 	if t.Name == "Selector" {
 		return sema.SelectorType()

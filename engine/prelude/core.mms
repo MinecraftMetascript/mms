@@ -51,6 +51,22 @@ extern Template replace(text: string, old: string, new: string): string
 extern Template named(asset: any, name: string): any
 /** The kind of a value: "none", "bool", "number", "string", "name", "list", "object", "range", "commands", or "runtime" for a value only known when the pack runs. */
 extern Template kind_of(value: any): string
+/** The texts of a list's items with `sep` between them: `join(["a", "b"], ", ")` is "a, b". */
+extern Template join(list: [any], sep: string): string
+/**
+ * How a vanilla block looks, from the game's resource pack:
+ * `vanilla_block(minecraft:oak_log)` has
+ * - `models`: the block models its block state and its item show, such as `["block/oak_log", "block/oak_log_horizontal"]`
+ * - `slots`: the texture slots their faces show, such as `["end", "side"]`
+ * - `other_slots`: the other slots their parent chains fill, such as `particle`
+ * - `state`: its block state file
+ * - `item`: its item's definition, when that shows block models; none for a door, whose item is a flat picture
+ *
+ * A block vanilla does not have has no models and no slots.
+ */
+extern Template vanilla_block(block: Id<block>): { models: [string], slots: [string], other_slots: [string], state: any?, item: any? }
+/** A value with every string in it that starts with `old` starting with `new` instead: `rebase(state, "minecraft:block/", "block/oak_log/")`. */
+extern Template rebase(value: any, old: string, new: string): any
 /** A whole number from 0 to 2147483647 made from a string, the same in every build: `hash("dungeon:dungeon")`. */
 extern Template hash(text: string): int
 

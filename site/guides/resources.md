@@ -324,6 +324,22 @@ Parents can be the project's own models too: a model whose parent is `block/marb
 
 The game only finds a model's textures in two atlases: the blocks atlas, which stitches every file under `textures/block/`, and the items atlas, which stitches `textures/item/`. So `Texture("art/glow1.png")` in a model copies the file to `textures/block/glow1.png` and stands for `<ns>:block/glow1`, which works in block and item models alike. Give it an id name to put it elsewhere, such as `Texture("art/glow1.png", "item/glow1")`. A texture a model names that neither atlas stitches shows as the missing texture, and the [`texture-outside-atlas`](lint.md) lint rule warns about it; an `Atlas minecraft:blocks` declaration that adds the texture as a source counts. Keep a model's textures in one atlas: the game draws a model from a single atlas, and the [`model-mixed-atlas`](lint.md) lint rule warns about a model that mixes the two.
 
+### Retexturing a vanilla block
+
+To give a vanilla block new textures and keep its shape, write a `Retexture` named after the block, with the textures by slot:
+
+```
+Retexture minecraft:oak_log {
+  textures = { side = Texture("art/log_side.png"), end = Texture("art/log_end.png") }
+}
+```
+
+It covers every model the block shows. For each vanilla model of the block's block state, a log's upright and sideways ones, each shape of a stair or each half of a door, it writes a model of the project's under `block/<block>/`, with the vanilla model as its parent and these textures. It then writes the block's block state, the vanilla one pointed at those models, and the item model of the block's item when that shows the block too. A door's item is a flat picture of its own, so it keeps it. Other blocks keep their look, even those that share a vanilla model: `minecraft:waxed_copper_block` shows copper's models, and changes only with a `Retexture` of its own.
+
+The slots are the vanilla models' own: `all` for stone or planks, `side` and `end` for a log, `top`, `bottom` and `side` for a stair, and `particle` for the bits that fly off when it breaks. In `textures`, completion lists the block's slots, the ones its faces show first, and a slot that none of its models has is an error that lists them. The textures can be [animated](#animated-textures); the [`embers`](../../examples/embers/) example retextures glowstone with an animated strip.
+
+To change the shape as well, write the `BlockState` and `Model` declarations yourself, as above. [Retexturing and remodeling blocks](blocks.md) covers what a new shape can and can't change, and how to give one block several looks.
+
 `sounds.json` is still generated from `Sound(...)`, and `.png.mcmeta` files from [`Texture`'s named arguments](#animated-textures). The [`resource-pack`](../../examples/resource-pack/) example shows each kind with vanilla textures; [`embers`](../../examples/embers/) uses files of its own.
 
 ## Custom items
