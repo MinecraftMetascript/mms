@@ -3,7 +3,9 @@ name: release
 # Pushing a tag such as v1.0.0 builds the CLI for every platform and the
 # VS Code extension (a universal .vsix plus one per platform with mms
 # bundled), publishes them as a GitHub release, and publishes the extension
-# to the VS Code Marketplace and Open VSX as version 1.0.0.
+# to the VS Code Marketplace and Open VSX as version 1.0.0. The release's
+# notes are docs/releases/v1.0.0.md, when that file exists, followed by
+# GitHub's generated list of pull requests.
 #
 # Each push to main that changes the extension or the engine publishes the
 # extension as a pre-release instead, for people who chose "Switch to
@@ -119,16 +121,31 @@ jobs:
       # Creates the release.
       contents: write
     steps:
+      # Only the hand-written notes, docs/releases/<tag>.md.
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: docs/releases
       - uses: actions/download-artifact@v4
         with:
           path: dist
           merge-multiple: true
       - name: Checksums
         run: cd dist && sha256sum * > SHA256SUMS
+      # The tag's notes file, when there is one, goes above the generated
+      # list of pull requests.
       - name: Create the release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --title "MMS $GITHUB_REF_NAME" --generate-notes
+        run: |
+          notes="docs/releases/$GITHUB_REF_NAME.md"
+          if [ -f "$notes" ]; then
+            # The release has its own title, so drop the file's.
+            sed '1{/^# /d}' "$notes" > notes.md
+            set -- --notes-file notes.md
+          else
+            set --
+          fi
+          gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --title "MMS $GITHUB_REF_NAME" --generate-notes "$@"
 
   # The same .vsix files, to the extension stores, on a tag or a push to
   # main. The stores check the OIDC token's repository and workflow file.

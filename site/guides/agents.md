@@ -4,7 +4,7 @@
 
 ## Setting it up
 
-The server is part of the `mms` command line and speaks over stdin and stdout. It needs a version of `mms` newer than 0.5.0: run `mms mcp -check`, which tests the server and prints the lines below. Its `claude mcp add` line has the path of your own `mms` filled in; the `.mcp.json` entry keeps plain `mms`, which everyone who shares the file needs on their PATH. If it says `unknown command "mcp"`, the `mms` it found is too old.
+The server is part of the `mms` command line and speaks over stdin and stdout. It needs `mms` 0.5.1 or newer: run `mms mcp -check`, which tests the server and prints the lines below. Its `claude mcp add` line has the path of your own `mms` filled in; the `.mcp.json` entry keeps plain `mms`, which everyone who shares the file needs on their PATH. If it says `unknown command "mcp"`, the `mms` it found is too old.
 
 In Claude Code, for yourself in one project folder:
 
