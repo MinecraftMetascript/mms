@@ -338,7 +338,7 @@ It covers every model the block shows. For each vanilla model of the block's blo
 
 The slots are the vanilla models' own: `all` for stone or planks, `side` and `end` for a log, `top`, `bottom` and `side` for a stair, and `particle` for the bits that fly off when it breaks. In `textures`, completion lists the block's slots, the ones its faces show first, and a slot that none of its models has is an error that lists them. The textures can be [animated](#animated-textures); the [`embers`](../../examples/embers/) example retextures glowstone with an animated strip.
 
-To change the shape as well, write the `BlockState` and `Model` declarations yourself, as above.
+To change the shape as well, write the `BlockState` and `Model` declarations yourself, as above. [Retexturing and remodeling blocks](blocks.md) covers what a new shape can and can't change, and how to give one block several looks.
 
 `sounds.json` is still generated from `Sound(...)`, and `.png.mcmeta` files from [`Texture`'s named arguments](#animated-textures). The [`resource-pack`](../../examples/resource-pack/) example shows each kind with vanilla textures; [`embers`](../../examples/embers/) uses files of its own.
 
