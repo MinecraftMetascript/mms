@@ -2,7 +2,7 @@ import { LSPPlugin, Workspace, type LSPClient, type WorkspaceFile } from '@codem
 import { ChangeSet, Text, type TransactionSpec } from '@codemirror/state';
 import type { EditorView } from '@codemirror/view';
 
-class ProjectFile implements WorkspaceFile {
+export class ProjectFile implements WorkspaceFile {
 	view: EditorView | null = null;
 	/** Changes applied while no editor showed the file, not yet synced. */
 	pending: { changes: ChangeSet; prevDoc: Text } | null = null;

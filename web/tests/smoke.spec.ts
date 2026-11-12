@@ -1644,3 +1644,81 @@ test('an empty Spline() starts a spline from the first double-click', async ({ p
 	await expect(page.locator('.cm-line', { hasText: /Spline\(\{ coordinate = 0, points = \[SplinePoint\([-\d.]+, 0, [-\d.]+\)\] \}\)/ })).toBeVisible({ timeout: 10_000 });
 	await expect(view.getByTestId('spline-point')).toHaveCount(1, { timeout: 10_000 });
 });
+
+test('a pinned spline editor stays up and writes back while the cursor is elsewhere, and the preview splits in two', async ({ page }) => {
+	const errors: string[] = [];
+	page.on('pageerror', (e) => errors.push(e.message));
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	await replaceText(
+		page,
+		'DensityFunction offset = Spline({\n  coordinate = overworld/continents\n  points = [\n    SplinePoint(-1, 0, 0),\n    SplinePoint(0, 0.5, 0),\n    SplinePoint(1, 0, 1),\n  ]\n})\n\nDensityFunction flat = 1\n'
+	);
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 15_000 });
+	await clickLine(page, 'SplinePoint(1, 0, 1)');
+	const view = page.getByTestId('spline-view');
+	await expect(view).toBeVisible({ timeout: 15_000 });
+
+	// Pinning keeps the spline editor, not the declaration's preview.
+	const pin = page.getByRole('button', { name: /^Pin/ });
+	await pin.click();
+	await expect(pin).toHaveAttribute('aria-pressed', 'true');
+	await clickLine(page, 'DensityFunction flat');
+	await page.waitForTimeout(500);
+	await expect(view).toBeVisible();
+	await expect(view.getByTestId('spline-point')).toHaveCount(3);
+
+	// Text typed above the spline moves it; edits still land on its numbers.
+	await clickLine(page, 'DensityFunction offset');
+	await page.keyboard.press('Home');
+	await page.keyboard.insertText('// moved\n');
+	await clickLine(page, 'DensityFunction flat');
+	await view.getByTestId('spline-point').nth(2).click();
+	await view.getByTestId('spline-selected').locator('input').nth(2).fill('0.25');
+	await view.getByTestId('spline-selected').locator('input').nth(2).press('Enter');
+	await expect(page.locator('.cm-line', { hasText: 'SplinePoint(1, 0.25, 1)' })).toBeVisible({ timeout: 10_000 });
+	await expect(page.locator('.cm-line', { hasText: '// moved' })).toBeVisible();
+
+	// Split: the new pane follows the cursor below the pinned one.
+	await page.getByRole('button', { name: 'Split the preview' }).click();
+	const panes = page.getByTestId('preview-pane');
+	await expect(panes).toHaveCount(2);
+	await expect(page.getByTestId('spline-view')).toHaveCount(1);
+	await clickLine(page, 'SplinePoint(-1, 0, 0)');
+	await expect(page.getByTestId('spline-view')).toHaveCount(2, { timeout: 15_000 });
+	const divider = page.getByRole('separator', { name: 'Resize the previews' });
+	await expect(divider).toHaveAttribute('aria-orientation', 'horizontal');
+	await page.getByRole('button', { name: 'Put the previews side by side' }).click();
+	await expect(divider).toHaveAttribute('aria-orientation', 'vertical');
+	await panes.nth(1).getByRole('button', { name: 'Close this preview' }).click();
+	await expect(panes).toHaveCount(1);
+	expect(errors).toEqual([]);
+});
+
+test('a pinned spline from another file takes edits while that file is not open', async ({ page }) => {
+	const errors: string[] = [];
+	page.on('pageerror', (e) => errors.push(e.message));
+	page.on('dialog', (d) => d.accept('other.mms'));
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	await replaceText(page, 'DensityFunction offset = Spline({\n  coordinate = overworld/continents\n  points = [SplinePoint(-1, 0, 0), SplinePoint(1, 0, 1)]\n})\n');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 15_000 });
+	await clickLine(page, 'SplinePoint(1, 0, 1)');
+	const view = page.getByTestId('spline-view');
+	await expect(view).toBeVisible({ timeout: 15_000 });
+	await page.getByRole('button', { name: /^Pin/ }).click();
+
+	await page.getByRole('button', { name: '+ New file' }).click();
+	await expect(page.getByRole('button', { name: 'other.mms', exact: true })).toBeVisible();
+	await page.getByRole('button', { name: 'other.mms', exact: true }).click();
+	await expect(page.locator('.cm-line', { hasText: 'SplinePoint' })).toHaveCount(0);
+	await expect(view).toBeVisible();
+	await view.getByTestId('spline-point').nth(1).click();
+	await view.getByTestId('spline-selected').locator('input').nth(2).fill('0.75');
+	await view.getByTestId('spline-selected').locator('input').nth(2).press('Enter');
+	await expect(view.getByTestId('spline-selected').locator('input').nth(2)).toHaveValue('0.75', { timeout: 10_000 });
+
+	await page.getByRole('button', { name: 'main.mms', exact: true }).click();
+	await expect(page.locator('.cm-line', { hasText: 'SplinePoint(1, 0.75, 1)' })).toBeVisible({ timeout: 10_000 });
+	expect(errors).toEqual([]);
+});
