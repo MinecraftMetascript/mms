@@ -49,6 +49,7 @@ type at struct {
 	// Function or hook, or an inline `{ ... }` function block (as a Decl
 	// with only a body) in any declaration. nil outside function code.
 	fn *syntax.Decl
+	r  *project.Result
 }
 
 func (s *Session) at(path string, off int) *at {
@@ -56,7 +57,7 @@ func (s *Session) at(path string, off int) *at {
 	if u == nil {
 		return nil
 	}
-	a := &at{u: u, path: syntax.PathAt(u.File, off)}
+	a := &at{u: u, path: syntax.PathAt(u.File, off), r: s.R}
 	// Past the end of an unfinished declaration (`X x = |` at the end of
 	// the file), the cursor still belongs to it.
 	if len(a.path) == 1 {
@@ -973,7 +974,37 @@ func (a *at) blockFields(b *syntax.Block) []sema.Candidate {
 			present[f.Key.Text] = true
 		}
 	}
-	return a.c.FieldCandidates(in, present, false)
+	return append(a.textureSlots(b, present), a.c.FieldCandidates(in, present, false)...)
+}
+
+// textureSlots offers, in a model's textures body, the slots its parent
+// chain has: first those its faces show, such as end and side under
+// block/cube_column, then those it fills already.
+func (a *at) textureSlots(b *syntax.Block, present map[string]bool) []sema.Candidate {
+	if a.decl == nil || a.r == nil || a.decl.Kind.Resource != "model" || a.decl.D == nil || project.ModelTexturesBody(a.decl.D) != b {
+		return nil
+	}
+	slots, _ := a.r.ModelSlots(a.decl)
+	var out []sema.Candidate
+	for i, sl := range slots {
+		if present[sl.Name] {
+			continue
+		}
+		from := strings.TrimPrefix(sl.From, "minecraft:")
+		detail := "texture slot of " + from
+		if sl.Used {
+			detail = "shown by " + from
+		}
+		if sl.Filled != "" {
+			detail += ", now " + strings.TrimPrefix(sl.Filled, "minecraft:")
+		}
+		rank := -100 + i
+		if !sl.Used {
+			rank = -50 + i
+		}
+		out = append(out, sema.Candidate{Label: sl.Name, Kind: sema.CandField, Insert: sl.Name + " = $1", Detail: detail, Rank: rank})
+	}
+	return out
 }
 
 func (a *at) methods(m *syntax.Member) []sema.Candidate {

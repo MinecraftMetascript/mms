@@ -384,6 +384,14 @@ func (s *Server) vanillaFile(van spec.Vanilla, file string) (string, error) {
 	if text, ok := van.File(spec.VanillaPrefix + "data/minecraft/" + rest + ".json"); ok {
 		return text, nil
 	}
+	// A resource pack file: assets/models/block/stone (a folder as the
+	// listing names it) or assets/minecraft/models/block/stone.
+	if asset, ok := strings.CutPrefix(rest, "assets/"); ok {
+		asset = strings.TrimPrefix(asset, "minecraft/")
+		if text, ok := van.File(spec.VanillaPrefix + "assets/minecraft/" + asset + ".json"); ok {
+			return text, nil
+		}
+	}
 	// Say what is near: the files of the folder whose ids share the
 	// last part of the path.
 	last := rest[strings.LastIndex(rest, "/")+1:]

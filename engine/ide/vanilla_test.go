@@ -16,6 +16,8 @@ func TestDefinitionVanilla(t *testing.T) {
 		{"PlacedFeatureTag ores = [ore_di|rt]\n", "worldgen/placed_feature/ore_dirt.json"},
 		{"BlockTag b = [#minecraft:lo|gs]\n", "tags/block/logs.json"},
 		{"BlockTag b = [st|one]\n", ""}, // blocks are not files
+		{"Model m { parent = block/cube_co|lumn }\n", "@assets/models/block/cube_column.json"},
+		{"BlockState minecraft:stone { variants = { \"\" = { model = block/gran|ite } } }\n", "@assets/models/block/granite.json"},
 	} {
 		s, off := session(t, tc.src)
 		defs := s.Definition("main.mms", off)
@@ -26,6 +28,9 @@ func TestDefinitionVanilla(t *testing.T) {
 			continue
 		}
 		want := spec.VanillaPrefix + "data/minecraft/" + tc.want
+		if rest, ok := strings.CutPrefix(tc.want, "@assets/"); ok {
+			want = spec.VanillaPrefix + "assets/minecraft/" + rest
+		}
 		if len(defs) != 1 || defs[0].Path != want {
 			t.Errorf("%q: definition = %+v, want %s", tc.src, defs, want)
 			continue

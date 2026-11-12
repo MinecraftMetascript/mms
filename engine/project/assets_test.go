@@ -393,3 +393,44 @@ Model block/c { parent = block/cube_all, textures = { all = Texture("art/lamp.pn
 		t.Errorf("diagnostics:\n%s", s)
 	}
 }
+
+func TestModelMissingTexture(t *testing.T) {
+	files := fstest.MapFS{"art/icon.png": {Data: pngBytes}}
+	src := `Model block/log { parent = block/cube_column, textures = { side = block/oak_log } }
+Model block/full { parent = block/cube_column, textures = { side = block/oak_log, end = "#side" } }
+Model block/mine { parent = block/log, textures = { end = block/stone } }
+Model block/own {
+  textures = { a = block/stone }
+  elements = [{ from = [0, 0, 0], to = [16, 16, 16], faces = { up = { texture = "#a" }, down = { texture = "#b" } } }]
+}
+Model block/elsewhere { parent = other:block/thing }
+Model item/flat { parent = item/generated, textures = { layer0 = item/stick } }
+`
+	_, r := assetProject(t, files, src)
+	var got []string
+	for _, d := range r.Diagnostics("main.mms") {
+		if d.Code == "lint/model-missing-texture" {
+			got = append(got, d.Message)
+		}
+	}
+	want := []string{
+		"nothing fills the texture slot #end, which the faces of 'block/cube_column' use",
+		"nothing fills the texture slot #b, which its elements use",
+	}
+	if len(got) != len(want) {
+		t.Fatalf("got %q", got)
+	}
+	for i := range want {
+		if !strings.HasPrefix(got[i], want[i]) {
+			t.Errorf("got %q, want %q", got[i], want[i])
+		}
+	}
+	for _, d := range r.Order {
+		if d.ID() == "demo:block/mine" {
+			slots, ok := r.ModelSlots(d)
+			if !ok || len(slots) < 2 || slots[0].Name != "end" || slots[0].Filled != "minecraft:block/stone" {
+				t.Errorf("slots: %+v", slots)
+			}
+		}
+	}
+}

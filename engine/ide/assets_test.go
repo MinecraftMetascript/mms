@@ -121,3 +121,50 @@ func TestTriggerApplies(t *testing.T) {
 		}
 	}
 }
+
+// TestTextureMetaCompletion offers the sections of a .png.mcmeta file as
+// Texture's named arguments, and their fields inside.
+func TestTextureMetaCompletion(t *testing.T) {
+	cases := []struct{ src, want string }{
+		{`Model m { parent = block/cube_all, textures = { all = Texture("art/sunset.png", |) } }`, "animation"},
+		{`Model m { parent = block/cube_all, textures = { all = Texture("art/sunset.png", g|) } }`, "gui"},
+		{`Model m { parent = block/cube_all, textures = { all = Texture("art/sunset.png", animation = { | }) } }`, "frametime"},
+		{`Model m { parent = block/cube_all, textures = { all = Texture("art/sunset.png", animation = { frametime = 2 }, |) } }`, "texture"},
+	}
+	for _, tc := range cases {
+		s, off := assetSession(t, tc.src)
+		items, _ := s.Completion("main.mms", off)
+		if got := labels(items); !slices.Contains(got, tc.want) {
+			t.Errorf("%s: got %v, want %s", tc.src, got, tc.want)
+		}
+	}
+}
+
+// TestTextureSlotCompletion offers the slots of a model's parent chain
+// in its textures body, those its faces show first.
+func TestTextureSlotCompletion(t *testing.T) {
+	s, off := assetSession(t, `Model m { parent = block/cube_column, textures = { side = block/oak_log, | } }`)
+	items, _ := s.Completion("main.mms", off)
+	got := labels(items)
+	if len(got) < 2 || got[0] != "end" || slices.Contains(got, "side") || !slices.Contains(got, "particle") {
+		t.Errorf("got %v", got)
+	}
+}
+
+func TestTextureHover(t *testing.T) {
+	src := `Model m { parent = block/cube_all, textures = { all = Tex|ture("art/lamp.png", animation = { frametime = 3 }) } }`
+	off := strings.Index(src, "|")
+	src = src[:off] + src[off+1:]
+	p := project.New(spec.MustDefault(), project.Config{Namespace: "test"})
+	p.Files = fstest.MapFS{"art/lamp.png": {Data: append([]byte("\x89PNG\r\n\x1a\n\x00\x00\x00\x0dIHDR"), 0, 0, 0, 16, 0, 0, 0, 64)}}
+	p.SetFile("main.mms", src)
+	r, err := p.Analyze(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := &Session{P: p, R: r}
+	md, _ := s.Hover("main.mms", off)
+	if !strings.Contains(md, "16×64 image") || !strings.Contains(md, "4 frames of 16×16, one loop every 12 ticks (0.6s)") {
+		t.Errorf("hover: %s", md)
+	}
+}

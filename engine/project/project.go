@@ -186,6 +186,10 @@ type Result struct {
 	jigsaw   *jigsawModel                   // structure files' jigsaw blocks, for the jigsaw rules
 	files    fs.FS
 	lintMu   sync.Mutex
+	// models are the project's models' slot facts, by full id, built
+	// on first use by modelInfo.
+	modelsOnce sync.Once
+	models     map[string]*spec.ModelInfo
 	relOnce  sync.Once
 	written  map[eval.Origin]eval.Prov // see relate
 	diagOnce sync.Once

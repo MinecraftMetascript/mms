@@ -153,6 +153,11 @@ func (c *Checker) assetCall(e syntax.Expr, v tview) jsonv.Value {
 		c.errorf("mms/type-mismatch", call.Fn.Span(), "%s(...) makes a %s id, but this field expects %s", name, h.registries[0], describe(v))
 		return nil
 	}
+	in := c.info(e)
+	if name == "Texture" {
+		// Completion offers the sections as named arguments.
+		in.Fields, _ = c.fields(c.norm(tview{T: &spec.Type{Kind: "reference", Path: tTextureMeta}}), "")
+	}
 	var src, idName string
 	var srcSp, nameSp syntax.Span
 	var nameArg syntax.Expr
@@ -186,7 +191,6 @@ func (c *Checker) assetCall(e syntax.Expr, v tview) jsonv.Value {
 		c.errorf("mms/type-mismatch", call.Sp, "%s needs the path of a %s file, relative to the project: %s(\"file%s\")", name, h.ext, name, h.ext)
 		return nil
 	}
-	in := c.info(e)
 	in.Type = v
 	var metaV *jsonv.Object
 	if len(meta) > 0 {

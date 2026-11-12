@@ -90,6 +90,11 @@
           "markdownDescription": "A jigsaw block whose target no piece of its pool can join: none of the pool's structure files has a jigsaw block with that name, or the pool has no pieces. Only pools whose pieces are all the project's own structure files are checked.\n\nDefault: `warning`.",
           "$ref": "#/definitions/severity"
         },
+        "model-missing-texture": {
+          "description": "A model whose faces show a texture slot, such as `#side`, that nothing in its parent chain fills, so the game draws the missing texture there. The faces are those of the nearest model in the chain with elements: `block/cube_column` uses `#end` and `#side`. Chains that reach a model neither the project nor vanilla has are not checked.\n\nDefault: `warning`.",
+          "markdownDescription": "A model whose faces show a texture slot, such as `#side`, that nothing in its parent chain fills, so the game draws the missing texture there. The faces are those of the nearest model in the chain with elements: `block/cube_column` uses `#end` and `#side`. Chains that reach a model neither the project nor vanilla has are not checked.\n\nDefault: `warning`.",
+          "$ref": "#/definitions/severity"
+        },
         "overrides-vanilla": {
           "description": "A declaration in the minecraft namespace replaces the vanilla resource with the same id.\n\nDefault: `info`.",
           "markdownDescription": "A declaration in the minecraft namespace replaces the vanilla resource with the same id.\n\nDefault: `info`.",
