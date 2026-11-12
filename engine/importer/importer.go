@@ -5,7 +5,6 @@ package importer
 
 import (
 	"regexp"
-	"strconv"
 	"strings"
 
 	"github.com/minecraftmetascript/mms/engine/jsonv"
@@ -14,8 +13,6 @@ import (
 )
 
 var (
-	identRe  = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
-	resLocRe = regexp.MustCompile(`^[a-z0-9_.-]+:[a-z0-9_./-]+$`)
 	pathRe   = regexp.MustCompile(`^[a-z_][a-z0-9_]*(/[a-z0-9_./-]+)*$`)
 )
 
@@ -78,57 +75,4 @@ func name(ns, id string) string {
 }
 
 // Expr prints a JSON value as an MMS expression.
-func Expr(v jsonv.Value) string {
-	var sb strings.Builder
-	expr(&sb, v)
-	return sb.String()
-}
-
-func expr(sb *strings.Builder, v jsonv.Value) {
-	switch x := v.(type) {
-	case *jsonv.Object:
-		if len(x.Members) == 0 {
-			sb.WriteString("{}")
-			return
-		}
-		sb.WriteString("{ ")
-		for i, m := range x.Members {
-			if i > 0 {
-				sb.WriteString(", ")
-			}
-			sb.WriteString(key(m.Key))
-			sb.WriteString(" = ")
-			expr(sb, m.Value)
-		}
-		sb.WriteString(" }")
-	case jsonv.Array:
-		sb.WriteString("[")
-		for i, e := range x {
-			if i > 0 {
-				sb.WriteString(", ")
-			}
-			expr(sb, e)
-		}
-		sb.WriteString("]")
-	case jsonv.String:
-		if resLocRe.MatchString(string(x)) {
-			// Resource locations read better bare (minecraft:stone).
-			sb.WriteString(string(x))
-			return
-		}
-		sb.WriteString(strconv.Quote(string(x)))
-	case jsonv.Number:
-		sb.WriteString(string(x))
-	case jsonv.Bool:
-		sb.WriteString(strconv.FormatBool(bool(x)))
-	case jsonv.Null, nil:
-		sb.WriteString("null")
-	}
-}
-
-func key(k string) string {
-	if identRe.MatchString(k) && !syntax.ReservedKey(k) {
-		return k
-	}
-	return strconv.Quote(k)
-}
+func Expr(v jsonv.Value) string { return sema.JSONExpr(v) }

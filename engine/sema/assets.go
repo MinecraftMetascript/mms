@@ -2,6 +2,7 @@ package sema
 
 import (
 	"bytes"
+	"encoding/binary"
 	"fmt"
 	"io"
 	"io/fs"
@@ -11,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/minecraftmetascript/mms/engine/jsonv"
+	"github.com/minecraftmetascript/mms/engine/spec"
 	"github.com/minecraftmetascript/mms/engine/syntax"
 )
 
@@ -35,6 +37,11 @@ type Asset struct {
 	ID     string   // ns:name, the value written to the JSON
 	Out    string   // pack-relative output path
 	Pack   PackKind // which pack Out belongs to
+	// Meta is a texture's .png.mcmeta file, from the call's named
+	// arguments, such as animation = { frametime = 2 }; nil without.
+	Meta *jsonv.Object
+	// Width and Height are a texture's size in pixels, when known.
+	Width, Height int
 }
 
 type assetHelper struct {
@@ -127,8 +134,16 @@ func assetName(src string) string {
 	return sb.String()
 }
 
-// assetCall checks Texture(path, name?), Sound(...) or StructureFile(...) at
-// an id position and returns the id it stands for.
+// tTextureMeta is the type of a .png.mcmeta file. Texture(...) takes
+// its sections (animation, texture, gui, villager) as named arguments.
+const tTextureMeta = "::java::assets::texture_meta::TextureMeta"
+
+// pngHeader is the length of a PNG's signature and IHDR chunk, which
+// hold its size.
+const pngHeader = 24
+
+// assetCall checks Texture(path, name?, section = ...), Sound(...) or
+// StructureFile(...) at an id position and returns the id it stands for.
 func (c *Checker) assetCall(e syntax.Expr, v tview) jsonv.Value {
 	call := e.(*syntax.Call)
 	name := assetCallName(e)
@@ -140,30 +155,49 @@ func (c *Checker) assetCall(e syntax.Expr, v tview) jsonv.Value {
 	}
 	var src, idName string
 	var srcSp, nameSp syntax.Span
-	for i, a := range call.Args {
+	var nameArg syntax.Expr
+	var meta []*syntax.Arg
+	pos := 0
+	for _, a := range call.Args {
+		if a.Name != nil {
+			if name != "Texture" {
+				c.errorf("mms/type-mismatch", a.Sp, "%s takes a file path and an optional id name, without argument names", name)
+				return nil
+			}
+			meta = append(meta, a)
+			continue
+		}
 		s, ok := a.Value.(*syntax.String)
 		switch {
-		case a.Name != nil:
-			c.errorf("mms/type-mismatch", a.Sp, "%s takes a file path and an optional id name, without argument names", name)
-			return nil
-		case i > 1:
+		case pos > 1:
 			c.errorf("mms/type-mismatch", a.Sp, "%s takes at most two arguments: a file path and an id name", name)
 			return nil
 		case !ok:
-			c.errorf("mms/type-mismatch", a.Value.Span(), "expected a quoted %s", map[bool]string{true: "file path", false: "id name"}[i == 0])
+			c.errorf("mms/type-mismatch", a.Value.Span(), "expected a quoted %s", map[bool]string{true: "file path", false: "id name"}[pos == 0])
 			return nil
-		case i == 0:
+		case pos == 0:
 			src, srcSp = s.Value, s.Sp
 		default:
-			idName, nameSp = s.Value, s.Sp
+			idName, nameSp, nameArg = s.Value, s.Sp, s
 		}
+		pos++
 	}
-	if len(call.Args) == 0 {
+	if pos == 0 {
 		c.errorf("mms/type-mismatch", call.Sp, "%s needs the path of a %s file, relative to the project: %s(\"file%s\")", name, h.ext, name, h.ext)
 		return nil
 	}
 	in := c.info(e)
 	in.Type = v
+	var metaV *jsonv.Object
+	if len(meta) > 0 {
+		// The named arguments are the fields of the .png.mcmeta file.
+		body := &syntax.Block{Closed: true, Sp: call.Sp}
+		for _, a := range meta {
+			body.Items = append(body.Items, &syntax.FieldStmt{Key: a.Name, Value: a.Value, Sp: a.Sp})
+		}
+		ref := &spec.Type{Kind: "reference", Path: tTextureMeta}
+		metaV, _ = c.check(&syntax.Object{Body: body, Sp: call.Sp}, tview{T: ref, Name: tTextureMeta}).(*jsonv.Object)
+	}
 	src = path.Clean(strings.ReplaceAll(src, "\\", "/"))
 	if path.IsAbs(src) || src == ".." || strings.HasPrefix(src, "../") {
 		c.errorf("mms/asset", srcSp, "asset paths are relative to the project folder and stay inside it")
@@ -174,6 +208,7 @@ func (c *Checker) assetCall(e syntax.Expr, v tview) jsonv.Value {
 		return nil
 	}
 	model := name == "Texture" && c.resource == "model"
+	ns := c.NS
 	if idName == "" {
 		idName = assetName(src)
 		if model {
@@ -183,11 +218,27 @@ func (c *Checker) assetCall(e syntax.Expr, v tview) jsonv.Value {
 			// alike, so a model's own texture goes there.
 			idName = "block/" + idName
 		}
-	} else if idName = c.stripAssetExt(idName, h.registries[0], call.Args[1].Value); !assetNamePattern.MatchString(idName) || strings.Contains(idName, "..") {
-		c.errorf("mms/invalid-name", nameSp, "an id name is lowercase letters, digits, '_', '-', '.' and '/'")
-		return nil
+	} else {
+		idName = c.stripAssetExt(idName, h.registries[0], nameArg)
+		// An id name may name another namespace, such as
+		// "minecraft:block/stone", to replace that texture.
+		if n, p, ok := strings.Cut(idName, ":"); ok && name == "Texture" {
+			if !assetNamePattern.MatchString(n) || strings.Contains(n, "/") || n == "." || n == ".." {
+				c.errorf("mms/invalid-name", nameSp, "a namespace is lowercase letters, digits, '_', '-' and '.'")
+				return nil
+			}
+			ns, idName = n, p
+		}
+		if !assetNamePattern.MatchString(idName) || strings.Contains(idName, "..") {
+			c.errorf("mms/invalid-name", nameSp, "an id name is lowercase letters, digits, '_', '-', '.' and '/'%s", map[bool]string{true: ", after an optional namespace such as minecraft:", false: ""}[name == "Texture"])
+			return nil
+		}
 	}
-	head, ok := c.assetHead(src, len(h.magic))
+	n := len(h.magic)
+	if name == "Texture" {
+		n = pngHeader
+	}
+	head, ok := c.assetHead(src, n)
 	if !ok && c.Files == nil {
 		c.errorf("mms/asset", srcSp, "asset files are not available here yet; build with the mms command line to include '%s'", src)
 		return nil
@@ -196,16 +247,211 @@ func (c *Checker) assetCall(e syntax.Expr, v tview) jsonv.Value {
 		c.errorf("mms/asset", srcSp, "no file '%s' in the project", src)
 		return nil
 	}
-	if !bytes.Equal(head, h.magic) {
+	if !bytes.HasPrefix(head, h.magic) {
 		c.errorf("mms/asset", srcSp, "'%s' is not %s", src, h.what)
 		return nil
 	}
-	ns := c.NS
 	full := ns + ":" + idName
 	in.ID = full
 	in.ModelTexture = model
 	in.Asset = &Asset{Helper: name, Src: src, ID: full, Out: h.out(ns, id.Path, idName), Pack: h.pack}
+	if name == "Texture" {
+		in.Asset.Width, in.Asset.Height = pngSize(head)
+		if metaV != nil {
+			in.Asset.Meta = metaV
+		}
+		c.textureChecks(call, in.Asset, meta, model)
+	}
 	return jsonv.String(full)
+}
+
+// pngSize reads a PNG's width and height from its IHDR chunk, or 0, 0.
+func pngSize(head []byte) (w, h int) {
+	if len(head) < pngHeader || string(head[12:16]) != "IHDR" {
+		return 0, 0
+	}
+	return int(binary.BigEndian.Uint32(head[16:20])), int(binary.BigEndian.Uint32(head[20:24]))
+}
+
+// FrameSize returns the size of one frame of an animated texture, as the
+// game works it out: the animation's width and height when given, the
+// image's own otherwise, and a square of the shorter side when neither
+// is. ok is false when the texture has no animation or no known size.
+func (a *Asset) FrameSize() (fw, fh int, ok bool) {
+	anim, _ := a.metaSection("animation")
+	if anim == nil || a.Width == 0 || a.Height == 0 {
+		return 0, 0, false
+	}
+	w, wok := intField(anim, "width")
+	h, hok := intField(anim, "height")
+	switch {
+	case wok && hok:
+		return w, h, true
+	case wok:
+		return w, a.Height, true
+	case hok:
+		return a.Width, h, true
+	}
+	m := min(a.Width, a.Height)
+	return m, m, true
+}
+
+// Frames returns the number of frames in an animated texture's image,
+// read left to right and top to bottom, or 0.
+func (a *Asset) Frames() int {
+	fw, fh, ok := a.FrameSize()
+	if !ok || fw <= 0 || fh <= 0 || a.Width%fw != 0 || a.Height%fh != 0 {
+		return 0
+	}
+	return (a.Width / fw) * (a.Height / fh)
+}
+
+// AnimationTicks returns how long one loop of an animated texture lasts,
+// in game ticks, or 0.
+func (a *Asset) AnimationTicks() int {
+	anim, _ := a.metaSection("animation")
+	n := a.Frames()
+	if anim == nil || n == 0 {
+		return 0
+	}
+	ft, ok := intField(anim, "frametime")
+	if !ok {
+		ft = 1
+	}
+	frames, _ := anim.Get("frames").(jsonv.Array)
+	if frames == nil {
+		return n * ft
+	}
+	total := 0
+	for _, f := range frames {
+		t := ft
+		if o, ok := f.(*jsonv.Object); ok {
+			if v, ok := intField(o, "time"); ok {
+				t = v
+			}
+		}
+		total += t
+	}
+	return total
+}
+
+func (a *Asset) metaSection(key string) (*jsonv.Object, bool) {
+	if a.Meta == nil {
+		return nil, false
+	}
+	o, ok := a.Meta.Get(key).(*jsonv.Object)
+	return o, ok
+}
+
+func intField(o *jsonv.Object, key string) (int, bool) {
+	n, ok := o.Get(key).(jsonv.Number)
+	if !ok {
+		return 0, false
+	}
+	v, err := strconv.Atoi(string(n))
+	return v, err == nil
+}
+
+// textureChecks compares a texture's animation with its image: a strip
+// that is not a whole number of frames, a frame index past the last
+// frame, a model texture that looks like an animation strip without one,
+// and a .png.mcmeta file beside the image, which MMS does not copy.
+func (c *Checker) textureChecks(call *syntax.Call, a *Asset, meta []*syntax.Arg, model bool) {
+	if c.trial {
+		return
+	}
+	var animArg *syntax.Arg
+	for _, m := range meta {
+		if m.Name.Text == "animation" {
+			animArg = m
+		}
+	}
+	if fw, fh, ok := a.FrameSize(); ok && animArg != nil {
+		if fw <= 0 || fh <= 0 || a.Width%fw != 0 || a.Height%fh != 0 {
+			c.warnf("mms/texture-animation", animArg.Sp, "'%s' is %dx%d, which is not a whole number of %dx%d frames, so the game shows the missing texture", a.Src, a.Width, a.Height, fw, fh)
+		} else if n := a.Frames(); n > 0 {
+			c.frameIndexChecks(animArg.Value, n, a.Src)
+		}
+	}
+	side := a.Src + ".mcmeta"
+	raw, hasSide := c.assetHead(side, 1<<16)
+	if animArg == nil && !hasSide && model && a.Width > 0 && a.Height >= 2*a.Width && a.Height%a.Width == 0 {
+		d := syntax.Diagnostic{
+			Code: "mms/texture-animation", Severity: syntax.SeverityWarning, Sp: call.Sp,
+			Message: fmt.Sprintf("'%s' is %dx%d, a strip of %d square frames, but it has no animation, so the game squashes the whole strip into the model; add animation = { frametime = ... }", a.Src, a.Width, a.Height, a.Height/a.Width),
+		}
+		if at, ok := callEnd(call); ok {
+			d.Fixes = []syntax.Fix{{Title: "Animate it", Edits: []syntax.TextEdit{{Sp: syntax.Span{Start: at, End: at}, Text: ", animation = { frametime = 2 }"}}}}
+		}
+		c.Diags = append(c.Diags, d)
+	}
+	if !hasSide {
+		return
+	}
+	d := syntax.Diagnostic{
+		Code: "mms/texture-mcmeta", Severity: syntax.SeverityWarning, Sp: call.Sp,
+		Message: fmt.Sprintf("MMS does not copy '%s'; write its sections in the call instead, such as Texture(\"%s\", animation = { ... })", side, a.Src),
+	}
+	if v, err := jsonv.Parse(raw); err == nil && len(meta) == 0 {
+		if o, ok := v.(*jsonv.Object); ok && len(o.Members) > 0 {
+			if at, ok := callEnd(call); ok {
+				var sb strings.Builder
+				for _, m := range o.Members {
+					sb.WriteString(", ")
+					sb.WriteString(JSONKey(m.Key))
+					sb.WriteString(" = ")
+					sb.WriteString(JSONExpr(m.Value))
+				}
+				d.Fixes = []syntax.Fix{{Title: "Move '" + path.Base(side) + "' into the call", Edits: []syntax.TextEdit{{Sp: syntax.Span{Start: at, End: at}, Text: sb.String()}}}}
+			}
+		}
+	}
+	c.Diags = append(c.Diags, d)
+}
+
+// frameIndexChecks warns about frames entries past the last frame: the
+// game then leaves the texture still.
+func (c *Checker) frameIndexChecks(anim syntax.Expr, n int, src string) {
+	o, ok := anim.(*syntax.Object)
+	if !ok {
+		return
+	}
+	for _, it := range o.Body.Items {
+		f, ok := it.(*syntax.FieldStmt)
+		if !ok || f.Key.Text != "frames" {
+			continue
+		}
+		l, ok := f.Value.(*syntax.List)
+		if !ok {
+			continue
+		}
+		for _, el := range l.Elems {
+			idx := el
+			if eo, ok := el.(*syntax.Object); ok {
+				idx = nil
+				for _, it := range eo.Body.Items {
+					if ff, ok := it.(*syntax.FieldStmt); ok && ff.Key.Text == "index" {
+						idx = ff.Value
+					}
+				}
+			}
+			num, ok := idx.(*syntax.Number)
+			if !ok {
+				continue
+			}
+			if i, err := strconv.Atoi(num.Text); err == nil && i >= n {
+				c.warnf("mms/texture-animation", num.Sp, "'%s' has %d frames (0 to %d), so frame %d is not there and the game does not animate the texture", src, n, n-1, i)
+			}
+		}
+	}
+}
+
+// callEnd returns the offset of a call's closing parenthesis.
+func callEnd(call *syntax.Call) (int, bool) {
+	if call.Sp.End <= call.Sp.Start {
+		return 0, false
+	}
+	return call.Sp.End - 1, true
 }
 
 // assetHead reads a file's first n bytes; ok is false when it does not

@@ -44,6 +44,13 @@ func (r *Result) collectAssets() {
 				r.assets = append(r.assets, u)
 				continue
 			}
+			if prev.Src == u.Src && metaText(prev.Meta) != metaText(u.Meta) {
+				r.assetErr[d.Unit.Path] = append(r.assetErr[d.Unit.Path], syntax.Diagnostic{
+					Code: "mms/asset-conflict", Severity: syntax.SeverityError, Sp: u.sp,
+					Message: fmt.Sprintf("'%s' is used as %s '%s' with different named arguments, but the texture has one %s.mcmeta; write the same ones at every use, or give this one its own id name", u.Src, strings.ToLower(u.Helper), u.ID, path.Base(u.Out)),
+				})
+				continue
+			}
 			if prev.Src != u.Src {
 				r.assetErr[d.Unit.Path] = append(r.assetErr[d.Unit.Path], syntax.Diagnostic{
 					Code: "mms/asset-conflict", Severity: syntax.SeverityError, Sp: u.sp,
@@ -53,6 +60,14 @@ func (r *Result) collectAssets() {
 			}
 		}
 	}
+}
+
+// metaText is a texture's .png.mcmeta as JSON text, or "" without one.
+func metaText(m *jsonv.Object) string {
+	if m == nil {
+		return ""
+	}
+	return string(jsonv.Marshal(m))
 }
 
 // providedAssets returns the ids asset helpers give files, by helper.
@@ -88,6 +103,9 @@ func (r *Result) emitAssets(hasResources bool) []OutFile {
 	for _, u := range r.assets {
 		f := OutFile{Path: u.Out, Asset: u.Src, Pack: u.Pack, Unit: u.decl.Unit.Path, Span: u.sp}
 		out = append(out, f)
+		if u.Meta != nil {
+			out = append(out, OutFile{Path: u.Out + ".mcmeta", Data: jsonv.Marshal(u.Meta), Pack: u.Pack, Unit: u.decl.Unit.Path, Span: u.sp})
+		}
 		if u.Pack == sema.ResourcePack {
 			hasResources = true
 		}

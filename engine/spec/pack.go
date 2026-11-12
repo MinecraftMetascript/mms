@@ -49,6 +49,9 @@ type Pack struct {
 	// Atlases maps each vanilla texture atlas ("blocks", "items") to the
 	// sources its assets/minecraft/atlases/<name>.json lists.
 	Atlases map[string][]AtlasSource `json:"atlases,omitempty"`
+	// Models maps each vanilla model ("block/cube_column", without the
+	// namespace) to what MMS needs to follow a model's parent chain.
+	Models map[string]*ModelInfo `json:"models,omitempty"`
 
 	registrySets map[string]map[string]struct{}
 	// vanilla is set on the embedded default pack, whose version has
@@ -66,6 +69,18 @@ type AtlasSource struct {
 	Prefix   string `json:"prefix,omitempty"`
 	Resource string `json:"resource,omitempty"`
 	Sprite   string `json:"sprite,omitempty"`
+}
+
+// ModelInfo is the part of a vanilla model file that says which texture
+// slots it fills and uses: its parent, its textures and, when it has
+// elements, the "#slot" references their faces name (without '#').
+// Elements replace a parent's, so the nearest model in a chain that has
+// them decides which slots must be filled.
+type ModelInfo struct {
+	Parent   string            `json:"parent,omitempty"`
+	Textures map[string]string `json:"textures,omitempty"`
+	Elements bool              `json:"elements,omitempty"`
+	Uses     []string          `json:"uses,omitempty"`
 }
 
 type BlockStates struct {

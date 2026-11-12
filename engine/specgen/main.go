@@ -92,6 +92,18 @@ func run(out, vanillaOut, cache string) error {
 	if err := fetchJSON(cache, mcmetaRepo, mcmetaRef, "assets/atlas/data.min.json", &atlases); err != nil {
 		return err
 	}
+	var models map[string]struct {
+		Parent   string            `json:"parent"`
+		Textures map[string]json.RawMessage `json:"textures"`
+		Elements []struct {
+			Faces map[string]struct {
+				Texture string `json:"texture"`
+			} `json:"faces"`
+		} `json:"elements"`
+	}
+	if err := fetchJSON(cache, mcmetaRepo, mcmetaRef, "assets/model/data.min.json", &models); err != nil {
+		return err
+	}
 	var commands spec.CommandNode
 	if err := fetchJSON(cache, mcmetaRepo, mcmetaRef, "commands/data.min.json", &commands); err != nil {
 		return err
@@ -138,6 +150,38 @@ func run(out, vanillaOut, cache string) error {
 	for name, a := range atlases {
 		pack.Atlases[name] = a.Sources
 	}
+	pack.Models = map[string]*spec.ModelInfo{}
+	for id, m := range models {
+		info := &spec.ModelInfo{Parent: strings.TrimPrefix(m.Parent, "minecraft:"), Elements: m.Elements != nil}
+		for slot, raw := range m.Textures {
+			// A slot holds a texture id or "#slot", or a material:
+			// { sprite, force_translucent }.
+			var mat struct {
+				Sprite string `json:"sprite"`
+			}
+			var id string
+			if json.Unmarshal(raw, &id) != nil && json.Unmarshal(raw, &mat) == nil {
+				id = mat.Sprite
+			}
+			if info.Textures == nil {
+				info.Textures = map[string]string{}
+			}
+			info.Textures[slot] = id
+		}
+		uses := map[string]bool{}
+		for _, e := range m.Elements {
+			for _, f := range e.Faces {
+				if slot, ok := strings.CutPrefix(f.Texture, "#"); ok {
+					uses[slot] = true
+				}
+			}
+		}
+		for slot := range uses {
+			info.Uses = append(info.Uses, slot)
+		}
+		sort.Strings(info.Uses)
+		pack.Models[id] = info
+	}
 
 	// Data-pack resource kinds: every kind whose type does not point into
 	// ::java::assets:: (decisions D5, D41). Resource-pack kinds are the
@@ -165,6 +209,13 @@ func run(out, vanillaOut, cache string) error {
 	}
 	for _, t := range pack.Resources {
 		r.typ(t)
+	}
+	// Texture(...) takes the sections of the .png.mcmeta file it writes
+	// beside the texture as named arguments.
+	if t := symbols.Dispatchers["minecraft:resource"]["texture_meta"]; t != nil {
+		r.typ(t)
+	} else {
+		return fmt.Errorf("resource kind texture_meta is not in the mcdoc")
 	}
 
 	for id, raw := range blocks {
@@ -226,6 +277,15 @@ func writeVanilla(pack *spec.Pack, out, cache string) error {
 		if err := get(kind, kind); err != nil {
 			return err
 		}
+	}
+	// The resource pack's model, block state and item model files, under
+	// "assets/<folder>".
+	for kind, src := range map[string]string{"model": "model", "block_definition": "block_definition", "item_definition": "item_definition"} {
+		var files map[string]json.RawMessage
+		if err := fetchJSON(cache, mcmetaRepo, mcmetaRef, "assets/"+src+"/data.min.json", &files); err != nil {
+			return err
+		}
+		v["assets/"+pack.Assets[kind]] = files
 	}
 	for reg := range pack.Registries {
 		if tag, ok := strings.CutPrefix(reg, "tag/"); ok {

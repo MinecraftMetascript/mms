@@ -1485,7 +1485,11 @@ func (s *Session) vanillaAt(path string, off int) string {
 	if in == nil || in.ID == "" || in.Symbol != nil {
 		return ""
 	}
-	return v.VanillaPath(in.Folder, in.ID)
+	folder := in.Folder
+	if a, ok := s.P.Pack.Assets[folder]; ok {
+		folder = "assets/" + a // a model, block state or item model
+	}
+	return v.VanillaPath(folder, in.ID)
 }
 
 // References returns every use of the symbol at off, with its declaration

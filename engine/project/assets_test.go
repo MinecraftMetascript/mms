@@ -305,3 +305,91 @@ Atlas minecraft:blocks { sources = [{ type = "single", resource = "demo:custom/o
 		}
 	}
 }
+
+// pngOf returns the start of a PNG of the given size: its signature and
+// IHDR chunk, which is all MMS reads.
+func pngOf(w, h int) []byte {
+	b := []byte("\x89PNG\r\n\x1a\n\x00\x00\x00\x0dIHDR")
+	b = append(b, byte(w>>24), byte(w>>16), byte(w>>8), byte(w), byte(h>>24), byte(h>>16), byte(h>>8), byte(h))
+	return append(b, "rest"...)
+}
+
+func TestAssetsTextureAnimation(t *testing.T) {
+	files := fstest.MapFS{
+		"art/icon.png":        {Data: pngBytes},
+		"art/lamp.png":        {Data: pngOf(16, 64)},
+		"art/odd.png":         {Data: pngOf(16, 40)},
+		"art/strip.png":       {Data: pngOf(16, 48)},
+		"art/glow.png":        {Data: pngOf(16, 32)},
+		"art/glow.png.mcmeta": {Data: []byte(`{"animation": {"frametime": 3, "interpolate": true}}`)},
+		"art/stone.png":       {Data: pngOf(16, 16)},
+	}
+	src := `Model block/lamp {
+  parent = block/cube_all
+  textures = { all = Texture("art/lamp.png", animation = { frametime = 4, frames = [0, 1, { index = 3, time = 8 }, 4] }) }
+}
+Model block/odd { parent = block/cube_all, textures = { all = Texture("art/odd.png", animation = {}) } }
+Model block/strip { parent = block/cube_all, textures = { all = Texture("art/strip.png") } }
+Model block/glow { parent = block/cube_all, textures = { all = Texture("art/glow.png") } }
+Model block/stone_again { parent = block/cube_all, textures = { all = Texture("art/stone.png", "minecraft:block/stone", texture = { blur = true }) } }
+`
+	_, r := assetProject(t, files, src)
+	var got []string
+	for _, d := range r.Diagnostics("main.mms") {
+		if strings.HasPrefix(d.Code, "mms/texture-") {
+			got = append(got, d.Code+": "+d.Message)
+			switch {
+			case strings.Contains(d.Message, "strip.png"):
+				if len(d.Fixes) != 1 || d.Fixes[0].Edits[0].Text != ", animation = { frametime = 2 }" {
+					t.Errorf("strip fix: %+v", d.Fixes)
+				}
+			case d.Code == "mms/texture-mcmeta":
+				if len(d.Fixes) != 1 || d.Fixes[0].Edits[0].Text != ", animation = { frametime = 3, interpolate = true }" {
+					t.Errorf("mcmeta fix: %+v", d.Fixes)
+				}
+			}
+		} else if d.Severity <= syntax.SeverityWarning {
+			t.Errorf("unexpected: %s: %s", d.Code, d.Message)
+		}
+	}
+	want := []string{"frame 4 is not there", "16x40, which is not a whole number of 16x16 frames", "a strip of 3 square frames", "does not copy 'art/glow.png.mcmeta'"}
+	if len(got) != len(want) {
+		t.Fatalf("got %d texture diagnostics, want %d:\n%s", len(got), len(want), strings.Join(got, "\n"))
+	}
+	for i, w := range want {
+		if !strings.Contains(got[i], w) {
+			t.Errorf("diagnostic %d: %s\nwant it to say %q", i, got[i], w)
+		}
+	}
+	paths := map[string]string{}
+	for _, f := range r.Emit() {
+		paths[f.Path] = strings.Join(strings.Fields(string(f.Data)), "")
+	}
+	if s := paths["assets/demo/textures/block/lamp.png.mcmeta"]; s != `{"animation":{"frametime":4,"frames":[0,1,{"index":3,"time":8},4]}}` {
+		t.Errorf("lamp mcmeta: %q", s)
+	}
+	if _, ok := paths["assets/demo/textures/block/strip.png.mcmeta"]; ok {
+		t.Error("strip has no animation, so no mcmeta")
+	}
+	if _, ok := paths["assets/minecraft/textures/block/stone.png"]; !ok {
+		t.Error("no replaced vanilla texture")
+	}
+	if s := paths["assets/minecraft/textures/block/stone.png.mcmeta"]; s != `{"texture":{"blur":true}}` {
+		t.Errorf("stone mcmeta: %q", s)
+	}
+	if s := paths["assets/demo/models/block/stone_again.json"]; !strings.Contains(s, `"all":"minecraft:block/stone"`) {
+		t.Errorf("stone model: %s", s)
+	}
+}
+
+func TestAssetsTextureMetaConflict(t *testing.T) {
+	files := fstest.MapFS{"art/icon.png": {Data: pngBytes}, "art/lamp.png": {Data: pngOf(16, 32)}}
+	src := `Model block/a { parent = block/cube_all, textures = { all = Texture("art/lamp.png", animation = { frametime = 2 }) } }
+Model block/b { parent = block/cube_all, textures = { all = Texture("art/lamp.png", animation = { frametime = 4 }) } }
+Model block/c { parent = block/cube_all, textures = { all = Texture("art/lamp.png", animation = { frametime = 2 }) } }
+`
+	_, r := assetProject(t, files, src)
+	if s := diagText(r); strings.Count(s, "mms/asset-conflict") != 1 || !strings.Contains(s, "different named arguments") {
+		t.Errorf("diagnostics:\n%s", s)
+	}
+}
