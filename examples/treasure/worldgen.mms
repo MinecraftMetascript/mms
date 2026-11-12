@@ -44,12 +44,10 @@ ProcessorList wreck_loot {
     Rule(
       [
         {
-          input_predicate = BlockstateMatch(
-            {
-              id = chest
-              properties = { facing = "west" }
-            },
-          )
+          input_predicate = BlockstateMatch({
+            id = chest
+            properties = { facing = "west" }
+          })
           location_predicate = AlwaysTrue()
           output_state = {
             id = chest
@@ -58,12 +56,10 @@ ProcessorList wreck_loot {
           block_entity_modifier = AppendLoot(chests/buried)
         },
         {
-          input_predicate = BlockstateMatch(
-            {
-              id = chest
-              properties = { facing = "north" }
-            },
-          )
+          input_predicate = BlockstateMatch({
+            id = chest
+            properties = { facing = "north" }
+          })
           location_predicate = AlwaysTrue()
           output_state = {
             id = chest

@@ -816,6 +816,13 @@ func (p *printer) binary(b *syntax.Binary) doc {
 	case *syntax.Object, *syntax.List:
 		return cat(p.operand(b.L, prec), txt(" "+b.Op+" "), p.operand(b.R, prec+1))
 	}
+	// A left operand that ends with a closing bracket keeps the operator on
+	// its last line when it breaks: `) - 1` rather than `) -` and a lone
+	// `1` on the next line. The operator only breaks if the right operand
+	// does not fit after the bracket.
+	if hugsLeft(b) {
+		return cat(p.operand(b.L, prec), grp(txt(" "+b.Op), ind(ln, p.operand(b.R, prec+1))))
+	}
 	// Left-associative arithmetic and comparisons: break after the operator.
 	return grp(p.operand(b.L, prec), txt(" "+b.Op), ind(ln, p.operand(b.R, prec+1)))
 }
@@ -898,7 +905,55 @@ loop:
 	return grp(concat(head), ind(tail...))
 }
 
+// hugsLeft reports whether b's operator follows its left operand on the
+// same line: the left operand ends with a closing bracket, either its own
+// or parentheses the printer adds, or is itself a binary that hugs, so
+// `) + roof + floor` stays on one line too.
+func hugsLeft(b *syntax.Binary) bool {
+	l, ok := b.L.(*syntax.Binary)
+	if !ok {
+		return endsWithBracket(b.L)
+	}
+	if precedence[l.Op] < precedence[b.Op] {
+		return true
+	}
+	return l.Op != "&&" && l.Op != "||" && hugsLeft(l)
+}
+
+// endsWithBracket reports whether e prints ending with a closing bracket,
+// so that a broken e ends on a line of its own closer.
+func endsWithBracket(e syntax.Expr) bool {
+	switch e := e.(type) {
+	case *syntax.Call, *syntax.Index, *syntax.Paren, *syntax.List, *syntax.Object, *syntax.Trailing:
+		return true
+	case *syntax.Unary:
+		return endsWithBracket(e.X)
+	}
+	return false
+}
+
+// commentOutside reports whether a comment not yet printed starts before
+// sp or between sp and end, which is where an argument's own comments go.
+func (p *printer) commentOutside(sp syntax.Span, end int) bool {
+	for _, c := range p.comments {
+		if c.Sp.Start >= end {
+			break
+		}
+		if c.Sp.Start < sp.Start || c.Sp.Start >= sp.End {
+			return true
+		}
+	}
+	return false
+}
+
 func (p *printer) args(args []*syntax.Arg, end int) doc {
+	// A lone object argument hugs the parentheses: `Spline({` on one line
+	// and `})` at the end, as with a trailing block.
+	if len(args) == 1 && args[0].Name == nil {
+		if obj, ok := args[0].Value.(*syntax.Object); ok && !p.commentOutside(obj.Span(), end) {
+			return cat(txt("("), p.expr(obj), txt(")"))
+		}
+	}
 	var items []item
 	for _, a := range args {
 		items = append(items, p.item(a, func() doc { return p.arg(a) }))
