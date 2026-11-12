@@ -284,23 +284,30 @@ func (r *Result) RetextureSlots(d *Decl) (slots []TextureSlot, ok bool) {
 			}
 		}
 	}
-	seen := map[string]bool{}
-	var used, rest []TextureSlot
+	// A slot one model shows and another only fills counts as shown.
+	var names []string
+	best := map[string]TextureSlot{}
 	for _, m := range r.Order {
 		if !emitted[m.D] || m.Kind.Resource != "model" {
 			continue
 		}
 		ms, _ := r.ModelSlots(m)
 		for _, s := range ms {
-			if seen[s.Name] {
-				continue
+			prev, ok := best[s.Name]
+			if !ok {
+				names = append(names, s.Name)
 			}
-			seen[s.Name] = true
-			if s.Used {
-				used = append(used, s)
-			} else {
-				rest = append(rest, s)
+			if !ok || s.Used && !prev.Used {
+				best[s.Name] = s
 			}
+		}
+	}
+	var used, rest []TextureSlot
+	for _, n := range names {
+		if s := best[n]; s.Used {
+			used = append(used, s)
+		} else {
+			rest = append(rest, s)
 		}
 	}
 	return append(used, rest...), true
