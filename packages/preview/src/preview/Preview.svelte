@@ -106,7 +106,7 @@
 	/** The 2D view each render in flight was asked for, so the grid lines up with the image shown, not the camera that moved since. */
 	const sentViews = new Map<number, PreviewView>();
 	/** The view the image on screen was rendered at. */
-	let shownView: PreviewView | null = null;
+	let shownView = $state.raw<PreviewView | null>(null);
 	let lastTarget: string | null = null;
 	let mode = $state<PreviewMode>('density');
 	let biome = $state('minecraft:plains');
@@ -650,14 +650,28 @@
 	/** The grid steps drawn at the current zoom (none in the 3D view or when off). */
 	const gridShown = $derived.by(() => {
 		if (!grid || mode === 'iso' || !info) return [];
-		// CSS pixels per block: a render pixel is `resolution` CSS pixels and view.scale blocks.
-		const perBlock = resolution / view.scale;
+		// CSS pixels per block in the image on screen: a render pixel is
+		// `resolution` CSS pixels and, at the scale it was rendered at, that many blocks.
+		const shown = shownView;
+		if (!shown) return [];
+		const perBlock = resolution / shown.scale;
 		return gridSteps.filter((s) => s.size * perBlock >= minGap);
 	});
 	$effect(() => {
 		void gridShown;
 		untrack(drawGrid);
 	});
+	/**
+	 * The multiples of size within half of c. Counted, not stepped, so a
+	 * coordinate too large for size to change it (1e20) can't loop forever.
+	 */
+	function lines(c: number, half: number, size: number): number[] {
+		const first = Math.ceil((c - half) / size);
+		const n = Math.min(4096, Math.floor((c + half) / size) - first + 1);
+		const out: number[] = [];
+		for (let i = 0; i < n; i++) out.push((first + i) * size);
+		return out;
+	}
 	function drawGrid() {
 		const v = shownView;
 		if (!box || !last || !v || gridShown.length === 0 || last.bitmap) {
@@ -683,9 +697,9 @@
 		gridSize = { w: W, h: H };
 		gridPaths = gridShown.map((step, k) => {
 			const d: string[] = [];
-			for (let u = Math.ceil((cu - halfU) / step.size) * step.size; u <= cu + halfU; u += step.size) d.push(`M${r(xOf(u))} 0V${H}`);
+			for (const u of lines(cu, halfU, step.size)) d.push(`M${r(xOf(u))} 0V${H}`);
 			// Regions are columns: a side view has no region lines up y.
-			if (flat || step.name !== 'regions') for (let t = Math.ceil((cv - halfV) / step.size) * step.size; t <= cv + halfV; t += step.size) d.push(`M0 ${r(yOf(t))}H${W}`);
+			if (flat || step.name !== 'regions') for (const t of lines(cv, halfV, step.size)) d.push(`M0 ${r(yOf(t))}H${W}`);
 			return { d: d.join(''), faint: k === 0 && gridShown.length > 1 };
 		});
 	}
@@ -917,7 +931,8 @@
 		const iy = Math.floor(at.py);
 		if (ix < 0 || iy < 0 || ix >= last.width || iy >= last.height) return '';
 		const v = last.values[iy * last.width + ix];
-		const coord = coords(toWorld(at.px, at.py));
+		// Per block, the value is the block at the pixel's centre, which the pointer may be just past.
+		const coord = coords(blockValues && mode === 'density' ? toWorld(ix + 0.5, iy + 0.5) : toWorld(at.px, at.py));
 		return Number.isNaN(v) ? coord : `${coord} · ${show(v)}`;
 	});
 	/** The value under the pointer, for the scale's marker. */
