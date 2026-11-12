@@ -5,9 +5,11 @@
 		/** The pinned output path, or null when the preview follows the cursor. */
 		pinned: string | null;
 		onclick: () => void;
+		/** What a pinned button says, in place of the pinned output's name. */
+		label?: string;
 		class?: string;
 	}
-	let { pinned, onclick, class: cls = '' }: Props = $props();
+	let { pinned, onclick, label, class: cls = '' }: Props = $props();
 </script>
 
 <button
@@ -21,7 +23,7 @@
 		<path d="M8 9.5v5" stroke-linecap="round" />
 	</svg>
 	{#if pinned}
-		<span class="truncate">Pinned {shows(pinned)?.id}</span>
+		<span class="truncate">{label ?? `Pinned ${shows(pinned)?.id}`}</span>
 	{:else}
 		<span>Pin</span>
 	{/if}

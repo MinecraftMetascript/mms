@@ -1,9 +1,9 @@
 <script lang="ts">
 	import Logo from '#lib/components/Logo.svelte';
-	import { onMount, tick } from 'svelte';
+	import { onMount, tick, untrack } from 'svelte';
 	import { asset, resolve } from '$app/paths';
 	import { LSPPlugin } from '@codemirror/lsp-client';
-	import { ChangeSet, EditorSelection, type Text } from '@codemirror/state';
+	import { EditorSelection } from '@codemirror/state';
 	import { EditorView } from '@codemirror/view';
 	import Editor from '#lib/editor/Editor.svelte';
 	import Sidebar from '#lib/components/Sidebar.svelte';
@@ -20,6 +20,7 @@
 	import AboutDialog from '#lib/components/AboutDialog.svelte';
 	import BuiltinViewer from '#lib/components/BuiltinViewer.svelte';
 	import { requestPersistence } from '#lib/project/store.ts';
+	import { applySplineEdits, followEdit, readSpline, trackPos, type SplineTrack } from '#lib/engine/spline.ts';
 	import Dropdown from '#lib/components/Dropdown.svelte';
 	import { fixAllKeys, formatKeys, mod, quickFixKeys } from '#lib/editor/shortcuts.ts';
 	import { bookPageAt, PinButton, PreviewPane, shows, type SplineAt, type SplineEdit } from '@mms/preview';
@@ -124,9 +125,10 @@
 		cursor = { uri: uriOf(project.active), line: l.number - 1, character: head - l.from };
 	}
 	const cursorExt = EditorView.updateListener.of((u) => {
-		if (u.docChanged && splineSince && u.startState.doc === splineNow) {
-			splineSince = splineSince.compose(u.changes);
-			splineNow = u.state.doc;
+		if (u.docChanged) {
+			const uri = uriOf(project.active);
+			if (cursorTrack) followEdit(cursorTrack, uri, u);
+			for (const t of pinnedTracks.values()) followEdit(t, uri, u);
 		}
 		if (u.selectionSet || u.docChanged) trackCursor(u.view);
 	});
@@ -162,10 +164,28 @@
 		return t ? { path: t.kind, text: JSON.stringify(JSON.parse(t.text), null, 2), uri: t.uri, range: t.range } : null;
 	});
 
-	// A pinned output keeps the Preview tab on one declaration while the
-	// cursor moves elsewhere; it still redraws as the pack changes. The JSON
-	// tab keeps following the cursor.
-	let pinned = $state<string | null>(null);
+	// The Preview tab shows one pane, or two split side by side or
+	// stacked. A pane follows the cursor, or is pinned: it keeps showing one
+	// declaration, and the spline it showed, while the cursor moves
+	// elsewhere, and still redraws as the pack changes. The JSON tab keeps
+	// following the cursor.
+	interface Pane {
+		id: number;
+		pinned: boolean;
+		/** The pinned output; null for a spline pinned outside of one. */
+		path: string | null;
+		/** The pinned spline, read again after each analysis. */
+		spline: SplineAt | null;
+		/** The book page to open. */
+		page: number;
+	}
+	const newPane = (id: number): Pane => ({ id, pinned: false, path: null, spline: null, page: 0 });
+	let panes = $state<Pane[]>([newPane(0)]);
+	let nextPaneId = 1;
+	let splitDir = $state<'row' | 'column'>('row');
+	// The first pane's share of the split, in percent.
+	let splitAt = $state(50);
+	let splitBox = $state<HTMLElement | null>(null);
 	// The Tests tab shows how many tests fail, so a failure is seen from the other tabs.
 	const testsLabel = $derived.by(() => {
 		const failed = engine?.tests.filter((t) => !t.pass).length ?? 0;
@@ -224,67 +244,115 @@
 	});
 	// The density function spline at the cursor opens the spline editor in
 	// the Preview tab; its edits go to the source through the editor, so
-	// they can be undone.
-	let spline = $state<SplineAt | null>(null);
-	// The text the shown spline's ranges are in, and the edits made to it
-	// since (splineNow is the text after them), so an edit made before the
-	// spline is read again still lands on the right numbers.
-	let splineDoc: Text | null = null;
-	let splineSince: ChangeSet | null = null;
-	let splineNow: Text | null = null;
+	// they can be undone. cursorTrack, and pinnedTracks for each pinned
+	// pane's spline by pane id, map the spline's ranges to the text now.
+	// They change in place as the text changes, so are not $state.
+	let cursorSpline = $state<SplineAt | null>(null);
+	let cursorTrack: SplineTrack | null = null;
+	const pinnedTracks = new Map<number, SplineTrack>();
+	const following = $derived(panes.some((p) => !p.pinned));
 	$effect(() => {
 		const c = cursor;
 		void engine?.output; // a new analysis
-		if (rightTab !== 'preview' || pinned || !engine || !c) {
-			spline = null;
+		const v = view;
+		if (rightTab !== 'preview' || !following || !engine || !c || !v) {
+			cursorSpline = null;
 			return;
 		}
 		let live = true;
-		// The server answers about the text it last saw, which the editor
-		// may have moved past; its changes since are kept to map the ranges.
-		const v = view;
-		const plugin = v && LSPPlugin.get(v);
-		if (!v || !plugin) return;
-		const doc = v.state.doc;
-		const synced = plugin.syncedDoc;
-		const since = plugin.unsyncedChanges;
-		// The cursor is in the editor's text; the server needs it in its own.
-		const head = since.invertedDesc.mapPos(v.state.selection.main.head);
-		const line = synced.lineAt(Math.min(head, synced.length));
-		void engine.spline(c.uri, { line: line.number - 1, character: head - line.from }).then((x) => {
-			if (!live || v.state.doc !== doc) return;
-			spline = x;
-			splineDoc = synced;
-			splineSince = since;
-			splineNow = doc;
+		void readSpline(engine, c.uri, v.state.selection.main.head).then((r) => {
+			if (!live || !r) return;
+			cursorSpline = r.spline;
+			cursorTrack = r.track;
 		});
 		return () => {
 			live = false;
 		};
 	});
-	function editSpline(edits: SplineEdit[]) {
-		const v = view;
-		const doc = splineDoc;
-		const since = splineSince;
-		if (!v || !doc || !since || v.state.doc !== splineNow) return;
-		const pos = (p: SplineEdit['range']['start']) => {
-			const line = doc.line(Math.min(p.line + 1, doc.lines));
-			return since.mapPos(Math.min(line.from + p.character, line.to));
-		};
-		v.dispatch({ changes: edits.map((e) => ({ from: pos(e.range.start), to: pos(e.range.end), insert: e.newText })), userEvent: 'input' });
+	// A pinned spline is read again, where it was pinned, after each analysis.
+	let pinnedReads = 0;
+	const latestRead = new Map<number, number>();
+	$effect(() => {
+		void engine?.output; // a new analysis
+		const e = engine;
+		if (rightTab !== 'preview' || !e) return;
+		for (const p of panes) {
+			if (!p.pinned) continue;
+			const id = p.id;
+			untrack(() => {
+				const track = pinnedTracks.get(id);
+				const pos = track && trackPos(e, track);
+				if (!track || pos === null || pos === undefined) return;
+				const seq = ++pinnedReads;
+				latestRead.set(id, seq);
+				void readSpline(e, track.uri, pos).then((r) => {
+					const pane = panes.find((x) => x.id === id);
+					if (!r || !pane?.pinned || latestRead.get(id) !== seq || !pinnedTracks.has(id)) return;
+					pinnedTracks.set(id, r.track);
+					pane.spline = r.spline;
+				});
+			});
+		}
+	});
+	function editSpline(p: Pane, edits: SplineEdit[]) {
+		const track = p.pinned ? pinnedTracks.get(p.id) : cursorTrack;
+		if (engine && track) applySplineEdits(engine, track, edits);
 	}
-	const previewPath = $derived(pinned ?? selectedOutput);
-	const pinnable = $derived(shows(previewPath, engine?.outputItems, engine?.outputTexts));
-	function togglePin() {
-		pinned = pinned ? null : previewPath && shows(previewPath, engine?.outputItems, engine?.outputTexts) ? previewPath : null;
+	const panePath = (p: Pane) => (p.pinned ? p.path : selectedOutput);
+	const paneSpline = (p: Pane) => (p.pinned ? p.spline : cursorSpline);
+	const pinnable = $derived(!!cursorSpline || !!shows(selectedOutput, engine?.outputItems, engine?.outputTexts));
+	function pin(p: Pane) {
+		if (!pinnable) return;
+		p.pinned = true;
+		p.path = shows(selectedOutput, engine?.outputItems, engine?.outputTexts) ? selectedOutput : null;
+		p.spline = cursorSpline;
+		if (cursorSpline && cursorTrack) pinnedTracks.set(p.id, { ...cursorTrack });
+	}
+	function unpin(p: Pane) {
+		p.pinned = false;
+		p.path = null;
+		p.spline = null;
+		pinnedTracks.delete(p.id);
+	}
+	const togglePin = (p: Pane) => (p.pinned ? unpin(p) : pin(p));
+	const pinLabel = (p: Pane) => (p.pinned && !p.path ? 'Pinned spline' : undefined);
+	// A second pane shows what the first does, pinned, so the first can go
+	// on following the cursor; next to a pinned first pane it follows the cursor.
+	function split() {
+		const p = newPane(nextPaneId++);
+		panes.push(p);
+		const added = panes[panes.length - 1];
+		if (!panes[0].pinned) pin(added);
+	}
+	function closePane(p: Pane) {
+		pinnedTracks.delete(p.id);
+		panes = panes.filter((x) => x.id !== p.id);
+	}
+	function resizeSplit(e: PointerEvent) {
+		const handle = e.currentTarget as HTMLElement;
+		handle.setPointerCapture(e.pointerId);
+		const move = (m: PointerEvent) => {
+			const r = splitBox?.getBoundingClientRect();
+			if (!r) return;
+			const at = splitDir === 'row' ? (m.clientX - r.left) / r.width : (m.clientY - r.top) / r.height;
+			splitAt = Math.round(Math.min(85, Math.max(15, at * 100)));
+		};
+		const up = () => {
+			handle.removeEventListener('pointermove', move);
+			handle.removeEventListener('pointerup', up);
+		};
+		handle.addEventListener('pointermove', move);
+		handle.addEventListener('pointerup', up);
 	}
 	// A book opens on the page the cursor is in, and stays there while
 	// the cursor is outside its text.
-	let bookPage = $state(0);
 	$effect(() => {
-		const it = engine?.outputItems.find((it) => itemKey(it) === previewPath);
-		const at = it && cursor ? bookPageAt(it.pages, cursor.uri, cursor.line) : null;
-		if (at !== null) bookPage = at;
+		for (const p of panes) {
+			const path = panePath(p);
+			const it = engine?.outputItems.find((it) => itemKey(it) === path);
+			const at = it && cursor ? bookPageAt(it.pages, cursor.uri, cursor.line) : null;
+			if (at !== null && untrack(() => p.page) !== at) p.page = at;
+		}
 	});
 
 	async function reveal(uri: string, range: Diagnostic['range']) {
@@ -308,7 +376,7 @@
 	function selectOutput(path: string) {
 		selectedOutput = path;
 		// A pinned preview stays on screen; otherwise show JSON for outputs with no preview.
-		if (!pinned && !shows(path, engine?.outputItems, engine?.outputTexts)) rightTab = 'json';
+		if (!panes.some((p) => p.pinned) && !shows(path, engine?.outputItems, engine?.outputTexts)) rightTab = 'json';
 	}
 
 	// Opens data as a new saved project; the open one stays saved.
@@ -320,7 +388,8 @@
 	}
 	// Another project opened: forget this one's preview state.
 	function onswitch() {
-		pinned = null;
+		for (const p of panes) unpin(p);
+		cursorTrack = null;
 		selectedOutput = null;
 		cursor = null;
 	}
@@ -580,28 +649,80 @@
 						onclick={() => (rightTab = id as typeof rightTab)}>{label}</button
 					>
 				{/each}
-				{#if rightTab === 'preview' && (pinned || pinnable)}
-					<PinButton class="ml-auto" {pinned} onclick={togglePin} />
+				{#if rightTab === 'preview'}
+					<div class="ml-auto flex min-w-0 items-center">
+						{#if panes.length === 1 && (panes[0].pinned || pinnable)}
+							<PinButton pinned={panes[0].pinned ? (panes[0].path ?? '') : null} label={pinLabel(panes[0])} onclick={() => togglePin(panes[0])} />
+						{/if}
+						{#if panes.length === 1}
+							<button class="shrink-0 px-2 py-1 text-muted hover:text-ink" onclick={split} aria-label="Split the preview" title="Split: show two previews at once, such as a pinned one and the one at the cursor">
+								<svg viewBox="0 0 16 16" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true">
+									<rect x="1.5" y="2.5" width="13" height="11" rx="1.5" />
+									<path d="M8 2.5v11" />
+								</svg>
+							</button>
+						{:else}
+							<button
+								class="shrink-0 px-2 py-1 text-muted hover:text-ink"
+								onclick={() => (splitDir = splitDir === 'row' ? 'column' : 'row')}
+								aria-label={splitDir === 'row' ? 'Stack the previews' : 'Put the previews side by side'}
+								title={splitDir === 'row' ? 'Stack the previews' : 'Put the previews side by side'}
+							>
+								<svg viewBox="0 0 16 16" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true">
+									<rect x="1.5" y="2.5" width="13" height="11" rx="1.5" />
+									<path d={splitDir === 'row' ? 'M1.5 8h13' : 'M8 2.5v11'} />
+								</svg>
+							</button>
+						{/if}
+					</div>
 				{/if}
 			</div>
 			<div class="min-h-0 flex-1">
 				{#if engine}
-					<div class="h-full" class:hidden={rightTab !== 'preview'}>
-						<PreviewPane
-							output={engine.output}
-							items={engine.outputItems}
-							texts={engine.outputTexts}
-							assets={engine.outputAssets}
-							{textures}
-							{structures}
-							page={bookPage}
-							path={previewPath}
-							{pinned}
-							onunpin={() => (pinned = null)}
-							createWorker={() => new PreviewWorker()}
-							{spline}
-							onsplineedit={editSpline}
-						/>
+					<div class="flex h-full min-h-0 {splitDir === 'row' ? 'flex-row' : 'flex-col'}" class:hidden={rightTab !== 'preview'} bind:this={splitBox}>
+						{#each panes as p, i (p.id)}
+							{#if i > 0}
+								<!-- svelte-ignore a11y_no_static_element_interactions -->
+								<div
+									role="separator"
+									aria-orientation={splitDir === 'row' ? 'vertical' : 'horizontal'}
+									aria-label="Resize the previews"
+									class="shrink-0 touch-none bg-line hover:bg-accent {splitDir === 'row' ? 'w-1 cursor-col-resize' : 'h-1 cursor-row-resize'}"
+									onpointerdown={resizeSplit}
+								></div>
+							{/if}
+							<div class="flex min-h-0 min-w-0 basis-0 flex-col" style:flex-grow={panes.length > 1 ? (i === 0 ? splitAt : 100 - splitAt) : 1} data-testid="preview-pane">
+								{#if panes.length > 1}
+									<div class="flex items-center border-b border-line text-xs">
+										{#if p.pinned || pinnable}
+											<PinButton pinned={p.pinned ? (p.path ?? '') : null} label={pinLabel(p)} onclick={() => togglePin(p)} />
+										{/if}
+										<button class="ml-auto shrink-0 px-2 py-1 text-muted hover:text-ink" onclick={() => closePane(p)} aria-label="Close this preview" title="Close this preview">
+											<svg viewBox="0 0 16 16" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true">
+												<path d="M4 4l8 8M12 4l-8 8" />
+											</svg>
+										</button>
+									</div>
+								{/if}
+								<div class="min-h-0 flex-1">
+									<PreviewPane
+										output={engine.output}
+										items={engine.outputItems}
+										texts={engine.outputTexts}
+										assets={engine.outputAssets}
+										{textures}
+										{structures}
+										page={p.page}
+										path={panePath(p)}
+										pinned={p.pinned ? p.path : null}
+										onunpin={() => unpin(p)}
+										createWorker={() => new PreviewWorker()}
+										spline={paneSpline(p)}
+										onsplineedit={(edits: SplineEdit[]) => editSpline(p, edits)}
+									/>
+								</div>
+							</div>
+						{/each}
 					</div>
 					<div class="h-full" class:hidden={rightTab !== 'json'}>
 						<JsonView file={selectedFile} onsource={(f: OutputFile) => f.uri && f.range && reveal(f.uri, f.range)} />
