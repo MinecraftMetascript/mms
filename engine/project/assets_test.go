@@ -326,7 +326,7 @@ func TestAssetsTextureAnimation(t *testing.T) {
 	}
 	src := `Model block/lamp {
   parent = block/cube_all
-  textures = { all = Texture("art/lamp.png", animation = { frametime = 4, frames = [0, 1, { index = 3, time = 8 }, 4] }) }
+  textures = { all = Texture("art/lamp.png", animation = { frametime = 4, frames = [0, 1, { index = 3, time = 8 }, (4)] }) }
 }
 Model block/odd { parent = block/cube_all, textures = { all = Texture("art/odd.png", animation = {}) } }
 Model block/strip { parent = block/cube_all, textures = { all = Texture("art/strip.png") } }
@@ -439,6 +439,13 @@ func TestModelMixedAtlas(t *testing.T) {
 	files := fstest.MapFS{"art/icon.png": {Data: pngBytes}, "art/a.png": {Data: pngBytes}}
 	src := `Model block/mixed { parent = block/cube_column, textures = { side = block/oak_log, end = item/stick } }
 Model block/fine { parent = block/cube_column, textures = { side = block/oak_log, end = Texture("art/a.png") } }
+Model block/half { parent = block/cube_column, textures = { side = block/oak_log } }
+Model block/child { parent = block/half, textures = { end = item/apple } }
+Model block/spare {
+  textures = { a = block/stone, unused = item/stick }
+  elements = [{ from = [0, 0, 0], to = [16, 16, 16], faces = { up = { texture = "#a" } } }]
+}
+Model block/custom { parent = block/cube_all, textures = { all = Texture("art/a.png", "minecraft:custom/a") } }
 `
 	_, r := assetProject(t, files, src)
 	var got []string
@@ -447,7 +454,17 @@ Model block/fine { parent = block/cube_column, textures = { side = block/oak_log
 			got = append(got, d.Message)
 		}
 	}
-	if len(got) != 1 || !strings.HasPrefix(got[0], "'minecraft:item/stick' is only in the items atlas, but 'minecraft:block/oak_log'") {
+	if len(got) != 2 || !strings.HasPrefix(got[0], "'minecraft:item/stick' is only in the items atlas, but 'minecraft:block/oak_log'") ||
+		!strings.HasPrefix(got[1], "'minecraft:item/apple' is only in the items atlas, but 'minecraft:block/oak_log'") {
 		t.Errorf("got %q", got)
+	}
+	n := 0
+	for _, d := range r.Diagnostics("main.mms") {
+		if d.Code == "lint/texture-outside-atlas" && strings.Contains(d.Message, "'minecraft:custom/a'") {
+			n++
+		}
+	}
+	if n != 1 {
+		t.Errorf("want a texture-outside-atlas warning on minecraft:custom/a, got %d", n)
 	}
 }

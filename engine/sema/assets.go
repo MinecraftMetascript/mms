@@ -416,7 +416,7 @@ func (c *Checker) textureChecks(call *syntax.Call, a *Asset, meta []*syntax.Arg,
 // frameIndexChecks warns about frames entries past the last frame: the
 // game then leaves the texture still.
 func (c *Checker) frameIndexChecks(anim syntax.Expr, n int, src string) {
-	o, ok := anim.(*syntax.Object)
+	o, ok := unparen(anim).(*syntax.Object)
 	if !ok {
 		return
 	}
@@ -425,17 +425,17 @@ func (c *Checker) frameIndexChecks(anim syntax.Expr, n int, src string) {
 		if !ok || f.Key.Text != "frames" {
 			continue
 		}
-		l, ok := f.Value.(*syntax.List)
+		l, ok := unparen(f.Value).(*syntax.List)
 		if !ok {
 			continue
 		}
 		for _, el := range l.Elems {
-			idx := el
-			if eo, ok := el.(*syntax.Object); ok {
+			idx := unparen(el)
+			if eo, ok := idx.(*syntax.Object); ok {
 				idx = nil
 				for _, it := range eo.Body.Items {
 					if ff, ok := it.(*syntax.FieldStmt); ok && ff.Key.Text == "index" {
-						idx = ff.Value
+						idx = unparen(ff.Value)
 					}
 				}
 			}
@@ -565,4 +565,15 @@ func (c *Checker) stripAssetExt(p, reg string, e syntax.Expr) string {
 		return bare
 	}
 	return p
+}
+
+// unparen strips the parentheses around an expression: (4) is 4.
+func unparen(e syntax.Expr) syntax.Expr {
+	for {
+		p, ok := e.(*syntax.Paren)
+		if !ok {
+			return e
+		}
+		e = p.X
+	}
 }

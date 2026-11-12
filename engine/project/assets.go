@@ -272,32 +272,72 @@ func (r *Result) modelAtlasesOf(id string, file bool) []string {
 	return out
 }
 
-// lintMixedAtlas reports a model whose textures only come from different
-// atlases, one only in the blocks atlas and another only in the items
-// atlas: the game cannot draw a model from two atlases.
+// lintMixedAtlas reports a model whose faces show textures from
+// different atlases, one only in the blocks atlas and another only in the
+// items atlas: the game cannot draw a model from two atlases. The
+// textures are those its parent chain resolves the faces' slots to,
+// inherited ones included; slots no face shows do not count. When the
+// chain reaches a model MMS does not know, the model's own textures are
+// checked instead.
 func lintMixedAtlas(l *lintRun) {
+	provided := l.r.providedAssets()
 	for _, d := range l.r.Order {
-		if d.Kind.Resource != "model" || hasErrors(d.Diags) {
+		if d.Kind.Resource != "model" || hasErrors(d.Diags) || d.D == nil {
 			continue
 		}
 		type use struct {
 			sp syntax.Span
 			id string
 		}
-		only := map[string][]use{}
+		// Where the model itself writes each texture id, first use first.
+		own := map[string]syntax.Span{}
+		var ownIDs []use
 		for n, in := range d.Info {
 			if !in.ModelTexture || in.ID == "" {
 				continue
 			}
-			if as := l.r.modelAtlasesOf(in.ID, in.Asset != nil); len(as) == 1 {
-				only[as[0]] = append(only[as[0]], use{n.Span(), in.ID})
+			if sp, ok := own[in.ID]; !ok || n.Span().Start < sp.Start {
+				own[in.ID] = n.Span()
+			}
+			ownIDs = append(ownIDs, use{n.Span(), in.ID})
+		}
+		var shown []use
+		if slots, known := l.r.ModelSlots(d); known {
+			at := d.D.Name.Sp
+			if f := modelField(d.D, "textures"); f != nil {
+				at = f.Key.Sp
+			}
+			seen := map[string]bool{}
+			for _, sl := range slots {
+				if !sl.Used || sl.Filled == "" || seen[sl.Filled] {
+					continue
+				}
+				seen[sl.Filled] = true
+				sp, ok := own[sl.Filled]
+				if !ok {
+					sp = at // inherited from a parent
+				}
+				shown = append(shown, use{sp, sl.Filled})
+			}
+		} else {
+			shown = ownIDs
+		}
+		only := map[string][]use{}
+		for _, u := range shown {
+			if as := l.r.modelAtlasesOf(u.id, provided["Texture|"+u.id]); len(as) == 1 {
+				only[as[0]] = append(only[as[0]], u)
 			}
 		}
 		if len(only["blocks"]) == 0 || len(only["items"]) == 0 {
 			continue
 		}
 		for _, us := range only {
-			sort.Slice(us, func(i, j int) bool { return us[i].sp.Start < us[j].sp.Start })
+			sort.Slice(us, func(i, j int) bool {
+				if us[i].sp.Start != us[j].sp.Start {
+					return us[i].sp.Start < us[j].sp.Start
+				}
+				return us[i].id < us[j].id
+			})
 		}
 		// Report the side with fewer textures, against the other's first.
 		few, many := "items", "blocks"
@@ -330,7 +370,9 @@ func lintTextureAtlas(l *lintRun) {
 		}
 		var hits []hit
 		for n, in := range d.Info {
-			if !in.ModelTexture || in.ID == "" || strings.HasPrefix(in.ID, "minecraft:") || covered(in.ID, in.Asset != nil) {
+			// Vanilla's own textures are stitched; a file Texture(...)
+			// writes into minecraft, such as minecraft:custom/foo, may not be.
+			if !in.ModelTexture || in.ID == "" || (in.Asset == nil && strings.HasPrefix(in.ID, "minecraft:")) || covered(in.ID, in.Asset != nil) {
 				continue
 			}
 			ns, p, _ := strings.Cut(in.ID, ":")
