@@ -212,7 +212,6 @@ func (c *Checker) assetCall(e syntax.Expr, v tview) jsonv.Value {
 		return nil
 	}
 	model := name == "Texture" && c.resource == "model"
-	ns := c.NS
 	if idName == "" {
 		idName = assetName(src)
 		if model {
@@ -223,18 +222,8 @@ func (c *Checker) assetCall(e syntax.Expr, v tview) jsonv.Value {
 			idName = "block/" + idName
 		}
 	} else {
-		idName = c.stripAssetExt(idName, h.registries[0], nameArg)
-		// An id name may name another namespace, such as
-		// "minecraft:block/stone", to replace that texture.
-		if n, p, ok := strings.Cut(idName, ":"); ok && name == "Texture" {
-			if !assetNamePattern.MatchString(n) || strings.Contains(n, "/") || n == "." || n == ".." {
-				c.errorf("mms/invalid-name", nameSp, "a namespace is lowercase letters, digits, '_', '-' and '.'")
-				return nil
-			}
-			ns, idName = n, p
-		}
-		if !assetNamePattern.MatchString(idName) || strings.Contains(idName, "..") {
-			c.errorf("mms/invalid-name", nameSp, "an id name is lowercase letters, digits, '_', '-', '.' and '/'%s", map[bool]string{true: ", after an optional namespace such as minecraft:", false: ""}[name == "Texture"])
+		if idName = c.stripAssetExt(idName, h.registries[0], nameArg); !assetNamePattern.MatchString(idName) || strings.Contains(idName, "..") {
+			c.errorf("mms/invalid-name", nameSp, "an id name is lowercase letters, digits, '_', '-', '.' and '/'")
 			return nil
 		}
 	}
@@ -255,6 +244,7 @@ func (c *Checker) assetCall(e syntax.Expr, v tview) jsonv.Value {
 		c.errorf("mms/asset", srcSp, "'%s' is not %s", src, h.what)
 		return nil
 	}
+	ns := c.NS
 	full := ns + ":" + idName
 	in.ID = full
 	in.ModelTexture = model

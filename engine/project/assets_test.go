@@ -322,7 +322,7 @@ func TestAssetsTextureAnimation(t *testing.T) {
 		"art/strip.png":       {Data: pngOf(16, 48)},
 		"art/glow.png":        {Data: pngOf(16, 32)},
 		"art/glow.png.mcmeta": {Data: []byte(`{"animation": {"frametime": 3, "interpolate": true}}`)},
-		"art/stone.png":       {Data: pngOf(16, 16)},
+		"art/soft.png":        {Data: pngOf(16, 16)},
 	}
 	src := `Model block/lamp {
   parent = block/cube_all
@@ -331,7 +331,7 @@ func TestAssetsTextureAnimation(t *testing.T) {
 Model block/odd { parent = block/cube_all, textures = { all = Texture("art/odd.png", animation = {}) } }
 Model block/strip { parent = block/cube_all, textures = { all = Texture("art/strip.png") } }
 Model block/glow { parent = block/cube_all, textures = { all = Texture("art/glow.png") } }
-Model block/stone_again { parent = block/cube_all, textures = { all = Texture("art/stone.png", "minecraft:block/stone", texture = { blur = true }) } }
+Model block/soft { parent = block/cube_all, textures = { all = Texture("art/soft.png", texture = { blur = true }) } }
 `
 	_, r := assetProject(t, files, src)
 	var got []string
@@ -371,14 +371,8 @@ Model block/stone_again { parent = block/cube_all, textures = { all = Texture("a
 	if _, ok := paths["assets/demo/textures/block/strip.png.mcmeta"]; ok {
 		t.Error("strip has no animation, so no mcmeta")
 	}
-	if _, ok := paths["assets/minecraft/textures/block/stone.png"]; !ok {
-		t.Error("no replaced vanilla texture")
-	}
-	if s := paths["assets/minecraft/textures/block/stone.png.mcmeta"]; s != `{"texture":{"blur":true}}` {
-		t.Errorf("stone mcmeta: %q", s)
-	}
-	if s := paths["assets/demo/models/block/stone_again.json"]; !strings.Contains(s, `"all":"minecraft:block/stone"`) {
-		t.Errorf("stone model: %s", s)
+	if s := paths["assets/demo/textures/block/soft.png.mcmeta"]; s != `{"texture":{"blur":true}}` {
+		t.Errorf("soft mcmeta: %q", s)
 	}
 }
 
@@ -445,7 +439,6 @@ Model block/spare {
   textures = { a = block/stone, unused = item/stick }
   elements = [{ from = [0, 0, 0], to = [16, 16, 16], faces = { up = { texture = "#a" } } }]
 }
-Model block/custom { parent = block/cube_all, textures = { all = Texture("art/a.png", "minecraft:custom/a") } }
 `
 	_, r := assetProject(t, files, src)
 	var got []string
@@ -457,14 +450,5 @@ Model block/custom { parent = block/cube_all, textures = { all = Texture("art/a.
 	if len(got) != 2 || !strings.HasPrefix(got[0], "'minecraft:item/stick' is only in the items atlas, but 'minecraft:block/oak_log'") ||
 		!strings.HasPrefix(got[1], "'minecraft:item/apple' is only in the items atlas, but 'minecraft:block/oak_log'") {
 		t.Errorf("got %q", got)
-	}
-	n := 0
-	for _, d := range r.Diagnostics("main.mms") {
-		if d.Code == "lint/texture-outside-atlas" && strings.Contains(d.Message, "'minecraft:custom/a'") {
-			n++
-		}
-	}
-	if n != 1 {
-		t.Errorf("want a texture-outside-atlas warning on minecraft:custom/a, got %d", n)
 	}
 }

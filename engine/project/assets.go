@@ -370,9 +370,7 @@ func lintTextureAtlas(l *lintRun) {
 		}
 		var hits []hit
 		for n, in := range d.Info {
-			// Vanilla's own textures are stitched; a file Texture(...)
-			// writes into minecraft, such as minecraft:custom/foo, may not be.
-			if !in.ModelTexture || in.ID == "" || (in.Asset == nil && strings.HasPrefix(in.ID, "minecraft:")) || covered(in.ID, in.Asset != nil) {
+			if !in.ModelTexture || in.ID == "" || strings.HasPrefix(in.ID, "minecraft:") || covered(in.ID, in.Asset != nil) {
 				continue
 			}
 			ns, p, _ := strings.Cut(in.ID, ":")

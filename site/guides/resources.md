@@ -242,8 +242,6 @@ Each call stands for the id the file gets in your namespace: its base name, lowe
 
 Inside the quotes, completion lists the project's files of the helper's type, in VS Code and the web editor. A path to a file that is not there is an error.
 
-An id name with a namespace replaces another pack's texture: `Texture("art/stone.png", "minecraft:block/stone")` copies the file to `assets/minecraft/textures/block/stone.png`, so every vanilla model that shows stone shows it, with no block state or model of your own.
-
 ### Animated textures
 
 A texture's `.png.mcmeta` file is written from named arguments of `Texture`, one for each of the file's sections:
