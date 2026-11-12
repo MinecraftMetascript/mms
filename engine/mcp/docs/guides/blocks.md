@@ -1,6 +1,6 @@
 # Retexturing and remodeling blocks
 
-A pack can change how any vanilla block looks: its textures, and the shape of its model. It cannot change how the block behaves. Collision, the outline you aim at, light, sounds and what drops come from the game's code for each block, and neither a data pack nor a resource pack can change them. This page covers what a pack can change, what it can't, and the usual ways around the limits.
+A pack can change how any vanilla block looks: its textures, and the shape of its model. A new model does not change how the block behaves. Collision, the outline you aim at, light and sounds come from the game's code for each block, and neither a data pack nor a resource pack can change them. What a block drops is the one exception: a data pack can replace its loot table. This page covers what a pack can change, what it can't, and the usual ways around the limits.
 
 ## New textures, same shape
 
@@ -84,7 +84,7 @@ ItemModel crate { model = { type = minecraft:model, model = block/crate } }
 /** Puts a crate on top of the block the player clicked. */
 Function place_crate {
   /setblock ~ ~1 ~ barrier
-  /summon item_display ~ ~1.5 ~ {Tags:["crate"],item:{id:"minecraft:stick",count:1,components:{"minecraft:item_model":"${crate}"}}}
+  /summon item_display ~ ~1 ~ {Tags:["crate"],item:{id:"minecraft:stick",count:1,components:{"minecraft:item_model":"${crate}"}}}
 }
 ```
 
@@ -98,4 +98,5 @@ Entities cost more than blocks, so keep this for things a world holds tens or hu
 | A new shape where the vanilla collision fits | your own `Model` and `BlockState` |
 | Random variety for one block | a weighted list in its `BlockState` |
 | Several looks the player chooses | display entities, or states nothing changes |
+| Different drops | a loot table that replaces the block's, such as `LootTable minecraft:blocks/stone` |
 | A different hitbox or behaviour | not possible from a pack; pick a vanilla block that already has it |
