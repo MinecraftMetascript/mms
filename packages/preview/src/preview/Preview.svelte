@@ -66,6 +66,12 @@
 	const defaultView = (kind: PreviewKind, mode: PreviewMode) => ({ ...defaults[mode === 'biomes' ? 'biomes' : kind] });
 
 	let canvas: HTMLCanvasElement;
+	/**
+	 * The grid, as SVG paths over the image (in CSS pixels, so its lines
+	 * stay thin however coarse the render is), finest step first.
+	 */
+	let gridPaths = $state.raw<{ d: string; faint: boolean }[]>([]);
+	let gridSize = $state.raw({ w: 0, h: 0 });
 	let box: HTMLDivElement;
 	let worker: Worker | null = null;
 	let view = $state<PreviewView>({ ...defaults.density_function });
@@ -97,6 +103,15 @@
 	type Point = { x: number; y: number; z: number };
 	let lock = $state<Point | null>(null);
 	let seq = 0;
+	/**
+	 * How a 2D render was asked for: the view, whether it looks down, and
+	 * CSS pixels per render pixel. Kept per render in flight, so the grid
+	 * lines up with the image shown, not the camera that moved since.
+	 */
+	type SentView = { view: PreviewView; flat: boolean; resolution: number };
+	const sentViews = new Map<number, SentView>();
+	/** How the image on screen was rendered. */
+	let shownView = $state.raw<SentView | null>(null);
 	let lastTarget: string | null = null;
 	let mode = $state<PreviewMode>('density');
 	let biome = $state('minecraft:plains');
@@ -110,6 +125,38 @@
 	const topBlocks = $derived(flat && canDown && mode === 'blocks');
 	/** The side view's y while top-down terrain looks down from the top of the world. */
 	let sideY: number | null = null;
+
+	/** A switch remembered in this browser. */
+	function storedFlag(key: string, fallback: boolean): boolean {
+		try {
+			const v = localStorage.getItem(key);
+			if (v === '1' || v === '0') return v === '1';
+		} catch {
+			// Storage can be unavailable (private windows, some webviews).
+		}
+		return fallback;
+	}
+	function storeFlag(key: string, on: boolean) {
+		try {
+			localStorage.setItem(key, on ? '1' : '0');
+		} catch {
+			// Not remembered; still applies now.
+		}
+	}
+	/** Grid lines over the 2D views: blocks when zoomed in, chunks further out, regions further still. */
+	let grid = $state(storedFlag('mms.preview.grid', false));
+	/** Density sampled at whole block positions, the values the game computes there (see PreviewView.blocks). */
+	let blockValues = $state(storedFlag('mms.preview.blocks', false));
+	function setGrid(on: boolean) {
+		grid = on;
+		storeFlag('mms.preview.grid', on);
+		drawGrid();
+	}
+	function setBlockValues(on: boolean) {
+		blockValues = on;
+		storeFlag('mms.preview.blocks', on);
+		request();
+	}
 
 	// Density colouring: a palette per kind, remembered in this browser, and
 	// the range it spans (the values in view, -1 to 1, or the user's own).
@@ -375,6 +422,8 @@
 			}
 			error = '';
 			last = r;
+			shownView = sentViews.get(r.seq) ?? null;
+			for (const k of sentViews.keys()) if (k < r.seq) sentViews.delete(k);
 			// The worker picks the default size and keeps zooming out within what fills the canvas.
 			if (r.scale && (!isoView.scale || r.scale > isoView.scale)) isoView.scale = r.scale;
 			draw();
@@ -524,6 +573,8 @@
 			const height = Math.max(16, Math.floor(box.clientHeight / resolution));
 			setBusy(true);
 			if (mode === 'iso' || topBlocks) startHelpers();
+			const sent: PreviewView = { ...$state.snapshot(view), down: lookDown && canDown, blocks: mode === 'density' && blockValues };
+			sentViews.set(seq + 1, { view: sent, flat, resolution });
 			worker.postMessage({
 				type: 'render',
 				seq: ++seq,
@@ -532,7 +583,7 @@
 				id: info.id,
 				width,
 				height,
-				view: mode === 'iso' ? $state.snapshot(isoView) : { ...$state.snapshot(view), down: lookDown && canDown },
+				view: mode === 'iso' ? $state.snapshot(isoView) : sent,
 				seed,
 				options: { biome, terrain }
 			} satisfies PreviewRequest);
@@ -586,6 +637,79 @@
 			ctx.arc(px, py, 4, 0, Math.PI * 2);
 			ctx.stroke();
 		}
+		drawGrid();
+	}
+
+	/**
+	 * Grid steps, finest first: blocks, chunks (and 16-block sections up a
+	 * side view), and regions. Each step is drawn once its lines are at
+	 * least minGap CSS pixels apart; the finest drawn is faint, the coarser
+	 * ones stronger over it.
+	 */
+	const gridSteps = [
+		{ size: 1, name: 'blocks' },
+		{ size: 16, name: 'chunks' },
+		{ size: 512, name: 'regions' }
+	];
+	const minGap = 6;
+	/**
+	 * The grid steps drawn over the image on screen (none in the 3D view or
+	 * when off), from the zoom it was rendered at: while a zoom is waiting
+	 * on its render, the grid stays the old image's.
+	 */
+	const gridShown = $derived.by(() => {
+		const shown = shownView;
+		if (!grid || mode === 'iso' || !info || !shown) return [];
+		// CSS pixels per block: a render pixel is `resolution` CSS pixels and view.scale blocks.
+		const perBlock = shown.resolution / shown.view.scale;
+		return gridSteps.filter((s) => s.size * perBlock >= minGap);
+	});
+	$effect(() => {
+		void gridShown;
+		untrack(drawGrid);
+	});
+	/**
+	 * The multiples of size within half of c. Counted, not stepped, so a
+	 * coordinate too large for size to change it (1e20) can't loop forever.
+	 */
+	function lines(c: number, half: number, size: number): number[] {
+		const first = Math.ceil((c - half) / size);
+		const n = Math.min(4096, Math.floor((c + half) / size) - first + 1);
+		const out: number[] = [];
+		for (let i = 0; i < n; i++) out.push((first + i) * size);
+		return out;
+	}
+	function drawGrid() {
+		const shown = shownView;
+		if (!box || !last || !shown || gridShown.length === 0 || last.bitmap) {
+			if (gridPaths.length) gridPaths = [];
+			return;
+		}
+		const W = box.clientWidth;
+		const H = box.clientHeight;
+		const { width: w, height: h } = last;
+		// The image is stretched over the whole box.
+		const sx = W / w;
+		const sy = H / h;
+		const { view: v, flat } = shown;
+		const a = screenAxes(v.facing);
+		// The world plane at the image's centre: u to the right, and v down
+		// the screen (top-down) or up it (a side view, where v is y).
+		const cu = v.x * a.rx + v.z * a.rz;
+		const cv = flat ? v.x * a.dx + v.z * a.dz : v.y;
+		const xOf = (u: number) => ((u - cu) / v.scale + w / 2) * sx;
+		const yOf = (t: number) => ((flat ? t - cv : cv - t) / v.scale + h / 2) * sy;
+		const halfU = (w / 2) * v.scale;
+		const halfV = (h / 2) * v.scale;
+		const r = (n: number) => Math.round(n * 2) / 2;
+		gridSize = { w: W, h: H };
+		gridPaths = gridShown.map((step, k) => {
+			const d: string[] = [];
+			for (const u of lines(cu, halfU, step.size)) d.push(`M${r(xOf(u))} 0V${H}`);
+			// Regions are columns: a side view has no region lines up y.
+			if (flat || step.name !== 'regions') for (const t of lines(cv, halfV, step.size)) d.push(`M0 ${r(yOf(t))}H${W}`);
+			return { d: d.join(''), faint: k === 0 && gridShown.length > 1 };
+		});
 	}
 
 	/**
@@ -815,7 +939,10 @@
 		const iy = Math.floor(at.py);
 		if (ix < 0 || iy < 0 || ix >= last.width || iy >= last.height) return '';
 		const v = last.values[iy * last.width + ix];
-		const coord = coords(toWorld(at.px, at.py));
+		// The pixel's value was sampled at its centre, so name the block there,
+		// not the one under the pointer, which can be its neighbour when a
+		// pixel straddles a block edge.
+		const coord = coords(toWorld(ix + 0.5, iy + 0.5));
 		return Number.isNaN(v) ? coord : `${coord} · ${show(v)}`;
 	});
 	/** The value under the pointer, for the scale's marker. */
@@ -1015,6 +1142,26 @@
 					{/if}
 				</div>
 			{/if}
+			{#if mode !== 'iso'}
+				<div class="flex items-center gap-0.5" role="group" aria-label="Overlays">
+					<button
+						class="rounded border border-line px-1.5 py-0.5 {grid ? 'bg-accent text-white' : 'hover:bg-hover'}"
+						title="Grid lines: blocks when zoomed in, chunks further out, then regions"
+						aria-pressed={grid}
+						onclick={() => setGrid(!grid)}>Grid</button
+					>
+					{#if mode === 'density'}
+						<button
+							class="rounded border border-line px-1.5 py-0.5 {blockValues ? 'bg-accent text-white' : 'hover:bg-hover'}"
+							title={blockValues
+								? 'Each block shows the value the game computes at its position. Click to sample between blocks instead.'
+								: 'Show the value the game computes at each block position (cell interpolation included), instead of sampling between blocks'}
+							aria-pressed={blockValues}
+							onclick={() => setBlockValues(!blockValues)}>Per block</button
+						>
+					{/if}
+				</div>
+			{/if}
 			<label class="ml-auto flex items-center gap-1">
 				Seed
 				<input
@@ -1053,6 +1200,15 @@
 			onpointerleave={() => (hover = null)}
 			onwheel={wheel}
 		></canvas>
+		{#if info && last && gridShown.length && gridPaths.length}
+			<!-- A dark line with a light edge, to read over light and dark images alike. -->
+			<svg class="pointer-events-none absolute inset-0 h-full w-full" viewBox="0 0 {gridSize.w} {gridSize.h}" preserveAspectRatio="none" aria-hidden="true" data-grid={gridShown.map((g) => g.name).join(' ')}>
+				{#each gridPaths as p, k (k)}
+					{#if !p.faint}<path d={p.d} transform="translate(1 1)" stroke="rgba(255,255,255,0.25)" stroke-width="1" fill="none" shape-rendering="crispEdges" />{/if}
+					<path d={p.d} stroke={p.faint ? 'rgba(0,0,0,0.22)' : 'rgba(0,0,0,0.55)'} stroke-width="1" fill="none" shape-rendering="crispEdges" />
+				{/each}
+			</svg>
+		{/if}
 		{#if info && error}
 			<div class="absolute inset-x-3 top-3 rounded border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-200">
 				Preview failed: {error}
@@ -1069,6 +1225,7 @@
 			<div class="pointer-events-none absolute top-2 left-2 rounded bg-black/60 px-2 py-1 font-mono text-[11px] text-white" aria-label="Camera facing">
 				{#if flat && canDown}Looking down, top is {compass(-axes.dx, -axes.dz)} ·{:else}Facing {view.facing} ·{/if}
 				← {compass(-axes.rx, -axes.rz)} {compass(axes.rx, axes.rz)} →
+				{#if gridShown.length}· grid: {gridShown.map((g) => g.name).join(', ')}{/if}
 			</div>
 		{/if}
 		{#if info && last?.notice}

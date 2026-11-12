@@ -1395,6 +1395,37 @@ async function terrainOf(req: RenderRequest): Promise<{ terrain: Terrain; key: s
 	return { terrain, key };
 }
 
+/**
+ * Samples a density view's pixels. At pixel centres by default; with
+ * blocks, at the block each pixel falls in, as the game samples. Zoomed in,
+ * a block covers several pixels and is computed once: a pixel in the same
+ * block as the one to its left or above takes its value (the screen's axes
+ * run along the world's, so a block is a rectangle of pixels).
+ */
+function sampler(width: number, values: Float32Array, blocks: boolean, scale: number) {
+	let lastRow = -1;
+	let row: string[] = [];
+	let above: string[] = [];
+	// At a block or more a pixel, neighbouring pixels never share a block.
+	const reuse = scale < 1;
+	return (px: number, py: number, x: number, y: number, z: number, compute: (x: number, y: number, z: number) => number): number => {
+		if (!blocks) return compute(x, y, z);
+		const bx = Math.floor(x), by = Math.floor(y), bz = Math.floor(z);
+		if (!reuse) return compute(bx, by, bz);
+		if (py !== lastRow) {
+			above = lastRow === py - 1 ? row : [];
+			row = new Array(width);
+			lastRow = py;
+		}
+		const key = `${bx} ${by} ${bz}`;
+		row[px] = key;
+		const i = py * width + px;
+		if (px > 0 && row[px - 1] === key) return values[i - 1];
+		if (above[px] === key) return values[i - width];
+		return compute(bx, by, bz);
+	};
+}
+
 async function render(req: RenderRequest): Promise<Rendered> {
 	const { width, height, view } = req;
 	const seed = seedOf(req.seed);
@@ -1442,10 +1473,11 @@ async function render(req: RenderRequest): Promise<Rendered> {
 			return rs.getOrCreateNoise(id);
 		});
 		const pace = pacer(req);
+		const at = sampler(width, values, !!view.blocks, view.scale);
 		for (let py = 0; py < height; py++) {
 			for (let px = 0; px < width; px++) {
 				await pace();
-				const v = noise.get3D(plane.x(px, py), view.y, plane.z(px, py));
+				const v = at(px, py, plane.x(px, py), view.y, plane.z(px, py), (x, y, z) => noise.get3D(x, y, z));
 				values[py * width + px] = v;
 				track(v);
 			}
@@ -1463,12 +1495,14 @@ async function render(req: RenderRequest): Promise<Rendered> {
 			return df.mapAll(rs.createVisitor(false));
 		});
 		const pace = pacer(req);
+		const at = sampler(width, values, !!view.blocks, view.scale);
+		const compute = (x: number, y: number, z: number) => fn.compute(DensityFunction.context(x, y, z));
 		for (let py = 0; py < height; py++) {
 			const y = view.down ? view.y : plane.y(py);
 			for (let px = 0; px < width; px++) {
 				await pace();
 				const [x, z] = view.down ? [plane.x(px, py), plane.z(px, py)] : plane.at(plane.along(px));
-				const v = fn.compute(DensityFunction.context(x, y, z));
+				const v = at(px, py, x, y, z, compute);
 				values[py * width + px] = v;
 				track(v);
 			}
@@ -1488,6 +1522,8 @@ async function render(req: RenderRequest): Promise<Rendered> {
 	// A side view, or top-down at the camera's y.
 	const yAt = (py: number) => (view.down ? view.y : plane.y(py));
 	const pace = pacer(req);
+	const at = sampler(width, values, !!view.blocks, view.scale);
+	const compute = (x: number, y: number, z: number) => router.finalDensity.compute(DensityFunction.context(x, y, z));
 	for (let py = 0; py < height; py++) {
 		const y = yAt(py);
 		for (let px = 0; px < width; px++) {
@@ -1496,7 +1532,7 @@ async function render(req: RenderRequest): Promise<Rendered> {
 			if (y >= minY && y < maxY) {
 				await pace();
 				const [x, z] = view.down ? [plane.x(px, py), plane.z(px, py)] : plane.at(plane.along(px));
-				v = router.finalDensity.compute(DensityFunction.context(x, y, z));
+				v = at(px, py, x, y, z, compute);
 				track(v);
 			}
 			values[i] = v;

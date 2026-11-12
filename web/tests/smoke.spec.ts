@@ -187,6 +187,55 @@ test('density previews use the picked palette over the range in view', async ({ 
 	expect(errors).toEqual([]);
 });
 
+test('the preview shows a grid, and per-block values when asked', async ({ page }) => {
+	const errors: string[] = [];
+	page.on('pageerror', (e) => errors.push(e.message));
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	await replaceText(page, 'DensityFunction grad = Gradient(axis = y, from_coordinate = 0, to_coordinate = 512, from_value = 0, to_value = 1)\n');
+	await expect(status(page)).toHaveText(/No problems/);
+	await page.locator('.cm-line').first().click();
+	const scale = page.getByLabel('Value scale');
+	await expect(scale).toContainText(/in view/, { timeout: 20_000 });
+	const canvas = page.locator('canvas');
+	const box = (await canvas.boundingBox())!;
+
+	// At the default zoom (2 blocks a pixel) blocks are too close for lines: the grid shows chunks.
+	const grid = page.locator('svg[data-grid]');
+	await expect(grid).toHaveCount(0);
+	await page.getByRole('button', { name: 'Grid', exact: true }).click();
+	await expect(grid).toHaveAttribute('data-grid', 'chunks regions');
+	await expect(page.getByLabel('Camera facing')).toContainText('grid: chunks');
+
+	// Zoomed in, block lines join them.
+	await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+	for (let i = 0; i < 6; i++) await page.mouse.wheel(0, -400);
+	await expect(grid).toHaveAttribute('data-grid', /^blocks chunks/, { timeout: 10_000 });
+
+	// Per block, a pixel takes the value at its block's y: a multiple of 1/512.
+	const readout = () => page.locator('text=/^x -?\\d+, y -?\\d+, z -?\\d+ · /').textContent();
+	await page.mouse.move(box.x + box.width / 2 + 3, box.y + box.height / 2 + 5);
+	await expect.poll(readout).toMatch(/·/);
+	await page.getByRole('button', { name: 'Per block', exact: true }).click();
+	await expect(page.getByRole('button', { name: 'Per block', exact: true })).toHaveAttribute('aria-pressed', 'true');
+	await page.mouse.move(box.x + box.width / 2 + 3, box.y + box.height / 2 + 5);
+	await expect
+		.poll(async () => {
+			const text = (await readout())!;
+			const y = Number(/y (-?\d+)/.exec(text)![1]);
+			return Number(text.split('· ')[1]) === +(y / 512).toFixed(4);
+		}, { timeout: 10_000 })
+		.toBe(true);
+
+	// Both switches are remembered.
+	await page.reload();
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	await page.locator('.cm-line').first().click();
+	await expect(page.getByRole('button', { name: 'Grid', exact: true })).toHaveAttribute('aria-pressed', 'true');
+	await expect(page.getByRole('button', { name: 'Per block', exact: true })).toHaveAttribute('aria-pressed', 'true');
+	expect(errors).toEqual([]);
+});
+
 test('dimensions, noise settings and surface rules preview as terrain', async ({ page }) => {
 	const errors: string[] = [];
 	page.on('pageerror', (e) => errors.push(e.message));
