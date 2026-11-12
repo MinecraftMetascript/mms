@@ -93,7 +93,7 @@ func run(out, vanillaOut, cache string) error {
 		return err
 	}
 	var models map[string]struct {
-		Parent   string            `json:"parent"`
+		Parent   string                     `json:"parent"`
 		Textures map[string]json.RawMessage `json:"textures"`
 		Elements []struct {
 			Faces map[string]struct {

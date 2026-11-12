@@ -13,7 +13,7 @@ import (
 )
 
 var (
-	pathRe   = regexp.MustCompile(`^[a-z_][a-z0-9_]*(/[a-z0-9_./-]+)*$`)
+	pathRe = regexp.MustCompile(`^[a-z_][a-z0-9_]*(/[a-z0-9_./-]+)*$`)
 )
 
 // Decl returns the declaration for one resource file: kind, the id's path
