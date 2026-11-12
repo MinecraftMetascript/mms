@@ -188,19 +188,23 @@ type Result struct {
 	lintMu   sync.Mutex
 	// models are the project's models' slot facts, by full id, built
 	// on first use by modelInfo.
-	modelsOnce sync.Once
-	models     map[string]*spec.ModelInfo
-	relOnce  sync.Once
-	written  map[eval.Origin]eval.Prov // see relate
-	diagOnce sync.Once
-	own      map[string][]syntax.Diagnostic // each file's own problems, see Diagnostics
-	echoes   map[string][]syntax.Diagnostic // problems shown again where they were written
-	lintDone bool
-	lints    map[string][]syntax.Diagnostic
-	symKey   uint64
-	pack     *spec.Pack
-	kinds    *sema.Kinds
-	cfg      Config
+	// atlasSources are the sources of the atlases models read, by
+	// name, built on first use by modelAtlasesOf.
+	atlasOnce    sync.Once
+	atlasSources map[string][]spec.AtlasSource
+	modelsOnce   sync.Once
+	models       map[string]*spec.ModelInfo
+	relOnce      sync.Once
+	written      map[eval.Origin]eval.Prov // see relate
+	diagOnce     sync.Once
+	own          map[string][]syntax.Diagnostic // each file's own problems, see Diagnostics
+	echoes       map[string][]syntax.Diagnostic // problems shown again where they were written
+	lintDone     bool
+	lints        map[string][]syntax.Diagnostic
+	symKey       uint64
+	pack         *spec.Pack
+	kinds        *sema.Kinds
+	cfg          Config
 }
 
 // Decl is the checked form of one declaration.

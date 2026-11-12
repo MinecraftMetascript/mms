@@ -277,7 +277,7 @@ Atlas minecraft:blocks { sources = [{ type = "single", resource = "demo:custom/o
 	for _, d := range r.Diagnostics("main.mms") {
 		if d.Code == "lint/texture-outside-atlas" {
 			atlas = append(atlas, d.Message)
-		} else if d.Severity <= syntax.SeverityWarning && d.Code != "lint/external-asset" {
+		} else if d.Severity <= syntax.SeverityWarning && d.Code != "lint/external-asset" && d.Code != "lint/model-mixed-atlas" {
 			t.Errorf("unexpected: %s: %s", d.Code, d.Message)
 		}
 	}
@@ -432,5 +432,22 @@ Model item/flat { parent = item/generated, textures = { layer0 = item/stick } }
 				t.Errorf("slots: %+v", slots)
 			}
 		}
+	}
+}
+
+func TestModelMixedAtlas(t *testing.T) {
+	files := fstest.MapFS{"art/icon.png": {Data: pngBytes}, "art/a.png": {Data: pngBytes}}
+	src := `Model block/mixed { parent = block/cube_column, textures = { side = block/oak_log, end = item/stick } }
+Model block/fine { parent = block/cube_column, textures = { side = block/oak_log, end = Texture("art/a.png") } }
+`
+	_, r := assetProject(t, files, src)
+	var got []string
+	for _, d := range r.Diagnostics("main.mms") {
+		if d.Code == "lint/model-mixed-atlas" {
+			got = append(got, d.Message)
+		}
+	}
+	if len(got) != 1 || !strings.HasPrefix(got[0], "'minecraft:item/stick' is only in the items atlas, but 'minecraft:block/oak_log'") {
+		t.Errorf("got %q", got)
 	}
 }

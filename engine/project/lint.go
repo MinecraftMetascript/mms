@@ -47,6 +47,8 @@ var Rules = []*Rule{
 		Doc: "A jigsaw block in a structure file that StructureFile(\"...\") includes draws from a pool in the project's namespace that no TemplatePool declares. The game skips the jigsaw, so the structure stops growing there. The quick fix declares the pool."},
 	{ID: "jigsaw-unreachable-target", Severity: syntax.SeverityWarning, all: lintJigsawTarget,
 		Doc: "A jigsaw block whose target no piece of its pool can join: none of the pool's structure files has a jigsaw block with that name, or the pool has no pieces. Only pools whose pieces are all the project's own structure files are checked."},
+	{ID: "model-mixed-atlas", Severity: syntax.SeverityWarning, all: lintMixedAtlas,
+		Doc: "A model with one texture that only the blocks atlas stitches and another that only the items atlas stitches. The game draws a model's faces from a single atlas, so keep its textures under one of textures/block/ and textures/item/. A Texture(...) in a Model goes under textures/block/ unless it is given an id name."},
 	{ID: "model-missing-texture", Severity: syntax.SeverityWarning, all: lintModelTexture,
 		Doc: "A model whose faces show a texture slot, such as `#side`, that nothing in its parent chain fills, so the game draws the missing texture there. The faces are those of the nearest model in the chain with elements: `block/cube_column` uses `#end` and `#side`. Chains that reach a model neither the project nor vanilla has are not checked."},
 	{ID: "overrides-vanilla", Severity: syntax.SeverityInfo, run: lintOverrides,

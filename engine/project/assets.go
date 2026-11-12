@@ -228,45 +228,97 @@ func lintExternalAsset(l *lintRun) {
 // modelAtlases are the atlases the game looks a model's textures up in.
 var modelAtlases = []string{"blocks", "items"}
 
+// modelAtlasesOf returns the atlases among modelAtlases that stitch a
+// sprite named id: from the file Texture(...) copies when file is set,
+// from any file otherwise. Their sources are vanilla's plus those of the
+// project's Atlas blocks and Atlas items declarations.
+func (r *Result) modelAtlasesOf(id string, file bool) []string {
+	r.atlasOnce.Do(func() {
+		r.atlasSources = map[string][]spec.AtlasSource{}
+		for _, a := range modelAtlases {
+			r.atlasSources[a] = append([]spec.AtlasSource(nil), r.pack.Atlases[a]...)
+		}
+		for _, d := range r.Order {
+			if d.Kind.Resource != "atlas" || d.Value == nil {
+				continue
+			}
+			name, ok := strings.CutPrefix(d.ID(), "minecraft:")
+			if !ok || (name != "blocks" && name != "items") {
+				continue
+			}
+			var a struct {
+				Sources []spec.AtlasSource `json:"sources"`
+			}
+			// The declaration checked against the atlas schema, so it decodes.
+			if json.Unmarshal(jsonv.Marshal(d.Value), &a) == nil {
+				r.atlasSources[name] = append(r.atlasSources[name], a.Sources...)
+			}
+		}
+	})
+	var out []string
+	for _, a := range modelAtlases {
+		for _, s := range r.atlasSources[a] {
+			if file {
+				if sp, ok := s.SpriteOf(id); ok && sp == id {
+					out = append(out, a)
+					break
+				}
+			} else if s.Makes(id) {
+				out = append(out, a)
+				break
+			}
+		}
+	}
+	return out
+}
+
+// lintMixedAtlas reports a model whose textures only come from different
+// atlases, one only in the blocks atlas and another only in the items
+// atlas: the game cannot draw a model from two atlases.
+func lintMixedAtlas(l *lintRun) {
+	for _, d := range l.r.Order {
+		if d.Kind.Resource != "model" || hasErrors(d.Diags) {
+			continue
+		}
+		type use struct {
+			sp syntax.Span
+			id string
+		}
+		only := map[string][]use{}
+		for n, in := range d.Info {
+			if !in.ModelTexture || in.ID == "" {
+				continue
+			}
+			if as := l.r.modelAtlasesOf(in.ID, in.Asset != nil); len(as) == 1 {
+				only[as[0]] = append(only[as[0]], use{n.Span(), in.ID})
+			}
+		}
+		if len(only["blocks"]) == 0 || len(only["items"]) == 0 {
+			continue
+		}
+		for _, us := range only {
+			sort.Slice(us, func(i, j int) bool { return us[i].sp.Start < us[j].sp.Start })
+		}
+		// Report the side with fewer textures, against the other's first.
+		few, many := "items", "blocks"
+		if len(only["blocks"]) < len(only["items"]) {
+			few, many = many, few
+		}
+		other := only[many][0]
+		for _, u := range only[few] {
+			msg := fmt.Sprintf("'%s' is only in the %s atlas, but '%s' in this model is only in the %s atlas; the game draws a model from one atlas, so keep its textures under one of textures/block/ or textures/item/", u.id, few, other.id, many)
+			l.out[d.Unit.Path] = append(l.out[d.Unit.Path], syntax.Diagnostic{Code: "lint/" + l.rule.ID, Severity: l.sev, Message: msg, Sp: u.sp})
+		}
+	}
+}
+
 // lintTextureAtlas reports a texture a model names, in a namespace other
 // than minecraft, that neither the blocks nor the items atlas stitches:
 // the game shows the missing texture. The atlases' sources are vanilla's
 // plus those of the project's own Atlas blocks and Atlas items
 // declarations in the minecraft namespace.
 func lintTextureAtlas(l *lintRun) {
-	var sources []spec.AtlasSource
-	for _, a := range modelAtlases {
-		sources = append(sources, l.r.pack.Atlases[a]...)
-	}
-	for _, d := range l.r.Order {
-		if d.Kind.Resource != "atlas" || d.Value == nil {
-			continue
-		}
-		if id := d.ID(); id != "minecraft:blocks" && id != "minecraft:items" {
-			continue
-		}
-		var a struct {
-			Sources []spec.AtlasSource `json:"sources"`
-		}
-		// The declaration checked against the atlas schema, so it decodes.
-		if json.Unmarshal(jsonv.Marshal(d.Value), &a) == nil {
-			sources = append(sources, a.Sources...)
-		}
-	}
-	// covered reports whether a sprite named id is stitched: from the
-	// file Texture(...) copies when file is set, from any file otherwise.
-	covered := func(id string, file bool) bool {
-		for _, s := range sources {
-			if file {
-				if sp, ok := s.SpriteOf(id); ok && sp == id {
-					return true
-				}
-			} else if s.Makes(id) {
-				return true
-			}
-		}
-		return false
-	}
+	covered := func(id string, file bool) bool { return len(l.r.modelAtlasesOf(id, file)) > 0 }
 	for _, d := range l.r.Order {
 		if hasErrors(d.Diags) {
 			continue
@@ -286,7 +338,7 @@ func lintTextureAtlas(l *lintRun) {
 			var fixes []syntax.Fix
 			if in.Asset != nil {
 				msg += fmt.Sprintf(", so name it like %s(\"%s\", \"block/%s\")", in.Asset.Helper, in.Asset.Src, path.Base(p))
-				if call, ok := n.(*syntax.Call); ok && len(call.Args) == 2 {
+				if call, ok := n.(*syntax.Call); ok && len(call.Args) >= 2 && call.Args[1].Name == nil {
 					fixes = []syntax.Fix{{Title: "Name it 'block/" + path.Base(p) + "'", Edits: []syntax.TextEdit{{Sp: call.Args[1].Value.Span(), Text: `"block/` + path.Base(p) + `"`}}}}
 				}
 			} else {
