@@ -185,6 +185,8 @@ NoiseSettings hills {
 
 `Interpolated(terrain, 4, 8)` works the formula out once per 4×8×4 cell and blends between, as vanilla does. It is much faster and smooths out single-block noise. The preview of the `NoiseSettings` shows the finished blocks, with water and the surface rule applied.
 
+To see the cells, zoom in on a density preview and turn on **Per block** and **Grid**. Per block samples each block at its own position, as the game does, so each block is one flat square and hovering shows the game's value there. Grid draws block lines when zoomed in, then chunk lines (16-block sections up a side view) and region lines further out.
+
 Give each step a name, as the samples here do. A named `DensityFunction` can be previewed on its own, which is how you find the step that went wrong, and its doc comment says what its numbers mean.
 
 ## Try it in the game

@@ -103,10 +103,15 @@
 	type Point = { x: number; y: number; z: number };
 	let lock = $state<Point | null>(null);
 	let seq = 0;
-	/** The 2D view each render in flight was asked for, so the grid lines up with the image shown, not the camera that moved since. */
-	const sentViews = new Map<number, PreviewView>();
-	/** The view the image on screen was rendered at. */
-	let shownView = $state.raw<PreviewView | null>(null);
+	/**
+	 * How a 2D render was asked for: the view, whether it looks down, and
+	 * CSS pixels per render pixel. Kept per render in flight, so the grid
+	 * lines up with the image shown, not the camera that moved since.
+	 */
+	type SentView = { view: PreviewView; flat: boolean; resolution: number };
+	const sentViews = new Map<number, SentView>();
+	/** How the image on screen was rendered. */
+	let shownView = $state.raw<SentView | null>(null);
 	let lastTarget: string | null = null;
 	let mode = $state<PreviewMode>('density');
 	let biome = $state('minecraft:plains');
@@ -569,7 +574,7 @@
 			setBusy(true);
 			if (mode === 'iso' || topBlocks) startHelpers();
 			const sent: PreviewView = { ...$state.snapshot(view), down: lookDown && canDown, blocks: mode === 'density' && blockValues };
-			sentViews.set(seq + 1, sent);
+			sentViews.set(seq + 1, { view: sent, flat, resolution });
 			worker.postMessage({
 				type: 'render',
 				seq: ++seq,
@@ -647,14 +652,16 @@
 		{ size: 512, name: 'regions' }
 	];
 	const minGap = 6;
-	/** The grid steps drawn at the current zoom (none in the 3D view or when off). */
+	/**
+	 * The grid steps drawn over the image on screen (none in the 3D view or
+	 * when off), from the zoom it was rendered at: while a zoom is waiting
+	 * on its render, the grid stays the old image's.
+	 */
 	const gridShown = $derived.by(() => {
-		if (!grid || mode === 'iso' || !info) return [];
-		// CSS pixels per block in the image on screen: a render pixel is
-		// `resolution` CSS pixels and, at the scale it was rendered at, that many blocks.
 		const shown = shownView;
-		if (!shown) return [];
-		const perBlock = resolution / shown.scale;
+		if (!grid || mode === 'iso' || !info || !shown) return [];
+		// CSS pixels per block: a render pixel is `resolution` CSS pixels and view.scale blocks.
+		const perBlock = shown.resolution / shown.view.scale;
 		return gridSteps.filter((s) => s.size * perBlock >= minGap);
 	});
 	$effect(() => {
@@ -673,8 +680,8 @@
 		return out;
 	}
 	function drawGrid() {
-		const v = shownView;
-		if (!box || !last || !v || gridShown.length === 0 || last.bitmap) {
+		const shown = shownView;
+		if (!box || !last || !shown || gridShown.length === 0 || last.bitmap) {
 			if (gridPaths.length) gridPaths = [];
 			return;
 		}
@@ -684,6 +691,7 @@
 		// The image is stretched over the whole box.
 		const sx = W / w;
 		const sy = H / h;
+		const { view: v, flat } = shown;
 		const a = screenAxes(v.facing);
 		// The world plane at the image's centre: u to the right, and v down
 		// the screen (top-down) or up it (a side view, where v is y).
@@ -931,8 +939,10 @@
 		const iy = Math.floor(at.py);
 		if (ix < 0 || iy < 0 || ix >= last.width || iy >= last.height) return '';
 		const v = last.values[iy * last.width + ix];
-		// Per block, the value is the block at the pixel's centre, which the pointer may be just past.
-		const coord = coords(blockValues && mode === 'density' ? toWorld(ix + 0.5, iy + 0.5) : toWorld(at.px, at.py));
+		// The pixel's value was sampled at its centre, so name the block there,
+		// not the one under the pointer, which can be its neighbour when a
+		// pixel straddles a block edge.
+		const coord = coords(toWorld(ix + 0.5, iy + 0.5));
 		return Number.isNaN(v) ? coord : `${coord} · ${show(v)}`;
 	});
 	/** The value under the pointer, for the scale's marker. */

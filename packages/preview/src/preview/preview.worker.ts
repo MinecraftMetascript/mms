@@ -1402,13 +1402,16 @@ async function terrainOf(req: RenderRequest): Promise<{ terrain: Terrain; key: s
  * block as the one to its left or above takes its value (the screen's axes
  * run along the world's, so a block is a rectangle of pixels).
  */
-function sampler(width: number, values: Float32Array, blocks: boolean) {
+function sampler(width: number, values: Float32Array, blocks: boolean, scale: number) {
 	let lastRow = -1;
 	let row: string[] = [];
 	let above: string[] = [];
+	// At a block or more a pixel, neighbouring pixels never share a block.
+	const reuse = scale < 1;
 	return (px: number, py: number, x: number, y: number, z: number, compute: (x: number, y: number, z: number) => number): number => {
 		if (!blocks) return compute(x, y, z);
 		const bx = Math.floor(x), by = Math.floor(y), bz = Math.floor(z);
+		if (!reuse) return compute(bx, by, bz);
 		if (py !== lastRow) {
 			above = lastRow === py - 1 ? row : [];
 			row = new Array(width);
@@ -1470,7 +1473,7 @@ async function render(req: RenderRequest): Promise<Rendered> {
 			return rs.getOrCreateNoise(id);
 		});
 		const pace = pacer(req);
-		const at = sampler(width, values, !!view.blocks);
+		const at = sampler(width, values, !!view.blocks, view.scale);
 		for (let py = 0; py < height; py++) {
 			for (let px = 0; px < width; px++) {
 				await pace();
@@ -1492,7 +1495,7 @@ async function render(req: RenderRequest): Promise<Rendered> {
 			return df.mapAll(rs.createVisitor(false));
 		});
 		const pace = pacer(req);
-		const at = sampler(width, values, !!view.blocks);
+		const at = sampler(width, values, !!view.blocks, view.scale);
 		const compute = (x: number, y: number, z: number) => fn.compute(DensityFunction.context(x, y, z));
 		for (let py = 0; py < height; py++) {
 			const y = view.down ? view.y : plane.y(py);
@@ -1519,7 +1522,7 @@ async function render(req: RenderRequest): Promise<Rendered> {
 	// A side view, or top-down at the camera's y.
 	const yAt = (py: number) => (view.down ? view.y : plane.y(py));
 	const pace = pacer(req);
-	const at = sampler(width, values, !!view.blocks);
+	const at = sampler(width, values, !!view.blocks, view.scale);
 	const compute = (x: number, y: number, z: number) => router.finalDensity.compute(DensityFunction.context(x, y, z));
 	for (let py = 0; py < height; py++) {
 		const y = yAt(py);
