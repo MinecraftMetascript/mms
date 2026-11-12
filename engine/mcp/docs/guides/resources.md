@@ -242,6 +242,29 @@ Each call stands for the id the file gets in your namespace: its base name, lowe
 
 Inside the quotes, completion lists the project's files of the helper's type, in VS Code and the web editor. A path to a file that is not there is an error.
 
+An id name with a namespace replaces another pack's texture: `Texture("art/stone.png", "minecraft:block/stone")` copies the file to `assets/minecraft/textures/block/stone.png`, so every vanilla model that shows stone shows it, with no block state or model of your own.
+
+### Animated textures
+
+A texture's `.png.mcmeta` file is written from named arguments of `Texture`, one for each of the file's sections:
+
+```mms in=examples/embers
+Model block/ember_glow {
+  parent = block/cube_all
+  textures = { all = Texture("art/ember_glow.png", animation = { frametime = 3, interpolate = true }) }
+}
+```
+
+This copies `ember_glow.png` to `assets/<ns>/textures/block/` and writes `ember_glow.png.mcmeta` beside it. The sections are the game's: `animation` (`frametime`, `interpolate`, `frames`, and `width` and `height` for frames that are not square), `texture` (`blur`, `clamp`, `mipmap_strategy`), `gui` (`scaling`, such as nine-slice scaling for GUI sprites) and `villager`. They are checked and completed like any other value.
+
+An animation's frames are stacked in the image, read from the top: a 16×64 image is four 16×16 frames. Without `frames`, they play in that order, each for `frametime` ticks; `frames = [0, 1, { index = 3, time = 8 }]` picks the order and gives one frame its own time. Hovering the call shows the image's size, its frames and how long one loop lasts. MMS reads the image's size and warns (`mms/texture-animation`) when:
+
+- the image is not a whole number of frames, so the game shows the missing texture;
+- `frames` names a frame past the last one, so the game does not animate it;
+- a model's texture is a strip of square frames with no `animation`, so the game squashes the whole strip onto each face. The quick fix adds one.
+
+A `.png.mcmeta` file next to the image, as Blockbench or Aseprite export it, is not copied. MMS warns about it (`mms/texture-mcmeta`), and the quick fix moves its sections into the call. A file used in several places has one `.png.mcmeta`, so every use must give the same named arguments, or use its own id name.
+
 Textures, sounds and [resource pack declarations](#resource-packs) go into a resource pack built next to the data pack: `build-resources/` (set `resourcePack.output` in `mms.json` to change it), `<name>-resources.zip` with `mms build --zip`, and `<world>/resourcepacks/resources.zip` with `mms build --world`, the world's bundled pack, which Minecraft applies by itself when you open the world (rejoin after a rebuild). It is not sent to LAN players; a server needs `resource-pack` in `server.properties`. `"icon": "art/icon.png"` in `mms.json` becomes `pack.png` in both packs.
 
 A world has only one bundled pack, so `--world` merges into it instead of overwriting it: build several projects into the same world and each keeps its files. Rebuilding a project replaces only the files it wrote last time, recorded in `mms-world-pack.json` inside the zip (Minecraft ignores it). Lang files, `sounds.json`, atlases and fonts that several projects write are merged: keys are combined and atlas sources and font providers are appended. Any other file two projects both write goes to the one built last, with a warning. A `resources.zip` that MMS did not write, such as a hand-made pack, is kept the same way. The description in `pack.mcmeta` lists every pack in the zip. Data packs already sit side by side, in `<world>/datapacks/<namespace>`.
@@ -288,9 +311,22 @@ A block state is named after the block it replaces, such as `minecraft:glowstone
 
 In a model's `textures`, a value is a texture id, `"#name"` for another slot, or `Texture("file.png")`. A texture id can name a vanilla texture, such as `block/stone`.
 
-The game only finds a model's textures in two atlases: the blocks atlas, which stitches every file under `textures/block/`, and the items atlas, which stitches `textures/item/`. So `Texture("art/glow1.png")` in a model copies the file to `textures/block/glow1.png` and stands for `<ns>:block/glow1`, which works in block and item models alike. Give it an id name to put it elsewhere, such as `Texture("art/glow1.png", "item/glow1")`. A texture a model names that neither atlas stitches shows as the missing texture, and the [`texture-outside-atlas`](lint.md) lint rule warns about it; an `Atlas minecraft:blocks` declaration that adds the texture as a source counts. Keep a model's textures in one atlas: the game rejects a model that mixes the two.
+### Models and texture slots
 
-`sounds.json` is still generated from `Sound(...)`, and textures cannot have `.png.mcmeta` animation yet. The [`resource-pack`](../../examples/resource-pack/) example shows each kind with vanilla textures; [`embers`](../../examples/embers/) uses files of its own.
+Most block models fill the slots of a vanilla template rather than list their own elements: `block/cube_all` shows `#all` on every face, `block/cube_column` shows `#end` on top and bottom and `#side` around, and `block/cross` shows `#cross` on two crossed planes. MMS knows vanilla's models, so in a model's `textures`, completion offers the slots its parent chain shows first, with the model they come from and what fills them now, and go to definition on a vanilla model, such as `block/cube_column`, opens its JSON. The [`model-missing-texture`](lint.md) lint warns about a slot the faces show that nothing fills, which the game draws as the missing texture:
+
+```
+Model block/marble_pillar {
+  parent = block/cube_column
+  textures = { end = Texture("art/marble_top.png"), side = Texture("art/marble_side.png") }
+}
+```
+
+Parents can be the project's own models too: a model whose parent is `block/marble_pillar` inherits its textures and can replace some of them. A chain that reaches a model from another pack is not checked.
+
+The game only finds a model's textures in two atlases: the blocks atlas, which stitches every file under `textures/block/`, and the items atlas, which stitches `textures/item/`. So `Texture("art/glow1.png")` in a model copies the file to `textures/block/glow1.png` and stands for `<ns>:block/glow1`, which works in block and item models alike. Give it an id name to put it elsewhere, such as `Texture("art/glow1.png", "item/glow1")`. A texture a model names that neither atlas stitches shows as the missing texture, and the [`texture-outside-atlas`](lint.md) lint rule warns about it; an `Atlas minecraft:blocks` declaration that adds the texture as a source counts. Keep a model's textures in one atlas: the game draws a model from a single atlas, and the [`model-mixed-atlas`](lint.md) lint rule warns about a model that mixes the two.
+
+`sounds.json` is still generated from `Sound(...)`, and `.png.mcmeta` files from [`Texture`'s named arguments](#animated-textures). The [`resource-pack`](../../examples/resource-pack/) example shows each kind with vanilla textures; [`embers`](../../examples/embers/) uses files of its own.
 
 ## Custom items
 
