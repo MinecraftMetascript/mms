@@ -281,6 +281,13 @@ effect give @s fire_resistance 5
   "painting.embers.hearth.title": "Hearth",
   "painting.embers.hearth.author": "MMS Examples"
 }
+=== assets/embers/models/block/ember_glow.json
+{
+  "parent": "minecraft:block/cube_all",
+  "textures": {
+    "all": "embers:block/ember_glow"
+  }
+}
 === assets/embers/models/item/ember_disc.json
 {
   "parent": "minecraft:item/generated",
@@ -307,12 +314,29 @@ effect give @s fire_resistance 5
 }
 === assets/embers/sounds/embers.ogg
 (copy of sounds/embers.ogg)
+=== assets/embers/textures/block/ember_glow.png
+(copy of art/ember_glow.png)
+=== assets/embers/textures/block/ember_glow.png.mcmeta
+{
+  "animation": {
+    "interpolate": true,
+    "frametime": 3
+  }
+}
 === assets/embers/textures/item/ember_disc.png
 (copy of art/ember_disc.png)
 === assets/embers/textures/item/ember_shard.png
 (copy of art/ember_shard.png)
 === assets/embers/textures/painting/hearth.png
 (copy of art/hearth.png)
+=== assets/minecraft/blockstates/glowstone.json
+{
+  "variants": {
+    "": {
+      "model": "embers:block/ember_glow"
+    }
+  }
+}
 === pack.mcmeta
 {
   "pack": {

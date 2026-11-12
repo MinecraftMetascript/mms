@@ -277,11 +277,22 @@ func named(c *ctx, x *syntax.Call, args []argValue) Value {
 		return args[0].v
 	}
 	call, ok := code.X.(*syntax.Call)
-	if !ok || len(call.Args) != 1 {
+	if !ok {
 		return code
 	}
+	positional := 0
+	for _, a := range call.Args {
+		if a.Name == nil {
+			positional++
+		}
+	}
+	if positional != 1 || call.Args[0].Name != nil {
+		return code
+	}
+	// The id name goes second, before named arguments such as
+	// animation = { ... }.
 	nc := *call
-	nc.Args = append(append([]*syntax.Arg(nil), call.Args...), &syntax.Arg{Value: &syntax.String{Value: n, Sp: call.Sp}, Sp: call.Sp})
+	nc.Args = append([]*syntax.Arg{call.Args[0], {Value: &syntax.String{Value: n, Sp: call.Sp}, Sp: call.Sp}}, call.Args[1:]...)
 	return &Code{code.pos, &nc}
 }
 

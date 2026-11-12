@@ -495,7 +495,25 @@ func (c *Checker) Hover(in *Info) string {
 			parts = append(parts, note)
 		}
 	}
+	if a := in.Asset; a != nil && a.Helper == "Texture" && a.Width > 0 {
+		parts = append(parts, textureHover(a))
+	}
 	return strings.Join(parts, "\n\n")
+}
+
+// textureHover describes a texture file: its size and, when animated,
+// its frames and how long one loop lasts.
+func textureHover(a *Asset) string {
+	out := fmt.Sprintf("%d×%d image, written to `%s`", a.Width, a.Height, a.Out)
+	if a.Meta != nil {
+		out += " with a `.mcmeta` file"
+	}
+	if n := a.Frames(); n > 0 {
+		fw, fh, _ := a.FrameSize()
+		t := a.AnimationTicks()
+		out += fmt.Sprintf(". Animated: %d frames of %d×%d, one loop every %d ticks (%gs)", n, fw, fh, t, float64(t)/20)
+	}
+	return out
 }
 
 // SymbolHead is the code line a hover shows for a declaration: its kind

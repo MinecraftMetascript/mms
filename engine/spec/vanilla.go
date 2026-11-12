@@ -13,8 +13,10 @@ import (
 // Vanilla holds the JSON files of the game's own data pack, as mcmeta's
 // summary lists them: Vanilla[folder][path] is the file
 // data/minecraft/<folder>/<path>.json. Folders are data pack folders such
-// as "worldgen/noise" and "tags/block". Editors show these files when go to
-// definition lands on a vanilla id.
+// as "worldgen/noise" and "tags/block", and "assets/<folder>" for the
+// resource pack's models, block states and item models, whose files are
+// assets/minecraft/<folder>/<path>.json. Editors show these files when go
+// to definition lands on a vanilla id.
 type Vanilla map[string]map[string]json.RawMessage
 
 // VanillaPrefix starts the path of a vanilla file, as go to definition
@@ -93,6 +95,9 @@ func (v Vanilla) VanillaPath(folder, id string) string {
 	if _, ok := v[folder][id]; !ok {
 		return ""
 	}
+	if asset, ok := strings.CutPrefix(folder, "assets/"); ok {
+		return VanillaPrefix + "assets/minecraft/" + asset + "/" + id + ".json"
+	}
 	return VanillaPrefix + "data/minecraft/" + folder + "/" + id + ".json"
 }
 
@@ -101,7 +106,10 @@ func (v Vanilla) VanillaPath(folder, id string) string {
 func (v Vanilla) File(path string) (string, bool) {
 	rest, ok := strings.CutPrefix(path, VanillaPrefix+"data/minecraft/")
 	if !ok {
-		return "", false
+		if rest, ok = strings.CutPrefix(path, VanillaPrefix+"assets/minecraft/"); !ok {
+			return "", false
+		}
+		rest = "assets/" + rest
 	}
 	rest, ok = strings.CutSuffix(rest, ".json")
 	if !ok {

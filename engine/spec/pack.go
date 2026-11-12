@@ -49,6 +49,9 @@ type Pack struct {
 	// Atlases maps each vanilla texture atlas ("blocks", "items") to the
 	// sources its assets/minecraft/atlases/<name>.json lists.
 	Atlases map[string][]AtlasSource `json:"atlases,omitempty"`
+	// Models maps each vanilla model ("block/cube_column", without the
+	// namespace) to what MMS needs to follow a model's parent chain.
+	Models map[string]*ModelInfo `json:"models,omitempty"`
 
 	registrySets map[string]map[string]struct{}
 	// vanilla is set on the embedded default pack, whose version has
@@ -66,6 +69,18 @@ type AtlasSource struct {
 	Prefix   string `json:"prefix,omitempty"`
 	Resource string `json:"resource,omitempty"`
 	Sprite   string `json:"sprite,omitempty"`
+}
+
+// ModelInfo is the part of a vanilla model file that says which texture
+// slots it fills and uses: its parent, its textures and, when it has
+// elements, the "#slot" references their faces name (without '#').
+// Elements replace a parent's, so the nearest model in a chain that has
+// them decides which slots must be filled.
+type ModelInfo struct {
+	Parent   string            `json:"parent,omitempty"`
+	Textures map[string]string `json:"textures,omitempty"`
+	Elements bool              `json:"elements,omitempty"`
+	Uses     []string          `json:"uses,omitempty"`
 }
 
 type BlockStates struct {
@@ -229,19 +244,49 @@ func (p *Pack) AssetKinds() []string {
 	return kinds
 }
 
-// Covers reports whether the source stitches the texture file
-// assets/<ns>/textures/<path>.png as the sprite id "<ns>:<path>", the id
-// a model names it by.
-func (s AtlasSource) Covers(id string) bool {
+// SpriteOf returns the sprite the source stitches from the texture file
+// assets/<ns>/textures/<path>.png, named "<ns>:<path>"; ok is false when
+// the source does not take that file.
+func (s AtlasSource) SpriteOf(file string) (sprite string, ok bool) {
+	ns, p := splitNS(file)
 	switch strings.TrimPrefix(s.Type, "minecraft:") {
 	case "directory":
-		rest, ok := strings.CutPrefix(id[strings.IndexByte(id, ':')+1:], strings.TrimSuffix(s.Source, "/")+"/")
-		return ok && s.Prefix+rest == id[strings.IndexByte(id, ':')+1:]
+		if rest, ok := strings.CutPrefix(p, strings.TrimSuffix(s.Source, "/")+"/"); ok {
+			return ns + ":" + s.Prefix + rest, true
+		}
 	case "single":
-		res := qualify(s.Resource)
-		return res == qualify(id) && (s.Sprite == "" || qualify(s.Sprite) == res)
+		if qualify(s.Resource) == ns+":"+p {
+			if s.Sprite != "" {
+				return qualify(s.Sprite), true
+			}
+			return ns + ":" + p, true
+		}
+	}
+	return "", false
+}
+
+// Makes reports whether the source can stitch a sprite named id, from
+// some file: a directory source names each of its files with its prefix.
+func (s AtlasSource) Makes(id string) bool {
+	switch strings.TrimPrefix(s.Type, "minecraft:") {
+	case "directory":
+		_, p := splitNS(id)
+		return strings.HasPrefix(p, s.Prefix)
+	case "single":
+		name := s.Sprite
+		if name == "" {
+			name = s.Resource
+		}
+		return qualify(name) == qualify(id)
 	}
 	return false
+}
+
+func splitNS(id string) (ns, path string) {
+	if ns, path, ok := strings.Cut(id, ":"); ok {
+		return ns, path
+	}
+	return "minecraft", id
 }
 
 func qualify(id string) string {

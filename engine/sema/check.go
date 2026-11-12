@@ -1037,6 +1037,9 @@ func (c *Checker) resolveID(text string, id idInfo, e syntax.Expr) string {
 	in.ID = full
 	in.Symbol = sym
 	in.Bare, in.Folder = BareID, reg
+	if reg == "texture" && c.resource == "model" {
+		in.ModelTexture = true
+	}
 	if id.excluded(full) {
 		c.excludedID(full, id, e.Span())
 		return full
@@ -1067,9 +1070,6 @@ func (c *Checker) resolveID(text string, id idInfo, e syntax.Expr) string {
 			c.errorf("mms/unknown-id", e.Span(), "%s", msg)
 		}
 		return full
-	}
-	if reg == "texture" && c.resource == "model" {
-		in.ModelTexture = true
 	}
 	if IsAssetRegistry(reg) {
 		// A file, not a declaration: the external-asset lint rule checks
