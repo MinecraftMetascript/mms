@@ -326,7 +326,7 @@ func TestAssetsTextureAnimation(t *testing.T) {
 	}
 	src := `Model block/lamp {
   parent = block/cube_all
-  textures = { all = Texture("art/lamp.png", animation = { frametime = 4, frames = [0, 1, { index = 3, time = 8 }, (4)] }) }
+  textures = { all = Texture("art/lamp.png", animation = { frametime = 4, frames = [0, 1, { index = 3, time = 8 }, (4), +5] }) }
 }
 Model block/odd { parent = block/cube_all, textures = { all = Texture("art/odd.png", animation = {}) } }
 Model block/strip { parent = block/cube_all, textures = { all = Texture("art/strip.png") } }
@@ -352,7 +352,7 @@ Model block/soft { parent = block/cube_all, textures = { all = Texture("art/soft
 			t.Errorf("unexpected: %s: %s", d.Code, d.Message)
 		}
 	}
-	want := []string{"frame 4 is not there", "16x40, which is not a whole number of 16x16 frames", "a strip of 3 square frames", "does not copy 'art/glow.png.mcmeta'"}
+	want := []string{"frame 4 is not there", "frame 5 is not there", "16x40, which is not a whole number of 16x16 frames", "a strip of 3 square frames", "does not copy 'art/glow.png.mcmeta'"}
 	if len(got) != len(want) {
 		t.Fatalf("got %d texture diagnostics, want %d:\n%s", len(got), len(want), strings.Join(got, "\n"))
 	}
@@ -365,7 +365,7 @@ Model block/soft { parent = block/cube_all, textures = { all = Texture("art/soft
 	for _, f := range r.Emit() {
 		paths[f.Path] = strings.Join(strings.Fields(string(f.Data)), "")
 	}
-	if s := paths["assets/demo/textures/block/lamp.png.mcmeta"]; s != `{"animation":{"frametime":4,"frames":[0,1,{"index":3,"time":8},4]}}` {
+	if s := paths["assets/demo/textures/block/lamp.png.mcmeta"]; s != `{"animation":{"frametime":4,"frames":[0,1,{"index":3,"time":8},4,5]}}` {
 		t.Errorf("lamp mcmeta: %q", s)
 	}
 	if _, ok := paths["assets/demo/textures/block/strip.png.mcmeta"]; ok {

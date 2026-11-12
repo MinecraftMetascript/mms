@@ -364,7 +364,7 @@ func (c *Checker) textureChecks(call *syntax.Call, a *Asset, meta []*syntax.Arg,
 		if fw <= 0 || fh <= 0 || a.Width%fw != 0 || a.Height%fh != 0 {
 			c.warnf("mms/texture-animation", animArg.Sp, "'%s' is %dx%d, which is not a whole number of %dx%d frames, so the game shows the missing texture", a.Src, a.Width, a.Height, fw, fh)
 		} else if n := a.Frames(); n > 0 {
-			c.frameIndexChecks(animArg.Value, n, a.Src)
+			c.frameIndexChecks(a, animArg.Value, n)
 		}
 	}
 	side := a.Src + ".mcmeta"
@@ -404,39 +404,44 @@ func (c *Checker) textureChecks(call *syntax.Call, a *Asset, meta []*syntax.Arg,
 }
 
 // frameIndexChecks warns about frames entries past the last frame: the
-// game then leaves the texture still.
-func (c *Checker) frameIndexChecks(anim syntax.Expr, n int, src string) {
-	o, ok := unparen(anim).(*syntax.Object)
-	if !ok {
+// game then leaves the texture still. The indices are read from the
+// checked .mcmeta, so any way of writing a number counts; the source only
+// gives each entry's span, or the animation argument's when the list is
+// not written out.
+func (c *Checker) frameIndexChecks(a *Asset, anim syntax.Expr, n int) {
+	sec, _ := a.metaSection("animation")
+	if sec == nil {
 		return
 	}
-	for _, it := range o.Body.Items {
-		f, ok := it.(*syntax.FieldStmt)
-		if !ok || f.Key.Text != "frames" {
-			continue
-		}
-		l, ok := unparen(f.Value).(*syntax.List)
-		if !ok {
-			continue
-		}
-		for _, el := range l.Elems {
-			idx := unparen(el)
-			if eo, ok := idx.(*syntax.Object); ok {
-				idx = nil
-				for _, it := range eo.Body.Items {
-					if ff, ok := it.(*syntax.FieldStmt); ok && ff.Key.Text == "index" {
-						idx = unparen(ff.Value)
-					}
+	frames, _ := sec.Get("frames").(jsonv.Array)
+	var elems []syntax.Expr
+	if o, ok := unparen(anim).(*syntax.Object); ok {
+		for _, it := range o.Body.Items {
+			if f, ok := it.(*syntax.FieldStmt); ok && f.Key.Text == "frames" {
+				if l, ok := unparen(f.Value).(*syntax.List); ok {
+					elems = l.Elems
 				}
 			}
-			num, ok := idx.(*syntax.Number)
-			if !ok {
-				continue
-			}
-			if i, err := strconv.Atoi(num.Text); err == nil && i >= n {
-				c.warnf("mms/texture-animation", num.Sp, "'%s' has %d frames (0 to %d), so frame %d is not there and the game does not animate the texture", src, n, n-1, i)
-			}
 		}
+	}
+	for i, fr := range frames {
+		var idx int
+		var ok bool
+		switch x := fr.(type) {
+		case jsonv.Number:
+			v, err := strconv.Atoi(string(x))
+			idx, ok = v, err == nil
+		case *jsonv.Object:
+			idx, ok = intField(x, "index")
+		}
+		if !ok || idx < n {
+			continue
+		}
+		sp := anim.Span()
+		if len(elems) == len(frames) {
+			sp = elems[i].Span()
+		}
+		c.warnf("mms/texture-animation", sp, "'%s' has %d frames (0 to %d), so frame %d is not there and the game does not animate the texture", a.Src, n, n-1, idx)
 	}
 }
 
