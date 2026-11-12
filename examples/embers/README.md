@@ -5,7 +5,7 @@ A small pack that brings its own art. Everything under `art/` and `sounds/` was 
 | File | Used by | Becomes |
 | --- | --- | --- |
 | `art/ember_shard.png`, `art/ember_disc.png` | the custom items in `items.mms` | `textures/item/`, with their models |
-| `art/ember_glow.png` (16x64, four frames) | the `ember_glow` model in `blocks.mms`, which glowstone shows | `textures/block/ember_glow.png` and its `.png.mcmeta` animation |
+| `art/ember_glow.png` (16x64, four frames) | the `Retexture` of glowstone in `blocks.mms`, for the block and its item | `textures/block/ember_glow.png` and its `.png.mcmeta` animation |
 | `art/hearth.png` (32x16) | the `hearth` painting in `painting.mms` | `textures/painting/hearth.png` |
 | `sounds/embers.ogg` | the `embers` jukebox song in `music.mms` | `sounds/embers.ogg` and `sounds.json` |
 | `art/icon.png` | `icon` in `mms.json` | `pack.png` in both packs |

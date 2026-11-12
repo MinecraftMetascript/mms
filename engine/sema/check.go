@@ -357,6 +357,11 @@ func (c *Checker) check(e syntax.Expr, v tview) jsonv.Value {
 	case "enum":
 		return c.enumValue(e, v)
 	case "any":
+		if _, ok := v.T.Attr(OpaqueAttr); ok {
+			// A function, commands or an asset file, inside a list or
+			// object: checked where the evaluator puts it.
+			return nil
+		}
 		return c.anyValue(e)
 	default:
 		// Dynamic dispatchers and other types MMS cannot resolve
@@ -900,6 +905,11 @@ func limit(s []string, n int) []string {
 	}
 	return s
 }
+
+// OpaqueAttr marks the any type of a value the evaluator passes on, such
+// as a Texture or a Function in a Blueprint field's list or object: the
+// declarations it lands in check it.
+const OpaqueAttr = "mms_opaque"
 
 // anyValue converts an expression to JSON without a schema.
 func (c *Checker) anyValue(e syntax.Expr) jsonv.Value {

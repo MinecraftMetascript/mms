@@ -4,6 +4,7 @@ import (
 	"github.com/minecraftmetascript/mms/engine/eval"
 	"github.com/minecraftmetascript/mms/engine/prelude"
 	"github.com/minecraftmetascript/mms/engine/sema"
+	"github.com/minecraftmetascript/mms/engine/spec"
 	"github.com/minecraftmetascript/mms/engine/syntax"
 	"github.com/minecraftmetascript/mms/engine/types"
 )
@@ -12,7 +13,7 @@ import (
 // declarations it changed gets a new unit holding the expanded
 // declarations, with the same text and tokens; every other unit is
 // returned as it was, so its checked results carry over.
-func expand(units []*sema.Unit, ns string, cache *eval.Cache) ([]*sema.Unit, *eval.Result) {
+func expand(units []*sema.Unit, ns string, cache *eval.Cache, pack *spec.Pack) ([]*sema.Unit, *eval.Result) {
 	in := make([]eval.Unit, 0, len(units)+4)
 	// The prelude comes first, as a library would: its Templates, Types
 	// and Blueprints are in scope everywhere. It writes nothing itself.
@@ -24,7 +25,14 @@ func expand(units []*sema.Unit, ns string, cache *eval.Cache) ([]*sema.Unit, *ev
 			in = append(in, eval.Unit{Path: u.Path, File: u.File})
 		}
 	}
-	r := eval.Run(in, eval.Options{Namespace: ns, Cache: cache})
+	// Vanilla's resource pack files are decoded only when a Blueprint
+	// such as Retexture asks for one.
+	vanilla := func(folder, path string) ([]byte, bool) {
+		v := pack.Vanilla()
+		raw, ok := v["assets/"+folder][path]
+		return raw, ok
+	}
+	r := eval.Run(in, eval.Options{Namespace: ns, Cache: cache, Vanilla: vanilla})
 	out := make([]*sema.Unit, len(units))
 	for i, u := range units {
 		out[i] = u

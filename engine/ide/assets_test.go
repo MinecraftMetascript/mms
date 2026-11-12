@@ -168,3 +168,18 @@ func TestTextureHover(t *testing.T) {
 		t.Errorf("hover: %s", md)
 	}
 }
+
+func TestRetextureSlotCompletion(t *testing.T) {
+	for src, want := range map[string]string{
+		`Retexture minecraft:oak_log { textures = { | } }`:                                 "end side",
+		`Retexture minecraft:oak_log { textures = { side = Texture("art/lamp.png"), | } }`: "end",
+		`Retexture minecraft:oak_stairs { textures = { | } }`:                              "bottom side top",
+	} {
+		s, off := assetSession(t, src)
+		items, _ := s.Completion("main.mms", off)
+		got := labels(items)
+		if n := len(strings.Fields(want)); len(got) < n || strings.Join(got[:n], " ") != want || !slices.Contains(got, "particle") {
+			t.Errorf("%s: got %v", src, got)
+		}
+	}
+}

@@ -281,9 +281,9 @@ effect give @s fire_resistance 5
   "painting.embers.hearth.title": "Hearth",
   "painting.embers.hearth.author": "MMS Examples"
 }
-=== assets/embers/models/block/ember_glow.json
+=== assets/embers/models/block/glowstone/glowstone.json
 {
-  "parent": "minecraft:block/cube_all",
+  "parent": "minecraft:block/glowstone",
   "textures": {
     "all": "embers:block/ember_glow"
   }
@@ -333,8 +333,15 @@ effect give @s fire_resistance 5
 {
   "variants": {
     "": {
-      "model": "embers:block/ember_glow"
+      "model": "embers:block/glowstone/glowstone"
     }
+  }
+}
+=== assets/minecraft/items/glowstone.json
+{
+  "model": {
+    "type": "model",
+    "model": "embers:block/glowstone/glowstone"
   }
 }
 === pack.mcmeta

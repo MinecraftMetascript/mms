@@ -43,6 +43,10 @@ type Options struct {
 	// Cache, when set, remembers across runs which declarations need no
 	// expansion, so an edit does not walk every unchanged declaration.
 	Cache *Cache
+	// Vanilla, when set, returns a file of the game's own resource
+	// pack: Vanilla("models", "block/stone") is
+	// assets/minecraft/models/block/stone.json. block_models reads it.
+	Vanilla func(folder, path string) ([]byte, bool)
 }
 
 // Cache remembers which declarations pass through unexpanded. It is safe
@@ -338,6 +342,8 @@ type evaluator struct {
 	// values are the names of Globals and Storages, which function code
 	// passes to a Template as the values they hold when the code runs.
 	values map[string]bool
+	// vanilla reads the game's resource pack files (Options.Vanilla).
+	vanilla func(folder, path string) ([]byte, bool)
 	// sites are the declarations written at the top of a file, by name,
 	// and siteOf by the name as written: the ones of a Blueprint's kind
 	// are instances whose emitted consts are read as name.const.
@@ -367,7 +373,7 @@ type site struct {
 // Run expands units, which must be in a stable order.
 func Run(units []Unit, opt Options) *Result {
 	e := &evaluator{r: &Result{Files: map[string]*FileOut{}, Consts: map[string]*Const{}, Templates: map[string]*Template{},
-		Blueprints: map[string]*Blueprint{}, Types: map[string]*TypeDef{}, Nodes: map[syntax.Node]Prov{}, Lines: map[syntax.Node]Prov{}}, budget: opt.Budget, values: map[string]bool{}}
+		Blueprints: map[string]*Blueprint{}, Types: map[string]*TypeDef{}, Nodes: map[syntax.Node]Prov{}, Lines: map[syntax.Node]Prov{}}, budget: opt.Budget, values: map[string]bool{}, vanilla: opt.Vanilla}
 	if e.budget <= 0 {
 		e.budget = DefaultBudget
 	}

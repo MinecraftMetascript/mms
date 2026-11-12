@@ -979,12 +979,19 @@ func (a *at) blockFields(b *syntax.Block) []sema.Candidate {
 
 // textureSlots offers, in a model's textures body, the slots its parent
 // chain has: first those its faces show, such as end and side under
-// block/cube_column, then those it fills already.
+// block/cube_column, then those it fills already. In a Retexture's
+// textures body they are the slots of the block's models.
 func (a *at) textureSlots(b *syntax.Block, present map[string]bool) []sema.Candidate {
-	if a.decl == nil || a.r == nil || a.decl.Kind.Resource != "model" || a.decl.D == nil || project.ModelTexturesBody(a.decl.D) != b {
+	if a.decl == nil || a.r == nil || a.decl.D == nil || project.ModelTexturesBody(a.decl.D) != b {
 		return nil
 	}
-	slots, _ := a.r.ModelSlots(a.decl)
+	slots, retexture := a.r.RetextureSlots(a.decl)
+	if !retexture {
+		if a.decl.Kind.Resource != "model" {
+			return nil
+		}
+		slots, _ = a.r.ModelSlots(a.decl)
+	}
 	var out []sema.Candidate
 	for i, sl := range slots {
 		if present[sl.Name] {
