@@ -159,8 +159,14 @@ export type PreviewResponse =
 			heights?: Float32Array<ArrayBuffer>;
 			/** For the isometric view: the image itself, drawn in the worker (pixels is then empty). */
 			bitmap?: ImageBitmap;
-			/** More of this render follows (chunks are still being built). */
+			/** More of this render follows (chunks are still being built, or this is a coarse first pass). */
 			partial?: boolean;
+			/**
+			 * For a coarse first pass of a 2D view: how many of the asked-for
+			 * pixels each of its pixels spans along a side (it was sampled at
+			 * step times the view's scale).
+			 */
+			step?: number;
 			/** Something to tell the viewer about an otherwise empty render. */
 			notice?: string;
 			/** For terrain: the sea level and world height. */
