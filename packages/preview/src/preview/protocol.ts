@@ -81,6 +81,13 @@ export interface PreviewView {
 	 * as if everything above y were cut away.
 	 */
 	down?: boolean;
+	/**
+	 * Samples density at whole block positions, as the game does: each
+	 * pixel takes the value of the block it falls in (x, y and z floored),
+	 * so zoomed in, a block shows as one flat cell. Otherwise each pixel is
+	 * sampled at its centre, between blocks. Only density views use it.
+	 */
+	blocks?: boolean;
 }
 
 export interface PreviewOptions {
