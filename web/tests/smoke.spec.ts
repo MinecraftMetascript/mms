@@ -1679,15 +1679,17 @@ test('a pinned spline editor stays up and writes back while the cursor is elsewh
 	await expect(page.locator('.cm-line', { hasText: 'SplinePoint(1, 0.25, 1)' })).toBeVisible({ timeout: 10_000 });
 	await expect(page.locator('.cm-line', { hasText: '// moved' })).toBeVisible();
 
-	// Split: the new pane follows the cursor beside the pinned one.
+	// Split: the new pane follows the cursor below the pinned one.
 	await page.getByRole('button', { name: 'Split the preview' }).click();
 	const panes = page.getByTestId('preview-pane');
 	await expect(panes).toHaveCount(2);
 	await expect(page.getByTestId('spline-view')).toHaveCount(1);
 	await clickLine(page, 'SplinePoint(-1, 0, 0)');
 	await expect(page.getByTestId('spline-view')).toHaveCount(2, { timeout: 15_000 });
-	await page.getByRole('button', { name: 'Stack the previews' }).click();
-	await expect(page.getByRole('separator', { name: 'Resize the previews' })).toHaveAttribute('aria-orientation', 'horizontal');
+	const divider = page.getByRole('separator', { name: 'Resize the previews' });
+	await expect(divider).toHaveAttribute('aria-orientation', 'horizontal');
+	await page.getByRole('button', { name: 'Put the previews side by side' }).click();
+	await expect(divider).toHaveAttribute('aria-orientation', 'vertical');
 	await panes.nth(1).getByRole('button', { name: 'Close this preview' }).click();
 	await expect(panes).toHaveCount(1);
 	expect(errors).toEqual([]);

@@ -182,7 +182,7 @@
 	const newPane = (id: number): Pane => ({ id, pinned: false, path: null, spline: null, page: 0 });
 	let panes = $state<Pane[]>([newPane(0)]);
 	let nextPaneId = 1;
-	let splitDir = $state<'row' | 'column'>('row');
+	let splitDir = $state<'row' | 'column'>('column');
 	// The first pane's share of the split, in percent.
 	let splitAt = $state(50);
 	let splitBox = $state<HTMLElement | null>(null);
