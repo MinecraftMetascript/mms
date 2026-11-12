@@ -75,40 +75,35 @@ DensityFunction tunnel_centre_1 = -24 + Noise(tunnel_height, 1, 0, shift_x = 409
 DensityFunction tunnels_1 = Max(
   Abs(Noise(tunnel_path, 1, 0, shift_x = 4096)) * 16,
   Abs(height - tunnel_centre_1) / 2.5,
-) -
-  1
+) - 1
 
 DensityFunction tunnel_centre_2 = 12 + Noise(tunnel_height, 1, 0, shift_x = 8192) * 12
 
 DensityFunction tunnels_2 = Max(
   Abs(Noise(tunnel_path, 1, 0, shift_x = 8192)) * 16,
   Abs(height - tunnel_centre_2) / 2.5,
-) -
-  1
+) - 1
 
 DensityFunction tunnel_centre_3 = 48 + Noise(tunnel_height, 1, 0, shift_x = 12288) * 12
 
 DensityFunction tunnels_3 = Max(
   Abs(Noise(tunnel_path, 1, 0, shift_x = 12288)) * 16,
   Abs(height - tunnel_centre_3) / 2.5,
-) -
-  1
+) - 1
 
 DensityFunction tunnel_centre_4 = 84 + Noise(tunnel_height, 1, 0, shift_x = 16384) * 12
 
 DensityFunction tunnels_4 = Max(
   Abs(Noise(tunnel_path, 1, 0, shift_x = 16384)) * 16,
   Abs(height - tunnel_centre_4) / 2.5,
-) -
-  1
+) - 1
 
 DensityFunction tunnel_centre_5 = 120 + Noise(tunnel_height, 1, 0, shift_x = 20480) * 12
 
 DensityFunction tunnels_5 = Max(
   Abs(Noise(tunnel_path, 1, 0, shift_x = 20480)) * 16,
   Abs(height - tunnel_centre_5) / 2.5,
-) -
-  1
+) - 1
 
 /** Below 0 inside any tunnel. */
 DensityFunction tunnels = Min(Min(Min(tunnels_1, tunnels_2), Min(tunnels_3, tunnels_4)), tunnels_5)
@@ -175,6 +170,4 @@ DensityFunction caves = Min(
     8,
   ),
   tunnels,
-) +
-  roof +
-  floor
+) + roof + floor
