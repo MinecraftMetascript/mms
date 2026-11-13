@@ -981,7 +981,7 @@
 			if (rest) startDrag(rest);
 			return;
 		}
-		if (e.type === 'pointerup' && drag && !drag.moved && !pinched && mode !== 'iso') {
+		if (e.type === 'pointerup' && last && shownView?.mode === mode && drag && !drag.moved && !pinched && mode !== 'iso') {
 			const p = toImage(pointer(e));
 			const at = toWorld(p.px, p.py);
 			lock = lock && lock.x === at.x && lock.y === at.y && lock.z === at.z ? null : at;
