@@ -2015,6 +2015,18 @@ func (s *Session) typeHints(u *sema.Unit) []InlayHint {
 func (s *Session) featureStepHints(u *sema.Unit) []InlayHint {
 	var out []InlayHint
 	seen := map[int]bool{}
+	// Only a list written in the file is labelled: one a const or a
+	// Template made is at the span of the name or call that brought it,
+	// and its items are not where the labels would go.
+	written := map[syntax.Span]*syntax.List{}
+	if f := s.R.Source[u.Path]; f != nil {
+		syntax.Walk(f, func(n syntax.Node) bool {
+			if l, ok := n.(*syntax.List); ok {
+				written[l.Sp] = l
+			}
+			return true
+		})
+	}
 	for _, d := range u.File.Decls {
 		dr := s.R.Decls[d]
 		if dr == nil {
@@ -2032,7 +2044,11 @@ func (s *Session) featureStepHints(u *sema.Unit) []InlayHint {
 			if in == nil || in.Field == nil || in.Field.Key != "features" || !ok || !isFeatureSteps(in.Field.Type.T) {
 				return true
 			}
-			for i, el := range l.Elems {
+			src := written[l.Sp]
+			if src == nil {
+				return true
+			}
+			for i, el := range src.Elems {
 				if i >= len(project.FeatureSteps) {
 					break
 				}
@@ -2040,8 +2056,7 @@ func (s *Session) featureStepHints(u *sema.Unit) []InlayHint {
 					break // the positions after it are not known
 				}
 				step := project.FeatureSteps[i]
-				if sp := el.Span(); seen[sp.Start] || sp.Start < d.Sp.Start || sp.End > d.Sp.End {
-					// Written elsewhere, as in a Template's body.
+				if seen[el.Span().Start] {
 					continue
 				}
 				seen[el.Span().Start] = true

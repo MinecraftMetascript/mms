@@ -351,69 +351,92 @@ func (r *Result) diagnose() {
 }
 
 // dropConstRepeats drops a problem found in a typed const's value where
-// the const is used, when the same problem is reported elsewhere: the
-// const's own check found it where the value is written, and each use,
-// and each const built from it, would only say it again.
+// the const is used, when the const's own declaration has the same
+// problem: its check found it where the value is written, and each use,
+// and each const built from it, would only say it again. For an
+// instance's const, `ash.noise_entries`, the declaration is the instance.
 func (r *Result) dropConstRepeats() {
 	if r.Eval == nil {
 		return
 	}
 	uses := r.typedConstUses()
-	repeat := func(path string, d syntax.Diagnostic) bool {
-		for _, sp := range uses[path] {
-			if d.Sp.Start >= sp.Start && d.Sp.End <= sp.End {
+	type key struct{ code, msg string }
+	// at reports whether a problem with this code and message is in the
+	// span sp of file path, kept or not.
+	at := func(path string, sp syntax.Span, k key) bool {
+		for _, d := range r.own[path] {
+			if !d.Echo && d.Code == k.code && d.Message == k.msg && d.Sp.Start >= sp.Start && d.Sp.End <= sp.End {
 				return true
 			}
 		}
 		return false
 	}
-	type key struct{ code, msg string }
-	root := map[key]bool{}
+	drop := map[string]map[int]bool{}
 	for path, ds := range r.own {
-		for _, d := range ds {
-			if !d.Echo && !repeat(path, d) {
-				root[key{d.Code, d.Message}] = true
+		for i, d := range ds {
+			if d.Echo {
+				continue
+			}
+			for _, u := range uses[path] {
+				if d.Sp.Start >= u.sp.Start && d.Sp.End <= u.sp.End && at(u.def.Path, u.def.Sp, key{d.Code, d.Message}) {
+					if drop[path] == nil {
+						drop[path] = map[int]bool{}
+					}
+					drop[path][i] = true
+					break
+				}
 			}
 		}
 	}
-	for path, ds := range r.own {
-		kept := ds[:0:0]
-		for _, d := range ds {
-			if !d.Echo && root[key{d.Code, d.Message}] && repeat(path, d) {
-				continue
+	for path, idx := range drop {
+		kept := r.own[path][:0:0]
+		for i, d := range r.own[path] {
+			if !idx[i] {
+				kept = append(kept, d)
 			}
-			kept = append(kept, d)
 		}
 		r.own[path] = kept
 	}
 }
 
-// typedConstUses are the spans, by file, of the names of typed consts
-// where they are used: `c` for `const c: T = ...`, and `ash.noise_entries`
-// for an instance's const that its Blueprint gives a type.
-func (r *Result) typedConstUses() map[string][]syntax.Span {
-	emitTyped := map[string]bool{}
-	for _, b := range r.Eval.Blueprints {
-		for _, e := range b.Emits {
-			for _, it := range e.Items {
-				if k, ok := it.(*syntax.ConstStmt); ok && k.Type != nil && k.Name != nil {
-					emitTyped[k.Name.Text] = true
-				}
+// constUse is a typed const named where it is used, and where it is
+// declared.
+type constUse struct {
+	sp  syntax.Span
+	def eval.Origin
+}
+
+// typedConstUses are the uses, by file, of typed consts: `c` for
+// `const c: T = ...`, and `ash.noise_entries` for the const of a
+// Blueprint instance `ash` whose Blueprint gives it a type.
+func (r *Result) typedConstUses() map[string][]constUse {
+	// The instances whose Blueprint declares a typed const, by name and
+	// const.
+	inst := map[string]*eval.Instance{}
+	for _, in := range r.Eval.Instances {
+		if !in.User || in.Name == nil || in.D == nil {
+			continue
+		}
+		for name, k := range in.ConstDefs {
+			if k.Type != nil {
+				inst[in.Name.Text+"."+name] = in
 			}
 		}
 	}
-	out := map[string][]syntax.Span{}
+	out := map[string][]constUse{}
 	for path, f := range r.Source {
 		syntax.Walk(f, func(n syntax.Node) bool {
 			switch n := n.(type) {
 			case *syntax.Ident:
 				if k := r.Eval.Const(path, n.Name); k != nil && k.S != nil && k.S.Type != nil && k.S.Name != nil && k.S.Name.Sp != n.Sp {
-					out[path] = append(out[path], n.Sp)
+					out[path] = append(out[path], constUse{n.Sp, eval.Origin{Path: k.Path, Sp: k.S.Sp}})
 				}
 			case *syntax.Member:
-				if _, ok := n.X.(*syntax.Ident); ok && n.Name != nil && emitTyped[n.Name.Text] {
-					out[path] = append(out[path], n.Sp)
-					return false
+				if id, ok := n.X.(*syntax.Ident); ok && n.Name != nil && r.Eval.Const(path, id.Name) == nil {
+					if in := inst[id.Name+"."+n.Name.Text]; in != nil {
+						out[path] = append(out[path], constUse{n.Sp, eval.Origin{Path: in.Path, Sp: in.D.Sp}})
+						return false
+					}
 				}
 			}
 			return true

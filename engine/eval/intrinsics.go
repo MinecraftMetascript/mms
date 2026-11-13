@@ -309,7 +309,7 @@ func kindOf(c *ctx, x *syntax.Call, args []argValue) Value {
 		return &Str{p, "none"}
 	}
 	k := "runtime"
-	switch v.(type) {
+	switch v := v.(type) {
 	case *None:
 		k = "none"
 	case *Bool:
@@ -320,7 +320,7 @@ func kindOf(c *ctx, x *syntax.Call, args []argValue) Value {
 		k = "string"
 	case *Word:
 		k = "name"
-		if strings.HasPrefix(v.(*Word).Text, "#") {
+		if strings.HasPrefix(v.Text, "#") {
 			k = "tag"
 		}
 	case *List:
