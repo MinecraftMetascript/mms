@@ -213,6 +213,7 @@ CustomBiome ash_fields {
     features = []
   }
   surface_rule = If(StoneDepth(Floor)) { Block(basalt) }
+  tags = [#is_overworld]
 }
 
 CustomBiome frost_fields {
@@ -270,7 +271,10 @@ Dimension fields {
 
 - The name of a `CustomBiome` stands for its biome, in a biome tag, a surface condition such as `Biome(ash_fields)`, or a command such as `/locate biome ${ash_fields}`.
 - With a `surface_rule`, it also writes the surface rule `ash_fields`, which is that rule kept to the biome. `material_rule` lists them in order, the way `[a, b]` lists any surface rules.
+- `tags = [#is_overworld]` adds the biome to biome tags, merged with their other values. Vanilla structures pick biomes by tags such as `#has_structure/mineshaft`.
 - `ash_fields.noise_entries` are its entries for the biome source. `climate` can be a list, for a biome that turns up at two climates, and then it has one entry for each.
+
+A biome's `features` holds one list per generation step, in the game's order. The editor names the step before each list, such as `raw_generation:` and `lakes:`, so a placed feature lands in the step meant for it.
 
 The dimension's **Biomes** preview shows where each one wins, and [why a biome doesn't appear](editors.md#why-a-biome-doesnt-appear) when one never does.
 

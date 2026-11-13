@@ -2694,14 +2694,6 @@ execute positioned ~ ~-1 ~ if function siege:standable run return run function s
     }
   }
 }
-=== data/siege/worldgen/material_condition/grassy.json
-{
-  "type": "minecraft:biome",
-  "biome_is": [
-    "siege:glowmeadow",
-    "siege:rootwood_hollow"
-  ]
-}
 === data/siege/worldgen/material_condition/topsoil.json
 {
   "type": "minecraft:stone_depth",
@@ -2710,7 +2702,7 @@ execute positioned ~ ~-1 ~ if function siege:standable run return run function s
   "add_surface_depth": false,
   "secondary_depth_range": 0
 }
-=== data/siege/worldgen/material_rule/ash_floor.json
+=== data/siege/worldgen/material_rule/ash_vents.json
 {
   "type": "minecraft:condition",
   "if_true": {
@@ -2835,7 +2827,7 @@ execute positioned ~ ~-1 ~ if function siege:standable run return run function s
     "result_state": "minecraft:bedrock"
   }
 }
-=== data/siege/worldgen/material_rule/darkroot_floor.json
+=== data/siege/worldgen/material_rule/darkroot_grove.json
 {
   "type": "minecraft:condition",
   "if_true": {
@@ -2933,7 +2925,112 @@ execute positioned ~ ~-1 ~ if function siege:standable run return run function s
     "result_state": "minecraft:deepslate"
   }
 }
-=== data/siege/worldgen/material_rule/lake_floor.json
+=== data/siege/worldgen/material_rule/glowmeadow.json
+{
+  "type": "minecraft:condition",
+  "if_true": {
+    "type": "minecraft:biome",
+    "biome_is": "siege:glowmeadow"
+  },
+  "then_run": {
+    "type": "minecraft:sequence",
+    "sequence": [
+      {
+        "type": "minecraft:condition",
+        "if_true": {
+          "type": "minecraft:stone_depth",
+          "offset": 0,
+          "surface_type": "floor",
+          "add_surface_depth": false,
+          "secondary_depth_range": 0
+        },
+        "then_run": {
+          "type": "minecraft:block",
+          "result_state": "minecraft:grass_block"
+        }
+      },
+      {
+        "type": "minecraft:condition",
+        "if_true": "siege:topsoil",
+        "then_run": {
+          "type": "minecraft:block",
+          "result_state": "minecraft:dirt"
+        }
+      }
+    ]
+  }
+}
+=== data/siege/worldgen/material_rule/mycelium_deeps.json
+{
+  "type": "minecraft:condition",
+  "if_true": {
+    "type": "minecraft:biome",
+    "biome_is": "siege:mycelium_deeps"
+  },
+  "then_run": {
+    "type": "minecraft:sequence",
+    "sequence": [
+      {
+        "type": "minecraft:condition",
+        "if_true": {
+          "type": "minecraft:stone_depth",
+          "offset": 0,
+          "surface_type": "floor",
+          "add_surface_depth": false,
+          "secondary_depth_range": 0
+        },
+        "then_run": {
+          "type": "minecraft:block",
+          "result_state": "minecraft:mycelium"
+        }
+      },
+      {
+        "type": "minecraft:condition",
+        "if_true": "siege:topsoil",
+        "then_run": {
+          "type": "minecraft:block",
+          "result_state": "minecraft:dirt"
+        }
+      }
+    ]
+  }
+}
+=== data/siege/worldgen/material_rule/rootwood_hollow.json
+{
+  "type": "minecraft:condition",
+  "if_true": {
+    "type": "minecraft:biome",
+    "biome_is": "siege:rootwood_hollow"
+  },
+  "then_run": {
+    "type": "minecraft:sequence",
+    "sequence": [
+      {
+        "type": "minecraft:condition",
+        "if_true": {
+          "type": "minecraft:stone_depth",
+          "offset": 0,
+          "surface_type": "floor",
+          "add_surface_depth": false,
+          "secondary_depth_range": 0
+        },
+        "then_run": {
+          "type": "minecraft:block",
+          "result_state": "minecraft:grass_block"
+        }
+      },
+      {
+        "type": "minecraft:condition",
+        "if_true": "siege:topsoil",
+        "then_run": {
+          "type": "minecraft:block",
+          "result_state": "minecraft:dirt"
+        }
+      }
+    ]
+  }
+}
+=== data/siege/worldgen/material_rule/sunken_lake.json
 {
   "type": "minecraft:condition",
   "if_true": {
@@ -2988,84 +3085,18 @@ execute positioned ~ ~-1 ~ if function siege:standable run return run function s
     ]
   }
 }
-=== data/siege/worldgen/material_rule/meadow_floor.json
-{
-  "type": "minecraft:condition",
-  "if_true": "siege:grassy",
-  "then_run": {
-    "type": "minecraft:sequence",
-    "sequence": [
-      {
-        "type": "minecraft:condition",
-        "if_true": {
-          "type": "minecraft:stone_depth",
-          "offset": 0,
-          "surface_type": "floor",
-          "add_surface_depth": false,
-          "secondary_depth_range": 0
-        },
-        "then_run": {
-          "type": "minecraft:block",
-          "result_state": "minecraft:grass_block"
-        }
-      },
-      {
-        "type": "minecraft:condition",
-        "if_true": "siege:topsoil",
-        "then_run": {
-          "type": "minecraft:block",
-          "result_state": "minecraft:dirt"
-        }
-      }
-    ]
-  }
-}
-=== data/siege/worldgen/material_rule/mycelium_floor.json
-{
-  "type": "minecraft:condition",
-  "if_true": {
-    "type": "minecraft:biome",
-    "biome_is": "siege:mycelium_deeps"
-  },
-  "then_run": {
-    "type": "minecraft:sequence",
-    "sequence": [
-      {
-        "type": "minecraft:condition",
-        "if_true": {
-          "type": "minecraft:stone_depth",
-          "offset": 0,
-          "surface_type": "floor",
-          "add_surface_depth": false,
-          "secondary_depth_range": 0
-        },
-        "then_run": {
-          "type": "minecraft:block",
-          "result_state": "minecraft:mycelium"
-        }
-      },
-      {
-        "type": "minecraft:condition",
-        "if_true": "siege:topsoil",
-        "then_run": {
-          "type": "minecraft:block",
-          "result_state": "minecraft:dirt"
-        }
-      }
-    ]
-  }
-}
 === data/siege/worldgen/material_rule/surface.json
 {
   "type": "minecraft:sequence",
   "sequence": [
     "siege:bedrock_floor",
     "siege:bedrock_roof",
-    "siege:meadow_floor",
-    "siege:darkroot_floor",
-    "siege:mycelium_floor",
-    "siege:lake_floor",
-    "siege:ash_floor",
+    "siege:glowmeadow",
+    "siege:rootwood_hollow",
+    "siege:darkroot_grove",
+    "siege:mycelium_deeps",
+    "siege:sunken_lake",
+    "siege:ash_vents",
     "siege:deepslate"
   ]
 }

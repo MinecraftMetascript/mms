@@ -389,8 +389,10 @@ func (c *ctx) nameParts(parts []syntax.NamePart, sp syntax.Span) (string, bool) 
 			return "", false
 		}
 		if w, ok := v.(*Word); ok {
-			// A tag in a name names the tag: `TagList ${t}` for #ns:t.
-			t = strings.TrimPrefix(w.Text, "#")
+			if tag, ok := strings.CutPrefix(w.Text, "#"); ok {
+				// A tag in a name names the tag: `BiomeTag ${t}` for #ns:t.
+				t = c.e.tagID(tag, c.ns)
+			}
 		}
 		b.WriteString(t)
 	}

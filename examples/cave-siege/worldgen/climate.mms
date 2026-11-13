@@ -1,4 +1,5 @@
-// Where each biome goes. The router's climate functions are flat noises
+// The climate the biomes are placed by: each CustomBiome's `climate` in
+// biomes.mms picks its ranges of these. The router's climate functions are flat noises
 // (they don't change with y), except depth, which falls from 1.5 at the
 // bedrock floor to -1 at the roof. So biomes form wide regions that change
 // with height too: Deep Dark and Darkroot Grove sit low, Glowmeadow and
@@ -6,7 +7,7 @@
 // show up at any height.
 //
 // The noises are scaled by 1.6 so that the -0.25 and 0.25 splits used in
-// dimension.mms cut each climate into roughly equal thirds.
+// the biomes' climates cut each climate into roughly equal thirds.
 
 /**
  * 0 at x 0, z 0, rising to 1 about 200 blocks out. The climate is faded

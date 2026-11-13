@@ -581,6 +581,22 @@ func (e *evaluator) addSites(path, ns string, d *syntax.Decl) {
 
 // instanceSites are the Blueprint instances written at the top of a file
 // with this name.
+// tagID is the id an unqualified tag means, as a reference does: the
+// project's own tag of that name in namespace ns when one is written,
+// and otherwise vanilla's. A declaration's name would mean ns:path
+// instead, so a tag passed in as a name piece keeps what it refers to.
+func (e *evaluator) tagID(tag, ns string) string {
+	if strings.Contains(tag, ":") {
+		return tag
+	}
+	for _, s := range e.sites[tag] {
+		if s.ns == ns && s.d.Kind != nil && strings.HasSuffix(s.d.Kind.Name, "Tag") {
+			return ns + ":" + tag
+		}
+	}
+	return "minecraft:" + tag
+}
+
 func (e *evaluator) instanceSites(name string) []*site {
 	var out []*site
 	for _, s := range e.sites[name] {

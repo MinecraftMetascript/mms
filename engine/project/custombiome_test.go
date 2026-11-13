@@ -11,7 +11,7 @@ CustomBiome ash_fields {
   climate = { temperature = [0.5, 1], humidity = [-1, 0], continentalness = 0, erosion = 0, weirdness = 0, depth = 0, offset = 0 }
   biome = { has_precipitation = false, temperature = 2, downfall = 0, effects = { water_color = "#3F76E4" }, carvers = [], features = [] }
   surface_rule = If(StoneDepth(Floor)) { Block(basalt) }
-  tags = [#minecraft:is_overworld, #hot]
+  tags = [#is_overworld, #hot]
 }
 
 BiomeTag hot = [minecraft:desert]
@@ -86,7 +86,7 @@ func TestCustomBiome(t *testing.T) {
 func TestCustomBiomeErrors(t *testing.T) {
 	src := strings.Replace(customBiomeSrc, "humidity = [-1, 0]", "humidty = [-1, 0]", 1)
 	src = strings.Replace(src, "[ash_fields, Block(stone)]", "[ash_fields, frost_fields]", 1)
-	src = strings.Replace(src, "#minecraft:is_overworld, #hot", "#minecraft:is_overworld, plains", 1)
+	src = strings.Replace(src, "#is_overworld, #hot", "#is_overworld, plains", 1)
 	_, r := assetProject(t, nil, src)
 	got := diagText(r)
 	for _, want := range []string{

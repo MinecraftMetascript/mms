@@ -28,7 +28,7 @@ Blueprint CustomBiome {
    */
   surface_rule: SurfaceRule?
   /**
-   * Biome tags the biome joins, such as `[#minecraft:is_overworld, #has_structure/village_plains]`.
+   * Biome tags the biome joins, such as `[#is_overworld, #has_structure/village_plains]`.
    * Each one is written as a biome tag holding the biome, merged with
    * the tag's other values, so structures and other tag checks find it.
    */

@@ -112,6 +112,7 @@ Blueprint CustomBiome {
   climate: ClimateParameters | [ClimateParameters]
   biome: Biome
   surface_rule: SurfaceRule?
+  tags: [Tag<worldgen/biome>] = []
 
   let climates = if (kind_of(climate) == "list") climate else [climate]
 
@@ -122,6 +123,10 @@ Blueprint CustomBiome {
       for c in climates:
         { biome = self.id, parameters = c }
     ]
+
+    for tag in tags {
+      BiomeTag ${tag} = [self.id]
+    }
 
     if (surface_rule != none) {
       SurfaceRule ${self.path} = If(Biome(self.id)) { surface_rule }
