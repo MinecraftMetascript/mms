@@ -158,7 +158,7 @@ func (c *ctx) reduce(x syntax.Expr) Value {
 		// field's value, a name piece or a value in a command.
 		return &Word{p, "#" + x.Name}
 	case *syntax.TemplatedName:
-		t, ok := c.nameParts(x.Parts, x.Sp)
+		t, ok := c.nameParts(x.Parts, x.Sp, "")
 		if !ok {
 			return &Code{p, &syntax.Bad{Sp: c.span(x.Sp)}}
 		}
@@ -372,7 +372,9 @@ func (c *ctx) constValue(k *Const, use syntax.Span) Value {
 }
 
 // nameParts spells a templated name: every `${...}` piece must be known.
-func (c *ctx) nameParts(parts []syntax.NamePart, sp syntax.Span) (string, bool) {
+// nameParts spells a templated name. kind is the kind of declaration it
+// names, if any, which says what kind of tag a tag in it means.
+func (c *ctx) nameParts(parts []syntax.NamePart, sp syntax.Span, kind string) (string, bool) {
 	var b strings.Builder
 	for _, pt := range parts {
 		if pt.X == nil {
@@ -393,7 +395,7 @@ func (c *ctx) nameParts(parts []syntax.NamePart, sp syntax.Span) (string, bool) 
 		if w, ok := v.(*Word); ok {
 			if tag, ok := strings.CutPrefix(w.Text, "#"); ok {
 				// A tag in a name names the tag: `BiomeTag ${t}` for #ns:t.
-				t = c.e.tagID(tag, c.ns)
+				t = c.e.tagID(tag, c.ns, kind)
 			}
 		}
 		b.WriteString(t)

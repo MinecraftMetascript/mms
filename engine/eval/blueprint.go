@@ -50,7 +50,7 @@ func (e *evaluator) expandSite(s *site, bp *Blueprint, c *ctx, placed bool) {
 }
 
 func (c *ctx) expandInstance(d *syntax.Decl, n *syntax.Name, bp *Blueprint, from *syntax.Decl) []*Decl {
-	name := c.declName(n)
+	name := c.declName(n, d.Kind.Name)
 	if name == nil {
 		return nil
 	}
