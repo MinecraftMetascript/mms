@@ -44,6 +44,7 @@ export const docGroups: Group[] = [
 			'blueprints',
 			'testing',
 			'terrain',
+			'biomes',
 			'jigsaw-pieces',
 			'building',
 			'editors',

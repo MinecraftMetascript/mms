@@ -63,7 +63,7 @@ Biome meadow {
 }
 ```
 
-With no carvers and no features, the islands are bare stone, grass and dirt. To add trees or ores later, list placed features in `features`, one list per generation step.
+With no carvers and no features, the islands are bare stone, grass and dirt. To add trees or ores later, list placed features in `features`, one list per generation step. [Biomes and features](../guides/biomes.md) covers those lists, mob spawns and the biome's sky and fog colours.
 
 ## 4. The terrain
 
@@ -184,7 +184,7 @@ In VS Code, tick **Reset changed dimensions** under **Build into world** in the 
 
 ## Next steps
 
-- Use a `multi_noise` biome source and the router's `temperature` and `vegetation` entries for several biomes.
-- Add features to the biome's `features` lists.
+- Use a `MultiNoise` biome source and the router's `temperature` and `vegetation` entries for several biomes, as in [where biomes go](../guides/biomes.md#where-biomes-go).
+- Add trees, ores and mobs to the biome, as in [biomes and features](../guides/biomes.md).
 - Turn on aquifers by adding an `aquifers` block to the settings.
 - Import a vanilla dimension with `mms import` to see a complete one written in MMS.
