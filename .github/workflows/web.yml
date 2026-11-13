@@ -3,9 +3,9 @@ name: web
 on:
   push:
     branches: [main]
-    paths: ['web/**', 'packages/**', 'engine/**', 'examples/**', 'package.json', 'package-lock.json', '.github/workflows/web.yml']
+    paths: ['web/**', 'site/**', 'packages/**', 'engine/**', 'examples/**', 'package.json', 'package-lock.json', '.github/workflows/web.yml']
   pull_request:
-    paths: ['web/**', 'packages/**', 'engine/**', 'examples/**', 'package.json', 'package-lock.json', '.github/workflows/web.yml']
+    paths: ['web/**', 'site/**', 'packages/**', 'engine/**', 'examples/**', 'package.json', 'package-lock.json', '.github/workflows/web.yml']
   workflow_dispatch:
 
 permissions:
