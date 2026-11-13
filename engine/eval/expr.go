@@ -31,8 +31,10 @@ type ctx struct {
 	emit *[]*Decl
 	// inst is the Blueprint instance being expanded, for check rules.
 	inst *Instance
-	// check allows error, warn and hint.
+	// check allows error, warn, hint and used.
 	check bool
+	// used answers used() in a check block run once the project is read.
+	used  func(Use) bool
 	depth int
 }
 
@@ -151,6 +153,10 @@ func (c *ctx) reduce(x syntax.Expr) Value {
 		return c.ident(x)
 	case *syntax.ResLoc:
 		return &Word{p, x.Text}
+	case *syntax.Tag:
+		// Kept as its text, '#' included, so a tag can be a Blueprint
+		// field's value, a name piece or a value in a command.
+		return &Word{p, "#" + x.Name}
 	case *syntax.TemplatedName:
 		t, ok := c.nameParts(x.Parts, x.Sp)
 		if !ok {
@@ -383,6 +389,12 @@ func (c *ctx) nameParts(parts []syntax.NamePart, sp syntax.Span) (string, bool) 
 			}
 			c.errorf("mms/name-piece", pt.Sp, "a ${...} in a name must be known at compile time, but "+c.pieceKind(pt.X, v))
 			return "", false
+		}
+		if w, ok := v.(*Word); ok {
+			if tag, ok := strings.CutPrefix(w.Text, "#"); ok {
+				// A tag in a name names the tag: `BiomeTag ${t}` for #ns:t.
+				t = c.e.tagID(tag, c.ns)
+			}
 		}
 		b.WriteString(t)
 	}

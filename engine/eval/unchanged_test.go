@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/minecraftmetascript/mms/engine/prelude"
 	"github.com/minecraftmetascript/mms/engine/syntax"
 )
 
@@ -29,8 +30,16 @@ func TestPlainFilesPassThrough(t *testing.T) {
 		units = append(units, Unit{Path: p, File: syntax.Parse(string(b))})
 	}
 	r := Run(units, Options{Namespace: "demo"})
-	// A declaration of a project Blueprint's kind is one of the new forms.
+	// A declaration of a project or prelude Blueprint's kind is one of
+	// the new forms.
 	blueprints := map[string]bool{}
+	for _, f := range prelude.Parse() {
+		for _, d := range f.File.Decls {
+			if d.Kind != nil && d.Kind.Name == "Blueprint" && !d.Extern {
+				blueprints[d.NameText()] = true
+			}
+		}
+	}
 	for _, u := range units {
 		for _, d := range u.File.Decls {
 			if d.Kind != nil && d.Kind.Name == "Blueprint" {

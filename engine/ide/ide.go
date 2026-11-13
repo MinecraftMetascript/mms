@@ -782,6 +782,7 @@ func (s *Session) checkCandidates(a *at) []sema.Candidate {
 	out := []sema.Candidate{
 		{Label: "error", Kind: sema.CandCallable, Detail: "check", Doc: "Reports an error at a field: `error(cooldown, \"a cooldown is at least one tick\")`.", Insert: "error($1)"},
 		{Label: "warn", Kind: sema.CandCallable, Detail: "check", Doc: "Reports a warning with a lint rule's name: `warn(cooldown, \"slow-wand\", \"...\")`.", Insert: "warn($1)", Rank: 1},
+		{Label: "used", Kind: sema.CandCallable, Detail: "check", Doc: "Whether the project reads a const of the emit block, or references a declaration of a kind it emits: `if (!used(noise_entries)) { warn(...) }`. A check that calls it runs once the whole project is read.", Insert: "used($1)", Rank: 2},
 	}
 	for i, kw := range []string{"if", "for", "let", "const"} {
 		out = append(out, sema.Candidate{Label: kw, Kind: sema.CandKeyword, Rank: 10 + i})
@@ -1936,6 +1937,9 @@ type InlayHint struct {
 	// Type marks an inferred type, `: int`, which sits right after the
 	// name.
 	Type bool
+	// Before marks a label that names the value right after it, such as
+	// a biome's `raw_generation:` features step.
+	Before bool
 }
 
 // InlayHints lists the inlay hints in a file, in order: the base item
@@ -1964,6 +1968,7 @@ func (s *Session) InlayHints(path string) []InlayHint {
 		}
 	}
 	out = append(out, s.typeHints(u)...)
+	out = append(out, s.featureStepHints(u)...)
 	// A Commands Template writes its code where it is called.
 	for _, c := range s.commandCalls(path) {
 		out = append(out, InlayHint{Off: c.X.Sp.End, Label: "inlined", Tooltip: inlinedText(c, false)})
@@ -2003,6 +2008,102 @@ func (s *Session) typeHints(u *sema.Unit) []InlayHint {
 		})
 	}
 	return out
+}
+
+// featureStepHints names the generation step of each list in a biome's
+// `features`, which the game reads by position: `raw_generation:` before
+// the first, `lakes:` before the second, and so on.
+func (s *Session) featureStepHints(u *sema.Unit) []InlayHint {
+	var out []InlayHint
+	seen := map[int]bool{}
+	// Only a list written in the file is labelled: one a const or a
+	// Template made is at the span of the name or call that brought it,
+	// and its items are not where the labels would go.
+	written := map[syntax.Span]*syntax.List{}
+	if f := s.R.Source[u.Path]; f != nil {
+		syntax.Walk(f, func(n syntax.Node) bool {
+			if l, ok := n.(*syntax.List); ok {
+				written[l.Sp] = l
+			}
+			return true
+		})
+	}
+	for _, d := range u.File.Decls {
+		dr := s.R.Decls[d]
+		if dr == nil {
+			continue
+		}
+		// A Blueprint instance's emitted Biome holds the instance's
+		// value as its own, such as a CustomBiome's `biome = { ... }`.
+		syntax.Walk(d, func(n syntax.Node) bool {
+			fs, ok := n.(*syntax.FieldStmt)
+			if !ok || fs.Key == nil {
+				return true
+			}
+			in := dr.Info[fs.Key]
+			l, ok := fs.Value.(*syntax.List)
+			if in == nil || in.Field == nil || in.Field.Key != "features" || !ok || !isFeatureSteps(in.Field.Type.T) {
+				return true
+			}
+			src := written[l.Sp]
+			if src == nil {
+				return true
+			}
+			for i, el := range src.Elems {
+				if i >= len(project.FeatureSteps) {
+					break
+				}
+				if _, spread := el.(*syntax.Spread); spread {
+					break // the positions after it are not known
+				}
+				step := project.FeatureSteps[i]
+				if seen[el.Span().Start] {
+					continue
+				}
+				seen[el.Span().Start] = true
+				out = append(out, InlayHint{Off: el.Span().Start, Label: step + ":", Before: true,
+					Tooltip: fmt.Sprintf("Step %d of %d: the game runs this list's placed features in the %s step", i+1, len(project.FeatureSteps), step)})
+			}
+			return true
+		})
+	}
+	return out
+}
+
+// isFeatureSteps reports whether t is a biome's features: a list of
+// lists of placed features (or tags of them), one per generation step.
+func isFeatureSteps(t *spec.Type) bool {
+	if t == nil {
+		return false
+	}
+	switch t.Kind {
+	case "union":
+		for _, m := range t.Members {
+			if isFeatureSteps(m) {
+				return true
+			}
+		}
+	case "list":
+		return listOfPlaced(t.Item)
+	}
+	return false
+}
+
+func listOfPlaced(t *spec.Type) bool {
+	if t == nil {
+		return false
+	}
+	switch t.Kind {
+	case "union":
+		for _, m := range t.Members {
+			if listOfPlaced(m) {
+				return true
+			}
+		}
+	case "list":
+		return t.Item != nil && t.Item.Kind == "reference" && strings.HasSuffix(t.Item.Path, "::PlacedFeatureRef")
+	}
+	return false
 }
 
 // commandCalls lists the calls in a file of Templates that return

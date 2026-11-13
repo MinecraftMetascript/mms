@@ -57,11 +57,12 @@ var builtins = map[string]intrinsic{
 	"error": checkRule(syntax.SeverityError),
 	"warn":  checkRule(syntax.SeverityWarning),
 	"hint":  checkRule(syntax.SeverityHint),
+	"used":  usedCall,
 }
 
 // checkOnly builtins are only callable in a Blueprint's check block;
 // elsewhere a call of that name is left alone.
-var checkOnly = map[string]bool{"error": true, "warn": true, "hint": true}
+var checkOnly = map[string]bool{"error": true, "warn": true, "hint": true, "used": true}
 
 func oneArg(c *ctx, x *syntax.Call, args []argValue, name string) (Value, bool) {
 	if len(args) != 1 {
@@ -309,7 +310,7 @@ func kindOf(c *ctx, x *syntax.Call, args []argValue) Value {
 		return &Str{p, "none"}
 	}
 	k := "runtime"
-	switch v.(type) {
+	switch v := v.(type) {
 	case *None:
 		k = "none"
 	case *Bool:
@@ -320,6 +321,9 @@ func kindOf(c *ctx, x *syntax.Call, args []argValue) Value {
 		k = "string"
 	case *Word:
 		k = "name"
+		if strings.HasPrefix(v.Text, "#") {
+			k = "tag"
+		}
 	case *List:
 		k = "list"
 	case *Record:
