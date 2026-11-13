@@ -189,6 +189,91 @@ To see the cells, zoom in on a density preview and turn on **Per block** and **G
 
 Give each step a name, as the samples here do. A named `DensityFunction` can be previewed on its own, which is how you find the step that went wrong, and its doc comment says what its numbers mean.
 
+## More than one biome
+
+With one biome, the router's climate entries can all be `0` and the dimension uses `Fixed(biome = ...)`. For more, a `MultiNoise` biome source picks the biome at each spot whose `climate` is nearest the climate the router samples there, and the surface rule picks blocks by biome. `CustomBiome` keeps those three in one place: the biome, where it goes, and its ground.
+
+```mms
+CustomBiome ash_fields {
+  climate = {
+    temperature = [0.2, 1]
+    humidity = [-1, 1]
+    continentalness = [-1, 1]
+    erosion = [-1, 1]
+    weirdness = [-1, 1]
+    depth = 0
+    offset = 0
+  }
+  biome = {
+    has_precipitation = false
+    temperature = 2
+    downfall = 0
+    effects = { water_color = "#3F76E4" }
+    carvers = []
+    features = []
+  }
+  surface_rule = If(StoneDepth(Floor)) { Block(basalt) }
+}
+
+CustomBiome frost_fields {
+  climate = {
+    temperature = [-1, 0.2]
+    humidity = [-1, 1]
+    continentalness = [-1, 1]
+    erosion = [-1, 1]
+    weirdness = [-1, 1]
+    depth = 0
+    offset = 0
+  }
+  biome = {
+    has_precipitation = true
+    temperature = -0.5
+    downfall = 0.5
+    effects = { water_color = "#3D57D6" }
+    carvers = []
+    features = []
+  }
+  surface_rule = If(StoneDepth(Floor)) { Block(snow_block) }
+}
+
+DensityFunction terrain = Gradient(axis = y, from_coordinate = -64, to_coordinate = 192, from_value = 1, to_value = -1)
+
+NoiseSettings fields {
+  sea_level = 48
+  default_block = stone
+  default_fluid = water
+  disable_mob_generation = false
+  legacy_random_source = false
+  noise = { min_y = -64, height = 384 }
+  material_rule = [ash_fields, frost_fields]
+  spawn_target = []
+  noise_router = {
+    final_density = Interpolated(terrain, 4, 8)
+    temperature = Noise(temperature, 0.25, 0)
+    vegetation = 0
+    continents = 0
+    erosion = 0
+    depth = 0
+    ridges = 0
+    chunk_surface_level = 0
+  }
+}
+
+Dimension fields {
+  type = overworld
+  generator = Noise(
+    settings = fields,
+    biome_source = MultiNoise(biomes = [...ash_fields.noise_entries, ...frost_fields.noise_entries]),
+  )
+}
+```
+
+- The name of a `CustomBiome` stands for its biome, in a biome tag, a surface condition such as `Biome(ash_fields)`, or a command such as `/locate biome ${ash_fields}`.
+- With a `surface_rule`, it also writes the surface rule `ash_fields`, which is that rule kept to the biome. `material_rule` lists them in order, the way `[a, b]` lists any surface rules.
+- `ash_fields.noise_entries` are its entries for the biome source. `climate` can be a list, for a biome that turns up at two climates, and then it has one entry for each.
+
+The dimension's **Biomes** preview shows where each one wins, and [why a biome doesn't appear](editors.md#why-a-biome-doesnt-appear) when one never does.
+
 ## Try it in the game
 
 ```sh

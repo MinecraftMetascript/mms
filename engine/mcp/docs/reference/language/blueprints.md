@@ -1,6 +1,6 @@
 # Blueprints
 
-A `Blueprint` declares a new kind of declaration. Its fields are checked and completed like the game's own, its `check` block reports problems, and its `emit` block writes the declarations it stands for. `CustomItem`, `Book` and `JigsawStructure` are Blueprints written this way, in the prelude: their pages under [Declaration kinds](https://minecraftmetascript.github.io/mms/docs/reference/kinds) list their fields.
+A `Blueprint` declares a new kind of declaration. Its fields are checked and completed like the game's own, its `check` block reports problems, and its `emit` block writes the declarations it stands for. `CustomItem`, `Book`, `JigsawStructure` and `CustomBiome` are Blueprints written this way, in the prelude: their pages under [Declaration kinds](https://minecraftmetascript.github.io/mms/docs/reference/kinds) list their fields.
 
 ```mms
 Objective wand_cooldown
@@ -105,23 +105,34 @@ One emitted declaration can be marked `primary`. It must have the declaration's 
 
 ### Consts of an instance
 
-A `const` at the top of an `emit` block belongs to each instance, and other code reads it as `name.const`. Use one for a value that has no file of its own, such as a biome's entry in a multi-noise biome source:
+A `const` at the top of an `emit` block belongs to each instance, and other code reads it as `name.const`. Use one for a value that has no file of its own. The prelude's `CustomBiome` has one, the biome's entries for a multi-noise biome source:
 
-```mms
+```
 Blueprint CustomBiome {
-  climate: ClimateParameters
+  climate: ClimateParameters | [ClimateParameters]
   biome: Biome
+  surface_rule: SurfaceRule?
+
+  let climates = if (kind_of(climate) == "list") climate else [climate]
 
   emit {
     primary Biome ${self.path} = biome
 
-    const noise_entry: BiomeNoiseEntry = {
-      biome = self.id
-      parameters = climate
+    const noise_entries: [BiomeNoiseEntry] = [
+      for c in climates:
+        { biome = self.id, parameters = c }
+    ]
+
+    if (surface_rule != none) {
+      SurfaceRule ${self.path} = If(Biome(self.id)) { surface_rule }
     }
   }
 }
+```
 
+Each `CustomBiome` then has its own `noise_entries`:
+
+```mms
 CustomBiome ash_fields {
   climate = {
     temperature = [0.5, 1]
@@ -163,8 +174,8 @@ CustomBiome frost_fields {
 }
 
 const fields_source: BiomeSource = MultiNoise(
-  biomes = [ash_fields.noise_entry, frost_fields.noise_entry]
+  biomes = [...ash_fields.noise_entries, ...frost_fields.noise_entries]
 )
 ```
 
-`ash_fields.noise_entry` is the entry that `CustomBiome ash_fields` worked out. It can be read anywhere a const can, in any file and before the instance is written, and in a command as `${ash_fields.noise_entry}`. Only the consts at the top of an `emit` block are read this way. A `let`, a field, or a const inside an `if` or a `for` stays inside the Blueprint. An instance that reads its own consts while it is being declared is an error.
+`ash_fields.noise_entries` are the entries that `CustomBiome ash_fields` worked out. They can be read anywhere a const can, in any file and before the instance is written, and in a command as `${ash_fields.noise_entries}`. Only the consts at the top of an `emit` block are read this way. A `let`, a field, or a const inside an `if` or a `for` stays inside the Blueprint. An instance that reads its own consts while it is being declared is an error.
