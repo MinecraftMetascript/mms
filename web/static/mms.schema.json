@@ -100,6 +100,11 @@
           "markdownDescription": "A model with one texture that only the blocks atlas stitches and another that only the items atlas stitches. The game draws a model's faces from a single atlas, so keep its textures under one of textures/block/ and textures/item/. A Texture(...) in a Model goes under textures/block/ unless it is given an id name.\n\nDefault: `warning`.",
           "$ref": "#/definitions/severity"
         },
+        "must-use": {
+          "description": "A Blueprint instance's const or emitted declaration that the Blueprint marks `@mustUse` in its doc comment, and that nothing reads or references, so it does nothing: a CustomBiome whose `noise_entries` no biome source lists never appears, and its surface rule is not applied until a `material_rule` names it.\n\nDefault: `warning`.",
+          "markdownDescription": "A Blueprint instance's const or emitted declaration that the Blueprint marks `@mustUse` in its doc comment, and that nothing reads or references, so it does nothing: a CustomBiome whose `noise_entries` no biome source lists never appears, and its surface rule is not applied until a `material_rule` names it.\n\nDefault: `warning`.",
+          "$ref": "#/definitions/severity"
+        },
         "overrides-vanilla": {
           "description": "A declaration in the minecraft namespace replaces the vanilla resource with the same id.\n\nDefault: `info`.",
           "markdownDescription": "A declaration in the minecraft namespace replaces the vanilla resource with the same id.\n\nDefault: `info`.",

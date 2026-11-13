@@ -51,6 +51,8 @@ var Rules = []*Rule{
 		Doc: "A model with one texture that only the blocks atlas stitches and another that only the items atlas stitches. The game draws a model's faces from a single atlas, so keep its textures under one of textures/block/ and textures/item/. A Texture(...) in a Model goes under textures/block/ unless it is given an id name."},
 	{ID: "model-missing-texture", Severity: syntax.SeverityWarning, all: lintModelTexture,
 		Doc: "A model whose faces show a texture slot, such as `#side`, that nothing in its parent chain fills, so the game draws the missing texture there. The faces are those of the nearest model in the chain with elements: `block/cube_column` uses `#end` and `#side`. Chains that reach a model neither the project nor vanilla has are not checked."},
+	{ID: "must-use", Severity: syntax.SeverityWarning, all: lintMustUse,
+		Doc: "A Blueprint instance's const or emitted declaration that the Blueprint marks `@mustUse` in its doc comment, and that nothing reads or references, so it does nothing: a CustomBiome whose `noise_entries` no biome source lists never appears, and its surface rule is not applied until a `material_rule` names it."},
 	{ID: "overrides-vanilla", Severity: syntax.SeverityInfo, run: lintOverrides,
 		Doc: "A declaration in the minecraft namespace replaces the vanilla resource with the same id."},
 	{ID: "accidental-markup", Severity: syntax.SeverityHint, run: lintAccidental,
@@ -572,10 +574,11 @@ func constValue(e syntax.Expr) (float64, bool) {
 
 var cmdIDRe = regexp.MustCompile(`#?[a-z0-9_.-]+:[a-z0-9_./-]+`)
 
-func lintUnused(l *lintRun) {
-	r := l.r
-	used := map[string]bool{} // folder|id, and ids named in commands
-	for _, d := range r.Order {
+// usedIDs are the ids the project references, as folder|id, and the ids
+// named in commands.
+func (l *lintRun) usedIDs() map[string]bool {
+	used := map[string]bool{}
+	for _, d := range l.r.Order {
 		for _, ref := range d.references() {
 			used[ref] = true
 		}
@@ -586,9 +589,16 @@ func lintUnused(l *lintRun) {
 			used["worldgen/template_pool|"+j.Pool] = true
 		}
 	}
+	return used
+}
+
+func lintUnused(l *lintRun) {
+	r := l.r
+	used := l.usedIDs()
+	must := mustUseDecls(r)
 	var unused []*sema.Symbol
 	for _, s := range r.Syms.All() {
-		if s.NS == "minecraft" || !unusedFolders[s.Kind.Folder()] || used[s.Kind.Folder()+"|"+s.ID()] || used[s.ID()] || s.Decl.Name == nil {
+		if s.NS == "minecraft" || !unusedFolders[s.Kind.Folder()] || used[s.Kind.Folder()+"|"+s.ID()] || used[s.ID()] || s.Decl.Name == nil || must[s.Decl] != nil {
 			continue
 		}
 		unused = append(unused, s)

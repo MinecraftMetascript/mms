@@ -237,6 +237,9 @@ type Decl struct {
 	Primary bool
 	// Instance is the Blueprint instance that emitted it, if any.
 	Instance *Instance
+	// Emit is the declaration in the Blueprint's emit block it was
+	// written from, when a Blueprint emitted it.
+	Emit *syntax.Decl
 }
 
 // Const is a const declared at the top of a file.

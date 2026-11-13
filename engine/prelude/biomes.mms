@@ -39,7 +39,10 @@ Blueprint CustomBiome {
   emit {
     primary Biome ${self.path} = biome
 
-    /** The biome's entries for a multi-noise biome source's `biomes`, one for each climate. */
+    /**
+     * The biome's entries for a multi-noise biome source's `biomes`, one for each climate.
+     * @mustUse no biome source places the biome
+     */
     const noise_entries: [BiomeNoiseEntry] = [
       for c in climates:
         { biome = self.id, parameters = c }
@@ -50,6 +53,7 @@ Blueprint CustomBiome {
     }
 
     if (surface_rule != none) {
+      /** @mustUse its ground is not made until a noise settings' material_rule lists it */
       SurfaceRule ${self.path} = If(Biome(self.id)) { surface_rule }
     }
   }

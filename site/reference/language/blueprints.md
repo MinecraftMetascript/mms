@@ -119,6 +119,7 @@ Blueprint CustomBiome {
   emit {
     primary Biome ${self.path} = biome
 
+    /** @mustUse no biome source places the biome */
     const noise_entries: [BiomeNoiseEntry] = [
       for c in climates:
         { biome = self.id, parameters = c }
@@ -182,5 +183,7 @@ const fields_source: BiomeSource = MultiNoise(
   biomes = [...ash_fields.noise_entries, ...frost_fields.noise_entries]
 )
 ```
+
+A doc comment with `@mustUse` on such a const, or on a declaration in the `emit` block, says the instance does nothing unless the project reads it. The `must-use` lint then warns at each instance whose one is never read or referenced, with the text after the tag as the reason. The prelude's `CustomBiome` marks its `noise_entries` with `@mustUse no biome source places the biome`, and its surface rule the same way.
 
 `ash_fields.noise_entries` are the entries that `CustomBiome ash_fields` worked out. They can be read anywhere a const can, in any file and before the instance is written, and in a command as `${ash_fields.noise_entries}`. Only the consts at the top of an `emit` block are read this way. A `let`, a field, or a const inside an `if` or a `for` stays inside the Blueprint. An instance that reads its own consts while it is being declared is an error.

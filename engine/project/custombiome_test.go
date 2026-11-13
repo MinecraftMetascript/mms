@@ -1,6 +1,7 @@
 package project
 
 import (
+	"sort"
 	"strings"
 	"testing"
 )
@@ -78,6 +79,42 @@ func TestCustomBiome(t *testing.T) {
 	}
 	if !strings.Contains(dim, `"humidity": [`) {
 		t.Errorf("climate ranges lost:\n%s", dim)
+	}
+}
+
+// An instance whose noise entries no biome source lists, or whose
+// surface rule no material_rule names, is reported: it does nothing.
+func TestCustomBiomeMustUse(t *testing.T) {
+	src := customBiomeSrc + `
+CustomBiome lost {
+  climate = climate_zero
+  biome = { has_precipitation = false, temperature = 2, downfall = 0, effects = { water_color = "#3F76E4" }, carvers = [], features = [] }
+  surface_rule = Block(stone)
+}
+
+Function show {
+  /say ${frost_fields.noise_entries}
+}
+`
+	_, r := assetProject(t, nil, src)
+	var got []string
+	for _, d := range r.Diagnostics("main.mms") {
+		if d.Code == "lint/must-use" {
+			got = append(got, src[d.Sp.Start:d.Sp.End]+": "+d.Message)
+		}
+	}
+	sort.Strings(got)
+	want := []string{
+		"lost: CustomBiome 'lost': nothing reads lost.noise_entries, so no biome source places the biome",
+		"lost: CustomBiome 'lost': nothing references its SurfaceRule 'demo:lost', so its ground is not made until a noise settings' material_rule lists it",
+	}
+	if strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Errorf("must-use:\n%s", strings.Join(got, "\n"))
+	}
+	for _, d := range r.Diagnostics("main.mms") {
+		if d.Code == "lint/unused" && strings.Contains(d.Message, "lost") {
+			t.Errorf("must-use output also reported as unused: %s", d.Message)
+		}
 	}
 }
 
