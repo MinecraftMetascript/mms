@@ -11,9 +11,9 @@ import (
 	"sync"
 
 	"github.com/minecraftmetascript/mms/engine/eval"
-	"github.com/minecraftmetascript/mms/engine/prelude"
 	"github.com/minecraftmetascript/mms/engine/fn"
 	"github.com/minecraftmetascript/mms/engine/jsonv"
+	"github.com/minecraftmetascript/mms/engine/prelude"
 	"github.com/minecraftmetascript/mms/engine/sema"
 	"github.com/minecraftmetascript/mms/engine/spec"
 	"github.com/minecraftmetascript/mms/engine/syntax"
