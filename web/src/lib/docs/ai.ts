@@ -38,7 +38,7 @@ export function llmsIndex(): string {
 		'',
 		'## Optional',
 		'',
-		`- [Everything in one file](${url('/llms-full.txt')}): every page above, and every helper group and lint rule, as Markdown`,
+		`- [Everything in one file](${url('/llms-full.txt')}): every page above, and every helper group, type area and lint rule, as Markdown`,
 		`- [Reference as YAML](${url('/docs/reference.yaml')}): kinds, helpers, types and lint rules as data`,
 		''
 	);
