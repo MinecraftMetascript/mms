@@ -237,9 +237,6 @@ type Decl struct {
 	Primary bool
 	// Instance is the Blueprint instance that emitted it, if any.
 	Instance *Instance
-	// Emit is the declaration in the Blueprint's emit block it was
-	// written from, when a Blueprint emitted it.
-	Emit *syntax.Decl
 }
 
 // Const is a const declared at the top of a file.
@@ -303,6 +300,7 @@ type Instance struct {
 	Consts    *Record
 	ConstDefs map[string]*syntax.ConstStmt
 	fieldSp   map[string]syntax.Span
+	later     []later
 }
 
 // Conversion is one `as T = expr hint(...)` of a Blueprint instance.
@@ -352,6 +350,9 @@ type evaluator struct {
 	// are instances whose emitted consts are read as name.const.
 	sites  map[string][]*site
 	siteOf map[*syntax.Name]*site
+	// sink, when set, takes the problems reported instead of the
+	// result's files: those of check blocks run once the project is read.
+	sink *[]syntax.Diagnostic
 }
 
 // site is one name of a declaration written at the top of a file. When
@@ -440,6 +441,15 @@ func (e *evaluator) emittedBefore(ns string, d *syntax.Decl) bool {
 }
 
 func (e *evaluator) report(path string, d syntax.Diagnostic) {
+	if e.sink != nil {
+		for _, o := range *e.sink {
+			if o.Sp == d.Sp && o.Message == d.Message {
+				return
+			}
+		}
+		*e.sink = append(*e.sink, d)
+		return
+	}
 	f := e.r.Files[path]
 	if f == nil {
 		f = &FileOut{}

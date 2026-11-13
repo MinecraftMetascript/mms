@@ -31,8 +31,10 @@ type ctx struct {
 	emit *[]*Decl
 	// inst is the Blueprint instance being expanded, for check rules.
 	inst *Instance
-	// check allows error, warn and hint.
+	// check allows error, warn, hint and used.
 	check bool
+	// used answers used() in a check block run once the project is read.
+	used  func(Use) bool
 	depth int
 }
 

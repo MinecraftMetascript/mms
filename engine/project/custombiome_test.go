@@ -83,8 +83,9 @@ func TestCustomBiome(t *testing.T) {
 }
 
 // An instance whose noise entries no biome source lists, or whose
-// surface rule no material_rule names, is reported: it does nothing.
-func TestCustomBiomeMustUse(t *testing.T) {
+// surface rule no material_rule names, is reported by CustomBiome's
+// check, which asks used() once the whole project is read.
+func TestCustomBiomeUsed(t *testing.T) {
 	src := customBiomeSrc + `
 CustomBiome lost {
   climate = climate_zero
@@ -99,21 +100,21 @@ Function show {
 	_, r := assetProject(t, nil, src)
 	var got []string
 	for _, d := range r.Diagnostics("main.mms") {
-		if d.Code == "lint/must-use" {
+		if d.Code == "lint/unplaced-biome" || d.Code == "lint/unused-surface-rule" {
 			got = append(got, src[d.Sp.Start:d.Sp.End]+": "+d.Message)
 		}
 	}
 	sort.Strings(got)
 	want := []string{
-		"lost: CustomBiome 'lost': nothing reads lost.noise_entries, so no biome source places the biome",
-		"lost: CustomBiome 'lost': nothing references its SurfaceRule 'demo:lost', so its ground is not made until a noise settings' material_rule lists it",
+		"lost: nothing reads lost.noise_entries, so no biome source places the biome",
+		"surface_rule = Block(stone): nothing references the surface rule demo:lost, so its ground is not made until a noise settings' material_rule lists it",
 	}
 	if strings.Join(got, "\n") != strings.Join(want, "\n") {
-		t.Errorf("must-use:\n%s", strings.Join(got, "\n"))
+		t.Errorf("used:\n%s", strings.Join(got, "\n"))
 	}
 	for _, d := range r.Diagnostics("main.mms") {
 		if d.Code == "lint/unused" && strings.Contains(d.Message, "lost") {
-			t.Errorf("must-use output also reported as unused: %s", d.Message)
+			t.Errorf("checked output also reported as unused: %s", d.Message)
 		}
 	}
 }
@@ -205,5 +206,32 @@ Template carvers_of(a: { noise_entries: [ConfiguredCarver] }): [ConfiguredCarver
 	}
 	if len(uses) != 2 {
 		t.Errorf("want 2 uses of a.noise_entries, got %d", len(uses))
+	}
+}
+
+// used() names a const of the emit block or a kind it emits, and only a
+// check block may call it.
+func TestUsedArgs(t *testing.T) {
+	src := `Blueprint Ore {
+  check {
+    if (!used(entries)) { warn(self, "x", "a") }
+    if (!used(Feature)) { warn(self, "y", "b") }
+  }
+  emit {
+    primary Biome ${self.path} = { has_precipitation = false, temperature = 2, downfall = 0, effects = { water_color = "#3F76E4" }, carvers = [], features = [] }
+    const noise_entries: [BiomeNoiseEntry] = []
+  }
+}
+Ore iron {}
+`
+	_, r := assetProject(t, nil, src)
+	got := diagText(r)
+	for _, want := range []string{
+		"Ore's emit block has no const or declaration kind 'entries'",
+		"Ore's emit block has no const or declaration kind 'Feature'",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("want %q in:\n%s", want, got)
+		}
 	}
 }

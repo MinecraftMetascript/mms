@@ -36,13 +36,19 @@ Blueprint CustomBiome {
 
   let climates = if (kind_of(climate) == "list") climate else [climate]
 
+  check {
+    if (!used(noise_entries)) {
+      warn(self, "unplaced-biome", "nothing reads ${self.path}.noise_entries, so no biome source places the biome")
+    }
+    if (surface_rule != none && !used(SurfaceRule)) {
+      warn(surface_rule, "unused-surface-rule", "nothing references the surface rule ${self.id}, so its ground is not made until a noise settings' material_rule lists it")
+    }
+  }
+
   emit {
     primary Biome ${self.path} = biome
 
-    /**
-     * The biome's entries for a multi-noise biome source's `biomes`, one for each climate.
-     * @mustUse no biome source places the biome
-     */
+    /** The biome's entries for a multi-noise biome source's `biomes`, one for each climate. */
     const noise_entries: [BiomeNoiseEntry] = [
       for c in climates:
         { biome = self.id, parameters = c }
@@ -53,7 +59,6 @@ Blueprint CustomBiome {
     }
 
     if (surface_rule != none) {
-      /** @mustUse its ground is not made until a noise settings' material_rule lists it */
       SurfaceRule ${self.path} = If(Biome(self.id)) { surface_rule }
     }
   }

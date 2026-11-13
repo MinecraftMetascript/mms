@@ -66,6 +66,21 @@ A field is `name: Type`, with `= default` or a `?` on the type when it can be le
 
 `check { }` runs at compile time on each declaration of the kind. `error(field, "message")`, `warn(...)` and `hint(...)` report a problem on that field's value. A rule name between the two, as in `warn(cooldown, "slow-wand", "...")`, lets `// mms-ignore slow-wand` and the `lint` settings in `mms.json` turn it off or change its level. A rule without a name is reported under the kind's name, such as `mms/wand`.
 
+`used(x)` asks whether the project uses one of the instance's outputs: `x` is a [const of the instance](#consts-of-an-instance), true when some code reads `name.x`, or a kind of declaration the `emit` block writes, such as `SurfaceRule`, true when something references the one the instance wrote. An instance that wrote none of that kind counts as used. A `check` block that calls `used()` runs once the whole project is read, so it sees every file. The prelude's `CustomBiome` warns this way when no biome source lists a biome's entries:
+
+```
+check {
+  if (!used(noise_entries)) {
+    warn(self, "unplaced-biome", "nothing reads ${self.path}.noise_entries, so no biome source places the biome")
+  }
+  if (surface_rule != none && !used(SurfaceRule)) {
+    warn(surface_rule, "unused-surface-rule", "nothing references the surface rule ${self.id}, so ...")
+  }
+}
+```
+
+A declaration that a `used(Kind)` asks about is left out of the `unused` lint, so it is not reported twice.
+
 ## as
 
 `as Type = value` says what the declaration's name means where a `Type` is expected. This is how a custom item's name becomes an item stack in a recipe result and a loot entry, and its base item in a tag:
@@ -116,10 +131,18 @@ Blueprint CustomBiome {
 
   let climates = if (kind_of(climate) == "list") climate else [climate]
 
+  check {
+    if (!used(noise_entries)) {
+      warn(self, "unplaced-biome", "nothing reads ${self.path}.noise_entries, so no biome source places the biome")
+    }
+    if (surface_rule != none && !used(SurfaceRule)) {
+      warn(surface_rule, "unused-surface-rule", "nothing references the surface rule ${self.id}, so its ground is not made until a noise settings' material_rule lists it")
+    }
+  }
+
   emit {
     primary Biome ${self.path} = biome
 
-    /** @mustUse no biome source places the biome */
     const noise_entries: [BiomeNoiseEntry] = [
       for c in climates:
         { biome = self.id, parameters = c }
@@ -184,6 +207,6 @@ const fields_source: BiomeSource = MultiNoise(
 )
 ```
 
-A doc comment with `@mustUse` on such a const, or on a declaration in the `emit` block, says the instance does nothing unless the project reads it. The `must-use` lint then warns at each instance whose one is never read or referenced, with the text after the tag as the reason. The prelude's `CustomBiome` marks its `noise_entries` with `@mustUse no biome source places the biome`, and its surface rule the same way.
+An instance whose entries nothing reads warns with `unplaced-biome`, from the [`used()`](#check) in `CustomBiome`'s check.
 
 `ash_fields.noise_entries` are the entries that `CustomBiome ash_fields` worked out. They can be read anywhere a const can, in any file and before the instance is written, and in a command as `${ash_fields.noise_entries}`. Only the consts at the top of an `emit` block are read this way. A `let`, a field, or a const inside an `if` or a `for` stays inside the Blueprint. An instance that reads its own consts while it is being declared is an error.

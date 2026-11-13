@@ -186,6 +186,10 @@ type Result struct {
 	jigsaw   *jigsawModel                   // structure files' jigsaw blocks, for the jigsaw rules
 	files    fs.FS
 	lintMu   sync.Mutex
+	// later are the problems of check blocks that call used(), run
+	// once the project is read.
+	laterOnce sync.Once
+	later     map[string][]syntax.Diagnostic
 	// models are the project's models' slot facts, by full id, built
 	// on first use by modelInfo.
 	// atlasSources are the sources of the atlases models read, by
@@ -524,6 +528,7 @@ func (r *Result) fileDiagnostics(path string) []syntax.Diagnostic {
 	out = append(out, r.langErr[path]...)
 	out = append(out, r.formErr[path]...)
 	out = append(out, r.selErr[path]...)
+	out = append(out, r.laterDiagnostics()[path]...)
 	typeErr := r.typeErr[path]
 	for _, d := range r.Order {
 		if d.Unit == u {

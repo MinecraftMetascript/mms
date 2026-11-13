@@ -178,6 +178,10 @@ func (c *ctx) expandInstance(d *syntax.Decl, n *syntax.Name, bp *Blueprint, from
 	for _, blk := range bp.Checks {
 		cc := bc.with()
 		cc.check = true
+		if callsUsed(blk) && inst.User {
+			inst.later = append(inst.later, later{cc, blk})
+			continue
+		}
 		var discard []syntax.Stmt
 		cc.stmts(blk.Items, &discard)
 	}

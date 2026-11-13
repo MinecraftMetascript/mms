@@ -782,6 +782,7 @@ func (s *Session) checkCandidates(a *at) []sema.Candidate {
 	out := []sema.Candidate{
 		{Label: "error", Kind: sema.CandCallable, Detail: "check", Doc: "Reports an error at a field: `error(cooldown, \"a cooldown is at least one tick\")`.", Insert: "error($1)"},
 		{Label: "warn", Kind: sema.CandCallable, Detail: "check", Doc: "Reports a warning with a lint rule's name: `warn(cooldown, \"slow-wand\", \"...\")`.", Insert: "warn($1)", Rank: 1},
+		{Label: "used", Kind: sema.CandCallable, Detail: "check", Doc: "Whether the project reads a const of the emit block, or references a declaration of a kind it emits: `if (!used(noise_entries)) { warn(...) }`. A check that calls it runs once the whole project is read.", Insert: "used($1)", Rank: 2},
 	}
 	for i, kw := range []string{"if", "for", "let", "const"} {
 		out = append(out, sema.Candidate{Label: kw, Kind: sema.CandKeyword, Rank: 10 + i})

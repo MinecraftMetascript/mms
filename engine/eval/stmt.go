@@ -391,12 +391,10 @@ func (c *ctx) decl(d *syntax.Decl, from *syntax.Decl) []*Decl {
 		at = Origin{c.path, nd.Name.Sp}
 	}
 	prov := Prov{At: at, Frames: c.fr}
-	var emit *syntax.Decl
 	if c.site != nil {
 		prov.Def = &Origin{c.defPath, d.Sp}
-		emit = d
 	}
-	return []*Decl{{D: nd, Prov: prov, From: from, Instance: c.inst, Emit: emit}}
+	return []*Decl{{D: nd, Prov: prov, From: from, Instance: c.inst}}
 }
 
 // declName spells a declaration's name, filling a templated one.
