@@ -49,7 +49,7 @@ extern Template matches(text: string, pattern: string): bool
 extern Template replace(text: string, old: string, new: string): string
 /** An asset call such as Texture("art/ruby.png") with an id name, unless it has one: named(texture, "item/ruby"). */
 extern Template named(asset: any, name: string): any
-/** The kind of a value: "none", "bool", "number", "string", "name", "list", "object", "range", "commands", or "runtime" for a value only known when the pack runs. */
+/** The kind of a value: "none", "bool", "number", "string", "name", "tag", "list", "object", "range", "commands", or "runtime" for a value only known when the pack runs. */
 extern Template kind_of(value: any): string
 /** The texts of a list's items with `sep` between them: `join(["a", "b"], ", ")` is "a, b". */
 extern Template join(list: [any], sep: string): string

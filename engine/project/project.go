@@ -3,7 +3,6 @@ package project
 import (
 	"context"
 	"fmt"
-	"github.com/minecraftmetascript/mms/engine/prelude"
 	"hash/fnv"
 	"io/fs"
 	"runtime/debug"
@@ -12,6 +11,7 @@ import (
 	"sync"
 
 	"github.com/minecraftmetascript/mms/engine/eval"
+	"github.com/minecraftmetascript/mms/engine/prelude"
 	"github.com/minecraftmetascript/mms/engine/fn"
 	"github.com/minecraftmetascript/mms/engine/jsonv"
 	"github.com/minecraftmetascript/mms/engine/sema"
@@ -311,8 +311,11 @@ func (r *Result) diagnose() {
 	at := map[key]int{}
 	whole := r.wholeDefs()
 	for _, u := range r.Units {
-		ds := r.fileDiagnostics(u.Path)
-		r.own[u.Path] = ds
+		r.own[u.Path] = r.fileDiagnostics(u.Path)
+	}
+	r.dropConstRepeats()
+	for _, u := range r.Units {
+		ds := r.own[u.Path]
 		for _, d := range ds {
 			if d.Echo {
 				continue
@@ -345,6 +348,78 @@ func (r *Result) diagnose() {
 			}
 		}
 	}
+}
+
+// dropConstRepeats drops a problem found in a typed const's value where
+// the const is used, when the same problem is reported elsewhere: the
+// const's own check found it where the value is written, and each use,
+// and each const built from it, would only say it again.
+func (r *Result) dropConstRepeats() {
+	if r.Eval == nil {
+		return
+	}
+	uses := r.typedConstUses()
+	repeat := func(path string, d syntax.Diagnostic) bool {
+		for _, sp := range uses[path] {
+			if d.Sp.Start >= sp.Start && d.Sp.End <= sp.End {
+				return true
+			}
+		}
+		return false
+	}
+	type key struct{ code, msg string }
+	root := map[key]bool{}
+	for path, ds := range r.own {
+		for _, d := range ds {
+			if !d.Echo && !repeat(path, d) {
+				root[key{d.Code, d.Message}] = true
+			}
+		}
+	}
+	for path, ds := range r.own {
+		kept := ds[:0:0]
+		for _, d := range ds {
+			if !d.Echo && root[key{d.Code, d.Message}] && repeat(path, d) {
+				continue
+			}
+			kept = append(kept, d)
+		}
+		r.own[path] = kept
+	}
+}
+
+// typedConstUses are the spans, by file, of the names of typed consts
+// where they are used: `c` for `const c: T = ...`, and `ash.noise_entries`
+// for an instance's const that its Blueprint gives a type.
+func (r *Result) typedConstUses() map[string][]syntax.Span {
+	emitTyped := map[string]bool{}
+	for _, b := range r.Eval.Blueprints {
+		for _, e := range b.Emits {
+			for _, it := range e.Items {
+				if k, ok := it.(*syntax.ConstStmt); ok && k.Type != nil && k.Name != nil {
+					emitTyped[k.Name.Text] = true
+				}
+			}
+		}
+	}
+	out := map[string][]syntax.Span{}
+	for path, f := range r.Source {
+		syntax.Walk(f, func(n syntax.Node) bool {
+			switch n := n.(type) {
+			case *syntax.Ident:
+				if k := r.Eval.Const(path, n.Name); k != nil && k.S != nil && k.S.Type != nil && k.S.Name != nil && k.S.Name.Sp != n.Sp {
+					out[path] = append(out[path], n.Sp)
+				}
+			case *syntax.Member:
+				if _, ok := n.X.(*syntax.Ident); ok && n.Name != nil && emitTyped[n.Name.Text] {
+					out[path] = append(out[path], n.Sp)
+					return false
+				}
+			}
+			return true
+		})
+	}
+	return out
 }
 
 // wholeDefs are the spans of the Blueprints and Templates, which a

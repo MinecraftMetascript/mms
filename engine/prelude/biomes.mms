@@ -27,6 +27,12 @@ Blueprint CustomBiome {
    * `material_rule` with the rules of the other biomes.
    */
   surface_rule: SurfaceRule?
+  /**
+   * Biome tags the biome joins, such as `[#minecraft:is_overworld, #has_structure/village_plains]`.
+   * Each one is written as a biome tag holding the biome, merged with
+   * the tag's other values, so structures and other tag checks find it.
+   */
+  tags: [Tag<worldgen/biome>] = []
 
   let climates = if (kind_of(climate) == "list") climate else [climate]
 
@@ -38,6 +44,10 @@ Blueprint CustomBiome {
       for c in climates:
         { biome = self.id, parameters = c }
     ]
+
+    for tag in tags {
+      BiomeTag ${tag} = [self.id]
+    }
 
     if (surface_rule != none) {
       SurfaceRule ${self.path} = If(Biome(self.id)) { surface_rule }

@@ -3,6 +3,7 @@ package eval
 import (
 	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/minecraftmetascript/mms/engine/syntax"
 )
@@ -34,7 +35,9 @@ func (c *ctx) lower(v Value) syntax.Expr {
 	case *Str:
 		out = &syntax.String{Value: v.S, Raw: strconv.Quote(v.S), Sp: p.Sp}
 	case *Word:
-		if identRe.MatchString(v.Text) {
+		if tag, ok := strings.CutPrefix(v.Text, "#"); ok {
+			out = &syntax.Tag{Name: tag, Sp: p.Sp}
+		} else if identRe.MatchString(v.Text) {
 			out = &syntax.Ident{Name: v.Text, Sp: p.Sp}
 		} else {
 			out = &syntax.ResLoc{Text: v.Text, Sp: p.Sp}

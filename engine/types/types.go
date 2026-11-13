@@ -240,7 +240,7 @@ func (e *Env) named(path string, t *syntax.TypeName) *spec.Type {
 	if t.Name == "BookText" {
 		return sema.BookTextType()
 	}
-	if t.Name == "Id" || t.Name == "Ids" {
+	if t.Name == "Id" || t.Name == "Ids" || t.Name == "Tag" {
 		if len(t.Args) != 1 {
 			e.errorf(path, t.Sp, t.Name+" takes one registry: "+t.Name+"<item>")
 			return &spec.Type{Kind: "string"}
@@ -252,6 +252,9 @@ func (e *Env) named(path string, t *syntax.TypeName) *spec.Type {
 		}
 		if t.Name == "Ids" {
 			return idsType(reg)
+		}
+		if t.Name == "Tag" {
+			return tagType(reg)
 		}
 		return idType(reg)
 	}
@@ -325,6 +328,16 @@ func idsType(reg string) *spec.Type {
 	return &spec.Type{Kind: "union", Members: []*spec.Type{{Kind: "list", Item: idType(reg)}, tagged}}
 }
 
+// tagType is a tag of a registry, such as #minecraft:is_overworld.
+func tagType(reg string) *spec.Type {
+	raw, _ := json.Marshal(reg)
+	required, _ := json.Marshal("required")
+	return &spec.Type{Kind: "string", Attributes: []spec.Attribute{{Name: "id", Value: &spec.Type{Kind: "tree", Tree: map[string]*spec.Type{
+		"registry": {Kind: "literal", Literal: &spec.Literal{Kind: "string", Value: raw}},
+		"tags":     {Kind: "literal", Literal: &spec.Literal{Kind: "string", Value: required}},
+	}}}}}
+}
+
 func idType(reg string) *spec.Type {
 	raw, _ := json.Marshal(reg)
 	return &spec.Type{Kind: "string", Attributes: []spec.Attribute{{Name: "id",
@@ -346,7 +359,7 @@ func (e *Env) Names(path string) []TypeName {
 	for _, n := range []string{"int", "float", "double", "long", "short", "byte", "bool", "string", "any"} {
 		out = append(out, TypeName{Name: n, Detail: "value type"})
 	}
-	out = append(out, TypeName{Name: "Id", Detail: "id in a registry", Args: true}, TypeName{Name: "Ids", Detail: "ids or a tag in a registry", Args: true})
+	out = append(out, TypeName{Name: "Id", Detail: "id in a registry", Args: true}, TypeName{Name: "Ids", Detail: "ids or a tag in a registry", Args: true}, TypeName{Name: "Tag", Detail: "tag of a registry", Args: true})
 	for _, n := range []string{"Text", "BookText", "Commands", "Function", "Selector", "Texture", "Sound", "StructureFile"} {
 		out = append(out, TypeName{Name: n, Detail: "language type"})
 	}

@@ -151,6 +151,10 @@ func (c *ctx) reduce(x syntax.Expr) Value {
 		return c.ident(x)
 	case *syntax.ResLoc:
 		return &Word{p, x.Text}
+	case *syntax.Tag:
+		// Kept as its text, '#' included, so a tag can be a Blueprint
+		// field's value, a name piece or a value in a command.
+		return &Word{p, "#" + x.Name}
 	case *syntax.TemplatedName:
 		t, ok := c.nameParts(x.Parts, x.Sp)
 		if !ok {
@@ -383,6 +387,10 @@ func (c *ctx) nameParts(parts []syntax.NamePart, sp syntax.Span) (string, bool) 
 			}
 			c.errorf("mms/name-piece", pt.Sp, "a ${...} in a name must be known at compile time, but "+c.pieceKind(pt.X, v))
 			return "", false
+		}
+		if w, ok := v.(*Word); ok {
+			// A tag in a name names the tag: `TagList ${t}` for #ns:t.
+			t = strings.TrimPrefix(w.Text, "#")
 		}
 		b.WriteString(t)
 	}

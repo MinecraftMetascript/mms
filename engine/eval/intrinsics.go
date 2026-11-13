@@ -320,6 +320,9 @@ func kindOf(c *ctx, x *syntax.Call, args []argValue) Value {
 		k = "string"
 	case *Word:
 		k = "name"
+		if strings.HasPrefix(v.(*Word).Text, "#") {
+			k = "tag"
+		}
 	case *List:
 		k = "list"
 	case *Record:

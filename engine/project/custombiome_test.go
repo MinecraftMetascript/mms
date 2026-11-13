@@ -11,7 +11,10 @@ CustomBiome ash_fields {
   climate = { temperature = [0.5, 1], humidity = [-1, 0], continentalness = 0, erosion = 0, weirdness = 0, depth = 0, offset = 0 }
   biome = { has_precipitation = false, temperature = 2, downfall = 0, effects = { water_color = "#3F76E4" }, carvers = [], features = [] }
   surface_rule = If(StoneDepth(Floor)) { Block(basalt) }
+  tags = [#minecraft:is_overworld, #hot]
 }
+
+BiomeTag hot = [minecraft:desert]
 
 CustomBiome frost_fields {
   climate = [
@@ -58,6 +61,14 @@ func TestCustomBiome(t *testing.T) {
 		t.Errorf("surface:\n%s", s)
 	}
 
+	// Each tag gets the biome, merged with the tag's own values.
+	if tag := emitted(t, r, "data/minecraft/tags/worldgen/biome/is_overworld.json"); !strings.Contains(tag, `"demo:ash_fields"`) {
+		t.Errorf("is_overworld:\n%s", tag)
+	}
+	if tag := emitted(t, r, "data/demo/tags/worldgen/biome/hot.json"); !strings.Contains(tag, `"demo:ash_fields"`) || !strings.Contains(tag, `"minecraft:desert"`) {
+		t.Errorf("hot:\n%s", tag)
+	}
+
 	dim := emitted(t, r, "data/demo/dimension/fields.json")
 	if n := strings.Count(dim, `"biome": "demo:frost_fields"`); n != 2 {
 		t.Errorf("want 2 frost_fields entries, got %d:\n%s", n, dim)
@@ -75,11 +86,13 @@ func TestCustomBiome(t *testing.T) {
 func TestCustomBiomeErrors(t *testing.T) {
 	src := strings.Replace(customBiomeSrc, "humidity = [-1, 0]", "humidty = [-1, 0]", 1)
 	src = strings.Replace(src, "[ash_fields, Block(stone)]", "[ash_fields, frost_fields]", 1)
+	src = strings.Replace(src, "#minecraft:is_overworld, #hot", "#minecraft:is_overworld, plains", 1)
 	_, r := assetProject(t, nil, src)
 	got := diagText(r)
 	for _, want := range []string{
 		"mms/unknown-field: unknown field 'humidty' in ClimateParameters; did you mean 'humidity'?",
 		"mms/type-mismatch: 'frost_fields' is a Biome, not a SurfaceRule",
+		"mms/type-mismatch: expected a worldgen/biome tag (#name) here",
 	} {
 		if !strings.Contains(got, want) {
 			t.Errorf("want %q in:\n%s", want, got)
@@ -93,5 +106,31 @@ func TestCustomBiomeErrors(t *testing.T) {
 	}
 	if !at {
 		t.Errorf("unknown-field not reported at the climate field:\n%s", got)
+	}
+}
+
+// A mistake in a typed const's value is reported once, where it is
+// written, not again at each use or in each const built from it. A
+// problem that only a use has is still reported there.
+func TestConstErrorNotRepeated(t *testing.T) {
+	src := `Biome ash { has_precipitation = false, temperature = 2, downfall = 0, effects = { water_color = "#3F76E4" }, carvers = [], features = [] }
+const c: ClimateParameters = { temperature = [0.5, 1], humidty = 0, continentalness = 0, erosion = 0, weirdness = 0, depth = 0, offset = 0 }
+const src: BiomeSource = MultiNoise(biomes = [{ biome = ash, parameters = c }])
+Dimension d { type = overworld, generator = Noise(settings = overworld, biome_source = src) }
+const n: int = 3
+Biome hot { has_precipitation = n, temperature = 2, downfall = n, effects = { water_color = "#3F76E4" }, carvers = [], features = [] }
+`
+	_, r := assetProject(t, nil, src)
+	count := map[string]int{}
+	for _, d := range r.Diagnostics("main.mms") {
+		if !d.Echo {
+			count[d.Code]++
+		}
+	}
+	if count["mms/unknown-field"] != 1 || count["mms/missing-field"] != 1 {
+		t.Errorf("want each climate problem once:\n%s", diagText(r))
+	}
+	if count["mms/type-mismatch"] != 1 {
+		t.Errorf("want the misused const reported where it is used:\n%s", diagText(r))
 	}
 }
