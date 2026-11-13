@@ -182,6 +182,7 @@ func TestConstRepeatNeedsTheConstsValue(t *testing.T) {
 }
 Dimension d { type = overworld, generator = Noise(settings = overworld, biome_source = MultiNoise(biomes = [...a.noise_entries])) }
 Biome hot { has_precipitation = false, temperature = 2, downfall = 0, effects = { water_color = "#3F76E4" }, carvers = a.noise_entries, features = [] }
+Biome cold { has_precipitation = false, temperature = 2, downfall = 0, effects = { water_color = "#3F76E4" }, carvers = [for a in [{ noise_entries = { biome = 1 } }]: a.noise_entries], features = [] }
 Template carvers_of(a: { noise_entries: [ConfiguredCarver] }): [ConfiguredCarver] = a.noise_entries
 `
 	_, r := assetProject(t, nil, src)
@@ -191,13 +192,15 @@ Template carvers_of(a: { noise_entries: [ConfiguredCarver] }): [ConfiguredCarver
 			n++
 		}
 	}
-	if n != 2 {
-		t.Errorf("want the instance's carver problem and the misused const's both reported, got %d:\n%s", n, diagText(r))
+	// The instance's carver, the misused const in hot, and cold's own
+	// carver, whose loop variable a hides the instance.
+	if n != 3 {
+		t.Errorf("want each carver problem reported, got %d:\n%s", n, diagText(r))
 	}
 	uses := r.typedConstUses()["main.mms"]
 	for _, u := range uses {
-		if text := src[u.sp.Start:u.sp.End]; u.sp.Start > strings.Index(src, "Template") {
-			t.Errorf("the Template's param a hides the instance, but %q counts as a use", text)
+		if text := src[u.sp.Start:u.sp.End]; u.sp.Start > strings.Index(src, "Biome cold") {
+			t.Errorf("a loop variable or param a hides the instance, but %q counts as a use", text)
 		}
 	}
 	if len(uses) != 2 {
