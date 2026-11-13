@@ -351,13 +351,13 @@ func (c *ctx) decl(d *syntax.Decl, from *syntax.Decl) []*Decl {
 		ts.Value, _ = c.interp(ts.Value, ts.Sp)
 	}
 	if d.Name != nil {
-		nd.Name = c.declName(d.Name)
+		nd.Name = c.declName(d.Name, d.Kind.Name)
 		if nd.Name == nil {
 			return nil
 		}
 	}
 	for _, m := range d.More {
-		if n := c.declName(m); n != nil {
+		if n := c.declName(m, d.Kind.Name); n != nil {
 			nd.More = append(nd.More, n)
 		}
 	}
@@ -398,11 +398,11 @@ func (c *ctx) decl(d *syntax.Decl, from *syntax.Decl) []*Decl {
 }
 
 // declName spells a declaration's name, filling a templated one.
-func (c *ctx) declName(n *syntax.Name) *syntax.Name {
+func (c *ctx) declName(n *syntax.Name, kind string) *syntax.Name {
 	if !n.Templated() {
 		return &syntax.Name{Text: n.Text, Sp: c.span(n.Sp)}
 	}
-	t, ok := c.nameParts(n.Parts, n.Sp)
+	t, ok := c.nameParts(n.Parts, n.Sp, kind)
 	if !ok {
 		return nil
 	}

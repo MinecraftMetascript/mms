@@ -235,3 +235,24 @@ Ore iron {}
 		}
 	}
 }
+
+// An unqualified tag in a CustomBiome's tags is the project's own only
+// when the project declares a biome tag of that name, written plainly
+// or with its namespace; a tag of another registry does not count.
+func TestCustomBiomeTagNamespace(t *testing.T) {
+	src := strings.Replace(customBiomeSrc, "BiomeTag hot = [minecraft:desert]", "BiomeTag demo:hot = [minecraft:desert]\nBlockTag is_overworld = [stone]", 1)
+	_, r := assetProject(t, nil, src)
+	files := emittedFiles(r)
+	if _, ok := files["data/demo/tags/worldgen/biome/is_overworld.json"]; ok {
+		t.Error("a BlockTag of the name moved #is_overworld into the project's namespace")
+	}
+	if tag := emitted(t, r, "data/minecraft/tags/worldgen/biome/is_overworld.json"); !strings.Contains(tag, `"demo:ash_fields"`) {
+		t.Errorf("is_overworld:\n%s", tag)
+	}
+	if tag := emitted(t, r, "data/demo/tags/worldgen/biome/hot.json"); !strings.Contains(tag, `"demo:ash_fields"`) {
+		t.Errorf("hot:\n%s", tag)
+	}
+	if _, ok := files["data/minecraft/tags/worldgen/biome/hot.json"]; ok {
+		t.Error("#hot went to minecraft although the project declares demo:hot")
+	}
+}
