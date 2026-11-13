@@ -50,7 +50,7 @@ func (s *Session) typeCompletion(a *at, off int) ([]sema.Candidate, bool) {
 		// parser kept; the token before the colon still belongs to it.
 		path = syntax.PathAt(f, prev.Sp.Start)
 		if prev.Kind == parser.MMSLexerLT {
-			if before := prevToken(f, prev.Sp.Start); before != nil && (before.Text == "Id" || before.Text == "Ids") {
+			if before := prevToken(f, prev.Sp.Start); before != nil && (before.Text == "Id" || before.Text == "Ids" || before.Text == "Tag") {
 				if inTypes(path) {
 					return s.registryCandidates(), true
 				}
@@ -63,7 +63,7 @@ func (s *Session) typeCompletion(a *at, off int) ([]sema.Candidate, bool) {
 			}
 		}
 	} else if len(path) >= 2 {
-		if outer, ok := path[len(path)-2].(*syntax.TypeName); ok && (outer.Name == "Id" || outer.Name == "Ids") {
+		if outer, ok := path[len(path)-2].(*syntax.TypeName); ok && (outer.Name == "Id" || outer.Name == "Ids" || outer.Name == "Tag") {
 			for _, arg := range outer.Args {
 				if arg == inner {
 					return s.registryCandidates(), true

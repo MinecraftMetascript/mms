@@ -8,9 +8,9 @@ import (
 	"github.com/minecraftmetascript/mms/engine/syntax"
 )
 
-// featureSteps names the generation steps a biome's features lists run
+// FeatureSteps names the generation steps a biome's features lists run
 // in, by index.
-var featureSteps = []string{
+var FeatureSteps = []string{
 	"raw_generation", "lakes", "local_modifications", "underground_structures",
 	"surface_structures", "strongholds", "underground_ores", "underground_decoration",
 	"fluid_springs", "vegetal_decoration", "top_layer_modification",
@@ -129,7 +129,7 @@ func (r *Result) checkFeatureOrder() {
 
 	reported := map[string]bool{}
 	for _, g := range groups {
-		for step := range featureSteps {
+		for step := range FeatureSteps {
 			// The game names one cycle; report a few, each with edges the
 			// ones before it did not use, so one check shows most fixes.
 			used := map[orderEdge]bool{}
@@ -372,7 +372,7 @@ func (r *Result) reportOrderCycle(biomes map[string]*orderBiome, step int, cyc, 
 		c := &chains[len(chains)-1]
 		c.feats = append(c.feats, cyc[i+1])
 	}
-	stepName := fmt.Sprintf("step %d (%s)", step+1, featureSteps[step])
+	stepName := fmt.Sprintf("step %d (%s)", step+1, FeatureSteps[step])
 	for _, id := range involved {
 		b := biomes[id]
 		name := func(f string) string { return shortID(f, b.decl.NS) }

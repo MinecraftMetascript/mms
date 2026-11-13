@@ -91,6 +91,7 @@ Types come from three places: the game's own schema (`ItemStack`, `LootPool`, `H
 | `A \| B` | either. The first one that matches is used. |
 | `Id<item>` | an id in a registry, vanilla or the project's |
 | `Ids<worldgen/biome>` | an id, a tag, or a list of ids |
+| `Tag<worldgen/biome>` | a tag, such as `#minecraft:is_overworld` |
 | `"rigid" \| "terrain_matching"` | one of these words |
 | `1 \| 2 \| 3` | one of these whole numbers |
 | `LootTable`, any kind's name | an id of one, or a value of one written in place |

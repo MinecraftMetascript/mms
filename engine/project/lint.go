@@ -572,10 +572,11 @@ func constValue(e syntax.Expr) (float64, bool) {
 
 var cmdIDRe = regexp.MustCompile(`#?[a-z0-9_.-]+:[a-z0-9_./-]+`)
 
-func lintUnused(l *lintRun) {
-	r := l.r
-	used := map[string]bool{} // folder|id, and ids named in commands
-	for _, d := range r.Order {
+// usedIDs are the ids the project references, as folder|id, and the ids
+// named in commands.
+func (l *lintRun) usedIDs() map[string]bool {
+	used := map[string]bool{}
+	for _, d := range l.r.Order {
 		for _, ref := range d.references() {
 			used[ref] = true
 		}
@@ -586,9 +587,16 @@ func lintUnused(l *lintRun) {
 			used["worldgen/template_pool|"+j.Pool] = true
 		}
 	}
+	return used
+}
+
+func lintUnused(l *lintRun) {
+	r := l.r
+	used := l.usedIDs()
+	checked := r.checkedUse()
 	var unused []*sema.Symbol
 	for _, s := range r.Syms.All() {
-		if s.NS == "minecraft" || !unusedFolders[s.Kind.Folder()] || used[s.Kind.Folder()+"|"+s.ID()] || used[s.ID()] || s.Decl.Name == nil {
+		if s.NS == "minecraft" || !unusedFolders[s.Kind.Folder()] || used[s.Kind.Folder()+"|"+s.ID()] || used[s.ID()] || s.Decl.Name == nil || checked[s.Decl] {
 			continue
 		}
 		unused = append(unused, s)

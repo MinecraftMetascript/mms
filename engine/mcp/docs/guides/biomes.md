@@ -160,7 +160,7 @@ A biome's `features` is a list of lists, one for each generation step, in this o
 | 5 | `surface_structures` | 11 | `top_layer_modification` |
 | 6 | `strongholds` | | |
 
-The steps have no names in the file, only their place in the list, so steps with nothing in them are `[]`. Trailing steps can be left out, so a biome with ores and trees needs the first ten:
+The steps have no names in the file, only their place in the list, so steps with nothing in them are `[]`. The editor shows each list's step name before it as an inlay hint. Trailing steps can be left out, so a biome with ores and trees needs the first ten:
 
 ```mms
 PlacedFeature meadow_oaks {
@@ -231,5 +231,7 @@ const meadow_and_desert: BiomeSource = MultiNoise(
 - Each one is matched against a function of the noise settings' `noise_router`: `temperature`, `vegetation` for `humidity`, `continents` for `continentalness`, `erosion`, `ridges` for `weirdness`, and `depth`. In vanilla's router only `depth` changes with height: it is 0 at the surface and grows underground, which is how cave biomes sit below the others.
 - `offset` is a plain number from 0 to 1, added to the biome's distance everywhere, so a biome with a higher offset wins less often.
 - `MultiNoise(preset = overworld)` uses vanilla's own table instead of `biomes`.
+
+To keep a biome and its climate together, declare it as a [`CustomBiome`](https://minecraftmetascript.github.io/mms/docs/reference/kinds/CustomBiome): it takes the `climate` (one `ClimateParameters` or a list), the `biome` and, optionally, its `surface_rule` and biome `tags`, and `name.noise_entries` are its entries for `MultiNoise(biomes = [...meadow.noise_entries, ...])`. [More than one biome](terrain.md#more-than-one-biome) builds a dimension that way.
 
 The biome source goes in the dimension's generator, as in `Noise(settings = ..., biome_source = MultiNoise(...))`. A `BiomeSource` is not a declaration of its own, since it has no file: name one with `const`, as here, or write it inline. The dimension's **Biomes** preview shows where each biome wins, and [why a biome doesn't appear](editors.md#why-a-biome-doesnt-appear) helps when one never does.

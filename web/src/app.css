@@ -91,6 +91,11 @@ body {
 	padding: 0;
 	background: none;
 }
+/* A label naming the value after it, such as a biome's `raw_generation:`. */
+.editor .cm-inlay-hint.cm-inlay-before {
+	margin-left: 0;
+	margin-right: 0.4em;
+}
 .cm-tooltip {
 	background: var(--c-panel) !important;
 	color: var(--c-ink);

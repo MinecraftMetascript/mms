@@ -300,6 +300,7 @@ type Instance struct {
 	Consts    *Record
 	ConstDefs map[string]*syntax.ConstStmt
 	fieldSp   map[string]syntax.Span
+	later     []later
 }
 
 // Conversion is one `as T = expr hint(...)` of a Blueprint instance.
@@ -349,6 +350,9 @@ type evaluator struct {
 	// are instances whose emitted consts are read as name.const.
 	sites  map[string][]*site
 	siteOf map[*syntax.Name]*site
+	// sink, when set, takes the problems reported instead of the
+	// result's files: those of check blocks run once the project is read.
+	sink *[]syntax.Diagnostic
 }
 
 // site is one name of a declaration written at the top of a file. When
@@ -437,6 +441,15 @@ func (e *evaluator) emittedBefore(ns string, d *syntax.Decl) bool {
 }
 
 func (e *evaluator) report(path string, d syntax.Diagnostic) {
+	if e.sink != nil {
+		for _, o := range *e.sink {
+			if o.Sp == d.Sp && o.Message == d.Message {
+				return
+			}
+		}
+		*e.sink = append(*e.sink, d)
+		return
+	}
 	f := e.r.Files[path]
 	if f == nil {
 		f = &FileOut{}
@@ -581,6 +594,22 @@ func (e *evaluator) addSites(path, ns string, d *syntax.Decl) {
 
 // instanceSites are the Blueprint instances written at the top of a file
 // with this name.
+// tagID is the id an unqualified tag means, as a reference does: the
+// project's own tag of that name in namespace ns when one is written,
+// and otherwise vanilla's. A declaration's name would mean ns:path
+// instead, so a tag passed in as a name piece keeps what it refers to.
+func (e *evaluator) tagID(tag, ns string) string {
+	if strings.Contains(tag, ":") {
+		return tag
+	}
+	for _, s := range e.sites[tag] {
+		if s.ns == ns && s.d.Kind != nil && strings.HasSuffix(s.d.Kind.Name, "Tag") {
+			return ns + ":" + tag
+		}
+	}
+	return "minecraft:" + tag
+}
+
 func (e *evaluator) instanceSites(name string) []*site {
 	var out []*site
 	for _, s := range e.sites[name] {
@@ -963,4 +992,46 @@ func (s *Const) Lowered() syntax.Expr {
 	}
 	c := &ctx{e: &evaluator{r: &Result{Nodes: map[syntax.Node]Prov{}, Lines: map[syntax.Node]Prov{}}}, path: s.Path, defPath: s.Path, sc: &scope{}}
 	return c.lower(s.val)
+}
+
+// ConstSources are where the text of the instance's const name was
+// written: the instance's own field values, and the Blueprint or const
+// text it was built from. A problem in the const's value is reported at
+// one of them.
+func (in *Instance) ConstSources(name string) []Origin {
+	if in.Consts == nil {
+		return nil
+	}
+	v, ok := in.Consts.get(name)
+	if !ok {
+		return nil
+	}
+	var out []Origin
+	var walk func(v Value)
+	walk = func(v Value) {
+		if v == nil {
+			return
+		}
+		p := v.at()
+		if p.def != nil {
+			out = append(out, *p.def)
+		} else {
+			out = append(out, Origin{Path: in.Path, Sp: p.Sp})
+		}
+		switch v := v.(type) {
+		case *List:
+			for _, e := range v.Elems {
+				walk(e)
+			}
+		case *Record:
+			for _, e := range v.Vals {
+				walk(e)
+			}
+		case *RangeV:
+			walk(v.Lo)
+			walk(v.Hi)
+		}
+	}
+	walk(v)
+	return out
 }

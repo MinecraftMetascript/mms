@@ -3,7 +3,6 @@ package project
 import (
 	"context"
 	"fmt"
-	"github.com/minecraftmetascript/mms/engine/prelude"
 	"hash/fnv"
 	"io/fs"
 	"runtime/debug"
@@ -14,6 +13,7 @@ import (
 	"github.com/minecraftmetascript/mms/engine/eval"
 	"github.com/minecraftmetascript/mms/engine/fn"
 	"github.com/minecraftmetascript/mms/engine/jsonv"
+	"github.com/minecraftmetascript/mms/engine/prelude"
 	"github.com/minecraftmetascript/mms/engine/sema"
 	"github.com/minecraftmetascript/mms/engine/spec"
 	"github.com/minecraftmetascript/mms/engine/syntax"
@@ -186,6 +186,10 @@ type Result struct {
 	jigsaw   *jigsawModel                   // structure files' jigsaw blocks, for the jigsaw rules
 	files    fs.FS
 	lintMu   sync.Mutex
+	// later are the problems of check blocks that call used(), run
+	// once the project is read.
+	laterOnce sync.Once
+	later     map[string][]syntax.Diagnostic
 	// models are the project's models' slot facts, by full id, built
 	// on first use by modelInfo.
 	// atlasSources are the sources of the atlases models read, by
@@ -311,8 +315,11 @@ func (r *Result) diagnose() {
 	at := map[key]int{}
 	whole := r.wholeDefs()
 	for _, u := range r.Units {
-		ds := r.fileDiagnostics(u.Path)
-		r.own[u.Path] = ds
+		r.own[u.Path] = r.fileDiagnostics(u.Path)
+	}
+	r.dropConstRepeats()
+	for _, u := range r.Units {
+		ds := r.own[u.Path]
 		for _, d := range ds {
 			if d.Echo {
 				continue
@@ -345,6 +352,130 @@ func (r *Result) diagnose() {
 			}
 		}
 	}
+}
+
+// dropConstRepeats drops a problem found in a typed const's value where
+// the const is used, when the const's own declaration has the same
+// problem: its check found it where the value is written, and each use,
+// and each const built from it, would only say it again. For an
+// instance's const, `ash.noise_entries`, the declaration is the instance.
+func (r *Result) dropConstRepeats() {
+	if r.Eval == nil {
+		return
+	}
+	uses := r.typedConstUses()
+	type key struct{ code, msg string }
+	// at reports whether a problem with this code and message is in one
+	// of the places the const's value was written, kept or not.
+	at := func(defs []eval.Origin, k key) bool {
+		for _, o := range defs {
+			for _, d := range r.own[o.Path] {
+				if !d.Echo && d.Code == k.code && d.Message == k.msg && d.Sp.Start >= o.Sp.Start && d.Sp.End <= o.Sp.End {
+					return true
+				}
+			}
+		}
+		return false
+	}
+	drop := map[string]map[int]bool{}
+	for path, ds := range r.own {
+		for i, d := range ds {
+			if d.Echo {
+				continue
+			}
+			for _, u := range uses[path] {
+				if d.Sp.Start >= u.sp.Start && d.Sp.End <= u.sp.End && at(u.defs, key{d.Code, d.Message}) {
+					if drop[path] == nil {
+						drop[path] = map[int]bool{}
+					}
+					drop[path][i] = true
+					break
+				}
+			}
+		}
+	}
+	for path, idx := range drop {
+		kept := r.own[path][:0:0]
+		for i, d := range r.own[path] {
+			if !idx[i] {
+				kept = append(kept, d)
+			}
+		}
+		r.own[path] = kept
+	}
+}
+
+// constUse is a typed const named where it is used, and where its
+// value was written.
+type constUse struct {
+	sp   syntax.Span
+	defs []eval.Origin
+}
+
+// typedConstUses are the uses, by file, of typed consts: `c` for
+// `const c: T = ...`, and `ash.noise_entries` for the const of a
+// Blueprint instance `ash` whose Blueprint gives it a type.
+func (r *Result) typedConstUses() map[string][]constUse {
+	// The instances whose Blueprint declares a typed const, by name and
+	// const.
+	inst := map[string]*eval.Instance{}
+	for _, in := range r.Eval.Instances {
+		if !in.User || in.Name == nil || in.D == nil {
+			continue
+		}
+		for name, k := range in.ConstDefs {
+			if k.Type != nil {
+				inst[in.Name.Text+"."+name] = in
+			}
+		}
+	}
+	out := map[string][]constUse{}
+	for path, f := range r.Source {
+		for _, it := range f.Items {
+			// A name bound inside the declaration, by a let, loop, param
+			// or field, may hide the const there, so a use of it is not
+			// counted.
+			local := map[string]bool{}
+			syntax.Walk(it, func(n syntax.Node) bool {
+				if m, ok := n.(*syntax.Member); ok {
+					// Its member name is not a binding.
+					if m.X != nil {
+						syntax.Walk(m.X, func(n syntax.Node) bool {
+							if nm, ok := n.(*syntax.Name); ok {
+								local[nm.Text] = true
+							}
+							return true
+						})
+					}
+					return false
+				}
+				if nm, ok := n.(*syntax.Name); ok {
+					local[nm.Text] = true
+				}
+				return true
+			})
+			syntax.Walk(it, func(n syntax.Node) bool {
+				switch n := n.(type) {
+				case *syntax.Ident:
+					if local[n.Name] {
+						break
+					}
+					if k := r.Eval.Const(path, n.Name); k != nil && k.S != nil && k.S.Type != nil && k.S.Name != nil && k.S.Name.Sp != n.Sp {
+						out[path] = append(out[path], constUse{n.Sp, []eval.Origin{{Path: k.Path, Sp: k.S.Sp}}})
+					}
+				case *syntax.Member:
+					if id, ok := n.X.(*syntax.Ident); ok && n.Name != nil && !local[id.Name] && r.Eval.Const(path, id.Name) == nil {
+						if in := inst[id.Name+"."+n.Name.Text]; in != nil {
+							out[path] = append(out[path], constUse{n.Sp, in.ConstSources(n.Name.Text)})
+							return false
+						}
+					}
+				}
+				return true
+			})
+		}
+	}
+	return out
 }
 
 // wholeDefs are the spans of the Blueprints and Templates, which a
@@ -397,6 +528,7 @@ func (r *Result) fileDiagnostics(path string) []syntax.Diagnostic {
 	out = append(out, r.langErr[path]...)
 	out = append(out, r.formErr[path]...)
 	out = append(out, r.selErr[path]...)
+	out = append(out, r.laterDiagnostics()[path]...)
 	typeErr := r.typeErr[path]
 	for _, d := range r.Order {
 		if d.Unit == u {

@@ -946,7 +946,11 @@ func (s *Server) inlayHint(_ context.Context, p struct {
 	hints := w.session().InlayHints(p.TextDocument.URI)
 	out := make([]map[string]any, 0, len(hints))
 	for _, h := range hints {
-		m := map[string]any{"position": l.pos(h.Off), "label": h.Label, "tooltip": h.Tooltip, "paddingLeft": !h.Type}
+		m := map[string]any{"position": l.pos(h.Off), "label": h.Label, "tooltip": h.Tooltip, "paddingLeft": !h.Type && !h.Before}
+		if h.Before {
+			m["paddingRight"] = true
+			m["kind"] = 2 // InlayHintKind.Parameter
+		}
 		if h.Type {
 			m["kind"] = 1 // InlayHintKind.Type
 		}

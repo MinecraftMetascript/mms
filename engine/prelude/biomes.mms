@@ -1,0 +1,65 @@
+// CustomBiome: a biome with where it goes and what its ground is made of,
+// written in MMS on top of the Biome and SurfaceRule it emits.
+
+/**
+ * A biome with its place in a multi-noise biome source and, optionally,
+ * its own surface:
+ * `CustomBiome ash_fields { climate = { temperature = [0.5, 1], humidity = [-1, 0], continentalness = 0, erosion = 0, weirdness = 0, depth = 0, offset = 0 }, biome = { ... }, surface_rule = Block(basalt) }`.
+ * Its name stands for the biome. `ash_fields.noise_entries` are its
+ * entries for a biome source, as in
+ * `MultiNoise(biomes = [...ash_fields.noise_entries, ...frost_fields.noise_entries])`,
+ * and with a `surface_rule` the surface rule `ash_fields` is that rule
+ * kept to the biome, for the noise settings' `material_rule`.
+ */
+Blueprint CustomBiome {
+  /**
+   * Where the biome goes: the climate it wins at in a multi-noise biome
+   * source, or a list of them for a biome found in more than one place.
+   * Each parameter is a number or a `[min, max]` range.
+   */
+  climate: ClimateParameters | [ClimateParameters]
+  /** The biome itself: its weather, colors, mobs, carvers and features. */
+  biome: Biome
+  /**
+   * The blocks on its ground, such as `If(StoneDepth(Floor)) { Block(grass_block) }`.
+   * It writes the surface rule of the biome's name, which applies this
+   * rule only in the biome. Put that name in the noise settings'
+   * `material_rule` with the rules of the other biomes.
+   */
+  surface_rule: SurfaceRule?
+  /**
+   * Biome tags the biome joins, such as `[#is_overworld, #has_structure/village_plains]`.
+   * Each one is written as a biome tag holding the biome, merged with
+   * the tag's other values, so structures and other tag checks find it.
+   */
+  tags: [Tag<worldgen/biome>] = []
+
+  let climates = if (kind_of(climate) == "list") climate else [climate]
+
+  check {
+    if (!used(noise_entries)) {
+      warn(self, "unplaced-biome", "nothing reads ${self.path}.noise_entries, so no biome source places the biome")
+    }
+    if (surface_rule != none && !used(SurfaceRule)) {
+      warn(surface_rule, "unused-surface-rule", "nothing references the surface rule ${self.id}, so its ground is not made until a noise settings' material_rule lists it")
+    }
+  }
+
+  emit {
+    primary Biome ${self.path} = biome
+
+    /** The biome's entries for a multi-noise biome source's `biomes`, one for each climate. */
+    const noise_entries: [BiomeNoiseEntry] = [
+      for c in climates:
+        { biome = self.id, parameters = c }
+    ]
+
+    for tag in tags {
+      BiomeTag ${tag} = [self.id]
+    }
+
+    if (surface_rule != none) {
+      SurfaceRule ${self.path} = If(Biome(self.id)) { surface_rule }
+    }
+  }
+}

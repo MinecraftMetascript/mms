@@ -100,25 +100,15 @@ NoiseSettings caves {
 
 /**
  * The cave world's generator, shared by the dimension and the world
- * preset: the caves noise settings, and biomes by climate and depth.
+ * preset: the caves noise settings, and biomes by climate and depth. The
+ * custom biomes' entries come from their CustomBiome; the vanilla ones are
+ * written here.
  */
 const cave_generator: ChunkGenerator = Noise(
   settings = caves,
   biome_source = MultiNoise(
     biomes = [
-      // Rare regions where continents is low
-      {
-        biome = mycelium_deeps
-        parameters = {
-          temperature = [-1, 1]
-          humidity = [-1, 1]
-          continentalness = [-1, -0.75]
-          erosion = [-1, 1]
-          weirdness = 0
-          depth = [0, 1.1]
-          offset = 0
-        }
-      },
+      ...mycelium_deeps.noise_entries,
       // The deep layer, below y -35
       {
         biome = deep_dark
@@ -132,55 +122,9 @@ const cave_generator: ChunkGenerator = Noise(
           offset = 0
         }
       },
-      {
-        biome = ash_vents
-        parameters = {
-          temperature = [0.5, 1]
-          humidity = [-1, -0.35]
-          continentalness = [-0.75, 1]
-          erosion = [-1, 1]
-          weirdness = 0
-          depth = [-1, 1.5]
-          offset = 0
-        }
-      },
-      // Below y 10
-      {
-        biome = darkroot_grove
-        parameters = {
-          temperature = [0.25, 1]
-          humidity = [0.25, 1]
-          continentalness = [-0.75, 1]
-          erosion = [-1, 1]
-          weirdness = 0
-          depth = [0.75, 1.5]
-          offset = 0
-        }
-      },
-      {
-        biome = rootwood_hollow
-        parameters = {
-          temperature = [0.25, 1]
-          humidity = [-0.25, 1]
-          continentalness = [-0.75, 1]
-          erosion = [-1, 1]
-          weirdness = 0
-          depth = [-1, 0.6]
-          offset = 0
-        }
-      },
-      {
-        biome = rootwood_hollow
-        parameters = {
-          temperature = [-1, -0.25]
-          humidity = [-0.25, 0.25]
-          continentalness = [-0.75, 1]
-          erosion = [-1, 1]
-          weirdness = 0
-          depth = [-1, 1.1]
-          offset = 0
-        }
-      },
+      ...ash_vents.noise_entries,
+      ...darkroot_grove.noise_entries,
+      ...rootwood_hollow.noise_entries,
       {
         biome = dripstone_caves
         parameters = {
@@ -193,30 +137,8 @@ const cave_generator: ChunkGenerator = Noise(
           offset = 0
         }
       },
-      {
-        biome = sunken_lake
-        parameters = {
-          temperature = [-1, -0.25]
-          humidity = [0.25, 1]
-          continentalness = [-0.75, 1]
-          erosion = [-1, 1]
-          weirdness = 0
-          depth = [-1, 1.1]
-          offset = 0
-        }
-      },
-      {
-        biome = glowmeadow
-        parameters = {
-          temperature = [-0.25, 0.25]
-          humidity = [-1, 0.25]
-          continentalness = [-0.75, 1]
-          erosion = [-1, 1]
-          weirdness = 0
-          depth = [-1, 1.1]
-          offset = 0
-        }
-      },
+      ...sunken_lake.noise_entries,
+      ...glowmeadow.noise_entries,
       {
         biome = lush_caves
         parameters = {
