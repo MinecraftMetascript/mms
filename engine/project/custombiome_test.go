@@ -171,3 +171,36 @@ Biome hot { has_precipitation = n, temperature = 2, downfall = n, effects = { wa
 		t.Errorf("want the misused const reported where it is used:\n%s", diagText(r))
 	}
 }
+
+// Only a problem in the const's own value makes a use's problem a
+// repeat: the same problem elsewhere in the instance does not, and a
+// local that hides the instance's name is not a use of its const.
+func TestConstRepeatNeedsTheConstsValue(t *testing.T) {
+	src := `CustomBiome a {
+  climate = { temperature = 0, humidity = 0, continentalness = 0, erosion = 0, weirdness = 0, depth = 0, offset = 0 }
+  biome = { has_precipitation = false, temperature = 2, downfall = 0, effects = { water_color = "#3F76E4" }, carvers = [{ type = canyon, biome = 1 }], features = [] }
+}
+Dimension d { type = overworld, generator = Noise(settings = overworld, biome_source = MultiNoise(biomes = [...a.noise_entries])) }
+Biome hot { has_precipitation = false, temperature = 2, downfall = 0, effects = { water_color = "#3F76E4" }, carvers = a.noise_entries, features = [] }
+Template carvers_of(a: { noise_entries: [ConfiguredCarver] }): [ConfiguredCarver] = a.noise_entries
+`
+	_, r := assetProject(t, nil, src)
+	n := 0
+	for _, d := range r.Diagnostics("main.mms") {
+		if !d.Echo && d.Message == "unknown field 'biome' in ConfiguredCarver" {
+			n++
+		}
+	}
+	if n != 2 {
+		t.Errorf("want the instance's carver problem and the misused const's both reported, got %d:\n%s", n, diagText(r))
+	}
+	uses := r.typedConstUses()["main.mms"]
+	for _, u := range uses {
+		if text := src[u.sp.Start:u.sp.End]; u.sp.Start > strings.Index(src, "Template") {
+			t.Errorf("the Template's param a hides the instance, but %q counts as a use", text)
+		}
+	}
+	if len(uses) != 2 {
+		t.Errorf("want 2 uses of a.noise_entries, got %d", len(uses))
+	}
+}

@@ -983,3 +983,45 @@ func (s *Const) Lowered() syntax.Expr {
 	c := &ctx{e: &evaluator{r: &Result{Nodes: map[syntax.Node]Prov{}, Lines: map[syntax.Node]Prov{}}}, path: s.Path, defPath: s.Path, sc: &scope{}}
 	return c.lower(s.val)
 }
+
+// ConstSources are where the text of the instance's const name was
+// written: the instance's own field values, and the Blueprint or const
+// text it was built from. A problem in the const's value is reported at
+// one of them.
+func (in *Instance) ConstSources(name string) []Origin {
+	if in.Consts == nil {
+		return nil
+	}
+	v, ok := in.Consts.get(name)
+	if !ok {
+		return nil
+	}
+	var out []Origin
+	var walk func(v Value)
+	walk = func(v Value) {
+		if v == nil {
+			return
+		}
+		p := v.at()
+		if p.def != nil {
+			out = append(out, *p.def)
+		} else {
+			out = append(out, Origin{Path: in.Path, Sp: p.Sp})
+		}
+		switch v := v.(type) {
+		case *List:
+			for _, e := range v.Elems {
+				walk(e)
+			}
+		case *Record:
+			for _, e := range v.Vals {
+				walk(e)
+			}
+		case *RangeV:
+			walk(v.Lo)
+			walk(v.Hi)
+		}
+	}
+	walk(v)
+	return out
+}

@@ -361,12 +361,14 @@ func (r *Result) dropConstRepeats() {
 	}
 	uses := r.typedConstUses()
 	type key struct{ code, msg string }
-	// at reports whether a problem with this code and message is in the
-	// span sp of file path, kept or not.
-	at := func(path string, sp syntax.Span, k key) bool {
-		for _, d := range r.own[path] {
-			if !d.Echo && d.Code == k.code && d.Message == k.msg && d.Sp.Start >= sp.Start && d.Sp.End <= sp.End {
-				return true
+	// at reports whether a problem with this code and message is in one
+	// of the places the const's value was written, kept or not.
+	at := func(defs []eval.Origin, k key) bool {
+		for _, o := range defs {
+			for _, d := range r.own[o.Path] {
+				if !d.Echo && d.Code == k.code && d.Message == k.msg && d.Sp.Start >= o.Sp.Start && d.Sp.End <= o.Sp.End {
+					return true
+				}
 			}
 		}
 		return false
@@ -378,7 +380,7 @@ func (r *Result) dropConstRepeats() {
 				continue
 			}
 			for _, u := range uses[path] {
-				if d.Sp.Start >= u.sp.Start && d.Sp.End <= u.sp.End && at(u.def.Path, u.def.Sp, key{d.Code, d.Message}) {
+				if d.Sp.Start >= u.sp.Start && d.Sp.End <= u.sp.End && at(u.defs, key{d.Code, d.Message}) {
 					if drop[path] == nil {
 						drop[path] = map[int]bool{}
 					}
@@ -399,11 +401,11 @@ func (r *Result) dropConstRepeats() {
 	}
 }
 
-// constUse is a typed const named where it is used, and where it is
-// declared.
+// constUse is a typed const named where it is used, and where its
+// value was written.
 type constUse struct {
-	sp  syntax.Span
-	def eval.Origin
+	sp   syntax.Span
+	defs []eval.Origin
 }
 
 // typedConstUses are the uses, by file, of typed consts: `c` for
@@ -425,22 +427,49 @@ func (r *Result) typedConstUses() map[string][]constUse {
 	}
 	out := map[string][]constUse{}
 	for path, f := range r.Source {
-		syntax.Walk(f, func(n syntax.Node) bool {
-			switch n := n.(type) {
-			case *syntax.Ident:
-				if k := r.Eval.Const(path, n.Name); k != nil && k.S != nil && k.S.Type != nil && k.S.Name != nil && k.S.Name.Sp != n.Sp {
-					out[path] = append(out[path], constUse{n.Sp, eval.Origin{Path: k.Path, Sp: k.S.Sp}})
+		for _, it := range f.Items {
+			// A name bound inside the declaration, by a let, loop, param
+			// or field, may hide the const there, so a use of it is not
+			// counted.
+			local := map[string]bool{}
+			syntax.Walk(it, func(n syntax.Node) bool {
+				if m, ok := n.(*syntax.Member); ok {
+					// Its member name is not a binding.
+					if m.X != nil {
+						syntax.Walk(m.X, func(n syntax.Node) bool {
+							if nm, ok := n.(*syntax.Name); ok {
+								local[nm.Text] = true
+							}
+							return true
+						})
+					}
+					return false
 				}
-			case *syntax.Member:
-				if id, ok := n.X.(*syntax.Ident); ok && n.Name != nil && r.Eval.Const(path, id.Name) == nil {
-					if in := inst[id.Name+"."+n.Name.Text]; in != nil {
-						out[path] = append(out[path], constUse{n.Sp, eval.Origin{Path: in.Path, Sp: in.D.Sp}})
-						return false
+				if nm, ok := n.(*syntax.Name); ok {
+					local[nm.Text] = true
+				}
+				return true
+			})
+			syntax.Walk(it, func(n syntax.Node) bool {
+				switch n := n.(type) {
+				case *syntax.Ident:
+					if local[n.Name] {
+						break
+					}
+					if k := r.Eval.Const(path, n.Name); k != nil && k.S != nil && k.S.Type != nil && k.S.Name != nil && k.S.Name.Sp != n.Sp {
+						out[path] = append(out[path], constUse{n.Sp, []eval.Origin{{Path: k.Path, Sp: k.S.Sp}}})
+					}
+				case *syntax.Member:
+					if id, ok := n.X.(*syntax.Ident); ok && n.Name != nil && !local[id.Name] && r.Eval.Const(path, id.Name) == nil {
+						if in := inst[id.Name+"."+n.Name.Text]; in != nil {
+							out[path] = append(out[path], constUse{n.Sp, in.ConstSources(n.Name.Text)})
+							return false
+						}
 					}
 				}
-			}
-			return true
-		})
+				return true
+			})
+		}
 	}
 	return out
 }
