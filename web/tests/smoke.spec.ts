@@ -236,6 +236,38 @@ test('the preview shows a grid, and per-block values when asked', async ({ page 
 	expect(errors).toEqual([]);
 });
 
+test('zooming and panning move the image on screen at once, before the new render lands', async ({ page }) => {
+	const errors: string[] = [];
+	page.on('pageerror', (e) => errors.push(e.message));
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	await replaceText(page, 'DensityFunction grad = Gradient(axis = y, from_coordinate = 0, to_coordinate = 512, from_value = 0, to_value = 1)\n');
+	await expect(status(page)).toHaveText(/No problems/);
+	await page.locator('.cm-line').first().click();
+	await expect(page.getByLabel('Value scale')).toContainText(/in view/, { timeout: 20_000 });
+	const image = page.locator('canvas').locator('..');
+	await expect.poll(() => image.evaluate((e) => e.style.transform)).toBe('');
+
+	// A wheel zooms out about the pointer: the image shrinks towards it in
+	// the same frame, with no worker message in between.
+	const moved = await page.locator('[data-preview-input]').evaluate(async (input) => {
+		const r = input.getBoundingClientRect();
+		input.dispatchEvent(new WheelEvent('wheel', { deltaY: 400, clientX: r.left + r.width / 4, clientY: r.top + r.height / 2, bubbles: true, cancelable: true }));
+		for (let i = 0; i < 10; i++) await Promise.resolve();
+		return (input.previousElementSibling as HTMLElement).style.transform;
+	});
+	const [a, , , d, e] = /matrix\((.*)\)/.exec(moved)![1].split(',').map(Number);
+	expect(a).toBeLessThan(1);
+	expect(d).toBeCloseTo(a, 5);
+	// The point under the pointer (a quarter of the way across) stays put.
+	const width = (await page.locator('[data-preview-input]').boundingBox())!.width;
+	expect(Math.abs(e + (a * width) / 4 - width / 4)).toBeLessThan(3);
+
+	// The new render lands and replaces it.
+	await expect.poll(() => image.evaluate((e) => e.style.transform), { timeout: 20_000 }).toBe('');
+	expect(errors).toEqual([]);
+});
+
 test('dimensions, noise settings and surface rules preview as terrain', async ({ page }) => {
 	const errors: string[] = [];
 	page.on('pageerror', (e) => errors.push(e.message));
@@ -1064,7 +1096,8 @@ test.describe('on a phone', () => {
 		const worldAt = async () => {
 			const v = await view();
 			return canvas.evaluate((c: HTMLCanvasElement, [x, y, v]) => {
-				const r = c.getBoundingClientRect();
+				// The preview's box: the image itself moves with the camera until its render lands.
+				const r = c.parentElement!.parentElement!.getBoundingClientRect();
 				const dx = ((x - r.left) / r.width) * c.width - c.width / 2;
 				const dy = ((y - r.top) / r.height) * c.height - c.height / 2;
 				return [v.x + (dx / v.scale + (2 * dy) / v.scale) / 2, v.y + ((2 * dy) / v.scale - dx / v.scale) / 2];

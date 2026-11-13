@@ -108,10 +108,17 @@
 	 * CSS pixels per render pixel. Kept per render in flight, so the grid
 	 * lines up with the image shown, not the camera that moved since.
 	 */
-	type SentView = { view: PreviewView; flat: boolean; resolution: number };
+	type SentView = { view: PreviewView; flat: boolean; resolution: number; mode: PreviewMode };
 	const sentViews = new Map<number, SentView>();
-	/** How the image on screen was rendered. */
-	let shownView = $state.raw<SentView | null>(null);
+	/**
+	 * How the image on screen was rendered, and its size in world terms:
+	 * for a 2D view the blocks a pixel spans (a coarse pass spans more), for
+	 * the 3D view a block's size in pixels.
+	 */
+	type ShownView = SentView & { scale: number };
+	let shownView = $state.raw<ShownView | null>(null);
+	/** The preview's box in CSS pixels, kept for the image's transform. */
+	let boxSize = $state.raw({ w: 0, h: 0 });
 	let lastTarget: string | null = null;
 	let mode = $state<PreviewMode>('density');
 	let biome = $state('minecraft:plains');
@@ -422,7 +429,8 @@
 			}
 			error = '';
 			last = r;
-			shownView = sentViews.get(r.seq) ?? null;
+			const sent = sentViews.get(r.seq);
+			shownView = sent ? { ...sent, scale: sent.mode === 'iso' ? r.scale || sent.view.scale : sent.view.scale * (r.step ?? 1) } : null;
 			for (const k of sentViews.keys()) if (k < r.seq) sentViews.delete(k);
 			// The worker picks the default size and keeps zooming out within what fills the canvas.
 			if (r.scale && (!isoView.scale || r.scale > isoView.scale)) isoView.scale = r.scale;
@@ -477,7 +485,10 @@
 	onMount(() => {
 		startWorker();
 		const watcher = setInterval(watch, 1000);
-		const ro = new ResizeObserver(() => request());
+		const ro = new ResizeObserver(() => {
+			boxSize = { w: box.clientWidth, h: box.clientHeight };
+			request();
+		});
 		ro.observe(box);
 		return () => {
 			ro.disconnect();
@@ -569,12 +580,11 @@
 		requestAnimationFrame(() => {
 			pending = false;
 			if (!worker || !info || !box) return;
-			const width = Math.max(16, Math.floor(box.clientWidth / resolution));
-			const height = Math.max(16, Math.floor(box.clientHeight / resolution));
+			const { w: width, h: height } = frame();
 			setBusy(true);
 			if (mode === 'iso' || topBlocks) startHelpers();
 			const sent: PreviewView = { ...$state.snapshot(view), down: lookDown && canDown, blocks: mode === 'density' && blockValues };
-			sentViews.set(seq + 1, { view: sent, flat, resolution });
+			sentViews.set(seq + 1, { view: mode === 'iso' ? $state.snapshot(isoView) : sent, flat, resolution, mode });
 			worker.postMessage({
 				type: 'render',
 				seq: ++seq,
@@ -619,8 +629,8 @@
 		} else {
 			ctx.putImageData(new ImageData(last.pixels, last.width, last.height), 0, 0);
 		}
-		if (last.seaLevel !== undefined && mode === 'density' && !flat) {
-			const py = (view.y - last.seaLevel) / view.scale + last.height / 2;
+		if (last.seaLevel !== undefined && mode === 'density' && !flat && shownView) {
+			const py = (shownView.view.y - last.seaLevel) / shownView.scale + last.height / 2;
 			ctx.strokeStyle = 'rgba(30, 80, 160, 0.6)';
 			ctx.setLineDash([4, 3]);
 			ctx.beginPath();
@@ -691,16 +701,16 @@
 		// The image is stretched over the whole box.
 		const sx = W / w;
 		const sy = H / h;
-		const { view: v, flat } = shown;
+		const { view: v, flat, scale } = shown;
 		const a = screenAxes(v.facing);
 		// The world plane at the image's centre: u to the right, and v down
 		// the screen (top-down) or up it (a side view, where v is y).
 		const cu = v.x * a.rx + v.z * a.rz;
 		const cv = flat ? v.x * a.dx + v.z * a.dz : v.y;
-		const xOf = (u: number) => ((u - cu) / v.scale + w / 2) * sx;
-		const yOf = (t: number) => ((flat ? t - cv : cv - t) / v.scale + h / 2) * sy;
-		const halfU = (w / 2) * v.scale;
-		const halfV = (h / 2) * v.scale;
+		const xOf = (u: number) => ((u - cu) / scale + w / 2) * sx;
+		const yOf = (t: number) => ((flat ? t - cv : cv - t) / scale + h / 2) * sy;
+		const halfU = (w / 2) * scale;
+		const halfV = (h / 2) * scale;
 		const r = (n: number) => Math.round(n * 2) / 2;
 		gridSize = { w: W, h: H };
 		gridPaths = gridShown.map((step, k) => {
@@ -717,10 +727,10 @@
 	 * right and v down it (top-down) or up it (side views, where v is y).
 	 * These map the camera and world points into it and back.
 	 */
-	function planeOf(c: { x: number; y: number; z: number }, facing = view.facing): [number, number] {
+	function planeOf(c: { x: number; y: number; z: number }, facing = view.facing, isFlat = flat): [number, number] {
 		const a = screenAxes(facing);
 		const u = c.x * a.rx + c.z * a.rz;
-		return [u, flat ? c.x * a.dx + c.z * a.dz : c.y];
+		return [u, isFlat ? c.x * a.dx + c.z * a.dz : c.y];
 	}
 	/** Moves the camera to plane point (u, v), keeping the slice's depth (or a top-down view's y). */
 	function setPlane(u: number, v: number) {
@@ -734,33 +744,41 @@
 			view.y = v;
 		}
 	}
-	/** The world block under a canvas point. */
-	function toWorld(px: number, py: number): Point {
-		const [u, v] = flatWorld(px, py, view.scale, ...planeOf(view));
-		const a = screenAxes(view.facing);
-		if (flat) {
-			// Top-down terrain shows a block at its own height; maps are at the camera's.
-			const i = Math.floor(py) * (last?.width ?? 0) + Math.floor(px);
-			const y = last?.heights?.[i];
-			return { x: Math.floor(u * a.rx + v * a.dx), y: y === undefined || Number.isNaN(y) ? Math.floor(view.y) : y, z: Math.floor(u * a.rz + v * a.dz) };
-		}
-		return a.rx
-			? { x: Math.floor(u * a.rx), y: Math.floor(v), z: Math.floor(view.z) }
-			: { x: Math.floor(view.x), y: Math.floor(v), z: Math.floor(u * a.rz) };
+	/** How the image on screen was rendered, or the camera before the first one. */
+	function onScreen(): ShownView {
+		return shownView ?? { view, flat, resolution, mode, scale: view.scale };
 	}
-	/** The canvas point at the middle of a world block. */
-	function toPixel(p: Point): [number, number] {
+	/** The world block under a point of the image on screen, in its own pixels. */
+	function toWorld(px: number, py: number): Point {
+		const { view: v, flat: isFlat, scale } = onScreen();
 		const w = last?.width ?? 0;
 		const h = last?.height ?? 0;
-		const [u, v] = planeOf({ x: p.x + 0.5, y: p.y + 0.5, z: p.z + 0.5 });
-		const [cu, cv] = planeOf(view);
-		return [(u - cu) / view.scale + w / 2, flat ? (v - cv) / view.scale + h / 2 : (cv - v) / view.scale + h / 2];
+		const [cu, cv] = planeOf(v, v.facing, isFlat);
+		const u = cu + (px - w / 2) * scale;
+		const t = isFlat ? cv + (py - h / 2) * scale : cv - (py - h / 2) * scale;
+		const a = screenAxes(v.facing);
+		if (isFlat) {
+			// Top-down terrain shows a block at its own height; maps are at the camera's.
+			const y = px >= 0 && px < w && py >= 0 && py < h ? last?.heights?.[Math.floor(py) * w + Math.floor(px)] : undefined;
+			return { x: Math.floor(u * a.rx + t * a.dx), y: y === undefined || Number.isNaN(y) ? Math.floor(v.y) : y, z: Math.floor(u * a.rz + t * a.dz) };
+		}
+		return a.rx ? { x: Math.floor(u * a.rx), y: Math.floor(t), z: Math.floor(v.z) } : { x: Math.floor(v.x), y: Math.floor(t), z: Math.floor(u * a.rz) };
 	}
-	/** Whether a world block is in the slice or map shown (a side view shows one depth, a map one y). */
+	/** The point of the image on screen, in its own pixels, at the middle of a world block. */
+	function toPixel(p: Point): [number, number] {
+		const { view: v, flat: isFlat, scale } = onScreen();
+		const w = last?.width ?? 0;
+		const h = last?.height ?? 0;
+		const [u, t] = planeOf({ x: p.x + 0.5, y: p.y + 0.5, z: p.z + 0.5 }, v.facing, isFlat);
+		const [cu, cv] = planeOf(v, v.facing, isFlat);
+		return [(u - cu) / scale + w / 2, isFlat ? (t - cv) / scale + h / 2 : (cv - t) / scale + h / 2];
+	}
+	/** Whether a world block is in the slice or map on screen (a side view shows one depth, a map one y). */
 	function inView(p: Point): boolean {
-		const a = screenAxes(view.facing);
-		if (flat) return true;
-		return a.rx ? p.z === Math.floor(view.z) : p.x === Math.floor(view.x);
+		const { view: v, flat: isFlat } = onScreen();
+		const a = screenAxes(v.facing);
+		if (isFlat) return true;
+		return a.rx ? p.z === Math.floor(v.z) : p.x === Math.floor(v.x);
 	}
 	function coords(p: Point): string {
 		return flat && !topBlocks ? `x ${p.x}, z ${p.z}` : `x ${p.x}, y ${p.y}, z ${p.z}`;
@@ -799,9 +817,61 @@
 	/** Whether this gesture pinched, so lifting a finger after it doesn't count as a tap. */
 	let pinched = false;
 
+	/** The size, in render pixels, of a render of a box this size. */
+	function frameOf(b: { w: number; h: number }) {
+		return { w: Math.max(16, Math.floor(b.w / resolution)), h: Math.max(16, Math.floor(b.h / resolution)) };
+	}
+	function frame() {
+		return frameOf({ w: box.clientWidth, h: box.clientHeight });
+	}
+	/**
+	 * Where the image on screen goes once the camera has moved since it was
+	 * rendered, so a pan or zoom moves it at once rather than waiting for the
+	 * new render: along each side, image pixel i lands on pixel
+	 * k·(i − size/2) + t + frame/2 of a render of the current view. Null when
+	 * the image can't follow the camera (it turned, or changed view).
+	 */
+	const imageMap = $derived.by((): { k: number; tx: number; ty: number } | null => {
+		const s = shownView;
+		if (!s || !last || s.mode !== mode) return null;
+		if (mode === 'iso') {
+			// Screen x = (x - z)·s and y = (x + z)·s/2 about the camera.
+			const s1 = isoView.scale || s.scale;
+			const dx = s.view.x - isoView.x;
+			const dz = s.view.y - isoView.y;
+			return { k: s1 / s.scale, tx: (dx - dz) * s1, ty: ((dx + dz) * s1) / 2 };
+		}
+		if (s.flat !== flat || s.view.facing !== view.facing) return null;
+		const [cu0, cv0] = planeOf(s.view);
+		const [cu, cv] = planeOf(view);
+		return { k: s.scale / view.scale, tx: (cu0 - cu) / view.scale, ty: (flat ? cv0 - cv : cv - cv0) / view.scale };
+	});
+	/** The CSS transform that puts the image where imageMap says, over the box it is stretched across. */
+	const imageTransform = $derived.by(() => {
+		const m = imageMap;
+		if (!m || !last || !boxSize.w || !boxSize.h) return '';
+		const f = frameOf(boxSize);
+		const ax = (m.k * last.width) / f.w;
+		const ay = (m.k * last.height) / f.h;
+		const bx = (boxSize.w / f.w) * (m.tx + f.w / 2 - (m.k * last.width) / 2);
+		const by = (boxSize.h / f.h) * (m.ty + f.h / 2 - (m.k * last.height) / 2);
+		if (Math.abs(ax - 1) < 1e-6 && Math.abs(ay - 1) < 1e-6 && Math.abs(bx) < 0.01 && Math.abs(by) < 0.01) return '';
+		return `matrix(${ax}, 0, 0, ${ay}, ${bx}, ${by})`;
+	});
+	/** The image's own pixel under a point of the current view's frame. */
+	function toImage(p: { px: number; py: number }): { px: number; py: number } {
+		const w = last?.width ?? 1;
+		const h = last?.height ?? 1;
+		const f = frameOf(boxSize);
+		const m = imageMap;
+		if (!m) return { px: (p.px * w) / f.w, py: (p.py * h) / f.h };
+		return { px: (p.px - m.tx - f.w / 2) / m.k + w / 2, py: (p.py - m.ty - f.h / 2) / m.k + h / 2 };
+	}
+	/** A pointer's position in the current view's frame, in render pixels. */
 	function pointer(e: { clientX: number; clientY: number }) {
-		const r = canvas.getBoundingClientRect();
-		return { px: ((e.clientX - r.left) / r.width) * (last?.width ?? 1), py: ((e.clientY - r.top) / r.height) * (last?.height ?? 1) };
+		const r = box.getBoundingClientRect();
+		const f = frame();
+		return { px: ((e.clientX - r.left) / r.width) * f.w, py: ((e.clientY - r.top) / r.height) * f.h };
 	}
 	/** The current block size of the 3D view (before its first render, what the worker picked). */
 	function isoScale(): number {
@@ -809,14 +879,16 @@
 	}
 	/** The world x/z under a canvas point of the 3D view, at block size s (screen x = (x - z)·s, y = (x + z)·s/2). */
 	function isoWorld(px: number, py: number, s: number, vx: number, vz: number): [number, number] {
-		const dx = px - (last?.width ?? 0) / 2;
-		const dy = py - (last?.height ?? 0) / 2;
+		const f = frame();
+		const dx = px - f.w / 2;
+		const dy = py - f.h / 2;
 		return [vx + (dx / s + (2 * dy) / s) / 2, vz + ((2 * dy) / s - dx / s) / 2];
 	}
 	/** The world point under a canvas point of a 2D view. */
 	function flatWorld(px: number, py: number, scale: number, vx: number, vy: number): [number, number] {
-		const dx = px - (last?.width ?? 0) / 2;
-		const dy = py - (last?.height ?? 0) / 2;
+		const f = frame();
+		const dx = px - f.w / 2;
+		const dy = py - f.h / 2;
 		return [vx + dx * scale, flat ? vy + dy * scale : vy - dy * scale];
 	}
 	/**
@@ -860,7 +932,7 @@
 	}
 
 	function down(e: PointerEvent) {
-		canvas.setPointerCapture(e.pointerId);
+		(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
 		if (pointers.size === 0) pinched = false;
 		pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 		if (pointers.size === 2) startPinch();
@@ -910,7 +982,7 @@
 			return;
 		}
 		if (e.type === 'pointerup' && drag && !drag.moved && !pinched && mode !== 'iso') {
-			const p = pointer(e);
+			const p = toImage(pointer(e));
 			const at = toWorld(p.px, p.py);
 			lock = lock && lock.x === at.x && lock.y === at.y && lock.z === at.z ? null : at;
 			draw();
@@ -933,7 +1005,7 @@
 	}
 
 	const readout = $derived.by(() => {
-		const at = hover;
+		const at = hover && toImage(hover);
 		if (!at || !last || mode === 'iso') return '';
 		const ix = Math.floor(at.px);
 		const iy = Math.floor(at.py);
@@ -947,7 +1019,7 @@
 	});
 	/** The value under the pointer, for the scale's marker. */
 	const hoverValue = $derived.by(() => {
-		const at = hover;
+		const at = hover && toImage(hover);
 		if (!at || !last || (mode !== 'density' && !layerValues)) return NaN;
 		const ix = Math.floor(at.px);
 		const iy = Math.floor(at.py);
@@ -964,7 +1036,10 @@
 		let ix: number;
 		let iy: number;
 		if (lock) [ix, iy] = toPixel(lock).map(Math.floor);
-		else if (hover) [ix, iy] = [Math.floor(hover.px), Math.floor(hover.py)];
+		else if (hover) {
+			const at = toImage(hover);
+			[ix, iy] = [Math.floor(at.px), Math.floor(at.py)];
+		}
 		else return null;
 		if (ix < 0 || iy < 0 || ix >= last.width || iy >= last.height) return null;
 		const n = last.width * last.height;
@@ -1187,28 +1262,37 @@
 			<span>{hint}</span>
 		{/if}
 	</div>
-	<div class="relative min-h-0 flex-1 bg-canvas" bind:this={box}>
-		<canvas
-			bind:this={canvas}
-			class="absolute inset-0 h-full w-full touch-none [image-rendering:pixelated]"
-			class:invisible={!info || !last}
-			data-view={JSON.stringify(mode === 'iso' ? isoView : view)}
+	<div class="relative min-h-0 flex-1 overflow-hidden bg-canvas" bind:this={box}>
+		<!-- The image and its grid, moved and scaled with the camera until the next render replaces them. -->
+		<div class="absolute inset-0 origin-top-left" style:transform={imageTransform || null}>
+			<canvas
+				bind:this={canvas}
+				class="absolute inset-0 h-full w-full [image-rendering:pixelated]"
+				class:invisible={!info || !last}
+				data-view={JSON.stringify(mode === 'iso' ? isoView : view)}
+			></canvas>
+			{#if info && last && gridShown.length && gridPaths.length}
+				<!-- A dark line with a light edge, to read over light and dark images alike. -->
+				<svg class="pointer-events-none absolute inset-0 h-full w-full" viewBox="0 0 {gridSize.w} {gridSize.h}" preserveAspectRatio="none" aria-hidden="true" data-grid={gridShown.map((g) => g.name).join(' ')}>
+					{#each gridPaths as p, k (k)}
+						{#if !p.faint}<path d={p.d} transform="translate(1 1)" stroke="rgba(255,255,255,0.25)" stroke-width="1" vector-effect="non-scaling-stroke" fill="none" shape-rendering="crispEdges" />{/if}
+						<path d={p.d} stroke={p.faint ? 'rgba(0,0,0,0.22)' : 'rgba(0,0,0,0.55)'} stroke-width="1" vector-effect="non-scaling-stroke" fill="none" shape-rendering="crispEdges" />
+					{/each}
+				</svg>
+			{/if}
+		</div>
+		<!-- Pointer input, over the whole box wherever the image has moved to. -->
+		<div
+			class="absolute inset-0 touch-none"
+			data-preview-input
+			role="presentation"
 			onpointerdown={down}
 			onpointermove={move}
 			onpointerup={up}
 			onpointercancel={up}
 			onpointerleave={() => (hover = null)}
 			onwheel={wheel}
-		></canvas>
-		{#if info && last && gridShown.length && gridPaths.length}
-			<!-- A dark line with a light edge, to read over light and dark images alike. -->
-			<svg class="pointer-events-none absolute inset-0 h-full w-full" viewBox="0 0 {gridSize.w} {gridSize.h}" preserveAspectRatio="none" aria-hidden="true" data-grid={gridShown.map((g) => g.name).join(' ')}>
-				{#each gridPaths as p, k (k)}
-					{#if !p.faint}<path d={p.d} transform="translate(1 1)" stroke="rgba(255,255,255,0.25)" stroke-width="1" fill="none" shape-rendering="crispEdges" />{/if}
-					<path d={p.d} stroke={p.faint ? 'rgba(0,0,0,0.22)' : 'rgba(0,0,0,0.55)'} stroke-width="1" fill="none" shape-rendering="crispEdges" />
-				{/each}
-			</svg>
-		{/if}
+		></div>
 		{#if info && error}
 			<div class="absolute inset-x-3 top-3 rounded border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-200">
 				Preview failed: {error}

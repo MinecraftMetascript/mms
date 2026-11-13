@@ -88,7 +88,14 @@ function register(kind: Folder, id: string, json: unknown) {
 	r.register(Identifier.parse(id), () => r.parse(json));
 }
 
+/** The files and bundles the registries were last filled from. */
+let registered = '';
 function registerAll() {
+	// Refilling is costly (every vanilla bundle is parsed again), and a pan
+	// asks for it on every render and strip: skip it when nothing changed.
+	const key = `${version}|${[...bundles.keys()].join(',')}`;
+	if (key === registered) return;
+	registered = key;
 	biomeTags.clear();
 	for (const r of Object.values(registries)) {
 		// Builtin entries (the surface noises) survive; everything else
@@ -1426,6 +1433,20 @@ function sampler(width: number, values: Float32Array, blocks: boolean, scale: nu
 	};
 }
 
+/**
+ * The last noise, density function or random state built for a 2D view,
+ * so panning and zooming sample the same one instead of building it again
+ * for every frame.
+ */
+let built: { key: string; value: unknown } | null = null;
+async function buildOnce<T>(req: RenderRequest, build: () => T): Promise<T> {
+	const key = [version, req.seed, req.kind, req.mode, req.id].join('|');
+	if (built?.key === key) return built.value as T;
+	const value = await withVanilla(build);
+	built = { key, value };
+	return value;
+}
+
 async function render(req: RenderRequest): Promise<Rendered> {
 	const { width, height, view } = req;
 	const seed = seedOf(req.seed);
@@ -1440,7 +1461,7 @@ async function render(req: RenderRequest): Promise<Rendered> {
 		if (v > max) max = v;
 	};
 	if (req.kind === 'dimension' && req.mode === 'biomes') {
-		const { dim, rs } = await withVanilla(() => {
+		const { dim, rs } = await buildOnce(req, () => {
 			const dim = readDimension(req.id);
 			const rs = new RandomState(dim.settings, seed);
 			// Touch the climate router, so missing entries are fetched now.
@@ -1468,7 +1489,7 @@ async function render(req: RenderRequest): Promise<Rendered> {
 
 	if (req.kind === 'noise') {
 		// Top-down, at the camera's y.
-		const noise = await withVanilla(() => {
+		const noise = await buildOnce(req, () => {
 			const rs = new RandomState(NoiseGeneratorSettings.create({}), seed);
 			return rs.getOrCreateNoise(id);
 		});
@@ -1488,7 +1509,7 @@ async function render(req: RenderRequest): Promise<Rendered> {
 
 	if (req.kind === 'density_function') {
 		// Side view: the slice through the camera, y up (or top-down, at the camera's y).
-		const fn = await withVanilla(() => {
+		const fn = await buildOnce(req, () => {
 			const rs = new RandomState(NoiseGeneratorSettings.create({}), seed);
 			// A reference holder, so the visitor binds noises and caches by id.
 			const df = new DensityFunction.HolderHolder(Holder.reference(WorldgenRegistries.DENSITY_FUNCTION, id));
@@ -1511,7 +1532,7 @@ async function render(req: RenderRequest): Promise<Rendered> {
 	}
 
 	// Noise settings, density mode: the terrain's final density.
-	const { settings, router } = await withVanilla(() => {
+	const { settings, router } = await buildOnce(req, () => {
 		const settings = WorldgenRegistries.NOISE_SETTINGS.getOrThrow(id);
 		const rs = speedUp(new RandomState(settings, seed));
 		return { settings, router: rs.router as NoiseRouter };
@@ -1564,6 +1585,45 @@ async function render(req: RenderRequest): Promise<Rendered> {
 	return { type: 'rendered', seq: req.seq, width, height, pixels, values, min, max, seaLevel: sea, minY, maxY };
 }
 
+/** How much coarser a slow 2D view's first pass is, along each side. */
+const coarseStep = 4;
+/** Shows a coarse pass when the full one will take longer than this, in ms. */
+const coarseWorth = 200;
+/** Adds a half-resolution pass between them when the full one will take longer than this. */
+const halfWorth = 1500;
+
+/**
+ * Renders a sampled 2D view (noise, density, biome map) coarsely first
+ * when it is slow, so a zoom or pan shows the new view soon and sharpens
+ * as finer passes finish. Terrain views have their own caches and
+ * partial frames.
+ */
+async function progressive(req: RenderRequest): Promise<Rendered> {
+	const sampled =
+		req.kind === 'noise' || req.kind === 'density_function' || (req.kind === 'noise_settings' && req.mode === 'density') || (req.kind === 'dimension' && req.mode === 'biomes');
+	if (!sampled || req.width < coarseStep * 8 || req.height < coarseStep * 8) return render(req);
+	const pass = (step: number): Promise<Rendered> =>
+		render({
+			...req,
+			width: Math.ceil(req.width / step),
+			height: Math.ceil(req.height / step),
+			view: { ...req.view, scale: req.view.scale * step }
+		});
+	const started = performance.now();
+	const first = await pass(coarseStep);
+	current(req);
+	// The full pass samples coarseStep² as many pixels.
+	const full = (performance.now() - started) * coarseStep * coarseStep;
+	if (full < coarseWorth) return render(req);
+	post({ ...first, partial: true, step: coarseStep });
+	if (full > halfWorth) {
+		const half = await pass(2);
+		current(req);
+		post({ ...half, partial: true, step: 2 });
+	}
+	return render(req);
+}
+
 function post(res: Rendered) {
 	const transfer: Transferable[] = [res.pixels.buffer, res.values.buffer];
 	if (res.bitmap) transfer.push(res.bitmap);
@@ -1607,11 +1667,16 @@ self.onmessage = async (e: MessageEvent<PreviewRequest>) => {
 		return;
 	}
 	latest = req.seq;
+	// A drag or a wheel sends a render a frame. Let the ones already queued
+	// arrive first, so only the newest starts instead of each one building
+	// its sampler before finding it is stale.
+	await breathe();
+	if (req.seq !== latest) return;
 	// Said before any work, so a viewer that finds this worker stuck knows
 	// which render it got to: newer ones never started.
 	(self as unknown as Worker).postMessage({ type: 'started', seq: req.seq } satisfies PreviewResponse);
 	try {
-		const res = await render(req);
+		const res = await progressive(req);
 		if (res.seq !== latest) return; // superseded while fetching
 		post(res);
 	} catch (err) {
