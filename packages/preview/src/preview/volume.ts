@@ -14,6 +14,7 @@
 //   under the ground (a cave) from the open air above it.
 
 import * as THREE from 'three';
+import { multiples, niceStep } from './rulers';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { VOLUME_TILE, type VolumeTile } from './protocol';
 
@@ -493,6 +494,8 @@ export class VolumeRenderer {
 	private lastWant = '';
 	/** Called when the camera's target moves, with its world x and z. */
 	moved: (x: number, z: number) => void = () => {};
+	/** Called after each frame is drawn, for overlays that follow the camera. */
+	drawn: () => void = () => {};
 	/** Called when a tile arrives, with the range of density in the window. */
 	ranged: (r: ValueRange) => void = () => {};
 
@@ -971,5 +974,43 @@ export class VolumeRenderer {
 		}
 		(this.uniforms.camPos.value as THREE.Vector3).copy(this.camera.position);
 		this.renderer.render(this.scene, this.camera);
+		this.drawn();
+	}
+
+	/**
+	 * A height ruler up one of the box's upright edges, in CSS pixels of the
+	 * canvas: the edge furthest left on screen, so it runs up the box's
+	 * outline rather than across the inside, with ticks at least `gap`
+	 * pixels apart. Empty when no edge is wholly in front of the camera.
+	 */
+	heightRuler(gap = 28): { y: number; px: number; py: number }[] {
+		const min = this.uniforms.boxMin.value as THREE.Vector3;
+		const max = this.uniforms.boxMax.value as THREE.Vector3;
+		if (!(max.y > min.y)) return [];
+		const w = this.canvas.clientWidth;
+		const h = this.canvas.clientHeight;
+		const p = new THREE.Vector3();
+		const toScreen = (x: number, y: number, z: number): [number, number] | null => {
+			p.set(x, y, z).project(this.camera);
+			if (p.z < -1 || p.z > 1) return null;
+			return [((p.x + 1) / 2) * w, ((1 - p.y) / 2) * h];
+		};
+		let best: { x: number; z: number; len: number; left: number } | null = null;
+		for (const x of [min.x, max.x])
+			for (const z of [min.z, max.z]) {
+				const b = toScreen(x, min.y, z);
+				const t = toScreen(x, max.y, z);
+				if (!b || !t) continue;
+				const left = b[0] + t[0];
+				if (!best || left < best.left) best = { x, z, len: Math.hypot(t[0] - b[0], t[1] - b[1]), left };
+			}
+		if (!best || best.len < gap) return [];
+		const step = niceStep(((max.y - min.y) / best.len) * gap);
+		const out: { y: number; px: number; py: number }[] = [];
+		for (const y of multiples(min.y, max.y, step)) {
+			const at = toScreen(best.x, y, best.z);
+			if (at) out.push({ y, px: at[0], py: at[1] });
+		}
+		return out;
 	}
 }

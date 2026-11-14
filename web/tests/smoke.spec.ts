@@ -200,6 +200,13 @@ test('the preview shows a grid, and per-block values when asked', async ({ page 
 	const canvas = page.locator('canvas');
 	const box = (await canvas.boundingBox())!;
 
+	// Rulers along the edges count x across and y up, and the scale bar is a power of two blocks.
+	await expect(page.locator('[data-ruler="x"]')).toContainText('0');
+	await expect(page.locator('[data-ruler="y"]')).toContainText('100');
+	const bar = page.getByLabel('Scale bar');
+	await expect(bar).toContainText(/^\d+ blocks · \d+ chunks?\s*$/);
+	const before = Number(await bar.getAttribute('data-scale'));
+
 	// At the default zoom (2 blocks a pixel) blocks are too close for lines: the grid shows chunks.
 	const grid = page.locator('svg[data-grid]');
 	await expect(grid).toHaveCount(0);
@@ -211,6 +218,7 @@ test('the preview shows a grid, and per-block values when asked', async ({ page 
 	await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
 	for (let i = 0; i < 6; i++) await page.mouse.wheel(0, -400);
 	await expect(grid).toHaveAttribute('data-grid', /^blocks chunks/, { timeout: 10_000 });
+	expect(Number(await bar.getAttribute('data-scale'))).toBeLessThan(before);
 
 	// Per block, a pixel takes the value at its block's y: a multiple of 1/512.
 	const readout = () => page.locator('text=/^x -?\\d+, y -?\\d+, z -?\\d+ · /').textContent();
@@ -542,6 +550,9 @@ test('the 3D density view samples tiles around the camera and travels', async ({
 	await expect(where).toContainText(/sampling|refining/);
 	await expect(where).not.toContainText(/sampling|refining/, { timeout: 45_000 });
 	await expect(view.getByText(/can't start|Preview failed/)).toBeHidden();
+	// A height ruler runs up the box's edge, topped with its y.
+	await expect(view.getByLabel('Height ruler')).toContainText(/y \d+/);
+	await expect(view.getByLabel('Height ruler')).toContainText('0');
 
 	// A slider's value is a text box, and a double-click on the slider resets it.
 	const cut = page.getByLabel('Cut from top value');

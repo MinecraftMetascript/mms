@@ -21,6 +21,7 @@
 	import { climateParams, gapLayer, missing, nearest, nearestOf, type BiomeLayer, type NearEntry } from './climate';
 	import { colorize, cssGradient, formatValue, paletteOf, palettes, position, rangeFor, solidPalette, type PaletteId, type Range } from './colormaps';
 	import VolumeView from './VolumeView.svelte';
+	import { scaleBar, ticks } from './rulers';
 
 	interface Props {
 		output: OutputFile[];
@@ -160,6 +161,12 @@
 	let grid = $state(storedFlag('mms.preview.grid', false));
 	/** Density sampled at whole block positions, the values the game computes there (see PreviewView.blocks). */
 	let blockValues = $state(storedFlag('mms.preview.blocks', false));
+	/** Coordinates along the left and bottom edges of the 2D views, and a scale bar. */
+	let rulers = $state(storedFlag('mms.preview.rulers', true));
+	function setRulers(on: boolean) {
+		rulers = on;
+		storeFlag('mms.preview.rulers', on);
+	}
 	function setGrid(on: boolean) {
 		grid = on;
 		storeFlag('mms.preview.grid', on);
@@ -803,6 +810,33 @@
 		return flat && !topBlocks ? `x ${p.x}, z ${p.z}` : `x ${p.x}, y ${p.y}, z ${p.z}`;
 	}
 	const axes = $derived(screenAxes(view.facing));
+	/**
+	 * The rulers along the bottom and left edges, from the camera as it is
+	 * now (the image follows it at once too), and the scale bar under them.
+	 */
+	const rulerMarks = $derived.by(() => {
+		if (!rulers || !info || !last || mode === 'iso' || mode === 'volume' || !boxSize.w || !boxSize.h) return null;
+		const { w: W, h: H } = boxSize;
+		const f = frameOf(boxSize);
+		const [cu, cv] = planeOf(view);
+		// Blocks per CSS pixel across and down.
+		const perX = (view.scale * f.w) / W;
+		const perY = (view.scale * f.h) / H;
+		const a = axes;
+		// u runs along the screen's right: it is x or z, or minus one of them.
+		const hSign = a.rx || a.rz;
+		const hName = a.rx ? 'x' : 'z';
+		const hOrigin = hSign * (cu - (f.w / 2) * view.scale);
+		// Down the screen is y going down (a side view), or x or z (top-down).
+		const vSign = flat ? a.dx || a.dz : -1;
+		const vName = flat ? (a.dx ? 'x' : 'z') : 'y';
+		const vOrigin = flat ? vSign * (cv - (f.h / 2) * view.scale) : cv + (f.h / 2) * view.scale;
+		return {
+			h: { name: hName, ticks: ticks(hOrigin, hSign * perX, W, 64) },
+			v: { name: vName, ticks: ticks(vOrigin, vSign * perY, H, 48) },
+			bar: scaleBar(perX)
+		};
+	});
 	function coordTitle(axis: 'x' | 'y' | 'z'): string {
 		if (axis === 'y') {
 			if (topBlocks) return 'The height the camera looks down from: blocks above it are cut away';
@@ -1244,6 +1278,12 @@
 						aria-pressed={grid}
 						onclick={() => setGrid(!grid)}>Grid</button
 					>
+					<button
+						class="rounded border border-line px-1.5 py-0.5 {rulers ? 'bg-accent text-white' : 'hover:bg-hover'}"
+						title="Coordinates along the edges, and a scale bar"
+						aria-pressed={rulers}
+						onclick={() => setRulers(!rulers)}>Rulers</button
+					>
 					{#if mode === 'density'}
 						<button
 							class="rounded border border-line px-1.5 py-0.5 {blockValues ? 'bg-accent text-white' : 'hover:bg-hover'}"
@@ -1313,20 +1353,44 @@
 			onpointerleave={() => (hover = null)}
 			onwheel={wheel}
 		></div>
+		{#if rulerMarks}
+			{@const r = rulerMarks}
+			<!-- Coordinates of the block edges along the bottom and left, and a scale bar above the bottom one. -->
+			<div class="pointer-events-none absolute inset-x-0 bottom-0 h-4 bg-black/45 font-mono text-[10px] leading-4 text-white" aria-label="{r.h.name} ruler" data-ruler={r.h.name}>
+				{#each r.h.ticks as t (t.value)}
+					<span class="absolute bottom-0 h-1.5 w-px bg-white/80" style:left="{t.at}px"></span>
+					{#if t.at > 16 && t.at < boxSize.w - 48}<span class="absolute top-0 pl-0.5" style:left="{t.at}px">{t.value}</span>{/if}
+				{/each}
+				<span class="absolute right-1 top-0 font-semibold">{r.h.name}</span>
+			</div>
+			<div class="pointer-events-none absolute top-0 bottom-4 left-0 w-4 bg-black/45 font-mono text-[10px] text-white" aria-label="{r.v.name} ruler" data-ruler={r.v.name}>
+				{#each r.v.ticks as t (t.value)}
+					<span class="absolute left-0 h-px w-1.5 bg-white/80" style:top="{t.at}px"></span>
+					{#if t.at > 48 && t.at < boxSize.h - 16}<span class="absolute left-0 w-4 -translate-y-full rotate-180 pb-0.5 text-center leading-4 [writing-mode:vertical-rl]" style:top="{t.at}px">{t.value}</span>{/if}
+				{/each}
+				<span class="absolute top-1 left-0 w-4 text-center font-semibold leading-4">{r.v.name}</span>
+			</div>
+			{#if r.bar}
+				<div class="pointer-events-none absolute bottom-6 left-7 flex flex-col gap-0.5 font-mono text-[10px] text-white [text-shadow:0_0_2px_black]" aria-label="Scale bar" data-scale={r.bar.blocks}>
+					<span>{r.bar.label}</span>
+					<span class="h-1.5 border-x-2 border-b-2 border-white shadow-[0_1px_0_black]" style:width="{r.bar.px}px"></span>
+				</div>
+			{/if}
+		{/if}
 		{#if info && error}
 			<div class="absolute inset-x-3 top-3 rounded border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-200">
 				Preview failed: {error}
 			</div>
 		{/if}
 		{#if info && (readout || lockValue || busy)}
-			<div class="pointer-events-none absolute bottom-2 left-2 flex flex-col gap-0.5 rounded bg-black/60 px-2 py-1 font-mono text-[11px] text-white">
+			<div class="pointer-events-none absolute flex flex-col gap-0.5 rounded bg-black/60 px-2 py-1 font-mono text-[11px] text-white {rulerMarks ? 'bottom-12 left-7' : 'bottom-2 left-2'}">
 				{#if readout && !pinned}<span>{readout}</span>{/if}
 				{#if lockValue}<span class="text-red-300">● {lockValue}</span>{/if}
 				{#if busy && (!last || mode !== 'density' || slow)}<span>Rendering…</span>{/if}
 			</div>
 		{/if}
 		{#if info && last && mode !== 'iso'}
-			<div class="pointer-events-none absolute top-2 left-2 rounded bg-black/60 px-2 py-1 font-mono text-[11px] text-white" aria-label="Camera facing">
+			<div class="pointer-events-none absolute top-2 rounded bg-black/60 px-2 py-1 font-mono text-[11px] text-white {rulerMarks ? 'left-7' : 'left-2'}" aria-label="Camera facing">
 				{#if flat && canDown}Looking down, top is {compass(-axes.dx, -axes.dz)} ·{:else}Facing {view.facing} ·{/if}
 				← {compass(-axes.rx, -axes.rz)} {compass(axes.rx, axes.rz)} →
 				{#if gridShown.length}· grid: {gridShown.map((g) => g.name).join(', ')}{/if}
@@ -1368,7 +1432,7 @@
 			</div>
 		{/if}
 		{#if info && last}
-			<div class="pointer-events-none absolute right-2 bottom-2 flex flex-col items-end gap-1">
+			<div class="pointer-events-none absolute right-2 flex flex-col items-end gap-1 {rulerMarks ? 'bottom-6' : 'bottom-2'}">
 				{#if palette && valueRange && palette.id !== 'solid'}
 					{@const r = valueRange}
 					{@const stat = layerValues ?? last}
