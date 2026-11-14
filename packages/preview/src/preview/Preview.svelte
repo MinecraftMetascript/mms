@@ -816,6 +816,8 @@
 	 */
 	const rulerMarks = $derived.by(() => {
 		if (!rulers || !info || !last || mode === 'iso' || mode === 'volume' || !boxSize.w || !boxSize.h) return null;
+		// After a turn or a switch to Top, the old image shows another slice until the new one comes: no rulers over it.
+		if (!imageMap) return null;
 		const { w: W, h: H } = boxSize;
 		const f = frameOf(boxSize);
 		const [cu, cv] = planeOf(view);

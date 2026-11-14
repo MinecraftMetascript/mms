@@ -18,7 +18,13 @@ export function multiples(lo: number, hi: number, step: number): number[] {
 	const b = Math.max(lo, hi);
 	const first = Math.ceil(a / step);
 	const n = Math.max(0, Math.min(200, Math.floor(b / step) - first + 1));
-	return Array.from({ length: n }, (_, i) => (first + i) * step);
+	// Far out, adding one no longer changes a float: keep only values that move on.
+	const out: number[] = [];
+	for (let i = 0; i < n; i++) {
+		const v = (first + i) * step;
+		if (!out.length || v > out[out.length - 1]) out.push(v);
+	}
+	return out;
 }
 
 /** A tick on a ruler: its world coordinate and its offset along the edge in CSS pixels. */
