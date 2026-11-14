@@ -53,6 +53,12 @@ interface Grid {
 	c: number;
 }
 
+export interface ValueRange {
+	min: number;
+	max: number;
+	median: number;
+}
+
 export interface VolumeSettings {
 	look: VolumeLook;
 	threshold: number;
@@ -385,6 +391,8 @@ export class VolumeRenderer {
 	private lastWant = '';
 	/** Called when the camera's target moves, with its world x and z. */
 	moved: (x: number, z: number) => void = () => {};
+	/** Called when a tile arrives, with the range of density in the window. */
+	ranged: (r: ValueRange) => void = () => {};
 
 	constructor(readonly canvas: HTMLCanvasElement) {
 		this.renderer = new THREE.WebGLRenderer({ canvas, antialias: false });
@@ -551,7 +559,32 @@ export class VolumeRenderer {
 		}
 		if (this.inWindow(t.tx, t.tz)) this.place(t);
 		this.replan();
+		const r = this.valueRange();
+		if (r) this.ranged(r);
 		this.redraw();
+	}
+
+	/** The smallest, largest and median density in the window's tiles (the median from a sample of each). */
+	valueRange(): ValueRange | null {
+		let min = Infinity;
+		let max = -Infinity;
+		const some: number[] = [];
+		for (let dz = -R; dz <= R; dz++) {
+			for (let dx = -R; dx <= R; dx++) {
+				const t = this.tiles.get(`${this.centre.tx + dx},${this.centre.tz + dz}`);
+				if (!t) continue;
+				const v = t.values;
+				for (let i = 0; i < v.length; i++) {
+					if (v[i] < min) min = v[i];
+					if (v[i] > max) max = v[i];
+				}
+				const stride = Math.max(1, Math.floor(v.length / 997));
+				for (let i = 0; i < v.length; i += stride) some.push(v[i]);
+			}
+		}
+		if (!some.length) return null;
+		some.sort((a, b) => a - b);
+		return { min, max, median: some[some.length >> 1] };
 	}
 
 	/** How many of the window's tiles are missing, and how many are coarser than the zoom calls for. */

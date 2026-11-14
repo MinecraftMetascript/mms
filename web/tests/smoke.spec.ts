@@ -562,6 +562,28 @@ test('the 3D density view samples tiles around the camera and travels', async ({
 	expect(errors).toEqual([]);
 });
 
+test('the 3D density view picks a threshold that shows something', async ({ page }) => {
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	// Never negative, so a threshold of 0 would draw nothing.
+	await replaceText(page, 'DensityFunction ridges = Abs(Noise({ base_octave = -5, amplitude_modifiers = [1] }, 1, 1)) * 2\n');
+	await expect(status(page)).toHaveText(/No problems/);
+	await page.locator('.cm-line').first().click();
+	await page.getByRole('tab', { name: 'Preview' }).click();
+	await page.getByRole('button', { name: '3D density', exact: true }).click();
+	const view = page.locator('[data-volume-view]');
+	await expect(view.getByText(/0 crosses nothing; the threshold is now the median/)).toBeVisible({ timeout: 45_000 });
+	const value = page.getByLabel('Threshold value');
+	await expect(value).not.toHaveValue(/^0(\.0+)?$/);
+
+	// Typing 0 back says why nothing shows, and Auto brings the surface back.
+	await value.fill('0');
+	await value.press('Enter');
+	await expect(view.getByText(/Nothing in view crosses 0/)).toBeVisible();
+	await view.getByRole('button', { name: 'Auto', exact: true }).click();
+	await expect(view.getByText(/Nothing in view crosses/)).toBeHidden();
+});
+
 test('a pinned preview stays put while the cursor moves to another declaration', async ({ page }) => {
 	const errors: string[] = [];
 	page.on('pageerror', (e) => errors.push(e.message));

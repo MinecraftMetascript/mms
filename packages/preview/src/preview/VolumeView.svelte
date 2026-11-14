@@ -7,7 +7,7 @@
 	import { onMount } from 'svelte';
 	import type { PreviewKind, VolumeTile, VolumeTileRequest } from './protocol';
 	import Slider from './Slider.svelte';
-	import { defaultSettings, VolumeRenderer, type TileWant, type VolumeLook, type VolumeSettings } from './volume';
+	import { defaultSettings, VolumeRenderer, type TileWant, type ValueRange, type VolumeLook, type VolumeSettings } from './volume';
 
 	interface Props {
 		kind: PreviewKind;
@@ -34,6 +34,12 @@
 	let settings = $state<VolumeSettings>({ ...defaultSettings });
 	let at = $state({ x: 0, z: 0 });
 	let loading = $state(0);
+	/** The density in view, so the threshold slider spans it. */
+	let range = $state.raw<ValueRange | null>(null);
+	/** Said when the threshold was picked for you. */
+	let autoNote = $state('');
+	/** Whether this function's threshold has been checked against its first full view. */
+	let autoChecked = false;
 	let refining = $state(0);
 	let goX = $state('');
 	let goZ = $state('');
@@ -88,8 +94,48 @@
 		failed.clear();
 		queue = [];
 		tileError = '';
+		range = null;
+		autoNote = '';
+		autoChecked = false;
 		gl?.clear();
 	}
+
+	/** A number to about three significant figures, without trailing zeros. */
+	function short(v: number): string {
+		if (v === 0) return '0';
+		const digits = Math.max(0, 2 - Math.floor(Math.log10(Math.abs(v))));
+		return String(Number(v.toFixed(Math.min(6, digits))));
+	}
+	const crosses = (r: ValueRange, t: number) => r.min < t && t < r.max;
+	/** The threshold that shows something: 0 where density crosses it (as the game reads it), else the median in view. */
+	function autoThreshold(r: ValueRange | null): number {
+		if (!r || crosses(r, 0)) return 0;
+		return Number(short(r.median));
+	}
+	function useAuto() {
+		set('threshold', autoThreshold(range));
+		autoNote = '';
+	}
+	/**
+	 * Once the first view is in: a density function that never crosses 0
+	 * there (one that is never negative, say) would show nothing, so the
+	 * threshold moves to the median and says so. Noise settings keep 0,
+	 * since that's where the game puts the ground.
+	 */
+	function ranged(r: ValueRange) {
+		range = r;
+		if (autoChecked || !gl || gl.missing().missing > 0) return;
+		autoChecked = true;
+		if (kind !== 'density_function' || crosses(r, settings.threshold)) return;
+		const was = settings.threshold;
+		const t = Number(short(r.median));
+		set('threshold', t);
+		autoNote = `Density here runs from ${short(r.min)} to ${short(r.max)}, so ${short(was)} crosses nothing; the threshold is now the median, ${short(t)}.`;
+	}
+	const sliderMin = $derived(range ? Math.min(range.min, settings.threshold) : -0.5);
+	const sliderMax = $derived(range ? Math.max(range.max, settings.threshold) : 0.5);
+	const sliderStep = $derived(Number(short((sliderMax - sliderMin) / 400)) || 0.001);
+	const thresholdDigits = $derived(Math.min(6, Math.max(0, -Math.floor(Math.log10(sliderStep)))));
 
 	// A new function, seed or pack: start over, keeping the camera.
 	let key = '';
@@ -168,6 +214,7 @@
 			queue = tiles;
 			pump();
 		};
+		gl.ranged = ranged;
 		gl.moved = (nx, nz) => {
 			at = { x: Math.round(nx), z: Math.round(nz) };
 			onmove?.(nx, nz);
@@ -242,7 +289,33 @@
 			</div>
 			<p class="text-[11px] text-muted">{looks.find((l) => l.id === settings.look)?.note}</p>
 		</div>
-		<Slider label="Threshold" value={settings.threshold} min={-0.5} max={0.5} step={0.005} reset={0} digits={3} title="Density counts as solid above this" onchange={(v) => set('threshold', v)} />
+		<div class="flex flex-col gap-1">
+			<Slider
+				label="Threshold"
+				value={settings.threshold}
+				min={sliderMin}
+				max={sliderMax}
+				step={sliderStep}
+				reset={autoThreshold(range)}
+				digits={thresholdDigits}
+				title="Density counts as solid above this. The slider spans the density in view."
+				onchange={(v) => {
+					autoNote = '';
+					set('threshold', v);
+				}}
+			/>
+			{#if range}
+				<div class="flex items-center justify-between gap-2 text-[11px] text-muted">
+					<span data-density-range>In view: {short(range.min)} to {short(range.max)}</span>
+					<button class="rounded border border-line px-1.5 py-px hover:bg-hover" title="0 if density crosses it here, else the median in view" onclick={useAuto}>Auto</button>
+				</div>
+				{#if autoNote}
+					<p class="rounded bg-accent/10 px-1.5 py-1 text-[11px] text-ink" role="status">{autoNote}</p>
+				{:else if !crosses(range, settings.threshold)}
+					<p class="rounded bg-amber-500/15 px-1.5 py-1 text-[11px] text-ink" role="status">Nothing in view crosses {short(settings.threshold)}, so there's no surface to draw. Try Auto.</p>
+				{/if}
+			{/if}
+		</div>
 		<Slider label="Cut from top" prefix="y" value={settings.cutY} min={-64} max={320} step={1} reset={defaultSettings.cutY} onchange={(v) => set('cutY', v)} />
 		<Slider label="Cut from east" suffix="%" value={settings.cutX * 100} min={1} max={100} step={1} reset={100} onchange={(v) => set('cutX', v / 100)} />
 		<Slider label="Cut from south" suffix="%" value={settings.cutZ * 100} min={1} max={100} step={1} reset={100} onchange={(v) => set('cutZ', v / 100)} />
