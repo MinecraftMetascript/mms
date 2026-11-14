@@ -8,6 +8,8 @@ In JSON a formula is a deep tree of `add` and `mul` objects. In MMS it is arithm
 
 Put the cursor on a `Noise`, a `DensityFunction` or a `NoiseSettings` and open the **Preview** tab of the web editor (in VS Code, click **Preview** above it). It draws the function as a slice of the world: the raw density, the blocks it makes, or a 3D view. The picture redraws on every edit, so changing a number and watching is the normal way to work.
 
+**3D density** shows a density function or a noise settings' final density in 3D, so you can see caves inside the ground. **Caves** draws air under solid ground coloured by height, **Shell** draws every surface see-through, and **Solid** draws the ground opaque so you can cut into it from the top, east or south. Drag to orbit, and right-drag or use WASD to travel (hold Shift to go faster). New ground is sampled as it comes into view. Noise settings are sampled at their cell corners and blended as the game blends them, while a plain density function is sampled at most every 2 blocks across and 4 up. Ground far from the camera is sampled more sparsely, always on whole blocks: the view fills in coarse first and sharpens as you zoom in. It draws whole blocks by default, each solid where the density at that block is over the threshold; switch to **Smooth** for a blended surface. The threshold starts at 0, or for a density function that never crosses 0 in view, at its median, and **Auto** picks it again. Aquifers, carvers and surface rules aren't shown here, so use **Blocks** for those.
+
 Every sample on this page is a file of its own. Paste one into a new project to see it.
 
 ## Ground with a height

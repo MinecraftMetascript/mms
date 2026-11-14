@@ -23,8 +23,18 @@ import {
 } from 'deepslate';
 import { biomeColor, blockColor, CAVE, SKY, VOID, type Rgb } from './colors';
 import { entryStride, fitness, type ClimateEntries } from './climate';
-import { speedUp } from './fastDensity';
-import { screenAxes, vanillaSummary, type PreviewFile, type PreviewRequest, type PreviewResponse, type PreviewView } from './protocol';
+import { fasten, speedUp } from './fastDensity';
+import {
+	screenAxes,
+	vanillaSummary,
+	VOLUME_TILE,
+	type PreviewFile,
+	type PreviewRequest,
+	type PreviewResponse,
+	type PreviewView,
+	type VolumeTile,
+	type VolumeTileRequest
+} from './protocol';
 
 // Renders previews with Deepslate. User files are registered under their
 // ids; minecraft: ids the pack references but does not define come from
@@ -637,10 +647,12 @@ const MAX_IMAGE = 4096 * 4096;
 
 type HelperMessage =
 	| { type: 'setup'; files: PreviewFile[] }
-	| { type: 'chunk'; job: number; req: RenderRequest; cx: number; cz: number };
+	| { type: 'chunk'; job: number; req: RenderRequest; cx: number; cz: number }
+	| VolumeTileRequest;
 type HelperReply =
 	| { type: 'chunk'; job: number; data: Uint16Array<ArrayBuffer>; ids: string[] }
-	| { type: 'chunk'; job: number; error: string };
+	| { type: 'chunk'; job: number; error: string }
+	| VolumeTile;
 
 interface Job {
 	id: number;
@@ -653,7 +665,8 @@ interface Job {
 	resolve: (c: IsoChunk) => void;
 	reject: (e: unknown) => void;
 }
-const helpers: { port: MessagePort; job: Job | null }[] = [];
+/** Each helper's chunk job, and how many volume tiles it has been handed and not answered. */
+const helpers: { port: MessagePort; job: Job | null; tiles: number }[] = [];
 let lastSetup: HelperMessage | null = null;
 let queue: Job[] = [];
 /** Queued and running jobs, by chunk. */
@@ -662,7 +675,7 @@ let nextJob = 0;
 
 function addHelpers(ports: MessagePort[]) {
 	for (const port of ports) {
-		const helper: (typeof helpers)[number] = { port, job: null };
+		const helper: (typeof helpers)[number] = { port, job: null, tiles: 0 };
 		port.onmessage = (e: MessageEvent<HelperReply>) => finish(helper, e.data);
 		if (lastSetup) port.postMessage(lastSetup);
 		helpers.push(helper);
@@ -671,6 +684,11 @@ function addHelpers(ports: MessagePort[]) {
 }
 
 function finish(helper: (typeof helpers)[number], reply: HelperReply) {
+	if (reply.type === 'tile') {
+		helper.tiles--;
+		postTile(reply);
+		return;
+	}
 	const job = helper.job;
 	helper.job = null;
 	if (job && job.id === reply.job) {
@@ -685,7 +703,7 @@ function finish(helper: (typeof helpers)[number], reply: HelperReply) {
 	dispatch();
 }
 
-function settle(job: Job, reply: HelperReply) {
+function settle(job: Job, reply: Exclude<HelperReply, VolumeTile>) {
 	if ('error' in reply) {
 		job.reject(new Error(reply.error));
 	} else if (job.key !== isoKey) {
@@ -787,6 +805,11 @@ async function serve(port: MessagePort, msg: HelperMessage) {
 		setup(msg.files);
 		return;
 	}
+	if (msg.type === 'tile') {
+		const tile = await sampleTile(msg);
+		port.postMessage(tile, 'values' in tile ? [tile.values.buffer] : []);
+		return;
+	}
 	try {
 		const { terrain } = await terrainOf(msg.req);
 		const data = await buildIsoChunk(terrain, msg.cx, msg.cz);
@@ -797,6 +820,103 @@ async function serve(port: MessagePort, msg: HelperMessage) {
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+// ---- Volume tiles -----------------------------------------------------
+//
+// The volume view ray-marches density on the GPU from tiles of samples.
+// Noise settings are sampled at their cell corners only: the game builds
+// final density from interpolated nodes, which blend those corners
+// trilinearly, and so does the GPU's texture filtering. With the
+// interpolated nodes taken out, a corner costs the whole router (about
+// 40 µs), but there are 128 blocks to a corner. A plain density function
+// needn't be interpolated, so it is sampled more finely.
+
+interface Volume {
+	key: string;
+	fn: DensityFunction;
+	sx: number;
+	sy: number;
+	minY: number;
+	ny: number;
+}
+let volume: Volume | null = null;
+
+async function volumeOf(req: VolumeTileRequest): Promise<Volume> {
+	const key = [version, req.seed, req.kind, req.id].join('|');
+	if (volume?.key === key) return volume;
+	const seed = seedOf(req.seed);
+	// The cell size comes from the interpolated nodes taken out (4 × 8 in vanilla).
+	let cell: [number, number] | null = null;
+	const unblend: DensityFunction.Visitor = {
+		apply: (f) => {
+			if (!(f instanceof DensityFunction.Interpolated)) return f;
+			cell ??= [f.cellSizeXz, f.cellSizeY];
+			return f.input;
+		}
+	};
+	volume = await withVanilla((): Volume => {
+		if (req.kind === 'noise_settings') {
+			const settings = WorldgenRegistries.NOISE_SETTINGS.getOrThrow(Identifier.parse(req.id));
+			const rs = new RandomState(settings, seed);
+			const fn = fasten(rs.router.finalDensity.mapAll(unblend));
+			fn.compute(DensityFunction.context(0, 0, 0)); // fetch missing entries now
+			const [sx, sy] = (cell as [number, number] | null) ?? [4, 8];
+			if (VOLUME_TILE % sx !== 0) throw new Error(`the 3D view needs a cell width that divides ${VOLUME_TILE} blocks (1, 2 or 4 for size_horizontal), not ${sx}`);
+			return { key, fn, sx, sy, minY: settings.noise.minY, ny: Math.floor(settings.noise.height / sy) + 1 };
+		}
+		const rs = new RandomState(NoiseGeneratorSettings.create({}), seed);
+		const df = new DensityFunction.HolderHolder(Holder.reference(WorldgenRegistries.DENSITY_FUNCTION, Identifier.parse(req.id)));
+		const fn = fasten(df.mapAll(rs.createVisitor(false)));
+		fn.compute(DensityFunction.context(0, 0, 0));
+		// The overworld's height, two blocks across and four up.
+		return { key, fn, sx: 2, sy: 4, minY: -64, ny: 384 / 4 + 1 };
+	});
+	return volume;
+}
+
+async function sampleTile(req: VolumeTileRequest): Promise<VolumeTile> {
+	const { session, job, tx, tz } = req;
+	try {
+		const { fn, sx, sy, minY, ny } = await volumeOf(req);
+		// A coarser grid, still whole blocks and still dividing the tile.
+		let lod = 1;
+		// Each level keeps the top layer too, so nothing above the last one is lost.
+		while (lod < req.lod && VOLUME_TILE % (sx * lod * 2) === 0 && (ny - 1) % (lod * 2) === 0) lod *= 2;
+		const step = sx * lod;
+		const n = VOLUME_TILE / step + 1;
+		const layers = Math.floor((ny - 1) / lod) + 1;
+		const values = new Float32Array(n * n * layers);
+		const x0 = tx * VOLUME_TILE;
+		const z0 = tz * VOLUME_TILE;
+		// Column by column, so per-column caches hit.
+		for (let k = 0; k < n; k++) {
+			for (let i = 0; i < n; i++) {
+				for (let j = 0; j < layers; j++) {
+					values[(j * n + k) * n + i] = fn.compute(DensityFunction.context(x0 + i * step, minY + j * sy * lod, z0 + k * step));
+				}
+			}
+		}
+		return { type: 'tile', session, job, tx, tz, sx, sy, ny, lod, minY, values };
+	} catch (err) {
+		return { type: 'tile', session, job, tx, tz, error: String(err instanceof Error ? err.message : err) };
+	}
+}
+
+function postTile(tile: VolumeTile) {
+	(self as unknown as Worker).postMessage(tile, 'values' in tile ? [tile.values.buffer] : []);
+}
+
+/** Hands a tile to the least busy helper, or samples it here when there are none. */
+async function askTile(req: VolumeTileRequest) {
+	if (helpers.length === 0) {
+		postTile(await sampleTile(req));
+		return;
+	}
+	let best = helpers[0];
+	for (const h of helpers) if (h.tiles + (h.job ? 1 : 0) < best.tiles + (best.job ? 1 : 0)) best = h;
+	best.tiles++;
+	best.port.postMessage(req satisfies HelperMessage);
+}
 
 /**
  * Draws the terrain as an isometric block diagram filling the canvas. In
@@ -1664,6 +1784,10 @@ self.onmessage = async (e: MessageEvent<PreviewRequest>) => {
 	if (req.type === 'serve') {
 		const { port } = req;
 		port.onmessage = (m: MessageEvent<HelperMessage>) => serve(port, m.data);
+		return;
+	}
+	if (req.type === 'tile') {
+		void askTile(req);
 		return;
 	}
 	latest = req.seq;

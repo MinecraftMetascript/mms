@@ -40,10 +40,14 @@
 		"svelte": "^5.57.1"
 	},
 	"devDependencies": {
+		"@types/three": "0.170.0",
 		"deepslate": "^0.27.2",
 		"esbuild": "0.27.7",
 		"svelte": "^5.57.1",
 		"svelte-check": "^4.6.0",
 		"typescript": "^6.0.3"
+	},
+	"dependencies": {
+		"three": "0.170.0"
 	}
 }
