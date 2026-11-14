@@ -22,8 +22,19 @@
 		type SplinePointData,
 		type TextEdit
 	} from './spline';
+	import { record, useMemory } from '../memory';
 
-	let { data, onedit }: { data: SplineAt; onedit?: (edits: TextEdit[]) => void } = $props();
+	let {
+		data,
+		onedit,
+		memoryKey
+	}: {
+		data: SplineAt;
+		onedit?: (edits: TextEdit[]) => void;
+		/** Where the coordinate sliders are remembered, per declaration. */
+		memoryKey?: string;
+	} = $props();
+	const memory = useMemory();
 
 	// The open spline, as point indices from the root. It follows the
 	// cursor when the cursor moves to another spline, and stays where the
@@ -52,6 +63,18 @@
 
 	// The values the nested splines' coordinates take, by coordinate.
 	let coords = $state<Coordinates>({});
+	// Another declaration's spline brings back the coordinates picked for it.
+	let coordsFor: string | undefined;
+	$effect.pre(() => {
+		if (memoryKey === coordsFor) return;
+		coordsFor = memoryKey;
+		const saved = record(memoryKey ? memory.current.get(memoryKey) : undefined);
+		coords = Object.fromEntries(Object.entries(record(saved?.coords) ?? {}).filter((e): e is [string, number] => typeof e[1] === 'number' && Number.isFinite(e[1])));
+	});
+	function setCoordinate(name: string, value: number) {
+		coords = { ...coords, [name]: value };
+		if (memoryKey) memory.current.set(memoryKey, { coords: $state.snapshot(coords) });
+	}
 	const nested = $derived(nestedCoordinates(spline));
 	const coordinateValue = (name: string, min: number, max: number) => coords[name] ?? Math.min(Math.max(0, min), max);
 	const at = $derived(Object.fromEntries(nested.map((c) => [c.name, coordinateValue(c.name, c.min, c.max)])));
@@ -388,7 +411,7 @@
 					max={c.max}
 					step={(c.max - c.min) / 200 || 0.01}
 					value={at[c.name]}
-					oninput={(e) => (coords = { ...coords, [c.name]: Number((e.target as HTMLInputElement).value) })}
+					oninput={(e) => setCoordinate(c.name, Number((e.target as HTMLInputElement).value))}
 				/>
 				<span class="w-12 text-right font-mono">{formatNumber(at[c.name], 2)}</span>
 			</label>

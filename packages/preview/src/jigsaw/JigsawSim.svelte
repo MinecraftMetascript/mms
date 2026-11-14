@@ -11,6 +11,7 @@
 	import { blockMesh, boxMesh, clip, edgeLines, fade, hit, ray, VoxelView, type Camera, type Rgb, type Slice } from './voxel';
 	import { blockColor } from '../preview/colors';
 	import type { OutputAsset, OutputFile } from '../types';
+	import { record, restore, useMemory } from '../memory';
 
 	interface Props {
 		/** The jigsaw structure's output path. */
@@ -30,11 +31,6 @@
 
 	/** A depth set here, in place of the structure's size; null follows the size. */
 	let depth = $state<number | null>(null);
-	$effect(() => {
-		// Another structure starts again from its own size.
-		void path;
-		depth = null;
-	});
 
 	const sim: Simulation | null = $derived(simulate(path, output, assets, { seed, ...(depth !== null ? { depth } : {}) }));
 	const setDepth = (v: number) => {
@@ -105,6 +101,35 @@
 	let camera = $state<Camera>({ target: [0, 0, 0], yaw: Math.PI / 4, pitch: Math.PI / 5, distance: 60 });
 	let framedFor: Simulation | null = null;
 
+	// Each structure remembers its seed, view, slice, depth and camera (see
+	// memory.ts). One shown for the first time starts from its own size,
+	// framed by the camera.
+	const memory = useMemory();
+	let shownPath: string | null = null;
+	/** The structure whose camera is in place, so its first layout isn't framed over it. */
+	let framedPath: string | null = null;
+	$effect.pre(() => {
+		if (path === shownPath) return;
+		shownPath = path;
+		const saved = record(memory.current.get(`jigsaw-sim:${path}`));
+		seed = typeof saved?.seed === 'number' && Number.isInteger(saved.seed) ? saved.seed : 0;
+		mode = saved?.mode === 'blocks' ? 'blocks' : 'boxes';
+		axis = (['x', 'y', 'z'] as const).find((a) => a === saved?.axis) ?? 'off';
+		lastAxis = axis; // keeps the slice where it was
+		at = typeof saved?.at === 'number' && Number.isFinite(saved.at) ? saved.at : 0;
+		depth = typeof saved?.depth === 'number' && Number.isFinite(saved.depth) ? Math.max(0, Math.min(MAX_DEPTH, Math.round(saved.depth))) : null;
+		const cam = saved?.camera ? restore<Camera>({ target: [0, 0, 0], yaw: camera.yaw, pitch: camera.pitch, distance: 60 }, saved.camera) : null;
+		framedFor = null;
+		if (cam && cam.target.length === 3 && cam.target.every(Number.isFinite) && cam.distance > 0) {
+			camera = cam;
+			framedPath = path; // stays where it was left, not framed again
+		} else framedPath = null;
+	});
+	$effect(() => {
+		const settings = { seed, mode, axis, at, depth, camera: $state.snapshot(camera) };
+		if (path === shownPath) memory.current.set(`jigsaw-sim:${path}`, settings);
+	});
+
 	function frame() {
 		const [lo, hi] = extent;
 		const size = Math.max(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]) + 1;
@@ -173,9 +198,11 @@
 	});
 	$effect(() => {
 		if (sim && sim !== framedFor && sim.pieces.length) {
-			// Frame the first layout; keep the camera when re-rolling.
-			if (!framedFor) frame();
+			// Frame the first layout; keep the camera when re-rolling, and
+			// where it was left when the structure comes back.
+			if (!framedFor && framedPath !== path) frame();
 			framedFor = sim;
+			framedPath = path;
 		}
 	});
 

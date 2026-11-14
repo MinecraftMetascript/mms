@@ -1,5 +1,8 @@
 import * as store from './store';
 
+/** The localStorage key where a project's previews remember their settings. */
+export const previewMemoryKey = (id: string) => `mms.preview.memory.${id}`;
+
 export interface SourceFile {
 	path: string;
 	text: string;
@@ -193,6 +196,11 @@ export class Project {
 			this.saveTimer = null;
 		}
 		await store.deleteProject(id);
+		try {
+			localStorage.removeItem(previewMemoryKey(id));
+		} catch {
+			// Nothing was remembered.
+		}
 		await this.refresh();
 		if (id !== this.id) return;
 		const next = this.saved[0];

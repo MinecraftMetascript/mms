@@ -48,6 +48,8 @@ Distances are the game's: the square root of the sum of squares of how far each 
 
 Previews redraw as you type. The pin button in the web editor keeps the Preview tab on one declaration while you edit another, which is how you watch terrain change while editing the noise behind it.
 
+Each declaration's preview remembers how you left it: the mode, camera and zoom, the 3D view's look, cuts and threshold, a jigsaw simulation's seed and slice, and a spline's coordinate sliders. Go back to a declaration and it shows the same view. The web editor keeps this in your browser for each project, and VS Code keeps it with the preview panel. **Reset view** puts the camera back.
+
 ## Seeing the output
 
 - **JSON** (web) shows the file the declaration at the cursor becomes.
