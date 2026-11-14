@@ -21,6 +21,7 @@
 	import { climateParams, gapLayer, missing, nearest, nearestOf, type BiomeLayer, type NearEntry } from './climate';
 	import { colorize, cssGradient, formatValue, paletteOf, palettes, position, rangeFor, solidPalette, type PaletteId, type Range } from './colormaps';
 	import VolumeView from './VolumeView.svelte';
+	import { record, restore, useMemory } from '../memory';
 
 	interface Props {
 		output: OutputFile[];
@@ -81,6 +82,8 @@
 	let isoView = $state<PreviewView>({ x: 0, y: 0, z: 0, facing: 'north', scale: 0 });
 	const isoAt = (v: PreviewView): PreviewView => ({ x: Math.round(v.x), y: Math.round(v.z), z: 0, facing: 'north', scale: 0 });
 	let seed = $state('0');
+	/** Each target's settings, remembered by the host (see memory.ts). */
+	const memory = useMemory();
 	/** Bumped when the pack's files change, so the volume view samples again. */
 	let filesVersion = $state(0);
 	/** Bumped by Reset view, which starts the volume view over. */
@@ -517,12 +520,18 @@
 		request();
 	});
 
-	// A new target starts from its kind's default mode, view and options.
+	// A target shown before comes back as it was left. A new one starts from
+	// its kind's default mode, view and options, or keeps the camera of the
+	// one before when that was the same kind.
 	$effect(() => {
 		const key = info ? `${info.kind}|${info.id}` : null;
 		if (info && key !== lastTarget) {
 			const sameKind = lastTarget?.startsWith(`${info.kind}|`);
 			lastTarget = key;
+			if (target && recall(memory.current.get(`preview:${target}`), info.kind)) {
+				request();
+				return;
+			}
 			if (!sameKind) {
 				mode = modesOf[info.kind][0];
 				view = defaultView(info.kind, mode);
@@ -539,6 +548,57 @@
 		}
 		request();
 	});
+
+	/**
+	 * What a target remembers: everything picked for it but the overlays
+	 * and palettes, which are remembered for every target alike.
+	 */
+	$effect(() => {
+		const key = info ? `${info.kind}|${info.id}` : null;
+		const settings = {
+			mode,
+			view: $state.snapshot(view),
+			isoView: $state.snapshot(isoView),
+			lookDown,
+			sideY,
+			biome,
+			terrain,
+			layer,
+			focus,
+			rangeMode,
+			customRange: $state.snapshot(customRange),
+			seed
+		};
+		// Saved once the target effect has shown this target, so a new
+		// target's first run doesn't save the last one's settings for it.
+		if (target && key === lastTarget) untrack(() => memory.current.set(`preview:${target}`, settings));
+	});
+	const rangeModes: RangeMode[] = ['auto', 'unit', 'custom'];
+	/** Shows a target as it was left; false if nothing is remembered for it. */
+	function recall(saved: unknown, kind: PreviewKind): boolean {
+		const r = record(saved);
+		if (!r) return false;
+		mode = modesOf[kind].includes(r.mode as PreviewMode) ? (r.mode as PreviewMode) : modesOf[kind][0];
+		const base = defaultView(kind, mode);
+		const v = restore(base, r.view);
+		view = { ...v, facing: facings.includes(v.facing) ? v.facing : base.facing, scale: v.scale > 0 ? v.scale : base.scale };
+		const iso = restore<PreviewView>({ ...isoAt(view) }, r.isoView);
+		isoView = { ...iso, facing: 'north', scale: Math.max(0, iso.scale) };
+		if (typeof r.lookDown === 'boolean') lookDown = r.lookDown;
+		sideY = typeof r.sideY === 'number' && Number.isFinite(r.sideY) ? r.sideY : null;
+		const text = (v: unknown, fallback: string) => (typeof v === 'string' && v ? v : fallback);
+		biome = text(r.biome, biomeChoices.first ?? 'minecraft:plains');
+		terrain = text(r.terrain, 'minecraft:overworld');
+		layer = typeof r.layer === 'string' && r.layer in layerNames ? (r.layer as BiomeLayer) : 'biomes';
+		focus = text(r.focus, '');
+		rangeMode = rangeModes.includes(r.rangeMode as RangeMode) ? (r.rangeMode as RangeMode) : 'auto';
+		customRange = restore({ lo: -1, hi: 1 }, r.customRange);
+		seed = text(r.seed, seed);
+		view.scale = Math.min(view.scale, maxScale());
+		lock = null;
+		last = null;
+		return true;
+	}
 
 	function setMode(m: PreviewMode) {
 		if (!info || m === mode) return;
@@ -1268,7 +1328,13 @@
 				class="rounded px-1.5 py-0.5 hover:bg-hover"
 				onclick={() => {
 					if (mode === 'iso') isoView = isoAt(view);
-					else if (mode === 'volume') volumeKey++;
+					else if (mode === 'volume') {
+						// The camera starts over; the look, cuts and threshold stay.
+						const key = `volume:${info.kind}|${info.id}`;
+						const saved = record(memory.current.get(key));
+						if (saved) memory.current.set(key, { ...saved, camera: null });
+						volumeKey++;
+					}
 					else {
 						view = defaultView(info.kind, mode);
 						sideY = null;

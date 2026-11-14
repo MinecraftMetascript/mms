@@ -8,10 +8,11 @@
 	// volume.ts ray-marches them on the GPU. Drag to orbit; right-drag or
 	// WASD to travel; the window of tiles follows the camera.
 
-	import { onMount } from 'svelte';
+	import { onMount, untrack } from 'svelte';
 	import type { PreviewKind, VolumeTile, VolumeTileRequest } from './protocol';
 	import Slider from './Slider.svelte';
-	import { defaultSettings, VolumeRenderer, type TileWant, type ValueRange, type VolumeLook, type VolumeSettings } from './volume';
+	import { defaultSettings, VolumeRenderer, type TileWant, type ValueRange, type VolumeLook, type VolumePose, type VolumeSettings } from './volume';
+	import { record, restore, useMemory } from '../memory';
 
 	interface Props {
 		kind: PreviewKind;
@@ -35,15 +36,34 @@
 	let gl: VolumeRenderer | null = null;
 	let failure = $state('');
 	let tileError = $state('');
-	let settings = $state<VolumeSettings>({ ...defaultSettings });
+	// The look, cuts, threshold and camera are remembered per function
+	// (see memory.ts), and come back when the view opens on it again.
+	const memory = useMemory();
+	// Read once: the preview starts a new view for another function.
+	const memoryKey = untrack(() => `volume:${kind}|${id}`);
+	const saved = record(memory.current.get(memoryKey));
+	const looksIds: VolumeLook[] = ['caves', 'shell', 'solid'];
+	function recalled(): VolumeSettings {
+		const s = restore(defaultSettings, saved?.settings);
+		return looksIds.includes(s.look) ? s : { ...s, look: defaultSettings.look };
+	}
+	const savedPose = saved?.camera ? restore<VolumePose>({ x: 0, y: 0, z: 0, dx: 0, dy: 0, dz: 0 }, saved.camera) : null;
+	let settings = $state<VolumeSettings>(recalled());
+	function remember() {
+		if (!gl) return;
+		memory.current.set(memoryKey, { settings: $state.snapshot(settings), camera: gl.pose() });
+	}
 	let at = $state({ x: 0, z: 0 });
 	let loading = $state(0);
 	/** The density in view, so the threshold slider spans it. */
 	let range = $state.raw<ValueRange | null>(null);
 	/** Said when the threshold was picked for you. */
 	let autoNote = $state('');
-	/** Whether this function's threshold has been checked against its first full view. */
-	let autoChecked = false;
+	/**
+	 * Whether this function's threshold has been checked against its first
+	 * full view; a remembered threshold was picked already.
+	 */
+	let autoChecked = saved?.settings !== undefined;
 	let refining = $state(0);
 	let goX = $state('');
 	let goZ = $state('');
@@ -155,6 +175,7 @@
 	$effect(() => {
 		const s = $state.snapshot(settings); // read first, so the effect follows it
 		gl?.apply(s);
+		remember();
 	});
 
 	function set<K extends keyof VolumeSettings>(k: K, v: VolumeSettings[K]) {
@@ -224,13 +245,18 @@
 		gl.moved = (nx, nz) => {
 			at = { x: Math.round(nx), z: Math.round(nz) };
 			onmove?.(nx, nz);
+			remember();
 		};
 		const ro = new ResizeObserver(() => gl?.resize(host.clientWidth, host.clientHeight));
 		ro.observe(host);
 		gl.resize(host.clientWidth, host.clientHeight);
 		colors();
 		gl.apply($state.snapshot(settings));
-		gl.lookAt(x, z);
+		// The camera this function had comes back: its angle, distance and
+		// height, over the spot the preview is at (which Density may have
+		// moved since).
+		if (savedPose && savedPose.dx ** 2 + savedPose.dy ** 2 + savedPose.dz ** 2 > 1e-6) gl.setPose({ ...savedPose, x, z });
+		else gl.lookAt(x, z);
 		goX = String(Math.round(x));
 		goZ = String(Math.round(z));
 		// Follow the editor's light and dark themes.

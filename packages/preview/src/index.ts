@@ -17,3 +17,4 @@ export { simulate, type Simulation, type PlacedPiece } from './jigsaw/simulate';
 export type { OutputAsset, OutputFile, OutputItem, OutputJigsaw, OutputText, SourceRange } from './types';
 export { default as SplineView } from './spline/SplineView.svelte';
 export { evaluate as evaluateSpline, type SplineAt, type SplineData, type TextEdit as SplineEdit } from './spline/spline';
+export { memory as previewMemory, storedMemory, type PreviewMemory } from './memory';
