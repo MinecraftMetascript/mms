@@ -189,7 +189,10 @@ export const VOLUME_TILE = 64;
  * Asks for one tile of the volume view: density sampled on a grid over a
  * VOLUME_TILE-square of columns and the whole height. `session` names the
  * viewer's current function and seed, so tiles from an older one are
- * dropped; `job` comes back with the answer.
+ * dropped; `job` comes back with the answer. `lod` (a power of two)
+ * multiplies the function's own spacing, so a tile seen from far away
+ * costs fewer samples; spacings are whole blocks, sampled at block
+ * positions.
  */
 export interface VolumeTileRequest {
 	type: 'tile';
@@ -200,12 +203,15 @@ export interface VolumeTileRequest {
 	seed: string;
 	tx: number;
 	tz: number;
+	lod: number;
 }
 
 /**
- * A sampled tile. Values are at x = tx·VOLUME_TILE + i·sx, y = minY + j·sy,
- * z = tz·VOLUME_TILE + k·sx, stored at (j·nz + k)·nx + i; nx and nz are
- * VOLUME_TILE / sx + 1, so a tile's last column is the next one's first.
+ * A sampled tile. sx and sy are the function's finest spacing, and ny the
+ * number of layers at it. The values were sampled lod times as far apart:
+ * at x = tx·VOLUME_TILE + i·sx·lod, y = minY + j·sy·lod, z likewise, stored
+ * at (j·n + k)·n + i with n = VOLUME_TILE / (sx·lod) + 1 (so a tile's last
+ * column is the next one's first) and j up to (ny - 1) / lod.
  */
 export type VolumeTile =
 	| {
@@ -216,9 +222,8 @@ export type VolumeTile =
 			tz: number;
 			sx: number;
 			sy: number;
-			nx: number;
 			ny: number;
-			nz: number;
+			lod: number;
 			minY: number;
 			values: Float32Array<ArrayBuffer>;
 	  }

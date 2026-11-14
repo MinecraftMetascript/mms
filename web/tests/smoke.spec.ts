@@ -538,8 +538,9 @@ test('the 3D density view samples tiles around the camera and travels', async ({
 
 	const view = page.locator('[data-volume-view]');
 	const where = view.getByText(/^x -?\d+ · z -?\d+/);
-	await expect(where).toContainText('sampling');
-	await expect(where).not.toContainText('sampling', { timeout: 45_000 });
+	// Coarse tiles fill the view first, then the ones close enough to show more get finer.
+	await expect(where).toContainText(/sampling|refining/);
+	await expect(where).not.toContainText(/sampling|refining/, { timeout: 45_000 });
 	await expect(view.getByText(/can't start|Preview failed/)).toBeHidden();
 
 	// A slider's value is a text box, and a double-click on the slider resets it.
@@ -554,10 +555,10 @@ test('the 3D density view samples tiles around the camera and travels', async ({
 	await view.getByRole('application').focus();
 	await page.keyboard.down('Shift');
 	await page.keyboard.down('d');
-	await expect(where).toContainText('sampling', { timeout: 10_000 });
+	await expect(where).toContainText(/sampling|refining/, { timeout: 10_000 });
 	await page.keyboard.up('d');
 	await page.keyboard.up('Shift');
-	await expect(where).not.toContainText('sampling', { timeout: 45_000 });
+	await expect(where).not.toContainText(/sampling|refining/, { timeout: 45_000 });
 	expect(errors).toEqual([]);
 });
 

@@ -28,10 +28,12 @@ const W = 2 * R + 2;
 /** Tiles kept on the CPU, so moving back doesn't sample them again. */
 const MAX_CACHED = 96;
 
-/** A tile as the window stores it. */
+/** A tile as the window stores it, on the function's finest grid. */
 interface Tile {
 	tx: number;
 	tz: number;
+	/** How much coarser than the grid it was sampled (1 for the grid itself). */
+	lod: number;
 	values: Float32Array;
 	/** Per cell: the steepest change per block within two cells (see lipOf). */
 	lip: Float32Array;
@@ -67,6 +69,49 @@ export const defaultSettings: VolumeSettings = { look: 'caves', threshold: 0, cu
 
 const mod = (a: number, n: number) => ((a % n) + n) % n;
 
+/** A tile the window wants, at a level of detail. */
+export interface TileWant {
+	tx: number;
+	tz: number;
+	lod: number;
+}
+
+/** Screen pixels between samples that still look smooth: the GPU blends between them. */
+const PIXELS_PER_SAMPLE = 4;
+
+/** Puts a coarse tile on the finest grid, blending its samples trilinearly. */
+function upsample(g: Grid, tile: Extract<VolumeTile, { values: Float32Array }>): Float32Array {
+	const { lod } = tile;
+	if (lod === 1) return tile.values;
+	const n = VOLUME_TILE / (g.sx * lod) + 1;
+	const layers = Math.floor((g.ny - 1) / lod) + 1;
+	const src = tile.values;
+	const at = (i: number, j: number, k: number) => src[(j * n + k) * n + i];
+	const out = new Float32Array(g.nx * g.nx * g.ny);
+	for (let j = 0; j < g.ny; j++) {
+		const gj = Math.min(j / lod, layers - 1);
+		const j0 = Math.min(Math.floor(gj), layers - 2 < 0 ? 0 : layers - 2);
+		const ty = layers > 1 ? gj - j0 : 0;
+		const j1 = Math.min(j0 + 1, layers - 1);
+		for (let k = 0; k < g.nx; k++) {
+			const gk = k / lod;
+			const k0 = Math.min(Math.floor(gk), n - 2);
+			const tz = gk - k0;
+			for (let i = 0; i < g.nx; i++) {
+				const gi = i / lod;
+				const i0 = Math.min(Math.floor(gi), n - 2);
+				const tx = gi - i0;
+				const lo =
+					(1 - tz) * ((1 - tx) * at(i0, j0, k0) + tx * at(i0 + 1, j0, k0)) + tz * ((1 - tx) * at(i0, j0, k0 + 1) + tx * at(i0 + 1, j0, k0 + 1));
+				const hi =
+					(1 - tz) * ((1 - tx) * at(i0, j1, k0) + tx * at(i0 + 1, j1, k0)) + tz * ((1 - tx) * at(i0, j1, k0 + 1) + tx * at(i0 + 1, j1, k0 + 1));
+				out[(j * g.nx + k) * g.nx + i] = lo + ty * (hi - lo);
+			}
+		}
+	}
+	return out;
+}
+
 /**
  * Per cell, the steepest slope of its edges in density per block; then
  * the largest within two cells, which is how far one step can go. Cells
@@ -98,24 +143,33 @@ function lipOf(g: Grid, values: Float32Array): Float32Array {
 			}
 		}
 	}
-	const out = new Float32Array(c * cy * c);
-	for (let j = 0; j < cy; j++) {
-		for (let k = 0; k < c; k++) {
+	// The largest within two cells along each axis in turn (a separable max filter).
+	const a = cell;
+	const b = new Float32Array(c * cy * c);
+	const idx = (i: number, j: number, k: number) => (j * c + k) * c + i;
+	for (let j = 0; j < cy; j++)
+		for (let k = 0; k < c; k++)
 			for (let i = 0; i < c; i++) {
 				let m = 0;
-				if (i < 2 || k < 2 || i >= c - 2 || k >= c - 2) {
-					m = most;
-				} else {
-					for (let dj = Math.max(0, j - 2); dj <= Math.min(cy - 1, j + 2); dj++) {
-						for (let dk = k - 2; dk <= k + 2; dk++) {
-							for (let di = i - 2; di <= i + 2; di++) m = Math.max(m, cell[(dj * c + dk) * c + di]);
-						}
-					}
-				}
-				out[(j * c + k) * c + i] = m * 1.02 + 1e-5;
+				for (let d = Math.max(0, i - 2); d <= Math.min(c - 1, i + 2); d++) m = Math.max(m, a[idx(d, j, k)]);
+				b[idx(i, j, k)] = m;
 			}
-		}
-	}
+	for (let j = 0; j < cy; j++)
+		for (let k = 0; k < c; k++)
+			for (let i = 0; i < c; i++) {
+				let m = 0;
+				for (let d = Math.max(0, k - 2); d <= Math.min(c - 1, k + 2); d++) m = Math.max(m, b[idx(i, j, d)]);
+				a[idx(i, j, k)] = m;
+			}
+	const out = new Float32Array(c * cy * c);
+	for (let j = 0; j < cy; j++)
+		for (let k = 0; k < c; k++)
+			for (let i = 0; i < c; i++) {
+				let m = 0;
+				if (i < 2 || k < 2 || i >= c - 2 || k >= c - 2) m = most;
+				else for (let d = Math.max(0, j - 2); d <= Math.min(cy - 1, j + 2); d++) m = Math.max(m, a[idx(i, d, k)]);
+				out[idx(i, j, k)] = m * 1.02 + 1e-5;
+			}
 	return out;
 }
 
@@ -322,8 +376,13 @@ export class VolumeRenderer {
 	private queued = false;
 	private sharpen: ReturnType<typeof setTimeout> | undefined;
 	private dirty = { vol: false, top: false };
-	/** Called when the window moves: the tiles it needs and doesn't have, nearest first. */
-	want: (tiles: [number, number][]) => void = () => {};
+	/**
+	 * Called when the camera moves: the tiles the window needs, missing
+	 * ones first (coarse, so the view fills fast), then finer ones where
+	 * the camera is close, nearest first.
+	 */
+	want: (tiles: TileWant[]) => void = () => {};
+	private lastWant = '';
 	/** Called when the camera's target moves, with its world x and z. */
 	moved: (x: number, z: number) => void = () => {};
 
@@ -454,6 +513,7 @@ export class VolumeRenderer {
 		this.readyData.fill(0);
 		this.readyTex.needsUpdate = this.topTex.needsUpdate = true;
 		this.centre = { tx: Number.NaN, tz: Number.NaN };
+		this.lastWant = '';
 		this.followTarget();
 	}
 
@@ -475,8 +535,11 @@ export class VolumeRenderer {
 		const g = this.grid;
 		if (!g || g.sx !== tile.sx || g.sy !== tile.sy || g.ny !== tile.ny || g.minY !== tile.minY) this.setGrid(tile);
 		const grid = this.grid!;
-		const t: Tile = { tx: tile.tx, tz: tile.tz, values: tile.values, lip: lipOf(grid, tile.values), tops: null, topsFor: NaN };
 		const key = `${tile.tx},${tile.tz}`;
+		const had = this.tiles.get(key);
+		if (had && had.lod <= tile.lod) return; // a finer one came first
+		const values = upsample(grid, tile);
+		const t: Tile = { tx: tile.tx, tz: tile.tz, lod: tile.lod, values, lip: lipOf(grid, values), tops: null, topsFor: NaN };
 		this.tiles.delete(key);
 		this.tiles.set(key, t);
 		if (this.tiles.size > MAX_CACHED) {
@@ -487,14 +550,82 @@ export class VolumeRenderer {
 			}
 		}
 		if (this.inWindow(t.tx, t.tz)) this.place(t);
+		this.replan();
 		this.redraw();
 	}
 
-	/** How many of the window's tiles are still missing. */
-	missing(): number {
-		let n = 0;
-		for (let dz = -R; dz <= R; dz++) for (let dx = -R; dx <= R; dx++) if (!this.tiles.has(`${this.centre.tx + dx},${this.centre.tz + dz}`)) n++;
-		return n;
+	/** How many of the window's tiles are missing, and how many are coarser than the zoom calls for. */
+	missing(): { missing: number; coarse: number } {
+		let missing = 0;
+		let coarse = 0;
+		for (let dz = -R; dz <= R; dz++) {
+			for (let dx = -R; dx <= R; dx++) {
+				const tx = this.centre.tx + dx;
+				const tz = this.centre.tz + dz;
+				const t = this.tiles.get(`${tx},${tz}`);
+				if (!t) missing++;
+				else if (t.lod > this.lodFor(tx, tz)) coarse++;
+			}
+		}
+		return { missing, coarse };
+	}
+
+	/** The coarsest level of detail: 16 blocks apart. */
+	private maxLod(): number {
+		return Math.max(1, Math.floor(16 / (this.grid?.sx ?? 4)));
+	}
+
+	/**
+	 * The level of detail a tile needs: samples about PIXELS_PER_SAMPLE
+	 * screen pixels apart at its distance, in whole powers of two of the
+	 * function's spacing (so always whole blocks).
+	 */
+	private lodFor(tx: number, tz: number): number {
+		const g = this.grid;
+		if (!g) return this.maxLod();
+		const h = this.canvas.clientHeight || 1;
+		const centre = new THREE.Vector3(
+			(tx + 0.5) * VOLUME_TILE - this.origin.x,
+			this.controls.target.y,
+			(tz + 0.5) * VOLUME_TILE - this.origin.z
+		);
+		// The tile's nearest point is about half a tile closer than its centre.
+		const dist = Math.max(1, this.camera.position.distanceTo(centre) - VOLUME_TILE / 2);
+		const blocksPerPixel = (2 * dist * Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2))) / h;
+		const spacing = blocksPerPixel * PIXELS_PER_SAMPLE;
+		let lod = 1;
+		while (lod < this.maxLod() && g.sx * lod * 2 <= spacing) lod *= 2;
+		return lod;
+	}
+
+	/** Asks for what the window needs now: missing tiles coarse, then refinements. */
+	private replan() {
+		if (!Number.isFinite(this.centre.tx)) return;
+		const { tx, tz } = this.centre;
+		const near = (a: TileWant, b: TileWant) => Math.hypot(a.tx - tx, a.tz - tz) - Math.hypot(b.tx - tx, b.tz - tz);
+		const missing: TileWant[] = [];
+		const finer: TileWant[] = [];
+		const coarsest = this.maxLod();
+		for (let dz = -R; dz <= R; dz++) {
+			for (let dx = -R; dx <= R; dx++) {
+				const at = { tx: tx + dx, tz: tz + dz };
+				const t = this.tiles.get(`${at.tx},${at.tz}`);
+				const lod = this.lodFor(at.tx, at.tz);
+				if (!t) {
+					missing.push({ ...at, lod: coarsest });
+					if (lod < coarsest) finer.push({ ...at, lod });
+				} else if (t.lod > lod) {
+					finer.push({ ...at, lod });
+				}
+			}
+		}
+		missing.sort(near);
+		finer.sort(near);
+		const wants = [...missing, ...finer];
+		const key = wants.map((w) => `${w.tx},${w.tz},${w.lod}`).join(' ');
+		if (key === this.lastWant) return;
+		this.lastWant = key;
+		this.want(wants);
 	}
 
 	/** The world x and z the camera looks at. */
@@ -517,7 +648,7 @@ export class VolumeRenderer {
 
 	private setGrid(tile: Extract<VolumeTile, { values: Float32Array }>) {
 		const c = VOLUME_TILE / tile.sx;
-		this.grid = { sx: tile.sx, sy: tile.sy, nx: tile.nx, ny: tile.ny, minY: tile.minY, c };
+		this.grid = { sx: tile.sx, sy: tile.sy, nx: c + 1, ny: tile.ny, minY: tile.minY, c };
 		this.tiles.clear();
 		this.slots.fill(null);
 		const across = W * c;
@@ -632,23 +763,19 @@ export class VolumeRenderer {
 		this.moved(x, z);
 		const tx = Math.floor(x / VOLUME_TILE);
 		const tz = Math.floor(z / VOLUME_TILE);
-		if (tx === this.centre.tx && tz === this.centre.tz) return;
-		this.centre = { tx, tz };
-		const needed: [number, number][] = [];
-		for (let dz = -R; dz <= R; dz++) {
-			for (let dx = -R; dx <= R; dx++) {
-				const t = this.tiles.get(`${tx + dx},${tz + dz}`);
-				if (t) {
-					if (this.grid && this.slots[mod(t.tz, W) * W + mod(t.tx, W)] !== t) this.place(t);
-				} else {
-					needed.push([tx + dx, tz + dz]);
+		if (tx !== this.centre.tx || tz !== this.centre.tz) {
+			this.centre = { tx, tz };
+			for (let dz = -R; dz <= R; dz++) {
+				for (let dx = -R; dx <= R; dx++) {
+					const t = this.tiles.get(`${tx + dx},${tz + dz}`);
+					if (t && this.grid && this.slots[mod(t.tz, W) * W + mod(t.tx, W)] !== t) this.place(t);
 				}
 			}
+			this.updateReady();
+			this.placeBox();
 		}
-		this.updateReady();
-		this.placeBox();
-		needed.sort((a, b) => Math.hypot(a[0] - tx, a[1] - tz) - Math.hypot(b[0] - tx, b[1] - tz));
-		this.want(needed);
+		// Zooming changes the detail tiles need, so this runs on every move.
+		this.replan();
 	}
 
 	/** Fits the box to the window, less the cuts, in scene coordinates. */

@@ -7,7 +7,7 @@
 	import { onMount } from 'svelte';
 	import type { PreviewKind, VolumeTile, VolumeTileRequest } from './protocol';
 	import Slider from './Slider.svelte';
-	import { defaultSettings, VolumeRenderer, type VolumeLook, type VolumeSettings } from './volume';
+	import { defaultSettings, VolumeRenderer, type TileWant, type VolumeLook, type VolumeSettings } from './volume';
 
 	interface Props {
 		kind: PreviewKind;
@@ -34,6 +34,7 @@
 	let settings = $state<VolumeSettings>({ ...defaultSettings });
 	let at = $state({ x: 0, z: 0 });
 	let loading = $state(0);
+	let refining = $state(0);
 	let goX = $state('');
 	let goZ = $state('');
 
@@ -42,22 +43,24 @@
 	let nextJob = 0;
 	/** Tiles asked for and not yet answered, by job. */
 	const inFlight = new Map<number, string>();
-	/** Tiles the window needs, nearest first. */
-	let queue: [number, number][] = [];
+	/** Tiles the window needs, in the order to ask for them. */
+	let queue: TileWant[] = [];
 	const failed = new Set<string>();
 
 	function pump() {
 		const busy = new Set(inFlight.values());
 		while (inFlight.size < parallel && queue.length) {
-			const [tx, tz] = queue.shift()!;
-			const key = `${tx},${tz}`;
-			if (busy.has(key) || failed.has(key)) continue;
+			const { tx, tz, lod } = queue.shift()!;
+			const key = `${tx},${tz},${lod}`;
+			if (busy.has(key) || failed.has(`${tx},${tz}`)) continue;
 			const job = nextJob++;
 			inFlight.set(job, key);
 			busy.add(key);
-			send({ type: 'tile', session, job, kind, id, seed, tx, tz });
+			send({ type: 'tile', session, job, kind, id, seed, tx, tz, lod });
 		}
-		loading = gl ? gl.missing() : 0;
+		const m = gl?.missing();
+		loading = m ? m.missing : 0;
+		refining = m ? m.coarse : 0;
 	}
 
 	/** A tile from the worker. */
@@ -222,7 +225,9 @@
 			</div>
 		{/if}
 		<div class="pointer-events-none absolute bottom-2 left-2 flex flex-col gap-0.5 rounded bg-black/60 px-2 py-1 font-mono text-[11px] text-white">
-			<span>x {at.x} · z {at.z}{loading ? ` · sampling ${loading} tile${loading === 1 ? '' : 's'}…` : ''}</span>
+			<span
+				>x {at.x} · z {at.z}{loading ? ` · sampling ${loading} tile${loading === 1 ? '' : 's'}…` : refining ? ` · refining ${refining} tile${refining === 1 ? '' : 's'}…` : ''}</span
+			>
 			<span class="text-white/70">drag: orbit · right-drag or WASD: travel (Shift: faster) · scroll: zoom</span>
 		</div>
 	</div>

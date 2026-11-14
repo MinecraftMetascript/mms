@@ -877,20 +877,24 @@ async function sampleTile(req: VolumeTileRequest): Promise<VolumeTile> {
 	const { session, job, tx, tz } = req;
 	try {
 		const { fn, sx, sy, minY, ny } = await volumeOf(req);
-		const nx = VOLUME_TILE / sx + 1;
-		const nz = nx;
-		const values = new Float32Array(nx * ny * nz);
+		// A coarser grid, still whole blocks and still dividing the tile.
+		let lod = 1;
+		while (lod < req.lod && VOLUME_TILE % (sx * lod * 2) === 0) lod *= 2;
+		const step = sx * lod;
+		const n = VOLUME_TILE / step + 1;
+		const layers = Math.floor((ny - 1) / lod) + 1;
+		const values = new Float32Array(n * n * layers);
 		const x0 = tx * VOLUME_TILE;
 		const z0 = tz * VOLUME_TILE;
 		// Column by column, so per-column caches hit.
-		for (let k = 0; k < nz; k++) {
-			for (let i = 0; i < nx; i++) {
-				for (let j = 0; j < ny; j++) {
-					values[(j * nz + k) * nx + i] = fn.compute(DensityFunction.context(x0 + i * sx, minY + j * sy, z0 + k * sx));
+		for (let k = 0; k < n; k++) {
+			for (let i = 0; i < n; i++) {
+				for (let j = 0; j < layers; j++) {
+					values[(j * n + k) * n + i] = fn.compute(DensityFunction.context(x0 + i * step, minY + j * sy * lod, z0 + k * step));
 				}
 			}
 		}
-		return { type: 'tile', session, job, tx, tz, sx, sy, nx, ny, nz, minY, values };
+		return { type: 'tile', session, job, tx, tz, sx, sy, ny, lod, minY, values };
 	} catch (err) {
 		return { type: 'tile', session, job, tx, tz, error: String(err instanceof Error ? err.message : err) };
 	}
