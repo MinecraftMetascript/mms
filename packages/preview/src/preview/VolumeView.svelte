@@ -288,6 +288,20 @@
 				{/each}
 			</div>
 			<p class="text-[11px] text-muted">{looks.find((l) => l.id === settings.look)?.note}</p>
+			<div class="flex overflow-hidden rounded border border-line" role="group" aria-label="Shape">
+				<button
+					class="flex-1 px-1.5 py-0.5 {settings.blocks ? 'bg-accent text-white' : 'hover:bg-hover'}"
+					aria-pressed={settings.blocks}
+					title="Whole blocks, solid where density at the block's position is over the threshold"
+					onclick={() => set('blocks', true)}>Cubes</button
+				>
+				<button
+					class="flex-1 px-1.5 py-0.5 {!settings.blocks ? 'bg-accent text-white' : 'hover:bg-hover'}"
+					aria-pressed={!settings.blocks}
+					title="The smooth surface where density crosses the threshold between samples"
+					onclick={() => set('blocks', false)}>Smooth</button
+				>
+			</div>
 		</div>
 		<div class="flex flex-col gap-1">
 			<Slider

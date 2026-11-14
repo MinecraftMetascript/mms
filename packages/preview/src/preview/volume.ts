@@ -69,9 +69,11 @@ export interface VolumeSettings {
 	cutZ: number;
 	haze: number;
 	caveOpacity: number;
+	/** Draws whole blocks, as the game places them, rather than the smooth surface between samples. */
+	blocks: boolean;
 }
 
-export const defaultSettings: VolumeSettings = { look: 'caves', threshold: 0, cutY: 320, cutX: 1, cutZ: 1, haze: 0.004, caveOpacity: 0.55 };
+export const defaultSettings: VolumeSettings = { look: 'caves', threshold: 0, cutY: 320, cutX: 1, cutZ: 1, haze: 0.004, caveOpacity: 0.55, blocks: true };
 
 const mod = (a: number, n: number) => ((a % n) + n) % n;
 
@@ -229,6 +231,7 @@ const fragmentShader = /* glsl */ `
 	uniform vec2 wrap;
 	uniform float sx, sy, minY, ny, cornersAcross, thr, haze, caveA;
 	uniform int look;
+	uniform bool cubes;
 	in vec3 vPos;
 	out vec4 outColor;
 
@@ -284,11 +287,102 @@ const fragmentShader = /* glsl */ `
 		vec3 mn = min(a, b), mx = max(a, b);
 		return vec2(max(max(mn.x, mn.y), max(mn.z, 0.0)), min(min(mx.x, mx.y), mx.z));
 	}
+	void add(inout vec4 acc, vec3 col, float a) {
+		acc.rgb += (1.0 - acc.a) * a * col;
+		acc.a += (1.0 - acc.a) * a;
+	}
+	void hazeOver(inout vec4 acc, float blocks) {
+		add(acc, vec3(0.62, 0.64, 0.66), 1.0 - pow(1.0 - haze, blocks * 2.0)); // haze per half block
+	}
+
+	// Blocks: a block is solid where density at its position (its lowest
+	// corner, where the game samples it) is over the threshold. The ray
+	// steps block by block (Amanatides and Woo) near a surface, and jumps
+	// ahead where the step bound says no block's solidity can change.
+	vec4 marchBlocks(vec3 ro, vec3 rd, vec2 tt) {
+		vec4 acc = vec4(0.0);
+		float t = tt.x + 1e-4;
+		vec3 cell = floor(ro + rd * t);
+		vec3 dir = sign(rd);
+		vec3 tDelta = abs(1.0 / rd);
+		vec3 tMax = (cell + max(dir, 0.0) - ro) / rd;
+		bool ok = ready(cell);
+		bool solid = ok && dens(cell) > 0.0;
+		if (look == 2 && solid) {
+			// The solid look starts on a cut face: shaded flat by height.
+			return vec4(ramp(cell.y + 0.5) * 0.78, 1.0);
+		}
+		float maxJump = 2.0 * min(sx, sy) - 1.0;
+		for (int i = 0; i < 4000; i++) {
+			if (acc.a > 0.97) break;
+			if (ok) {
+				// Within s blocks along the ray, every block corner is within s + 1.74 blocks of this block's centre.
+				vec3 c = cell + 0.5;
+				float L = lipAt(c);
+				float s = min(0.9 * abs(dens(c)) / L - 1.74, maxJump);
+				if (s > 2.0) {
+					if (look == 0 && solid && haze > 0.0) hazeOver(acc, s);
+					t += s;
+					if (t >= tt.y) break;
+					cell = floor(ro + rd * t);
+					tMax = (cell + max(dir, 0.0) - ro) / rd;
+					continue;
+				}
+			}
+			float tPrev = t;
+			int axis;
+			if (tMax.x < tMax.y && tMax.x < tMax.z) { axis = 0; t = tMax.x; tMax.x += tDelta.x; cell.x += dir.x; }
+			else if (tMax.y < tMax.z) { axis = 1; t = tMax.y; tMax.y += tDelta.y; cell.y += dir.y; }
+			else { axis = 2; t = tMax.z; tMax.z += tDelta.z; cell.z += dir.z; }
+			if (t >= tt.y) break;
+			if (look == 0 && solid && ok && haze > 0.0) hazeOver(acc, t - tPrev);
+			if (!ready(cell)) { ok = false; continue; }
+			bool s1 = dens(cell) > 0.0;
+			if (!ok) { ok = true; solid = s1; continue; }
+			if (s1 != solid) {
+				vec3 moved = vec3(axis == 0 ? dir.x : 0.0, axis == 1 ? dir.y : 0.0, axis == 2 ? dir.z : 0.0);
+				vec3 solidCell = s1 ? cell : cell - moved;
+				vec3 airCell = s1 ? cell - moved : cell;
+				// Flat light per face, as blocks are lit in the game: tops brightest.
+				float shade = axis == 1 ? (moved.y < 0.0 ? 1.0 : 0.5) : axis == 0 ? 0.8 : 0.65;
+				// A darker line along each block's edges.
+				vec3 h = fract(ro + rd * t);
+				vec2 uv = axis == 0 ? h.yz : axis == 1 ? h.xz : h.xy;
+				float edge = min(min(uv.x, uv.y), min(1.0 - uv.x, 1.0 - uv.y));
+				if (edge < 0.06) shade *= 0.82;
+				float y = solidCell.y + 0.5;
+				vec3 col;
+				float a;
+				if (look == 2) {
+					col = mix(vec3(0.72, 0.74, 0.70), ramp(y), 0.35) * shade;
+					a = 1.0;
+				} else if (look == 1) {
+					col = ramp(y) * shade;
+					a = 0.32;
+				} else if (airCell.y < topAt(airCell + 0.5) - 3.0) {
+					col = ramp(y) * shade;
+					a = caveA;
+				} else {
+					col = vec3(0.80, 0.83, 0.80) * shade;
+					a = 0.07;
+				}
+				add(acc, col, a);
+			}
+			solid = s1;
+		}
+		return acc;
+	}
+
 	void main() {
 		vec3 ro = camPos;
 		vec3 rd = normalize(vPos - camPos);
 		vec2 tt = hitBox(ro, rd);
 		if (tt.x >= tt.y) { outColor = vec4(bg, 1.0); return; }
+		if (cubes) {
+			vec4 acc = marchBlocks(ro, rd, tt);
+			outColor = vec4(acc.rgb + (1.0 - acc.a) * bg, 1.0);
+			return;
+		}
 		float minStep = min(1.0, sx / 4.0), maxStep = 2.0 * min(sx, sy);
 		vec4 acc = vec4(0.0);
 		float t = tt.x + 1e-3;
@@ -433,7 +527,8 @@ export class VolumeRenderer {
 			thr: { value: 0 },
 			haze: { value: defaultSettings.haze },
 			caveA: { value: defaultSettings.caveOpacity },
-			look: { value: 0 }
+			look: { value: 0 },
+			cubes: { value: true }
 		};
 		this.material = new THREE.ShaderMaterial({
 			glslVersion: THREE.GLSL3,
@@ -533,6 +628,7 @@ export class VolumeRenderer {
 		u.thr.value = s.threshold;
 		u.haze.value = s.haze;
 		u.caveA.value = s.caveOpacity;
+		u.cubes.value = s.blocks;
 		if (thresholdChanged) this.refreshTops();
 		this.placeBox();
 		this.moving();
