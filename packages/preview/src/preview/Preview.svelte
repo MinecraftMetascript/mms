@@ -20,6 +20,7 @@
 	import { VOID } from './colors';
 	import { climateParams, gapLayer, missing, nearest, nearestOf, type BiomeLayer, type NearEntry } from './climate';
 	import { colorize, cssGradient, formatValue, paletteOf, palettes, position, rangeFor, solidPalette, type PaletteId, type Range } from './colormaps';
+	import VolumeView from './VolumeView.svelte';
 
 	interface Props {
 		output: OutputFile[];
@@ -55,7 +56,7 @@
 	const facingLetters: Record<Facing, string> = { north: 'N', east: 'E', south: 'S', west: 'W' };
 	/** The compass letter of the way a world x/z step points. */
 	const compass = (dx: number, dz: number) => (dx > 0 ? 'E' : dx < 0 ? 'W' : dz > 0 ? 'S' : 'N');
-	const modeNames: Record<PreviewMode, string> = { density: 'Density', blocks: 'Blocks', biomes: 'Biomes', iso: '3D' };
+	const modeNames: Record<PreviewMode, string> = { density: 'Density', blocks: 'Blocks', biomes: 'Biomes', iso: '3D', volume: '3D density' };
 	const kindNames: Record<PreviewKind, string> = {
 		noise: 'noise',
 		density_function: 'density function',
@@ -80,6 +81,11 @@
 	let isoView = $state<PreviewView>({ x: 0, y: 0, z: 0, facing: 'north', scale: 0 });
 	const isoAt = (v: PreviewView): PreviewView => ({ x: Math.round(v.x), y: Math.round(v.z), z: 0, facing: 'north', scale: 0 });
 	let seed = $state('0');
+	/** Bumped when the pack's files change, so the volume view samples again. */
+	let filesVersion = $state(0);
+	/** Bumped by Reset view, which starts the volume view over. */
+	let volumeKey = $state(0);
+	let volumeView = $state<ReturnType<typeof VolumeView> | null>(null);
 	let error = $state('');
 	let busy = $state(false);
 	/** A render has been running long enough to say so, even over a density view. */
@@ -418,6 +424,10 @@
 				started = r.seq;
 				return;
 			}
+			if (r.type === 'tile') {
+				volumeView?.tile(r);
+				return;
+			}
 			if (r.seq !== seq) {
 				if (r.type === 'rendered') r.bitmap?.close();
 				return;
@@ -460,6 +470,7 @@
 		const waiting = seq > started;
 		stopWorkers();
 		startWorker();
+		volumeView?.restart();
 		started = seq;
 		if (waiting) {
 			request();
@@ -502,6 +513,7 @@
 	$effect(() => {
 		files = parsed.map(({ kind, id, json }) => ({ kind, id, json }));
 		worker?.postMessage({ type: 'setup', files } satisfies PreviewRequest);
+		filesVersion = untrack(() => filesVersion) + 1;
 		request();
 	});
 
@@ -553,9 +565,10 @@
 	 * first time it is shown and talking to the main worker directly.
 	 */
 	let helpers: Worker[] = [];
+	const helperCount = Math.max(1, Math.min(6, (globalThis.navigator?.hardwareConcurrency || 4) - 1));
 	function startHelpers() {
 		if (helpers.length > 0 || !worker) return;
-		const count = Math.max(1, Math.min(6, (navigator.hardwareConcurrency || 4) - 1));
+		const count = helperCount;
 		const ports: MessagePort[] = [];
 		for (let i = 0; i < count; i++) {
 			const helper = createWorker();
@@ -580,6 +593,12 @@
 		requestAnimationFrame(() => {
 			pending = false;
 			if (!worker || !info || !box) return;
+			if (mode === 'volume') {
+				// The volume view asks for its own tiles.
+				startHelpers();
+				setBusy(false);
+				return;
+			}
 			const { w: width, h: height } = frame();
 			setBusy(true);
 			if (mode === 'iso' || topBlocks) startHelpers();
@@ -1178,7 +1197,7 @@
 					{/if}
 				{/if}
 			{/if}
-			{#if mode !== 'iso'}
+			{#if mode !== 'iso' && mode !== 'volume'}
 				<div class="flex items-center gap-1" role="group" aria-label="Camera">
 					{#each ['x', 'y', 'z'] as const as axis (axis)}
 						<label class="flex items-center gap-1" title={coordTitle(axis)}>
@@ -1217,7 +1236,7 @@
 					{/if}
 				</div>
 			{/if}
-			{#if mode !== 'iso'}
+			{#if mode !== 'iso' && mode !== 'volume'}
 				<div class="flex items-center gap-0.5" role="group" aria-label="Overlays">
 					<button
 						class="rounded border border-line px-1.5 py-0.5 {grid ? 'bg-accent text-white' : 'hover:bg-hover'}"
@@ -1249,6 +1268,7 @@
 				class="rounded px-1.5 py-0.5 hover:bg-hover"
 				onclick={() => {
 					if (mode === 'iso') isoView = isoAt(view);
+					else if (mode === 'volume') volumeKey++;
 					else {
 						view = defaultView(info.kind, mode);
 						sideY = null;
@@ -1314,6 +1334,25 @@
 		{/if}
 		{#if info && last?.notice}
 			<div class="pointer-events-none absolute inset-x-3 rounded bg-black/60 px-3 py-2 text-xs text-white {mode === 'iso' ? 'top-3' : 'top-10'}">{last.notice}</div>
+		{/if}
+		{#if info && mode === 'volume'}
+			{#key `${info.kind}|${info.id}|${volumeKey}`}
+				<VolumeView
+					bind:this={volumeView}
+					kind={info.kind}
+					id={info.id}
+					{seed}
+					version={filesVersion}
+					x={view.x}
+					z={view.z}
+					parallel={helperCount + 1}
+					send={(req) => worker?.postMessage(req satisfies PreviewRequest)}
+					onmove={(x, z) => {
+						view.x = x;
+						view.z = z;
+					}}
+				/>
+			{/key}
 		{/if}
 		{#if info && last?.legend}
 			<div class="pointer-events-none absolute top-2 right-2 flex max-h-[60%] flex-col gap-0.5 overflow-hidden rounded bg-black/60 px-2 py-1 text-[11px] text-white" aria-label="Biomes in view">

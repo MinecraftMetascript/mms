@@ -523,6 +523,44 @@ test('an inline noise where an id is needed previews', async ({ page }) => {
 	expect(errors).toEqual([]);
 });
 
+test('the 3D density view samples tiles around the camera and travels', async ({ page }) => {
+	const errors: string[] = [];
+	page.on('pageerror', (e) => errors.push(e.message));
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	await page.getByRole('button', { name: /Examples/ }).click();
+	await page.getByRole('button', { name: /cave-siege/ }).click();
+	await page.getByRole('button', { name: 'worldgen/terrain.mms' }).click();
+	await clickLine(page, 'DensityFunction cheese');
+	await page.getByRole('tab', { name: 'Preview' }).click();
+	await expect(page.getByText('siege:cheese', { exact: true })).toBeVisible();
+	await page.getByRole('button', { name: '3D density', exact: true }).click();
+
+	const view = page.locator('[data-volume-view]');
+	const where = view.getByText(/^x -?\d+ · z -?\d+/);
+	await expect(where).toContainText('sampling');
+	await expect(where).not.toContainText('sampling', { timeout: 45_000 });
+	await expect(view.getByText(/can't start|Preview failed/)).toBeHidden();
+
+	// A slider's value is a text box, and a double-click on the slider resets it.
+	const cut = page.getByLabel('Cut from top value');
+	await cut.fill('20');
+	await cut.press('Enter');
+	await expect(cut).toHaveValue('20');
+	await page.getByRole('slider', { name: 'Cut from top' }).dblclick();
+	await expect(cut).toHaveValue('320');
+
+	// Holding D travels east, and the new ground is sampled.
+	await view.getByRole('application').focus();
+	await page.keyboard.down('Shift');
+	await page.keyboard.down('d');
+	await expect(where).toContainText('sampling', { timeout: 10_000 });
+	await page.keyboard.up('d');
+	await page.keyboard.up('Shift');
+	await expect(where).not.toContainText('sampling', { timeout: 45_000 });
+	expect(errors).toEqual([]);
+});
+
 test('a pinned preview stays put while the cursor moves to another declaration', async ({ page }) => {
 	const errors: string[] = [];
 	page.on('pageerror', (e) => errors.push(e.message));

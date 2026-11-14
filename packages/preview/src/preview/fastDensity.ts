@@ -164,8 +164,18 @@ function dependsOnY(fn: DensityFunction, memo: WeakMap<DensityFunction, boolean>
 
 /** Swaps a random state's router for one using the faster nodes above. */
 export function speedUp(rs: RandomState): RandomState {
+	(rs as { router: NoiseRouter }).router = NoiseRouter.mapAll(rs.router, fastVisitor());
+	return rs;
+}
+
+/** The same swap for one density function. */
+export function fasten(fn: DensityFunction): DensityFunction {
+	return fn.mapAll(fastVisitor());
+}
+
+function fastVisitor(): DensityFunction.Visitor {
 	const memo = new WeakMap<DensityFunction, boolean>();
-	const visitor: DensityFunction.Visitor = {
+	return {
 		apply(fn: DensityFunction): DensityFunction {
 			if (fn instanceof DensityFunction.Interpolated) {
 				return new FastInterpolated(fn.input, fn.cellSizeXz, fn.cellSizeY);
@@ -176,6 +186,4 @@ export function speedUp(rs: RandomState): RandomState {
 			return fn;
 		}
 	};
-	(rs as { router: NoiseRouter }).router = NoiseRouter.mapAll(rs.router, visitor);
-	return rs;
 }

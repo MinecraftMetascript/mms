@@ -8,14 +8,15 @@ export type { PreviewKind } from '../paths';
  * - blocks: a terrain slice from the chunk generator, with aquifers and surface rules
  * - biomes: a top-down map of a dimension's biome source
  * - iso: an isometric block diagram of a couple of chunks of terrain
+ * - volume: density in 3D, ray-marched on the GPU from tiles of samples
  */
-export type PreviewMode = 'density' | 'blocks' | 'biomes' | 'iso';
+export type PreviewMode = 'density' | 'blocks' | 'biomes' | 'iso' | 'volume';
 
 /** The modes each kind offers, the first being the default. */
 export const modesOf: Record<PreviewKind, PreviewMode[]> = {
 	noise: ['density'],
-	density_function: ['density'],
-	noise_settings: ['blocks', 'iso', 'density'],
+	density_function: ['density', 'volume'],
+	noise_settings: ['blocks', 'iso', 'density', 'volume'],
 	material_rule: ['blocks', 'iso'],
 	dimension: ['biomes', 'blocks', 'iso']
 };
@@ -114,6 +115,7 @@ export type PreviewRequest =
 	 * worker that doesn't answer is stuck, and the viewer restarts it.
 	 */
 	| { type: 'ping' }
+	| VolumeTileRequest
 	| {
 			type: 'render';
 			seq: number;
@@ -174,10 +176,53 @@ export type PreviewResponse =
 			minY?: number;
 			maxY?: number;
 	  }
+	| VolumeTile
 	| { type: 'error'; seq: number; message: string }
 	/** A render is under way (sent as it starts, before any work). */
 	| { type: 'started'; seq: number }
 	| { type: 'pong' };
+
+/** The width of a volume tile in blocks, along x and z. */
+export const VOLUME_TILE = 64;
+
+/**
+ * Asks for one tile of the volume view: density sampled on a grid over a
+ * VOLUME_TILE-square of columns and the whole height. `session` names the
+ * viewer's current function and seed, so tiles from an older one are
+ * dropped; `job` comes back with the answer.
+ */
+export interface VolumeTileRequest {
+	type: 'tile';
+	session: number;
+	job: number;
+	kind: PreviewKind;
+	id: string;
+	seed: string;
+	tx: number;
+	tz: number;
+}
+
+/**
+ * A sampled tile. Values are at x = tx·VOLUME_TILE + i·sx, y = minY + j·sy,
+ * z = tz·VOLUME_TILE + k·sx, stored at (j·nz + k)·nx + i; nx and nz are
+ * VOLUME_TILE / sx + 1, so a tile's last column is the next one's first.
+ */
+export type VolumeTile =
+	| {
+			type: 'tile';
+			session: number;
+			job: number;
+			tx: number;
+			tz: number;
+			sx: number;
+			sy: number;
+			nx: number;
+			ny: number;
+			nz: number;
+			minY: number;
+			values: Float32Array<ArrayBuffer>;
+	  }
+	| { type: 'tile'; session: number; job: number; tx: number; tz: number; error: string };
 
 /**
  * Vanilla worldgen that MMS output references comes from mcmeta's summary
