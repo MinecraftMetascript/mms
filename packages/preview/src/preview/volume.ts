@@ -249,6 +249,13 @@ const fragmentShader = /* glsl */ `
 		vec3 c = floor(vec3(w.x / sx, w.z / sx, clamp((w.y - minY) / sy, 0.0, ny - 2.0)));
 		return texture(lipTex, (c + 0.5) / vec3(cornersAcross, cornersAcross, ny - 1.0)).r;
 	}
+	// A cell's bound only covers its own tile, so a step that may reach into
+	// the next one also takes the bound where it would land: steps are at
+	// most two cells, and a tile's cells within two of its edge hold the
+	// largest slope in that tile.
+	float lipAlong(vec3 p, vec3 rd, float far) {
+		return max(lipAt(p), lipAt(p + rd * far));
+	}
 	float topAt(vec3 p) {
 		vec3 w = floor(world(p));
 		return texture(topTex, (w.xz + 0.5) / (SLOTS * TILE)).r;
@@ -318,8 +325,8 @@ const fragmentShader = /* glsl */ `
 			if (ok) {
 				// Within s blocks along the ray, every block corner is within s + 1.74 blocks of this block's centre.
 				vec3 c = cell + 0.5;
-				float L = lipAt(c);
-				float s = min(0.9 * abs(dens(c)) / L - 1.74, maxJump);
+				float s = min(0.9 * abs(dens(c)) / lipAt(c) - 1.74, maxJump);
+				if (s > 2.0) s = min(s, 0.9 * abs(dens(c)) / lipAlong(c, rd, s + 1.74) - 1.74);
 				if (s > 2.0) {
 					if (look == 0 && solid && haze > 0.0) hazeOver(acc, s);
 					t += s;
@@ -396,6 +403,7 @@ const fragmentShader = /* glsl */ `
 		}
 		for (int i = 0; i < 3000; i++) {
 			float dt = ok ? clamp(0.9 * abs(d) / lipAt(p), minStep, maxStep) : sx;
+			if (ok && dt > minStep) dt = clamp(0.9 * abs(d) / lipAlong(p, rd, dt), minStep, dt);
 			float t1 = t + dt;
 			if (t1 > tt.y || acc.a > 0.97) break;
 			vec3 p1 = ro + rd * t1;

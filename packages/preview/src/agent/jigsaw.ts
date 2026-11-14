@@ -152,6 +152,8 @@ function never(files: OutputFile[], sims: Simulation[]): string[] {
 	for (const s of sims)
 		for (const p of s.pieces) {
 			placed.add(p.id);
+			// A list element is placed as one piece made of several structures.
+			for (const id of p.parts ?? []) placed.add(id);
 			pools.add(p.pool);
 			for (const j of p.jigsaws) pools.add(j.pool.includes(':') ? j.pool : `minecraft:${j.pool}`);
 		}

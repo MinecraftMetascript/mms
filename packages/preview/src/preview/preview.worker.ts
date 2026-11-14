@@ -861,6 +861,7 @@ async function volumeOf(req: VolumeTileRequest): Promise<Volume> {
 			const fn = fasten(rs.router.finalDensity.mapAll(unblend));
 			fn.compute(DensityFunction.context(0, 0, 0)); // fetch missing entries now
 			const [sx, sy] = (cell as [number, number] | null) ?? [4, 8];
+			if (VOLUME_TILE % sx !== 0) throw new Error(`the 3D view needs a cell width that divides ${VOLUME_TILE} blocks (1, 2 or 4 for size_horizontal), not ${sx}`);
 			return { key, fn, sx, sy, minY: settings.noise.minY, ny: Math.floor(settings.noise.height / sy) + 1 };
 		}
 		const rs = new RandomState(NoiseGeneratorSettings.create({}), seed);
@@ -879,7 +880,8 @@ async function sampleTile(req: VolumeTileRequest): Promise<VolumeTile> {
 		const { fn, sx, sy, minY, ny } = await volumeOf(req);
 		// A coarser grid, still whole blocks and still dividing the tile.
 		let lod = 1;
-		while (lod < req.lod && VOLUME_TILE % (sx * lod * 2) === 0) lod *= 2;
+		// Each level keeps the top layer too, so nothing above the last one is lost.
+		while (lod < req.lod && VOLUME_TILE % (sx * lod * 2) === 0 && (ny - 1) % (lod * 2) === 0) lod *= 2;
 		const step = sx * lod;
 		const n = VOLUME_TILE / step + 1;
 		const layers = Math.floor((ny - 1) / lod) + 1;

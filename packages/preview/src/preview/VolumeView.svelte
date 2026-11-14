@@ -1,3 +1,7 @@
+<script module lang="ts">
+	let sessions = 0;
+</script>
+
 <script lang="ts">
 	// The volume view: a density function or noise settings drawn in 3D.
 	// Tiles of samples come from the preview worker (and its helpers), and
@@ -45,7 +49,9 @@
 	let goZ = $state('');
 
 	// ---- tiles ----
-	let session = 0;
+	// Sessions come from one counter shared by every view, so a remounted
+	// view never takes a late reply meant for the view before it.
+	let session = ++sessions;
 	let nextJob = 0;
 	/** Tiles asked for and not yet answered, by job. */
 	const inFlight = new Map<number, string>();
@@ -77,7 +83,8 @@
 			failed.add(`${t.tx},${t.tz}`);
 			tileError = t.error;
 		} else {
-			tileError = '';
+			// Keep the reason up while some tile is still failing.
+			if (failed.size === 0) tileError = '';
 			gl?.add(t);
 		}
 		pump();
@@ -89,7 +96,7 @@
 	}
 
 	function fresh() {
-		session++;
+		session = ++sessions;
 		inFlight.clear();
 		failed.clear();
 		queue = [];
@@ -103,8 +110,7 @@
 	/** A number to about three significant figures, without trailing zeros. */
 	function short(v: number): string {
 		if (v === 0) return '0';
-		const digits = Math.max(0, 2 - Math.floor(Math.log10(Math.abs(v))));
-		return String(Number(v.toFixed(Math.min(6, digits))));
+		return String(Number(v.toPrecision(3)));
 	}
 	const crosses = (r: ValueRange, t: number) => r.min < t && t < r.max;
 	/** The threshold that shows something: 0 where density crosses it (as the game reads it), else the median in view. */
