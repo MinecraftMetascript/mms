@@ -78,6 +78,16 @@ export const defaultSettings: VolumeSettings = { look: 'caves', threshold: 0, cu
 const mod = (a: number, n: number) => ((a % n) + n) % n;
 
 /** A tile the window wants, at a level of detail. */
+/** A camera: the world point it looks at, and the camera's offset from it in blocks. */
+export interface VolumePose {
+	x: number;
+	y: number;
+	z: number;
+	dx: number;
+	dy: number;
+	dz: number;
+}
+
 export interface TileWant {
 	tx: number;
 	tz: number;
@@ -578,6 +588,23 @@ export class VolumeRenderer {
 		const maxY = g ? g.minY + (g.ny - 1) * g.sy : 320;
 		this.controls.target.set(x - this.origin.x, (minY + maxY) / 2, z - this.origin.z);
 		this.fit();
+		this.followTarget();
+	}
+
+	/** Where the camera is: the world point it looks at and its offset from there. */
+	pose(): VolumePose {
+		const t = this.controls.target;
+		const p = this.camera.position;
+		return { x: t.x + this.origin.x, y: t.y, z: t.z + this.origin.z, dx: p.x - t.x, dy: p.y - t.y, dz: p.z - t.z };
+	}
+
+	/** Puts the camera back where pose() said it was, as if moved by hand. */
+	setPose(pose: VolumePose) {
+		this.origin = { x: Math.round(pose.x), z: Math.round(pose.z) };
+		const t = this.controls.target.set(pose.x - this.origin.x, pose.y, pose.z - this.origin.z);
+		this.camera.position.set(t.x + pose.dx, t.y + pose.dy, t.z + pose.dz);
+		this.touched = true;
+		this.controls.update();
 		this.followTarget();
 	}
 

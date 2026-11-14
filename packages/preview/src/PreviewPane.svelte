@@ -17,6 +17,7 @@
 	import SplineView from './spline/SplineView.svelte';
 	import type { SplineAt, TextEdit } from './spline/spline';
 	import type { OutputAsset, OutputFile, OutputItem, OutputText } from './types';
+	import { provideMemory, record, storedMemory, type PreviewMemory } from './memory';
 
 	interface Props {
 		output: OutputFile[];
@@ -49,6 +50,11 @@
 		spline?: SplineAt | null;
 		/** Applies the spline editor's edits to the source. */
 		onsplineedit?: (edits: TextEdit[]) => void;
+		/**
+		 * Where each preview remembers its settings per declaration (mode,
+		 * camera, cuts and so on). Without one, they're kept in this browser.
+		 */
+		memory?: PreviewMemory;
 	}
 	let {
 		output,
@@ -65,14 +71,36 @@
 		textures = {},
 		structures = {},
 		spline = null,
-		onsplineedit
+		onsplineedit,
+		memory
 	}: Props = $props();
+	let ownMemory: PreviewMemory | undefined;
+	const memorySource = {
+		get current(): PreviewMemory {
+			return memory ?? (ownMemory ??= storedMemory('mms.preview.memory'));
+		}
+	};
+	provideMemory(memorySource);
 	// With the cursor in a spline, the spline editor shows over the
 	// declaration's own preview, unless that tab is picked.
 	let splineTab = $state<'spline' | 'preview'>('spline');
 	// A jigsaw structure shows its connections or a simulated layout.
 	let jigsawTab = $state<'connections' | 'simulation'>('connections');
 	const itemInfo = $derived(itemContext(output, items, textures));
+	// The tabs picked for a declaration come back with it.
+	let tabsFor: string | null = null;
+	$effect.pre(() => {
+		if (path === tabsFor) return;
+		tabsFor = path;
+		const saved = path ? record(memorySource.current.get(`pane:${path}`)) : undefined;
+		splineTab = saved?.spline === 'preview' ? 'preview' : 'spline';
+		jigsawTab = saved?.jigsaw === 'simulation' ? 'simulation' : 'connections';
+	});
+	function pickTab(spline: typeof splineTab, jigsaw: typeof jigsawTab) {
+		splineTab = spline;
+		jigsawTab = jigsaw;
+		if (path) memorySource.current.set(`pane:${path}`, { spline, jigsaw });
+	}
 
 	const file = $derived(output.find((f) => f.path === path) ?? null);
 	const book = $derived(bookAt(path, items) ? (items.find((it) => itemPath(it.id) === path) ?? null) : null);
@@ -97,14 +125,14 @@
 					role="tab"
 					aria-selected={splineTab === id}
 					class="-mb-px border-b-2 px-2 py-1 {splineTab === id ? 'border-accent font-medium' : 'border-transparent text-muted hover:text-ink'}"
-					onclick={() => (splineTab = id as typeof splineTab)}>{label}</button
+					onclick={() => pickTab(id as typeof splineTab, jigsawTab)}>{label}</button
 				>
 			{/each}
 		</div>
 	{/if}
 	<div class="min-h-0 flex-1">
 		{#if spline && splineTab === 'spline'}
-			<SplineView data={spline} onedit={onsplineedit} />
+			<SplineView data={spline} onedit={onsplineedit} memoryKey={path ? `spline:${path}` : undefined} />
 		{:else if book}
 			<BookView stack={book.text} {output} {page} />
 		{:else if text}
@@ -118,7 +146,7 @@
 							role="tab"
 							aria-selected={jigsawTab === id}
 							class="-mb-px border-b-2 px-2 py-1 {jigsawTab === id ? 'border-accent font-medium' : 'border-transparent text-muted hover:text-ink'}"
-							onclick={() => (jigsawTab = id as typeof jigsawTab)}>{label}</button
+							onclick={() => pickTab(splineTab, id as typeof jigsawTab)}>{label}</button
 						>
 					{/each}
 				</div>

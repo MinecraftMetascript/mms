@@ -12,7 +12,7 @@
 	import JigsawPanel from '#lib/components/JigsawPanel.svelte';
 	import WorldPanel from '#lib/components/WorldPanel.svelte';
 	import { Engine, itemKey, outputKey, type Diagnostic, type DocSymbol, type Expansion, type OutputFile } from '#lib/engine/engine.svelte.ts';
-	import { Project, pathOf, uriOf, starter, type ProjectData } from '#lib/project/project.svelte.ts';
+	import { Project, previewMemoryKey, pathOf, uriOf, starter, type ProjectData } from '#lib/project/project.svelte.ts';
 	import { examples } from '#lib/project/examples.ts';
 	import { download, hasResourcePack, isDataPack, packZip, projectZip, readProjectZip, readZip } from '#lib/project/zip.ts';
 	import PasteJson from '#lib/components/PasteJson.svelte';
@@ -23,10 +23,12 @@
 	import { applySplineEdits, followEdit, readSpline, trackPos, type SplineTrack } from '#lib/engine/spline.ts';
 	import Dropdown from '#lib/components/Dropdown.svelte';
 	import { fixAllKeys, formatKeys, mod, quickFixKeys } from '#lib/editor/shortcuts.ts';
-	import { bookPageAt, PinButton, PreviewPane, shows, type SplineAt, type SplineEdit } from '@mms/preview';
+	import { bookPageAt, PinButton, PreviewPane, shows, storedMemory, type SplineAt, type SplineEdit } from '@mms/preview';
 	import PreviewWorker from '@mms/preview/worker?worker';
 
 	const project = new Project();
+	// What each preview was left showing, per declaration, kept in this browser for each project.
+	const previewMemory = $derived(storedMemory(previewMemoryKey(project.id)));
 	let engine = $state<Engine | null>(null);
 	let view: EditorView | null = null;
 	let viewWaiters: ((v: EditorView) => void)[] = [];
@@ -719,6 +721,7 @@
 										createWorker={() => new PreviewWorker()}
 										spline={paneSpline(p)}
 										onsplineedit={(edits: SplineEdit[]) => editSpline(p, edits)}
+										memory={previewMemory}
 									/>
 								</div>
 							</div>

@@ -3,12 +3,22 @@
 	// the declaration to show (picked with a Preview CodeLens); the pane is
 	// the web editor's own component from packages/preview. The panel stays
 	// on that declaration while you edit elsewhere.
-	import { itemPath, PreviewPane, type OutputFile, type OutputItem } from '@mms/preview';
+	import { itemPath, PreviewPane, previewMemory, type OutputFile, type OutputItem } from '@mms/preview';
 	import PreviewWorker from '@mms/preview/worker?worker&inline';
 	import type { OutputAsset, OutputText, SplineAt, ToPanel, ToExtension } from '../src/messages';
 
 	// The state is what VS Code hands back when it restores the panel.
-	const vscode = acquireVsCodeApi<{ path: string | null; page?: number }>();
+	// It also holds what each preview was left showing, per declaration
+	// (mode, camera, cuts and so on), so it lasts as long as the panel does,
+	// across VS Code restarts too.
+	type Saved = { path: string | null; page?: number; memory?: [string, unknown][] };
+	const vscode = acquireVsCodeApi<Saved>();
+	let saved: Saved = vscode.getState() ?? { path: null };
+	function save(change: Partial<Saved>) {
+		saved = { ...saved, ...change };
+		vscode.setState(saved);
+	}
+	const memory = previewMemory(saved.memory ?? [], (entries) => save({ memory: entries }));
 
 	let output = $state<OutputFile[]>([]);
 	let items = $state<OutputItem[]>([]);
@@ -16,9 +26,9 @@
 	let assets = $state<OutputAsset[]>([]);
 	let textures = $state<Record<string, string>>({});
 	let structures = $state<Record<string, string>>({});
-	let path = $state<string | null>(vscode.getState()?.path ?? null);
+	let path = $state<string | null>(saved.path ?? null);
 	// The book page to open, from 0.
-	let page = $state(vscode.getState()?.page ?? 0);
+	let page = $state(saved.page ?? 0);
 	let ready = $state(false);
 	// The spline at the cursor in the last .mms editor, for the spline editor.
 	// What goes back to the extension is a $state.snapshot: postMessage
@@ -28,7 +38,7 @@
 	// The document version the spline's ranges are in, sent back with each edit.
 	let splineVersion = -1;
 
-	$effect(() => vscode.setState({ path, page }));
+	$effect(() => save({ path, page }));
 
 	window.addEventListener('message', (e: MessageEvent<ToPanel>) => {
 		const m = e.data;
@@ -88,6 +98,7 @@
 				unpinLabel="clear it"
 				onunpin={() => vscode.postMessage({ type: 'clear' } satisfies ToExtension)}
 				createWorker={() => new PreviewWorker()}
+				{memory}
 				{spline}
 				onsplineedit={(edits) => splineUri && vscode.postMessage({ type: 'splineEdit', uri: splineUri, version: splineVersion, edits: $state.snapshot(edits) } satisfies ToExtension)}
 				hint="Click Preview above a noise, density function, noise settings, surface rule, dimension, loot table, recipe, biome, template pool, jigsaw structure or book to show it here, or Edit spline above a spline to graph it."

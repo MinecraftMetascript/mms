@@ -584,6 +584,87 @@ test('the 3D density view picks a threshold that shows something', async ({ page
 	await expect(view.getByText(/Nothing in view crosses/)).toBeHidden();
 });
 
+test('a preview comes back as it was left for each declaration, also after a reload', async ({ page }) => {
+	const errors: string[] = [];
+	page.on('pageerror', (e) => errors.push(e.message));
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	await replaceText(
+		page,
+		'DensityFunction first = Noise({ base_octave = -5, amplitude_modifiers = [1] }, 1, 1)\nDensityFunction second = Noise({ base_octave = -4, amplitude_modifiers = [1] }, 1, 1)\n'
+	);
+	await expect(status(page)).toHaveText(/No problems/);
+	await page.getByRole('tab', { name: 'Preview' }).click();
+	const range = page.getByLabel('Range');
+	const cameraY = page.getByLabel('Camera y');
+	const cut = page.getByLabel('Cut from top value');
+	const density = page.getByRole('button', { name: 'Density', exact: true });
+	const volume = page.getByRole('button', { name: '3D density', exact: true });
+
+	// The first one gets a fixed range, a camera height, then the 3D view with a cut.
+	await clickLine(page, 'DensityFunction first');
+	await range.selectOption('unit');
+	await cameraY.fill('100');
+	await cameraY.press('Enter');
+	await volume.click();
+	await cut.fill('20');
+	await cut.press('Enter');
+
+	// The second one, new, starts like the first; it gets its own settings.
+	await clickLine(page, 'DensityFunction second');
+	await expect(page.getByText(/:second$/)).toBeVisible();
+	await density.click();
+	await range.selectOption('auto');
+	await cameraY.fill('50');
+	await cameraY.press('Enter');
+
+	// Back on the first, it's as it was.
+	const leftAsItWas = async () => {
+		await clickLine(page, 'DensityFunction first');
+		await expect(volume).toHaveAttribute('aria-pressed', 'true');
+		await expect(cut).toHaveValue('20');
+		await density.click();
+		await expect(range).toHaveValue('unit');
+		await expect(cameraY).toHaveValue('100');
+	};
+	await leftAsItWas();
+	await clickLine(page, 'DensityFunction second');
+	await expect(range).toHaveValue('auto');
+	await expect(cameraY).toHaveValue('50');
+	await clickLine(page, 'DensityFunction first');
+	await volume.click();
+
+	// And after a reload.
+	await page.waitForTimeout(600); // settings are saved at most every 400 ms
+	await page.reload();
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	await page.getByRole('tab', { name: 'Preview' }).click();
+	await leftAsItWas();
+	expect(errors).toEqual([]);
+});
+
+test('a jigsaw structure keeps its tab and simulation seed after a reload', async ({ page }) => {
+	const errors: string[] = [];
+	page.on('pageerror', (e) => errors.push(e.message));
+	page.on('dialog', (d) => d.accept());
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	await page.getByRole('button', { name: /Examples/ }).click();
+	await page.getByRole('button', { name: /jigsaw/ }).click();
+	await expect(status(page)).toHaveText(/No problems/);
+	await page.locator('.cm-line', { hasText: 'JigsawStructure dungeon {' }).click();
+	await page.getByRole('tab', { name: 'Simulation' }).click();
+	const seed = page.getByLabel('Jigsaw simulation').getByLabel('Layout seed');
+	await seed.fill('42');
+	await page.waitForTimeout(600); // settings are saved at most every 400 ms
+	await page.reload();
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	await page.locator('.cm-line', { hasText: 'JigsawStructure dungeon {' }).click();
+	await expect(page.getByRole('tab', { name: 'Simulation' })).toHaveAttribute('aria-selected', 'true');
+	await expect(seed).toHaveValue('42');
+	expect(errors).toEqual([]);
+});
+
 test('a pinned preview stays put while the cursor moves to another declaration', async ({ page }) => {
 	const errors: string[] = [];
 	page.on('pageerror', (e) => errors.push(e.message));
