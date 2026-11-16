@@ -194,6 +194,19 @@ export const VOLUME_TILE = 64;
  * costs fewer samples; spacings are whole blocks, sampled at block
  * positions.
  */
+/**
+ * The heights a density function's tiles are sampled at for Bottom..Top:
+ * every sy blocks from minY, in a multiple of 16 layers (so coarser
+ * levels keep the top layer), sy doubling from 4 until that's at most 256.
+ */
+export function yGrid(bottomY: number, topY: number): { sy: number; minY: number; layers: number } {
+	for (let sy = 4; ; sy *= 2) {
+		const minY = Math.floor(bottomY / sy) * sy;
+		const layers = Math.max(16, Math.ceil((topY - minY) / sy / 16) * 16);
+		if (layers <= 256 || sy >= 1 << 12) return { sy, minY, layers };
+	}
+}
+
 export interface VolumeTileRequest {
 	type: 'tile';
 	session: number;
@@ -204,6 +217,9 @@ export interface VolumeTileRequest {
 	tx: number;
 	tz: number;
 	lod: number;
+	/** The y range to sample a density function over (noise settings use their own height). */
+	bottomY: number;
+	topY: number;
 }
 
 /**

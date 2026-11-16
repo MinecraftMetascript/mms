@@ -532,6 +532,8 @@ test('an inline noise where an id is needed previews', async ({ page }) => {
 });
 
 test('the 3D density view samples tiles around the camera and travels', async ({ page }) => {
+	// It samples several height ranges in turn, which is slow without a GPU.
+	test.setTimeout(150_000);
 	const errors: string[] = [];
 	page.on('pageerror', (e) => errors.push(e.message));
 	await page.goto('./');
@@ -555,12 +557,30 @@ test('the 3D density view samples tiles around the camera and travels', async ({
 	await expect(view.getByLabel('Height ruler')).toContainText('0');
 
 	// A slider's value is a text box, and a double-click on the slider resets it.
-	const cut = page.getByLabel('Cut from top value');
+	const cut = page.getByLabel('Top value', { exact: true });
 	await cut.fill('20');
 	await cut.press('Enter');
 	await expect(cut).toHaveValue('20');
-	await page.getByRole('slider', { name: 'Cut from top' }).dblclick();
+	await page.getByRole('slider', { name: 'Top', exact: true }).dblclick();
 	await expect(cut).toHaveValue('320');
+
+	// Bottom and Top set the heights a density function is sampled over, and colour spans them.
+	const bottom = page.getByLabel('Bottom value', { exact: true });
+	await bottom.fill('-128');
+	await bottom.press('Enter');
+	await cut.fill('384');
+	await cut.press('Enter');
+	await expect(view.locator('[data-colour-heights]')).toHaveText(/^-128.*384$/);
+	await expect
+		.poll(async () => {
+			const ys = ((await view.getByLabel('Height ruler').getAttribute('data-height-ruler')) ?? '').split(' ').map(Number);
+			return Math.min(...ys) <= -100 && Math.max(...ys) >= 350;
+		}, { timeout: 45_000 })
+		.toBe(true);
+	// (No need to wait for the taller range to finish refining: the ruler shows the new heights arrived.)
+	// (A range over 1024 tall is sampled more sparsely up and says so, but drawing one
+	// is too slow under CI's software GL to try here.)
+	await expect(view.locator('[data-y-spacing]')).toHaveCount(0);
 
 	// Holding D travels east, and the new ground is sampled.
 	await view.getByRole('application').focus();
@@ -610,7 +630,7 @@ test('a preview comes back as it was left for each declaration, also after a rel
 	await page.getByRole('tab', { name: 'Preview' }).click();
 	const range = page.getByLabel('Range');
 	const cameraY = page.getByLabel('Camera y');
-	const cut = page.getByLabel('Cut from top value');
+	const cut = page.getByLabel('Top value', { exact: true });
 	const volume = page.getByRole('button', { name: '3D density', exact: true });
 	const setY = async (y: string) => {
 		await cameraY.fill(y);

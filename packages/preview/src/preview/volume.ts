@@ -63,8 +63,13 @@ export interface ValueRange {
 export interface VolumeSettings {
 	look: VolumeLook;
 	threshold: number;
-	/** The highest y drawn. */
-	cutY: number;
+	/**
+	 * The lowest and highest y drawn. A density function is sampled over
+	 * this range; noise settings are sampled over their own height and cut
+	 * to it.
+	 */
+	bottomY: number;
+	topY: number;
 	/** How much of the window to keep along x and z, 0 to 1, cut from the east and south. */
 	cutX: number;
 	cutZ: number;
@@ -74,7 +79,7 @@ export interface VolumeSettings {
 	blocks: boolean;
 }
 
-export const defaultSettings: VolumeSettings = { look: 'caves', threshold: 0, cutY: 320, cutX: 1, cutZ: 1, haze: 0.004, caveOpacity: 0.55, blocks: true };
+export const defaultSettings: VolumeSettings = { look: 'caves', threshold: 0, bottomY: -64, topY: 320, cutX: 1, cutZ: 1, haze: 0.004, caveOpacity: 0.55, blocks: true };
 
 const mod = (a: number, n: number) => ((a % n) + n) % n;
 
@@ -287,7 +292,8 @@ const fragmentShader = /* glsl */ `
 	}
 	// Height: deep magenta, red, amber, green, sky blue, from the bottom of the world to y 200.
 	vec3 ramp(float y) {
-		float t = clamp((y - minY) / (200.0 - minY), 0.0, 1.0) * 4.0;
+		// From the bottom of the box (purple) to its top (blue).
+		float t = clamp((y - boxMin.y) / max(1.0, boxMax.y - boxMin.y), 0.0, 1.0) * 4.0;
 		vec3 c0 = vec3(0.45, 0.12, 0.55), c1 = vec3(0.86, 0.27, 0.22), c2 = vec3(0.93, 0.68, 0.20), c3 = vec3(0.25, 0.66, 0.45), c4 = vec3(0.35, 0.58, 0.92);
 		if (t < 1.0) return mix(c0, c1, t);
 		if (t < 2.0) return mix(c1, c2, t - 1.0);
@@ -331,7 +337,8 @@ const fragmentShader = /* glsl */ `
 			return vec4(ramp(cell.y + 0.5) * 0.78, 1.0);
 		}
 		float maxJump = 2.0 * min(sx, sy) - 1.0;
-		for (int i = 0; i < 4000; i++) {
+		// Enough block crossings for a ray across the tallest box (4063 up, 320 by 320 across).
+		for (int i = 0; i < 6000; i++) {
 			if (acc.a > 0.97) break;
 			if (ok) {
 				// Within s blocks along the ray, every block corner is within s + 1.74 blocks of this block's centre.
@@ -412,7 +419,8 @@ const fragmentShader = /* glsl */ `
 			outColor = vec4(ramp(p.y) * 0.78, 1.0);
 			return;
 		}
-		for (int i = 0; i < 3000; i++) {
+		// Enough half-block steps for a ray across the tallest box, where density stays near 0.
+		for (int i = 0; i < 9000; i++) {
 			float dt = ok ? clamp(0.9 * abs(d) / lipAt(p), minStep, maxStep) : sx;
 			if (ok && dt > minStep) dt = clamp(0.9 * abs(d) / lipAlong(p, rd, dt), minStep, dt);
 			float t1 = t + dt;
@@ -928,8 +936,14 @@ export class VolumeRenderer {
 		}
 		const { x, z } = this.target();
 		this.moved(x, z);
-		const tx = Math.floor(x / VOLUME_TILE);
-		const tz = Math.floor(z / VOLUME_TILE);
+		// Panning moves the camera within the box; the box only follows
+		// when the target comes within a tile of its edge, and then just
+		// far enough to keep it there.
+		const tx0 = Math.floor(x / VOLUME_TILE);
+		const tz0 = Math.floor(z / VOLUME_TILE);
+		const near = (c: number, t: number) => (Number.isFinite(c) ? Math.min(t + R - 1, Math.max(t - R + 1, c)) : t);
+		const tx = near(this.centre.tx, tx0);
+		const tz = near(this.centre.tz, tz0);
 		if (tx !== this.centre.tx || tz !== this.centre.tz) {
 			this.centre = { tx, tz };
 			for (let dz = -R; dz <= R; dz++) {
@@ -956,8 +970,9 @@ export class VolumeRenderer {
 		const span = (2 * R + 1) * VOLUME_TILE - (g?.sx ?? 4);
 		const minY = g?.minY ?? -64;
 		const maxY = g ? g.minY + (g.ny - 1) * g.sy : 320;
-		const top = Math.max(minY + 1, Math.min(maxY, s.cutY));
-		const min = new THREE.Vector3(x0, minY, z0);
+		const bottom = Math.max(minY, Math.min(maxY - 1, s.bottomY));
+		const top = Math.max(bottom + 1, Math.min(maxY, s.topY));
+		const min = new THREE.Vector3(x0, bottom, z0);
 		const max = new THREE.Vector3(x0 + Math.max(1, span * s.cutX), top, z0 + Math.max(1, span * s.cutZ));
 		(this.uniforms.boxMin.value as THREE.Vector3).copy(min);
 		(this.uniforms.boxMax.value as THREE.Vector3).copy(max);
@@ -1022,21 +1037,32 @@ export class VolumeRenderer {
 			if (p.z < -1 || p.z > 1) return null;
 			return [((p.x + 1) / 2) * w, ((1 - p.y) / 2) * h];
 		};
-		let best: { x: number; z: number; len: number; left: number } | null = null;
+		// An edge counts when it stands inside the view, with enough of it showing for a few ticks.
+		const onScreen = (b: [number, number], t: [number, number]) =>
+			Math.min(b[0], t[0]) >= 0 && Math.max(b[0], t[0]) <= w && Math.min(h, Math.max(b[1], t[1])) - Math.max(0, Math.min(b[1], t[1])) >= 3 * gap;
+		let best: { x: number; z: number; len: number; left: number; pin?: number } | null = null;
 		for (const x of [min.x, max.x])
 			for (const z of [min.z, max.z]) {
 				const b = toScreen(x, min.y, z);
 				const t = toScreen(x, max.y, z);
-				if (!b || !t) continue;
+				if (!b || !t || !onScreen(b, t)) continue;
 				const left = b[0] + t[0];
 				if (!best || left < best.left) best = { x, z, len: Math.hypot(t[0] - b[0], t[1] - b[1]), left };
 			}
+		if (!best) {
+			// Zoomed in past the box's edges: measure the column the camera
+			// looks at, and pin its ticks to the left edge of the view.
+			const { x, z } = this.controls.target;
+			const b = toScreen(x, min.y, z);
+			const t = toScreen(x, max.y, z);
+			if (b && t) best = { x, z, len: Math.abs(t[1] - b[1]), left: 0, pin: 12 };
+		}
 		if (!best || best.len < gap) return [];
 		const step = niceStep(((max.y - min.y) / best.len) * gap);
 		const out: { y: number; px: number; py: number }[] = [];
 		for (const y of multiples(min.y, max.y, step)) {
 			const at = toScreen(best.x, y, best.z);
-			if (at) out.push({ y, px: at[0], py: at[1] });
+			if (at) out.push({ y, px: best.pin ?? at[0], py: at[1] });
 		}
 		return out;
 	}
