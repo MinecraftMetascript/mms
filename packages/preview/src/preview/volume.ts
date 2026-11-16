@@ -934,8 +934,14 @@ export class VolumeRenderer {
 		}
 		const { x, z } = this.target();
 		this.moved(x, z);
-		const tx = Math.floor(x / VOLUME_TILE);
-		const tz = Math.floor(z / VOLUME_TILE);
+		// Panning moves the camera within the box; the box only follows
+		// when the target comes within a tile of its edge, and then just
+		// far enough to keep it there.
+		const tx0 = Math.floor(x / VOLUME_TILE);
+		const tz0 = Math.floor(z / VOLUME_TILE);
+		const near = (c: number, t: number) => (Number.isFinite(c) ? Math.min(t + R - 1, Math.max(t - R + 1, c)) : t);
+		const tx = near(this.centre.tx, tx0);
+		const tz = near(this.centre.tz, tz0);
 		if (tx !== this.centre.tx || tz !== this.centre.tz) {
 			this.centre = { tx, tz };
 			for (let dz = -R; dz <= R; dz++) {
@@ -1029,21 +1035,32 @@ export class VolumeRenderer {
 			if (p.z < -1 || p.z > 1) return null;
 			return [((p.x + 1) / 2) * w, ((1 - p.y) / 2) * h];
 		};
-		let best: { x: number; z: number; len: number; left: number } | null = null;
+		// An edge counts when it stands inside the view, with enough of it showing for a few ticks.
+		const onScreen = (b: [number, number], t: [number, number]) =>
+			Math.min(b[0], t[0]) >= 0 && Math.max(b[0], t[0]) <= w && Math.min(h, Math.max(b[1], t[1])) - Math.max(0, Math.min(b[1], t[1])) >= 3 * gap;
+		let best: { x: number; z: number; len: number; left: number; pin?: number } | null = null;
 		for (const x of [min.x, max.x])
 			for (const z of [min.z, max.z]) {
 				const b = toScreen(x, min.y, z);
 				const t = toScreen(x, max.y, z);
-				if (!b || !t) continue;
+				if (!b || !t || !onScreen(b, t)) continue;
 				const left = b[0] + t[0];
 				if (!best || left < best.left) best = { x, z, len: Math.hypot(t[0] - b[0], t[1] - b[1]), left };
 			}
+		if (!best) {
+			// Zoomed in past the box's edges: measure the column the camera
+			// looks at, and pin its ticks to the left edge of the view.
+			const { x, z } = this.controls.target;
+			const b = toScreen(x, min.y, z);
+			const t = toScreen(x, max.y, z);
+			if (b && t) best = { x, z, len: Math.abs(t[1] - b[1]), left: 0, pin: 12 };
+		}
 		if (!best || best.len < gap) return [];
 		const step = niceStep(((max.y - min.y) / best.len) * gap);
 		const out: { y: number; px: number; py: number }[] = [];
 		for (const y of multiples(min.y, max.y, step)) {
 			const at = toScreen(best.x, y, best.z);
-			if (at) out.push({ y, px: at[0], py: at[1] });
+			if (at) out.push({ y, px: best.pin ?? at[0], py: at[1] });
 		}
 		return out;
 	}
