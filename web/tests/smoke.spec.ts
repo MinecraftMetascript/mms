@@ -595,6 +595,88 @@ test('the 3D density view picks a threshold that shows something', async ({ page
 	await expect(view.getByText(/Nothing in view crosses/)).toBeHidden();
 });
 
+test('a preview comes back as it was left for each declaration, also after a reload', async ({ page }) => {
+	// The 3D view draws slowly without a GPU, so it's shown as little as possible.
+	test.setTimeout(120_000);
+	const errors: string[] = [];
+	page.on('pageerror', (e) => errors.push(e.message));
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	await replaceText(
+		page,
+		'DensityFunction first = Noise({ base_octave = -5, amplitude_modifiers = [1] }, 1, 1)\nDensityFunction second = Noise({ base_octave = -4, amplitude_modifiers = [1] }, 1, 1)\n'
+	);
+	await expect(status(page)).toHaveText(/No problems/);
+	await page.getByRole('tab', { name: 'Preview' }).click();
+	const range = page.getByLabel('Range');
+	const cameraY = page.getByLabel('Camera y');
+	const cut = page.getByLabel('Cut from top value');
+	const volume = page.getByRole('button', { name: '3D density', exact: true });
+	const setY = async (y: string) => {
+		await cameraY.fill(y);
+		await cameraY.press('Enter');
+	};
+
+	// Each gets its own range and camera height.
+	await clickLine(page, 'DensityFunction second');
+	await setY('50');
+	await clickLine(page, 'DensityFunction first');
+	await range.selectOption('unit');
+	await setY('100');
+	await clickLine(page, 'DensityFunction second');
+	await expect(range).toHaveValue('auto');
+	await expect(cameraY).toHaveValue('50');
+	await clickLine(page, 'DensityFunction first');
+	await expect(range).toHaveValue('unit');
+	await expect(cameraY).toHaveValue('100');
+
+	// The first goes to the 3D view with a cut; the second stays on Density.
+	await volume.click();
+	await cut.fill('20');
+	await cut.press('Enter');
+	await clickLine(page, 'DensityFunction second');
+	await expect(volume).toHaveAttribute('aria-pressed', 'false');
+	await expect(cameraY).toHaveValue('50');
+	await clickLine(page, 'DensityFunction first');
+	await expect(volume).toHaveAttribute('aria-pressed', 'true');
+	await expect(cut).toHaveValue('20');
+
+	// And after a reload.
+	await clickLine(page, 'DensityFunction second');
+	await page.waitForTimeout(600); // settings are saved at most every 400 ms
+	await page.reload();
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	await page.getByRole('tab', { name: 'Preview' }).click();
+	await clickLine(page, 'DensityFunction second');
+	await expect(cameraY).toHaveValue('50');
+	await clickLine(page, 'DensityFunction first');
+	await expect(volume).toHaveAttribute('aria-pressed', 'true');
+	await expect(cut).toHaveValue('20');
+	expect(errors).toEqual([]);
+});
+
+test('a jigsaw structure keeps its tab and simulation seed after a reload', async ({ page }) => {
+	const errors: string[] = [];
+	page.on('pageerror', (e) => errors.push(e.message));
+	page.on('dialog', (d) => d.accept());
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	await page.getByRole('button', { name: /Examples/ }).click();
+	await page.getByRole('button', { name: /jigsaw/ }).click();
+	await expect(status(page)).toHaveText(/No problems/);
+	await page.locator('.cm-line', { hasText: 'JigsawStructure dungeon {' }).click();
+	await page.getByRole('tab', { name: 'Simulation' }).click();
+	const seed = page.getByLabel('Jigsaw simulation').getByLabel('Layout seed');
+	await seed.fill('42');
+	await page.waitForTimeout(600); // settings are saved at most every 400 ms
+	await page.reload();
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	await page.locator('.cm-line', { hasText: 'JigsawStructure dungeon {' }).click();
+	await expect(page.getByRole('tab', { name: 'Simulation' })).toHaveAttribute('aria-selected', 'true');
+	await expect(seed).toHaveValue('42');
+	expect(errors).toEqual([]);
+});
+
 test('a pinned preview stays put while the cursor moves to another declaration', async ({ page }) => {
 	const errors: string[] = [];
 	page.on('pageerror', (e) => errors.push(e.message));
