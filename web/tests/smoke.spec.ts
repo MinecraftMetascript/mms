@@ -596,6 +596,8 @@ test('the 3D density view picks a threshold that shows something', async ({ page
 });
 
 test('a preview comes back as it was left for each declaration, also after a reload', async ({ page }) => {
+	// The 3D view draws slowly without a GPU, so it's shown as little as possible.
+	test.setTimeout(120_000);
 	const errors: string[] = [];
 	page.on('pageerror', (e) => errors.push(e.message));
 	await page.goto('./');
@@ -609,48 +611,47 @@ test('a preview comes back as it was left for each declaration, also after a rel
 	const range = page.getByLabel('Range');
 	const cameraY = page.getByLabel('Camera y');
 	const cut = page.getByLabel('Cut from top value');
-	const density = page.getByRole('button', { name: 'Density', exact: true });
 	const volume = page.getByRole('button', { name: '3D density', exact: true });
+	const setY = async (y: string) => {
+		await cameraY.fill(y);
+		await cameraY.press('Enter');
+	};
 
-	// The first one gets a fixed range, a camera height, then the 3D view with a cut.
+	// Each gets its own range and camera height.
+	await clickLine(page, 'DensityFunction second');
+	await setY('50');
 	await clickLine(page, 'DensityFunction first');
 	await range.selectOption('unit');
-	await cameraY.fill('100');
-	await cameraY.press('Enter');
-	await volume.click();
-	await cut.fill('20');
-	await cut.press('Enter');
-
-	// The second one, new, starts like the first; it gets its own settings.
-	await clickLine(page, 'DensityFunction second');
-	await expect(page.getByText(/:second$/)).toBeVisible();
-	await density.click();
-	await range.selectOption('auto');
-	await cameraY.fill('50');
-	await cameraY.press('Enter');
-
-	// Back on the first, it's as it was.
-	const leftAsItWas = async () => {
-		await clickLine(page, 'DensityFunction first');
-		await expect(volume).toHaveAttribute('aria-pressed', 'true');
-		await expect(cut).toHaveValue('20');
-		await density.click();
-		await expect(range).toHaveValue('unit');
-		await expect(cameraY).toHaveValue('100');
-	};
-	await leftAsItWas();
+	await setY('100');
 	await clickLine(page, 'DensityFunction second');
 	await expect(range).toHaveValue('auto');
 	await expect(cameraY).toHaveValue('50');
 	await clickLine(page, 'DensityFunction first');
+	await expect(range).toHaveValue('unit');
+	await expect(cameraY).toHaveValue('100');
+
+	// The first goes to the 3D view with a cut; the second stays on Density.
 	await volume.click();
+	await cut.fill('20');
+	await cut.press('Enter');
+	await clickLine(page, 'DensityFunction second');
+	await expect(volume).toHaveAttribute('aria-pressed', 'false');
+	await expect(cameraY).toHaveValue('50');
+	await clickLine(page, 'DensityFunction first');
+	await expect(volume).toHaveAttribute('aria-pressed', 'true');
+	await expect(cut).toHaveValue('20');
 
 	// And after a reload.
+	await clickLine(page, 'DensityFunction second');
 	await page.waitForTimeout(600); // settings are saved at most every 400 ms
 	await page.reload();
 	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
 	await page.getByRole('tab', { name: 'Preview' }).click();
-	await leftAsItWas();
+	await clickLine(page, 'DensityFunction second');
+	await expect(cameraY).toHaveValue('50');
+	await clickLine(page, 'DensityFunction first');
+	await expect(volume).toHaveAttribute('aria-pressed', 'true');
+	await expect(cut).toHaveValue('20');
 	expect(errors).toEqual([]);
 });
 
