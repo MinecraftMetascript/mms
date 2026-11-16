@@ -682,12 +682,14 @@ function addHelpers(ports: MessagePort[]) {
 		helpers.push(helper);
 	}
 	dispatch();
+	sendTiles();
 }
 
 function finish(helper: (typeof helpers)[number], reply: HelperReply) {
 	if (reply.type === 'tile') {
 		helper.tiles--;
 		postTile(reply);
+		sendTiles();
 		return;
 	}
 	const job = helper.job;
@@ -909,16 +911,37 @@ function postTile(tile: VolumeTile) {
 	(self as unknown as Worker).postMessage(tile, 'values' in tile ? [tile.values.buffer] : []);
 }
 
-/** Hands a tile to the least busy helper, or samples it here when there are none. */
+/**
+ * Tiles waiting for a helper. Each helper holds one tile at a time, so when
+ * the view starts a new session (its Y range changed, say) the old
+ * session's waiting tiles are dropped here instead of keeping every core
+ * busy with samples nobody will draw.
+ */
+let tileQueue: VolumeTileRequest[] = [];
+let tileSession = -Infinity;
+
+/** Hands a tile to an idle helper, or samples it here when there are none. */
 async function askTile(req: VolumeTileRequest) {
+	if (req.session < tileSession) return;
+	if (req.session > tileSession) {
+		tileSession = req.session;
+		tileQueue = [];
+	}
 	if (helpers.length === 0) {
 		postTile(await sampleTile(req));
 		return;
 	}
-	let best = helpers[0];
-	for (const h of helpers) if (h.tiles + (h.job ? 1 : 0) < best.tiles + (best.job ? 1 : 0)) best = h;
-	best.tiles++;
-	best.port.postMessage(req satisfies HelperMessage);
+	tileQueue.push(req);
+	sendTiles();
+}
+
+function sendTiles() {
+	for (const h of helpers) {
+		if (!tileQueue.length) return;
+		if (h.tiles > 0) continue;
+		h.tiles++;
+		h.port.postMessage(tileQueue.shift()! satisfies HelperMessage);
+	}
 }
 
 /**
