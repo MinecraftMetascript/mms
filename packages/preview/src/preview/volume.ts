@@ -337,7 +337,8 @@ const fragmentShader = /* glsl */ `
 			return vec4(ramp(cell.y + 0.5) * 0.78, 1.0);
 		}
 		float maxJump = 2.0 * min(sx, sy) - 1.0;
-		for (int i = 0; i < 4000; i++) {
+		// Enough block crossings for a ray across the tallest box (4063 up, 320 by 320 across).
+		for (int i = 0; i < 6000; i++) {
 			if (acc.a > 0.97) break;
 			if (ok) {
 				// Within s blocks along the ray, every block corner is within s + 1.74 blocks of this block's centre.
@@ -418,7 +419,8 @@ const fragmentShader = /* glsl */ `
 			outColor = vec4(ramp(p.y) * 0.78, 1.0);
 			return;
 		}
-		for (int i = 0; i < 3000; i++) {
+		// Enough half-block steps for a ray across the tallest box, where density stays near 0.
+		for (int i = 0; i < 9000; i++) {
 			float dt = ok ? clamp(0.9 * abs(d) / lipAt(p), minStep, maxStep) : sx;
 			if (ok && dt > minStep) dt = clamp(0.9 * abs(d) / lipAlong(p, rd, dt), minStep, dt);
 			float t1 = t + dt;
