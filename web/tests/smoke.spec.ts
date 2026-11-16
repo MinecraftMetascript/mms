@@ -566,15 +566,15 @@ test('the 3D density view samples tiles around the camera and travels', async ({
 
 	// Bottom and Top set the heights a density function is sampled over, and colour spans them.
 	const bottom = page.getByLabel('Bottom value', { exact: true });
-	await bottom.fill('-300');
+	await bottom.fill('-128');
 	await bottom.press('Enter');
-	await cut.fill('600');
+	await cut.fill('384');
 	await cut.press('Enter');
-	await expect(view.locator('[data-colour-heights]')).toHaveText(/^-300.*600$/);
+	await expect(view.locator('[data-colour-heights]')).toHaveText(/^-128.*384$/);
 	await expect
 		.poll(async () => {
 			const ys = ((await view.getByLabel('Height ruler').getAttribute('data-height-ruler')) ?? '').split(' ').map(Number);
-			return Math.min(...ys) <= -200 && Math.max(...ys) >= 500;
+			return Math.min(...ys) <= -100 && Math.max(...ys) >= 350;
 		}, { timeout: 45_000 })
 		.toBe(true);
 	// (No need to wait for the taller range to finish refining: the ruler shows the new heights arrived.)
