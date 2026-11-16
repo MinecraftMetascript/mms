@@ -9,7 +9,7 @@
 	// WASD to travel; the window of tiles follows the camera.
 
 	import { onMount, untrack } from 'svelte';
-	import type { PreviewKind, VolumeTile, VolumeTileRequest } from './protocol';
+	import { yGrid, type PreviewKind, type VolumeTile, type VolumeTileRequest } from './protocol';
 	import Slider from './Slider.svelte';
 	import { defaultSettings, VolumeRenderer, type TileWant, type ValueRange, type VolumeLook, type VolumePose, type VolumeSettings } from './volume';
 	import { record, restore, useMemory } from '../memory';
@@ -207,11 +207,7 @@
 		return { bottom: b, top: Math.max(b + 1, Math.min(yLimits.max, settings.topY)) };
 	});
 	/** Blocks between samples up, as the worker picks them for a density function's range. */
-	const ySpacing = $derived.by(() => {
-		let sy = 4;
-		while ((settings.topY - settings.bottomY) / sy > 256) sy *= 2;
-		return sy;
-	});
+	const ySpacing = $derived(yGrid(settings.bottomY, settings.topY).sy);
 	/** Sets Bottom or Top, moving the other along to keep at least a block between them. */
 	function setY(k: 'bottomY' | 'topY', v: number) {
 		v = Math.round(v);

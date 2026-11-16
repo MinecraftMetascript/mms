@@ -33,7 +33,8 @@ import {
 	type PreviewResponse,
 	type PreviewView,
 	type VolumeTile,
-	type VolumeTileRequest
+	type VolumeTileRequest,
+	yGrid
 } from './protocol';
 
 // Renders previews with Deepslate. User files are registered under their
@@ -870,12 +871,7 @@ async function volumeOf(req: VolumeTileRequest): Promise<Volume> {
 		fn.compute(DensityFunction.context(0, 0, 0));
 		// The asked-for heights, two blocks across and four up; a tall range
 		// is sampled more sparsely up, so a tile stays at most 256 layers.
-		const span = Math.max(1, req.topY - req.bottomY);
-		let sy = 4;
-		while (span / sy > 256) sy *= 2;
-		const minY = Math.floor(req.bottomY / sy) * sy;
-		// Layers in multiples of 16, so coarser levels keep the top layer.
-		const layers = Math.max(16, Math.ceil((req.topY - minY) / sy / 16) * 16);
+		const { sy, minY, layers } = yGrid(req.bottomY, req.topY);
 		return { key, fn, sx: 2, sy, minY, ny: layers + 1 };
 	});
 	return volume;
