@@ -38,18 +38,21 @@ export function memory(initial: Entries, save: (entries: Entries) => void, wait 
 		}
 	};
 	let cleared = false;
-	globalThis.addEventListener?.('pagehide', () => timer !== undefined && flush());
+	const onHide = () => timer !== undefined && flush();
+	globalThis.addEventListener?.('pagehide', onHide);
 	return {
 		clear() {
 			cleared = true;
 			clearTimeout(timer);
 			timer = undefined;
 			map.clear();
+			globalThis.removeEventListener?.('pagehide', onHide);
 		},
 		get<T>(key: string) {
 			return map.get(key) as T | undefined;
 		},
 		set(key, value) {
+			if (cleared) return;
 			const json = JSON.stringify(value);
 			if (json === undefined) return;
 			const copy = JSON.parse(json);
@@ -57,7 +60,7 @@ export function memory(initial: Entries, save: (entries: Entries) => void, wait 
 			map.delete(key);
 			map.set(key, copy);
 			while (map.size > MEMORY_LIMIT) map.delete(map.keys().next().value!);
-			if (timer === undefined && !cleared) timer = setTimeout(flush, wait);
+			if (timer === undefined) timer = setTimeout(flush, wait);
 		}
 	};
 }
