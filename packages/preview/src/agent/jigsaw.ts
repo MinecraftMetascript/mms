@@ -63,10 +63,17 @@ function poolPieces(files: OutputFile[], pools: Iterable<string>): Map<string, s
 
 const boxText = (b: Simulation['bounds']) => `${b[0].join(' ')} to ${b[1].join(' ')}`;
 
-function header(id: string, s: Simulation): string[] {
+function header(id: string, s: Simulation, notes = s.notes): string[] {
 	const out = [`Jigsaw structure ${id}: depth ${s.depth}${s.depth !== s.size ? ` (its size is ${s.size})` : ''}.`];
-	if (s.notes.length) out.push(...s.notes.map((n) => `Note: ${n}`));
+	if (notes.length) out.push(...notes.map((n) => `Note: ${n}`));
 	return out;
+}
+
+/** Every run's notes, in the order first seen, saying how many runs gave each when not all did. */
+function notesOf(sims: Simulation[]): string[] {
+	const runs = new Map<string, number>();
+	for (const s of sims) for (const n of s.notes) runs.set(n, (runs.get(n) ?? 0) + 1);
+	return [...runs].map(([n, c]) => (c === sims.length ? n : `${n} (in ${c} of ${sims.length} runs)`));
 }
 
 /** One seed: every piece, and every jigsaw block that stayed empty. */
@@ -96,7 +103,7 @@ function one(id: string, s: Simulation, files: OutputFile[]): string {
 
 /** Many seeds: how often each piece appears, and how the structure's size varies. */
 function many(id: string, sims: Simulation[], files: OutputFile[]): string {
-	const out = header(id, sims[0]);
+	const out = header(id, sims[0], notesOf(sims));
 	out.push(`Seeds ${sims[0].seed}..${sims[sims.length - 1].seed} (${sims.length} runs).`);
 	const failed = sims.filter((s) => s.failed);
 	if (failed.length) {

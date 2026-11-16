@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -98,4 +100,35 @@ func TestAgentInSync(t *testing.T) {
 	if !bytes.Equal(built, agentJS) {
 		t.Fatal("engine/mcp/preview/agent.mjs is stale: run `npm run build:agent -w packages/preview`")
 	}
+}
+
+// A note only some runs give, such as a pool only some starts reach, is
+// reported over many runs with how many gave it.
+func TestPreviewJigsawNotesFromEveryRun(t *testing.T) {
+	needJS(t)
+	s := server(t)
+	dir := t.TempDir()
+	if err := os.CopyFS(dir, os.DirFS("../../examples/jigsaw")); err != nil {
+		t.Fatal(err)
+	}
+	src, err := os.ReadFile(filepath.Join(dir, "dungeon.mms"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Some runs start with a cap, which leads nowhere, so only the others
+	// reach the halls pool, which lists a vanilla piece the simulation lacks.
+	text := strings.Replace(string(src), `start = [Piece("start")]`, `start = [Piece("start"), Piece("caps/hall_cap")]`, 1)
+	text = strings.Replace(text, `Piece("halls/short_hall"),`, `Piece("halls/short_hall"), WeightedElement(1, SinglePoolElement(rigid, minecraft:village/plains/houses/plains_small_house_1, minecraft:empty)),`, 1)
+	if err := os.WriteFile(filepath.Join(dir, "dungeon.mms"), []byte(text), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out, failed := call(t, s, "jigsaw", map[string]any{"dir": dir, "runs": 20, "depth": 1})
+	if failed {
+		t.Fatal(out)
+	}
+	if strings.Contains(out, "has errors") {
+		t.Fatal(out)
+	}
+	// Seed 0 starts with the cap, so before, the report showed none of the halls run's notes.
+	wantAll(t, out, "Note: minecraft:village/plains/houses/plains_small_house_1 is not one of this project's structure files, so it is never placed here. (in 9 of 20 runs)")
 }
