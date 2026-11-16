@@ -209,6 +209,9 @@
 		gl.lookAt(nx, nz);
 	}
 
+	/** The height ruler up the box's left edge, redrawn with every frame. */
+	let ruler = $state.raw<{ y: number; px: number; py: number }[]>([]);
+
 	onMount(() => {
 		try {
 			gl = new VolumeRenderer(canvas);
@@ -221,6 +224,10 @@
 			pump();
 		};
 		gl.ranged = ranged;
+		gl.drawn = () => {
+			const next = gl?.heightRuler() ?? [];
+			if (next.length !== ruler.length || next.some((t, i) => t.y !== ruler[i].y || Math.abs(t.px - ruler[i].px) > 0.5 || Math.abs(t.py - ruler[i].py) > 0.5)) ruler = next;
+		};
 		gl.moved = (nx, nz) => {
 			at = { x: Math.round(nx), z: Math.round(nz) };
 			onmove?.(nx, nz);
@@ -268,6 +275,20 @@
 		onblur={() => held.clear()}
 	>
 		<canvas bind:this={canvas} class="absolute inset-0 h-full w-full touch-none" oncontextmenu={(e) => e.preventDefault()}></canvas>
+		{#if ruler.length}
+			<!-- Heights up the box's left edge: a tick to its left and the y beside it. -->
+			<div class="pointer-events-none absolute inset-0 overflow-hidden font-mono text-[10px] text-white" aria-label="Height ruler" data-height-ruler={ruler.map((t) => t.y).join(' ')}>
+				{#each ruler as t, i (t.y)}
+					<span class="absolute h-px w-1.5 -translate-x-full -translate-y-1/2 bg-white shadow-[0_0_0_1px_rgba(0,0,0,0.5)]" style:left="{t.px}px" style:top="{t.py}px"></span>
+					<!-- Beside the tick, on whichever side of the edge has room. -->
+					<span
+						class="absolute -translate-y-1/2 rounded bg-black/55 px-1 leading-4 whitespace-nowrap {t.px < 56 ? 'ml-1' : '-translate-x-full -ml-2.5'}"
+						style:left="{t.px}px"
+						style:top="{t.py}px">{i === ruler.length - 1 ? `y ${t.y}` : t.y}</span
+					>
+				{/each}
+			</div>
+		{/if}
 		{#if failure}
 			<div class="absolute inset-x-3 top-3 rounded border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-200">
 				The 3D view can't start: {failure}.
