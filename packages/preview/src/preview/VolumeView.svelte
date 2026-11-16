@@ -234,6 +234,10 @@
 	let ruler = $state.raw<{ y: number; px: number; py: number }[]>([]);
 
 	onMount(() => {
+		// The preview's spot, read before the renderer reports its own
+		// starting camera, which would move the preview's x and z to it.
+		const spot = { x, z };
+		let placed = false;
 		try {
 			gl = new VolumeRenderer(canvas);
 		} catch (e) {
@@ -250,6 +254,7 @@
 			if (next.length !== ruler.length || next.some((t, i) => t.y !== ruler[i].y || Math.abs(t.px - ruler[i].px) > 0.5 || Math.abs(t.py - ruler[i].py) > 0.5)) ruler = next;
 		};
 		gl.moved = (nx, nz) => {
+			if (!placed) return;
 			at = { x: Math.round(nx), z: Math.round(nz) };
 			onmove?.(nx, nz);
 			remember();
@@ -262,10 +267,11 @@
 		// The camera this function had comes back: its angle, distance and
 		// height, over the spot the preview is at (which Density may have
 		// moved since).
-		if (savedPose && savedPose.dx ** 2 + savedPose.dy ** 2 + savedPose.dz ** 2 > 1e-6) gl.setPose({ ...savedPose, x, z });
-		else gl.lookAt(x, z);
-		goX = String(Math.round(x));
-		goZ = String(Math.round(z));
+		placed = true;
+		if (savedPose && savedPose.dx ** 2 + savedPose.dy ** 2 + savedPose.dz ** 2 > 1e-6) gl.setPose({ ...savedPose, ...spot });
+		else gl.lookAt(spot.x, spot.z);
+		goX = String(Math.round(spot.x));
+		goZ = String(Math.round(spot.z));
 		// Follow the editor's light and dark themes.
 		const mo = new MutationObserver(colors);
 		mo.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'data-theme', 'style'] });

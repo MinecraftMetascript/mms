@@ -1,3 +1,4 @@
+import { forgetStoredMemory } from '@mms/preview';
 import * as store from './store';
 
 /** The localStorage key where a project's previews remember their settings. */
@@ -196,11 +197,7 @@ export class Project {
 			this.saveTimer = null;
 		}
 		await store.deleteProject(id);
-		try {
-			localStorage.removeItem(previewMemoryKey(id));
-		} catch {
-			// Nothing was remembered.
-		}
+		forgetStoredMemory(previewMemoryKey(id));
 		await this.refresh();
 		if (id !== this.id) return;
 		const next = this.saved[0];

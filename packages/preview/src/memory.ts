@@ -10,6 +10,8 @@ import { getContext, setContext } from 'svelte';
 export interface PreviewMemory {
 	get<T>(key: string): T | undefined;
 	set(key: string, value: unknown): void;
+	/** Forgets everything, and doesn't save again. */
+	clear(): void;
 }
 
 /** The most declarations remembered; the ones left longest ago go first. */
@@ -35,8 +37,15 @@ export function memory(initial: Entries, save: (entries: Entries) => void, wait 
 			// Not remembered past this page; still remembered while it's open.
 		}
 	};
+	let cleared = false;
 	globalThis.addEventListener?.('pagehide', () => timer !== undefined && flush());
 	return {
+		clear() {
+			cleared = true;
+			clearTimeout(timer);
+			timer = undefined;
+			map.clear();
+		},
 		get<T>(key: string) {
 			return map.get(key) as T | undefined;
 		},
@@ -48,24 +57,41 @@ export function memory(initial: Entries, save: (entries: Entries) => void, wait 
 			map.delete(key);
 			map.set(key, copy);
 			while (map.size > MEMORY_LIMIT) map.delete(map.keys().next().value!);
-			if (timer === undefined) timer = setTimeout(flush, wait);
+			if (timer === undefined && !cleared) timer = setTimeout(flush, wait);
 		}
 	};
 }
 
-/** A memory kept in this browser's localStorage under `key`. */
+const stored = new Map<string, PreviewMemory>();
+/**
+ * The memory kept in this browser's localStorage under `key`. There is one
+ * per key for the page's life, so going back to a project finds the
+ * settings it hasn't saved yet, and its pagehide listener isn't added twice.
+ */
 export function storedMemory(key: string): PreviewMemory {
+	let m = stored.get(key);
+	if (m) return m;
 	let initial: Entries = [];
 	try {
 		initial = JSON.parse(localStorage.getItem(key) ?? '[]');
 	} catch {
 		// Storage can be unavailable (private windows, some webviews) or hold something else.
 	}
-	return memory(initial, (entries) => localStorage.setItem(key, JSON.stringify(entries)));
+	m = memory(initial, (entries) => localStorage.setItem(key, JSON.stringify(entries)));
+	stored.set(key, m);
+	return m;
 }
 
-/** A memory that lasts only while the page is open. */
-export const pageMemory = (): PreviewMemory => memory([], () => {});
+/** Forgets the memory under `key`, here and in localStorage (its project was deleted). */
+export function forgetStoredMemory(key: string) {
+	stored.get(key)?.clear();
+	stored.delete(key);
+	try {
+		localStorage.removeItem(key);
+	} catch {
+		// Nothing was remembered.
+	}
+}
 
 const contextKey = Symbol('preview memory');
 
@@ -74,7 +100,6 @@ export function provideMemory(source: { readonly current: PreviewMemory }) {
 	setContext(contextKey, source);
 }
 
-let fallback: PreviewMemory | undefined;
 /**
  * The memory PreviewPane provides. A preview used on its own remembers in
  * this browser, under a shared key.
@@ -82,9 +107,7 @@ let fallback: PreviewMemory | undefined;
 export function useMemory(): { readonly current: PreviewMemory } {
 	const source = getContext<{ readonly current: PreviewMemory } | undefined>(contextKey);
 	if (source) return source;
-	fallback ??= storedMemory('mms.preview.memory');
-	const m = fallback;
-	return { current: m };
+	return { current: storedMemory('mms.preview.memory') };
 }
 
 /**

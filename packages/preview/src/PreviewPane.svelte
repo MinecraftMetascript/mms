@@ -89,10 +89,14 @@
 	const itemInfo = $derived(itemContext(output, items, textures));
 	// The tabs picked for a declaration come back with it.
 	let tabsFor: string | null = null;
+	let tabsFrom: PreviewMemory | null = null;
 	$effect.pre(() => {
-		if (path === tabsFor) return;
+		// Another project's memory (in the web editor) counts as another declaration.
+		const m = memorySource.current;
+		if (path === tabsFor && m === tabsFrom) return;
 		tabsFor = path;
-		const saved = path ? record(memorySource.current.get(`pane:${path}`)) : undefined;
+		tabsFrom = m;
+		const saved = path ? record(m.get(`pane:${path}`)) : undefined;
 		splineTab = saved?.spline === 'preview' ? 'preview' : 'spline';
 		jigsawTab = saved?.jigsaw === 'simulation' ? 'simulation' : 'connections';
 	});

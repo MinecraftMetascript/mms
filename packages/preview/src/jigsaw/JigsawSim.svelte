@@ -11,7 +11,7 @@
 	import { blockMesh, boxMesh, clip, edgeLines, fade, hit, ray, VoxelView, type Camera, type Rgb, type Slice } from './voxel';
 	import { blockColor } from '../preview/colors';
 	import type { OutputAsset, OutputFile } from '../types';
-	import { record, restore, useMemory } from '../memory';
+	import { record, restore, useMemory, type PreviewMemory } from '../memory';
 
 	interface Props {
 		/** The jigsaw structure's output path. */
@@ -108,10 +108,13 @@
 	let shownPath: string | null = null;
 	/** The structure whose camera is in place, so its first layout isn't framed over it. */
 	let framedPath: string | null = null;
+	let shownFrom: PreviewMemory | null = null;
 	$effect.pre(() => {
-		if (path === shownPath) return;
+		const m = memory.current; // another project's memory counts as another structure
+		if (path === shownPath && m === shownFrom) return;
 		shownPath = path;
-		const saved = record(memory.current.get(`jigsaw-sim:${path}`));
+		shownFrom = m;
+		const saved = record(m.get(`jigsaw-sim:${path}`));
 		seed = typeof saved?.seed === 'number' && Number.isInteger(saved.seed) ? saved.seed : 0;
 		mode = saved?.mode === 'blocks' ? 'blocks' : 'boxes';
 		axis = (['x', 'y', 'z'] as const).find((a) => a === saved?.axis) ?? 'off';
@@ -127,7 +130,8 @@
 	});
 	$effect(() => {
 		const settings = { seed, mode, axis, at, depth, camera: $state.snapshot(camera) };
-		if (path === shownPath) memory.current.set(`jigsaw-sim:${path}`, settings);
+		const m = memory.current;
+		if (path === shownPath && m === shownFrom) m.set(`jigsaw-sim:${path}`, settings);
 	});
 
 	function frame() {

@@ -22,7 +22,7 @@
 	import { colorize, cssGradient, formatValue, paletteOf, palettes, position, rangeFor, solidPalette, type PaletteId, type Range } from './colormaps';
 	import VolumeView from './VolumeView.svelte';
 	import { scaleBar, ticks } from './rulers';
-	import { record, restore, useMemory } from '../memory';
+	import { record, restore, useMemory, type PreviewMemory } from '../memory';
 
 	interface Props {
 		output: OutputFile[];
@@ -85,6 +85,8 @@
 	let seed = $state('0');
 	/** Each target's settings, remembered by the host (see memory.ts). */
 	const memory = useMemory();
+	/** The memory the target was shown from. */
+	let lastMemory: PreviewMemory | null = null;
 	/** Bumped when the pack's files change, so the volume view samples again. */
 	let filesVersion = $state(0);
 	/** Bumped by Reset view, which starts the volume view over. */
@@ -532,9 +534,12 @@
 	// one before when that was the same kind.
 	$effect(() => {
 		const key = info ? `${info.kind}|${info.id}` : null;
-		if (info && key !== lastTarget) {
+		// Another project's memory (in the web editor) makes it another target.
+		const m = memory.current;
+		if (info && (key !== lastTarget || m !== lastMemory)) {
 			const sameKind = lastTarget?.startsWith(`${info.kind}|`);
 			lastTarget = key;
+			lastMemory = m;
 			if (target && recall(memory.current.get(`preview:${target}`), info.kind)) {
 				request();
 				return;
@@ -578,7 +583,8 @@
 		};
 		// Saved once the target effect has shown this target, so a new
 		// target's first run doesn't save the last one's settings for it.
-		if (target && key === lastTarget) untrack(() => memory.current.set(`preview:${target}`, settings));
+		const m = memory.current;
+		if (target && key === lastTarget && m === lastMemory) untrack(() => m.set(`preview:${target}`, settings));
 	});
 	const rangeModes: RangeMode[] = ['auto', 'unit', 'custom'];
 	/** Shows a target as it was left; false if nothing is remembered for it. */

@@ -22,7 +22,7 @@
 		type SplinePointData,
 		type TextEdit
 	} from './spline';
-	import { record, useMemory } from '../memory';
+	import { record, useMemory, type PreviewMemory } from '../memory';
 
 	let {
 		data,
@@ -65,10 +65,13 @@
 	let coords = $state<Coordinates>({});
 	// Another declaration's spline brings back the coordinates picked for it.
 	let coordsFor: string | undefined;
+	let coordsFrom: PreviewMemory | null = null;
 	$effect.pre(() => {
-		if (memoryKey === coordsFor) return;
+		const m = memory.current; // another project's memory counts as another declaration
+		if (memoryKey === coordsFor && m === coordsFrom) return;
 		coordsFor = memoryKey;
-		const saved = record(memoryKey ? memory.current.get(memoryKey) : undefined);
+		coordsFrom = m;
+		const saved = record(memoryKey ? m.get(memoryKey) : undefined);
 		coords = Object.fromEntries(Object.entries(record(saved?.coords) ?? {}).filter((e): e is [string, number] => typeof e[1] === 'number' && Number.isFinite(e[1])));
 	});
 	function setCoordinate(name: string, value: number) {
