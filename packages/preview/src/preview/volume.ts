@@ -63,8 +63,13 @@ export interface ValueRange {
 export interface VolumeSettings {
 	look: VolumeLook;
 	threshold: number;
-	/** The highest y drawn. */
-	cutY: number;
+	/**
+	 * The lowest and highest y drawn. A density function is sampled over
+	 * this range; noise settings are sampled over their own height and cut
+	 * to it.
+	 */
+	bottomY: number;
+	topY: number;
 	/** How much of the window to keep along x and z, 0 to 1, cut from the east and south. */
 	cutX: number;
 	cutZ: number;
@@ -74,7 +79,7 @@ export interface VolumeSettings {
 	blocks: boolean;
 }
 
-export const defaultSettings: VolumeSettings = { look: 'caves', threshold: 0, cutY: 320, cutX: 1, cutZ: 1, haze: 0.004, caveOpacity: 0.55, blocks: true };
+export const defaultSettings: VolumeSettings = { look: 'caves', threshold: 0, bottomY: -64, topY: 320, cutX: 1, cutZ: 1, haze: 0.004, caveOpacity: 0.55, blocks: true };
 
 const mod = (a: number, n: number) => ((a % n) + n) % n;
 
@@ -287,7 +292,8 @@ const fragmentShader = /* glsl */ `
 	}
 	// Height: deep magenta, red, amber, green, sky blue, from the bottom of the world to y 200.
 	vec3 ramp(float y) {
-		float t = clamp((y - minY) / (200.0 - minY), 0.0, 1.0) * 4.0;
+		// From the bottom of the box (purple) to its top (blue).
+		float t = clamp((y - boxMin.y) / max(1.0, boxMax.y - boxMin.y), 0.0, 1.0) * 4.0;
 		vec3 c0 = vec3(0.45, 0.12, 0.55), c1 = vec3(0.86, 0.27, 0.22), c2 = vec3(0.93, 0.68, 0.20), c3 = vec3(0.25, 0.66, 0.45), c4 = vec3(0.35, 0.58, 0.92);
 		if (t < 1.0) return mix(c0, c1, t);
 		if (t < 2.0) return mix(c1, c2, t - 1.0);
@@ -956,8 +962,9 @@ export class VolumeRenderer {
 		const span = (2 * R + 1) * VOLUME_TILE - (g?.sx ?? 4);
 		const minY = g?.minY ?? -64;
 		const maxY = g ? g.minY + (g.ny - 1) * g.sy : 320;
-		const top = Math.max(minY + 1, Math.min(maxY, s.cutY));
-		const min = new THREE.Vector3(x0, minY, z0);
+		const bottom = Math.max(minY, Math.min(maxY - 1, s.bottomY));
+		const top = Math.max(bottom + 1, Math.min(maxY, s.topY));
+		const min = new THREE.Vector3(x0, bottom, z0);
 		const max = new THREE.Vector3(x0 + Math.max(1, span * s.cutX), top, z0 + Math.max(1, span * s.cutZ));
 		(this.uniforms.boxMin.value as THREE.Vector3).copy(min);
 		(this.uniforms.boxMax.value as THREE.Vector3).copy(max);

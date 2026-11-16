@@ -78,6 +78,14 @@
 	/** Tiles the window needs, in the order to ask for them. */
 	let queue: TileWant[] = [];
 	const failed = new Set<string>();
+	/**
+	 * The heights this session samples a density function over: a change
+	 * to Bottom or Top starts a new session once it settles, so one
+	 * session's tiles all share a grid.
+	 */
+	let sampled = { bottomY: settings.bottomY, topY: settings.topY };
+	/** The heights the tiles in view cover, once one arrives. */
+	let gridY = $state.raw<{ min: number; max: number } | null>(null);
 
 	function pump() {
 		const busy = new Set(inFlight.values());
@@ -88,7 +96,7 @@
 			const job = nextJob++;
 			inFlight.set(job, key);
 			busy.add(key);
-			send({ type: 'tile', session, job, kind, id, seed, tx, tz, lod });
+			send({ type: 'tile', session, job, kind, id, seed, tx, tz, lod, ...sampled });
 		}
 		const m = gl?.missing();
 		loading = m ? m.missing : 0;
@@ -105,6 +113,8 @@
 		} else {
 			// Keep the reason up while some tile is still failing.
 			if (failed.size === 0) tileError = '';
+			const max = t.minY + (t.ny - 1) * t.sy;
+			if (gridY?.min !== t.minY || gridY.max !== max) gridY = { min: t.minY, max };
 			gl?.add(t);
 		}
 		pump();
@@ -117,6 +127,8 @@
 
 	function fresh() {
 		session = ++sessions;
+		sampled = { bottomY: settings.bottomY, topY: settings.topY };
+		gridY = null;
 		inFlight.clear();
 		failed.clear();
 		queue = [];
@@ -181,6 +193,46 @@
 	function set<K extends keyof VolumeSettings>(k: K, v: VolumeSettings[K]) {
 		settings[k] = v;
 	}
+
+	// ---- heights ----
+	/** The game's limits for a dimension's height. */
+	const WORLD_BOTTOM = -2032;
+	const WORLD_TOP = 2031;
+	/** Bottom and Top can go anywhere in the world for a density function; noise settings have their own height. */
+	const yLimits = $derived(kind === 'noise_settings' ? (gridY ?? { min: -64, max: 320 }) : { min: WORLD_BOTTOM, max: WORLD_TOP });
+	const yReset = $derived(kind === 'noise_settings' && gridY ? { bottomY: gridY.min, topY: gridY.max } : { bottomY: defaultSettings.bottomY, topY: defaultSettings.topY });
+	/** The heights drawn, inside what's sampled. */
+	const shownY = $derived.by(() => {
+		const b = Math.max(yLimits.min, Math.min(yLimits.max - 1, settings.bottomY));
+		return { bottom: b, top: Math.max(b + 1, Math.min(yLimits.max, settings.topY)) };
+	});
+	/** Blocks between samples up, as the worker picks them for a density function's range. */
+	const ySpacing = $derived.by(() => {
+		let sy = 4;
+		while ((settings.topY - settings.bottomY) / sy > 256) sy *= 2;
+		return sy;
+	});
+	/** Sets Bottom or Top, moving the other along to keep at least a block between them. */
+	function setY(k: 'bottomY' | 'topY', v: number) {
+		v = Math.round(v);
+		if (k === 'bottomY') {
+			settings.bottomY = v;
+			if (settings.topY <= v) settings.topY = v + 1;
+		} else {
+			settings.topY = v;
+			if (settings.bottomY >= v) settings.bottomY = v - 1;
+		}
+	}
+	// A density function samples the new heights once a drag has settled.
+	$effect(() => {
+		const want = { bottomY: settings.bottomY, topY: settings.topY };
+		if (kind === 'noise_settings') return;
+		if (want.bottomY === sampled.bottomY && want.topY === sampled.topY) return;
+		const t = setTimeout(() => {
+			if (gl) fresh();
+		}, 350);
+		return () => clearTimeout(t);
+	});
 
 	function colors() {
 		if (!gl || !host) return;
@@ -389,7 +441,31 @@
 				{/if}
 			{/if}
 		</div>
-		<Slider label="Cut from top" prefix="y" value={settings.cutY} min={-64} max={320} step={1} reset={defaultSettings.cutY} onchange={(v) => set('cutY', v)} />
+		<Slider
+			label="Top"
+			prefix="y"
+			value={shownY.top}
+			min={yLimits.min + 1}
+			max={yLimits.max}
+			step={1}
+			reset={yReset.topY}
+			title={kind === 'noise_settings' ? 'The highest y drawn, within the noise settings\' height' : 'The highest y sampled and drawn'}
+			onchange={(v) => setY('topY', v)}
+		/>
+		<Slider
+			label="Bottom"
+			prefix="y"
+			value={shownY.bottom}
+			min={yLimits.min}
+			max={yLimits.max - 1}
+			step={1}
+			reset={yReset.bottomY}
+			title={kind === 'noise_settings' ? 'The lowest y drawn, within the noise settings\' height' : 'The lowest y sampled and drawn'}
+			onchange={(v) => setY('bottomY', v)}
+		/>
+		{#if kind !== 'noise_settings' && ySpacing > 4}
+			<p class="-mt-2 text-[11px] text-muted" data-y-spacing={ySpacing}>Over this many heights, density is sampled every {ySpacing} blocks up.</p>
+		{/if}
 		<Slider label="Cut from east" suffix="%" value={settings.cutX * 100} min={1} max={100} step={1} reset={100} onchange={(v) => set('cutX', v / 100)} />
 		<Slider label="Cut from south" suffix="%" value={settings.cutZ * 100} min={1} max={100} step={1} reset={100} onchange={(v) => set('cutZ', v / 100)} />
 		{#if settings.look === 'caves'}
@@ -399,7 +475,9 @@
 		<div class="flex flex-col gap-1">
 			<span>Colour is height</span>
 			<div class="h-2 rounded-sm" style="background: linear-gradient(90deg, rgb(115 31 140), rgb(219 69 56), rgb(237 173 51), rgb(64 168 115), rgb(89 148 235))"></div>
-			<div class="flex justify-between font-mono text-[10px] text-muted"><span>-64</span><span>2</span><span>68</span><span>134</span><span>200</span></div>
+			<div class="flex justify-between font-mono text-[10px] text-muted" data-colour-heights>
+				{#each [0, 1, 2, 3, 4] as i (i)}<span>{Math.round(shownY.bottom + ((shownY.top - shownY.bottom) * i) / 4)}</span>{/each}
+			</div>
 		</div>
 		<form
 			class="flex items-center gap-1"

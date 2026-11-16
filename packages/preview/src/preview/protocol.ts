@@ -204,6 +204,9 @@ export interface VolumeTileRequest {
 	tx: number;
 	tz: number;
 	lod: number;
+	/** The y range to sample a density function over (noise settings use their own height). */
+	bottomY: number;
+	topY: number;
 }
 
 /**

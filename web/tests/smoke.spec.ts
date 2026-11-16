@@ -555,12 +555,27 @@ test('the 3D density view samples tiles around the camera and travels', async ({
 	await expect(view.getByLabel('Height ruler')).toContainText('0');
 
 	// A slider's value is a text box, and a double-click on the slider resets it.
-	const cut = page.getByLabel('Cut from top value');
+	const cut = page.getByLabel('Top value', { exact: true });
 	await cut.fill('20');
 	await cut.press('Enter');
 	await expect(cut).toHaveValue('20');
-	await page.getByRole('slider', { name: 'Cut from top' }).dblclick();
+	await page.getByRole('slider', { name: 'Top', exact: true }).dblclick();
 	await expect(cut).toHaveValue('320');
+
+	// Bottom and Top set the heights a density function is sampled over, and colour spans them.
+	const bottom = page.getByLabel('Bottom value', { exact: true });
+	await bottom.fill('-300');
+	await bottom.press('Enter');
+	await cut.fill('600');
+	await cut.press('Enter');
+	await expect(view.locator('[data-colour-heights]')).toHaveText(/^-300.*600$/);
+	await expect
+		.poll(async () => {
+			const ys = ((await view.getByLabel('Height ruler').getAttribute('data-height-ruler')) ?? '').split(' ').map(Number);
+			return Math.min(...ys) <= -200 && Math.max(...ys) >= 500;
+		}, { timeout: 45_000 })
+		.toBe(true);
+	await expect(where).not.toContainText(/sampling|refining/, { timeout: 45_000 });
 
 	// Holding D travels east, and the new ground is sampled.
 	await view.getByRole('application').focus();
@@ -610,7 +625,7 @@ test('a preview comes back as it was left for each declaration, also after a rel
 	await page.getByRole('tab', { name: 'Preview' }).click();
 	const range = page.getByLabel('Range');
 	const cameraY = page.getByLabel('Camera y');
-	const cut = page.getByLabel('Cut from top value');
+	const cut = page.getByLabel('Top value', { exact: true });
 	const volume = page.getByRole('button', { name: '3D density', exact: true });
 	const setY = async (y: string) => {
 		await cameraY.fill(y);

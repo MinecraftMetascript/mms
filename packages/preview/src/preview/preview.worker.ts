@@ -842,7 +842,7 @@ interface Volume {
 let volume: Volume | null = null;
 
 async function volumeOf(req: VolumeTileRequest): Promise<Volume> {
-	const key = [version, req.seed, req.kind, req.id].join('|');
+	const key = [version, req.seed, req.kind, req.id, ...(req.kind === 'noise_settings' ? [] : [req.bottomY, req.topY])].join('|');
 	if (volume?.key === key) return volume;
 	const seed = seedOf(req.seed);
 	// The cell size comes from the interpolated nodes taken out (4 × 8 in vanilla).
@@ -868,8 +868,15 @@ async function volumeOf(req: VolumeTileRequest): Promise<Volume> {
 		const df = new DensityFunction.HolderHolder(Holder.reference(WorldgenRegistries.DENSITY_FUNCTION, Identifier.parse(req.id)));
 		const fn = fasten(df.mapAll(rs.createVisitor(false)));
 		fn.compute(DensityFunction.context(0, 0, 0));
-		// The overworld's height, two blocks across and four up.
-		return { key, fn, sx: 2, sy: 4, minY: -64, ny: 384 / 4 + 1 };
+		// The asked-for heights, two blocks across and four up; a tall range
+		// is sampled more sparsely up, so a tile stays at most 256 layers.
+		const span = Math.max(1, req.topY - req.bottomY);
+		let sy = 4;
+		while (span / sy > 256) sy *= 2;
+		const minY = Math.floor(req.bottomY / sy) * sy;
+		// Layers in multiples of 16, so coarser levels keep the top layer.
+		const layers = Math.max(16, Math.ceil((req.topY - minY) / sy / 16) * 16);
+		return { key, fn, sx: 2, sy, minY, ny: layers + 1 };
 	});
 	return volume;
 }
