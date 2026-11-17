@@ -613,6 +613,31 @@ test('the 3D density view picks a threshold that shows something', async ({ page
 	await expect(view.getByText(/Nothing in view crosses 0/)).toBeVisible();
 	await view.getByRole('button', { name: 'Auto', exact: true }).click();
 	await expect(view.getByText(/Nothing in view crosses/)).toBeHidden();
+
+	// A thin slice of heights is brought to the middle of the view, also after an orbit.
+	const canvas = view.getByRole('application');
+	const at = (await canvas.boundingBox())!;
+	await page.mouse.move(at.x + at.width / 2, at.y + at.height / 2);
+	await page.mouse.down();
+	await page.mouse.move(at.x + at.width / 2 + 40, at.y + at.height / 2 + 10, { steps: 5 });
+	await page.mouse.up();
+	const bottom = page.getByLabel('Bottom value', { exact: true });
+	await bottom.fill('0');
+	await bottom.press('Enter');
+	const top = page.getByLabel('Top value', { exact: true });
+	await top.fill('64');
+	await top.press('Enter');
+	await expect
+		.poll(async () => {
+			const tops = await view
+				.getByLabel('Height ruler')
+				.locator('span')
+				.evaluateAll((spans) => spans.map((e) => parseFloat((e as HTMLElement).style.top)));
+			if (!tops.length) return false;
+			const mid = tops.reduce((a, b) => a + b, 0) / tops.length;
+			return Math.abs(mid / at.height - 0.5) < 0.08;
+		})
+		.toBe(true);
 });
 
 test('a preview comes back as it was left for each declaration, also after a reload', async ({ page }) => {
