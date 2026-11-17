@@ -181,6 +181,7 @@ type Result struct {
 	orderErr map[string][]syntax.Diagnostic // feature order cycles
 	emitted  map[*syntax.Decl]bool          // declarations Blueprint instances emitted
 	langErr  map[string][]syntax.Diagnostic // keys two Lang declarations set
+	cycleErr map[string][]syntax.Diagnostic // density functions that refer to themselves
 	formErr  map[string][]syntax.Diagnostic // declaration forms the language dropped
 	selErr   map[string][]syntax.Diagnostic // selectors written with unknown options
 	jigsaw   *jigsawModel                   // structure files' jigsaw blocks, for the jigsaw rules
@@ -395,6 +396,7 @@ func (r *Result) fileDiagnostics(path string) []syntax.Diagnostic {
 	out = append(out, r.assetErr[path]...)
 	out = append(out, r.orderErr[path]...)
 	out = append(out, r.langErr[path]...)
+	out = append(out, r.cycleErr[path]...)
 	out = append(out, r.formErr[path]...)
 	out = append(out, r.selErr[path]...)
 	typeErr := r.typeErr[path]
@@ -473,7 +475,7 @@ func (p *Project) Analyze(ctx context.Context) (*Result, error) {
 	for _, u := range units {
 		source[u.Path] = u.File
 	}
-	units, ev := expand(units, p.Config.Namespace, &p.evalCache, p.Pack)
+	units, ev := expand(units, p.Config.Namespace, &p.evalCache, p.Pack, p.Kinds)
 	syms, collect := sema.Collect(units, p.Kinds, p.Config.Namespace)
 	tenv := types.New(p.Pack, p.Kinds, ev)
 	syms.Types = tenv.Types
@@ -649,6 +651,7 @@ func (p *Project) Analyze(ctx context.Context) (*Result, error) {
 	r.collectAssets()
 	r.checkFeatureOrder()
 	r.checkLangKeys()
+	r.checkDensityCycles()
 	p.mu.Lock()
 	p.last = r
 	p.mu.Unlock()

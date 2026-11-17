@@ -107,6 +107,8 @@ Each wand gets its own objective, `fire_wand_cooldown`, so two wands cool down s
 
 `OnTick` is a kind that merges: every instance's block is added to the pack's one tick function, along with any `OnTick` the project writes itself. Tags, `Lang` and `OnLoad` merge in the same way.
 
+Name what an instance emits from the instance, as `${self.path}_cooldown` does. A fixed name is the same for every instance, which suits a file they all write alike, such as a shared setup function, but two instances that write different files under one name clash. That includes a Blueprint that emits itself one level down: written as `Recurse inner { layer = next }`, every level emits its own `inner`, and the error says so. Write `Recurse ${self.path}_inner { layer = next }` and refer to it by that name, so each level gets its own.
+
 ## 4. Rules of your own
 
 `check` runs on every instance at compile time, and reports problems on the field that caused them:

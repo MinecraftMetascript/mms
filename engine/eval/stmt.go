@@ -1,9 +1,11 @@
 package eval
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 
+	"github.com/minecraftmetascript/mms/engine/format"
 	"github.com/minecraftmetascript/mms/engine/syntax"
 )
 
@@ -45,7 +47,16 @@ func (c *ctx) stmt(it syntax.Stmt, out *[]syntax.Stmt) {
 				c.markPrimary(st, res, first)
 			}
 			plain := st.Kind != nil && c.e.r.Blueprint(c.defPath, st.Kind.Name) == nil
+			var clash *Instance
+			if !plain && st.Kind != nil && c.inst != nil {
+				clash = c.instanceClash(st, res, first)
+			}
 			for _, d := range res {
+				if clash != nil && d.Instance == clash {
+					// Its own files are dropped, so the name means the
+					// first one's and nothing refers to a mix of both.
+					continue
+				}
 				// Emitting the same declaration twice writes it once:
 				// every custom item with a click hook needs the click
 				// objective, but the namespace gets one.
@@ -677,4 +688,48 @@ func isName(x syntax.Expr) bool {
 		return isName(x.X)
 	}
 	return false
+}
+
+// instanceClash reports a Blueprint instance that a Blueprint emits
+// under a fixed name when it would write a file that an earlier
+// emission wrote differently: say a Blueprint that emits itself as
+// `Recurse inner`, where every level writes its own `inner`. Instances
+// that add to what another wrote, such as the shared setup of every
+// item with a projectile hook, are no clash: the files they share are
+// the same, or merge, like tags.
+func (c *ctx) instanceClash(st *syntax.Decl, res []*Decl, first int) *Instance {
+	if st.Name == nil || len(st.More) > 0 || first >= len(c.e.r.Instances) {
+		return nil
+	}
+	inst := c.e.r.Instances[first]
+	clash := false
+	for _, d := range res {
+		if d.Instance != inst || d.D.Kind == nil || d.D.Name == nil || (c.e.merges != nil && c.e.merges(d.D.Kind.Name)) {
+			continue
+		}
+		id := d.D.Name.Text
+		if !strings.Contains(id, ":") {
+			id = c.ns + ":" + id
+		}
+		key := d.D.Kind.Name + "\x00" + id
+		text := format.File(&syntax.File{Items: []syntax.Stmt{d.D}, Decls: []*syntax.Decl{d.D}})
+		prev, seen := c.e.files[key]
+		if !seen {
+			if c.e.files == nil {
+				c.e.files = map[string]string{}
+			}
+			c.e.files[key] = text
+		} else if prev != text {
+			clash = true
+		}
+	}
+	if !clash || st.Name.Templated() {
+		// A templated name that clashes is the sema's duplicate.
+		return nil
+	}
+	name := st.Name.Text
+	c.errorf("mms/emit-clash", st.Name.Sp, fmt.Sprintf(
+		"every %s instance emits a %s named '%s', so this one clashes with one emitted before it; name it from the instance, such as `%s ${self.path}_%s`, and refer to it by that name",
+		c.inst.Blueprint.D.NameText(), st.Kind.Name, name, st.Kind.Name, name))
+	return inst
 }

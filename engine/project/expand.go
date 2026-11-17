@@ -13,7 +13,7 @@ import (
 // declarations it changed gets a new unit holding the expanded
 // declarations, with the same text and tokens; every other unit is
 // returned as it was, so its checked results carry over.
-func expand(units []*sema.Unit, ns string, cache *eval.Cache, pack *spec.Pack) ([]*sema.Unit, *eval.Result) {
+func expand(units []*sema.Unit, ns string, cache *eval.Cache, pack *spec.Pack, kinds *sema.Kinds) ([]*sema.Unit, *eval.Result) {
 	in := make([]eval.Unit, 0, len(units)+4)
 	// The prelude comes first, as a library would: its Templates, Types
 	// and Blueprints are in scope everywhere. It writes nothing itself.
@@ -32,7 +32,12 @@ func expand(units []*sema.Unit, ns string, cache *eval.Cache, pack *spec.Pack) (
 		raw, ok := v["assets/"+folder][path]
 		return raw, ok
 	}
-	r := eval.Run(in, eval.Options{Namespace: ns, Cache: cache, Vanilla: vanilla})
+	// Tags and Lang files merge, so instances may each write one.
+	merges := func(kind string) bool {
+		k, ok := kinds.Lookup(kind)
+		return ok && (k.TagOf != "" || k.Merges())
+	}
+	r := eval.Run(in, eval.Options{Namespace: ns, Cache: cache, Vanilla: vanilla, Merges: merges})
 	out := make([]*sema.Unit, len(units))
 	for i, u := range units {
 		out[i] = u

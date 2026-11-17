@@ -23,6 +23,7 @@ import {
 } from 'deepslate';
 import { biomeColor, blockColor, CAVE, SKY, VOID, type Rgb } from './colors';
 import { entryStride, fitness, type ClimateEntries } from './climate';
+import { cycleMessage, densityCycle } from './cycle';
 import { speedUp } from './fastDensity';
 import { screenAxes, vanillaSummary, type PreviewFile, type PreviewRequest, type PreviewResponse, type PreviewView } from './protocol';
 
@@ -785,8 +786,18 @@ async function serve(port: MessagePort, msg: HelperMessage) {
 		const data = await buildIsoChunk(terrain, msg.cx, msg.cz);
 		port.postMessage({ type: 'chunk', job: msg.job, data, ids: palette.slice() } satisfies HelperReply, [data.buffer]);
 	} catch (err) {
-		port.postMessage({ type: 'chunk', job: msg.job, error: String(err instanceof Error ? err.message : err) } satisfies HelperReply);
+		port.postMessage({ type: 'chunk', job: msg.job, error: errorText(err) } satisfies HelperReply);
 	}
+}
+
+/**
+ * What went wrong, for the viewer. A density function that refers to
+ * itself recurses until the stack runs out: that names the cycle instead.
+ */
+function errorText(err: unknown): string {
+	const cyc = err instanceof RangeError ? densityCycle(userFiles) : undefined;
+	if (cyc) return cycleMessage(cyc);
+	return String(err instanceof Error ? err.message : err);
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -1580,6 +1591,6 @@ self.onmessage = async (e: MessageEvent<PreviewRequest>) => {
 		post(res);
 	} catch (err) {
 		if (err instanceof Superseded || req.seq !== latest) return;
-		(self as unknown as Worker).postMessage({ type: 'error', seq: req.seq, message: String(err instanceof Error ? err.message : err) } satisfies PreviewResponse);
+		(self as unknown as Worker).postMessage({ type: 'error', seq: req.seq, message: errorText(err) } satisfies PreviewResponse);
 	}
 };
