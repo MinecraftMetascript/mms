@@ -629,6 +629,9 @@ test('the 3D density view picks a threshold that shows something', async ({ page
 	await top.press('Enter');
 	await expect
 		.poll(async () => {
+			// Only once the ruler shows the new heights, so stale ticks can't pass.
+			const ys = ((await view.getByLabel('Height ruler').getAttribute('data-height-ruler')) ?? '').split(' ').map(Number);
+			if (!ys.includes(0) || ys.some((y) => !(y >= 0 && y <= 64))) return false;
 			const tops = await view
 				.getByLabel('Height ruler')
 				.locator('span')

@@ -501,6 +501,8 @@ export class VolumeRenderer {
 	private touched = false;
 	/** The heights the box was last drawn between, so a change to them can bring the camera along. */
 	private shownY: { bottom: number; top: number } | null = null;
+	/** Whether the camera came from a remembered pose, which first framing leaves alone. */
+	private restored = false;
 	private full: number;
 	private queued = false;
 	private sharpen: ReturnType<typeof setTimeout> | undefined;
@@ -615,6 +617,7 @@ export class VolumeRenderer {
 		const t = this.controls.target.set(pose.x - this.origin.x, pose.y, pose.z - this.origin.z);
 		this.camera.position.set(t.x + pose.dx, t.y + pose.dy, t.z + pose.dz);
 		this.touched = true;
+		this.restored = true;
 		this.controls.update();
 		this.followTarget();
 	}
@@ -994,17 +997,15 @@ export class VolumeRenderer {
 		// Without tiles the heights are only guesses; wait for the grid they're clamped to.
 		if (!this.grid || (was && was.bottom === bottom && was.top === top)) return;
 		this.shownY = { bottom, top };
+		// A remembered camera is already where it was left.
+		if (!was && this.restored) return;
 		const mid = (bottom + top) / 2;
-		if (!this.touched) {
-			this.controls.target.y = mid;
-			this.fit();
-			return;
-		}
-		if (!was) return; // a remembered camera is already where it was left
-		const dy = mid - (was.bottom + was.top) / 2;
+		// A camera moved by hand keeps its offset from the middle; otherwise it looks at the middle.
+		const dy = mid - (was && this.touched ? (was.bottom + was.top) / 2 : this.controls.target.y);
 		this.controls.target.y += dy;
 		this.camera.position.y += dy;
-		this.controls.update();
+		if (this.touched) this.controls.update();
+		else this.fit();
 	}
 
 	/** While the view moves, draw at half resolution, then sharpen once it has been still a moment. */
