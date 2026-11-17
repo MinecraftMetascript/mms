@@ -98,8 +98,13 @@ export interface PreviewView {
 	topY?: number;
 }
 
-/** Whether a side view's y falls outside the heights it draws (see PreviewView.bottomY). */
+/**
+ * Whether a side view's y falls outside the heights it draws (see
+ * PreviewView.bottomY). Per block, y is the block it falls in, as sampled,
+ * so the whole Top block is drawn.
+ */
 export function outsideY(view: PreviewView, y: number): boolean {
+	if (view.blocks) y = Math.floor(y);
 	return !view.down && ((view.bottomY !== undefined && y < view.bottomY) || (view.topY !== undefined && y > view.topY));
 }
 
