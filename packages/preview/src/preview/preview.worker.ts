@@ -25,6 +25,7 @@ import { biomeColor, blockColor, CAVE, SKY, VOID, type Rgb } from './colors';
 import { entryStride, fitness, type ClimateEntries } from './climate';
 import { fasten, speedUp } from './fastDensity';
 import {
+	outsideY,
 	screenAxes,
 	vanillaSummary,
 	VOLUME_TILE,
@@ -1666,6 +1667,10 @@ async function render(req: RenderRequest): Promise<Rendered> {
 		const compute = (x: number, y: number, z: number) => fn.compute(DensityFunction.context(x, y, z));
 		for (let py = 0; py < height; py++) {
 			const y = view.down ? view.y : plane.y(py);
+			if (outsideY(view, y)) {
+				values.fill(NaN, py * width, (py + 1) * width);
+				continue;
+			}
 			for (let px = 0; px < width; px++) {
 				await pace();
 				const [x, z] = view.down ? [plane.x(px, py), plane.z(px, py)] : plane.at(plane.along(px));
@@ -1696,7 +1701,7 @@ async function render(req: RenderRequest): Promise<Rendered> {
 		for (let px = 0; px < width; px++) {
 			const i = py * width + px;
 			let v = NaN;
-			if (y >= minY && y < maxY) {
+			if (y >= minY && y < maxY && !outsideY(view, y)) {
 				await pace();
 				const [x, z] = view.down ? [plane.x(px, py), plane.z(px, py)] : plane.at(plane.along(px));
 				v = at(px, py, x, y, z, compute);

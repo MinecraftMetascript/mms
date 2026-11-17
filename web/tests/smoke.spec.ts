@@ -187,6 +187,29 @@ test('density previews use the picked palette over the range in view', async ({ 
 	expect(errors).toEqual([]);
 });
 
+test('a side view of density draws only the heights between Bottom and Top, framed', async ({ page }) => {
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	// Its value is y / 512, so the colour range in view says which heights were drawn.
+	await replaceText(page, 'DensityFunction grad = Gradient(axis = y, from_coordinate = 0, to_coordinate = 512, from_value = 0, to_value = 1)\n');
+	await expect(status(page)).toHaveText(/No problems/);
+	await page.locator('.cm-line').first().click();
+	const scale = page.getByLabel('Value scale');
+	await expect(scale).toContainText(/in view/, { timeout: 20_000 });
+	const bottom = page.getByLabel('Bottom y', { exact: true });
+	const top = page.getByLabel('Top y', { exact: true });
+	await bottom.fill('100');
+	await bottom.press('Enter');
+	await top.fill('164');
+	await top.press('Enter');
+	// The camera moves to their middle and zooms so 64 blocks fill most of the view.
+	const view = async () => JSON.parse((await page.locator('canvas[data-view]').getAttribute('data-view'))!);
+	await expect.poll(async () => (await view()).y).toBe(132);
+	expect((await view()).scale).toBeLessThan(0.5);
+	// Only 100 to 164 is sampled: about 0.195 to 0.320 in view.
+	await expect(scale).toContainText(/in view 0\.19\d … 0\.32\d/, { timeout: 20_000 });
+});
+
 test('the preview shows a grid, and per-block values when asked', async ({ page }) => {
 	const errors: string[] = [];
 	page.on('pageerror', (e) => errors.push(e.message));
@@ -594,6 +617,8 @@ test('the 3D density view samples tiles around the camera and travels', async ({
 });
 
 test('the 3D density view picks a threshold that shows something', async ({ page }) => {
+	// It waits for tiles twice, which is slow without a GPU.
+	test.setTimeout(120_000);
 	await page.goto('./');
 	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
 	// Never negative, so a threshold of 0 would draw nothing.
@@ -613,6 +638,34 @@ test('the 3D density view picks a threshold that shows something', async ({ page
 	await expect(view.getByText(/Nothing in view crosses 0/)).toBeVisible();
 	await view.getByRole('button', { name: 'Auto', exact: true }).click();
 	await expect(view.getByText(/Nothing in view crosses/)).toBeHidden();
+
+	// A thin slice of heights is brought to the middle of the view, also after an orbit.
+	const canvas = view.getByRole('application');
+	const at = (await canvas.boundingBox())!;
+	await page.mouse.move(at.x + at.width / 2, at.y + at.height / 2);
+	await page.mouse.down();
+	await page.mouse.move(at.x + at.width / 2 + 40, at.y + at.height / 2 + 10, { steps: 5 });
+	await page.mouse.up();
+	const bottom = page.getByLabel('Bottom value', { exact: true });
+	await bottom.fill('0');
+	await bottom.press('Enter');
+	const top = page.getByLabel('Top value', { exact: true });
+	await top.fill('64');
+	await top.press('Enter');
+	await expect
+		.poll(async () => {
+			// Only once the ruler shows the new heights, so stale ticks can't pass.
+			const ys = ((await view.getByLabel('Height ruler').getAttribute('data-height-ruler')) ?? '').split(' ').map(Number);
+			if (!ys.includes(0) || ys.some((y) => !(y >= 0 && y <= 64))) return false;
+			const tops = await view
+				.getByLabel('Height ruler')
+				.locator('span')
+				.evaluateAll((spans) => spans.map((e) => parseFloat((e as HTMLElement).style.top)));
+			if (!tops.length) return false;
+			const mid = tops.reduce((a, b) => a + b, 0) / tops.length;
+			return Math.abs(mid / at.height - 0.5) < 0.08;
+		}, { timeout: 45_000 })
+		.toBe(true);
 });
 
 test('a preview comes back as it was left for each declaration, also after a reload', async ({ page }) => {

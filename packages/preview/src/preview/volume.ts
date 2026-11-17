@@ -499,6 +499,10 @@ export class VolumeRenderer {
 	private settings: VolumeSettings = { ...defaultSettings };
 	/** Whether the camera has been moved by hand; until then a resize refits it. */
 	private touched = false;
+	/** The heights the box was last drawn between, so a change to them can bring the camera along. */
+	private shownY: { bottom: number; top: number } | null = null;
+	/** Whether the camera came from a remembered pose, which first framing leaves alone. */
+	private restored = false;
 	private full: number;
 	private queued = false;
 	private sharpen: ReturnType<typeof setTimeout> | undefined;
@@ -594,10 +598,8 @@ export class VolumeRenderer {
 	/** Puts the camera over world (x, z), looking down at an angle from the south-east, far enough back to see the window. */
 	lookAt(x: number, z: number) {
 		this.origin = { x: Math.round(x), z: Math.round(z) };
-		const g = this.grid;
-		const minY = g?.minY ?? -64;
-		const maxY = g ? g.minY + (g.ny - 1) * g.sy : 320;
-		this.controls.target.set(x - this.origin.x, (minY + maxY) / 2, z - this.origin.z);
+		const y = this.shownY ? (this.shownY.bottom + this.shownY.top) / 2 : 128;
+		this.controls.target.set(x - this.origin.x, y, z - this.origin.z);
 		this.fit();
 		this.followTarget();
 	}
@@ -615,6 +617,7 @@ export class VolumeRenderer {
 		const t = this.controls.target.set(pose.x - this.origin.x, pose.y, pose.z - this.origin.z);
 		this.camera.position.set(t.x + pose.dx, t.y + pose.dy, t.z + pose.dz);
 		this.touched = true;
+		this.restored = true;
 		this.controls.update();
 		this.followTarget();
 	}
@@ -622,7 +625,7 @@ export class VolumeRenderer {
 	/** Backs the camera off along its current direction until the window fits. */
 	private fit() {
 		const g = this.grid;
-		const height = g ? (g.ny - 1) * g.sy : 384;
+		const height = this.shownY ? this.shownY.top - this.shownY.bottom : g ? (g.ny - 1) * g.sy : 384;
 		const width = (2 * R + 1) * VOLUME_TILE * Math.SQRT2; // seen corner on
 		const tan = Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2));
 		const dist = 1.1 * Math.max(height / (2 * tan), width / (2 * tan * this.camera.aspect));
@@ -853,11 +856,7 @@ export class VolumeRenderer {
 		u.ny.value = tile.ny;
 		u.cornersAcross.value = across;
 		this.box.visible = true;
-		if (!this.touched) {
-			// Centre on the world's height now that it's known.
-			this.controls.target.y = tile.minY + ((tile.ny - 1) * tile.sy) / 2;
-			this.fit();
-		}
+		// Placing the box frames the camera on the heights now that they're known.
 		this.placeBox();
 	}
 
@@ -972,6 +971,7 @@ export class VolumeRenderer {
 		const maxY = g ? g.minY + (g.ny - 1) * g.sy : 320;
 		const bottom = Math.max(minY, Math.min(maxY - 1, s.bottomY));
 		const top = Math.max(bottom + 1, Math.min(maxY, s.topY));
+		this.frameY(bottom, top);
 		const min = new THREE.Vector3(x0, bottom, z0);
 		const max = new THREE.Vector3(x0 + Math.max(1, span * s.cutX), top, z0 + Math.max(1, span * s.cutZ));
 		(this.uniforms.boxMin.value as THREE.Vector3).copy(min);
@@ -983,6 +983,29 @@ export class VolumeRenderer {
 			m.position.copy(mid);
 		}
 		(this.uniforms.wrap.value as THREE.Vector2).set(mod(this.origin.x, W * VOLUME_TILE), mod(this.origin.z, W * VOLUME_TILE));
+	}
+
+	/**
+	 * Keeps the drawn heights in the middle of the view: when Bottom or Top
+	 * change, the camera moves up or down by as much as the middle of the
+	 * box did, so a thin slice such as 0 to 64 isn't left at the bottom of
+	 * the screen. Before the camera has been moved by hand, it is fitted to
+	 * the box again too.
+	 */
+	private frameY(bottom: number, top: number) {
+		const was = this.shownY;
+		// Without tiles the heights are only guesses; wait for the grid they're clamped to.
+		if (!this.grid || (was && was.bottom === bottom && was.top === top)) return;
+		this.shownY = { bottom, top };
+		// A remembered camera is already where it was left.
+		if (!was && this.restored) return;
+		const mid = (bottom + top) / 2;
+		// A camera moved by hand keeps its offset from the middle; otherwise it looks at the middle.
+		const dy = mid - (was && this.touched ? (was.bottom + was.top) / 2 : this.controls.target.y);
+		this.controls.target.y += dy;
+		this.camera.position.y += dy;
+		if (this.touched) this.controls.update();
+		else this.fit();
 	}
 
 	/** While the view moves, draw at half resolution, then sharpen once it has been still a moment. */
