@@ -594,6 +594,8 @@ test('the 3D density view samples tiles around the camera and travels', async ({
 });
 
 test('the 3D density view picks a threshold that shows something', async ({ page }) => {
+	// It waits for tiles twice, which is slow without a GPU.
+	test.setTimeout(120_000);
 	await page.goto('./');
 	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
 	// Never negative, so a threshold of 0 would draw nothing.
@@ -639,7 +641,7 @@ test('the 3D density view picks a threshold that shows something', async ({ page
 			if (!tops.length) return false;
 			const mid = tops.reduce((a, b) => a + b, 0) / tops.length;
 			return Math.abs(mid / at.height - 0.5) < 0.08;
-		})
+		}, { timeout: 45_000 })
 		.toBe(true);
 });
 
