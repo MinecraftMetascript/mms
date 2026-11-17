@@ -1978,3 +1978,63 @@ test('a pinned spline from another file takes edits while that file is not open'
 	await expect(page.locator('.cm-line', { hasText: 'SplinePoint(1, 0.75, 1)' })).toBeVisible({ timeout: 10_000 });
 	expect(errors).toEqual([]);
 });
+
+test('the sidebar hides, and the sidebar and the editor resize by dragging, after a reload too', async ({ page }) => {
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	const sidebar = page.getByTestId('sidebar');
+	const editor = page.locator('section', { has: page.locator('.cm-editor') });
+	const width = async (l: typeof sidebar) => (await l.boundingBox())!.width;
+	await expect(sidebar).toBeVisible();
+
+	// Dragging the sidebar's edge widens it.
+	const sideHandle = page.getByRole('separator', { name: 'Resize the sidebar' });
+	let box = (await sideHandle.boundingBox())!;
+	await page.mouse.move(box.x + 2, box.y + 200);
+	await page.mouse.down();
+	await page.mouse.move(box.x + 102, box.y + 200, { steps: 5 });
+	await page.mouse.up();
+	expect(Math.round(await width(sidebar))).toBe(308);
+
+	// Dragging the editor's edge gives it more room than the preview.
+	const preview = page.locator('section', { has: page.getByRole('tablist') });
+	const split = page.getByRole('separator', { name: 'Resize the editor and the preview' });
+	box = (await split.boundingBox())!;
+	await page.mouse.move(box.x + 2, box.y + 200);
+	await page.mouse.down();
+	await page.mouse.move(box.x + 202, box.y + 200, { steps: 5 });
+	await page.mouse.up();
+	const ed = await width(editor);
+	const pv = await width(preview);
+	expect(ed).toBeGreaterThan(pv + 300);
+
+	// The button and Ctrl/Cmd+B hide and show the sidebar; hidden, the editor takes its room.
+	await page.getByRole('button', { name: 'Hide the sidebar' }).click();
+	await expect(sidebar).toBeHidden();
+	expect(await width(editor)).toBeGreaterThan(ed + 100);
+	await page.locator('.cm-content').click();
+	await page.keyboard.press('ControlOrMeta+b');
+	await expect(sidebar).toBeVisible();
+	await page.keyboard.press('ControlOrMeta+b');
+	await expect(sidebar).toBeHidden();
+
+	// All of it is remembered.
+	await page.waitForTimeout(400);
+	await page.reload();
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	await expect(sidebar).toBeHidden();
+	await page.getByRole('button', { name: 'Show the sidebar' }).click();
+	await expect(sidebar).toBeVisible();
+	expect(Math.round(await width(sidebar))).toBe(308);
+	expect(Math.abs((await width(editor)) - ed)).toBeLessThan(2);
+
+	// Double-clicking a handle resets it; dragging the sidebar to the edge hides it.
+	await split.dblclick();
+	expect(Math.abs((await width(editor)) - (await width(preview)))).toBeLessThan(2);
+	box = (await sideHandle.boundingBox())!;
+	await page.mouse.move(box.x + 2, box.y + 200);
+	await page.mouse.down();
+	await page.mouse.move(20, box.y + 200, { steps: 5 });
+	await page.mouse.up();
+	await expect(sidebar).toBeHidden();
+});
