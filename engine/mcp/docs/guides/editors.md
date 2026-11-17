@@ -9,6 +9,8 @@ MMS has two editors: the [web editor](https://minecraftmetascript.github.io/mms/
 
 A project moves between them as a zip: **Export project zip** and **Import zip…** in the web editor's project menu.
 
+In the web editor, the button left of the file name, or Ctrl/⌘+B, hides the sidebar. Drag the lines between the sidebar, the text and the preview to resize them, and double-click one to reset it. The layout is kept in your browser.
+
 ## While you type
 
 These work the same in both editors.

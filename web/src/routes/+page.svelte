@@ -22,9 +22,10 @@
 	import { requestPersistence } from '#lib/project/store.ts';
 	import { applySplineEdits, followEdit, readSpline, trackPos, type SplineTrack } from '#lib/engine/spline.ts';
 	import Dropdown from '#lib/components/Dropdown.svelte';
-	import { fixAllKeys, formatKeys, mod, quickFixKeys } from '#lib/editor/shortcuts.ts';
+	import { fixAllKeys, formatKeys, mac, mod, quickFixKeys } from '#lib/editor/shortcuts.ts';
 	import { bookPageAt, PinButton, PreviewPane, shows, storedMemory, type SplineAt, type SplineEdit } from '@mms/preview';
 	import PreviewWorker from '@mms/preview/worker?worker';
+	import { Layout, editorDefault, editorMax, editorMin, sidebarDefault, sidebarMax, sidebarMin } from '#lib/layout.svelte.ts';
 
 	const project = new Project();
 	// What each preview was left showing, per declaration, kept in this browser for each project.
@@ -48,7 +49,74 @@
 	let about = $state<ReturnType<typeof AboutDialog> | null>(null);
 	let builtinViewer = $state<ReturnType<typeof BuiltinViewer> | null>(null);
 
+	// The sidebar can be hidden (Ctrl/Cmd+B), and the handles between the
+	// columns drag to resize them; both are remembered in this browser.
+	const layout = new Layout();
+	let mainBox = $state<HTMLElement | null>(null);
+	const columns = $derived(
+		(layout.sidebarOpen ? `${layout.sidebarWidth}px auto ` : '') + `minmax(0,${layout.editorShare}fr) auto minmax(0,${100 - layout.editorShare}fr)`
+	);
+	// Follows the pointer until it is let go, with how far it has moved;
+	// the handle stays where it was grabbed.
+	function drag(e: PointerEvent, by: (dx: number, width: number) => void) {
+		if (e.button !== 0) return;
+		e.preventDefault();
+		const handle = e.currentTarget as HTMLElement;
+		handle.setPointerCapture(e.pointerId);
+		const x0 = e.clientX;
+		const move = (m: PointerEvent) => by(m.clientX - x0, mainBox?.getBoundingClientRect().width ?? 0);
+		const up = () => {
+			handle.removeEventListener('pointermove', move);
+			handle.removeEventListener('pointerup', up);
+			handle.removeEventListener('pointercancel', up);
+		};
+		handle.addEventListener('pointermove', move);
+		handle.addEventListener('pointerup', up);
+		handle.addEventListener('pointercancel', up);
+	}
+	// A sidebar dragged to under half its narrowest hides, as in VS Code.
+	function dragSidebar(e: PointerEvent) {
+		const w0 = layout.sidebarWidth;
+		drag(e, (dx) => {
+			if (w0 + dx >= sidebarMin / 2) layout.setSidebarWidth(w0 + dx);
+			else if (layout.sidebarOpen) layout.toggleSidebar();
+		});
+	}
+	// The editor's share is of the room right of the sidebar and the handles.
+	function dragEditor(e: PointerEvent) {
+		const share0 = layout.editorShare;
+		drag(e, (dx, width) => {
+			const room = width - (layout.sidebarOpen ? layout.sidebarWidth + 4 : 0) - 4;
+			if (room > 0) layout.setEditorShare(share0 + (dx / room) * 100);
+		});
+	}
+	function keySidebar(e: KeyboardEvent) {
+		const step = e.shiftKey ? 64 : 16;
+		if (e.key === 'ArrowLeft') layout.setSidebarWidth(layout.sidebarWidth - step);
+		else if (e.key === 'ArrowRight') layout.setSidebarWidth(layout.sidebarWidth + step);
+		else if (e.key === 'Home') layout.setSidebarWidth(sidebarMin);
+		else if (e.key === 'End') layout.setSidebarWidth(sidebarMax);
+		else return;
+		e.preventDefault();
+	}
+	function keyEditor(e: KeyboardEvent) {
+		const step = e.shiftKey ? 10 : 2;
+		if (e.key === 'ArrowLeft') layout.setEditorShare(layout.editorShare - step);
+		else if (e.key === 'ArrowRight') layout.setEditorShare(layout.editorShare + step);
+		else if (e.key === 'Home') layout.setEditorShare(editorMin);
+		else if (e.key === 'End') layout.setEditorShare(editorMax);
+		else return;
+		e.preventDefault();
+	}
+	function onkeydown(e: KeyboardEvent) {
+		if (e.key.toLowerCase() === 'b' && (mac ? e.metaKey && !e.ctrlKey : e.ctrlKey && !e.metaKey) && !e.shiftKey && !e.altKey) {
+			e.preventDefault();
+			layout.toggleSidebar();
+		}
+	}
+
 	onMount(() => {
+		layout.load();
 		try {
 			theme = (localStorage.getItem('mms-theme') as typeof theme) ?? 'system';
 		} catch {
@@ -505,6 +573,8 @@
 	);
 </script>
 
+<svelte:window {onkeydown} />
+
 <div class="flex h-dvh flex-col">
 	<header class="flex items-center gap-2 border-b border-line bg-panel px-3 py-2">
 		<span class="flex shrink-0 items-center"><Logo class="h-6 w-auto sm:hidden" wordmark={false} /><Logo class="hidden h-6 w-auto sm:block" /></span>
@@ -591,14 +661,47 @@
 		</div>
 	</header>
 
-	<main class="grid min-h-0 flex-1 grid-cols-1 grid-rows-[minmax(0,1fr)_minmax(0,1fr)] md:grid-cols-[13rem_minmax(0,1fr)_minmax(0,1fr)] md:grid-rows-1">
-		<aside class="hidden min-h-0 border-r border-line bg-panel md:block">
+	<main
+		class="grid min-h-0 flex-1 grid-cols-1 grid-rows-[minmax(0,1fr)_minmax(0,1fr)] md:grid-cols-(--cols) md:grid-rows-1"
+		style:--cols={columns}
+		bind:this={mainBox}
+	>
+		<!-- Hidden rather than removed, so the sidebar keeps its tab and open folders. -->
+		<aside class="hidden min-h-0 min-w-0 bg-panel {layout.sidebarOpen ? 'md:block' : ''}" data-testid="sidebar">
 			{#if engine}
 				<Sidebar {project} {engine} {selectedOutput} onoutput={selectOutput} onsymbol={(uri: string, s: DocSymbol) => reveal(uri, s.selectionRange)} />
 			{/if}
 		</aside>
-		<section class="flex min-h-0 flex-col border-b border-line md:border-r md:border-b-0">
+		{#if layout.sidebarOpen}
+			<!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
+			<div
+				role="separator"
+				tabindex="0"
+				aria-orientation="vertical"
+				aria-label="Resize the sidebar"
+				aria-valuenow={layout.sidebarWidth}
+				aria-valuemin={sidebarMin}
+				aria-valuemax={sidebarMax}
+				title="Drag to resize the sidebar, or to the edge to hide it. Double-click to reset."
+				class="hidden w-1 cursor-col-resize touch-none bg-line hover:bg-accent focus-visible:bg-accent focus-visible:outline-none md:block"
+				onpointerdown={dragSidebar}
+				ondblclick={() => layout.setSidebarWidth(sidebarDefault)}
+				onkeydown={keySidebar}
+			></div>
+		{/if}
+		<section class="flex min-h-0 min-w-0 flex-col border-b border-line md:border-b-0">
 			<div class="flex items-center gap-1 border-b border-line bg-panel px-2 py-1 text-sm">
+				<button
+					class="hidden shrink-0 rounded p-1 text-muted hover:bg-hover hover:text-ink md:block"
+					onclick={() => layout.toggleSidebar()}
+					aria-label={layout.sidebarOpen ? 'Hide the sidebar' : 'Show the sidebar'}
+					title="{layout.sidebarOpen ? 'Hide' : 'Show'} the sidebar ({mod}+B)"
+					><svg viewBox="0 0 16 16" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true">
+						<rect x="1.5" y="2.5" width="13" height="11" rx="1.5" />
+						<path d="M5.5 2.5v11" />
+						{#if layout.sidebarOpen}<path d="M2 3h3.5v10H2z" fill="currentColor" stroke="none" opacity="0.5" />{/if}
+					</svg></button
+				>
 				<select class="min-w-0 flex-1 rounded border border-line bg-panel px-1 py-0.5 md:hidden" bind:value={project.active} aria-label="File">
 					{#each project.files as f (f.path)}<option value={f.path}>{f.path}</option>{/each}
 				</select>
@@ -641,7 +744,22 @@
 			{/if}
 			</div>
 		</section>
-		<section class="flex min-h-0 flex-col bg-panel">
+		<!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
+		<div
+			role="separator"
+			tabindex="0"
+			aria-orientation="vertical"
+			aria-label="Resize the editor and the preview"
+			aria-valuenow={layout.editorShare}
+			aria-valuemin={editorMin}
+			aria-valuemax={editorMax}
+			title="Drag to share the room between the editor and the preview. Double-click to reset."
+			class="hidden w-1 cursor-col-resize touch-none bg-line hover:bg-accent focus-visible:bg-accent focus-visible:outline-none md:block"
+			onpointerdown={dragEditor}
+			ondblclick={() => layout.setEditorShare(editorDefault)}
+			onkeydown={keyEditor}
+		></div>
+		<section class="flex min-h-0 min-w-0 flex-col bg-panel">
 			<div class="flex border-b border-line text-xs" role="tablist">
 				{#each [['preview', 'Preview'], ['json', 'JSON'], ['expanded', 'Expanded'], ...(engine?.hasTests ? [['tests', testsLabel]] : []), ...(hasJigsaw ? [['jigsaw', 'Jigsaw']] : []), ['world', 'World']] as [id, label] (id)}
 					<button
