@@ -144,6 +144,13 @@
 	const topBlocks = $derived(flat && canDown && mode === 'blocks');
 	/** The side view's y while top-down terrain looks down from the top of the world. */
 	let sideY: number | null = null;
+	/**
+	 * The heights a side view of density draws, either end left open with
+	 * null: the rest stays empty and out of the colour range.
+	 */
+	let yBounds = $state<{ bottom: number | null; top: number | null }>({ bottom: null, top: null });
+	/** Whether the Bottom and Top heights apply: density seen from the side. */
+	const boundsY = $derived(!!info && mode === 'density' && !flat && (info.kind === 'density_function' || info.kind === 'noise_settings'));
 
 	/** A switch remembered in this browser. */
 	function storedFlag(key: string, fallback: boolean): boolean {
@@ -544,6 +551,7 @@
 				request();
 				return;
 			}
+			yBounds = { bottom: null, top: null };
 			if (!sameKind) {
 				mode = modesOf[info.kind][0];
 				view = defaultView(info.kind, mode);
@@ -579,6 +587,7 @@
 			focus,
 			rangeMode,
 			customRange: $state.snapshot(customRange),
+			yBounds: $state.snapshot(yBounds),
 			seed
 		};
 		// Saved once the target effect has shown this target, so a new
@@ -606,6 +615,9 @@
 		focus = text(r.focus, '');
 		rangeMode = rangeModes.includes(r.rangeMode as RangeMode) ? (r.rangeMode as RangeMode) : 'auto';
 		customRange = restore({ lo: -1, hi: 1 }, r.customRange);
+		const b = record(r.yBounds);
+		const height = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+		yBounds = { bottom: height(b?.bottom), top: height(b?.top) };
 		seed = text(r.seed, seed);
 		view.scale = Math.min(view.scale, maxScale());
 		lock = null;
@@ -676,6 +688,10 @@
 			setBusy(true);
 			if (mode === 'iso' || topBlocks) startHelpers();
 			const sent: PreviewView = { ...$state.snapshot(view), down: lookDown && canDown, blocks: mode === 'density' && blockValues };
+			if (boundsY) {
+				if (yBounds.bottom !== null) sent.bottomY = yBounds.bottom;
+				if (yBounds.top !== null) sent.topY = yBounds.top;
+			}
 			sentViews.set(seq + 1, { view: mode === 'iso' ? $state.snapshot(isoView) : sent, flat, resolution, mode });
 			worker.postMessage({
 				type: 'render',
@@ -923,6 +939,40 @@
 		draw();
 	}
 	/** Sets one camera coordinate from an input, ignoring what isn't a number yet. */
+	/**
+	 * Sets Bottom or Top (blank leaves that end open), then frames the
+	 * heights drawn: the camera moves to their middle and, with both ends
+	 * set, zooms so they fill most of the view's height.
+	 */
+	function setBound(end: 'bottom' | 'top', value: string) {
+		const n = Number(value);
+		const v = value.trim() === '' || !Number.isFinite(n) ? null : Math.round(n);
+		const next = { ...yBounds, [end]: v };
+		// Keep at least one block between them, moving the other end.
+		if (next.bottom !== null && next.top !== null && next.top <= next.bottom) {
+			if (end === 'bottom') next.top = next.bottom + 1;
+			else next.bottom = next.top - 1;
+		}
+		yBounds = next;
+		frameBounds();
+		request();
+	}
+	function frameBounds() {
+		const { bottom, top } = yBounds;
+		if (bottom === null && top === null) return;
+		if (bottom !== null && top !== null) {
+			view.y = (bottom + top) / 2;
+			const h = frame().h;
+			view.scale = Math.min(maxScale(), Math.max(1 / 16, ((top - bottom) * 1.15) / h));
+		} else {
+			// One end: bring it a quarter of the way in from its edge of the view.
+			const half = (frame().h / 2) * view.scale;
+			if (bottom !== null) view.y = bottom + half / 2;
+			else view.y = top! - half / 2;
+		}
+		lock = null;
+	}
+
 	function setCoord(axis: 'x' | 'y' | 'z', value: string) {
 		const n = Number(value);
 		if (value.trim() === '' || !Number.isFinite(n)) return;
@@ -1338,6 +1388,23 @@
 					{/if}
 				</div>
 			{/if}
+			{#if boundsY}
+				<div class="flex items-center gap-1" role="group" aria-label="Heights" title="Draw only the heights from Bottom up to Top (blank: no limit), and fit the view to them">
+					{#each [['bottom', 'Bottom'], ['top', 'Top']] as const as [end, name] (end)}
+						<label class="flex items-center gap-1">
+							{name}
+							<input
+								type="number"
+								aria-label="{name} y"
+								placeholder="any"
+								class="w-16 rounded border border-line bg-panel px-1.5 py-0.5 text-ink"
+								value={yBounds[end] ?? ''}
+								onchange={(e) => setBound(end, e.currentTarget.value)}
+							/>
+						</label>
+					{/each}
+				</div>
+			{/if}
 			{#if mode !== 'iso' && mode !== 'volume'}
 				<div class="flex items-center gap-0.5" role="group" aria-label="Overlays">
 					<button
@@ -1388,6 +1455,7 @@
 						sideY = null;
 						fitTop(false);
 						lock = null;
+						if (boundsY) frameBounds();
 					}
 					request();
 				}}>Reset view</button

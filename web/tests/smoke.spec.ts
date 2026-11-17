@@ -187,6 +187,29 @@ test('density previews use the picked palette over the range in view', async ({ 
 	expect(errors).toEqual([]);
 });
 
+test('a side view of density draws only the heights between Bottom and Top, framed', async ({ page }) => {
+	await page.goto('./');
+	await expect(status(page)).toHaveText(/No problems/, { timeout: 30_000 });
+	// Its value is y / 512, so the colour range in view says which heights were drawn.
+	await replaceText(page, 'DensityFunction grad = Gradient(axis = y, from_coordinate = 0, to_coordinate = 512, from_value = 0, to_value = 1)\n');
+	await expect(status(page)).toHaveText(/No problems/);
+	await page.locator('.cm-line').first().click();
+	const scale = page.getByLabel('Value scale');
+	await expect(scale).toContainText(/in view/, { timeout: 20_000 });
+	const bottom = page.getByLabel('Bottom y', { exact: true });
+	const top = page.getByLabel('Top y', { exact: true });
+	await bottom.fill('100');
+	await bottom.press('Enter');
+	await top.fill('164');
+	await top.press('Enter');
+	// The camera moves to their middle and zooms so 64 blocks fill most of the view.
+	const view = async () => JSON.parse((await page.locator('canvas[data-view]').getAttribute('data-view'))!);
+	await expect.poll(async () => (await view()).y).toBe(132);
+	expect((await view()).scale).toBeLessThan(0.5);
+	// Only 100 to 164 is sampled: about 0.195 to 0.320 in view.
+	await expect(scale).toContainText(/in view 0\.19\d … 0\.32\d/, { timeout: 20_000 });
+});
+
 test('the preview shows a grid, and per-block values when asked', async ({ page }) => {
 	const errors: string[] = [];
 	page.on('pageerror', (e) => errors.push(e.message));

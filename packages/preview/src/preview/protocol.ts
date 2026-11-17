@@ -89,6 +89,18 @@ export interface PreviewView {
 	 * sampled at its centre, between blocks. Only density views use it.
 	 */
 	blocks?: boolean;
+	/**
+	 * A side view of density draws only the heights from bottomY up to
+	 * topY (either may be left out); the rest is left empty, unsampled, and
+	 * out of the colour range.
+	 */
+	bottomY?: number;
+	topY?: number;
+}
+
+/** Whether a side view's y falls outside the heights it draws (see PreviewView.bottomY). */
+export function outsideY(view: PreviewView, y: number): boolean {
+	return !view.down && ((view.bottomY !== undefined && y < view.bottomY) || (view.topY !== undefined && y > view.topY));
 }
 
 export interface PreviewOptions {
